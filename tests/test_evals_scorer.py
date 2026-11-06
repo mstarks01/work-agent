@@ -28,6 +28,7 @@ from evals.harness.scorer import (
     position_fate,
     score_case,
     unlisted_for_promotion,
+    vote_coverage,
 )
 from tests.eval_factories import (
     ScriptedMatcher,
@@ -264,6 +265,53 @@ class TestTheRejectedRateCarriesItsDenominators:
         assert (score.eligible_count, score.reviewed_count) == (2, 1)
         assert score.rejected_rate == 0.5
         assert score.rejected_rate_of_reviewed == 1.0
+
+    @pytest.mark.parametrize(
+        ("votes_cast", "reviewed", "rate"),
+        [
+            pytest.param(("down", "stale"), 1, 1.0, id="current-and-stale"),
+            pytest.param(("stale", "stale"), 0, 0.0, id="all-stale"),
+            pytest.param(("up", "stale", None), 1, 0.0, id="mixed"),
+        ],
+    )
+    def test_a_stale_finding_is_eligible_and_not_reviewed(
+        self, case, votes_cast, reviewed, rate
+    ):
+        """#2202: a vote on an earlier argument answers nothing in this run."""
+        produced = [
+            produced_threat(1, "spoofing", "A"),
+            produced_threat(2, "tampering", "B"),
+            produced_threat(3, "repudiation", "C"),
+        ][: len(votes_cast)]
+        earlier = TestAStandingIsAboutTheArgumentAndNotTheKey._reargued
+        ledger = []
+        for threat, cast_vote in zip(produced, votes_cast, strict=True):
+            if cast_vote == "stale":
+                ledger.append(
+                    vote_on(case, threat, "up", content=structural(earlier(threat)))
+                )
+            elif cast_vote == "down":
+                ledger.append(vote_on(case, threat, "down", reason="not-a-threat"))
+            elif cast_vote == "up":
+                ledger.append(vote_on(case, threat, "up"))
+
+        score = score_case(case, produced, ScriptedMatcher(), Ledger(ledger))
+
+        assert score.status_counts["stale"] == votes_cast.count("stale")
+        assert score.eligible_count == len(produced)
+        assert score.reviewed_count == reviewed
+        assert score.rejected_rate_of_reviewed == rate
+        assert vote_coverage({"scores": [score.to_json()]}) == (
+            reviewed,
+            len(produced),
+        ), "the published table counts the population the artifact counts"
+
+    def test_an_empty_population_has_no_coverage(self, case, no_votes):
+        score = score_case(case, [], ScriptedMatcher(), no_votes)
+
+        assert (score.eligible_count, score.reviewed_count) == (0, 0)
+        assert score.rejected_rate_of_reviewed == 0.0
+        assert vote_coverage({"scores": [score.to_json()]}) == (0, 0)
 
     def test_the_artifact_carries_all_three(self, case, no_votes):
         produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
@@ -537,6 +585,58 @@ def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case, no_votes):
     assert score.lane_errors[0].reference_category == "tampering"
     assert score.lane_accuracy == 0.0
     assert score.unlisted == ()  # already accounted for, not keyed twice
+
+
+@pytest.mark.parametrize("reverse", [False, True], ids=["as-filed", "reversed"])
+def test_lane_errors_do_not_depend_on_the_order_of_the_findings(
+    case, no_votes, reverse
+):
+    """#2202: one finding matches X and Y in another lane, the other only X.
+
+    A first-fit pass gave one lane error in one order and two in the other.
+    The maximum assignment gives two in both, and leaves the in-lane match
+    where the in-lane pass put it.
+    """
+    references = case.stride_claims()
+    x, y = [
+        index
+        for index, ref in enumerate(references)
+        if ref.category == "tampering" and index not in case.ruled_positions
+    ][:2]
+    in_lane = next(
+        ref
+        for index, ref in enumerate(references)
+        if ref.category == "spoofing" and index not in case.ruled_positions
+    )
+    produced = [
+        produced_threat(1, "spoofing", "Flexible"),
+        produced_threat(2, "spoofing", "Specific"),
+        produced_threat(3, "spoofing", "In lane"),
+    ]
+    if reverse:
+        produced.reverse()
+    matcher = ScriptedMatcher(
+        [
+            (references[x].claim, "Flexible"),
+            (references[y].claim, "Flexible"),
+            (references[x].claim, "Specific"),
+            (in_lane.claim, "In lane"),
+        ]
+    )
+
+    score = score_case(case, produced, matcher, no_votes)
+
+    pairs = {(error.threat_id, error.reference_index) for error in score.lane_errors}
+    assert pairs == {
+        (produced_threat(1, "spoofing", "Flexible").id, y),
+        (produced_threat(2, "spoofing", "Specific").id, x),
+    }
+    assert score.lane_accuracy == pytest.approx(1 / 3)
+    assert [pair.reference_index for pair in score.matched] == [
+        references.index(in_lane)
+    ]
+    assert x in score.missed and y in score.missed, "a misfiled finding is a miss"
+    assert score.unlisted == (), "a lane error is not keyed again"
 
 
 def test_severity_calibration_is_arithmetic(case, no_votes):

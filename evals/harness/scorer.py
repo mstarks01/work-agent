@@ -54,7 +54,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_args
 
 from analysis_service.claim_identity import NO_ROWS, mechanism_of
 from analysis_service.claims import (
@@ -69,6 +69,7 @@ from evals.harness.fingerprint import key_claim
 from evals.harness.identity import CaseFlows, ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
+from evals.harness.standings import SubstanceClass
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases
@@ -337,13 +338,16 @@ class CaseScore:
 
     @property
     def reviewed_count(self) -> int:
-        """How many eligible findings a person has actually answered.
+        """How many eligible findings a live vote answers.
 
         The numerator's real denominator. Rejections can only come from here,
         so a rate over ``produced_count`` beside a ``reviewed_count`` of zero
-        is not a low false-positive rate — it is no measurement at all.
+        is not a low false-positive rate — it is no measurement at all. A
+        ``stale`` finding is eligible and not reviewed: its vote judged an
+        earlier argument.
         """
-        return self.eligible_count - self.status_counts["unvoted"]
+        answered, _ = review_coverage(self.status_counts)
+        return answered
 
     @property
     def rejected_rate(self) -> float:
@@ -437,6 +441,23 @@ _VOTE_STATUSES: tuple[VoteStatus, ...] = (
     "unvoted",
     "stale",
 )
+
+#: The statuses a live vote gives, which are the statuses that answer the
+#: argument this run produced. ``unvoted`` and ``stale`` are eligible and
+#: unanswered.
+_ANSWERED: tuple[SubstanceClass, ...] = get_args(SubstanceClass)
+
+
+def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
+    """(answered, eligible) over one score row's vote-status counts.
+
+    The one reader of which statuses answer a finding. The scorer's
+    ``reviewed`` count, the published table's coverage and the gain gate's
+    unanswered count all read it, so the three agree on one population.
+    """
+    answered = sum(counts.get(status, 0) for status in _ANSWERED)
+    eligible = sum(counts.get(status, 0) for status in _VOTE_STATUSES)
+    return answered, eligible
 
 
 def ratio(numerator: float, denominator: float) -> float:
@@ -708,15 +729,20 @@ def _find_lane_errors(
     Bounded on purpose: a produced threat that already consumed a reference
     cannot also be evidence of a lane error, and a reference that matched is
     not missing.
+
+    Every cross-lane pair is ruled, and :func:`_assign` takes the maximum
+    one-to-one assignment over the matches, so the count of lane errors does
+    not depend on the order of ``produced``. The threats are tried in ID
+    order, so a reordered run also assigns the same pairs.
     """
-    errors: list[LaneError] = []
-    claimed_references: set[int] = set()
-    for position in unmatched_positions:
+    references = case.stride_claims()
+    candidates: dict[int, list[int]] = {}
+    rationales: dict[tuple[int, int], str] = {}
+    for position in sorted(unmatched_positions, key=lambda at: produced[at].id):
         threat = produced[position]
         for reference_index in missed:
-            reference = case.stride_claims()[reference_index]
-            already_used = reference_index in claimed_references
-            if reference.category == threat.category or already_used:
+            reference = references[reference_index]
+            if reference.category == threat.category:
                 continue
             ruling, _ = _rule(matcher, case, reference_index, threat)
             rulings.append(
@@ -729,20 +755,23 @@ def _find_lane_errors(
                     rationale=ruling.rationale,
                 )
             )
-            if not ruling.match:
-                continue
-            claimed_references.add(reference_index)
-            errors.append(
-                LaneError(
-                    threat_id=threat.id,
-                    produced_category=threat.category,
-                    reference_index=reference_index,
-                    reference_category=reference.category,
-                    rationale=ruling.rationale,
-                )
-            )
-            break
-    return tuple(errors)
+            if ruling.match:
+                candidates.setdefault(reference_index, []).append(position)
+                rationales[reference_index, position] = ruling.rationale
+
+    assignment = _assign(candidates, references)
+    return tuple(
+        LaneError(
+            threat_id=produced[position].id,
+            produced_category=produced[position].category,
+            reference_index=reference_index,
+            reference_category=references[reference_index].category,
+            rationale=rationales[reference_index, position],
+        )
+        for reference_index, position in sorted(
+            assignment.items(), key=lambda pair: pair[1]
+        )
+    )
 
 
 def _status_of_unmatched(
@@ -1006,13 +1035,13 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
 
 
 def vote_coverage(blocks: Mapping[str, Any]) -> tuple[int, int]:
-    """(answered, total) unmatched findings, so a reader can weigh the row."""
+    """(answered, eligible) unmatched findings, so a reader can weigh the row."""
     rows = blocks.get("scores") or []
     total = answered = 0
     for row in rows:
         counts = row.get("counts", {}) if isinstance(row, Mapping) else {}
-        here = sum(counts.get(name, 0) for name in ("rejected", "pooled", "open"))
-        total += here + counts.get("unvoted", 0)
+        here, eligible = review_coverage(counts)
+        total += eligible
         answered += here
     return answered, total
 

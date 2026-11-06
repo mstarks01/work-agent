@@ -73,6 +73,16 @@ class TestTheNegativeControl:
         assert verdicts["volume"] == "fail"
         assert verdicts["reviewed"] == "fail"
 
+    def test_a_flood_whose_votes_are_all_stale_fails_on_review(self):
+        """#2202: a vote on an earlier argument answers nothing in this run."""
+        candidate = _gained(_baseline(), added=6, voted=True)
+        for row in candidate["scores"]:
+            row["counts"]["stale"] = 6
+
+        readings = gain.read(_baseline(), candidate, "stride", spread=SPREAD)[0]
+
+        assert _verdicts(readings)["reviewed"] == "fail"
+
     def test_a_flood_somebody_voted_on_still_fails_on_volume(self):
         """Votes do not launder volume: the two halves are separate gates."""
         readings = gain.read(

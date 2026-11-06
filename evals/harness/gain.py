@@ -58,6 +58,7 @@ from evals.harness.promotion import (
     in_spreads,
     read_spread,
 )
+from evals.harness.scorer import review_coverage
 
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.
@@ -119,10 +120,12 @@ def _stride_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     return _mean([row["counts"]["eligible"] for row in cases.rows(blocks, "scores")])
 
 
-def _stride_unvoted(blocks: Mapping[str, Any], cases: Cases) -> float | None:
-    """Unmatched findings no vote answers, summed over the cases."""
-    rows = cases.rows(blocks, "scores")
-    return float(sum(row["counts"]["unvoted"] for row in rows)) if rows else None
+def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
+    """Unmatched findings no live vote answers, summed over the cases."""
+    coverage = [review_coverage(row["counts"]) for row in cases.rows(blocks, "scores")]
+    if not coverage:
+        return None
+    return float(sum(eligible - answered for answered, eligible in coverage))
 
 
 def _stride_rejected(blocks: Mapping[str, Any], cases: Cases) -> float | None:
@@ -147,7 +150,7 @@ class Readers:
     """One package's readers for the three gates. ``None`` is a stated absence."""
 
     volume: Reader
-    unvoted: Reader | None
+    unanswered: Reader | None
     rejected: Reader | None
     #: Why a vote reader is absent, printed where its gate reads.
     absent: str = ""
@@ -160,12 +163,12 @@ READERS: Mapping[FrameworkName, Readers] = MappingProxyType(
     {
         "stride": Readers(
             volume=_stride_volume,
-            unvoted=_stride_unvoted,
+            unanswered=_stride_unanswered,
             rejected=_stride_rejected,
         ),
         "asvs": Readers(
             volume=_asvs_volume,
-            unvoted=None,
+            unanswered=None,
             rejected=None,
             absent=(
                 "the applicability rows carry no vote standing: an over-applied"
@@ -289,7 +292,7 @@ def _reader(framework: FrameworkName, gate: GainGateName) -> Reader | None:
     readers = READERS[framework]
     return {
         "volume": readers.volume,
-        "reviewed": readers.unvoted,
+        "reviewed": readers.unanswered,
         "rejected-rate": readers.rejected,
     }[gate]
 
