@@ -4,15 +4,15 @@ Calls the production CriticRound.view() with one Control whose row sits on an
 ASVS chapter and whose evidence is one file of max_source_bytes.
 """
 
-import json
 import sys
 
 from analysis_service.claims import AnalysisMarks
 from analysis_service.controls import Control, ControlDocument
 from analysis_service.critic_round import CriticRound
 from analysis_service.job_controls import CopiedControl
+from analysis_service.markdown_loader import estimate_tokens
 from analysis_service.resilience import load_resilience
-from analysis_service.sources import text_digest
+from analysis_service.sources import render_fenced, text_digest
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_critic_controls import (
@@ -52,7 +52,8 @@ def _app_control(text: str):
     )
 
 
-def view_bytes(drafts: int, text: str) -> int:
+def rendered_view(drafts: int, text: str) -> str:
+    """The draft view as the critic request renders it, over ``drafts`` drafts."""
     items = [_asvs_draft(f"V11.2.{n}", "store:orders-db") for n in range(1, drafts + 1)]
     critic_round = CriticRound.of(
         "asvs",
@@ -62,15 +63,16 @@ def view_bytes(drafts: int, text: str) -> int:
         None,
         _applied(_app_control(text)),
     )
-    return len(json.dumps(critic_round.view()))
+    return render_fenced(critic_round.view())
 
 
 def main() -> None:
     text = ("Storage is encrypted with AES-256. " * 3000)[:MAX_SOURCE_BYTES]
     for drafts in map(int, sys.argv[1:]):
-        size = view_bytes(drafts, text)
+        view = rendered_view(drafts, text)
+        size, tokens = len(view.encode()), estimate_tokens(view)
         print(
-            f"{drafts:3d} drafts: view {size:>10,} bytes, about {size // 4:>9,} tokens"
+            f"{drafts:3d} drafts: view {size:>10,} bytes, {tokens:>9,} estimated tokens"
         )
 
 
