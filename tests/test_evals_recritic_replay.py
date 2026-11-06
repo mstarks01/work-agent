@@ -11,8 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-from types import SimpleNamespace
-from typing import cast, get_args
+from typing import get_args
 
 import pytest
 
@@ -93,8 +92,7 @@ def faults_for(archived, refused_by=None) -> recritic_replay.FaultSet:
 
 
 def sent_and_rebuilt(seen, archived, reask):
-    """The user turns a node sent with the rebuilt re-ask instruction, or None,
-    and the rebuilt user turn."""
+    """The turns sent with the rebuilt instruction, or None, and the rebuilt turn."""
     instruction, turn = asyncio.run(
         recritic_replay.compose(archived, reask, PACKAGE_LOADER, PROMPT_LOADER)
     )
@@ -180,15 +178,18 @@ def test_a_confirmed_exclusion_is_the_one_fault_on_an_asvs_draft():
         id=draft.id,
         verdict=ProposedVerdict(rejected_because="evidence", reason="not applicable"),
     )
-    archived = cast(
-        critic_replay.Archived, SimpleNamespace(drafts=[draft], model=valid_model())
-    )
     faults = recritic_replay.FaultSet(
         control=EVERY_LANE, refused={}, control_reasons={}
     )
 
     faulty, faulted = recritic_replay.inject(
-        archived, [ruled], faults, frozenset(), draft.id, "confirmed-ruled-out"
+        [draft],
+        valid_model(),
+        [ruled],
+        faults,
+        frozenset(),
+        draft.id,
+        "confirmed-ruled-out",
     )
 
     problems = review_issues([draft], faulty, valid_model(), {})
@@ -437,7 +438,11 @@ def test_the_command_writes_the_repair_after_its_record(
             *loaded((PACKAGE_LOADER, PROMPT_LOADER)),
         )
     )
-    assert (held["draft"], held["fault"]) == (draft, "row-not-shown")
+    assert (held["draft"], held["fault"], held["faulted_id"]) == (
+        draft,
+        "row-not-shown",
+        draft,
+    )
     assert (held["remaining"], held["unbriefed"]) == ([], [])
 
 

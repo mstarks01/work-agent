@@ -43,7 +43,7 @@ import argparse
 import asyncio
 import json
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -54,6 +54,7 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.claims import (
+    Claim,
     ControlRowRef,
     FrameworkName,
     RefusedControl,
@@ -265,7 +266,8 @@ def _unknowns_with_a_foreign_attribute(
 
 
 def inject(
-    archived: Archived,
+    drafts: Sequence[Claim],
+    model: SystemModel,
     rulings: list[Ruling],
     faults: FaultSet,
     shown: frozenset[ControlRowRef],
@@ -282,7 +284,7 @@ def inject(
         (index, ruling) for index, ruling in enumerate(rulings) if ruling.id == draft_id
     )
     before, after = rulings[:index], rulings[index + 1 :]
-    faulted = draft_id
+    faulted_id = draft_id
     refused = list(ruling.verdict.refused_controls)
     if shape == "row-unanswered":
         changed = [_with(ruling, refused_controls=refused[1:])]
@@ -297,11 +299,11 @@ def inject(
     elif shape == "dropped":
         changed = []
     elif shape == "invented":
-        faulted = f"{draft_id}a"
-        if faulted in {draft.id for draft in archived.drafts}:
-            raise EvalRunError(f"a lane drafted {faulted}, so it is not invented")
+        faulted_id = f"{draft_id}a"
+        if faulted_id in {draft.id for draft in drafts}:
+            raise EvalRunError(f"a lane drafted {faulted_id}, so it is not invented")
         invented_ruling = _with(ruling, control_row=None, refused_controls=[])
-        changed = [ruling, invented_ruling.model_copy(update={"id": faulted})]
+        changed = [ruling, invented_ruling.model_copy(update={"id": faulted_id})]
     elif shape == "duplicate-id":
         changed = [ruling, ruling]
     elif shape == "verdict-shape":
@@ -309,16 +311,16 @@ def inject(
             raise EvalRunError(f"{draft_id} names no open fact")
         changed = [_with(ruling, rejected_because="reasoning")]
     elif shape == "confirmed-ruled-out":
-        draft = next(draft for draft in archived.drafts if draft.id == draft_id)
+        draft = next(draft for draft in drafts if draft.id == draft_id)
         if not type(draft).excludes(draft):
             raise EvalRunError(f"{draft_id} does not rule its unit out")
         changed = [_with(ruling, rejected_because=None, related_unknowns=[])]
     elif shape == "unresolved-unknown":
-        unknowns = _unknowns_with_a_foreign_attribute(ruling, archived.model)
+        unknowns = _unknowns_with_a_foreign_attribute(ruling, model)
         changed = [_with(ruling, related_unknowns=unknowns)]
     else:
         assert_never(shape)
-    return [*before, *changed, *after], faulted
+    return [*before, *changed, *after], faulted_id
 
 
 def fault_view(
@@ -352,17 +354,20 @@ def fault_view(
             "the first pass before the fault does not reconcile: "
             + "; ".join(clean.messages)
         )
-    faulty, faulted = inject(archived, rulings, faults, shown, draft_id, shape)
+    faulty, faulted_id = inject(
+        archived.drafts, archived.model, rulings, faults, shown, draft_id, shape
+    )
     outcome = critic_round.first(_emitted(faulty, archived.framework))
     if isinstance(outcome, Accepted):
         raise EvalRunError(f"the {shape} fault on {draft_id} gives no problem")
     named = [(problem.kind, problem.claim_id) for problem in outcome.problems]
-    if named != [(kind, faulted) for kind in PROBLEMS_BY_SHAPE[shape]]:
+    if named != [(kind, faulted_id) for kind in PROBLEMS_BY_SHAPE[shape]]:
         raise EvalRunError(
             f"the {shape} fault on {draft_id} does not give the"
-            f" {', '.join(PROBLEMS_BY_SHAPE[shape])} problems on {faulted}: {outcome.messages}"
+            f" problems {list(PROBLEMS_BY_SHAPE[shape])} on {faulted_id}:"
+            f" {outcome.messages}"
         )
-    return FaultView(draft_id, faulted, critic_round, clean, outcome)
+    return FaultView(draft_id, faulted_id, critic_round, clean, outcome)
 
 
 def stored(raw: str, framework: FrameworkName) -> list[Any]:
