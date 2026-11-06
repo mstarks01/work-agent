@@ -285,3 +285,52 @@ cover a `control` rejection.
 arm adds `control-e4.patch`, so its record reads `clean: false`. Offline, all
 seven views build in both run worktrees, and `confirmed-ruled-out` is refused
 on I-01 ("does not rule its unit out").
+
+## E4 result, added after the run
+
+The run read `523c6650` in both arms; the control arm adds `control-e4.patch`
+(`clean: false`, the `prompts/recritic.md` input digest `31e318e3`). The
+treatment arm's digest is `b20ec3cb`, the file on `main`. It spent $0.3255 for
+14 calls. The calls cost about $0.023 each, with no cached prefix, so repeat 1
+spent more than $0.20, and the rule of `run_e4.sh` ran no repeat 2.
+
+Each of the 14 files was read by hand against its `count.sh` line before the
+totals:
+
+- `dropped`: each arm returns I-01 alone, `needs-info`, with three open facts.
+  The control keeps the first pass's three. The treatment names one of them
+  as a `stored-copy-access` question on the config store. The check accepts
+  both.
+- `invented`: each arm returns `{"claims": []}`. The merge drops the first
+  pass's copy of I-01a, so the set reconciles.
+- `duplicate-id`, `verdict-shape` and `unresolved-unknown`: each arm returns
+  I-01 once, `needs-info`, with the first pass's three open facts and no
+  `rejected_because`. On `verdict-shape` both arms clear `rejected_because`
+  rather than drop the open facts. On `unresolved-unknown` both arms drop the
+  foreign attribute.
+- `control-row-missing` and `control-row-not-shown`: each arm returns I-02
+  rejected for `control`, with `control_row` on its `information-disclosure`
+  row, no `refused_controls` and no open fact.
+
+| View | Control | Treatment |
+|---|---|---|
+| `dropped` | repaired | repaired |
+| `invented` | repaired | repaired |
+| `duplicate-id` | repaired | repaired |
+| `verdict-shape` | repaired | repaired |
+| `unresolved-unknown` | repaired | repaired |
+| `control-row-missing` | repaired | repaired |
+| `control-row-not-shown` | repaired | repaired |
+
+**The five other kinds:** 5 of 5 repaired in each arm, 0 new problems, 0
+unbriefed changes, 0 status changes, 0 unread answers. The falsifier does not
+hold: the treatment repairs as many as the control and adds nothing the
+control does not.
+
+**The two control-rejection views:** 2 of 2 repaired in each arm. Without a
+step for a ruling rejected for `control`, the re-ask still names the
+`control_row` and drops the row it was not shown. These views give no reason
+to widen step 8.
+
+Not measured: `confirmed-ruled-out` (no ASVS archive of case 05), other cases,
+other drafts, and the spread: one call per view per arm.
