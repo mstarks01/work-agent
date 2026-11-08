@@ -103,9 +103,15 @@ const workspace = (() => {
     message(refused.length ? "Not deleted. " + refused.join(" ") : "Deleted " + counted(runs.length, "analysis", "analyses") + ".");
   };
   // Stop the analysis's run. A 204 says the run ended, and a 202 that it
-  // still ends; resolves to whether it ended and the page's message for it.
+  // still ends; resolves to whether it ended and the page's message for it,
+  // a lost connection included. Both Stop buttons read the outcome here.
   const stopRun = async (run) => {
-    const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    let response;
+    try {
+      response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    } catch {
+      return {ended: false, text: "Not stopped. The connection was interrupted."};
+    }
     if (response.status === 204) return {ended: true, text: "Stopped “" + run.name + "”."};
     if (response.status === 202) return {ended: false, text: "Stopping “" + run.name + "”. Its run ends after its current step."};
     return {ended: false, text: "Not stopped. " + ((await response.json().catch(() => ({}))).message || "Could not stop it.")};
@@ -215,8 +221,6 @@ const workspace = (() => {
               let text;
               try {
                 ({text} = await stopRun(run));
-              } catch {
-                text = "Not stopped. The connection was interrupted.";
               } finally {
                 stopping.delete(run.run);
               }

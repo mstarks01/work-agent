@@ -558,7 +558,7 @@ $("finish").addEventListener("click", async () => {
     res = await post("/api/finish", {
       case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
     });
-    d = await res.json();
+    d = await res.json().catch(() => ({}));
   } catch {
     res = null;
   } finally {
@@ -567,7 +567,7 @@ $("finish").addEventListener("click", async () => {
   }
   if (current !== id) { if (res?.ok) await loadRail(); return; }
   if (!res) { $("saveStatus").textContent = "The connection was interrupted. Record the review again."; return; }
-  if (!res.ok) { $("saveStatus").textContent = d.detail; return; }
+  if (!res.ok) { $("saveStatus").textContent = d.detail || "Not recorded. Try again."; return; }
   warn(d.moved);
   $("summary").textContent = markSummary();
   $("doneTitle").textContent = was ? "Changes saved" : "Recorded";
@@ -690,12 +690,13 @@ $("submit").addEventListener("click", async () => {
   let res, d;
   try {
     res = await post("/api/contribute", choice);
-    d = await res.json();
+    d = await res.json().catch(() => ({}));
   } catch {
     res = null;
   } finally {
     submitting = false;
-    $("submit").disabled = false;
+    // The stage may have changed meanwhile: Submit follows its rows.
+    $("submit").disabled = !$("carrying").children.length;
   }
   if (!res) {
     $("contributeStatus").textContent = "The connection was interrupted. Contribute again.";

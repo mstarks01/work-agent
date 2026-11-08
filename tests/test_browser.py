@@ -1081,8 +1081,33 @@ def test_a_redraw_during_a_stop_keeps_its_button_off(browser, hanging):
     context.close()
 
 
+def _count_reads(page, part: str) -> None:
+    """Count in ``window.readsDone`` each answer to a URL that holds
+    ``part`` once the page's own handler has read it and run on."""
+    page.evaluate(
+        """(part) => {
+          window.readsDone = 0;
+          const send = window.fetch;
+          window.fetch = async (...args) => {
+            const response = await send(...args);
+            if (String(args[0]).includes(part)) {
+              const read = response.json.bind(response);
+              response.json = async () => {
+                const body = await read();
+                setTimeout(() => { window.readsDone += 1; }, 0);
+                return body;
+              };
+            }
+            return response;
+          };
+        }""",
+        part,
+    )
+
+
 def test_an_older_list_answer_leaves_the_newer_list(page):
     page.goto("/")
+    _count_reads(page, "/workspace/runs")
     held: list = []
     page.route(
         "**/workspace/runs",
@@ -1102,10 +1127,8 @@ def test_an_older_list_answer_leaves_the_newer_list(page):
         "created_at": "2026-11-01T00:00:00Z",
         "frameworks": [],
     }
-    with page.expect_response("**/workspace/runs") as answered:
-        held[0].fulfill(json=[old])
-    answered.value.finished()
-    page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
+    held[0].fulfill(json=[old])
+    page.wait_for_function("() => window.readsDone >= 2")
     assert page.locator("text=An older list").count() == 0
 
 
@@ -3575,6 +3598,7 @@ def test_a_lock_that_answers_after_another_case_opens_leaves_it(sitting_page):
 @pytest.mark.parametrize("sitting_page", ["signed"], indirect=True)
 def test_a_late_read_only_case_leaves_the_case_opened_after_it(sitting_page):
     page, _, (case, other) = sitting_page
+    _count_reads(page, "/api/read-only")
     held = _hold(page, f"**/api/read-only?case={case}")
     page.click(f'#cases li[data-case="{case}"] button')
     _wait_for(page, held)
@@ -3583,10 +3607,8 @@ def test_a_late_read_only_case_leaves_the_case_opened_after_it(sitting_page):
         "() => document.getElementById('readOnlyDocument').textContent"
     )
     shown = page.inner_text("#readOnlyTitle")
-    with page.expect_response(f"**/api/read-only?case={case}") as answered:
-        held[0].continue_()
-    answered.value.finished()
-    page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
+    held[0].continue_()
+    page.wait_for_function("() => window.readsDone >= 2")
     assert page.inner_text("#readOnlyTitle") == shown
 
 
@@ -3662,3 +3684,38 @@ def test_a_stop_that_fails_to_send_says_so(browser, hanging):
     page.wait_for_selector("#workspace-message:has-text('Not stopped')")
     page.wait_for_selector('[aria-label="Stop Hangs"]:enabled')
     context.close()
+
+
+def test_a_stop_from_the_analysis_that_fails_to_send_says_so(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.click("#analysis-rows a:text-is('Hangs')")
+    page.wait_for_selector("#stop-run", state="visible")
+    page.route("**/stop", lambda route: route.abort())
+    page.click("#stop-run")
+    page.wait_for_selector("#workspace-message:has-text('Not stopped')")
+    assert page.is_enabled("#stop-run")
+    context.close()
+
+
+def test_submit_follows_the_stage_after_a_contribution(sitting_page):
+    page, _, _ = sitting_page
+    held = _hold(page, "**/api/contribute")
+    page.evaluate("openSubmit()")
+    page.wait_for_selector("#submit:enabled")
+    page.click("#submit")
+    _wait_for(page, held)
+    while rows := page.locator("#carrying button").count():
+        page.locator("#carrying button").first.click()
+        page.wait_for_function(
+            "n => document.querySelectorAll('#carrying button').length < n",
+            arg=rows,
+        )
+    held[0].fulfill(status=409, json={"detail": "Contribution needs attention"})
+    page.wait_for_selector(
+        "#contributeStatus:has-text('needs attention')", state="attached"
+    )
+    assert page.is_disabled("#submit")
