@@ -59,6 +59,8 @@ const formControls = (() => {
   // after a good one keeps the last list and sets `stale`.
   let state = "loading";
   let stale = false;
+  // The operator's choice to continue without Controls. A good read clears it.
+  let declined = false;
   // The form page sets `changed` to learn when `ready()` can change, and
   // holds its start button while the Controls of a submission are unknown.
   let changed = () => {};
@@ -160,7 +162,6 @@ const formControls = (() => {
   // Every Control is ticked when the page first lists it.
   const load = async () => {
     const read = ++reads;
-    const before = state;
     if (state !== "loaded") state = "loading";
     drawChecklist();
     let body = null;
@@ -175,12 +176,13 @@ const formControls = (() => {
       if (state !== "loaded") body.forEach((control) => ticked.add(control.id));
       held = body;
       state = "loaded";
+      declined = false;
       stale = false;
     } else if (state === "loaded") {
       stale = true;
     } else {
       // A failed read keeps the operator's choice to continue without them.
-      state = before === "declined" ? "declined" : "failed";
+      state = declined ? "declined" : "failed";
     }
     drawChecklist();
   };
@@ -189,6 +191,7 @@ const formControls = (() => {
   const ready = () => reopened || state === "loaded" || state === "declined";
   el("controls-retry")?.addEventListener("click", load);
   el("controls-skip")?.addEventListener("click", () => {
+    declined = true;
     state = "declined";
     drawChecklist();
     el("controls-retry").focus();

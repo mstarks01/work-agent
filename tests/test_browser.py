@@ -3046,6 +3046,20 @@ def test_continue_without_controls_opens_the_start_and_keeps_retry(zoned_page):
     assert page.is_checked(f"#control-{kept}")
 
 
+def test_overlapping_failed_reads_keep_the_choice_to_continue(zoned_page):
+    page = zoned_page
+    keep_control(page, "Guard", {"type": "application"})
+    _fail_the_first_list(page, "http")
+    page.goto("/")
+    page.click("#controls-skip")
+    page.route("**/workspace/controls", lambda route: route.abort())
+    page.evaluate("Promise.all([formControls.load(), formControls.load()])")
+    assert page.inner_text("#controls-status") == (
+        "No Controls: you chose to continue without them."
+    )
+    assert page.is_enabled("#go")
+
+
 def test_a_controls_read_during_a_run_leaves_the_start_off(zoned_page):
     page = zoned_page
     kept = keep_control(page, "Guard", {"type": "application"})

@@ -280,16 +280,16 @@
     ...held().map(([kind, upload]) => ({ kind, label: upload.label, text: upload.text })),
   ];
 
-  // Nodes and strings, never markup. replaceChildren() inserts a string as a
-  // text node, so a source label or a validator message that spells markup
-  // shows the characters the submitter typed. Same rule as the report viewer,
-  // and for the same reason: with no escape helper on the page there is none
-  // to forget, and forgetting shows junk on screen instead of running.
   // The start button is off while a submission or a run is under way, and
   // while the Controls of a submission are unknown.
   let running = false;
   const gate = () => { go.disabled = running || !formControls.ready(); };
   formControls.onChange(gate);
+  // Nodes and strings, never markup. replaceChildren() inserts a string as a
+  // text node, so a source label or a validator message that spells markup
+  // shows the characters the submitter typed. Same rule as the report viewer,
+  // and for the same reason: with no escape helper on the page there is none
+  // to forget, and forgetting shows junk on screen instead of running.
   const fail = (...content) => {
     problem.replaceChildren(...content);
     problem.hidden = false;
