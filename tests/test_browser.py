@@ -3000,6 +3000,22 @@ def test_rapid_control_changes_save_the_latest_choice(zoned_page):
     assert not page.is_checked(f"#offer-{second}")
 
 
+def test_a_question_save_during_a_control_save_takes_the_next_revision(zoned_page):
+    page = zoned_page
+    first = keep_control(page, "First", {"type": "application"})
+    submit_with_controls(page)
+    held = _hold_answers(page)
+    page.click(f"#offer-{first}")
+    page.locator("#list select").first.select_option(index=1)
+    # Longer than the autosave delay: a question save that does not wait for
+    # the Control save goes out now.
+    page.wait_for_timeout(600)
+    _release(page, held, 2)
+    scope, question = (route.request.post_data_json for route in held[:2])
+    assert "control_scopes" in scope
+    assert question["revision"] == scope["revision"] + 1
+
+
 def test_a_double_toggle_saves_the_control_ticked(zoned_page):
     page = zoned_page
     first = keep_control(page, "First", {"type": "application"})

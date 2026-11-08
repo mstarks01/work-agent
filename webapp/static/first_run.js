@@ -584,13 +584,16 @@
     return inFlight;
   };
   const send = async () => {
+    saving = true;
+    // A Control save in flight returns the next revision: wait for it.
+    await scopeInFlight;
     const sent = batch();
     const body = bodyOf(sent);
     if (!body) {
+      saving = false;
       showState();
       return;
     }
-    saving = true;
     setStatus("saving");
     try {
       const response = await fetch("/answer/" + pausedRun, {
@@ -896,7 +899,7 @@
   // never moved: a new row is inserted where the service's order puts it.
   let pass = 0;
   let updateQuestionActions = () => {};
-  // True while a skip, a start or an amendment runs. The skip and start
+  // True while an answer action runs (`answerAction`). The skip and start
   // buttons stay disabled until it ends.
   let answerBusy = false;
   // How many new rows wait above a focused editor (`reconcile`).
@@ -1173,6 +1176,9 @@
   // answer and drops the choices that wait.
   let wantedScopes = null;
   let savingScopes = false;
+  // Settles when the Control save in flight has its answer drawn, so a
+  // question save sends the revision that answer returned.
+  let scopeInFlight = Promise.resolve();
   const unsaved = "Your last Control change was not saved. The list shows the choices the service kept. Make the change again.";
   const sendScopes = async (scopes) => {
     await flush();
@@ -1180,7 +1186,8 @@
       refuse("Some answers are not saved yet. Save them, then try again.");
       return false;
     }
-    let response, data;
+    let response, data, answered;
+    scopeInFlight = new Promise((resolve) => { answered = resolve; });
     try {
       response = await fetch("/answer/" + pausedRun, {
         method: "POST",
@@ -1191,16 +1198,21 @@
       });
       data = await response.json();
     } catch {
+      answered();
       refuse(unsaved);
       return false;
     }
-    if (!response.ok) {
-      refuse(data.message ? `${unsaved} ${data.message}` : unsaved);
-      return false;
+    try {
+      if (!response.ok) {
+        refuse(data.message ? `${unsaved} ${data.message}` : unsaved);
+        return false;
+      }
+      answerProblem.hidden = true;
+      if (data.early_questions) reconcile(data);
+      return true;
+    } finally {
+      answered();
     }
-    answerProblem.hidden = true;
-    if (data.early_questions) reconcile(data);
-    return true;
   };
   const saveScopes = (scopes) => {
     wantedScopes = scopes;
@@ -1214,9 +1226,9 @@
         while (wantedScopes && saved) {
           const next = wantedScopes;
           wantedScopes = null;
-          while (answerBusy) await answerDone;
           saved = false;
-          await answerAction(async () => { saved = await sendScopes(next); });
+          // Another action may take the turn first: wait, then try again.
+          while (!await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
         }
       } finally {
         wantedScopes = null;
@@ -1654,8 +1666,9 @@
 
   // Settles when the action under way ends, so a later save can wait for it.
   let answerDone = Promise.resolve();
+  // Resolves to whether the action ran: an action under way turns it away.
   const answerAction = async (action) => {
-    if (answerBusy) return;
+    if (answerBusy) return false;
     answerBusy = true;
     let done;
     answerDone = new Promise((resolve) => { done = resolve; });
@@ -1669,6 +1682,7 @@
       updateQuestionActions();
       done();
     }
+    return true;
   };
   startButton.addEventListener("click", () => answerAction(startAnalysis));
 
