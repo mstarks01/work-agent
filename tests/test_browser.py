@@ -3452,7 +3452,7 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
 
 
 @pytest.fixture(params=["recorded"])
-def sitting_page(browser, tmp_path, request):
+def sitting_page(browser, tmp_path, request, monkeypatch):
     """A page on a review sitting with two cases: each recorded with a mark
     on every finding, blank, or signed by a central review. The page's
     confirm dialogs are accepted."""
@@ -3465,6 +3465,9 @@ def sitting_page(browser, tmp_path, request):
     )
     from webapp import sitting
 
+    # No GitHub login, on every machine: a contribution takes the browser
+    # route, which asks for an author and opens no pull request.
+    monkeypatch.setattr(sitting, "_gh_login", lambda root: "")
     tree = tree_for(tmp_path)
     if request.param == "signed":
         central_review(tree, cases=(CASE, OTHER))
@@ -3536,6 +3539,13 @@ def test_a_reset_that_answers_after_another_case_opens_clears_only_its_case(
         page.eval_on_selector_all("select[data-finding]", "s => s.map((x) => x.value)")
     )
     assert session.draft(other).marks
+
+
+def _open_submit(page) -> None:
+    """Open the contribution stage, with an author for the browser route."""
+    page.evaluate("openSubmit()")
+    page.wait_for_selector("#submit:enabled")
+    page.fill("#githubAuthor", "web-reviewer")
 
 
 def _hold(page, path: str) -> list:
@@ -3615,8 +3625,7 @@ def test_a_late_read_only_case_leaves_the_case_opened_after_it(sitting_page):
 def test_a_stage_redraw_during_a_contribution_keeps_submit_off(sitting_page):
     page, _, _ = sitting_page
     held = _hold(page, "**/api/contribute")
-    page.evaluate("openSubmit()")
-    page.wait_for_selector("#submit:enabled")
+    _open_submit(page)
     page.click("#submit")
     _wait_for(page, held)
     page.evaluate("loadStage()")
@@ -3666,8 +3675,7 @@ def test_a_cancelled_pick_drops_an_earlier_read(page):
 def test_a_contribution_that_fails_to_send_gives_submit_back(sitting_page):
     page, _, _ = sitting_page
     page.route("**/api/contribute", lambda route: route.abort())
-    page.evaluate("openSubmit()")
-    page.wait_for_selector("#submit:enabled")
+    _open_submit(page)
     page.click("#submit")
     page.wait_for_selector("#contributeStatus:has-text('connection was interrupted')")
     assert page.is_enabled("#submit")
@@ -3704,8 +3712,7 @@ def test_a_stop_from_the_analysis_that_fails_to_send_says_so(browser, hanging):
 def test_submit_follows_the_stage_after_a_contribution(sitting_page):
     page, _, _ = sitting_page
     held = _hold(page, "**/api/contribute")
-    page.evaluate("openSubmit()")
-    page.wait_for_selector("#submit:enabled")
+    _open_submit(page)
     page.click("#submit")
     _wait_for(page, held)
     while rows := page.locator("#carrying button").count():
@@ -3734,8 +3741,7 @@ def test_a_good_answer_that_is_not_json_says_so(sitting_page, path, button, stat
     if path == "finish":
         _open_case(page, case)
     else:
-        page.evaluate("openSubmit()")
-        page.wait_for_selector("#submit:enabled")
+        _open_submit(page)
     page.click(button)
     page.wait_for_selector(
         f"{status}:has-text('connection was interrupted')", state="attached"
