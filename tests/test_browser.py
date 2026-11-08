@@ -2495,6 +2495,42 @@ def test_a_refused_save_unlocks_the_editor_and_keeps_the_draft(page):
     assert page.is_enabled('button[aria-label="Edit B"]')
 
 
+def test_a_delete_during_a_save_leaves_the_table_usable(page):
+    _two_kept_controls(page)
+    held: list = []
+    page.route("**/workspace/controls/*", lambda route: held.append(route))
+    page.click('button[aria-label="Edit A"]')
+    page.click('button[aria-label="Delete A"]')
+    page.click("#delete-go")
+    page.click("#save-control")
+    page.wait_for_function("document.querySelector('fieldset.editor').disabled")
+    deleting, saving = sorted(held, key=lambda route: route.request.method)
+    deleting.continue_()
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    with page.expect_response("**/workspace/controls/*"):
+        saving.continue_()
+    page.wait_for_timeout(200)
+    assert page.is_enabled('button[aria-label="Edit B"]')
+    assert page.is_enabled("#new-control")
+
+
+def test_a_new_editor_shows_no_old_refusal(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: (
+            route.fulfill(status=409, json={"message": "Another tab changed it."})
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
+    )
+    page.click('button[aria-label="Edit A"]')
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:has-text('Another tab changed it.')")
+    page.click('button[aria-label="Edit B"]')
+    assert page.is_hidden("#editor-problem")
+
+
 def test_a_file_read_waits_for_save_and_stays_with_its_draft(page):
     _two_kept_controls(page)
     _hold_file_reads(page)

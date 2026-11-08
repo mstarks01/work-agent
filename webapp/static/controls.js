@@ -82,6 +82,7 @@
   const startEdit = (control) => {
     if (saving) return;
     session += 1;
+    refuse("");
     editing = control ? control.id : "new";
     draft = control
       ? JSON.parse(JSON.stringify({ ...control, evidence: control.evidence.map((file) => ({ ...file })) }))
@@ -92,6 +93,7 @@
   };
   const stopEdit = () => {
     session += 1;
+    refuse("");
     editing = null;
     draft = null;
     draw();
@@ -309,6 +311,7 @@
     saving = true;
     const mine = session;
     draw();
+    let saved = null;
     try {
       const sent = await fetch(editing === "new" ? "/workspace/controls" : `/workspace/controls/${encodeURIComponent(editing)}`, {
         method: editing === "new" ? "POST" : "PUT",
@@ -316,23 +319,22 @@
         body: JSON.stringify(saveBody()),
       });
       const body = await sent.json();
-      saving = false;
-      if (mine !== session) return;
-      if (!sent.ok) {
-        refuse(body.message);
-        draw();
-        return;
+      if (mine === session) {
+        if (sent.ok) saved = body;
+        else refuse(body.message);
       }
-      refuse("");
-      stopEdit();
-      show("controls-notice", `“${body.name}” is saved.`);
-      await load();
     } catch {
+      if (mine === session) refuse("The connection was interrupted. Check Controls before you save again.");
+    } finally {
       saving = false;
-      if (mine !== session) return;
-      refuse("The connection was interrupted. Check Controls before you save again.");
-      draw();
     }
+    if (!saved) {
+      draw();
+      return;
+    }
+    stopEdit();
+    show("controls-notice", `“${saved.name}” is saved.`);
+    await load();
   };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
@@ -344,7 +346,7 @@
     h("div", { class: "dialog-actions" },
       h("span", { id: "editor-status", class: "hint", role: "status" },
         saving ? `Saving “${draft.name}”…` : reading() ? "Save waits for the file read to end." : ""),
-      h("button", { type: "button", id: "cancel-control", on: { click: () => { refuse(""); stopEdit(); } } }, "Cancel"),
+      h("button", { type: "button", id: "cancel-control", on: { click: stopEdit } }, "Cancel"),
       h("button", { type: "button", id: "save-control", class: "primary", disabled: reading(), on: { click: save } }, "Save Control")));
 
   // ---- The table ----------------------------------------------------------
