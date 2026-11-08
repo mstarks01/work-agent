@@ -2509,9 +2509,8 @@ def test_a_delete_during_a_save_leaves_the_table_usable(page):
     page.wait_for_selector("#controls-notice:has-text('is deleted')")
     with page.expect_response("**/workspace/controls/*"):
         saving.continue_()
-    page.wait_for_timeout(200)
-    assert page.is_enabled('button[aria-label="Edit B"]')
-    assert page.is_enabled("#new-control")
+    page.wait_for_selector('button[aria-label="Edit B"]:enabled')
+    page.wait_for_selector("#new-control:enabled")
 
 
 def test_a_new_editor_shows_no_old_refusal(page):
