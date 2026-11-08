@@ -558,7 +558,8 @@ $("finish").addEventListener("click", async () => {
     res = await post("/api/finish", {
       case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
     });
-    d = await res.json().catch(() => ({}));
+    // Only a refusal may come back as a page that is not JSON.
+    d = res.ok ? await res.json() : await res.json().catch(() => ({}));
   } catch {
     res = null;
   } finally {
@@ -690,7 +691,8 @@ $("submit").addEventListener("click", async () => {
   let res, d;
   try {
     res = await post("/api/contribute", choice);
-    d = await res.json().catch(() => ({}));
+    // Only a refusal may come back as a page that is not JSON.
+    d = res.ok ? await res.json() : await res.json().catch(() => ({}));
   } catch {
     res = null;
   } finally {

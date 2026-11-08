@@ -3719,3 +3719,25 @@ def test_submit_follows_the_stage_after_a_contribution(sitting_page):
         "#contributeStatus:has-text('needs attention')", state="attached"
     )
     assert page.is_disabled("#submit")
+
+
+@pytest.mark.parametrize(
+    ("path", "button", "status"),
+    [
+        ("finish", "#finish", "#saveStatus"),
+        ("contribute", "#submit", "#contributeStatus"),
+    ],
+)
+def test_a_good_answer_that_is_not_json_says_so(sitting_page, path, button, status):
+    page, _, (case, _) = sitting_page
+    page.route(f"**/api/{path}", lambda route: route.fulfill(body="<html>oops</html>"))
+    if path == "finish":
+        _open_case(page, case)
+    else:
+        page.evaluate("openSubmit()")
+        page.wait_for_selector("#submit:enabled")
+    page.click(button)
+    page.wait_for_selector(
+        f"{status}:has-text('connection was interrupted')", state="attached"
+    )
+    assert page.is_enabled(button)
