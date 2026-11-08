@@ -112,7 +112,7 @@ const workspace = (() => {
     try {
       response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
     } catch {
-      return {ended: false, text: "Not stopped. The connection was interrupted."};
+      return {ended: false, text: "Not stopped. The connection to stop “" + run.name + "” was interrupted."};
     } finally {
       stopping.delete(run.run);
     }
@@ -324,6 +324,8 @@ const workspace = (() => {
     el("stop-run").disabled = true;
     const {ended, text} = await stopRun(current);
     el("stop-run").disabled = false;
+    // The list may show this run's Stop, held off while the stop ran.
+    if (!el("library-panel").hidden) await library();
     // An ended run shows its own status on the next read.
     if (!ended) message(text);
   });

@@ -3757,5 +3757,6 @@ def test_the_list_keeps_stop_off_while_the_header_stops_the_run(browser, hanging
     page.click("#library-nav")
     page.wait_for_selector('[aria-label="Stop Hangs"]')
     assert page.is_disabled('[aria-label="Stop Hangs"]')
-    held[0].continue_()
+    held[0].fulfill(status=409, json={"message": "Not now."})
+    page.wait_for_selector('[aria-label="Stop Hangs"]:enabled')
     context.close()
