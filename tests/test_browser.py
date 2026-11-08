@@ -2427,13 +2427,13 @@ def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
     assert (rows, row_refusal) == (MAX_CONTROL_ROWS, ROWS_FULL)
 
 
-def _two_kept_controls(page) -> tuple[str, str]:
+def _two_kept_controls(page) -> None:
     """Keep the Controls A and B, and show them on the Controls page."""
     page.goto("/controls")
-    kept = tuple(keep_control(page, name, {"type": "application"}) for name in "AB")
+    for name in "AB":
+        keep_control(page, name, {"type": "application"})
     page.reload()
     page.wait_for_selector("#controls-list tr")
-    return kept
 
 
 def _hold_file_reads(page) -> None:
@@ -2454,9 +2454,9 @@ def test_a_save_locks_the_editor_and_lands_on_its_own_draft(page):
     held: list = []
     page.route(
         "**/workspace/controls/*",
-        lambda route: held.append(route)
-        if route.request.method == "PUT"
-        else route.fallback(),
+        lambda route: (
+            held.append(route) if route.request.method == "PUT" else route.fallback()
+        ),
     )
     page.click('button[aria-label="Edit A"]')
     page.fill("#control-name", "A2")
@@ -2478,11 +2478,13 @@ def test_a_refused_save_unlocks_the_editor_and_keeps_the_draft(page):
     _two_kept_controls(page)
     page.route(
         "**/workspace/controls/*",
-        lambda route: route.fulfill(
-            status=409, json={"message": "Another tab changed this Control."}
-        )
-        if route.request.method == "PUT"
-        else route.fallback(),
+        lambda route: (
+            route.fulfill(
+                status=409, json={"message": "Another tab changed this Control."}
+            )
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
     )
     page.click('button[aria-label="Edit A"]')
     page.fill("#control-name", "A2")
