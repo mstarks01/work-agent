@@ -3586,7 +3586,7 @@ def test_a_late_read_only_case_leaves_the_case_opened_after_it(sitting_page):
 
 
 def test_a_stage_redraw_during_a_contribution_keeps_submit_off(sitting_page):
-    page, _, (case, _) = sitting_page
+    page, _, _ = sitting_page
     held = _hold(page, "**/api/contribute")
     page.evaluate("openSubmit()")
     page.wait_for_selector("#submit:enabled")
