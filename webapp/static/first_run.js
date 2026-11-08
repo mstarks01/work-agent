@@ -440,6 +440,12 @@
   const controlsBox = document.createElement("div");
   controlsBox.className = "control-offer";
   controlsBox.id = "control-offer";
+  // Says that the Control choices are saving, below the offer.
+  const scopeStatus = document.createElement("p");
+  scopeStatus.className = "hint";
+  scopeStatus.id = "scope-status";
+  scopeStatus.setAttribute("role", "status");
+  scopeStatus.hidden = true;
   // The answers this run carried from an earlier one and could not take,
   // redrawn from each payload (drawCarried).
   const carried = document.createElement("div");
@@ -447,7 +453,7 @@
   let framed = false;
   const frame = () => {
     if (framed) return;
-    questions.replaceChildren(detectedBox, controlsBox, intro, list, carried, tail);
+    questions.replaceChildren(detectedBox, controlsBox, scopeStatus, intro, list, carried, tail);
     framed = true;
   };
 
@@ -578,13 +584,17 @@
     return inFlight;
   };
   const send = async () => {
+    saving = true;
+    // A Control save in flight returns the next revision: wait for it. With
+    // none, the request goes out at once, as leaving the page needs.
+    if (scopeInFlight) await scopeInFlight;
     const sent = batch();
     const body = bodyOf(sent);
     if (!body) {
+      saving = false;
       showState();
       return;
     }
-    saving = true;
     setStatus("saving");
     try {
       const response = await fetch("/answer/" + pausedRun, {
@@ -890,7 +900,7 @@
   // never moved: a new row is inserted where the service's order puts it.
   let pass = 0;
   let updateQuestionActions = () => {};
-  // True while a skip, a start or an amendment runs. The skip and start
+  // True while an answer action runs (`answerAction`). The skip and start
   // buttons stay disabled until it ends.
   let answerBusy = false;
   // How many new rows wait above a focused editor (`reconcile`).
@@ -1160,31 +1170,83 @@
     if (data.early_questions) reconcile(data);
   });
   // Save the resolution of each copied Control after a change at the pause
-  // (ADR 0124). A refused save draws the offer again from the last answer.
-  const saveScopes = (scopes) => answerAction(async () => {
+  // (ADR 0124). The page keeps the newest choices in `wantedScopes` and
+  // sends them when the save before answers, with the revision it returned,
+  // so no change is dropped. While newer choices wait, an answer does not
+  // draw the offer again. A failed save draws the offer from the last
+  // answer and drops the choices that wait.
+  let wantedScopes = null;
+  let savingScopes = false;
+  // The Control save in flight, settled when its answer is drawn, so a
+  // question save sends the revision that answer returned. Null with none.
+  let scopeInFlight = null;
+  const unsaved = "Your last Control change was not saved. The list shows the choices the service kept. Make the change again.";
+  const sendScopes = async (scopes) => {
     await flush();
     if (edits.size) {
       refuse("Some answers are not saved yet. Save them, then try again.");
-      drawOffer(view);
-      return;
+      return false;
     }
-    const response = await fetch("/answer/" + pausedRun, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      refuse(data.message || "The service did not keep this change.");
-      drawOffer(view);
-      return;
+    let response, data, settle;
+    scopeInFlight = new Promise((resolve) => { settle = resolve; });
+    const answered = () => {
+      scopeInFlight = null;
+      settle();
+    };
+    try {
+      response = await fetch("/answer/" + pausedRun, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
+        }),
+      });
+      data = await response.json();
+    } catch {
+      answered();
+      refuse(unsaved);
+      return false;
     }
-    answerProblem.hidden = true;
-    if (data.early_questions) reconcile(data);
-  });
-  const drawOffer = (data) => formControls.drawOffer(controlsBox, data, { save: saveScopes, refuse });
+    try {
+      if (!response.ok) {
+        refuse(data.message ? `${unsaved} ${data.message}` : unsaved);
+        return false;
+      }
+      answerProblem.hidden = true;
+      if (data.early_questions) reconcile(data);
+      return true;
+    } finally {
+      answered();
+    }
+  };
+  const saveScopes = (scopes) => {
+    wantedScopes = scopes;
+    if (savingScopes) return;
+    savingScopes = true;
+    (async () => {
+      scopeStatus.textContent = "Saving your Control choices…";
+      scopeStatus.hidden = false;
+      let saved = true;
+      try {
+        while (wantedScopes && saved) {
+          const next = wantedScopes;
+          wantedScopes = null;
+          saved = false;
+          // Another action may take the turn first: wait, then try again.
+          while (!await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
+        }
+      } finally {
+        wantedScopes = null;
+        savingScopes = false;
+        scopeStatus.hidden = true;
+        if (!saved) drawOffer(view);
+      }
+    })();
+  };
+  const drawOffer = (data) => {
+    if (wantedScopes) return;
+    formControls.drawOffer(controlsBox, data, { save: saveScopes, refuse });
+  };
   // Whether a dropped answer waits for the submitter to choose an element, by its
   // reason (CarriedReason).
   const waitsForElement = {
@@ -1607,9 +1669,14 @@
     }
   };
 
+  // Settles when the action under way ends, so a later save can wait for it.
+  let answerDone = Promise.resolve();
+  // Resolves to whether the action ran: an action under way turns it away.
   const answerAction = async (action) => {
-    if (answerBusy) return;
+    if (answerBusy) return false;
     answerBusy = true;
+    let done;
+    answerDone = new Promise((resolve) => { done = resolve; });
     const controls = [skipButton, startButton, noRestButton];
     controls.forEach((control) => { control.disabled = true; });
     try { await action(); }
@@ -1618,7 +1685,9 @@
       answerBusy = false;
       controls.forEach((control) => { control.disabled = false; });
       updateQuestionActions();
+      done();
     }
+    return true;
   };
   startButton.addEventListener("click", () => answerAction(startAnalysis));
 
