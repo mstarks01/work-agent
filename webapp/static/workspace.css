@@ -1573,6 +1573,12 @@ a.analysis-row:hover {
   font-size:14px;
   overflow-wrap:anywhere
 }
+.controls-recover {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:0 0 10px
+}
 /* A button that opens a dialog, drawn as a text link. */
 .link-button {
   min-height:0;

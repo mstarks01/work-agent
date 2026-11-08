@@ -157,14 +157,19 @@
     box.required = needsDescription();
     updateDescriptionRemaining();
   };
+  // A failed read keeps the last list, so a chosen file does not read as
+  // missing, and the dialog says the read failed.
+  let filesFailed = false;
   const loadFiles = async () => {
+    let body = null;
     try {
       const listed = await fetch("/workspace/files");
-      const body = listed.ok ? await listed.json() : [];
-      ownerFiles = Array.isArray(body) ? body : [];
+      if (listed.ok) body = await listed.json();
     } catch {
-      ownerFiles = [];
+      // A failed read leaves `body` null.
     }
+    filesFailed = !Array.isArray(body);
+    if (!filesFailed) ownerFiles = body;
     drawChosen();
   };
   // The dialog ticks the chosen files. Select makes the ticked files the
@@ -187,11 +192,13 @@
       row.append(tick, name, facts);
       return row;
     });
-    if (!rows.length) {
-      const empty = document.createElement("p");
-      empty.className = "hint";
-      empty.textContent = "Files is empty.";
-      rows.push(empty);
+    if (filesFailed || !rows.length) {
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = filesFailed
+        ? "Your files did not load. Close this and open it again to retry."
+        : "Files is empty.";
+      rows.unshift(note);
     }
     filesRows.replaceChildren(...rows);
     filesDialog.showModal();
@@ -273,6 +280,11 @@
     ...held().map(([kind, upload]) => ({ kind, label: upload.label, text: upload.text })),
   ];
 
+  // The start button is off while a submission or a run is under way, and
+  // while the Controls of a submission are unknown.
+  let running = false;
+  const gate = () => { go.disabled = running || !formControls.ready(); };
+  formControls.onChange(gate);
   // Nodes and strings, never markup. replaceChildren() inserts a string as a
   // text node, so a source label or a validator message that spells markup
   // shows the characters the submitter typed. Same rule as the report viewer,
@@ -282,7 +294,8 @@
     problem.replaceChildren(...content);
     problem.hidden = false;
     idle();
-    go.disabled = false;
+    running = false;
+    gate();
   };
 
   // The question toggle is on the page only where the install can ask.
@@ -304,7 +317,8 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     problem.hidden = true;
-    go.disabled = true;
+    running = true;
+    gate();
 
     const name = document.getElementById("analysis-name").value.trim();
     if (!name) {
@@ -324,6 +338,10 @@
 
     // A job with Controls pauses even with the questions off: the service
     // continues it at once (ADR 0125).
+    if (!formControls.ready()) {
+      fail("Your Controls are not known yet. Wait for them to load, retry, or continue without Controls.");
+      return;
+    }
     const controls = formControls.chosen();
     try {
       const started = await fetch("/analyze", {
@@ -1627,7 +1645,8 @@
 
   // Follow one run's progress to its end: a report, questions, or a failure.
   const follow = (runId, initialStage, pauses) => {
-    go.disabled = true;
+    running = true;
+    gate();
     if (typeof workspace !== "undefined") workspace.track(runId);
     working(initialStage);
     if (typeof workspace !== "undefined") workspace.processing([], pauses, initialStage, runId);
