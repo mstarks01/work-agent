@@ -594,7 +594,7 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "upload-menu","upload-computer","upload-files","controls-offer",
                   "controls-rows","controls-summary","controls-used","controls-used-list",
                   "controls-choose","controls-dialog","controls-find","controls-all","controls-none",
-                  "controls-count","controls-unfit","controls-unfit-summary","controls-unfit-rows",
+                  "controls-count","controls-status","controls-recover","controls-retry","controls-skip","go-wait","controls-unfit","controls-unfit-summary","controls-unfit-rows",
                   "controls-done","frameworks","frameworks-toggle","frameworks-panel",
                   "frameworks-summary"])
   ids[id] = new Node(id);
@@ -668,7 +668,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         .replace("TYPE_NOUN_TABLE", json.dumps(json.dumps(dict(ELEMENT_TYPE_NOUNS))))
         + script
-        + "\n(async () => {\n"
+        + "\n(async () => {\nawait settle(); await settle();\n"
         + steps
         + "\nconsole.log(JSON.stringify({calls, streams: streams.map(s => s.url),"
         " href: location.href, asked: !ids.asked.hidden}));\n})();"

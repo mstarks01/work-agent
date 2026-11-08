@@ -2287,6 +2287,13 @@ def test_the_plus_button_offers_an_upload_and_a_choice_from_files(page):
     assert "Files is empty." in page.inner_text("#files-rows")
     page.click("#files-cancel")
     assert page.is_hidden("#chosen-files")
+    page.route("**/workspace/files", lambda route: route.abort())
+    page.click("#upload")
+    page.click("#upload-files")
+    page.wait_for_selector("#files-dialog[open]")
+    assert page.inner_text("#files-rows") == (
+        "Your files did not load. Close this and open it again to retry."
+    )
 
 
 def test_a_chosen_file_goes_into_the_analysis_and_shows_when_it_opens_again(page):
@@ -2967,6 +2974,112 @@ def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
     page.wait_for_selector("#controls-used", state="visible")
     assert page.inner_text("#controls-used-list") == "SSO (applied)"
     assert page.is_hidden("#controls-offer")
+
+
+def _fail_the_first_list(page, failure: str) -> None:
+    """Fail the page's first read of the Controls list in ``failure``'s way."""
+    failed = []
+
+    def answer(route):
+        if route.request.method != "GET" or failed:
+            route.fallback()
+            return
+        failed.append(route.request.url)
+        if failure == "network":
+            route.abort()
+        elif failure == "http":
+            route.fulfill(status=500, body="{}", content_type="application/json")
+        else:
+            route.fulfill(body="not json", content_type="application/json")
+
+    page.route("**/workspace/controls", answer)
+
+
+@pytest.mark.parametrize("failure", ["http", "malformed", "network"])
+def test_a_failed_controls_list_blocks_the_start_until_a_retry(zoned_page, failure):
+    """A failed first read of the list says so and holds the start; Retry
+    ticks every Control, as a first successful read does."""
+    page = zoned_page
+    kept = keep_control(page, "Guard", {"type": "application"})
+    _fail_the_first_list(page, failure)
+    page.goto("/")
+    page.wait_for_selector("#controls-retry:visible")
+    assert "did not load" in page.inner_text("#controls-status")
+    assert page.is_disabled("#go")
+    page.click("#controls-retry")
+    page.wait_for_selector(f"#control-{kept}", state="attached")
+    assert page.is_checked(f"#control-{kept}")
+    assert page.inner_text("#controls-summary") == "1 ticked: Guard."
+    assert page.is_enabled("#go")
+
+
+def test_a_controls_list_in_flight_holds_the_start(zoned_page):
+    """The form sends no analysis while it does not know the Controls."""
+    page = zoned_page
+    keep_control(page, "Guard", {"type": "application"})
+    held = []
+    page.route("**/workspace/controls", lambda route: held.append(route))
+    page.goto("/")
+    page.wait_for_selector("#controls-status:visible")
+    assert page.is_disabled("#go")
+    assert page.is_visible("#go-wait")
+    page.unroute("**/workspace/controls")
+    held[0].fallback()
+    page.wait_for_selector("#controls-summary:visible")
+    assert page.is_enabled("#go")
+    assert page.is_hidden("#go-wait")
+
+
+def test_continue_without_controls_opens_the_start_and_keeps_retry(zoned_page):
+    page = zoned_page
+    kept = keep_control(page, "Guard", {"type": "application"})
+    _fail_the_first_list(page, "http")
+    page.goto("/")
+    page.click("#controls-skip")
+    assert page.is_enabled("#go")
+    assert page.inner_text("#controls-status") == (
+        "No Controls: you chose to continue without them."
+    )
+    assert page.evaluate("formControls.chosen()") is None
+    page.click("#controls-retry")
+    page.wait_for_selector(f"#control-{kept}", state="attached")
+    assert page.is_checked(f"#control-{kept}")
+
+
+def test_a_controls_read_during_a_run_leaves_the_start_off(zoned_page):
+    page = zoned_page
+    kept = keep_control(page, "Guard", {"type": "application"})
+    _fail_the_first_list(page, "http")
+    page.goto("/")
+    page.click("#controls-skip")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Declined Controls")
+    open_frameworks(page)
+    page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
+    with page.expect_response("**/analyze"):
+        page.click("#go")
+    assert page.is_disabled("#go")
+    page.evaluate("formControls.load()")
+    page.wait_for_selector(f"#control-{kept}", state="attached")
+    assert page.is_disabled("#go")
+
+
+def test_a_failed_reload_keeps_the_last_list_and_its_ticks(zoned_page):
+    page = zoned_page
+    first = keep_control(page, "First", {"type": "application"})
+    second = keep_control(page, "Second", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector(f"#control-{first}", state="attached")
+    page.click("#controls-choose")
+    page.uncheck(f"#control-{first}")
+    page.click("#controls-done")
+    page.route("**/workspace/controls", lambda route: route.abort())
+    page.evaluate("formControls.load()")
+    page.wait_for_selector("#controls-retry:visible")
+    assert "did not refresh" in page.inner_text("#controls-status")
+    assert page.evaluate("formControls.chosen()") == [second]
+    assert page.is_enabled("#go")
 
 
 def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers):

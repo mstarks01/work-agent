@@ -53,7 +53,23 @@ const formControls = (() => {
 
   // ---- The submission ------------------------------------------------------
   let held = [];
-  let loaded = false;
+  // What the page knows of the list: "loading" until a first read answers,
+  // "loaded" after a good read, "failed" after a first read fails, and
+  // "declined" when the operator continues without Controls. A failed read
+  // after a good one keeps the last list and sets `stale`.
+  let state = "loading";
+  let stale = false;
+  // The form page sets `changed` to learn when `ready()` can change, and
+  // holds its start button while the Controls of a submission are unknown.
+  let changed = () => {};
+  const holdStart = () => {
+    el("go-wait").textContent = state === "loading" ? "Wait for your Controls to load."
+      : "Retry, or choose to continue without Controls.";
+    el("go-wait").hidden = ready();
+    changed();
+  };
+  // Each read takes a number, and only the latest read sets the list.
+  let reads = 0;
   // A reopened analysis shows what it used and offers no choice.
   let reopened = false;
   const ticked = new Set();
@@ -102,7 +118,21 @@ const formControls = (() => {
       unfit.length ? h("span", { class: "hint" }, ` ${counted(unfit.length, "does", "do")} not apply.`) : null,
       missing.length ? h("span", { class: "hint" }, ` ${counted(missing.length, "ticked Control is", "ticked Controls are")} missing.`) : null,
     ].filter(Boolean));
-    el("controls-offer").hidden = reopened || (!held.length && !missing.length);
+    const known = state === "loaded";
+    el("controls-status").replaceChildren(...{
+      loading: ["Loading your Controls…"],
+      failed: ["Your Controls did not load, so this analysis has none yet."],
+      declined: ["No Controls: you chose to continue without them."],
+      loaded: stale ? ["The list did not refresh. It shows the Controls from the last load."] : [],
+    }[state]);
+    el("controls-status").className = state === "failed" ? "problem" : "controls-line";
+    el("controls-status").hidden = known && !stale;
+    el("controls-recover").hidden = known ? !stale : state === "loading";
+    el("controls-skip").hidden = state !== "failed";
+    el("controls-summary").hidden = !known;
+    el("controls-choose").hidden = !known;
+    holdStart();
+    el("controls-offer").hidden = reopened || (known && !stale && !held.length && !missing.length);
     // A hidden line takes its dialog with it, so no closed list holds the
     // page, and focus goes to the form.
     if (el("controls-offer").hidden && el("controls-dialog").open) {
@@ -129,17 +159,40 @@ const formControls = (() => {
   el("controls-find")?.addEventListener("keydown", (event) => { if (event.key === "Enter") event.preventDefault(); });
   // Every Control is ticked when the page first lists it.
   const load = async () => {
+    const read = ++reads;
+    const before = state;
+    if (state !== "loaded") state = "loading";
+    drawChecklist();
+    let body = null;
     try {
       const listed = await fetch("/workspace/controls");
-      const body = listed.ok ? await listed.json() : [];
-      held = Array.isArray(body) ? body : [];
+      if (listed.ok) body = await listed.json();
     } catch {
-      held = [];
+      // A failed read leaves `body` null.
     }
-    if (!loaded) held.forEach((control) => ticked.add(control.id));
-    loaded = true;
+    if (read !== reads) return;
+    if (Array.isArray(body)) {
+      if (state !== "loaded") body.forEach((control) => ticked.add(control.id));
+      held = body;
+      state = "loaded";
+      stale = false;
+    } else if (state === "loaded") {
+      stale = true;
+    } else {
+      // A failed read keeps the operator's choice to continue without them.
+      state = before === "declined" ? "declined" : "failed";
+    }
     drawChecklist();
   };
+  // Whether a submission knows its Controls: from a read, by the operator's
+  // choice, or from a reopened analysis.
+  const ready = () => reopened || state === "loaded" || state === "declined";
+  el("controls-retry")?.addEventListener("click", load);
+  el("controls-skip")?.addEventListener("click", () => {
+    state = "declined";
+    drawChecklist();
+    el("controls-retry").focus();
+  });
   el("frameworks")?.addEventListener("change", drawChecklist);
   // The IDs a submission sends, or nothing where none is ticked. A Control
   // that does not fit the selected frameworks stays ticked for later, but
@@ -302,9 +355,11 @@ const formControls = (() => {
   const drawUsed = (used) => {
     reopened = true;
     el("controls-offer").hidden = true;
+    holdStart();
     el("controls-used-list").replaceChildren(...(used || []).map((control) => h("li", {}, `${control.name} (${STATES[control.state]})`)));
     el("controls-used").hidden = !(used || []).length;
   };
 
-  return { load, chosen, drawOffer, drawUsed };
+  const onChange = (handler) => { changed = handler; };
+  return { load, ready, onChange, chosen, drawOffer, drawUsed };
 })();
