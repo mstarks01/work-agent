@@ -617,6 +617,11 @@ async function stageAct(path, id) {
 const drop = id => stageAct("/api/drop", id);
 const putBack = id => stageAct("/api/put-back", id);
 
+// Submit is on when the stage carries a case and no contribution is in flight.
+function submitGate() {
+  $("submit").disabled = submitting || !$("carrying").children.length;
+}
+
 async function loadStage() {
   let d, status;
   try {
@@ -635,7 +640,7 @@ async function loadStage() {
   $("heldBox").classList.toggle("hidden", !d.held_back.length);
   $("waysOut").classList.toggle("hidden", !d.ready.length);
   $("showFiles").disabled = !d.ready.length;
-  $("submit").disabled = submitting || !d.ready.length;
+  submitGate();
   $("browserIdentity").classList.toggle("hidden", status.mode !== "browser");
   if (status.author) $("githubAuthor").value = status.author;
   hide("filePreview");
@@ -697,8 +702,7 @@ $("submit").addEventListener("click", async () => {
     res = null;
   } finally {
     submitting = false;
-    // The stage may have changed meanwhile: Submit follows its rows.
-    $("submit").disabled = !$("carrying").children.length;
+    submitGate();
   }
   if (!res) {
     $("contributeStatus").textContent = "The connection was interrupted. Contribute again.";

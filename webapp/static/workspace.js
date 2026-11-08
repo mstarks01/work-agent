@@ -104,13 +104,17 @@ const workspace = (() => {
   };
   // Stop the analysis's run. A 204 says the run ended, and a 202 that it
   // still ends; resolves to whether it ended and the page's message for it,
-  // a lost connection included. Both Stop buttons read the outcome here.
+  // a lost connection included. Both Stop buttons stop here, and the run
+  // stays in `stopping` until the answer comes.
   const stopRun = async (run) => {
     let response;
+    stopping.add(run.run);
     try {
       response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
     } catch {
       return {ended: false, text: "Not stopped. The connection was interrupted."};
+    } finally {
+      stopping.delete(run.run);
     }
     if (response.status === 204) return {ended: true, text: "Stopped “" + run.name + "”."};
     if (response.status === 202) return {ended: false, text: "Stopping “" + run.name + "”. Its run ends after its current step."};
@@ -216,14 +220,8 @@ const workspace = (() => {
             stopButton.setAttribute("aria-label", "Stop " + run.name);
             stopButton.disabled = stopping.has(run.run);
             stopButton.onclick = async () => {
-              stopping.add(run.run);
               stopButton.disabled = true;
-              let text;
-              try {
-                ({text} = await stopRun(run));
-              } finally {
-                stopping.delete(run.run);
-              }
+              const {text} = await stopRun(run);
               await library();
               message(text);
             };

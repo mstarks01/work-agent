@@ -3741,3 +3741,21 @@ def test_a_good_answer_that_is_not_json_says_so(sitting_page, path, button, stat
         f"{status}:has-text('connection was interrupted')", state="attached"
     )
     assert page.is_enabled(button)
+
+
+def test_the_list_keeps_stop_off_while_the_header_stops_the_run(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.click("#analysis-rows a:text-is('Hangs')")
+    page.wait_for_selector("#stop-run", state="visible")
+    held = _hold(page, "**/stop")
+    page.click("#stop-run")
+    _wait_for(page, held)
+    page.click("#library-nav")
+    page.wait_for_selector('[aria-label="Stop Hangs"]')
+    assert page.is_disabled('[aria-label="Stop Hangs"]')
+    held[0].continue_()
+    context.close()
