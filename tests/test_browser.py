@@ -3060,6 +3060,21 @@ def test_overlapping_failed_reads_keep_the_choice_to_continue(zoned_page):
     assert page.is_enabled("#go")
 
 
+def test_a_read_in_flight_keeps_the_choice_to_continue(zoned_page):
+    page = zoned_page
+    keep_control(page, "Guard", {"type": "application"})
+    _fail_the_first_list(page, "http")
+    page.goto("/")
+    page.click("#controls-skip")
+    held: list = []
+    page.route("**/workspace/controls", lambda route: held.append(route))
+    page.evaluate("void formControls.load()")
+    page.wait_for_timeout(200)
+    assert page.is_enabled("#go")
+    assert page.is_visible("#controls-retry")
+    held[0].abort()
+
+
 def test_a_controls_read_during_a_run_leaves_the_start_off(zoned_page):
     page = zoned_page
     kept = keep_control(page, "Guard", {"type": "application"})

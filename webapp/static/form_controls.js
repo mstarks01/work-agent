@@ -53,10 +53,9 @@ const formControls = (() => {
 
   // ---- The submission ------------------------------------------------------
   let held = [];
-  // What the page knows of the list: "loading" until a first read answers,
-  // "loaded" after a good read, "failed" after a first read fails, and
-  // "declined" when the operator continues without Controls. A failed read
-  // after a good one keeps the last list and sets `stale`.
+  // What the page knows of the list: "loading" until a read answers,
+  // "loaded" after a good read, and "failed" after a first read fails. A
+  // failed read after a good one keeps the last list and sets `stale`.
   let state = "loading";
   let stale = false;
   // The operator's choice to continue without Controls. A good read clears it.
@@ -121,16 +120,18 @@ const formControls = (() => {
       missing.length ? h("span", { class: "hint" }, ` ${counted(missing.length, "ticked Control is", "ticked Controls are")} missing.`) : null,
     ].filter(Boolean));
     const known = state === "loaded";
+    // Until a good read, the operator's choice decides what the line says.
+    const view = !known && declined ? "declined" : state;
     el("controls-status").replaceChildren(...{
       loading: ["Loading your Controls…"],
       failed: ["Your Controls did not load, so this analysis has none yet."],
       declined: ["No Controls: you chose to continue without them."],
       loaded: stale ? ["The list did not refresh. It shows the Controls from the last load."] : [],
-    }[state]);
-    el("controls-status").className = state === "failed" ? "problem" : "controls-line";
+    }[view]);
+    el("controls-status").className = view === "failed" ? "problem" : "controls-line";
     el("controls-status").hidden = known && !stale;
-    el("controls-recover").hidden = known ? !stale : state === "loading";
-    el("controls-skip").hidden = state !== "failed";
+    el("controls-recover").hidden = known ? !stale : view === "loading";
+    el("controls-skip").hidden = view !== "failed";
     el("controls-summary").hidden = !known;
     el("controls-choose").hidden = !known;
     holdStart();
@@ -181,18 +182,16 @@ const formControls = (() => {
     } else if (state === "loaded") {
       stale = true;
     } else {
-      // A failed read keeps the operator's choice to continue without them.
-      state = declined ? "declined" : "failed";
+      state = "failed";
     }
     drawChecklist();
   };
   // Whether a submission knows its Controls: from a read, by the operator's
   // choice, or from a reopened analysis.
-  const ready = () => reopened || state === "loaded" || state === "declined";
+  const ready = () => reopened || declined || state === "loaded";
   el("controls-retry")?.addEventListener("click", load);
   el("controls-skip")?.addEventListener("click", () => {
     declined = true;
-    state = "declined";
     drawChecklist();
     el("controls-retry").focus();
   });
