@@ -2978,7 +2978,7 @@ def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
 
 def _fail_the_first_list(page, failure: str) -> None:
     """Fail the page's first read of the Controls list in ``failure``'s way."""
-    failed = []
+    failed: list[str] = []
 
     def answer(route):
         if route.request.method != "GET" or failed:
@@ -3017,7 +3017,7 @@ def test_a_controls_list_in_flight_holds_the_start(zoned_page):
     """The form sends no analysis while it does not know the Controls."""
     page = zoned_page
     keep_control(page, "Guard", {"type": "application"})
-    held = []
+    held: list = []
     page.route("**/workspace/controls", lambda route: held.append(route))
     page.goto("/")
     page.wait_for_selector("#controls-status:visible")
