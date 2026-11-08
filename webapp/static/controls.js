@@ -73,7 +73,15 @@
     rows: [],
     evidence: [],
   });
+  // Each start and stop of an edit opens a new session. A file read keeps
+  // the session it started in, and changes no draft of a later one. While a
+  // save runs, the page opens no other draft, so its answer lands on the
+  // draft that sent it.
+  let session = 0;
+  let saving = false;
   const startEdit = (control) => {
+    if (saving) return;
+    session += 1;
     editing = control ? control.id : "new";
     draft = control
       ? JSON.parse(JSON.stringify({ ...control, evidence: control.evidence.map((file) => ({ ...file })) }))
@@ -83,6 +91,7 @@
     el("control-name").focus();
   };
   const stopEdit = () => {
+    session += 1;
     editing = null;
     draft = null;
     draw();
@@ -244,23 +253,34 @@
         refuse(PAGE.at_limit.evidence);
         return;
       }
+      // The file holds its place in the list while the page reads it.
+      const pending = { name: file.name.slice(0, limits.name_chars), class: classPick.value, reading: true };
+      const own = draft;
+      const mine = session;
+      own.evidence.push(pending);
+      draw();
       const read = await textFile.decode(file, limits.max_evidence_bytes);
+      const at = own.evidence.indexOf(pending);
+      if (mine !== session || at < 0) return;
       if (read.error) {
+        own.evidence.splice(at, 1);
         refuse(read.error);
-        return;
+      } else {
+        refuse("");
+        own.evidence[at] = {
+          name: pending.name,
+          class: pending.class,
+          size_bytes: new TextEncoder().encode(read.text).length,
+          text: read.text,
+        };
       }
-      refuse("");
-      draft.evidence.push({
-        name: file.name.slice(0, limits.name_chars),
-        class: classPick.value,
-        size_bytes: new TextEncoder().encode(read.text).length,
-        text: read.text,
-      });
       draw();
     } } });
     return card("Evidence", "A file that shows the protection, as plain text. The analysis quotes it beside a ruling and never reads it as a description.",
       h("ul", { class: "lines", id: "evidence-list" }, ...draft.evidence.map((file, index) => h("li", {},
-        h("span", {}, h("b", {}, file.name), ` · ${CLASS_LABEL[file.class]} · ${textFile.size(file.size_bytes)}`),
+        h("span", {}, h("b", {}, file.name), file.reading
+          ? ` · ${CLASS_LABEL[file.class]} · Reading…`
+          : ` · ${CLASS_LABEL[file.class]} · ${textFile.size(file.size_bytes)}`),
         remove(draft.evidence, index, `the file ${file.name}`)))),
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "evidence-class" }, "Kind of evidence"), classPick),
@@ -278,13 +298,17 @@
     evidence: draft.evidence.map((file) => (file.id ? { id: file.id } : { name: file.name, class: file.class, text: file.text })),
     ...(editing === "new" ? {} : { updated_at: draft.updated_at }),
   });
-  const save = async (button) => {
+  const reading = () => draft.evidence.some((file) => file.reading);
+  const save = async () => {
+    if (saving || reading()) return;
     const missing = draft.facts.find((fact) => !fact.facets && !fact.value.trim());
     if (missing) {
       refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
       return;
     }
-    button.disabled = true;
+    saving = true;
+    const mine = session;
+    draw();
     try {
       const sent = await fetch(editing === "new" ? "/workspace/controls" : `/workspace/controls/${encodeURIComponent(editing)}`, {
         method: editing === "new" ? "POST" : "PUT",
@@ -292,22 +316,25 @@
         body: JSON.stringify(saveBody()),
       });
       const body = await sent.json();
+      saving = false;
+      if (mine !== session) return;
       if (!sent.ok) {
         refuse(body.message);
+        draw();
         return;
       }
       refuse("");
-      editing = null;
-      draft = null;
+      stopEdit();
       show("controls-notice", `“${body.name}” is saved.`);
       await load();
     } catch {
+      saving = false;
+      if (mine !== session) return;
       refuse("The connection was interrupted. Check Controls before you save again.");
-    } finally {
-      button.disabled = false;
+      draw();
     }
   };
-  const editor = () => h("div", { class: "editor" },
+  const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
     h("div", {}, h("label", { class: "field-label", for: "control-name" }, "Name"),
       h("input", { type: "text", id: "control-name", maxlength: limits.name_chars, value: draft.name,
@@ -315,8 +342,10 @@
     rowCard(), scopeCard(), factCard(), evidenceCard(),
     editorProblem,
     h("div", { class: "dialog-actions" },
+      h("span", { id: "editor-status", class: "hint", role: "status" },
+        saving ? `Saving “${draft.name}”…` : reading() ? "Save waits for the file read to end." : ""),
       h("button", { type: "button", id: "cancel-control", on: { click: () => { refuse(""); stopEdit(); } } }, "Cancel"),
-      h("button", { type: "button", id: "save-control", class: "primary", on: { click: (event) => save(event.target) } }, "Save Control")));
+      h("button", { type: "button", id: "save-control", class: "primary", disabled: reading(), on: { click: save } }, "Save Control")));
 
   // ---- The table ----------------------------------------------------------
   el("controls-kind").append(...PAGE.scope_types.map((row) => h("option", { value: row.type }, row.label)));
@@ -349,7 +378,7 @@
       h("td", {}, h("input", { type: "checkbox", checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); draw(); } } })),
       h("td", { class: "name-cell" },
-        h("a", { href: "#", on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
+        h("a", { href: "#", "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
         facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null),
       h("td", {}, scopeText(control.scope_phrase)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
@@ -359,13 +388,13 @@
         : "None"),
       h("td", {}, h("time", { datetime: control.updated_at }, day(control.updated_at))),
       h("td", {}, h("div", { class: "row-actions" },
-        h("button", { type: "button", "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
-        h("button", { type: "button", class: "danger", "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
+        h("button", { type: "button", disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
+        h("button", { type: "button", class: "danger", disabled: saving, "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
   };
 
   const draw = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
-    el("new-control").disabled = atLimit() || editing === "new";
+    el("new-control").disabled = saving || atLimit() || editing === "new";
     show("controls-full", atLimit() ? textFile.refusals.at_limit : "");
     el("editor").replaceChildren(...(draft ? [editor()] : []));
     const shown = shownControls();
@@ -374,7 +403,7 @@
     const shownPicked = shown.filter((control) => chosen.has(control.id)).length;
     selectShown.checked = Boolean(shown.length) && shownPicked === shown.length;
     selectShown.indeterminate = Boolean(shownPicked) && shownPicked < shown.length;
-    el("delete-selected").disabled = !picked.length;
+    el("delete-selected").disabled = saving || !picked.length;
     el("delete-selected").textContent = picked.length ? `Delete selected (${picked.length})` : "Delete selected";
     for (const head of document.querySelectorAll("th[data-sort]")) {
       head.setAttribute("aria-sort", head.dataset.sort === sort.by ? (sort.descending ? "descending" : "ascending") : "none");

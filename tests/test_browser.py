@@ -2427,6 +2427,115 @@ def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
     assert (rows, row_refusal) == (MAX_CONTROL_ROWS, ROWS_FULL)
 
 
+def _two_kept_controls(page) -> tuple[str, str]:
+    """Keep the Controls A and B, and show them on the Controls page."""
+    page.goto("/controls")
+    kept = tuple(keep_control(page, name, {"type": "application"}) for name in "AB")
+    page.reload()
+    page.wait_for_selector("#controls-list tr")
+    return kept
+
+
+def _hold_file_reads(page) -> None:
+    """Hold each evidence file read until ``window.releaseReads()``."""
+    page.evaluate(
+        """() => {
+          const decode = textFile.decode;
+          let open;
+          const gate = new Promise((resolve) => { open = resolve; });
+          window.releaseReads = open;
+          textFile.decode = async (...args) => { await gate; return decode(...args); };
+        }"""
+    )
+
+
+def test_a_save_locks_the_editor_and_lands_on_its_own_draft(page):
+    _two_kept_controls(page)
+    held: list = []
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: held.append(route)
+        if route.request.method == "PUT"
+        else route.fallback(),
+    )
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click("#save-control")
+    page.wait_for_function("document.querySelector('fieldset.editor').disabled")
+    assert page.inner_text("#editor-status") == "Saving “A2”…"
+    assert page.is_disabled('button[aria-label="Edit B"]')
+    assert page.is_disabled("#new-control")
+    page.locator("#controls-list td.name-cell a", has_text="B").click(force=True)
+    assert page.input_value("#control-name") == "A2"
+    page.unroute("**/workspace/controls/*")
+    with page.expect_response("**/workspace/controls/*"):
+        held[0].fallback()
+    page.wait_for_selector("#controls-notice:has-text('“A2” is saved.')")
+    assert page.is_enabled('button[aria-label="Edit B"]')
+
+
+def test_a_refused_save_unlocks_the_editor_and_keeps_the_draft(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: route.fulfill(
+            status=409, json={"message": "Another tab changed this Control."}
+        )
+        if route.request.method == "PUT"
+        else route.fallback(),
+    )
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:has-text('Another tab changed')")
+    assert page.input_value("#control-name") == "A2"
+    assert page.is_enabled("#save-control")
+    assert page.is_enabled('button[aria-label="Edit B"]')
+
+
+def test_a_file_read_waits_for_save_and_stays_with_its_draft(page):
+    _two_kept_controls(page)
+    _hold_file_reads(page)
+    page.click('button[aria-label="Edit A"]')
+    add_evidence(page, "a.txt", "for A\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    assert page.is_disabled("#save-control")
+    assert page.inner_text("#editor-status") == "Save waits for the file read to end."
+    page.click('button[aria-label="Edit B"]')
+    page.evaluate("window.releaseReads()")
+    page.wait_for_timeout(200)
+    assert page.input_value("#control-name") == "B"
+    assert page.locator("#evidence-list li").count() == 0
+
+
+def test_a_file_read_after_cancel_changes_nothing(page):
+    _two_kept_controls(page)
+    _hold_file_reads(page)
+    page.click('button[aria-label="Edit A"]')
+    add_evidence(page, "a.txt", "for A\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    page.click("#cancel-control")
+    page.evaluate("window.releaseReads()")
+    page.wait_for_timeout(200)
+    assert page.locator("#control-name").count() == 0
+
+
+def test_a_finished_file_read_opens_save_again(page):
+    _two_kept_controls(page)
+    _hold_file_reads(page)
+    page.click('button[aria-label="Edit A"]')
+    add_evidence(page, "a.txt", "for A\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    page.evaluate("window.releaseReads()")
+    page.wait_for_selector("#evidence-list li:not(:has-text('Reading…'))")
+    assert page.is_enabled("#save-control")
+    with page.expect_request("**/workspace/controls/*") as sent:
+        page.click("#save-control")
+    assert sent.value.post_data_json["evidence"] == [
+        {"name": "a.txt", "class": "config", "text": "for A\n"}
+    ]
+
+
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     page.goto("/controls")
     assert page.get_attribute("#controls-nav", "aria-current") == "page"
