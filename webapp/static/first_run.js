@@ -585,8 +585,9 @@
   };
   const send = async () => {
     saving = true;
-    // A Control save in flight returns the next revision: wait for it.
-    await scopeInFlight;
+    // A Control save in flight returns the next revision: wait for it. With
+    // none, the request goes out at once, as leaving the page needs.
+    if (scopeInFlight) await scopeInFlight;
     const sent = batch();
     const body = bodyOf(sent);
     if (!body) {
@@ -1176,9 +1177,9 @@
   // answer and drops the choices that wait.
   let wantedScopes = null;
   let savingScopes = false;
-  // Settles when the Control save in flight has its answer drawn, so a
-  // question save sends the revision that answer returned.
-  let scopeInFlight = Promise.resolve();
+  // The Control save in flight, settled when its answer is drawn, so a
+  // question save sends the revision that answer returned. Null with none.
+  let scopeInFlight = null;
   const unsaved = "Your last Control change was not saved. The list shows the choices the service kept. Make the change again.";
   const sendScopes = async (scopes) => {
     await flush();
@@ -1186,8 +1187,12 @@
       refuse("Some answers are not saved yet. Save them, then try again.");
       return false;
     }
-    let response, data, answered;
-    scopeInFlight = new Promise((resolve) => { answered = resolve; });
+    let response, data, settle;
+    scopeInFlight = new Promise((resolve) => { settle = resolve; });
+    const answered = () => {
+      scopeInFlight = null;
+      settle();
+    };
     try {
       response = await fetch("/answer/" + pausedRun, {
         method: "POST",

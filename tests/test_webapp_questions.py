@@ -4388,9 +4388,12 @@ calls.push({{ said: text(box), open: box.open, order }});
     seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
     said = seen["said"]
     assert seen["open"] is True
-    assert seen["order"][:3] == ["detected-facts", "control-offer", "list-intro"], (
-        "the facts and the Controls come before the list"
-    )
+    assert seen["order"][:4] == [
+        "detected-facts",
+        "control-offer",
+        "hint",
+        "list-intro",
+    ], "the facts and the Controls come before the list"
     assert "What your description says (1 part)" in said
     assert (
         "Web App (process) \u2014 technology: FastAPI; exposure: internet-facing"
