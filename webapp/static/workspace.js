@@ -4,6 +4,8 @@ const workspace = (() => {
   const panels = ["description-panel", "progress-panel", "asked", "reports-panel", "library-panel"];
   let current = null;
   let generation = 0;
+  // The runs whose stop is in flight: a redraw keeps their Stop button off.
+  const stopping = new Set();
   let progressRun = null;
   let completedSteps = [];
   let stepStatus = null;
@@ -136,7 +138,7 @@ const workspace = (() => {
     input.select();
   };
   const library = async () => {
-    ++generation;
+    const ticket = ++generation;
     show("library-panel");
     el("analysis-header").hidden = true;
     history.replaceState(null, "", "/?view=analyses");
@@ -144,6 +146,8 @@ const workspace = (() => {
       const response = await fetch("/workspace/runs");
       if (!response.ok) throw new Error("Could not load analyses. Try again.");
       const data = await response.json();
+      // A later load, or another view, owns the page now.
+      if (ticket !== generation) return;
       let sortBy = "date";
       let descending = true;
       const selected = new Set();
@@ -204,9 +208,16 @@ const workspace = (() => {
             const stopButton = node("button", "Stop", "danger");
             stopButton.type = "button";
             stopButton.setAttribute("aria-label", "Stop " + run.name);
+            stopButton.disabled = stopping.has(run.run);
             stopButton.onclick = async () => {
+              stopping.add(run.run);
               stopButton.disabled = true;
-              const {text} = await stopRun(run);
+              let text;
+              try {
+                ({text} = await stopRun(run));
+              } finally {
+                stopping.delete(run.run);
+              }
               await library();
               message(text);
             };

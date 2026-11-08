@@ -4,6 +4,10 @@ const lines = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
 // The case on the stage, the rail as the server last described it, the
 // pending save, and which way a contribution leaves.
 let current = null;
+// A record or a contribution in flight keeps its button off, whatever the
+// marks or the stage draw meanwhile.
+let finishing = false;
+let submitting = false;
 let rows = [];
 let queued = 0;
 let contributionMode = "browser";
@@ -246,6 +250,7 @@ async function openReadOnly(id) {
   show("readOnly");
   const res = await fetch("/api/read-only?case=" + encodeURIComponent(id));
   const d = await res.json();
+  if (current !== id) return;
   if (!res.ok) { $("readOnlyDocument").textContent = d.detail; return; }
   $("readOnlyTitle").textContent = d.title;
   $("readOnlyMeta").textContent = "Reviewed by " + d.reviewed_by + " · " + d.date;
@@ -501,7 +506,7 @@ function unmarked() {
 function updateMarkCounts() {
   $("markCounts").textContent = markSummary();
   const left = unmarked();
-  $("finish").disabled = left > 0;
+  $("finish").disabled = finishing || left > 0;
   $("finishHint").textContent = left > 0
     ? "Answer every finding to record this review — " + left + " left."
     : "";
@@ -526,6 +531,8 @@ $("own").addEventListener("input", gate);
 $("lock").addEventListener("click", async () => {
   const id = current;
   const res = await post("/api/own-list", {case: id, items: lines("own")});
+  // A case opened meanwhile owns the stage: the answer changes only the rail.
+  if (current !== id) { if (res.ok) await loadRail(); return; }
   if (!res.ok) { $("ownHint").textContent = (await res.json()).detail; return; }
   lock();
   await loadRail();
@@ -544,11 +551,18 @@ for (const event of ["input", "change"]) {
 $("finish").addEventListener("click", async () => {
   const id = current;
   const was = $("finish").textContent === "Save changes";
-  $("finish").disabled = true;
-  const res = await post("/api/finish", {
-    case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
-  });
-  const d = await res.json();
+  finishing = true;
+  updateMarkCounts();
+  let res, d;
+  try {
+    res = await post("/api/finish", {
+      case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
+    });
+    d = await res.json();
+  } finally {
+    finishing = false;
+  }
+  if (current !== id) { if (res.ok) await loadRail(); return; }
   updateMarkCounts();
   if (!res.ok) { $("saveStatus").textContent = d.detail; return; }
   warn(d.moved);
@@ -560,9 +574,11 @@ $("finish").addEventListener("click", async () => {
 });
 
 $("resetReview").addEventListener("click", async () => {
-  if (!current) return;
+  const id = current;
+  if (!id) return;
   if (!confirm("Reset your Part 2 answers for this case? Your independent list will stay locked.")) return;
-  const res = await post("/api/reset", {case: current});
+  const res = await post("/api/reset", {case: id});
+  if (current !== id) { if (res.ok) await loadRail(); return; }
   if (!res.ok) { $("saveStatus").textContent = (await res.json()).detail; return; }
   for (const s of allSelects()) s.value = "";
   $("missing").value = "";
@@ -615,7 +631,7 @@ async function loadStage() {
   $("heldBox").classList.toggle("hidden", !d.held_back.length);
   $("waysOut").classList.toggle("hidden", !d.ready.length);
   $("showFiles").disabled = !d.ready.length;
-  $("submit").disabled = !d.ready.length;
+  $("submit").disabled = submitting || !d.ready.length;
   $("browserIdentity").classList.toggle("hidden", status.mode !== "browser");
   if (status.author) $("githubAuthor").value = status.author;
   hide("filePreview");
@@ -663,12 +679,18 @@ $("githubAuthor").addEventListener("input", () => hide("filePreview"));
 $("submit").addEventListener("click", async () => {
   const choice = contributionChoice();
   if (!requireBrowserAuthor(choice)) return;
+  submitting = true;
   $("submit").disabled = true;
   // The preview is the reader's to reopen; the way out must not sit below it.
   hide("filePreview");
   $("contributeStatus").textContent = "Preparing contribution…";
-  const res = await post("/api/contribute", choice);
-  const d = await res.json();
+  let res, d;
+  try {
+    res = await post("/api/contribute", choice);
+    d = await res.json();
+  } finally {
+    submitting = false;
+  }
   $("submit").disabled = false;
   show("thanks");
   if (!res.ok) {

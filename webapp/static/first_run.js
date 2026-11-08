@@ -84,10 +84,15 @@
       }));
 
   document.getElementById("load").addEventListener("click", async () => {
+    // Text typed while the example loads stays: the example fills only the
+    // description the click left.
+    const before = box.value;
     try {
       const response = await fetch("/example");
       if (!response.ok) throw new Error();
-      box.value = await response.text();
+      const example = await response.text();
+      if (box.value !== before) return;
+      box.value = example;
       updateDescriptionRemaining();
     } catch {
       fail("Could not load the example. Try again.");
