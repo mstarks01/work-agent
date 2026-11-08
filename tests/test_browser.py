@@ -1102,8 +1102,10 @@ def test_an_older_list_answer_leaves_the_newer_list(page):
         "created_at": "2026-11-01T00:00:00Z",
         "frameworks": [],
     }
-    held[0].fulfill(json=[old])
-    page.wait_for_timeout(300)
+    with page.expect_response("**/workspace/runs") as answered:
+        held[0].fulfill(json=[old])
+    answered.value.finished()
+    page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
     assert page.locator("text=An older list").count() == 0
 
 
@@ -2263,11 +2265,12 @@ def test_an_older_file_read_leaves_the_newer_file_in_the_dialog(page):
           let open;
           window.releaseFirst = () => open();
           textFile.read = async (...args) => {
-            if (first) {
-              first = false;
-              await new Promise((resolve) => { open = resolve; });
-            }
-            return read(...args);
+            if (!first) return read(...args);
+            first = false;
+            await new Promise((resolve) => { open = resolve; });
+            const out = await read(...args);
+            setTimeout(() => { window.firstDone = true; }, 0);
+            return out;
           };
         }"""
     )
@@ -2276,7 +2279,7 @@ def test_an_older_file_read_leaves_the_newer_file_in_the_dialog(page):
     upload_to_files(page, "newer.txt", "new\n")
     page.wait_for_selector("#upload-dialog[open]")
     page.evaluate("window.releaseFirst()")
-    page.wait_for_timeout(300)
+    page.wait_for_function("() => window.firstDone")
     assert page.input_value("#upload-name") == "newer.txt"
 
 
@@ -3500,10 +3503,12 @@ def test_a_reset_that_answers_after_another_case_opens_clears_only_its_case(
             break
         page.wait_for_timeout(20)
     _open_case(page, other)
-    with page.expect_response("**/api/reset") as answered:
+    with (
+        page.expect_response("**/api/rail"),
+        page.expect_response("**/api/reset") as answered,
+    ):
         held[0].continue_()
     assert answered.value.ok, answered.value.text()
-    page.wait_for_timeout(300)
     assert all(
         page.eval_on_selector_all("select[data-finding]", "s => s.map((x) => x.value)")
     )
@@ -3518,7 +3523,7 @@ def _hold(page, path: str) -> list:
 
 
 def _wait_for(page, held: list) -> None:
-    for _ in range(100):
+    for _ in range(250):
         if held:
             return
         page.wait_for_timeout(20)
@@ -3532,10 +3537,10 @@ def test_a_record_that_answers_after_another_case_opens_leaves_it(sitting_page):
     page.click("#finish")
     _wait_for(page, held)
     _open_case(page, other)
-    with page.expect_response("**/api/finish"):
+    with page.expect_response("**/api/rail"):
         held[0].continue_()
-    page.wait_for_timeout(300)
     assert page.is_hidden("#done")
+    page.wait_for_selector("#finish:enabled")
 
 
 def test_a_mark_change_during_a_record_keeps_its_button_off(sitting_page):
@@ -3561,9 +3566,8 @@ def test_a_lock_that_answers_after_another_case_opens_leaves_it(sitting_page):
     _wait_for(page, held)
     page.click(f'#cases li[data-case="{other}"] button')
     page.wait_for_function("id => current === id", arg=other)
-    with page.expect_response("**/api/own-list"):
+    with page.expect_response("**/api/rail"):
         held[0].continue_()
-    page.wait_for_timeout(300)
     assert not page.evaluate("document.getElementById('own').readOnly")
     assert session.draft(case).own_list
 
@@ -3579,9 +3583,10 @@ def test_a_late_read_only_case_leaves_the_case_opened_after_it(sitting_page):
         "() => document.getElementById('readOnlyDocument').textContent"
     )
     shown = page.inner_text("#readOnlyTitle")
-    with page.expect_response(f"**/api/read-only?case={case}"):
+    with page.expect_response(f"**/api/read-only?case={case}") as answered:
         held[0].continue_()
-    page.wait_for_timeout(300)
+    answered.value.finished()
+    page.evaluate("() => new Promise((r) => setTimeout(r, 0))")
     assert page.inner_text("#readOnlyTitle") == shown
 
 
@@ -3593,7 +3598,67 @@ def test_a_stage_redraw_during_a_contribution_keeps_submit_off(sitting_page):
     page.click("#submit")
     _wait_for(page, held)
     page.evaluate("loadStage()")
-    page.wait_for_timeout(300)
     assert page.is_disabled("#submit")
     held[0].fulfill(status=409, json={"detail": "Contribution needs attention"})
     page.wait_for_selector("#submit:enabled")
+
+
+def test_a_record_that_fails_to_send_gives_its_button_back(sitting_page):
+    page, _, (case, _) = sitting_page
+    page.route("**/api/finish", lambda route: route.abort())
+    _open_case(page, case)
+    page.click("#finish")
+    page.wait_for_selector("#saveStatus:has-text('connection was interrupted')")
+    assert page.is_enabled("#finish")
+
+
+def test_a_cancelled_pick_drops_an_earlier_read(page):
+    page.goto("/files")
+    page.evaluate(
+        """() => {
+          const read = textFile.read;
+          let open;
+          window.releaseFirst = () => open();
+          textFile.read = async (...args) => {
+            await new Promise((resolve) => { open = resolve; });
+            const out = await read(...args);
+            setTimeout(() => { window.firstDone = true; }, 0);
+            return out;
+          };
+        }"""
+    )
+    upload_to_files(page, "slow.txt", "slow\n")
+    page.wait_for_function("() => typeof window.releaseFirst === 'function'")
+    page.evaluate(
+        """() => {
+          const input = document.getElementById("file-input");
+          Object.defineProperty(input, "files", {value: [], configurable: true});
+          input.dispatchEvent(new Event("change"));
+        }"""
+    )
+    page.evaluate("window.releaseFirst()")
+    page.wait_for_function("() => window.firstDone")
+    assert page.is_hidden("#upload-dialog")
+
+
+def test_a_contribution_that_fails_to_send_gives_submit_back(sitting_page):
+    page, _, _ = sitting_page
+    page.route("**/api/contribute", lambda route: route.abort())
+    page.evaluate("openSubmit()")
+    page.wait_for_selector("#submit:enabled")
+    page.click("#submit")
+    page.wait_for_selector("#contributeStatus:has-text('connection was interrupted')")
+    assert page.is_enabled("#submit")
+
+
+def test_a_stop_that_fails_to_send_says_so(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.route("**/stop", lambda route: route.abort())
+    page.click('[aria-label="Stop Hangs"]')
+    page.wait_for_selector("#workspace-message:has-text('Not stopped')")
+    page.wait_for_selector('[aria-label="Stop Hangs"]:enabled')
+    context.close()

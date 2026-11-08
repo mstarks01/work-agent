@@ -94,6 +94,8 @@
   el("upload-file-button").addEventListener("click", () => el("file-input").click());
   let picks = 0;
   el("file-input").addEventListener("change", async () => {
+    // Only the latest file the operator picks fills the dialog.
+    const pick = ++picks;
     const [file] = el("file-input").files;
     el("file-input").value = "";
     if (!file) return;
@@ -102,8 +104,6 @@
       show("files-problem", textFile.refusals.at_limit);
       return;
     }
-    // Only the latest file the operator picks fills the dialog.
-    const pick = ++picks;
     const read = await textFile.read(file, limits.max_bytes, "Files keeps");
     if (pick !== picks) return;
     if (read.error) {

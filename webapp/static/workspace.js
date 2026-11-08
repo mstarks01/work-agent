@@ -215,6 +215,8 @@ const workspace = (() => {
               let text;
               try {
                 ({text} = await stopRun(run));
+              } catch {
+                text = "Not stopped. The connection was interrupted.";
               } finally {
                 stopping.delete(run.run);
               }

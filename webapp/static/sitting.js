@@ -559,11 +559,14 @@ $("finish").addEventListener("click", async () => {
       case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
     });
     d = await res.json();
+  } catch {
+    res = null;
   } finally {
     finishing = false;
+    updateMarkCounts();
   }
-  if (current !== id) { if (res.ok) await loadRail(); return; }
-  updateMarkCounts();
+  if (current !== id) { if (res?.ok) await loadRail(); return; }
+  if (!res) { $("saveStatus").textContent = "The connection was interrupted. Record the review again."; return; }
   if (!res.ok) { $("saveStatus").textContent = d.detail; return; }
   warn(d.moved);
   $("summary").textContent = markSummary();
@@ -688,10 +691,16 @@ $("submit").addEventListener("click", async () => {
   try {
     res = await post("/api/contribute", choice);
     d = await res.json();
+  } catch {
+    res = null;
   } finally {
     submitting = false;
+    $("submit").disabled = false;
   }
-  $("submit").disabled = false;
+  if (!res) {
+    $("contributeStatus").textContent = "The connection was interrupted. Contribute again.";
+    return;
+  }
   show("thanks");
   if (!res.ok) {
     $("contributeStatus").textContent = d.detail || "Contribution needs attention";
