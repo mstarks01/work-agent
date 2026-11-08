@@ -4,6 +4,10 @@ const lines = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
 // The case on the stage, the rail as the server last described it, the
 // pending save, and which way a contribution leaves.
 let current = null;
+// A record or a contribution in flight keeps its button off, whatever the
+// marks or the stage draw meanwhile.
+let finishing = false;
+let submitting = false;
 let rows = [];
 let queued = 0;
 let contributionMode = "browser";
@@ -246,6 +250,7 @@ async function openReadOnly(id) {
   show("readOnly");
   const res = await fetch("/api/read-only?case=" + encodeURIComponent(id));
   const d = await res.json();
+  if (current !== id) return;
   if (!res.ok) { $("readOnlyDocument").textContent = d.detail; return; }
   $("readOnlyTitle").textContent = d.title;
   $("readOnlyMeta").textContent = "Reviewed by " + d.reviewed_by + " · " + d.date;
@@ -501,7 +506,7 @@ function unmarked() {
 function updateMarkCounts() {
   $("markCounts").textContent = markSummary();
   const left = unmarked();
-  $("finish").disabled = left > 0;
+  $("finish").disabled = finishing || left > 0;
   $("finishHint").textContent = left > 0
     ? "Answer every finding to record this review — " + left + " left."
     : "";
@@ -526,6 +531,8 @@ $("own").addEventListener("input", gate);
 $("lock").addEventListener("click", async () => {
   const id = current;
   const res = await post("/api/own-list", {case: id, items: lines("own")});
+  // A case opened meanwhile owns the stage: the answer changes only the rail.
+  if (current !== id) { if (res.ok) await loadRail(); return; }
   if (!res.ok) { $("ownHint").textContent = (await res.json()).detail; return; }
   lock();
   await loadRail();
@@ -544,13 +551,24 @@ for (const event of ["input", "change"]) {
 $("finish").addEventListener("click", async () => {
   const id = current;
   const was = $("finish").textContent === "Save changes";
-  $("finish").disabled = true;
-  const res = await post("/api/finish", {
-    case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
-  });
-  const d = await res.json();
+  finishing = true;
   updateMarkCounts();
-  if (!res.ok) { $("saveStatus").textContent = d.detail; return; }
+  let res, d;
+  try {
+    res = await post("/api/finish", {
+      case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
+    });
+    // Only a refusal may come back as a page that is not JSON.
+    d = res.ok ? await res.json() : await res.json().catch(() => ({}));
+  } catch {
+    res = null;
+  } finally {
+    finishing = false;
+    updateMarkCounts();
+  }
+  if (current !== id) { if (res?.ok) await loadRail(); return; }
+  if (!res) { $("saveStatus").textContent = "The connection was interrupted. Record the review again."; return; }
+  if (!res.ok) { $("saveStatus").textContent = d.detail || "Not recorded. Try again."; return; }
   warn(d.moved);
   $("summary").textContent = markSummary();
   $("doneTitle").textContent = was ? "Changes saved" : "Recorded";
@@ -560,9 +578,11 @@ $("finish").addEventListener("click", async () => {
 });
 
 $("resetReview").addEventListener("click", async () => {
-  if (!current) return;
+  const id = current;
+  if (!id) return;
   if (!confirm("Reset your Part 2 answers for this case? Your independent list will stay locked.")) return;
-  const res = await post("/api/reset", {case: current});
+  const res = await post("/api/reset", {case: id});
+  if (current !== id) { if (res.ok) await loadRail(); return; }
   if (!res.ok) { $("saveStatus").textContent = (await res.json()).detail; return; }
   for (const s of allSelects()) s.value = "";
   $("missing").value = "";
@@ -597,6 +617,11 @@ async function stageAct(path, id) {
 const drop = id => stageAct("/api/drop", id);
 const putBack = id => stageAct("/api/put-back", id);
 
+// Submit is on when the stage carries a case and no contribution is in flight.
+function submitGate() {
+  $("submit").disabled = submitting || !$("carrying").children.length;
+}
+
 async function loadStage() {
   let d, status;
   try {
@@ -615,7 +640,7 @@ async function loadStage() {
   $("heldBox").classList.toggle("hidden", !d.held_back.length);
   $("waysOut").classList.toggle("hidden", !d.ready.length);
   $("showFiles").disabled = !d.ready.length;
-  $("submit").disabled = !d.ready.length;
+  submitGate();
   $("browserIdentity").classList.toggle("hidden", status.mode !== "browser");
   if (status.author) $("githubAuthor").value = status.author;
   hide("filePreview");
@@ -663,13 +688,26 @@ $("githubAuthor").addEventListener("input", () => hide("filePreview"));
 $("submit").addEventListener("click", async () => {
   const choice = contributionChoice();
   if (!requireBrowserAuthor(choice)) return;
+  submitting = true;
   $("submit").disabled = true;
   // The preview is the reader's to reopen; the way out must not sit below it.
   hide("filePreview");
   $("contributeStatus").textContent = "Preparing contribution…";
-  const res = await post("/api/contribute", choice);
-  const d = await res.json();
-  $("submit").disabled = false;
+  let res, d;
+  try {
+    res = await post("/api/contribute", choice);
+    // Only a refusal may come back as a page that is not JSON.
+    d = res.ok ? await res.json() : await res.json().catch(() => ({}));
+  } catch {
+    res = null;
+  } finally {
+    submitting = false;
+    submitGate();
+  }
+  if (!res) {
+    $("contributeStatus").textContent = "The connection was interrupted. Contribute again.";
+    return;
+  }
   show("thanks");
   if (!res.ok) {
     $("contributeStatus").textContent = d.detail || "Contribution needs attention";

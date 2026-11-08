@@ -1020,8 +1020,7 @@
   // service keeps the earlier answer to a facet left out. A changed detail
   // alone sends the facets it starts from, which the service keeps as they
   // are.
-  const sendable = (row) => {
-    const answer = row.read ? row.read() : null;
+  const sendable = (row, answer) => {
     if (!answer || sameAnswer(answer, row.start)) return null;
     if (!answer.facets || !row.start || !row.start.facets) return answer;
     const before = row.start.facets;
@@ -1030,9 +1029,13 @@
     if (Object.keys(given).length) return withDetail({ key: answer.key, facets: given }, answer.detail || "");
     return (answer.detail || "") !== (row.start.detail || "") ? answer : null;
   };
-  // Every row whose answer would be sent, with what it sends.
+  // Every row whose answer would be sent, with what it sends and the whole
+  // answer it read, which a save keeps as the row's start.
   const changes = () => [...QUESTION_ROWS.values()]
-    .map(row => ({ row, answer: sendable(row) }))
+    .map(row => {
+      const read = row.read ? row.read() : null;
+      return { row, read, answer: sendable(row, read) };
+    })
     .filter(({ answer }) => answer);
 
   if (RESUMED_BY) {
@@ -1218,8 +1221,8 @@
         const reply = await post({ ...request, save: true, revision });
         revision = reply.revision;
       }
-      edited.forEach(({ row, answer }) => {
-        row.start = row.read();
+      edited.forEach(({ row, read, answer }) => {
+        row.start = read;
         if (row.kind === "link") DRAFT_LINKS.set(row.q.key, answer.element);
         else DRAFT_FACTS.set(questionKey(answer.key), answer);
       });

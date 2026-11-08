@@ -1061,6 +1061,77 @@ def test_the_stop_buttons_stop_a_running_analysis(browser, hanging):
     assert errors == [], f"the page raised: {errors}"
 
 
+def test_a_redraw_during_a_stop_keeps_its_button_off(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    held: list = []
+    page.route("**/stop", lambda route: held.append(route))
+    page.click('[aria-label="Stop Hangs"]')
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    page.fill("#analysis-search", "Hang")
+    assert page.is_disabled('[aria-label="Stop Hangs"]')
+    held[0].continue_()
+    page.wait_for_selector("#analysis-rows .badge:text-is('Stopped')")
+    context.close()
+
+
+def _count_reads(page, part: str) -> None:
+    """Count in ``window.readsDone`` each answer to a URL that holds
+    ``part`` once the page's own handler has read it and run on."""
+    page.evaluate(
+        """(part) => {
+          window.readsDone = 0;
+          const send = window.fetch;
+          window.fetch = async (...args) => {
+            const response = await send(...args);
+            if (String(args[0]).includes(part)) {
+              const read = response.json.bind(response);
+              response.json = async () => {
+                const body = await read();
+                setTimeout(() => { window.readsDone += 1; }, 0);
+                return body;
+              };
+            }
+            return response;
+          };
+        }""",
+        part,
+    )
+
+
+def test_an_older_list_answer_leaves_the_newer_list(page):
+    page.goto("/")
+    _count_reads(page, "/workspace/runs")
+    held: list = []
+    page.route(
+        "**/workspace/runs",
+        lambda route: held.append(route) if not held else route.fallback(),
+    )
+    page.click("#library-nav")
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    page.click("#library-nav")
+    page.wait_for_selector("#analysis-empty", state="visible")
+    old = {
+        "run": "old",
+        "name": "An older list",
+        "status": "completed",
+        "created_at": "2026-11-01T00:00:00Z",
+        "frameworks": [],
+    }
+    held[0].fulfill(json=[old])
+    page.wait_for_function("() => window.readsDone >= 2")
+    assert page.locator("text=An older list").count() == 0
+
+
 def test_the_settings_page_runs_its_script(browser, tmp_path):
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app
@@ -2192,6 +2263,78 @@ def upload_to_files(page, name: str, text: str) -> None:
     )
 
 
+def test_text_typed_while_the_example_loads_stays(page):
+    page.goto("/")
+    held: list = []
+    page.route("**/example", lambda route: held.append(route))
+    page.click("#load")
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    page.fill("#description", "My own system.")
+    with page.expect_response("**/example"):
+        held[0].continue_()
+    page.wait_for_timeout(200)
+    assert page.input_value("#description") == "My own system."
+
+
+def test_an_older_file_read_leaves_the_newer_file_in_the_dialog(page):
+    page.goto("/files")
+    page.evaluate(
+        """() => {
+          const read = textFile.read;
+          let first = true;
+          let open;
+          window.releaseFirst = () => open();
+          textFile.read = async (...args) => {
+            if (!first) return read(...args);
+            first = false;
+            await new Promise((resolve) => { open = resolve; });
+            const out = await read(...args);
+            setTimeout(() => { window.firstDone = true; }, 0);
+            return out;
+          };
+        }"""
+    )
+    upload_to_files(page, "older.txt", "old\n")
+    page.wait_for_function("() => typeof window.releaseFirst === 'function'")
+    upload_to_files(page, "newer.txt", "new\n")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.evaluate("window.releaseFirst()")
+    page.wait_for_function("() => window.firstDone")
+    assert page.input_value("#upload-name") == "newer.txt"
+
+
+def test_a_save_that_answers_after_a_new_pick_leaves_its_dialog(page):
+    page.goto("/files")
+    held: list = []
+    page.route(
+        "**/workspace/files",
+        lambda route: (
+            held.append(route)
+            if route.request.method == "POST" and not held
+            else route.fallback()
+        ),
+    )
+    upload_to_files(page, "first.txt", "one\n")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.click("#upload-save")
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#upload-dialog:not([open])", state="attached")
+    upload_to_files(page, "second.txt", "two\n")
+    page.wait_for_selector("#upload-dialog[open]")
+    with page.expect_response("**/workspace/files"):
+        held[0].continue_()
+    page.wait_for_selector("#files-notice:has-text('first.txt')")
+    assert page.is_visible("#upload-dialog")
+    assert page.input_value("#upload-name") == "second.txt"
+
+
 def test_the_files_page_keeps_lists_and_deletes_a_file_as_text(page):
     """A name and a text that spell markup stay text (OWASP A03)."""
     page.goto("/files")
@@ -3306,3 +3449,320 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
         assert page.evaluate("window.ran") is None
         context.close()
         assert errors == [], f"the page raised: {errors}"
+
+
+@pytest.fixture(params=["recorded"])
+def sitting_page(browser, tmp_path, request, monkeypatch):
+    """A page on a review sitting with two cases: each recorded with a mark
+    on every finding, blank, or signed by a central review. The page's
+    confirm dialogs are accepted."""
+    from tests.test_sitting_feedback import (
+        CASE,
+        OTHER,
+        OWN_LIST,
+        central_review,
+        tree_for,
+    )
+    from webapp import sitting
+
+    # No GitHub login, on every machine: a contribution takes the browser
+    # route, which asks for an author and opens no pull request.
+    monkeypatch.setattr(sitting, "_gh_login", lambda root: "")
+    tree = tree_for(tmp_path)
+    if request.param == "signed":
+        central_review(tree, cases=(CASE, OTHER))
+    session = sitting.build_session(
+        tree,
+        sitting.LOCAL_SUBMITTER,
+        "anonymous",
+        drafts=tree.parent / "state" / "reviews",
+    )
+    with contextmanager(serve)(sitting.create_app(session)) as base:
+        context = browser.new_context(base_url=base)
+        opened = context.new_page()
+        errors: list[str] = []
+        opened.on("pageerror", lambda error: errors.append(str(error)))
+        opened.on("dialog", lambda dialog: dialog.accept())
+        opened.goto("/")
+        opened.wait_for_selector("#cases li button")
+        for case in (CASE, OTHER) if request.param == "recorded" else ():
+            opened.evaluate(
+                """async ([id, own]) => {
+                  await post("/api/own-list", {case: id, items: own});
+                  const two = await fetch("/api/part-two?case=" + id, {headers})
+                    .then((r) => r.json());
+                  const marks = Object.fromEntries(
+                    two.marks.map((t) => [t.fingerprint, "agree"]));
+                  await post("/api/finish",
+                    {case: id, marks, missing: [], notes: ""});
+                }""",
+                [case, OWN_LIST],
+            )
+        opened.reload()
+        opened.wait_for_selector("#cases li button")
+        yield opened, session, (CASE, OTHER)
+        context.close()
+        assert errors == [], f"the page raised: {errors}"
+
+
+def _open_case(page, case: str) -> None:
+    page.click(f'#cases li[data-case="{case}"] button')
+    page.wait_for_function(
+        "id => current === id"
+        " && document.querySelectorAll('select[data-finding]').length > 0"
+        " && [...document.querySelectorAll('select[data-finding]')]"
+        ".every((s) => s.value)",
+        arg=case,
+    )
+
+
+def test_a_reset_that_answers_after_another_case_opens_clears_only_its_case(
+    sitting_page,
+):
+    page, session, (case, other) = sitting_page
+    held: list = []
+    page.route("**/api/reset", lambda route: held.append(route))
+    _open_case(page, case)
+    page.click("#resetReview")
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(20)
+    _open_case(page, other)
+    with (
+        page.expect_response("**/api/rail"),
+        page.expect_response("**/api/reset") as answered,
+    ):
+        held[0].continue_()
+    assert answered.value.ok, answered.value.text()
+    assert all(
+        page.eval_on_selector_all("select[data-finding]", "s => s.map((x) => x.value)")
+    )
+    assert session.draft(other).marks
+
+
+def _open_submit(page) -> None:
+    """Open the contribution stage, with an author for the browser route."""
+    page.evaluate("openSubmit()")
+    page.wait_for_selector("#submit:enabled")
+    page.fill("#githubAuthor", "web-reviewer")
+
+
+def _hold(page, path: str) -> list:
+    """Hold each request to ``path``, and return the held routes."""
+    held: list = []
+    page.route(path, lambda route: held.append(route))
+    return held
+
+
+def _wait_for(page, held: list) -> None:
+    for _ in range(250):
+        if held:
+            return
+        page.wait_for_timeout(20)
+    raise AssertionError("no request was held")
+
+
+def test_a_record_that_answers_after_another_case_opens_leaves_it(sitting_page):
+    page, _, (case, other) = sitting_page
+    held = _hold(page, "**/api/finish")
+    _open_case(page, case)
+    page.click("#finish")
+    _wait_for(page, held)
+    _open_case(page, other)
+    with page.expect_response("**/api/rail"):
+        held[0].continue_()
+    assert page.is_hidden("#done")
+    page.wait_for_selector("#finish:enabled")
+
+
+def test_a_mark_change_during_a_record_keeps_its_button_off(sitting_page):
+    page, _, (case, _) = sitting_page
+    held = _hold(page, "**/api/finish")
+    _open_case(page, case)
+    page.click("#finish")
+    _wait_for(page, held)
+    page.select_option("select[data-finding] >> nth=0", "unsure")
+    assert page.is_disabled("#finish")
+    held[0].continue_()
+    page.wait_for_selector("#finish:enabled")
+
+
+@pytest.mark.parametrize("sitting_page", ["blank"], indirect=True)
+def test_a_lock_that_answers_after_another_case_opens_leaves_it(sitting_page):
+    page, session, (case, other) = sitting_page
+    held = _hold(page, "**/api/own-list")
+    page.click(f'#cases li[data-case="{case}"] button')
+    page.wait_for_function("id => current === id", arg=case)
+    page.fill("#own", "a spoofed device\nanother line of my own list")
+    page.click("#lock")
+    _wait_for(page, held)
+    page.click(f'#cases li[data-case="{other}"] button')
+    page.wait_for_function("id => current === id", arg=other)
+    with page.expect_response("**/api/rail"):
+        held[0].continue_()
+    assert not page.evaluate("document.getElementById('own').readOnly")
+    assert session.draft(case).own_list
+
+
+@pytest.mark.parametrize("sitting_page", ["signed"], indirect=True)
+def test_a_late_read_only_case_leaves_the_case_opened_after_it(sitting_page):
+    page, _, (case, other) = sitting_page
+    _count_reads(page, "/api/read-only")
+    held = _hold(page, f"**/api/read-only?case={case}")
+    page.click(f'#cases li[data-case="{case}"] button')
+    _wait_for(page, held)
+    page.click(f'#cases li[data-case="{other}"] button')
+    page.wait_for_function(
+        "() => document.getElementById('readOnlyDocument').textContent"
+    )
+    shown = page.inner_text("#readOnlyTitle")
+    held[0].continue_()
+    page.wait_for_function("() => window.readsDone >= 2")
+    assert page.inner_text("#readOnlyTitle") == shown
+
+
+def test_a_stage_redraw_during_a_contribution_keeps_submit_off(sitting_page):
+    page, _, _ = sitting_page
+    held = _hold(page, "**/api/contribute")
+    _open_submit(page)
+    page.click("#submit")
+    _wait_for(page, held)
+    page.evaluate("loadStage()")
+    assert page.is_disabled("#submit")
+    held[0].fulfill(status=409, json={"detail": "Contribution needs attention"})
+    page.wait_for_selector("#submit:enabled")
+
+
+def test_a_record_that_fails_to_send_gives_its_button_back(sitting_page):
+    page, _, (case, _) = sitting_page
+    page.route("**/api/finish", lambda route: route.abort())
+    _open_case(page, case)
+    page.click("#finish")
+    page.wait_for_selector("#saveStatus:has-text('connection was interrupted')")
+    assert page.is_enabled("#finish")
+
+
+def test_a_cancelled_pick_drops_an_earlier_read(page):
+    page.goto("/files")
+    page.evaluate(
+        """() => {
+          const read = textFile.read;
+          let open;
+          window.releaseFirst = () => open();
+          textFile.read = async (...args) => {
+            await new Promise((resolve) => { open = resolve; });
+            const out = await read(...args);
+            setTimeout(() => { window.firstDone = true; }, 0);
+            return out;
+          };
+        }"""
+    )
+    upload_to_files(page, "slow.txt", "slow\n")
+    page.wait_for_function("() => typeof window.releaseFirst === 'function'")
+    page.evaluate(
+        """() => {
+          const input = document.getElementById("file-input");
+          Object.defineProperty(input, "files", {value: [], configurable: true});
+          input.dispatchEvent(new Event("change"));
+        }"""
+    )
+    page.evaluate("window.releaseFirst()")
+    page.wait_for_function("() => window.firstDone")
+    assert page.is_hidden("#upload-dialog")
+
+
+def test_a_contribution_that_fails_to_send_gives_submit_back(sitting_page):
+    page, _, _ = sitting_page
+    page.route("**/api/contribute", lambda route: route.abort())
+    _open_submit(page)
+    page.click("#submit")
+    page.wait_for_selector("#contributeStatus:has-text('connection was interrupted')")
+    assert page.is_enabled("#submit")
+
+
+def test_a_stop_that_fails_to_send_says_so(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.route("**/stop", lambda route: route.abort())
+    page.click('[aria-label="Stop Hangs"]')
+    page.wait_for_selector("#workspace-message:has-text('Not stopped')")
+    page.wait_for_selector('[aria-label="Stop Hangs"]:enabled')
+    context.close()
+
+
+def test_a_stop_from_the_analysis_that_fails_to_send_says_so(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.click("#analysis-rows a:text-is('Hangs')")
+    page.wait_for_selector("#stop-run", state="visible")
+    page.route("**/stop", lambda route: route.abort())
+    page.click("#stop-run")
+    page.wait_for_selector("#workspace-message:has-text('Not stopped')")
+    assert page.is_enabled("#stop-run")
+    context.close()
+
+
+def test_submit_follows_the_stage_after_a_contribution(sitting_page):
+    page, _, _ = sitting_page
+    held = _hold(page, "**/api/contribute")
+    _open_submit(page)
+    page.click("#submit")
+    _wait_for(page, held)
+    while rows := page.locator("#carrying button").count():
+        page.locator("#carrying button").first.click()
+        page.wait_for_function(
+            "n => document.querySelectorAll('#carrying button').length < n",
+            arg=rows,
+        )
+    held[0].fulfill(status=409, json={"detail": "Contribution needs attention"})
+    page.wait_for_selector(
+        "#contributeStatus:has-text('needs attention')", state="attached"
+    )
+    assert page.is_disabled("#submit")
+
+
+@pytest.mark.parametrize(
+    ("path", "button", "status"),
+    [
+        ("finish", "#finish", "#saveStatus"),
+        ("contribute", "#submit", "#contributeStatus"),
+    ],
+)
+def test_a_good_answer_that_is_not_json_says_so(sitting_page, path, button, status):
+    page, _, (case, _) = sitting_page
+    page.route(f"**/api/{path}", lambda route: route.fulfill(body="<html>oops</html>"))
+    if path == "finish":
+        _open_case(page, case)
+    else:
+        _open_submit(page)
+    page.click(button)
+    page.wait_for_selector(
+        f"{status}:has-text('connection was interrupted')", state="attached"
+    )
+    assert page.is_enabled(button)
+
+
+def test_the_list_keeps_stop_off_while_the_header_stops_the_run(browser, hanging):
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.click("#analysis-rows a:text-is('Hangs')")
+    page.wait_for_selector("#stop-run", state="visible")
+    held = _hold(page, "**/stop")
+    page.click("#stop-run")
+    _wait_for(page, held)
+    page.click("#library-nav")
+    page.wait_for_selector('[aria-label="Stop Hangs"]')
+    assert page.is_disabled('[aria-label="Stop Hangs"]')
+    held[0].fulfill(status=409, json={"message": "Not now."})
+    page.wait_for_selector('[aria-label="Stop Hangs"]:enabled')
+    context.close()

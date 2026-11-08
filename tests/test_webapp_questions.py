@@ -4081,6 +4081,30 @@ calls.push({{
         assert not after["disabled"]
         assert seen["href"] == ""
 
+    def test_an_edit_during_a_save_stays_unsaved(self):
+        """A save marks as saved what it sent, never an edit made during it."""
+        steps = (
+            _FILL_AND_SERVE
+            + """
+const served = globalThis.fetch;
+let release;
+globalThis.fetch = (url, init) => new Promise((resolve) => {
+  release = () => resolve(served(url, init));
+});
+const first = button("Save draft").listeners.click();
+await new Promise((r) => setTimeout(r, 0));
+box.all("input").filter(i => i.type === "text")[0].value = "edited during the save";
+release();
+await first;
+globalThis.fetch = served;
+await button("Save draft").listeners.click();
+"""
+        )
+        calls = _run_answer_block(_draft_payloads(2), steps)["calls"]
+        assert [c["body"]["facts"] for c in calls][-1] == [
+            calls[0]["body"]["facts"][0] | {"value": "edited during the save"}
+        ]
+
     def test_a_refused_request_shows_the_service_s_reason(self):
         steps = (
             _FILL_AND_SERVE

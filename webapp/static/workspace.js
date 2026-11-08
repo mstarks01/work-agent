@@ -4,6 +4,8 @@ const workspace = (() => {
   const panels = ["description-panel", "progress-panel", "asked", "reports-panel", "library-panel"];
   let current = null;
   let generation = 0;
+  // The runs whose stop is in flight: a redraw keeps their Stop button off.
+  const stopping = new Set();
   let progressRun = null;
   let completedSteps = [];
   let stepStatus = null;
@@ -101,9 +103,19 @@ const workspace = (() => {
     message(refused.length ? "Not deleted. " + refused.join(" ") : "Deleted " + counted(runs.length, "analysis", "analyses") + ".");
   };
   // Stop the analysis's run. A 204 says the run ended, and a 202 that it
-  // still ends; resolves to whether it ended and the page's message for it.
+  // still ends; resolves to whether it ended and the page's message for it,
+  // a lost connection included. Both Stop buttons stop here, and the run
+  // stays in `stopping` until the answer comes.
   const stopRun = async (run) => {
-    const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    let response;
+    stopping.add(run.run);
+    try {
+      response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    } catch {
+      return {ended: false, text: "Not stopped. The connection to stop “" + run.name + "” was interrupted."};
+    } finally {
+      stopping.delete(run.run);
+    }
     if (response.status === 204) return {ended: true, text: "Stopped “" + run.name + "”."};
     if (response.status === 202) return {ended: false, text: "Stopping “" + run.name + "”. Its run ends after its current step."};
     return {ended: false, text: "Not stopped. " + ((await response.json().catch(() => ({}))).message || "Could not stop it.")};
@@ -136,7 +148,7 @@ const workspace = (() => {
     input.select();
   };
   const library = async () => {
-    ++generation;
+    const ticket = ++generation;
     show("library-panel");
     el("analysis-header").hidden = true;
     history.replaceState(null, "", "/?view=analyses");
@@ -144,6 +156,8 @@ const workspace = (() => {
       const response = await fetch("/workspace/runs");
       if (!response.ok) throw new Error("Could not load analyses. Try again.");
       const data = await response.json();
+      // A later load, or another view, owns the page now.
+      if (ticket !== generation) return;
       let sortBy = "date";
       let descending = true;
       const selected = new Set();
@@ -204,6 +218,7 @@ const workspace = (() => {
             const stopButton = node("button", "Stop", "danger");
             stopButton.type = "button";
             stopButton.setAttribute("aria-label", "Stop " + run.name);
+            stopButton.disabled = stopping.has(run.run);
             stopButton.onclick = async () => {
               stopButton.disabled = true;
               const {text} = await stopRun(run);
@@ -309,6 +324,8 @@ const workspace = (() => {
     el("stop-run").disabled = true;
     const {ended, text} = await stopRun(current);
     el("stop-run").disabled = false;
+    // The list may show this run's Stop, held off while the stop ran.
+    if (!el("library-panel").hidden) await library();
     // An ended run shows its own status on the next read.
     if (!ended) message(text);
   });

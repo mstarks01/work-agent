@@ -88,24 +88,26 @@ def record_one(client: TestClient) -> None:
     )
 
 
-def central_review(tree: Path, author: str = "ada") -> Path:
-    prepared = sittings.prepare(tree / "evals" / "corpus" / CASE)
+def _answers(tree: Path, case: str) -> envelopes.CaseAnswers:
+    prepared = sittings.prepare(tree / "evals" / "corpus" / case)
+    return envelopes.CaseAnswers(
+        own_list=OWN_LIST,
+        marks={target.fingerprint: "agree" for target in prepared.mark_targets},
+        missing=["a missed authorization edge"],
+        notes="reviewer context",
+        opened_digests=sittings.digests(
+            tree / "evals" / "corpus" / case, prepared.files
+        ),
+    )
+
+
+def central_review(tree: Path, author: str = "ada", cases=(CASE,)) -> Path:
     envelope = envelopes.Envelope(
         envelope=envelopes.VERSION,
         submitted_by=author,
         submitted_for=author,
         generated="2026-09-05",
-        cases={
-            CASE: envelopes.CaseAnswers(
-                own_list=OWN_LIST,
-                marks={target.fingerprint: "agree" for target in prepared.mark_targets},
-                missing=["a missed authorization edge"],
-                notes="reviewer context",
-                opened_digests=sittings.digests(
-                    tree / "evals" / "corpus" / CASE, prepared.files
-                ),
-            )
-        },
+        cases={case: _answers(tree, case) for case in cases},
     )
     path = tree / review_submissions.relative_path(envelope)
     path.parent.mkdir(parents=True, exist_ok=True)

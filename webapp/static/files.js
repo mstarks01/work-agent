@@ -92,7 +92,10 @@
   // A chosen file is read and checked in the browser, then named and kinded
   // in the dialog. The server checks it again before it keeps it.
   el("upload-file-button").addEventListener("click", () => el("file-input").click());
+  let picks = 0;
   el("file-input").addEventListener("change", async () => {
+    // Only the latest file the operator picks fills the dialog.
+    const pick = ++picks;
     const [file] = el("file-input").files;
     el("file-input").value = "";
     if (!file) return;
@@ -102,6 +105,7 @@
       return;
     }
     const read = await textFile.read(file, limits.max_bytes, "Files keeps");
+    if (pick !== picks) return;
     if (read.error) {
       show("files-problem", read.error);
       return;
@@ -142,23 +146,28 @@
       return;
     }
     el("upload-save").disabled = true;
+    // The dialog can close and open on another file while this save runs:
+    // the answer then changes only the list and the notice.
+    const sending = pending;
     try {
       const saved = await fetch("/workspace/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, kind: pending.kind, format: pending.row.format, text: pending.text }),
+        body: JSON.stringify({ name, kind: sending.kind, format: sending.row.format, text: sending.text }),
       });
       const body = await saved.json();
       if (!saved.ok) {
-        show("upload-problem", body.message);
+        if (pending === sending) show("upload-problem", body.message);
         return;
       }
-      pending = null;
-      el("upload-dialog").close();
+      if (pending === sending) {
+        pending = null;
+        el("upload-dialog").close();
+      }
       show("files-notice", `“${body.name}” is in Files.`);
       await load();
     } catch {
-      show("upload-problem", "The connection was interrupted. Check Files before you upload again.");
+      if (pending === sending) show("upload-problem", "The connection was interrupted. Check Files before you upload again.");
     } finally {
       el("upload-save").disabled = false;
     }
