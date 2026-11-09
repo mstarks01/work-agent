@@ -2975,15 +2975,38 @@ def test_a_scope_change_that_removes_nothing_shows_no_notice(page):
     assert page.locator("#scope-removed").count() == 0
 
 
-def test_an_edit_after_a_scope_change_ends_its_undo(page):
+def test_an_edit_of_the_scope_after_a_scope_change_ends_its_undo(page):
     page.goto("/controls")
     new_control(page, "Orders DB encryption")
-    page.select_option("#scope-type", "application")
+    page.select_option("#scope-type", "process")
     assert page.locator("#scope-removed").count() == 1
+    page.fill("#scope-name", "Worker")
+    assert page.locator("#scope-removed").count() == 0
+
+
+def test_an_alias_after_a_scope_change_ends_its_undo(page):
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    page.select_option("#scope-type", "process")
+    page.fill("#alias-input", "worker")
+    page.press("#alias-input", "Enter")
+    assert page.locator("#scope-removed").count() == 0
+
+
+def test_other_edits_and_a_file_read_keep_the_undo(page):
+    page.goto("/controls")
+    _hold_file_reads(page)
+    new_control(page, "Orders DB encryption")
+    add_evidence(page, "rds.tf", "storage_encrypted = true\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    page.select_option("#scope-type", "application")
     page.fill("#control-name", "Edge TLS")
-    assert page.locator("#scope-removed").count() == 0
     add_row(page, "stride", "spoofing")
-    assert page.locator("#scope-removed").count() == 0
+    page.evaluate("window.releaseReads()")
+    page.wait_for_selector("#evidence-list li:not(:has-text('Reading…'))")
+    page.click("#scope-undo")
+    assert page.input_value("#scope-name") == "Orders DB"
+    assert page.input_value("#control-name") == "Edge TLS"
 
 
 def test_a_scope_change_that_removes_nothing_keeps_the_undo(page):
@@ -3013,6 +3036,10 @@ def test_save_and_open_waits_for_a_file_read(page):
     page.wait_for_selector("#evidence-list li:has-text('Reading…')")
     page.click('button[aria-label="Edit B"]')
     assert page.is_disabled("#leave-save")
+    assert page.is_visible("#leave-wait")
+    page.evaluate("window.releaseReads()")
+    page.wait_for_selector("#leave-save:enabled")
+    assert page.is_hidden("#leave-wait")
 
 
 def test_save_and_open_keeps_a_draft_opened_during_the_reload(page):

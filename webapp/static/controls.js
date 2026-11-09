@@ -89,10 +89,13 @@
   const changed = () => draft !== null && JSON.stringify(draft) !== clean;
   // What the last change of "What it protects" removed, which Undo puts
   // back: the scope and the facts before the change, the facts it removed,
-  // and the draft after it. Undo lasts until the next edit of the draft.
+  // and the scope and facts after it. Undo lasts until the next edit of the
+  // scope or the facts; it leaves the name, the rows and the evidence as
+  // they are.
   let removed = null;
+  const undoKey = () => JSON.stringify([draft.scope, draft.facts]);
   const dropUndo = () => {
-    if (!removed || JSON.stringify(draft) === removed.after) return;
+    if (!removed || undoKey() === removed.after) return;
     removed = null;
     el("scope-removed")?.remove();
   };
@@ -128,7 +131,6 @@
     const title = draft.name ? `“${draft.name}”` : editing === "new" ? "The new Control" : "This Control";
     el("leave-question").textContent = `${title} has changes you have not saved.`;
     el("leave-save").textContent = control ? `Save and open “${control.name}”` : "Save and open a new Control";
-    el("leave-save").disabled = reading();
     el("leave-dialog").showModal();
   };
   // Closing the editor from inside it moves focus to the edited Control's
@@ -206,6 +208,8 @@
         drawEditor();
       } },
     });
+    // An alias added or removed draws the editor with no input event, so
+    // the draw ends the Undo too.
     dropUndo();
     return card("What it protects", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
       h("div", { class: "line" },
@@ -215,7 +219,7 @@
             draft.scope = { type: event.target.value, name: "", aliases: [] };
             draft.facts = draft.facts.filter((fact) => ticks(draft.scope.type, fact).length);
             const lost = before.facts.filter((fact) => !draft.facts.includes(fact));
-            const after = JSON.stringify(draft);
+            const after = undoKey();
             // A change that removes nothing keeps the Undo of the change
             // before it.
             if (lost.length || before.scope.name || before.scope.aliases.length) removed = { ...before, lost, after };
@@ -505,7 +509,12 @@
   };
   // The editor draws again after a change in it. The table draws on its
   // own, so a filter, a sort or a row tick leaves the editor as it is.
-  const drawEditor = () => redraw(el("editor"), draft ? [editor()] : []);
+  // "Save and open" waits for a file read, as Save does.
+  const drawEditor = () => {
+    redraw(el("editor"), draft ? [editor()] : []);
+    el("leave-save").disabled = Boolean(draft) && reading();
+    el("leave-wait").hidden = !el("leave-save").disabled;
+  };
   const drawTable = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
     el("new-control").disabled = saving || atLimit() || editing === "new";

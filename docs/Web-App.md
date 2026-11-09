@@ -368,7 +368,7 @@ it.
   kind, the name and the aliases. A change of the kind removes the name, the
   aliases and each fact that the new kind does not take. A notice lists what
   the change removed and has an "Undo" button. The Undo stays until the next
-  edit of the draft. "What it does" is a checklist of
+  edit of what the Control protects or does. "What it does" is a checklist of
   protections, grouped by topic, such as "Encrypts its backups and
   snapshots." or "The internet cannot reach it.". Each tick writes the
   answer that makes its fact a protection: a Question Kind or one of its
