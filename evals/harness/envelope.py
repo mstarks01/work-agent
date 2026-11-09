@@ -120,8 +120,25 @@ def stamp(now: datetime | None = None) -> str:
     return (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H%M%SZ")
 
 
+def _printable(text: str) -> str:
+    """``text`` with each character a terminal could act on written as its
+    escape."""
+    return "".join(
+        char if char.isprintable() or char == "\n" else ascii(char)[1:-1]
+        for char in text
+    )
+
+
 class EnvelopeError(RuntimeError):
-    """An envelope this operator's tree will not take, and why."""
+    """An envelope this operator's tree will not take, and why.
+
+    The reason quotes the envelope, and the envelope is untrusted, so the
+    message holds no character a terminal could act on. Each command that
+    prints the refusal reads it from here.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(_printable(reason))
 
 
 class CaseAnswers(BaseModel):
@@ -284,15 +301,6 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
     return sorted(envelope.cases)
 
 
-def _printable(text: str) -> str:
-    """``text`` with each character a terminal could act on written as its
-    escape. A refusal quotes the envelope, and the envelope is untrusted."""
-    return "".join(
-        char if char.isprintable() or char == "\n" else ascii(char)[1:-1]
-        for char in text
-    )
-
-
 def command_import(args: argparse.Namespace) -> int:
     """``run sitting-import <file> --submitted-by <login>``: one envelope in.
 
@@ -323,7 +331,7 @@ def command_import(args: argparse.Namespace) -> int:
             )
         written = apply(envelope, root)
     except EnvelopeError as exc:
-        print(f"this envelope was not applied:\n{_printable(str(exc))}")
+        print(f"this envelope was not applied:\n{exc}")
         return 1
 
     names = sittings.naming(envelope.submitted_by, envelope.submitted_for)

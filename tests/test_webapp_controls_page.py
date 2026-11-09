@@ -1036,6 +1036,10 @@ def test_a_csv_cell_that_reads_as_a_formula_starts_with_an_apostrophe(ruled, lea
         ("Spoofed login;=cmd|' /C calc'!A0;", "Spoofed login;'=cmd|' /C calc'!A0;"),
         ("Spoofed login\t@SUM(1)", "Spoofed login\t'@SUM(1)"),
         ("Spoofed login;＝1", "Spoofed login;'＝1"),
+        ("Spoofed login;+1", "Spoofed login;'+1"),
+        ('Spoofed login;"=1+1;x', "Spoofed login;'\"=1+1;x"),
+        ('Spoofed login\t"@SUM(1)\tx', "Spoofed login\t'\"@SUM(1)\tx"),
+        ('Spoofed login\n"=1+1\nx', "Spoofed login\n'\"=1+1\nx"),
         ("A well-known key; a second point", "A well-known key; a second point"),
         ("Tokens = secrets - salt", "Tokens = secrets - salt"),
         ("Two lines\r\n\n=text\n- a bullet", "Two lines\r\n\n'=text\n'- a bullet"),
@@ -1053,7 +1057,7 @@ def test_a_csv_cell_has_no_formula_after_a_separator(ruled, title, cell):
             for row in csv.reader(io.StringIO(text), delimiter=delimiter)
             for part in row
         ]
-        assert not [part for part in cells if part.startswith(("=", "-", "@", "＝"))]
+        assert not [part for part in cells if part.startswith(tuple("=+-@＝＋－＠"))]
     assert list(csv.reader(io.StringIO(text)))[1][2] == cell
 
 

@@ -163,8 +163,10 @@ CSV_COLUMNS = (
 #: there, and it does not read the quotes around a cell that starts after a
 #: comma, so a line break in the value starts a row. A tab, a CR or an LF at
 #: the start counts too. The full-width forms count because a spreadsheet
-#: reads them as the ASCII characters.
-_FORMULA_START = re.compile(r"^(?=[\t\r\n])|(?:^|(?<=[;\t\r\n]))(?=[=+\-@＝＋－＠])")
+#: reads them as the ASCII characters. Quote marks before the formula
+#: character do not hide it, because the writer doubles each one and a
+#: spreadsheet reads a doubled pair at the start of a cell as an empty quote.
+_FORMULA_START = re.compile(r"^(?=[\t\r\n])|(?:^|(?<=[;\t\r\n]))(?=\"*[=+\-@＝＋－＠])")
 
 
 def _level(severity: Severity) -> str:

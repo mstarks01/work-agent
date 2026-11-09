@@ -360,6 +360,9 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         assert (code, recorded) == (1, [])
         assert "pwned" in printed
         assert printed.replace("\n", "").isprintable()
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+        assert str(refusal.value).replace("\n", "").isprintable()
 
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys
