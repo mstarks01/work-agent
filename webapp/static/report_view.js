@@ -1380,7 +1380,7 @@
     const lists = Object.entries(RULING_LISTS)
       .map(([verdict, heading]) => [heading, row.rulings.filter((ruling) => ruling.ruling === verdict)])
       .filter(([, rulings]) => rulings.length);
-    if (lists.length) summary.append(" ", el("span", "meta", lists.map(([heading, rulings]) => `${heading}: ${rulings.length}`).join(" · ")));
+    if (row.tally) summary.append(" ", el("span", "meta", row.tally));
     open.append(summary);
     for (const [heading, rulings] of lists) {
       const items = el("ul", "ruling-list");
@@ -1394,7 +1394,6 @@
     for (const quoted of row.quoted) {
       open.append(el("p", "meta", `${quoted.file} · ${quoted.class} · line ${quoted.line}`), el("blockquote", "excerpt", quoted.text));
     }
-    if (!row.ticked) open.append(el("p", "meta", `This row was left out: version ${row.version} is not the version the analysis ran.`));
     open.append(el("p", "meta", row.meaning));
     return open;
   };

@@ -491,7 +491,7 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="applied", reason="yes"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "applied"
+        assert row_outcome(rulings, ticked=True, unreached=False) == "applied"
 
     def test_a_row_applied_once_and_refused_once_is_partly_applied(self):
         rulings = [
@@ -499,7 +499,7 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="applied", reason="yes"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "partly-applied"
+        assert row_outcome(rulings, ticked=True, unreached=False) == "partly-applied"
 
     def test_a_row_refused_on_every_ruling_is_refused(self):
         rulings = [
@@ -507,18 +507,21 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="refused", reason="no"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "refused"
+        assert row_outcome(rulings, ticked=True, unreached=False) == "refused"
 
     def test_a_row_with_no_ruling_found_nothing(self):
-        assert row_outcome([], unreached=False) == "no-finding"
+        assert row_outcome([], ticked=True, unreached=False) == "no-finding"
 
     def test_a_row_with_no_ruling_and_a_finding_it_missed_is_not_reached(self):
-        assert row_outcome([], unreached=True) == "not-reached"
+        assert row_outcome([], ticked=True, unreached=True) == "not-reached"
+
+    def test_a_row_of_another_version_is_left_out(self):
+        assert row_outcome([], ticked=False, unreached=True) == "left-out"
 
     def test_a_ruling_outweighs_a_finding_the_row_missed(self):
         rulings = [RowRuling(claim="a", ruling="applied", reason="yes")]
 
-        assert row_outcome(rulings, unreached=True) == "applied"
+        assert row_outcome(rulings, ticked=True, unreached=True) == "applied"
 
 
 class TestTheUnreachedRows:
@@ -563,6 +566,24 @@ class TestTheUnreachedRows:
         assert outcomes["spoofing"][0] == "not-reached"
         assert outcomes["spoofing"][1].startswith("Not reached")
         assert outcomes["tampering"][0] == "no-finding"
+
+    def test_a_left_out_row_names_the_version_the_analysis_ran(self):
+        """The sentence names the version the report holds, not the version
+        a later build carries."""
+        old = _row("tampering", "stride") | {"version": "0.9"}
+        db = _db(_row("spoofing", "stride"), old)
+        block = sample_analysis([]).model_copy(update={"framework_version": "0.8"})
+
+        [entry] = controls_section([db], None, None, valid_model(), [block])
+
+        [row] = [row for row in entry.rows if row.unit == "tampering"]
+        assert (row.outcome, row.meaning) == (
+            "left-out",
+            (
+                "Left out: this row names version 0.9 of stride, and the analysis"
+                " ran version 0.8, so the critic did not judge it."
+            ),
+        )
 
     def test_the_report_leaves_out_a_row_of_a_framework_not_run(self):
         db = _db(_row("spoofing", "stride"), _row("V11.2.1"))
@@ -653,7 +674,9 @@ class TestTheUnDefer:
             "config",
         )
         assert (
-            row_outcome(row_rulings(claims, returned)[ROW], unreached=False)
+            row_outcome(
+                row_rulings(claims, returned)[ROW], ticked=True, unreached=False
+            )
             == "refused"
         )
         entries = AsvsAnalysis.scope_entries(
@@ -676,7 +699,11 @@ class TestTheUnDefer:
 
         assert (claims, returned, deferred) == ([], [], {})
         assert (
-            row_outcome(row_rulings(outcome.rejected, returned)[ROW], unreached=False)
+            row_outcome(
+                row_rulings(outcome.rejected, returned)[ROW],
+                ticked=True,
+                unreached=False,
+            )
             == "applied"
         )
         entries = AsvsAnalysis.scope_entries(

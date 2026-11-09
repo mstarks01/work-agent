@@ -27,6 +27,7 @@ became of a row, from the rulings the report's verdicts hold.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -649,9 +650,10 @@ RowVerdict = Literal["applied", "refused"]
 #: What became of one row over a job: it covered every draft it was shown,
 #: it covered some and the critic refused it on the others, the critic
 #: refused it on every draft it was shown, a finding on its unit lay outside
-#: the scope, or no draft was shown it.
+#: the scope, no draft was shown it, or it names another package version, so
+#: the job left it out.
 RowOutcome = Literal[
-    "applied", "partly-applied", "refused", "not-reached", "no-finding"
+    "applied", "partly-applied", "refused", "not-reached", "no-finding", "left-out"
 ]
 
 #: The list each ruling sits under in the report and the Markdown export, by
@@ -700,12 +702,17 @@ def row_rulings(
     return rulings
 
 
-def row_outcome(rulings: Sequence[RowRuling], *, unreached: bool) -> RowOutcome:
+def row_outcome(
+    rulings: Sequence[RowRuling], *, ticked: bool, unreached: bool
+) -> RowOutcome:
     """**The one reader of a row's outcome** (ADR 0126): ``applied`` where
     every ruling applied it, ``partly-applied`` where some did and the
-    others refused it, ``refused`` where every ruling refused it. A row with
-    no ruling is ``not-reached`` where ``unreached`` says a finding on its
-    unit lay outside the scope, and ``no-finding`` where none did."""
+    others refused it, ``refused`` where every ruling refused it. A row that
+    is not ``ticked`` names another package version, and is ``left-out``. A
+    row with no ruling is ``not-reached`` where ``unreached`` says a finding on
+    its unit lay outside the scope, and ``no-finding`` where none did."""
+    if not ticked:
+        return "left-out"
     if not rulings:
         return "not-reached" if unreached else "no-finding"
     verdicts = {ruling.ruling for ruling in rulings}
@@ -951,6 +958,10 @@ ROW_MEANINGS: Mapping[RowOutcome, str] = MappingProxyType(
             "No finding: no draft on this unit reached the critic with this row,"
             " so nothing was ruled."
         ),
+        "left-out": (
+            "Left out: this row names version {version} of {framework}, and the"
+            " analysis ran version {ran}, so the critic did not judge it."
+        ),
     }
 )
 
@@ -980,6 +991,9 @@ class SectionRow(BaseModel):
     ticked: bool
     outcome: RowOutcome
     meaning: str
+    #: The count of rulings in each list of :data:`RULING_LISTS` that holds
+    #: one, as in "Ruled out: 2 · Refused: 1"; empty where none does.
+    tally: str
     rulings: list[RowRuling]
     quoted: list[EvidenceLine]
 
@@ -1120,14 +1134,16 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
-    packages_run: dict[str, FrameworkPackage] = {
-        block.framework: PACKAGES[block.framework] for block in blocks
+    # Each framework the analysis ran, with its block. The block holds the
+    # version the framework ran at: a later build can carry another.
+    blocks_run: dict[str, FrameworkAnalysis] = {
+        block.framework: block for block in blocks
     }
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
         for block in blocks
-        for unit in unreached_rows(block.claims, packages_run[block.framework], control)
+        for unit in unreached_rows(block.claims, PACKAGES[block.framework], control)
     }
     entries = []
     for copy, resolution in zip(
@@ -1148,18 +1164,32 @@ def controls_section(
         ]
         rows = []
         # A row of a framework the analysis did not run has no outcome here.
-        for row in (row for row in copy.rows if row.framework in packages_run):
+        for row in (row for row in copy.rows if row.framework in blocks_run):
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
-            row_result = row_outcome(ruled, unreached=(copy.id, row.unit) in unreached)
+            row_result = row_outcome(
+                ruled, ticked=row.ticked, unreached=(copy.id, row.unit) in unreached
+            )
+            block = blocks_run[row.framework]
+            package = PACKAGES[block.framework]
+            counts = Counter(ruling.ruling for ruling in ruled)
             rows.append(
                 SectionRow(
                     framework=row.framework,
                     unit=row.unit,
-                    label=packages_run[row.framework].record.text_of_unit(row.unit),
+                    label=package.record.text_of_unit(row.unit),
                     version=row.version,
                     ticked=row.ticked,
                     outcome=row_result,
-                    meaning=ROW_MEANINGS[row_result],
+                    meaning=ROW_MEANINGS[row_result].format(
+                        version=row.version,
+                        framework=row.framework,
+                        ran=block.framework_version,
+                    ),
+                    tally=" · ".join(
+                        f"{heading}: {counts[verdict]}"
+                        for verdict, heading in RULING_LISTS.items()
+                        if counts[verdict]
+                    ),
                     rulings=ruled,
                     quoted=list(
                         dict.fromkeys(
