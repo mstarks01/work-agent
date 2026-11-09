@@ -49,6 +49,12 @@
     const text = one.label.replace(/\.$/, "");
     return one.answer === null ? `${text}: ${fact.value}` : text;
   };
+  // A Control's statements, and its evidence files with their class, as the
+  // table and the stale notice show them.
+  const factTexts = (control) => control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one)));
+  const evidenceText = (control) => control.evidence.length
+    ? control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ")
+    : "None";
   const unitOf = (row) => units[row.framework]?.units.find((unit) => unit.id === row.unit);
   const unitText = (row) => {
     const label = unitOf(row)?.label;
@@ -93,8 +99,10 @@
   const changed = () => draft !== null && JSON.stringify(draft) !== clean;
   // The version that a stale save found: another tab or window saved the
   // Control after this edit opened it. The draft stays as it is until the
-  // owner keeps it or opens the saved version.
+  // owner keeps it or opens the saved version. `basis` is the version the
+  // draft started from: the opened one, or the one "Keep my changes" took.
   let stale = null;
+  let basis = null;
   // What the last change of "What it protects" removed, which Undo puts
   // back: the scope and the facts before the change, the facts it removed,
   // and the scope and facts after it. Undo lasts until the next edit of the
@@ -119,6 +127,7 @@
       ? JSON.parse(JSON.stringify({ ...control, evidence: control.evidence.map((file) => ({ ...file })) }))
       : blank();
     clean = JSON.stringify(draft);
+    basis = JSON.parse(clean);
     show("controls-notice", "");
     draw();
     el("control-name").focus();
@@ -593,7 +602,7 @@
       if (mine === session) {
         if (sent.ok && body) saved = body;
         else if (sent.status === 409 && body?.current) {
-          refuse("");
+          refuse(body.message);
           stale = body.current;
           load();
         } else refuse(body?.message ?? "The service could not save the Control. Check Controls before you save again.");
@@ -615,40 +624,49 @@
     return true;
   };
   // What a Control holds, field by field, as the stale notice shows it.
+  // The table's cells use the same texts for facts and evidence.
   const FIELDS = [
     ["Name", (control) => control.name],
     ["What it protects", (control) => [SCOPES[control.scope.type]?.label, control.scope.name, ...control.scope.aliases].filter(Boolean).join(", ")],
-    ["What it does", (control) => control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one))).join("; ") || "None"],
+    ["What it does", (control) => factTexts(control).join("; ") || "None"],
     ["Rows", (control) => control.rows.map((one) => `${one.framework} ${one.unit}`).join(", ") || "None"],
-    ["Evidence", (control) => control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ") || "None"],
+    ["Evidence", evidenceText],
   ];
   // The notice of a stale save: each field that the other save changed, as
   // the saved version holds it, and the two ways on.
   const staleNote = () => {
-    const opened = JSON.parse(clean);
-    const differs = FIELDS.filter(([, text]) => text(stale) !== text(opened));
-    return h("div", { class: "notice", id: "stale-note", role: "alert" },
-      h("p", {}, `“${stale.name}” changed in another tab or window after you opened it. Your changes are still here.`),
+    const differs = FIELDS.filter(([, text]) => text(stale) !== text(basis));
+    return h("div", { class: "notice", id: "stale-note" },
+      h("p", {}, "Your changes are still here."),
       differs.length
         ? h("div", {}, "The saved version now holds:", h("ul", { id: "stale-fields" }, ...differs.map(([label, text]) => h("li", {}, `${label}: ${text(stale)}`))))
-        : h("p", {}, "The saved version holds the same values that you opened."),
+        : h("p", {}, "The saved version holds the same values as the version your changes started from."),
       h("div", { class: "dialog-actions" },
         h("button", { type: "button", id: "stale-open", on: { click: () => open(stale) } }, "Open the saved version"),
-        h("button", { type: "button", id: "stale-keep", class: "primary", on: { click: keepDraft } }, "Keep my changes")));
+        h("button", { type: "button", id: "stale-keep", class: "primary", disabled: reading(), on: { click: keepDraft } }, "Keep my changes")));
   };
   // Keep my changes: the draft takes the saved version's time, so the next
   // save replaces that version. A held file that the saved version no longer
-  // holds leaves the draft, because no save can keep it.
+  // holds leaves the draft, because no save can keep it. A file that the
+  // other save added joins the draft, because a save deletes each file it
+  // does not list.
   const keepDraft = () => {
     const held = new Set(stale.evidence.map((file) => file.id));
+    const known = new Set(basis.evidence.map((file) => file.id));
     const gone = draft.evidence.filter((file) => file.id && !held.has(file.id));
-    draft.evidence = draft.evidence.filter((file) => !gone.includes(file));
+    const added = stale.evidence.filter((file) => !known.has(file.id));
+    draft.evidence = [...draft.evidence.filter((file) => !gone.includes(file)), ...added.map((file) => ({ ...file }))];
     draft.updated_at = stale.updated_at;
+    basis = JSON.parse(JSON.stringify(stale));
     stale = null;
+    refuse("");
     drawEditor();
-    show("controls-notice", gone.length
-      ? `Save to replace the saved version with your changes. The saved version no longer holds ${gone.map((file) => `“${file.name}”`).join(", ")}, so your changes leave ${gone.length === 1 ? "it" : "them"} out.`
-      : "Save to replace the saved version with your changes.");
+    const names = (files) => files.map((file) => `“${file.name}”`).join(", ");
+    show("controls-notice", [
+      "Save to replace the saved version with your changes.",
+      gone.length ? `The saved version no longer holds ${names(gone)}, so your changes leave ${gone.length === 1 ? "it" : "them"} out.` : "",
+      added.length ? `The saved version also holds ${names(added)}, so your changes keep ${added.length === 1 ? "it" : "them"}.` : "",
+    ].filter(Boolean).join(" "));
     el("save-control").focus();
   };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
@@ -691,7 +709,7 @@
     el("delete-dialog").showModal();
   };
   const row = (control) => {
-    const facts = control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one)));
+    const facts = factTexts(control);
     return h("tr", {},
       h("td", {}, h("input", { type: "checkbox", id: `select-${control.id}`, checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); drawTable(); } } })),
@@ -701,9 +719,7 @@
       h("td", {}, scopeText(control.scope_phrase)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
         `${one.framework} ${one.unit}`)))),
-      h("td", {}, control.evidence.length
-        ? control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ")
-        : "None"),
+      h("td", {}, evidenceText(control)),
       h("td", {}, h("time", { datetime: control.updated_at }, day(control.updated_at))),
       h("td", {}, h("div", { class: "row-actions" },
         h("button", { type: "button", id: `edit-${control.id}`, disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),

@@ -418,10 +418,12 @@ it.
   class or the file takes effect at the save. "Save Control" sends the
   Control, and an edit replaces it and keeps no earlier version. When another
   tab or window saved the Control after you opened it, the save keeps your
-  changes and lists each field that the other save changed, as the saved
-  version holds it. "Keep my changes" makes your next save replace that
-  version, and leaves out each file that the saved version no longer holds.
-  "Open the saved version" discards your changes. When the editor has changes
+  changes and lists each field that differs from the version your changes
+  started from, as the saved version holds it. "Keep my changes" makes your
+  next save replace that version. It leaves out each file that the saved
+  version no longer holds, and it adds each file that the other save added,
+  because a save deletes each file that it does not list. "Open the saved
+  version" discards your changes. When the editor has changes
   that you did not save, another Control or "New Control" opens a dialog with
   "Stay", "Discard changes" and "Save and open". The browser also asks before
   you leave the page with such changes, or during a save.
@@ -435,8 +437,9 @@ it.
   `PUT /workspace/controls/{control_id}` replaces one, and the body names the
   `updated_at` the page read: a Control that changed since is refused with
   `409`, and the refusal carries the saved version as `current`. The route
-  checks the version before the evidence list. Each save refuses a document that breaks a rule with `400` and the
-  rule's sentence, such as "Give the Control a name.", and refuses a name you
+  checks the version before the evidence list. Each save refuses a document
+  that breaks a rule with `400` and the rule's sentence, such as "Give the
+  Control a name.", and refuses a name you
   already use, an alias that another scope holds and a save over the count
   limit with `409`. A file that the Control holds is sent as its ID and its
   class, and keeps its text. An evidence file over the byte limit, with a control
