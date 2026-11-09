@@ -109,9 +109,10 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
             )
         for row in entry.rows:
             label = f" · {_text(row.label)}" if row.label else ""
+            tally = f"{row.tally}. " if row.tally else ""
             lines.append(
-                f"- Row: {_text(row.framework)} {_text(row.unit)}{label} —"
-                f" {row.meaning}"
+                f"- Row: {_text(row.framework)} {_text(row.unit)}"
+                f" (version {_text(row.version)}){label} — {tally}{row.meaning}"
             )
             for verdict, heading in RULING_LISTS.items():
                 lines += [

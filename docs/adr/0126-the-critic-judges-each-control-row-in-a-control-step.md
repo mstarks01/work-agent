@@ -68,7 +68,9 @@ The report holds each ruling in a verdict, so one reader builds each row's
 list from the report's claims and rejected claims, and the job keeps no second
 record of it. One reader computes the row's outcome: `applied` when every ruling
 applied it, `partly-applied` when some rulings applied it and the others refused
-it, `refused` when every ruling refused it. A row with an empty list is
+it, `refused` when every ruling refused it. A row of another package version
+is `left-out`, because the job never shows it to the critic. A row with an
+empty list is
 `not-reached` when a finding sits on its unit and the scope does not reach the
 finding's elements, and `no-finding` otherwise. A framework whose record lets
 `affected_element_ids` be empty gives findings that name no element. Only a

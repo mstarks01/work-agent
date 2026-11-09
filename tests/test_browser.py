@@ -4103,7 +4103,11 @@ def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
         context = browser.new_context(base_url=base)
         page = context.new_page()
         page.goto("/controls")
-        runner.control = keep_control(page, "WAF", {"type": "application"})
+        rows = [
+            {"framework": "stride", "unit": "spoofing", "version": "1.0"},
+            {"framework": "stride", "unit": "denial-of-service", "version": "0.9"},
+        ]
+        runner.control = keep_control(page, "WAF", {"type": "application"}, rows=rows)
         submit_with_controls(page)
         with page.expect_response("**/answer/**"):
             page.click("#continue")
@@ -4122,6 +4126,15 @@ def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
         assert "refused this row for the findings listed under Refused" in (
             row.inner_text()
         )
+        old = page.locator(
+            "#controls-section details.control-row", has_text="denial-of-service"
+        )
+        assert old.locator("summary .tag").inner_text() == "left out"
+        old.locator("summary").click()
+        assert old.locator("p.meta").all_inner_texts() == [
+            "Left out: this row names version 0.9 of stride, and the analysis ran"
+            " version 1.0, so the critic did not judge it."
+        ]
         context.close()
 
 

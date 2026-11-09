@@ -491,7 +491,7 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="applied", reason="yes"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "applied"
+        assert row_outcome(rulings, ticked=True, unreached=False) == "applied"
 
     def test_a_row_applied_once_and_refused_once_is_partly_applied(self):
         rulings = [
@@ -499,7 +499,7 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="applied", reason="yes"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "partly-applied"
+        assert row_outcome(rulings, ticked=True, unreached=False) == "partly-applied"
 
     def test_a_row_refused_on_every_ruling_is_refused(self):
         rulings = [
@@ -507,18 +507,21 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="refused", reason="no"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "refused"
+        assert row_outcome(rulings, ticked=True, unreached=False) == "refused"
 
     def test_a_row_with_no_ruling_found_nothing(self):
-        assert row_outcome([], unreached=False) == "no-finding"
+        assert row_outcome([], ticked=True, unreached=False) == "no-finding"
 
     def test_a_row_with_no_ruling_and_a_finding_it_missed_is_not_reached(self):
-        assert row_outcome([], unreached=True) == "not-reached"
+        assert row_outcome([], ticked=True, unreached=True) == "not-reached"
+
+    def test_a_row_of_another_version_is_left_out(self):
+        assert row_outcome([], ticked=False, unreached=True) == "left-out"
 
     def test_a_ruling_outweighs_a_finding_the_row_missed(self):
         rulings = [RowRuling(claim="a", ruling="applied", reason="yes")]
 
-        assert row_outcome(rulings, unreached=True) == "applied"
+        assert row_outcome(rulings, ticked=True, unreached=True) == "applied"
 
 
 class TestTheUnreachedRows:
@@ -653,7 +656,9 @@ class TestTheUnDefer:
             "config",
         )
         assert (
-            row_outcome(row_rulings(claims, returned)[ROW], unreached=False)
+            row_outcome(
+                row_rulings(claims, returned)[ROW], ticked=True, unreached=False
+            )
             == "refused"
         )
         entries = AsvsAnalysis.scope_entries(
@@ -676,7 +681,11 @@ class TestTheUnDefer:
 
         assert (claims, returned, deferred) == ([], [], {})
         assert (
-            row_outcome(row_rulings(outcome.rejected, returned)[ROW], unreached=False)
+            row_outcome(
+                row_rulings(outcome.rejected, returned)[ROW],
+                ticked=True,
+                unreached=False,
+            )
             == "applied"
         )
         entries = AsvsAnalysis.scope_entries(

@@ -610,6 +610,8 @@ def ruled(tiers):
         row(unit, framework="stride", version="1.0")
         for unit in ("spoofing", "tampering", "repudiation")
     ]
+    # A row of another version, which the job leaves out.
+    stride.append(row("denial-of-service", framework="stride", version="0.9"))
     waf = owner.keep("WAF", {"type": "application"}, rows=stride, facts=[])
     db = owner.keep("Encrypted", ORDERS_DB)
     gone = owner.keep("Billing", {"type": "process", "name": "Billing"})
@@ -639,7 +641,14 @@ class TestTheReportSection:
             "spoofing": "applied",
             "tampering": "refused",
             "repudiation": "no-finding",
+            "denial-of-service": "left-out",
         }
+        assert rows["spoofing"]["tally"] == "Ruled out: 2"
+        assert rows["repudiation"]["tally"] == ""
+        assert rows["denial-of-service"]["meaning"] == (
+            "Left out: this row names version 0.9 of stride, and the analysis ran"
+            " version 1.0, so the critic did not judge it."
+        )
         assert [one["ruling"] for one in rows["spoofing"]["rulings"]] == [
             "applied",
             "applied",
@@ -669,6 +678,56 @@ class TestTheReportSection:
             "missing-element",
         )
 
+    def test_the_markdown_export_gives_each_outcome_its_version_and_sentence(
+        self, ruled
+    ):
+        """A row of each :data:`~analysis_service.job_controls.RowOutcome`
+        shows in the Markdown export with its version, its counts and the
+        sentence the page shows."""
+        from typing import get_args
+
+        from analysis_service.job_controls import (
+            RowOutcome,
+            RowRuling,
+            SectionEntry,
+        )
+        from webapp.report_export import controls_markdown
+
+        owner, child, _ = ruled
+        sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
+        entry = SectionEntry.model_validate(sent[0])
+        [template] = entry.rows[:1]
+        rows = [
+            template.model_copy(
+                update={
+                    "unit": outcome,
+                    "outcome": outcome,
+                    "meaning": f"The sentence of {outcome}.",
+                    "quoted": [],
+                    "tally": "Ruled out: 1 · Refused: 1"
+                    if outcome == "partly-applied"
+                    else "",
+                    "rulings": [
+                        RowRuling(claim="A-1", ruling="applied", reason="yes"),
+                        RowRuling(claim="A-2", ruling="refused", reason="no"),
+                    ]
+                    if outcome == "partly-applied"
+                    else [],
+                }
+            )
+            for outcome in get_args(RowOutcome)
+        ]
+        text = "\n".join(controls_markdown([entry.model_copy(update={"rows": rows})]))
+        for one in rows:
+            label = f" · {one.label}" if one.label else ""
+            tally = f"{one.tally}. " if one.tally else ""
+            assert (
+                f"- Row: stride {one.unit} (version {one.version})"
+                f"{label} — {tally}{one.meaning}" in text
+            )
+        assert "  - Ruled out: A-1. yes" in text
+        assert "  - Refused: A-2. no" in text
+
     def test_the_markdown_export_carries_the_section_as_text(self, ruled):
         owner, child, _ = ruled
         exported = owner.client.get(f"/report/{child}/export.md")
@@ -677,12 +736,22 @@ class TestTheReportSection:
         text = exported.text
         assert "## Controls" in text
         assert "### WAF" in text
-        assert "- Row: stride spoofing — Applied: the critic" in text
-        assert "- Row: stride tampering — Refused: the critic" in text
+        assert (
+            "- Row: stride spoofing (version 1.0) — Ruled out: 2. Applied: the critic"
+            in text
+        )
+        assert (
+            "- Row: stride tampering (version 1.0) — Refused: 1. Refused: the critic"
+            in text
+        )
+        assert (
+            "- Row: stride denial-of-service (version 0.9) — Left out: this row"
+            " names version 0.9 of stride, and the analysis ran version 1.0" in text
+        )
         assert "  - Refused: stride-returned. It shows no" in text
         assert "  - Ruled out: " in text
         assert ": refused." not in text and ": applied." not in text
-        assert "- Row: stride repudiation — No finding: no draft" in text
+        assert "- Row: stride repudiation (version 1.0) — No finding: no draft" in text
         assert "— no-finding" not in text
         assert "It shows no \\<b\\>signing\\</b\\> at https\\://evil.example." in text
         assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
