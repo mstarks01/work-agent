@@ -2752,9 +2752,36 @@ def test_a_table_filter_leaves_the_editor_as_it_is(page):
     page.goto("/controls")
     new_control(page, "Rows")
     page.evaluate("document.querySelector('fieldset.editor').dataset.mark = 'kept'")
-    page.focus("#control-name")
     page.fill("#controls-search", "nothing")
+    page.fill("#controls-search", "")
     assert page.get_attribute("fieldset.editor", "data-mark") == "kept"
+
+
+def test_a_row_tick_keeps_its_focus(page):
+    _two_kept_controls(page)
+    page.focus('input[aria-label="Select A"]')
+    page.keyboard.press("Space")
+    assert page.is_checked('input[aria-label="Select A"]')
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
+        "Select A"
+    )
+
+
+def test_a_failed_save_gives_focus_back(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: (
+            route.fulfill(status=409, json={"message": "Changed elsewhere."})
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
+    )
+    page.click('button[aria-label="Edit A"]')
+    page.focus("#save-control")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#editor-problem:has-text('Changed elsewhere.')")
+    assert page.evaluate("document.activeElement.id") == "save-control"
 
 
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):

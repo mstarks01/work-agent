@@ -108,14 +108,16 @@
     editorProblem.textContent = text;
     editorProblem.hidden = !text;
   };
-  // A Remove button keeps its place: after a redraw, focus goes to the
-  // button now at its index, the one before it, or `fallback`.
+  // After a removal, focus goes to the Remove button now at its index, the
+  // one before it, or `fallback`.
+  const focusNear = (prefix, index, fallback) =>
+    (el(`${prefix}-remove-${index}`) ?? el(`${prefix}-remove-${index - 1}`) ?? el(fallback))?.focus();
   const remove = (list, index, label, prefix, fallback) => h("button", {
     type: "button", class: "quiet", id: `${prefix}-remove-${index}`, "aria-label": `Remove ${label}`,
     on: { click: () => {
       list.splice(index, 1);
       drawEditor();
-      (el(`${prefix}-remove-${index}`) ?? el(`${prefix}-remove-${index - 1}`) ?? el(fallback))?.focus();
+      focusNear(prefix, index, fallback);
     } },
   }, "Remove");
   // The "?" beside a card's title, as the analysis page has beside its
@@ -178,7 +180,7 @@
                 on: { click: () => {
                   draft.scope.aliases.splice(index, 1);
                   drawEditor();
-                  (el(`alias-remove-${index}`) ?? el(`alias-remove-${index - 1}`) ?? el("alias-input"))?.focus();
+                  focusNear("alias", index, "alias-input");
                 } } }, "×"))),
             aliasInput)) : null));
   };
@@ -275,13 +277,13 @@
         return;
       }
       // The file holds its place in the list while the page reads it.
-      const pending = { name: file.name.slice(0, limits.name_chars), class: classPick.value, reading: true };
+      const entry = { name: file.name.slice(0, limits.name_chars), class: classPick.value, reading: true };
       const own = draft;
       const mine = session;
-      own.evidence.push(pending);
+      own.evidence.push(entry);
       draw();
       const read = await textFile.decode(file, limits.max_evidence_bytes);
-      const at = own.evidence.indexOf(pending);
+      const at = own.evidence.indexOf(entry);
       if (mine !== session || at < 0) return;
       if (read.error) {
         own.evidence.splice(at, 1);
@@ -289,8 +291,8 @@
       } else {
         refuse("");
         own.evidence[at] = {
-          name: pending.name,
-          class: pending.class,
+          name: entry.name,
+          class: entry.class,
           size_bytes: new TextEncoder().encode(read.text).length,
           text: read.text,
         };
@@ -327,6 +329,8 @@
       refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
       return;
     }
+    // The locked editor drops focus: a save that fails gives it back.
+    const focused = document.activeElement?.id;
     saving = true;
     const mine = session;
     draw();
@@ -349,6 +353,7 @@
     }
     if (!saved) {
       draw();
+      if (focused) el(focused)?.focus();
       return;
     }
     stopEdit();
@@ -396,7 +401,7 @@
   const row = (control) => {
     const facts = control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one)));
     return h("tr", {},
-      h("td", {}, h("input", { type: "checkbox", checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
+      h("td", {}, h("input", { type: "checkbox", id: `select-${control.id}`, checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); drawTable(); } } })),
       h("td", { class: "name-cell" },
         h("a", { href: "#", "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
@@ -413,14 +418,16 @@
         h("button", { type: "button", class: "danger", disabled: saving, "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
   };
 
-  // The editor draws again after a change in it, and keeps focus on the
-  // control that had it. The table draws on its own, so a filter or a
-  // sort leaves the editor as it is.
-  const drawEditor = () => {
-    const focused = el("editor").contains(document.activeElement) ? document.activeElement.id : "";
-    el("editor").replaceChildren(...(draft ? [editor()] : []));
+  // Draw `box` again with `children`, and keep focus on the control in it
+  // that had focus, by its ID.
+  const redraw = (box, children) => {
+    const focused = box.contains(document.activeElement) ? document.activeElement.id : "";
+    box.replaceChildren(...children);
     if (focused) el(focused)?.focus();
   };
+  // The editor draws again after a change in it. The table draws on its
+  // own, so a filter, a sort or a row tick leaves the editor as it is.
+  const drawEditor = () => redraw(el("editor"), draft ? [editor()] : []);
   const drawTable = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
     el("new-control").disabled = saving || atLimit() || editing === "new";
@@ -439,7 +446,7 @@
     el("controls-table").hidden = !shown.length;
     el("controls-empty").hidden = Boolean(shown.length);
     el("controls-empty").textContent = controls.length ? "No Controls match your filters." : "No Controls yet.";
-    el("controls-list").replaceChildren(...shown.map(row));
+    redraw(el("controls-list"), shown.map(row));
   };
   const draw = () => {
     drawEditor();
