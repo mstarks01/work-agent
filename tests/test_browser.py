@@ -2682,6 +2682,7 @@ def test_a_file_read_waits_for_save_and_stays_with_its_draft(page):
     assert page.is_disabled("#save-control")
     assert page.inner_text("#editor-status") == "Save waits for the file read to end."
     page.click('button[aria-label="Edit B"]')
+    page.click("#leave-discard")
     page.evaluate("window.releaseReads()")
     page.wait_for_timeout(200)
     assert page.input_value("#control-name") == "B"
@@ -2872,6 +2873,126 @@ def test_each_focusable_control_on_the_controls_page_has_an_id(page):
           .map((node) => node.outerHTML.slice(0, 80))"""
     )
     assert missing == []
+
+
+def test_another_control_opens_at_once_when_the_draft_has_no_change(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.click('button[aria-label="Edit B"]')
+    assert page.is_hidden("#leave-dialog")
+    assert page.input_value("#control-name") == "B"
+
+
+def test_stay_keeps_the_changed_draft(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click('button[aria-label="Edit B"]')
+    assert page.inner_text("#leave-question") == (
+        "“A2” has changes you have not saved."
+    )
+    assert page.inner_text("#leave-save") == "Save and open “B”"
+    page.click("#leave-stay")
+    assert page.is_hidden("#leave-dialog")
+    assert page.input_value("#control-name") == "A2"
+
+
+def test_discard_opens_the_other_control(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click("#new-control")
+    assert page.inner_text("#leave-save") == "Save and open a new Control"
+    page.click("#leave-discard")
+    assert page.input_value("#control-name") == ""
+    assert page.locator("#controls-list td.name-cell a").all_inner_texts() == [
+        "B",
+        "A",
+    ]
+
+
+def test_save_and_open_saves_then_opens_the_other_control(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click('button[aria-label="Edit B"]')
+    with page.expect_response("**/workspace/controls/*"):
+        page.click("#leave-save")
+    page.wait_for_function("() => document.querySelector('#control-name')?.value === 'B'")
+    assert page.inner_text("#controls-notice") == "“A2” is saved."
+
+
+def test_a_refused_save_and_open_keeps_the_draft(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: (
+            route.fulfill(status=409, json={"message": "Changed elsewhere."})
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
+    )
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click('button[aria-label="Edit B"]')
+    page.click("#leave-save")
+    page.wait_for_selector("#editor-problem:has-text('Changed elsewhere.')")
+    assert page.input_value("#control-name") == "A2"
+
+
+def test_a_scope_change_lists_what_it_removed_and_undo_restores_it(page):
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    page.fill("#alias-input", "orders")
+    page.press("#alias-input", "Enter")
+    tick(page, "Encrypts its data at rest.", "AES-256")
+    page.select_option("#scope-type", "application")
+    assert page.inner_text("#scope-removed").splitlines()[:3] == [
+        "This change removed what does not fit the new choice:",
+        "its name “Orders DB” and 1 alias",
+        "1 fact: “Encrypts its data at rest: AES-256”",
+    ]
+    page.click("#scope-undo")
+    assert page.input_value("#scope-type") == "store"
+    assert page.input_value("#scope-name") == "Orders DB"
+    assert page.locator(".aliases .tag").all_inner_texts() == ["orders\n×"]
+    assert page.input_value(
+        "#statements input[aria-label='How: Encrypts its data at rest.']"
+    ) == "AES-256"
+    assert page.locator("#scope-removed").count() == 0
+    assert page.evaluate("document.activeElement.id") == "scope-type"
+
+
+def test_a_scope_change_that_removes_nothing_shows_no_notice(page):
+    page.goto("/controls")
+    new_control(page, "Empty", scope=("store", ""))
+    page.select_option("#scope-type", "application")
+    assert page.locator("#scope-removed").count() == 0
+
+
+def test_the_reach_note_says_what_the_whole_application_means(page):
+    page.goto("/controls")
+    new_control(page, "TLS at the edge")
+    add_row(page, "asvs", "V2.4.1")
+    note = page.inner_text("#rows-reach")
+    assert "only when the protection covers every part of the application" in note
+    assert "removes the name and the facts of this part" in note
+
+
+def test_leaving_with_a_changed_draft_asks_first(page):
+    _two_kept_controls(page)
+    asked = page.evaluate(
+        """() => { const event = new Event('beforeunload', { cancelable: true });
+          window.dispatchEvent(event); return event.defaultPrevented; }"""
+    )
+    assert not asked
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    asked = page.evaluate(
+        """() => { const event = new Event('beforeunload', { cancelable: true });
+          window.dispatchEvent(event); return event.defaultPrevented; }"""
+    )
+    assert asked
 
 
 def test_a_failed_save_gives_focus_back(page):
