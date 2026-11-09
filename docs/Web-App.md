@@ -266,11 +266,11 @@ mitigation cells come from the record's own fields, through `JUDGEMENT_CELLS`
 in `webapp/report_export.py`. A record that declares no such field leaves that
 cell empty. The `controls` cell names each Control row that ruled on the finding,
 and its ruling. A `=`, `+`, `-` or `@`, or its full-width form, at the start of
-a cell, or after a `;`, a tab or a line break, gets an apostrophe first, and so
-does a cell that starts with a tab or a line break. So a line of a cell that
-starts with a hyphen shows an apostrophe. A spreadsheet then shows the cell as text
-and does not run it as a formula, also when it splits the file on `;` or on a
-tab. A `/v1` report carries no Controls section.
+a cell, or after a `;`, a tab or a line break, also behind quote marks, gets an
+apostrophe first, and so does a cell that starts with a tab or a line break. So
+a line of a cell that starts with a hyphen shows an apostrophe. A spreadsheet
+then shows the cell as text and does not run it as a formula, also when it
+splits the file on `;` or on a tab. A `/v1` report carries no Controls section.
 
 ## When the configuration is wrong
 

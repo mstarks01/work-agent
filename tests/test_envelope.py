@@ -364,6 +364,30 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
             envelopes.read(path)
         assert str(refusal.value).replace("\n", "").isprintable()
 
+    @pytest.mark.parametrize(
+        "key", ["k\x1b]0;pwned\x07", "k\n::error::forged", "k\u202eforged"]
+    )
+    @pytest.mark.parametrize("field", ["cases", "marks", "opened_digests"])
+    def test_a_key_of_an_envelope_cannot_forge_a_line(self, tree, tmp_path, field, key):
+        # The value under the key is valid, so only the key can refuse. A key
+        # that passed would reach each later refusal that quotes it.
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        if field == "cases":
+            document["cases"] = {key: answers}
+        else:
+            answers[field] = {key: "agree" if field == "marks" else "0" * 64}
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        with pytest.raises(reviews_module.ReviewSubmissionError) as refusal:
+            reviews_module._read(path)
+
+        lines = str(refusal.value).splitlines()
+        assert "forged" in lines[-1] or "pwned" in lines[-1]
+        assert all(line.isprintable() for line in lines)
+        assert not [line for line in lines if line.startswith("::")]
+
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys
     ):
