@@ -2791,6 +2791,32 @@ def test_a_delete_moves_focus_to_the_next_row(page):
     )
 
 
+def test_a_saved_control_takes_focus_on_its_edit_button(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.focus("#save-control")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#controls-notice:has-text('“A2” is saved.')")
+    page.wait_for_function(
+        "() => document.activeElement?.getAttribute('aria-label') === 'Edit A2'"
+    )
+
+
+def test_a_delete_with_new_control_off_moves_focus_to_search(page):
+    page.goto("/controls")
+    keep_control(page, "Only", {"type": "application"})
+    page.reload()
+    page.wait_for_selector("#controls-list tr")
+    page.click("#new-control")
+    assert page.is_disabled("#new-control")
+    page.focus('button[aria-label="Delete Only"]')
+    page.keyboard.press("Enter")
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    page.wait_for_function("() => document.activeElement?.id === 'controls-search'")
+
+
 def test_a_failed_save_gives_focus_back(page):
     _two_kept_controls(page)
     page.route(

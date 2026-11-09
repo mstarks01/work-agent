@@ -106,17 +106,19 @@
     editing = null;
     draft = null;
     draw();
-    if (inside) (el(`edit-${was}`) ?? el("new-control"))?.focus();
+    if (inside) focusFirst(`edit-${was}`, "new-control", "controls-search");
   };
   const editorProblem = h("div", { id: "editor-problem", class: "problem", role: "alert", hidden: true });
   const refuse = (text) => {
     editorProblem.textContent = text;
     editorProblem.hidden = !text;
   };
+  // Focus the first element of `ids` that exists and is enabled.
+  const focusFirst = (...ids) => ids.map(el).find((node) => node && !node.disabled)?.focus();
   // After a removal, focus goes to the Remove button now at its index, the
   // one before it, or `fallback`.
   const focusNear = (prefix, index, fallback) =>
-    (el(`${prefix}-remove-${index}`) ?? el(`${prefix}-remove-${index - 1}`) ?? el(fallback))?.focus();
+    focusFirst(`${prefix}-remove-${index}`, `${prefix}-remove-${index - 1}`, fallback);
   const remove = (list, index, label, prefix, fallback) => h("button", {
     type: "button", class: "quiet", id: `${prefix}-remove-${index}`, "aria-label": `Remove ${label}`,
     on: { click: () => {
@@ -334,8 +336,10 @@
       refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
       return;
     }
-    // The locked editor drops focus: a save that fails gives it back.
+    // The locked editor drops focus: a save that fails gives it back, and
+    // one that succeeds moves it to the saved Control's Edit button.
     const focused = document.activeElement?.id;
+    const inside = el("editor").contains(document.activeElement);
     saving = true;
     const mine = session;
     draw();
@@ -364,6 +368,7 @@
     stopEdit();
     show("controls-notice", `“${saved.name}” is saved.`);
     await load();
+    if (inside) focusFirst(`edit-${saved.id}`, "new-control", "controls-search");
   };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
@@ -522,8 +527,7 @@
       : `${picked.length} Controls are deleted. The analyses that applied them keep their copy.`);
     await load();
     const rows = shownControls();
-    const next = rows[at] ?? rows[at - 1];
-    (next ? el(`select-${next.id}`) : el("new-control"))?.focus();
+    focusFirst(`select-${rows[at]?.id}`, `select-${rows[at - 1]?.id}`, "new-control", "controls-search");
   });
 
   load();
