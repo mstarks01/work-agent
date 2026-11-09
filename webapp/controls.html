@@ -20,6 +20,21 @@
   table.controls th[aria-sort=ascending] button::after { content:" ↑"; }
   table.controls th[aria-sort=descending] button::after { content:" ↓"; }
   table.controls td time { white-space:nowrap; }
+  /* On a narrow screen a row keeps its name, what it protects and its
+     actions; the units, the evidence and the date go under "Details". */
+  table.controls .narrow-only { display:none; }
+  .row-more { margin-top:4px; font-size:13px; }
+  .row-more summary { cursor:pointer; color:var(--muted); }
+  .row-more dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px 8px; margin:6px 0 0; }
+  .row-more dt { color:var(--muted); }
+  .row-more dd { margin:0; overflow-wrap:anywhere; }
+  @media (max-width:640px) {
+    table.controls { min-width:0; }
+    table.controls .wide-only { display:none; }
+    table.controls .narrow-only { display:block; }
+    table.controls .name-cell { width:auto; }
+    table.controls .row-actions { flex-direction:column; align-items:stretch; }
+  }
   .sub { font-size:12px; color:var(--muted); }
   .chips { display:flex; gap:6px; flex-wrap:wrap; }
   .chip { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
@@ -91,7 +106,7 @@
       <div class="analysis-actions"><button type="button" id="delete-selected" disabled>Delete selected</button></div>
       <div class="controls-table-wrap">
         <table class="controls" id="controls-table" hidden>
-          <thead><tr><th scope="col"><input type="checkbox" id="select-shown" aria-label="Select all shown Controls"></th><th scope="col" class="name-cell" data-sort="name" aria-sort="none"><button type="button">Name</button></th><th scope="col">Protects</th><th scope="col">Covers</th><th scope="col">Evidence</th><th scope="col" data-sort="updated" aria-sort="descending"><button type="button">Updated</button></th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+          <thead><tr><th scope="col"><input type="checkbox" id="select-shown" aria-label="Select all shown Controls"></th><th scope="col" class="name-cell" data-sort="name" aria-sort="none"><button type="button">Name</button></th><th scope="col" class="wide-only">Protects</th><th scope="col" class="wide-only">Covers</th><th scope="col" class="wide-only">Evidence</th><th scope="col" class="wide-only" data-sort="updated" aria-sort="descending"><button type="button">Updated</button></th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody id="controls-list"></tbody>
         </table>
       </div>
