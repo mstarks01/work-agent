@@ -4094,6 +4094,37 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
         assert errors == [], f"the page raised: {errors}"
 
 
+def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
+    from tests.test_webapp_controls_page import RulingRunner
+
+    runner = RulingRunner()
+    runner.mixed = True
+    with contextmanager(serve)(web.app_for(tiers, runner)) as base:
+        context = browser.new_context(base_url=base)
+        page = context.new_page()
+        page.goto("/controls")
+        runner.control = keep_control(page, "WAF", {"type": "application"})
+        submit_with_controls(page)
+        with page.expect_response("**/answer/**"):
+            page.click("#continue")
+        page.wait_for_url("**/report/**", timeout=20_000)
+        row = page.locator("#controls-section details.control-row", has_text="spoofing")
+        summary = row.locator("summary").inner_text()
+        assert "partly applied" in summary
+        assert "Ruled out: 2 · Refused: 1" in summary
+        row.locator("summary").click()
+        assert row.locator(".ruling-heading").all_inner_texts() == [
+            "Ruled out",
+            "Refused",
+        ]
+        [refused] = row.locator(".ruling-list").nth(1).locator("li").all_inner_texts()
+        assert refused == "stride-returned: It shows no check of the token's issuer."
+        assert "refused this row for the findings listed under Refused" in (
+            row.inner_text()
+        )
+        context.close()
+
+
 @pytest.fixture(params=["recorded"])
 def sitting_page(browser, tmp_path, request, monkeypatch):
     """A page on a review sitting with two cases: each recorded with a mark

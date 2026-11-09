@@ -1368,21 +1368,28 @@
     return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),
       ` (${entry.meaning})`];
   };
+  // The list each ruling sits under, a copy of the service's RULING_LISTS.
+  const RULING_LISTS = {
+    "applied": "Ruled out",
+    "refused": "Refused",
+  };
   const controlRow = (row) => {
     const open = el("details", "control-row");
     const summary = el("summary", null, `${row.framework} ${row.unit}${row.label ? ` · ${row.label}` : ""} `);
-    summary.append(el("span", `tag ${row.outcome}`, row.outcome));
+    summary.append(el("span", `tag ${row.outcome}`, row.outcome.replaceAll("-", " ")));
+    const lists = Object.entries(RULING_LISTS)
+      .map(([verdict, heading]) => [heading, row.rulings.filter((ruling) => ruling.ruling === verdict)])
+      .filter(([, rulings]) => rulings.length);
+    if (lists.length) summary.append(" ", el("span", "meta", lists.map(([heading, rulings]) => `${heading}: ${rulings.length}`).join(" · ")));
     open.append(summary);
-    const ruledOut = row.rulings.filter((ruling) => ruling.ruling === "applied").map((ruling) => ruling.claim);
-    if (ruledOut.length) {
-      const line = el("p", "meta", "Ruled out: ");
-      ruledOut.forEach((claim, at) => line.append(at ? ", " : "", code(claim)));
-      open.append(line);
-    }
-    for (const ruling of row.rulings) {
-      const line = el("p", null);
-      line.append(el("span", "meta", `The critic's reason on ${ruling.claim}: `), ruling.reason);
-      open.append(line);
+    for (const [heading, rulings] of lists) {
+      const items = el("ul", "ruling-list");
+      for (const ruling of rulings) {
+        const item = el("li", null);
+        item.append(code(ruling.claim), ": ", ruling.reason);
+        items.append(item);
+      }
+      open.append(el("p", "ruling-heading", heading), items);
     }
     for (const quoted of row.quoted) {
       open.append(el("p", "meta", `${quoted.file} · ${quoted.class} · line ${quoted.line}`), el("blockquote", "excerpt", quoted.text));

@@ -543,6 +543,9 @@ class RulingRunner(ZonedRunner):
     ``tampering`` row on a claim that went back to the deferred set."""
 
     control = ""
+    #: Whether the returned claim also refuses the ``spoofing`` row, so the
+    #: row is applied on two drafts and refused on one.
+    mixed = False
 
     async def run(self, job, on_node):
         outcome = await super().run(job, on_node)
@@ -566,7 +569,18 @@ class RulingRunner(ZonedRunner):
                     control=self.control,
                     unit="tampering",
                     reason="It shows no <b>signing</b> at https://evil.example.",
-                )
+                ),
+                *(
+                    [
+                        RefusedControl(
+                            control=self.control,
+                            unit="spoofing",
+                            reason="It shows no check of the token's issuer.",
+                        )
+                    ]
+                    if self.mixed
+                    else []
+                ),
             ],
         )
         # Two drafts on one row, each ruled on by the same quoted line.
@@ -665,6 +679,9 @@ class TestTheReportSection:
         assert "### WAF" in text
         assert "- Row: stride spoofing — Applied: the critic" in text
         assert "- Row: stride tampering — Refused: the critic" in text
+        assert "  - Refused: stride-returned. It shows no" in text
+        assert "  - Ruled out: " in text
+        assert ": refused." not in text and ": applied." not in text
         assert "- Row: stride repudiation — No finding: no draft" in text
         assert "— no-finding" not in text
         assert "It shows no \\<b\\>signing\\</b\\> at https\\://evil.example." in text
@@ -859,6 +876,21 @@ class TestTheTables:
             get_args(CoverReason)
         )
         assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
+
+    def test_the_report_page_copies_each_ruling_list_name(self):
+        """``report_view.js`` names each list as
+        :data:`~analysis_service.job_controls.RULING_LISTS` does,
+        so the page and the Markdown export use the same words."""
+        from typing import get_args
+
+        from analysis_service.job_controls import RULING_LISTS, RowVerdict
+        from tests.test_webapp import _table_keys, page_javascript
+
+        assert set(RULING_LISTS) == set(get_args(RowVerdict))
+        assert _table_keys("report_view.js", "RULING_LISTS") == set(RULING_LISTS)
+        script = page_javascript("report_view.js")
+        for verdict, heading in RULING_LISTS.items():
+            assert f'"{verdict}": "{heading}",' in script
 
     def test_the_page_tables_name_each_member(self):
         from typing import get_args
