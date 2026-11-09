@@ -2716,6 +2716,47 @@ def test_a_finished_file_read_opens_save_again(page):
     ]
 
 
+def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    page.select_option("#row-framework", "asvs")
+    page.select_option("#row-unit", "V11.2")
+    page.focus("#add-row")
+    page.keyboard.press("Enter")
+    assert page.input_value("#row-framework") == "asvs"
+    assert page.input_value("#row-unit") == "V11.2"
+    assert page.evaluate("document.activeElement.id") == "add-row"
+    page.select_option("#row-unit", "V11.3")
+    page.keyboard.press("Enter")
+    rows = page.locator("#rows-list li").all_inner_texts()
+    assert [row.split()[0] for row in rows] == ["asvs", "asvs"]
+    page.select_option("#evidence-class", "code")
+    page.fill("#alias-input", "half typed")
+    tick(page, "Encrypts its data at rest.", "AES-256")
+    assert page.input_value("#evidence-class") == "code"
+    assert page.input_value("#alias-input") == "half typed"
+
+
+def test_removing_a_row_moves_focus_to_its_neighbour(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    add_row(page, "stride", "spoofing")
+    add_row(page, "stride", "tampering")
+    page.click("#row-remove-0")
+    assert page.evaluate("document.activeElement.id") == "row-remove-0"
+    page.click("#row-remove-0")
+    assert page.evaluate("document.activeElement.id") == "row-framework"
+
+
+def test_a_table_filter_leaves_the_editor_as_it_is(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    page.evaluate("document.querySelector('fieldset.editor').dataset.mark = 'kept'")
+    page.focus("#control-name")
+    page.fill("#controls-search", "nothing")
+    assert page.get_attribute("fieldset.editor", "data-mark") == "kept"
+
+
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     page.goto("/controls")
     assert page.get_attribute("#controls-nav", "aria-current") == "page"
