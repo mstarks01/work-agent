@@ -441,10 +441,24 @@ class TestReplace:
         assert replace(owner, control["id"], first).status_code == 200
         second = replace(owner, control["id"], first | {"name": "Second"})
         assert second.status_code == 409
-        assert second.json()["message"] == (
-            "This Control changed in another tab or window. Reload the page, then"
-            " edit it again."
-        )
+        assert second.json() == {
+            "message": (
+                "This Control changed in another tab or window after you opened it."
+            ),
+            "current": listed(owner)[0],
+        }
+        assert second.json()["current"]["name"] == "First"
+
+    def test_a_stale_edit_of_a_removed_file_answers_with_the_saved_version(self, owner):
+        control = create(owner).json()
+        [kept] = control["evidence"]
+        held = {"id": kept["id"], "class": "code"}
+        first = body(evidence=[]) | {"updated_at": control["updated_at"]}
+        assert replace(owner, control["id"], first).status_code == 200
+        stale = body(evidence=[held]) | {"updated_at": control["updated_at"]}
+        answered = replace(owner, control["id"], stale)
+        assert answered.status_code == 409
+        assert answered.json()["current"]["evidence"] == []
 
     def test_another_owner_s_control_is_missing(self, owner):
         foreign = owner.keep("Theirs", {"type": "application"}, identity=BOB)

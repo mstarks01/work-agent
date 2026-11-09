@@ -91,6 +91,10 @@
   // no change.
   let clean = "";
   const changed = () => draft !== null && JSON.stringify(draft) !== clean;
+  // The version that a stale save found: another tab or window saved the
+  // Control after this edit opened it. The draft stays as it is until the
+  // owner keeps it or opens the saved version.
+  let stale = null;
   // What the last change of "What it protects" removed, which Undo puts
   // back: the scope and the facts before the change, the facts it removed,
   // and the scope and facts after it. Undo lasts until the next edit of the
@@ -109,6 +113,7 @@
     pending = { framework: FRAMEWORKS[0], find: "", open: new Set(), evidenceClass: PAGE.evidence_classes[0].id, alias: "",
       shown: new Set(), texts: new Map(), replacing: null };
     removed = null;
+    stale = null;
     editing = control ? control.id : "new";
     draft = control
       ? JSON.parse(JSON.stringify({ ...control, evidence: control.evidence.map((file) => ({ ...file })) }))
@@ -147,6 +152,7 @@
     session += 1;
     refuse("");
     removed = null;
+    stale = null;
     editing = null;
     draft = null;
     draw();
@@ -581,11 +587,16 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(saveBody()),
       });
-      const body = sent.ok ? await sent.json() : null;
-      const message = sent.ok ? "" : await messageOf(sent, "The service could not save the Control. Check Controls before you save again.");
+      // A stale refusal carries the saved version beside its message, so
+      // the page reads a refusal's body once here.
+      const body = await sent.json().catch(() => null);
       if (mine === session) {
-        if (sent.ok) saved = body;
-        else refuse(message);
+        if (sent.ok && body) saved = body;
+        else if (sent.status === 409 && body?.current) {
+          refuse("");
+          stale = body.current;
+          load();
+        } else refuse(body?.message ?? "The service could not save the Control. Check Controls before you save again.");
       }
     } catch {
       if (mine === session) refuse("The connection was interrupted. Check Controls before you save again.");
@@ -603,12 +614,50 @@
     if (inside && document.activeElement === document.body) focusFirst(`edit-${saved.id}`, "new-control", "controls-search");
     return true;
   };
+  // What a Control holds, field by field, as the stale notice shows it.
+  const FIELDS = [
+    ["Name", (control) => control.name],
+    ["What it protects", (control) => [SCOPES[control.scope.type]?.label, control.scope.name, ...control.scope.aliases].filter(Boolean).join(", ")],
+    ["What it does", (control) => control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one))).join("; ") || "None"],
+    ["Rows", (control) => control.rows.map((one) => `${one.framework} ${one.unit}`).join(", ") || "None"],
+    ["Evidence", (control) => control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ") || "None"],
+  ];
+  // The notice of a stale save: each field that the other save changed, as
+  // the saved version holds it, and the two ways on.
+  const staleNote = () => {
+    const opened = JSON.parse(clean);
+    const differs = FIELDS.filter(([, text]) => text(stale) !== text(opened));
+    return h("div", { class: "notice", id: "stale-note", role: "alert" },
+      h("p", {}, `“${stale.name}” changed in another tab or window after you opened it. Your changes are still here.`),
+      differs.length
+        ? h("div", {}, "The saved version now holds:", h("ul", { id: "stale-fields" }, ...differs.map(([label, text]) => h("li", {}, `${label}: ${text(stale)}`))))
+        : h("p", {}, "The saved version holds the same values that you opened."),
+      h("div", { class: "dialog-actions" },
+        h("button", { type: "button", id: "stale-open", on: { click: () => open(stale) } }, "Open the saved version"),
+        h("button", { type: "button", id: "stale-keep", class: "primary", on: { click: keepDraft } }, "Keep my changes")));
+  };
+  // Keep my changes: the draft takes the saved version's time, so the next
+  // save replaces that version. A held file that the saved version no longer
+  // holds leaves the draft, because no save can keep it.
+  const keepDraft = () => {
+    const held = new Set(stale.evidence.map((file) => file.id));
+    const gone = draft.evidence.filter((file) => file.id && !held.has(file.id));
+    draft.evidence = draft.evidence.filter((file) => !gone.includes(file));
+    draft.updated_at = stale.updated_at;
+    stale = null;
+    drawEditor();
+    show("controls-notice", gone.length
+      ? `Save to replace the saved version with your changes. The saved version no longer holds ${gone.map((file) => `“${file.name}”`).join(", ")}, so your changes leave ${gone.length === 1 ? "it" : "them"} out.`
+      : "Save to replace the saved version with your changes.");
+    el("save-control").focus();
+  };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
     h("div", {}, h("label", { class: "field-label", for: "control-name" }, "Name"),
       h("input", { type: "text", id: "control-name", maxlength: limits.name_chars, value: draft.name,
         on: { input: (event) => { draft.name = event.target.value; } } })),
     scopeCard(), factCard(), rowCard(), evidenceCard(),
+    stale ? staleNote() : null,
     editorProblem,
     h("div", { class: "dialog-actions" },
       h("span", { id: "editor-status", class: "hint", role: "status" },
