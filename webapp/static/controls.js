@@ -157,9 +157,6 @@
     editorProblem.textContent = text;
     editorProblem.hidden = !text;
   };
-  // The message of a refused request, or `fallback` where the answer is not
-  // the service's JSON, such as a plain error page.
-  const messageOf = async (answer, fallback) => (await answer.json().catch(() => null))?.message ?? fallback;
   // Focus the first element of `ids` that exists and is enabled.
   const focusFirst = (...ids) => ids.map(el).find((node) => node && !node.disabled)?.focus();
   // After a removal, focus goes to the Remove button now at its index, the

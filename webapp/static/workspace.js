@@ -73,9 +73,8 @@ const workspace = (() => {
   };
   const fetchRun = async (id) => {
     const response = await fetch("/workspace/runs/" + encodeURIComponent(id));
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message);
-    return data;
+    if (!response.ok) throw new Error(await messageOf(response, "Could not load this analysis. Try again."));
+    return response.json();
   };
   // Ask once with the native dialog; resolves true on Delete.
   const confirmDelete = (text) => new Promise((resolve) => {
@@ -97,7 +96,7 @@ const workspace = (() => {
     const refused = [];
     for (const run of runs) {
       const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run), {method: "DELETE"});
-      if (!response.ok) refused.push(run.name + ": " + ((await response.json().catch(() => ({}))).message || "Could not delete it."));
+      if (!response.ok) refused.push(run.name + ": " + await messageOf(response, "Could not delete it."));
     }
     await library();
     message(refused.length ? "Not deleted. " + refused.join(" ") : "Deleted " + counted(runs.length, "analysis", "analyses") + ".");
@@ -118,7 +117,7 @@ const workspace = (() => {
     }
     if (response.status === 204) return {ended: true, text: "Stopped “" + run.name + "”."};
     if (response.status === 202) return {ended: false, text: "Stopping “" + run.name + "”. Its run ends after its current step."};
-    return {ended: false, text: "Not stopped. " + ((await response.json().catch(() => ({}))).message || "Could not stop it.")};
+    return {ended: false, text: "Not stopped. " + await messageOf(response, "Could not stop it.")};
   };
   const rename = (run, cell) => {
     const input = document.createElement("input");
@@ -133,8 +132,7 @@ const workspace = (() => {
         const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/title", {
           method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: input.value}),
         });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) { await library(); message(data.message || "Could not rename it."); return; }
+        if (!response.ok) { const refusal = await messageOf(response, "Could not rename it."); await library(); message(refusal); return; }
       }
       await library();
     };

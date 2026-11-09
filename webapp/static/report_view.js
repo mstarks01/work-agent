@@ -1080,8 +1080,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ facts, revision: CORRECTIONS.revision }),
           });
-          const body = await saved.json();
-          if (!saved.ok) throw new Error(body.message);
+          if (!saved.ok) throw new Error(await messageOf(saved, "The service did not save your corrections. They are still on this page."));
           location.href = location.pathname + "?view=questions";
         } catch (error) {
           problem.textContent = error.message || "The connection was interrupted. Your corrections are still on this page.";
@@ -1181,12 +1180,12 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        reply = await response.json();
+        reply = response.ok ? await response.json() : null;
       } catch {
         throw new Error("The connection was interrupted. Your answers are still on this page;"
           + " reload it to check what was saved, or try again.");
       }
-      if (!response.ok) throw new Error(reply.message);
+      if (!response.ok) throw new Error(await messageOf(response, "The service did not save your answers. They are still on this page."));
       return reply;
     };
     // An element that holds its box's shared answer sends no answer of its own:

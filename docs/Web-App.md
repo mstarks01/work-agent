@@ -411,11 +411,11 @@ it.
   `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
   counts as it does in any file. Each line has a list of its class and the
   buttons "View", "Replace" and "Remove", and a file that the Control holds
-  also has "Download". A line that the page still reads has no "View". "View" shows the file's text under the line, as plain text.
-  "Download" saves a file that the Control holds. "Replace" reads a new file
-  into the line and keeps its class. "Remove" takes the file out. A change of
-  the class or the file takes effect at the save. "Save
-  Control" sends the Control, and an edit replaces it and keeps no earlier
+  also has "Download". A line that the page still reads has no "View".
+  "View" shows the file's text under the line, as plain text. "Download"
+  saves a file that the Control holds. "Replace" reads a new file into the
+  line and keeps its class. "Remove" takes the file out. A change of the
+  class or the file takes effect at the save. "Save Control" sends the Control, and an edit replaces it and keeps no earlier
   version. When the editor has changes that you did not save, another Control
   or "New Control" opens a dialog with "Stay", "Discard changes" and "Save and
   open". The browser also asks before you leave the page with such changes, or

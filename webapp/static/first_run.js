@@ -363,7 +363,7 @@
         }),
       });
       if (!started.ok) {
-        fail((await started.json()).message);
+        fail(await messageOf(started, "The service could not start the analysis. Try again."));
         // A chosen file or Control can be gone: the list shows it as missing.
         if (chosen.size) loadFiles();
         formControls.load();
@@ -602,7 +602,10 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await response.json();
+      // A refusal can carry a contradiction beside its message, so the page
+      // reads the body once here.
+      const data = await response.json().catch(() => null);
+      const problem = data?.message ?? "The service did not save these answers. Retry.";
       if (response.ok) {
         acknowledge(sent);
         // A batch that left edits behind is followed by the next one.
@@ -619,9 +622,9 @@
         for (const [key, edit] of sent) {
           if (edits.get(key) === edit) edit.refused = true;
         }
-        refuse(data.message);
-        setStatus("failed", data.message);
-        if (data.contradiction) offerCorrection(data.contradiction);
+        refuse(problem);
+        setStatus("failed", problem);
+        if (data?.contradiction) offerCorrection(data.contradiction);
       }
     } catch {
       // The response was lost, and the save may have landed. Read the
@@ -1161,11 +1164,11 @@
         links: [], facts: [], save: true, skip: [], presented: presented(), revision, renames,
       }),
     });
-    const data = await response.json();
     if (!response.ok) {
-      refuse(data.detail || "The service did not keep this change.");
+      refuse(await messageOf(response, "The service did not keep this change."));
       return;
     }
+    const data = await response.json();
     answerProblem.hidden = true;
     if (data.early_questions) reconcile(data);
   });
@@ -1201,7 +1204,7 @@
           links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
         }),
       });
-      data = await response.json();
+      data = await response.json().catch(() => ({}));
     } catch {
       answered();
       refuse(unsaved);
@@ -1417,11 +1420,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, revision }),
       });
-      const body = await amended.json();
       if (!amended.ok) {
-        refuse(body.message);
+        refuse(await messageOf(amended, "The service could not read the corrected description. Try again."));
         return;
       }
+      const body = await amended.json();
       answerProblem.hidden = true;
       asked.hidden = true;
       follow(body.run, "Reading your description and identifying the parts of your system…", true);
@@ -1648,8 +1651,8 @@
         // The response was lost. Where the start landed, the run now names
         // the job it started; follow it instead of starting again.
         const snapshot = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
-        const payload = await snapshot.json();
-        if (snapshot.ok && payload.run !== pausedRun) {
+        const payload = snapshot.ok ? await snapshot.json() : null;
+        if (payload && payload.run !== pausedRun) {
           asked.hidden = true;
           follow(payload.run, "Using your answers to continue the analysis…", false);
           return;
@@ -1658,7 +1661,7 @@
         return;
       }
       if (!resumed.ok) {
-        refuse((await resumed.json()).message);
+        refuse(await messageOf(resumed, "The service could not continue the analysis. Try again."));
         return;
       }
       answerProblem.hidden = true;

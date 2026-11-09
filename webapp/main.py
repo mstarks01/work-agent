@@ -1179,6 +1179,7 @@ def render_report(
             client_script(name)
             for name in (
                 "sidebar.js",
+                "service_answer.js",
                 "answer_editor.js",
                 "question_list.js",
                 "report_view.js",
@@ -1722,6 +1723,7 @@ def create_app(
                     client_script(name)
                     for name in (
                         "sidebar.js",
+                        "service_answer.js",
                         "workspace.js",
                         "answer_editor.js",
                         "question_list.js",
@@ -1858,7 +1860,12 @@ def create_app(
                 _FILES_GRANTS,
                 script="\n".join(
                     client_script(name)
-                    for name in ("sidebar.js", "text_file.js", "files.js")
+                    for name in (
+                        "sidebar.js",
+                        "text_file.js",
+                        "service_answer.js",
+                        "files.js",
+                    )
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
@@ -1962,7 +1969,12 @@ def create_app(
                 _CONTROLS_GRANTS,
                 script="\n".join(
                     client_script(name)
-                    for name in ("sidebar.js", "text_file.js", "controls.js")
+                    for name in (
+                        "sidebar.js",
+                        "text_file.js",
+                        "service_answer.js",
+                        "controls.js",
+                    )
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
@@ -2103,8 +2115,8 @@ def create_app(
     @app.get("/workspace/controls/{control_id}/evidence/{evidence_id}")
     async def control_evidence(control_id: str, evidence_id: str) -> Response:
         """The text of one evidence file of the operator's Control, as an
-        attachment under the file's own name. The store checks the text
-        against the digest the Control lists."""
+        attachment under the file's own name: only a text that matches the
+        digest the Control lists."""
         if not (
             CONTROL_ID_PATTERN.fullmatch(control_id)
             and EVIDENCE_ID_PATTERN.fullmatch(evidence_id)

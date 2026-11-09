@@ -2372,6 +2372,24 @@ def test_the_files_page_keeps_lists_and_deletes_a_file_as_text(page):
     assert "keep their copy" in page.inner_text("#files-notice")
 
 
+def test_a_files_answer_that_is_not_json_says_what_failed(page):
+    page.goto("/files")
+    page.route(
+        "**/workspace/files",
+        lambda route: (
+            route.fulfill(status=502, body="Bad Gateway")
+            if route.request.method == "POST"
+            else route.fallback()
+        ),
+    )
+    upload_to_files(page, "notes.txt", "Ana: hi")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.click("#upload-save")
+    page.wait_for_selector(
+        "#upload-problem:has-text('The service could not keep the file.')"
+    )
+
+
 def test_the_files_page_filters_by_name_kind_and_format(page):
     page.goto("/files")
     for name, text in (

@@ -1888,6 +1888,7 @@ PAGE_SCRIPTS = {
     "webapp/main.py": (
         "theme.js",
         "sidebar.js",
+        "service_answer.js",
         "workspace.js",
         "answer_editor.js",
         "question_list.js",
@@ -1899,8 +1900,27 @@ PAGE_SCRIPTS = {
         "controls.js",
     ),
     "webapp/offline_sitting.py": "offline_sitting.js",
-    "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),
+    "webapp/report_view.html": (
+        "sidebar.js",
+        "service_answer.js",
+        "answer_editor.js",
+        "report_view.js",
+    ),
 }
+
+
+def test_each_workspace_script_reads_a_refusal_through_message_of():
+    """A plain error page is not JSON, so a refusal's message is read only
+    through ``messageOf`` of service_answer.js, which has a fallback."""
+    unguarded = re.compile(
+        r"\.json\(\)\)\.message|\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\.message"
+    )
+    found = {
+        name: unguarded.findall(page_javascript(name))
+        for name in PAGE_SCRIPTS["webapp/main.py"]
+    }
+    assert {name: hits for name, hits in found.items() if hits} == {}
+
 
 #: Every client script the apps serve, as :data:`PAGE_SCRIPTS` names them.
 #: :func:`~tests.test_reader_lints.test_every_client_script_belongs_to_a_page`
