@@ -53,8 +53,8 @@ cannot drift. One table in code holds the credential shapes the service knows:
 a private key block, a cloud access key ID, a vendor token prefix, and an
 assignment of a password, key, secret or token name to a literal value. In a
 settings file, such as a `.env` or an `.ini` file, such a name at the start of a
-line counts with any plain value; an empty value, a reference, a mask, a quote
-and a comment do not. `credential_hit` reads the table and the settings rule.
+line counts with any plain value; an empty value, a reference, a mask and a
+comment do not, and a quoted value counts as it does in any file. `credential_hit` reads the table and the settings rule.
 A hit refuses the upload and names the line. The table is a list of shapes and
 does not find every credential, so the page asks the owner to remove each one
 before an upload, and a refusal says that the file looks like it holds one. The

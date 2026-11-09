@@ -607,9 +607,10 @@ _SETTING = re.compile(
 
 
 def settings_file(name: str) -> bool:
-    """Whether the file ``name`` is a settings file (:data:`SETTINGS_FILE_ENDS`)."""
-    lower = name.lower()
-    return lower.endswith(SETTINGS_FILE_ENDS) or lower.startswith(".env.")
+    """Whether the file ``name`` is a settings file: its last part ends in one of
+    :data:`SETTINGS_FILE_ENDS` or starts with ``.env.``."""
+    last = name.lower().rpartition("/")[2]
+    return last.endswith(SETTINGS_FILE_ENDS) or last.startswith(".env.")
 
 
 def credential_hit(text: str, *, name: str) -> tuple[int, CredentialShape] | None:
