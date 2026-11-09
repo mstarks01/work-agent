@@ -4117,8 +4117,8 @@ def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
             "Ruled out",
             "Refused",
         ]
-        [stands] = row.locator(".ruling-list").nth(1).locator("li").all_inner_texts()
-        assert stands == "stride-returned: It shows no check of the token's issuer."
+        [refused] = row.locator(".ruling-list").nth(1).locator("li").all_inner_texts()
+        assert refused == "stride-returned: It shows no check of the token's issuer."
         assert "refused this row for the findings listed under Refused" in (
             row.inner_text()
         )

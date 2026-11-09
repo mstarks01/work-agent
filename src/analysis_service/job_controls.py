@@ -656,8 +656,8 @@ RowOutcome = Literal[
 
 #: The list each ruling sits under in the report and the Markdown export, by
 #: what the row did: it ruled the finding out, or the critic refused it. A
-#: refusal says nothing of the finding, which another row can rule out. ``report_view.js``
-#: holds a copy, which a test checks against this table.
+#: refusal says nothing of the finding, which another row can rule out.
+#: ``report_view.js`` holds a copy, which a test checks against this table.
 RULING_LISTS: Mapping[RowVerdict, str] = MappingProxyType(
     {"applied": "Ruled out", "refused": "Refused"}
 )
@@ -944,8 +944,8 @@ ROW_MEANINGS: Mapping[RowOutcome, str] = MappingProxyType(
         ),
         "not-reached": (
             "Not reached: each finding on this unit names no part that this"
-            " Control protects, so the critic did not judge this row, and it ruled"
-            " out none of them."
+            " Control protects, so the critic did not judge this row, and this row"
+            " ruled out none of them."
         ),
         "no-finding": (
             "No finding: no draft on this unit reached the critic with this row,"
