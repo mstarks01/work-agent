@@ -2610,7 +2610,6 @@ def test_a_save_locks_the_editor_and_lands_on_its_own_draft(page):
     assert page.is_disabled("#new-control")
     page.locator("#controls-list td.name-cell a", has_text="B").click(force=True)
     assert page.input_value("#control-name") == "A2"
-    page.unroute("**/workspace/controls/*")
     with page.expect_response("**/workspace/controls/*"):
         held[0].fallback()
     page.wait_for_selector("#controls-notice:has-text('“A2” is saved.')")
