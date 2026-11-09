@@ -223,14 +223,15 @@ const formControls = (() => {
     ? entry.covers
     : entry.choices.find((choice) => choice.id === element)?.covers ?? []);
   const defaultTicks = (candidates) => new Set(candidates.filter((cover) => cover.ticked).map((cover) => cover.element));
-  // What the owner chose for each copy, by Control ID: whether it applies,
-  // its element, and a zone's ticked parts. Drawn from the service's
-  // resolution, and sent whole on each change.
   // The zone the owner chose for a Control on this page, by Control ID. A
   // zone with no ticked part leaves its Control out, and the service then
   // keeps no element, so the page keeps the choice until the owner ticks a
-  // part or chooses "Not this time".
+  // part or chooses "Not this time". A choice counts only while the
+  // Control's choices still hold it.
   const targets = new Map();
+  // What the owner chose for each copy, by Control ID: whether it applies,
+  // its element, and a zone's ticked parts. Drawn from the service's
+  // resolution, and sent whole on each change.
   const chosenOf = (entry) => {
     const resolution = entry.resolution;
     if (resolution.state === "applied") {
@@ -240,8 +241,12 @@ const formControls = (() => {
         ticks: new Set(resolution.covers.filter((cover) => cover.ticked).map((cover) => cover.element)),
       };
     }
-    // A zone left out because no part is ticked shows no tick.
-    const element = targets.get(entry.id) ?? (entry.element ? entry.element.id : "");
+    // A Control left out as "unticked" has no tick saved: its top box is
+    // off, or its zone has no ticked part. It shows no tick.
+    const target = targets.get(entry.id);
+    const element = entry.choices.some((choice) => choice.id === target)
+      ? target
+      : (entry.element ? entry.element.id : "");
     const ticks = resolution.reason === "unticked" ? new Set() : defaultTicks(candidatesOf(entry, element));
     return { on: false, element, ticks };
   };
@@ -279,7 +284,12 @@ const formControls = (() => {
       const resolution = entry.resolution;
       const needsChoice = entry.match === "missing-element";
       const box = h("input", { type: "checkbox", id: `offer-${entry.id}`, checked: pick.on, disabled: needsChoice && !pick.element,
-        on: { change: (event) => { pick.on = event.target.checked; send(); } } });
+        on: { change: (event) => {
+          pick.on = event.target.checked;
+          // A zone ticked on again with no part takes its default ticks.
+          if (pick.on && !pick.ticks.size) pick.ticks = defaultTicks(candidatesOf(entry, pick.element));
+          send();
+        } } });
       const chip = resolution.state === "applied"
         ? (resolution.outcome === "application" ? entry.meaning : `matches ${names.get(resolution.element)}: ${entry.meaning}`)
         : `left out: ${entry.meaning}`;
