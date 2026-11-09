@@ -679,7 +679,7 @@ class TestTheReportSection:
         assert "### WAF" in text
         assert "- Row: stride spoofing — Applied: the critic" in text
         assert "- Row: stride tampering — Refused: the critic" in text
-        assert "  - Stands: stride-returned. It shows no" in text
+        assert "  - Refused: stride-returned. It shows no" in text
         assert "  - Ruled out: " in text
         assert ": refused." not in text and ": applied." not in text
         assert "- Row: stride repudiation — No finding: no draft" in text
@@ -878,7 +878,8 @@ class TestTheTables:
         assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
 
     def test_the_report_page_copies_each_ruling_list_name(self):
-        """``report_view.js`` names each list as :data:`RULING_LISTS` does,
+        """``report_view.js`` names each list as
+        :data:`~analysis_service.job_controls.RULING_LISTS` does,
         so the page and the Markdown export use the same words."""
         from typing import get_args
 

@@ -223,12 +223,14 @@ of each Control: what it matched, the facts it wrote, each with the meaning
 of its state (`written`, `changed` or `stated`), and its rows of the
 frameworks the job ran, each with the outcome `applied`, `partly-applied`,
 `refused`, `not-reached` or `no-finding`. A row is `partly-applied` when the
-critic applied it to some findings and refused it for others. A row is `not-reached` when no
+critic applied it to some findings and refused it for others. A row is
+`not-reached` when no
 finding on its unit reached the critic with the row, and a finding on its
 unit names no part that the Control's scope holds. The summary of a row
-counts its rulings, such as "Ruled out: 1 · Stands: 1". A row opens to two
-lists: "Ruled out" holds each finding that the row ruled out, and "Stands"
-holds each finding for which the critic refused the row. Each entry gives the
+counts its rulings, such as "Ruled out: 1 · Refused: 1". A row opens to two
+lists: "Ruled out" holds each finding that the row ruled out, and "Refused"
+holds each finding for which the critic refused the row. A refusal says
+nothing more of the finding: another Control's row can rule it out. Each entry gives the
 claim ID and the critic's reason. The Markdown export labels each ruling with
 the same list names. The row also shows each line of the evidence that the
 quotation of an applied ruling quotes, by file, class and line, and one

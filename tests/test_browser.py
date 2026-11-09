@@ -4111,15 +4111,17 @@ def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
         row = page.locator("#controls-section details.control-row", has_text="spoofing")
         summary = row.locator("summary").inner_text()
         assert "partly applied" in summary
-        assert "Ruled out: 2 · Stands: 1" in summary
+        assert "Ruled out: 2 · Refused: 1" in summary
         row.locator("summary").click()
         assert row.locator(".ruling-heading").all_inner_texts() == [
             "Ruled out",
-            "Stands",
+            "Refused",
         ]
         [stands] = row.locator(".ruling-list").nth(1).locator("li").all_inner_texts()
         assert stands == "stride-returned: It shows no check of the token's issuer."
-        assert "listed under Stands remain" in row.inner_text()
+        assert "refused this row for the findings listed under Refused" in (
+            row.inner_text()
+        )
         context.close()
 
 

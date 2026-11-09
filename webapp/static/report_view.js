@@ -1371,7 +1371,7 @@
   // The list each ruling sits under, a copy of the service's RULING_LISTS.
   const RULING_LISTS = {
     "applied": "Ruled out",
-    "refused": "Stands",
+    "refused": "Refused",
   };
   const controlRow = (row) => {
     const open = el("details", "control-row");
