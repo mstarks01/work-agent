@@ -614,9 +614,11 @@
         // A save answers with the list again; a stand-in may answer less.
         if (data.early_questions) reconcile(data);
         showState();
-      } else if (response.status === 409) {
-        // Another tab saved first. Read the answers again, keep every edit
-        // that does not contradict them, and show the ones that do.
+      } else if (response.ok || response.status === 409) {
+        // Another tab saved first, or an ok answer came with no readable
+        // body and the save may have landed. Read the answers again, keep
+        // every edit that does not contradict them, and show the ones that
+        // do.
         await resync();
       } else {
         for (const [key, edit] of sent) {
