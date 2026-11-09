@@ -632,8 +632,8 @@
     ["Rows", (control) => control.rows.map((one) => `${one.framework} ${one.unit}`).join(", ") || "None"],
     ["Evidence", evidenceText],
   ];
-  // The notice of a stale save: each field that the other save changed, as
-  // the saved version holds it, and the two ways on.
+  // The notice of a stale save: each field of the saved version that differs
+  // from the version the draft started from, and the two ways on.
   const staleNote = () => {
     const differs = FIELDS.filter(([, text]) => text(stale) !== text(basis));
     return h("div", { class: "notice", id: "stale-note" },
