@@ -3953,6 +3953,26 @@ def test_a_failed_controls_list_blocks_the_start_until_a_retry(zoned_page, failu
     assert page.is_enabled("#go")
 
 
+def test_the_controls_line_says_how_the_controls_apply(zoned_page):
+    page = zoned_page
+    keep_control(page, "Guard", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector("#controls-summary:visible")
+    assert page.is_checked("#ask")
+    assert page.inner_text("#controls-apply") == (
+        "You confirm what each Control protects when the questions open."
+    )
+    page.uncheck("#ask")
+    assert page.inner_text("#controls-apply").startswith(
+        "Questions are off, so each Control applies where its name or an alias"
+        " matches a part, with no check by you."
+    )
+    page.click("#controls-choose")
+    page.click("#controls-none")
+    page.click("#controls-done")
+    assert page.is_hidden("#controls-apply")
+
+
 def test_a_controls_list_in_flight_holds_the_start(zoned_page):
     """The form sends no analysis while it does not know the Controls."""
     page = zoned_page

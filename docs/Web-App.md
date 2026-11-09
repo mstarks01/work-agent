@@ -442,7 +442,10 @@ the analysis, so the dialog shows it unticked and disabled, with the note "Not
 for this analysis". The note says when its rows are not at the framework
 version the service carries. The service refuses a submission that names one.
 A Control with facts and rows only of other frameworks stays ticked, with the
-note "Only its facts apply here".
+note "Only its facts apply here". Under the line, when a Control is ticked,
+one sentence says how the Controls apply: with the questions on, you confirm
+what each one protects when the questions open; with the questions off, each
+one applies where its name or an alias matches a part, with no check by you.
 Controls apply at the pause. With the questions off, a job with Controls also
 pauses, and the service continues it at once with no answers (ADR 0125). The
 page shows "Continuing with your Controls…" until the next run starts. Each
@@ -470,6 +473,18 @@ it matched, and why where it matched nothing.
   element.
 - **A row of another package version is unticked.** A unit can change its
   meaning between two versions of a catalog.
+
+This table is the current behaviour. ADRs 0123 to 0127 hold the decisions, and
+ADR 0123 notes where a later ADR changed it.
+
+| Case | Questions on | Questions off |
+| --- | --- | --- |
+| A name or an alias matches a part | The pause shows the match. You keep it or choose another part. | The Control applies to that part. |
+| Nothing matches | The pause lists the parts of the scope's type to choose from. "Keep this name" adds the name as an alias. | The Control is left out, with its reason in the report. |
+| A zone | Each part that a source places in the zone is ticked. A part that the service placed there, or that no source placed, is unticked, and you can tick it. | The Control covers only the parts that a source places in the zone. |
+| Two Controls give one fact two values | The save is refused, and the refusal names both Controls. | The job stays at the pause with the refusal. Untick or edit a Control, then continue. |
+| A row of another package version | The row is unticked at submission, and the report shows it as `left-out`. A Control with no row at the carried version and no fact cannot be ticked. | The same. |
+| The service restarts while a job waits | The job stays paused. The page says that the app did not continue it, and you continue it. | The same. |
 
 A save sends `control_scopes` to `/answer/{run}`: one entry for each Control
 that applies, with its element and, for a zone, the ticked elements. A

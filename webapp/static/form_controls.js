@@ -78,6 +78,10 @@ const formControls = (() => {
   // The dialog lists the Controls that fit the selected frameworks first,
   // and folds the ones that do not. The find box shows the Controls whose
   // name holds its text.
+  const APPLY = {
+    asked: "You confirm what each Control protects when the questions open.",
+    unasked: "Questions are off, so each Control applies where its name or an alias matches a part, with no check by you. A zone covers only the parts that a source places in it. A Control that matches nothing is left out. The report says what each Control did.",
+  };
   const drawChecklist = () => {
     const focused = document.activeElement?.id;
     const present = new Set(held.map((control) => control.id));
@@ -119,6 +123,11 @@ const formControls = (() => {
       unfit.length ? h("span", { class: "hint" }, ` ${counted(unfit.length, "does", "do")} not apply.`) : null,
       missing.length ? h("span", { class: "hint" }, ` ${counted(missing.length, "ticked Control is", "ticked Controls are")} missing.`) : null,
     ].filter(Boolean));
+    // How a ticked Control applies: the owner confirms each match at the
+    // pause, or, with the questions off or absent, the default resolution
+    // applies it with no check (ADR 0125).
+    el("controls-apply").textContent = !names.length ? ""
+      : el("ask")?.checked ? APPLY.asked : APPLY.unasked;
     const known = state === "loaded";
     // Until a good read, the operator's choice decides what the line says.
     const view = !known && declined ? "declined" : state;
@@ -133,6 +142,7 @@ const formControls = (() => {
     el("controls-recover").hidden = known ? !stale : view === "loading";
     el("controls-skip").hidden = view !== "failed";
     el("controls-summary").hidden = !known;
+    el("controls-apply").hidden = !known || !names.length;
     el("controls-choose").hidden = !known;
     holdStart();
     el("controls-offer").hidden = reopened || (known && !stale && !held.length && !missing.length);
@@ -196,6 +206,7 @@ const formControls = (() => {
     el("controls-retry").focus();
   });
   el("frameworks")?.addEventListener("change", drawChecklist);
+  el("ask")?.addEventListener("change", drawChecklist);
   // The IDs a submission sends, or nothing where none is ticked. A Control
   // that does not fit the selected frameworks stays ticked for later, but
   // goes with no submission.

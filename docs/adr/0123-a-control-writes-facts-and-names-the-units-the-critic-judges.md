@@ -77,10 +77,23 @@ into a ground; no model writes the excerpt. A document settles nothing on its
 own while `CARRIED_EVIDENCE_KINDS` stays `("prose",)`; a row un-defers its unit
 (ADR 0126).
 
+> **Amended by [ADR 0126](0126-the-critic-judges-each-control-row-in-a-control-step.md).**
+> No ground holds an excerpt. The critic sees each document's service-copied
+> excerpt in a view of the draft, and its verdict carries a reason with no
+> ground; the report quotes each evidence line that the reason quotes.
+
 **A Control binds to one of three shapes**: the whole application, one zone by
 name or one element by name. The service matches the name at submission, and
 the owner confirms the match (ADR 0124). A prose match is a lead for a
 suggested Control and never the binding.
+
+> **Amended by [ADR 0124](0124-a-control-s-scope-matches-by-element-id-and-the-owner-confirms-it.md)
+> and [ADR 0125](0125-a-control-fills-only-an-open-fact.md).** The service
+> matches the name against the extracted model, at the pause. The owner
+> confirms the match where the questions are on. Where they are off, the job
+> pauses and continues at once, and each Control takes its default
+> resolution with no check by the owner. `docs/Web-App.md` holds a table of
+> the current behaviour.
 
 **The term is Control.** A "control attribute" is a fact on an element, which
 a Control may write. The two words name different things, and `GLOSSARY.md`
