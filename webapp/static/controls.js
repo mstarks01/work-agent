@@ -319,7 +319,7 @@
   // inside, as a chapter holds its sections. A search shows each unit whose
   // ID or label holds every word, under its open ancestors. A unit that is a
   // row already shows "Added", so no row goes in twice. It returns the tree
-  // and the line that counts the matches, which is empty with no search.
+  // and the text that counts the matches, which is empty with no search.
   const unitTree = (framework) => {
     const all = units[framework].units;
     const byId = new Map(all.map((unit) => [unit.id, unit]));
@@ -378,14 +378,14 @@
     const next = order.slice(order.indexOf(unit.id) + 1).map((id) => `unit-add-${framework}-${id}`);
     focusFirst(...next, "unit-find");
   };
-  // The count line stays in the page, so a screen reader announces each
-  // change of its text.
+  // The count line stays in the page and is never hidden, so a screen
+  // reader announces each change of its text.
   const drawTree = () => {
     const box = el("unit-box");
     if (!box) return;
     const { tree, count } = unitTree(pending.framework);
     redraw(box, [tree]);
-    show("unit-count", count);
+    el("unit-count").textContent = count;
   };
   const rowCard = () => {
     // The service needs a fact or a row (ADR 0123), so a chosen scope with
@@ -393,7 +393,7 @@
     const required = Boolean(draft.scope.type) && !draft.facts.length;
     // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
-    const tree = unitTree(pending.framework);
+    const { tree, count } = unitTree(pending.framework);
     const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
     return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
@@ -418,8 +418,8 @@
               drawTree();
             } } })),
         h("span", {})),
-      h("p", { class: "hint", id: "unit-count", role: "status", hidden: !tree.count }, tree.count),
-      h("div", { id: "unit-box" }, tree.tree));
+      h("p", { class: "hint", id: "unit-count", role: "status" }, count),
+      h("div", { id: "unit-box" }, tree));
   };
 
   // The page reads an evidence file and keeps only its text, as Files does.

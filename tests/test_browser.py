@@ -2775,7 +2775,7 @@ def test_a_search_opens_its_lines_and_keeps_one_count_line(page):
     assert page.get_attribute("#unit-count", "data-mark") == "kept"
     assert page.get_attribute("#unit-count", "role") == "status"
     page.fill("#unit-find", "")
-    assert page.is_hidden("#unit-count")
+    assert page.inner_text("#unit-count") == ""
     assert toggle.get_attribute("aria-expanded") == "false"
 
 
