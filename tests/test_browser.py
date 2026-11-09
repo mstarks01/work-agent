@@ -3044,6 +3044,44 @@ def test_a_second_stale_save_lists_only_what_changed_since_keep(page):
     ]
 
 
+def _fits_the_screen(page) -> bool:
+    return page.evaluate(
+        "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+    )
+
+
+def test_a_narrow_screen_shows_each_row_without_a_side_scroll(page):
+    page.set_viewport_size({"width": 390, "height": 844})
+    _two_kept_controls(page)
+    assert _fits_the_screen(page)
+    wrap = page.evaluate(
+        """() => { const box = document.querySelector('.controls-table-wrap');
+          return box.scrollWidth <= box.clientWidth; }"""
+    )
+    assert wrap
+    for name in ("A", "B"):
+        for action in ("Edit", "Delete"):
+            box = page.locator(f'button[aria-label="{action} {name}"]').bounding_box()
+            assert box["x"] + box["width"] <= 390
+    row = page.locator("#controls-list tr", has=page.locator("a:text-is('A')"))
+    assert "The whole application" in row.inner_text()
+    assert row.locator("td.wide-only").first.is_hidden()
+    assert page.is_visible("th[data-sort='updated'] button")
+    page.click("summary[aria-label='Details of A']")
+    assert "stride spoofing" in row.locator(".row-more dl").inner_text()
+    row.locator("input[type=checkbox]").check()
+    assert row.locator(".row-more").get_attribute("open") == ""
+    page.click('button[aria-label="Edit A"]')
+    assert _fits_the_screen(page)
+
+
+def test_a_wide_screen_shows_the_columns_and_no_details(page):
+    page.set_viewport_size({"width": 1280, "height": 800})
+    _two_kept_controls(page)
+    assert page.locator("#controls-list .row-more").first.is_hidden()
+    assert page.locator("#controls-list td.wide-only").first.is_visible()
+
+
 def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):
     page.goto("/controls")
     new_control(page, "Rows")

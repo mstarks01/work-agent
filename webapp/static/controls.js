@@ -66,6 +66,9 @@
   let draft = null;
   let deleting = [];
   const chosen = new Set();
+  // The rows whose "Details" are open on a narrow screen. A redraw keeps
+  // them open.
+  const detailed = new Set();
   const sort = { by: "updated", descending: true };
   const atLimit = () => controls.length >= limits.max_controls;
 
@@ -715,11 +718,18 @@
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); drawTable(); } } })),
       h("td", { class: "name-cell" },
         h("a", { href: "#", id: `name-${control.id}`, "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
-        facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null),
-      h("td", {}, scopeText(control.scope_phrase)),
-      h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
+        facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null,
+        h("div", { class: "narrow-only" }, scopeText(control.scope_phrase)),
+        h("details", { class: "narrow-only row-more", open: detailed.has(control.id),
+          on: { toggle: (event) => { if (event.target.open) detailed.add(control.id); else detailed.delete(control.id); } } },
+        h("summary", { id: `more-${control.id}`, "aria-label": `Details of ${control.name}` }, "Details"),
+        h("dl", {},
+          h("dt", {}, "Covers"), h("dd", {}, control.rows.map((one) => `${one.framework} ${one.unit}`).join(", ")),
+          h("dt", {}, "Evidence"), h("dd", {}, evidenceText(control))))),
+      h("td", { class: "wide-only" }, scopeText(control.scope_phrase)),
+      h("td", { class: "wide-only" }, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
         `${one.framework} ${one.unit}`)))),
-      h("td", {}, evidenceText(control)),
+      h("td", { class: "wide-only" }, evidenceText(control)),
       h("td", {}, h("time", { datetime: control.updated_at }, day(control.updated_at))),
       h("td", {}, h("div", { class: "row-actions" },
         h("button", { type: "button", id: `edit-${control.id}`, disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
