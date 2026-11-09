@@ -1137,6 +1137,9 @@ def controls_section(
     packages_run: dict[str, FrameworkPackage] = {
         block.framework: PACKAGES[block.framework] for block in blocks
     }
+    # The version each framework ran at, as the report holds it: a later
+    # build can carry another.
+    versions_run = {block.framework: block.framework_version for block in blocks}
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
@@ -1180,7 +1183,7 @@ def controls_section(
                     meaning=ROW_MEANINGS[row_result].format(
                         version=row.version,
                         framework=row.framework,
-                        ran=package.version,
+                        ran=versions_run[row.framework],
                     ),
                     tally=" · ".join(
                         f"{heading}: {counts[verdict]}"

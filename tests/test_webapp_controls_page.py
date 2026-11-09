@@ -610,8 +610,9 @@ def ruled(tiers):
         row(unit, framework="stride", version="1.0")
         for unit in ("spoofing", "tampering", "repudiation")
     ]
-    # A row of another version, which the job leaves out.
-    stride.append(row("denial-of-service", framework="stride", version="0.9"))
+    # A row of another version, which the job leaves out. The owner types
+    # the version, so it holds markup the export must escape.
+    stride.append(row("denial-of-service", framework="stride", version="<b>0.9</b>"))
     waf = owner.keep("WAF", {"type": "application"}, rows=stride, facts=[])
     db = owner.keep("Encrypted", ORDERS_DB)
     gone = owner.keep("Billing", {"type": "process", "name": "Billing"})
@@ -646,8 +647,8 @@ class TestTheReportSection:
         assert rows["spoofing"]["tally"] == "Ruled out: 2"
         assert rows["repudiation"]["tally"] == ""
         assert rows["denial-of-service"]["meaning"] == (
-            "Left out: this row names version 0.9 of stride, and the analysis ran"
-            " version 1.0, so the critic did not judge it."
+            "Left out: this row names version <b>0.9</b> of stride, and the"
+            " analysis ran version 1.0, so the critic did not judge it."
         )
         assert [one["ruling"] for one in rows["spoofing"]["rulings"]] == [
             "applied",
@@ -745,9 +746,11 @@ class TestTheReportSection:
             in text
         )
         assert (
-            "- Row: stride denial-of-service (version 0.9) — Left out: this row"
-            " names version 0.9 of stride, and the analysis ran version 1.0" in text
+            "- Row: stride denial-of-service (version \\<b\\>0.9\\</b\\>) — Left"
+            " out: this row names version \\<b\\>0.9\\</b\\> of stride, and the"
+            " analysis ran version 1.0" in text
         )
+        assert "<b>0.9" not in text
         assert "  - Refused: stride-returned. It shows no" in text
         assert "  - Ruled out: " in text
         assert ": refused." not in text and ": applied." not in text
@@ -945,6 +948,15 @@ class TestTheTables:
             get_args(CoverReason)
         )
         assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
+
+    def test_each_row_meaning_formats_with_the_row_values(self):
+        """The section formats every meaning with the row's version, its
+        framework and the version the analysis ran, so no meaning holds a
+        brace that the format reads."""
+        from analysis_service.job_controls import ROW_MEANINGS
+
+        for meaning in ROW_MEANINGS.values():
+            meaning.format(version="v", framework="f", ran="r")
 
     def test_the_report_page_copies_each_ruling_list_name(self):
         """``report_view.js`` names each list as
