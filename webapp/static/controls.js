@@ -79,10 +79,15 @@
   // draft that sent it.
   let session = 0;
   let saving = false;
+  // The choices of an edit that no draft field holds yet: the framework,
+  // unit and evidence kind of the next row or file, and an alias being
+  // typed. A redraw keeps them; a new edit starts them afresh.
+  let pending = {};
   const startEdit = (control) => {
     if (saving) return;
     session += 1;
     refuse("");
+    pending = { framework: FRAMEWORKS[0], unit: "", evidenceClass: PAGE.evidence_classes[0].id, alias: "" };
     editing = control ? control.id : "new";
     draft = control
       ? JSON.parse(JSON.stringify({ ...control, evidence: control.evidence.map((file) => ({ ...file })) }))
@@ -91,21 +96,37 @@
     draw();
     el("control-name").focus();
   };
+  // Closing the editor from inside it moves focus to the edited Control's
+  // Edit button, to New Control, or to the search field when New Control is
+  // off.
   const stopEdit = () => {
+    const was = editing;
+    const inside = el("editor").contains(document.activeElement);
     session += 1;
     refuse("");
     editing = null;
     draft = null;
     draw();
+    if (inside) focusFirst(`edit-${was}`, "new-control", "controls-search");
   };
   const editorProblem = h("div", { id: "editor-problem", class: "problem", role: "alert", hidden: true });
   const refuse = (text) => {
     editorProblem.textContent = text;
     editorProblem.hidden = !text;
   };
-  const remove = (list, index, label) => h("button", {
-    type: "button", class: "quiet", "aria-label": `Remove ${label}`,
-    on: { click: () => { list.splice(index, 1); draw(); } },
+  // Focus the first element of `ids` that exists and is enabled.
+  const focusFirst = (...ids) => ids.map(el).find((node) => node && !node.disabled)?.focus();
+  // After a removal, focus goes to the Remove button now at its index, the
+  // one before it, or `fallback`.
+  const focusNear = (prefix, index, fallback) =>
+    focusFirst(`${prefix}-remove-${index}`, `${prefix}-remove-${index - 1}`, fallback);
+  const remove = (list, index, label, prefix, fallback) => h("button", {
+    type: "button", class: "quiet", id: `${prefix}-remove-${index}`, "aria-label": `Remove ${label}`,
+    on: { click: () => {
+      list.splice(index, 1);
+      drawEditor();
+      focusNear(prefix, index, fallback);
+    } },
   }, "Remove");
   // The "?" beside a card's title, as the analysis page has beside its
   // question toggle: it opens the card's description.
@@ -122,7 +143,7 @@
   svg("path", { d: "M9.7 9a2.5 2.5 0 0 1 4.6 1.3c0 1.7-2.3 2.1-2.3 3.7" }),
   svg("path", { d: "M12 17h.01" }));
   const help = (title, text) => h("details", { class: "question-help" },
-    h("summary", {}, h("span", { class: "sr-only" }, `About ${title}`), helpIcon()),
+    h("summary", { id: `help-${title.toLowerCase().replace(/[^a-z]+/g, "-")}` }, h("span", { class: "sr-only" }, `About ${title}`), helpIcon()),
     h("div", { class: "question-help-content" }, h("strong", {}, title), h("p", {}, text)));
   const card = (title, about, ...content) => h("section", { class: "q-card" },
     h("div", { class: "card-head" }, h("h3", {}, title), about ? help(title, about) : null), ...content);
@@ -134,8 +155,8 @@
   const scopeCard = () => {
     const named = draft.scope.type !== "application";
     const aliasInput = h("input", {
-      type: "text", id: "alias-input", maxlength: limits.name_chars, placeholder: "Add an alias and press Enter",
-      on: { keydown: (event) => {
+      type: "text", id: "alias-input", maxlength: limits.name_chars, placeholder: "Add an alias and press Enter", value: pending.alias,
+      on: { input: (event) => { pending.alias = event.target.value; }, keydown: (event) => {
         if (event.key !== "Enter") return;
         event.preventDefault();
         const alias = event.target.value.trim();
@@ -145,8 +166,8 @@
           return;
         }
         draft.scope.aliases.push(alias);
-        draw();
-        el("alias-input").focus();
+        pending.alias = "";
+        drawEditor();
       } },
     });
     return card("What it protects", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
@@ -163,8 +184,12 @@
         named ? h("div", {}, h("label", { class: "field-label", for: "alias-input" }, "Other names it goes by"),
           h("div", { class: "aliases" },
             ...draft.scope.aliases.map((alias, index) => h("span", { class: "tag" }, alias,
-              h("button", { type: "button", class: "quiet", "aria-label": `Remove the alias ${alias}`,
-                on: { click: () => { draft.scope.aliases.splice(index, 1); draw(); } } }, "×"))),
+              h("button", { type: "button", class: "quiet", id: `alias-remove-${index}`, "aria-label": `Remove the alias ${alias}`,
+                on: { click: () => {
+                  draft.scope.aliases.splice(index, 1);
+                  drawEditor();
+                  focusNear("alias", index, "alias-input");
+                } } }, "×"))),
             aliasInput)) : null));
   };
 
@@ -192,14 +217,14 @@
       } else if (fact) {
         draft.facts.splice(draft.facts.indexOf(fact), 1);
       }
-      draw();
+      drawEditor();
       if (on && one.answer === null) el(`how-${index}`)?.focus();
     };
     const item = (one, index) => {
       const fact = factOfKey(one.key);
       const on = Boolean(fact) && (!one.facet || fact.facets?.[one.facet] === one.answer);
       return h("li", {},
-        h("label", {}, h("input", { type: "checkbox", checked: on, on: { change: (event) => tick(one, index, event.target.checked) } }), one.label),
+        h("label", {}, h("input", { type: "checkbox", id: `fact-${index}`, checked: on, on: { change: (event) => tick(one, index, event.target.checked) } }), one.label),
         one.answer === null && on ? h("input", { type: "text", id: `how-${index}`, class: "how", maxlength: limits.value_chars, value: fact.value,
           "aria-label": `How: ${one.label}`, placeholder: "How, such as AES-256 with keys in a KMS",
           on: { input: (event) => { fact.value = event.target.value; } } }) : null);
@@ -211,10 +236,13 @@
   };
 
   const rowCard = () => {
-    let framework = FRAMEWORKS[0];
-    const unitPick = () => h("select", { id: "row-unit" },
-      ...units[framework].units.map((unit) => h("option", { value: unit.id },
-        unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
+    const unitPick = () => {
+      const pick = h("select", { id: "row-unit", on: { change: (event) => { pending.unit = event.target.value; } } },
+        ...units[pending.framework].units.map((unit) => h("option", { value: unit.id },
+          unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
+      if (pending.unit) pick.value = pending.unit;
+      return pick;
+    };
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
     // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
@@ -223,30 +251,31 @@
     return card("What it covers", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
-        remove(draft.rows, index, `the row ${row.unit}`)))),
+        remove(draft.rows, index, `the row ${row.unit}`, "row", "row-framework")))),
       unplaced.length ? h("p", { class: "notice", id: "rows-reach", role: "note" },
         `Many findings of ${unplaced.join(" and ")} are about the whole application, not one part of it. This Control protects only part of the application, so the analysis cannot apply it to those findings. To apply it to them, choose “${SCOPES.application.label}” in “What it protects”.`) : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {
-            framework = event.target.value;
+            pending.framework = event.target.value;
+            pending.unit = "";
             holder.replaceChildren(holder.firstChild, unitPick());
-          } } }, ...FRAMEWORKS.map((name) => h("option", { value: name }, `${name} ${units[name].version}`)))),
+          } } }, ...FRAMEWORKS.map((name) => h("option", { value: name, selected: name === pending.framework }, `${name} ${units[name].version}`)))),
         holder,
         h("button", { type: "button", id: "add-row", on: { click: () => {
           if (draft.rows.length >= limits.max_rows) {
             refuse(PAGE.at_limit.rows);
             return;
           }
-          draft.rows.push({ framework, unit: el("row-unit").value, version: units[framework].version });
-          draw();
+          draft.rows.push({ framework: pending.framework, unit: el("row-unit").value, version: units[pending.framework].version });
+          drawEditor();
         } } }, "Add row")));
   };
 
   // The page reads an evidence file and keeps only its text, as Files does.
   const evidenceCard = () => {
-    const classPick = h("select", { id: "evidence-class" },
-      ...PAGE.evidence_classes.map((row) => h("option", { value: row.id }, row.label)));
+    const classPick = h("select", { id: "evidence-class", on: { change: (event) => { pending.evidenceClass = event.target.value; } } },
+      ...PAGE.evidence_classes.map((row) => h("option", { value: row.id, selected: row.id === pending.evidenceClass }, row.label)));
     const fileInput = h("input", { type: "file", id: "evidence-file", on: { change: async (event) => {
       const [file] = event.target.files;
       event.target.value = "";
@@ -256,13 +285,13 @@
         return;
       }
       // The file holds its place in the list while the page reads it.
-      const pending = { name: file.name.slice(0, limits.name_chars), class: classPick.value, reading: true };
+      const entry = { name: file.name.slice(0, limits.name_chars), class: classPick.value, reading: true };
       const own = draft;
       const mine = session;
-      own.evidence.push(pending);
+      own.evidence.push(entry);
       draw();
       const read = await textFile.decode(file, limits.max_evidence_bytes);
-      const at = own.evidence.indexOf(pending);
+      const at = own.evidence.indexOf(entry);
       if (mine !== session || at < 0) return;
       if (read.error) {
         own.evidence.splice(at, 1);
@@ -270,8 +299,8 @@
       } else {
         refuse("");
         own.evidence[at] = {
-          name: pending.name,
-          class: pending.class,
+          name: entry.name,
+          class: entry.class,
           size_bytes: new TextEncoder().encode(read.text).length,
           text: read.text,
         };
@@ -283,7 +312,7 @@
         h("span", {}, h("b", {}, file.name), file.reading
           ? ` · ${CLASS_LABEL[file.class]} · Reading…`
           : ` · ${CLASS_LABEL[file.class]} · ${textFile.size(file.size_bytes)}`),
-        remove(draft.evidence, index, `the file ${file.name}`)))),
+        remove(draft.evidence, index, `the file ${file.name}`, "evidence", "evidence-class")))),
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "evidence-class" }, "Kind of evidence"), classPick),
         h("div", {}, h("label", { class: "field-label", for: "evidence-file" }, "File"), fileInput),
@@ -308,6 +337,11 @@
       refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
       return;
     }
+    // The locked editor drops focus: a save that fails gives it back, and
+    // one that succeeds moves it to the saved Control's Edit button. Focus
+    // the owner moved elsewhere during the save stays where it is.
+    const focused = document.activeElement?.id;
+    const inside = el("editor").contains(document.activeElement);
     saving = true;
     const mine = session;
     draw();
@@ -330,11 +364,13 @@
     }
     if (!saved) {
       draw();
+      if (focused && document.activeElement === document.body) el(focused)?.focus();
       return;
     }
     stopEdit();
     show("controls-notice", `“${saved.name}” is saved.`);
     await load();
+    if (inside && document.activeElement === document.body) focusFirst(`edit-${saved.id}`, "new-control", "controls-search");
   };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
@@ -377,10 +413,10 @@
   const row = (control) => {
     const facts = control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one)));
     return h("tr", {},
-      h("td", {}, h("input", { type: "checkbox", checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
-        on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); draw(); } } })),
+      h("td", {}, h("input", { type: "checkbox", id: `select-${control.id}`, checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
+        on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); drawTable(); } } })),
       h("td", { class: "name-cell" },
-        h("a", { href: "#", "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
+        h("a", { href: "#", id: `name-${control.id}`, "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
         facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null),
       h("td", {}, scopeText(control.scope_phrase)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
@@ -390,15 +426,24 @@
         : "None"),
       h("td", {}, h("time", { datetime: control.updated_at }, day(control.updated_at))),
       h("td", {}, h("div", { class: "row-actions" },
-        h("button", { type: "button", disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
-        h("button", { type: "button", class: "danger", disabled: saving, "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
+        h("button", { type: "button", id: `edit-${control.id}`, disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
+        h("button", { type: "button", id: `delete-${control.id}`, class: "danger", disabled: saving, "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
   };
 
-  const draw = () => {
+  // Draw `box` again with `children`, and keep focus on the control in it
+  // that had focus, by its ID.
+  const redraw = (box, children) => {
+    const focused = box.contains(document.activeElement) ? document.activeElement.id : "";
+    box.replaceChildren(...children);
+    if (focused) el(focused)?.focus();
+  };
+  // The editor draws again after a change in it. The table draws on its
+  // own, so a filter, a sort or a row tick leaves the editor as it is.
+  const drawEditor = () => redraw(el("editor"), draft ? [editor()] : []);
+  const drawTable = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
     el("new-control").disabled = saving || atLimit() || editing === "new";
     show("controls-full", atLimit() ? textFile.refusals.at_limit : "");
-    el("editor").replaceChildren(...(draft ? [editor()] : []));
     const shown = shownControls();
     const picked = controls.filter((control) => chosen.has(control.id));
     const selectShown = el("select-shown");
@@ -413,7 +458,11 @@
     el("controls-table").hidden = !shown.length;
     el("controls-empty").hidden = Boolean(shown.length);
     el("controls-empty").textContent = controls.length ? "No Controls match your filters." : "No Controls yet.";
-    el("controls-list").replaceChildren(...shown.map(row));
+    redraw(el("controls-list"), shown.map(row));
+  };
+  const draw = () => {
+    drawEditor();
+    drawTable();
   };
 
   const load = async () => {
@@ -431,21 +480,21 @@
   };
 
   el("new-control").addEventListener("click", () => startEdit(null));
-  el("controls-search").addEventListener("input", draw);
-  el("controls-kind").addEventListener("change", draw);
-  el("controls-framework").addEventListener("change", draw);
+  el("controls-search").addEventListener("input", drawTable);
+  el("controls-kind").addEventListener("change", drawTable);
+  el("controls-framework").addEventListener("change", drawTable);
   el("select-shown").addEventListener("change", (event) => {
     for (const control of shownControls()) {
       if (event.target.checked) chosen.add(control.id);
       else chosen.delete(control.id);
     }
-    draw();
+    drawTable();
   });
   for (const head of document.querySelectorAll("th[data-sort]")) {
     head.querySelector("button").addEventListener("click", () => {
       sort.descending = sort.by === head.dataset.sort ? !sort.descending : head.dataset.sort === "updated";
       sort.by = head.dataset.sort;
-      draw();
+      drawTable();
     });
   }
   el("delete-selected").addEventListener("click", () => confirmDelete(controls.filter((control) => chosen.has(control.id))));
@@ -457,6 +506,12 @@
     const picked = deleting;
     deleting = [];
     el("delete-dialog").close();
+    // After a delete, focus goes to the row now in the first deleted row's
+    // place, the row before it, New Control, or the search field when New
+    // Control is off. Focus the owner moved elsewhere during the delete
+    // stays where it is.
+    const opener = document.activeElement;
+    const at = shownControls().findIndex((control) => picked.some((one) => one.id === control.id));
     try {
       for (const control of picked) {
         const removed = await fetch(`/workspace/controls/${encodeURIComponent(control.id)}`, { method: "DELETE" });
@@ -476,6 +531,9 @@
       ? `“${picked[0].name}” is deleted. The analyses that applied it keep their copy.`
       : `${picked.length} Controls are deleted. The analyses that applied them keep their copy.`);
     await load();
+    const rows = shownControls();
+    if (document.activeElement !== document.body && document.activeElement !== opener) return;
+    focusFirst(`select-${rows[at]?.id}`, `select-${rows[at - 1]?.id}`, "new-control", "controls-search");
   });
 
   load();

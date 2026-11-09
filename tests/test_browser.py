@@ -2716,6 +2716,181 @@ def test_a_finished_file_read_opens_save_again(page):
     ]
 
 
+def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    page.select_option("#row-framework", "asvs")
+    page.select_option("#row-unit", "V11.2")
+    page.focus("#add-row")
+    page.keyboard.press("Enter")
+    assert page.input_value("#row-framework") == "asvs"
+    assert page.input_value("#row-unit") == "V11.2"
+    assert page.evaluate("document.activeElement.id") == "add-row"
+    page.select_option("#row-unit", "V11.3")
+    page.keyboard.press("Enter")
+    rows = page.locator("#rows-list li").all_inner_texts()
+    assert [row.split()[0] for row in rows] == ["asvs", "asvs"]
+    page.select_option("#evidence-class", "code")
+    page.fill("#alias-input", "half typed")
+    tick(page, "Encrypts its data at rest.", "AES-256")
+    assert page.input_value("#evidence-class") == "code"
+    assert page.input_value("#alias-input") == "half typed"
+
+
+def test_removing_a_row_moves_focus_to_its_neighbour(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    add_row(page, "stride", "spoofing")
+    add_row(page, "stride", "tampering")
+    page.click("#row-remove-0")
+    assert page.evaluate("document.activeElement.id") == "row-remove-0"
+    page.click("#row-remove-0")
+    assert page.evaluate("document.activeElement.id") == "row-framework"
+
+
+def test_a_table_filter_leaves_the_editor_as_it_is(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    page.evaluate("document.querySelector('fieldset.editor').dataset.mark = 'kept'")
+    page.fill("#controls-search", "nothing")
+    page.fill("#controls-search", "")
+    assert page.get_attribute("fieldset.editor", "data-mark") == "kept"
+
+
+def test_a_row_tick_keeps_its_focus(page):
+    _two_kept_controls(page)
+    page.focus('input[aria-label="Select A"]')
+    page.keyboard.press("Space")
+    assert page.is_checked('input[aria-label="Select A"]')
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
+        "Select A"
+    )
+
+
+def test_cancel_moves_focus_to_the_edit_button(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.focus("#cancel-control")
+    page.keyboard.press("Enter")
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
+        "Edit A"
+    )
+
+
+def test_a_delete_moves_focus_to_the_next_row(page):
+    _two_kept_controls(page)
+    first = page.locator("#controls-list td.name-cell a").first.inner_text()
+    second = page.locator("#controls-list td.name-cell a").nth(1).inner_text()
+    page.focus(f'button[aria-label="Delete {first}"]')
+    page.keyboard.press("Enter")
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    page.wait_for_function(
+        "name => document.activeElement?.getAttribute('aria-label') === 'Select ' + name",
+        arg=second,
+    )
+
+
+def test_a_saved_control_takes_focus_on_its_edit_button(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.focus("#save-control")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#controls-notice:has-text('“A2” is saved.')")
+    page.wait_for_function(
+        "() => document.activeElement?.getAttribute('aria-label') === 'Edit A2'"
+    )
+
+
+def test_a_delete_with_new_control_off_moves_focus_to_search(page):
+    page.goto("/controls")
+    keep_control(page, "Only", {"type": "application"})
+    page.reload()
+    page.wait_for_selector("#controls-list tr")
+    page.click("#new-control")
+    assert page.is_disabled("#new-control")
+    page.focus('button[aria-label="Delete Only"]')
+    page.keyboard.press("Enter")
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    page.wait_for_function("() => document.activeElement?.id === 'controls-search'")
+
+
+def test_focus_moved_during_a_save_stays(page):
+    _two_kept_controls(page)
+    held = _hold(page, "**/workspace/controls/*")
+    page.click('button[aria-label="Edit A"]')
+    page.focus("#save-control")
+    page.keyboard.press("Enter")
+    _wait_for(page, held)
+    page.focus("#controls-search")
+    with page.expect_response("**/workspace/controls/*"):
+        held[0].continue_()
+    page.wait_for_selector("#controls-notice:has-text('is saved')")
+    page.wait_for_selector('button[aria-label="Edit A"]:enabled')
+    assert page.evaluate("document.activeElement.id") == "controls-search"
+
+
+def test_focus_moved_during_a_delete_stays(page):
+    _two_kept_controls(page)
+    held = _hold(page, "**/workspace/controls/*")
+    page.focus('button[aria-label="Delete A"]')
+    page.keyboard.press("Enter")
+    page.click("#delete-go")
+    _wait_for(page, held)
+    page.focus("#controls-search")
+    with page.expect_response("**/workspace/controls/*"):
+        held[0].continue_()
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#controls-list tr').length === 1"
+    )
+    assert page.evaluate("document.activeElement.id") == "controls-search"
+
+
+def test_each_focusable_control_on_the_controls_page_has_an_id(page):
+    """The page keeps focus across a redraw by element ID, so a focusable
+    element with no ID loses focus when its box draws again."""
+    _two_kept_controls(page)
+    # Every part of the editor that holds a focusable element: a named scope
+    # with an alias, a fact with its "how" field, a row and an evidence file.
+    new_control(page, "Every part")
+    page.fill("#alias-input", "orders")
+    page.press("#alias-input", "Enter")
+    tick(page, "Encrypts its data at rest.", "AES-256")
+    add_row(page, "stride", "spoofing")
+    add_evidence(page, "rds.tf", "storage_encrypted = true\n")
+    page.wait_for_selector("#evidence-remove-0")
+    ids = page.evaluate("[...document.querySelectorAll('[id]')].map((node) => node.id)")
+    assert len(ids) == len(set(ids)), "an ID occurs twice"
+    missing = page.evaluate(
+        """() => [...document.querySelectorAll('#editor, #controls-list')]
+          .flatMap((box) => [...box.querySelectorAll(
+            'a[href], button, input, select, textarea, summary')])
+          .filter((node) => !node.id)
+          .map((node) => node.outerHTML.slice(0, 80))"""
+    )
+    assert missing == []
+
+
+def test_a_failed_save_gives_focus_back(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: (
+            route.fulfill(status=409, json={"message": "Changed elsewhere."})
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
+    )
+    page.click('button[aria-label="Edit A"]')
+    page.focus("#save-control")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#editor-problem:has-text('Changed elsewhere.')")
+    assert page.evaluate("document.activeElement.id") == "save-control"
+
+
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     page.goto("/controls")
     assert page.get_attribute("#controls-nav", "aria-current") == "page"
