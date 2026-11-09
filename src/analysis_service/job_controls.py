@@ -1134,17 +1134,16 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
-    packages_run: dict[str, FrameworkPackage] = {
-        block.framework: PACKAGES[block.framework] for block in blocks
+    # Each framework the analysis ran, with its block. The block holds the
+    # version the framework ran at: a later build can carry another.
+    blocks_run: dict[str, FrameworkAnalysis] = {
+        block.framework: block for block in blocks
     }
-    # The version each framework ran at, as the report holds it: a later
-    # build can carry another.
-    versions_run = {block.framework: block.framework_version for block in blocks}
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
         for block in blocks
-        for unit in unreached_rows(block.claims, packages_run[block.framework], control)
+        for unit in unreached_rows(block.claims, PACKAGES[block.framework], control)
     }
     entries = []
     for copy, resolution in zip(
@@ -1165,12 +1164,13 @@ def controls_section(
         ]
         rows = []
         # A row of a framework the analysis did not run has no outcome here.
-        for row in (row for row in copy.rows if row.framework in packages_run):
+        for row in (row for row in copy.rows if row.framework in blocks_run):
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
             row_result = row_outcome(
                 ruled, ticked=row.ticked, unreached=(copy.id, row.unit) in unreached
             )
-            package = packages_run[row.framework]
+            block = blocks_run[row.framework]
+            package = PACKAGES[block.framework]
             counts = Counter(ruling.ruling for ruling in ruled)
             rows.append(
                 SectionRow(
@@ -1183,7 +1183,7 @@ def controls_section(
                     meaning=ROW_MEANINGS[row_result].format(
                         version=row.version,
                         framework=row.framework,
-                        ran=versions_run[row.framework],
+                        ran=block.framework_version,
                     ),
                     tally=" · ".join(
                         f"{heading}: {counts[verdict]}"
