@@ -81,9 +81,10 @@
   // draft that sent it.
   let session = 0;
   let saving = false;
-  // The choices of an edit that no draft field holds yet: the framework,
-  // unit and evidence kind of the next row or file, and an alias being
-  // typed. A redraw keeps them; a new edit starts them afresh.
+  // The choices of an edit that no draft field holds yet: the framework, the
+  // unit search and the open units of the next row, the evidence kind of the
+  // next file, and an alias being typed. A redraw keeps them; a new edit
+  // starts them afresh.
   let pending = {};
   // The draft as the edit opened it, to tell a changed draft from one with
   // no change.
@@ -104,7 +105,7 @@
   const open = (control) => {
     session += 1;
     refuse("");
-    pending = { framework: FRAMEWORKS[0], unit: "", evidenceClass: PAGE.evidence_classes[0].id, alias: "" };
+    pending = { framework: FRAMEWORKS[0], find: "", open: new Set(), evidenceClass: PAGE.evidence_classes[0].id, alias: "" };
     removed = null;
     editing = control ? control.id : "new";
     draft = control
@@ -314,20 +315,85 @@
         h("ul", {}, ...offered.map((one, index) => (one.topic === topic ? item(one, index) : null)))))));
   };
 
-  const rowCard = () => {
-    const unitPick = () => {
-      const pick = h("select", { id: "row-unit", on: { change: (event) => { pending.unit = event.target.value; } } },
-        ...units[pending.framework].units.map((unit) => h("option", { value: unit.id },
-          unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
-      if (pending.unit) pick.value = pending.unit;
-      return pick;
+  // The units of one framework as a tree: each unit under the unit it sits
+  // inside, as a chapter holds its sections. A search shows each unit whose
+  // ID or label holds every word, under its open ancestors. A unit that is a
+  // row already shows "Added", so no row goes in twice. It returns the tree
+  // and the text that counts the matches, which is empty with no search.
+  const unitTree = (framework) => {
+    const all = units[framework].units;
+    const byId = new Map(all.map((unit) => [unit.id, unit]));
+    const children = new Map();
+    for (const unit of all) {
+      const parent = byId.has(unit.inside) ? unit.inside : "";
+      if (!children.has(parent)) children.set(parent, []);
+      children.get(parent).push(unit);
+    }
+    const words = pending.find.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    const matches = (unit) => words.every((word) => `${unit.id} ${unit.label}`.toLocaleLowerCase().includes(word));
+    // With a search, a unit shows where it or a unit inside it matches.
+    const shown = new Set();
+    if (words.length) {
+      for (const unit of all.filter(matches)) {
+        for (let at = unit; at && !shown.has(at.id); at = byId.get(at.inside)) shown.add(at.id);
+      }
+    }
+    const added = (unit) => draft.rows.some((row) => row.framework === framework && row.unit === unit.id);
+    const order = [];
+    const line = (unit) => {
+      order.push(unit.id);
+      const kids = (children.get(unit.id) ?? []).filter((kid) => !words.length || shown.has(kid.id));
+      // A search opens every line it shows, so a line then has no toggle.
+      const open = words.length > 0 || pending.open.has(unit.id);
+      const text = unit.label ? `${unit.id} · ${unit.label}` : unit.id;
+      return h("li", { class: `unit unit-${unit.grain}` },
+        h("div", { class: "unit-line" },
+          kids.length && !words.length ? h("button", { type: "button", class: "quiet unit-toggle", id: `unit-open-${framework}-${unit.id}`, "aria-expanded": open ? "true" : "false",
+            on: { click: () => {
+              if (pending.open.has(unit.id)) pending.open.delete(unit.id);
+              else pending.open.add(unit.id);
+              drawTree();
+            } } }, h("span", { "aria-hidden": "true" }, open ? "▾ " : "▸ "), text) : h("span", {}, text),
+          added(unit) ? h("span", { class: "sub" }, "Added")
+            : h("button", { type: "button", class: "quiet", id: `unit-add-${framework}-${unit.id}`, "aria-label": `Add ${unit.id}`,
+              on: { click: () => addUnit(framework, unit, order) } }, "Add")),
+        kids.length && open ? h("ul", {}, ...kids.map(line)) : null);
     };
-    const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
+    const roots = (children.get("") ?? []).filter((unit) => !words.length || shown.has(unit.id));
+    const count = all.filter(matches).length;
+    return {
+      tree: h("ul", { class: "unit-tree", id: "unit-tree" }, ...roots.map(line)),
+      count: !words.length ? "" : count ? `${counted(count, "unit matches", "units match")}.` : "No unit matches.",
+    };
+  };
+  // After an Add, focus goes to the next unit's Add button that shows, or
+  // to the search field.
+  const addUnit = (framework, unit, order) => {
+    if (draft.rows.length >= limits.max_rows) {
+      refuse(PAGE.at_limit.rows);
+      return;
+    }
+    draft.rows.push({ framework, unit: unit.id, version: units[framework].version });
+    drawEditor();
+    const next = order.slice(order.indexOf(unit.id) + 1).map((id) => `unit-add-${framework}-${id}`);
+    focusFirst(...next, "unit-find");
+  };
+  // The count line stays in the page and is never hidden, so a screen
+  // reader announces each change of its text.
+  const drawTree = () => {
+    const box = el("unit-box");
+    if (!box) return;
+    const { tree, count } = unitTree(pending.framework);
+    redraw(box, [tree]);
+    el("unit-count").textContent = count;
+  };
+  const rowCard = () => {
     // The service needs a fact or a row (ADR 0123), so a chosen scope with
     // no fact needs a row. The whole application states no fact.
     const required = Boolean(draft.scope.type) && !draft.facts.length;
     // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
+    const { tree, count } = unitTree(pending.framework);
     const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
     return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
@@ -343,18 +409,17 @@
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {
             pending.framework = event.target.value;
-            pending.unit = "";
-            holder.replaceChildren(holder.firstChild, unitPick());
+            drawTree();
           } } }, ...FRAMEWORKS.map((name) => h("option", { value: name, selected: name === pending.framework }, `${name} ${units[name].version}`)))),
-        holder,
-        h("button", { type: "button", id: "add-row", on: { click: () => {
-          if (draft.rows.length >= limits.max_rows) {
-            refuse(PAGE.at_limit.rows);
-            return;
-          }
-          draft.rows.push({ framework: pending.framework, unit: el("row-unit").value, version: units[pending.framework].version });
-          drawEditor();
-        } } }, "Add row")));
+        h("div", {}, h("label", { class: "field-label", for: "unit-find" }, "Find a unit"),
+          h("input", { type: "search", id: "unit-find", placeholder: "ID or words", autocomplete: "off", value: pending.find,
+            on: { input: (event) => {
+              pending.find = event.target.value;
+              drawTree();
+            } } })),
+        h("span", {})),
+      h("p", { class: "hint", id: "unit-count", role: "status" }, count),
+      h("div", { id: "unit-box" }, tree));
   };
 
   // The page reads an evidence file and keeps only its text, as Files does.
