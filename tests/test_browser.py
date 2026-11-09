@@ -2918,7 +2918,9 @@ def test_save_and_open_saves_then_opens_the_other_control(page):
     page.click('button[aria-label="Edit B"]')
     with page.expect_response("**/workspace/controls/*"):
         page.click("#leave-save")
-    page.wait_for_function("() => document.querySelector('#control-name')?.value === 'B'")
+    page.wait_for_function(
+        "() => document.querySelector('#control-name')?.value === 'B'"
+    )
     assert page.inner_text("#controls-notice") == "“A2” is saved."
 
 
@@ -2956,9 +2958,12 @@ def test_a_scope_change_lists_what_it_removed_and_undo_restores_it(page):
     assert page.input_value("#scope-type") == "store"
     assert page.input_value("#scope-name") == "Orders DB"
     assert page.locator(".aliases .tag").all_inner_texts() == ["orders\n×"]
-    assert page.input_value(
-        "#statements input[aria-label='How: Encrypts its data at rest.']"
-    ) == "AES-256"
+    assert (
+        page.input_value(
+            "#statements input[aria-label='How: Encrypts its data at rest.']"
+        )
+        == "AES-256"
+    )
     assert page.locator("#scope-removed").count() == 0
     assert page.evaluate("document.activeElement.id") == "scope-type"
 
