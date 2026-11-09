@@ -318,14 +318,16 @@
   // The units of one framework as a tree: each unit under the unit it sits
   // inside, as a chapter holds its sections. A search shows each unit whose
   // ID or label holds every word, under its open ancestors. A unit that is a
-  // row already shows "Added", so no row goes in twice.
+  // row already shows "Added", so no row goes in twice. It returns the tree
+  // and the line that counts the matches, which is empty with no search.
   const unitTree = (framework) => {
     const all = units[framework].units;
     const byId = new Map(all.map((unit) => [unit.id, unit]));
     const children = new Map();
     for (const unit of all) {
       const parent = byId.has(unit.inside) ? unit.inside : "";
-      children.set(parent, [...(children.get(parent) ?? []), unit]);
+      if (!children.has(parent)) children.set(parent, []);
+      children.get(parent).push(unit);
     }
     const words = pending.find.toLocaleLowerCase().split(/\s+/).filter(Boolean);
     const matches = (unit) => words.every((word) => `${unit.id} ${unit.label}`.toLocaleLowerCase().includes(word));
@@ -341,16 +343,17 @@
     const line = (unit) => {
       order.push(unit.id);
       const kids = (children.get(unit.id) ?? []).filter((kid) => !words.length || shown.has(kid.id));
+      // A search opens every line it shows, so a line then has no toggle.
       const open = words.length > 0 || pending.open.has(unit.id);
       const text = unit.label ? `${unit.id} · ${unit.label}` : unit.id;
       return h("li", { class: `unit unit-${unit.grain}` },
         h("div", { class: "unit-line" },
-          kids.length ? h("button", { type: "button", class: "quiet unit-toggle", id: `unit-open-${framework}-${unit.id}`, "aria-expanded": open ? "true" : "false",
+          kids.length && !words.length ? h("button", { type: "button", class: "quiet unit-toggle", id: `unit-open-${framework}-${unit.id}`, "aria-expanded": open ? "true" : "false",
             on: { click: () => {
               if (pending.open.has(unit.id)) pending.open.delete(unit.id);
               else pending.open.add(unit.id);
               drawTree();
-            } } }, open ? "▾ " : "▸ ", text) : h("span", {}, text),
+            } } }, h("span", { "aria-hidden": "true" }, open ? "▾ " : "▸ "), text) : h("span", {}, text),
           added(unit) ? h("span", { class: "sub" }, "Added")
             : h("button", { type: "button", class: "quiet", id: `unit-add-${framework}-${unit.id}`, "aria-label": `Add ${unit.id}`,
               on: { click: () => addUnit(framework, unit, order) } }, "Add")),
@@ -358,11 +361,10 @@
     };
     const roots = (children.get("") ?? []).filter((unit) => !words.length || shown.has(unit.id));
     const count = all.filter(matches).length;
-    return [
-      words.length ? h("p", { class: "hint", id: "unit-count", role: "status" },
-        count ? `${counted(count, "unit matches", "units match")}.` : "No unit matches.") : null,
-      h("ul", { class: "unit-tree", id: "unit-tree" }, ...roots.map(line)),
-    ];
+    return {
+      tree: h("ul", { class: "unit-tree", id: "unit-tree" }, ...roots.map(line)),
+      count: !words.length ? "" : count ? `${counted(count, "unit matches", "units match")}.` : "No unit matches.",
+    };
   };
   // After an Add, focus goes to the next unit's Add button that shows, or
   // to the search field.
@@ -376,9 +378,14 @@
     const next = order.slice(order.indexOf(unit.id) + 1).map((id) => `unit-add-${framework}-${id}`);
     focusFirst(...next, "unit-find");
   };
+  // The count line stays in the page, so a screen reader announces each
+  // change of its text.
   const drawTree = () => {
     const box = el("unit-box");
-    if (box) redraw(box, unitTree(pending.framework));
+    if (!box) return;
+    const { tree, count } = unitTree(pending.framework);
+    redraw(box, [tree]);
+    show("unit-count", count);
   };
   const rowCard = () => {
     // The service needs a fact or a row (ADR 0123), so a chosen scope with
@@ -386,6 +393,7 @@
     const required = Boolean(draft.scope.type) && !draft.facts.length;
     // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
+    const tree = unitTree(pending.framework);
     const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
     return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
@@ -410,7 +418,8 @@
               drawTree();
             } } })),
         h("span", {})),
-      h("div", { id: "unit-box" }, ...unitTree(pending.framework)));
+      h("p", { class: "hint", id: "unit-count", role: "status", hidden: !tree.count }, tree.count),
+      h("div", { id: "unit-box" }, tree.tree));
   };
 
   // The page reads an evidence file and keeps only its text, as Files does.

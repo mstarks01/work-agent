@@ -375,7 +375,7 @@ it.
   application states no fact, so it always needs a row. "What it covers" takes
   a row by framework and unit, and the row keeps the package version. The units
   of the chosen framework show as a tree, each under the unit it sits inside,
-  as a chapter holds its sections, with each unit's full label from its
+  as an ASVS chapter holds its sections, with each unit's full label from its
   package's catalog. "Find a unit" shows each unit whose ID or label holds
   every word, under its chapter and section. Each unit has an "Add" button, and
   a unit that is a row already shows "Added", so no row goes in twice. A note

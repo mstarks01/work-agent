@@ -2762,6 +2762,23 @@ def test_the_unit_tree_opens_by_chapter_and_finds_by_words(page):
     assert page.inner_text("#unit-count") == "No unit matches."
 
 
+def test_a_search_opens_its_lines_and_keeps_one_count_line(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    page.select_option("#row-framework", "asvs")
+    toggle = page.locator("[id='unit-open-asvs-V11']")
+    assert toggle.locator("span[aria-hidden='true']").inner_text().strip() == "▸"
+    page.evaluate("document.querySelector('#unit-count').dataset.mark = 'kept'")
+    page.fill("#unit-find", "V11")
+    assert page.locator("[id^='unit-open-asvs-']").count() == 0
+    page.fill("#unit-find", "V11.2")
+    assert page.get_attribute("#unit-count", "data-mark") == "kept"
+    assert page.get_attribute("#unit-count", "role") == "status"
+    page.fill("#unit-find", "")
+    assert page.is_hidden("#unit-count")
+    assert toggle.get_attribute("aria-expanded") == "false"
+
+
 def test_a_unit_already_a_row_cannot_be_added_again(page):
     page.goto("/controls")
     new_control(page, "Rows")
