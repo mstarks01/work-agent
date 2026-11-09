@@ -4132,8 +4132,10 @@ def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
         assert old.locator("summary .tag").inner_text() == "left out"
         old.locator("summary").click()
         assert old.locator("p.meta").all_inner_texts() == [
-            "Left out: this row names version 0.9 of stride, and the analysis ran"
-            " version 1.0, so the critic did not judge it."
+            (
+                "Left out: this row names version 0.9 of stride, and the analysis"
+                " ran version 1.0, so the critic did not judge it."
+            )
         ]
         context.close()
 

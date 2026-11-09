@@ -579,8 +579,10 @@ class TestTheUnreachedRows:
         [row] = [row for row in entry.rows if row.unit == "tampering"]
         assert (row.outcome, row.meaning) == (
             "left-out",
-            "Left out: this row names version 0.9 of stride, and the analysis ran"
-            " version 0.8, so the critic did not judge it.",
+            (
+                "Left out: this row names version 0.9 of stride, and the analysis"
+                " ran version 0.8, so the critic did not judge it."
+            ),
         )
 
     def test_the_report_leaves_out_a_row_of_a_framework_not_run(self):
