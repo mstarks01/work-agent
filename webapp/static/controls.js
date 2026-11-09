@@ -66,9 +66,11 @@
   // ---- The editor ---------------------------------------------------------
   // A draft holds the Control as the editor shows it. A held evidence file
   // has an ID and no text; a new one has its text and no ID.
+  // A new Control starts with no scope type: the owner chooses what it
+  // protects first.
   const blank = () => ({
     name: "",
-    scope: { type: "application", name: "", aliases: [] },
+    scope: { type: "", name: "", aliases: [] },
     facts: [],
     rows: [],
     evidence: [],
@@ -183,15 +185,18 @@
   const help = (title, text) => h("details", { class: "question-help" },
     h("summary", { id: `help-${title.toLowerCase().replace(/[^a-z]+/g, "-")}` }, h("span", { class: "sr-only" }, `About ${title}`), helpIcon()),
     h("div", { class: "question-help-content" }, h("strong", {}, title), h("p", {}, text)));
-  const card = (title, about, ...content) => h("section", { class: "q-card" },
-    h("div", { class: "card-head" }, h("h3", {}, title), about ? help(title, about) : null), ...content);
+  // A card of the editor, with its place in the order and whether it is
+  // optional or required.
+  const card = (title, step, about, ...content) => h("section", { class: "q-card" },
+    h("div", { class: "card-head" }, h("h3", {}, title), h("span", { class: "card-step" }, step),
+      about ? help(title, about) : null), ...content);
 
   const SCOPE_HINTS = {
     boundary: "The name must match the trust boundary after case and punctuation. The Control applies to each part the description places in it.",
     other: "The name must match the part after case and punctuation. A similar name matches nothing.",
   };
   const scopeCard = () => {
-    const named = draft.scope.type !== "application";
+    const named = Boolean(draft.scope.type) && draft.scope.type !== "application";
     const aliasInput = h("input", {
       type: "text", id: "alias-input", maxlength: limits.name_chars, placeholder: "Add an alias and press Enter", value: pending.alias,
       on: { input: (event) => { pending.alias = event.target.value; }, keydown: (event) => {
@@ -211,7 +216,7 @@
     // An alias added or removed draws the editor with no input event, so
     // the draw ends the Undo too.
     dropUndo();
-    return card("What it protects", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
+    return card("What it protects", "1 of 4", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
       h("div", { class: "line" },
         h("div", {},
           h("select", { id: "scope-type", "aria-label": "What it protects", on: { change: (event) => {
@@ -225,7 +230,9 @@
             if (lost.length || before.scope.name || before.scope.aliases.length) removed = { ...before, lost, after };
             else if (removed) removed.after = after;
             drawEditor();
-          } } }, ...PAGE.scope_types.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
+          } } },
+          h("option", { value: "", disabled: true, selected: !draft.scope.type }, "Choose what it protects"),
+          ...PAGE.scope_types.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
         named ? h("div", {}, h("label", { class: "field-label", for: "scope-name" }, "Its name in your descriptions"),
           h("input", { type: "text", id: "scope-name", maxlength: limits.name_chars, value: draft.scope.name,
             on: { input: (event) => { draft.scope.name = event.target.value; } } })) : null,
@@ -264,10 +271,14 @@
   // Each statement is a tick. A tick writes the answer that makes it a
   // protection, and a statement that asks how takes the owner's words.
   const factCard = () => {
+    if (!draft.scope.type) {
+      return card("What it does", "2 of 4", null,
+        h("p", { class: "hint" }, "Choose what it protects to see the protections it can state."));
+    }
     const offered = SCOPES[draft.scope.type].statements;
     if (!offered.length) {
-      return card("What it does", null,
-        h("p", { class: "hint" }, "A Control of the whole application states no fact. Name the units it covers above."));
+      return card("What it does", "2 of 4", null,
+        h("p", { class: "hint" }, "A Control of the whole application states no fact. It works through the units it covers."));
     }
     const factOfKey = (key) => draft.facts.find((fact) => keyText(fact.key) === keyText(key));
     const tick = (one, index, on) => {
@@ -298,7 +309,7 @@
           on: { input: (event) => { fact.value = event.target.value; } } }) : null);
     };
     const topics = [...new Set(offered.map((one) => one.topic))];
-    return card("What it does", "Tick each protection the part has. The analysis takes each one as a fact about the part. A fact that the description states stands.",
+    return card("What it does", "2 of 4", "Tick each protection the part has. The analysis takes each one as a fact about the part. A fact that the description states stands.",
       h("div", { class: "statements", id: "statements" }, ...topics.map((topic) => h("fieldset", {}, h("legend", {}, topic),
         h("ul", {}, ...offered.map((one, index) => (one.topic === topic ? item(one, index) : null)))))));
   };
@@ -314,9 +325,11 @@
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
     // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
-    const unplaced = draft.scope.type === "application" ? []
+    const whole = draft.scope.type === "application";
+    const unplaced = whole || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
-    return card("What it covers", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
+    return card("What it covers", whole ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
+      whole ? h("p", { class: "hint" }, "Add at least one unit. The analysis judges each one against its findings.") : null,
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`, "row", "row-framework")))),
@@ -375,7 +388,7 @@
       }
       draw();
     } } });
-    return card("Evidence", "A file that shows the protection, as plain text. The analysis quotes it beside a ruling and never reads it as a description.",
+    return card("Evidence", "4 of 4 · optional", "A file that shows the protection, as plain text. The analysis quotes it beside a ruling and never reads it as a description.",
       h("p", { class: "hint", id: "evidence-note" }, "Remove each password, key and token from a file before you add it. The service refuses a file that looks like it holds one, but it does not find every form. A credential that it does not find is saved with the file."),
       h("ul", { class: "lines", id: "evidence-list" }, ...draft.evidence.map((file, index) => h("li", {},
         h("span", {}, h("b", {}, file.name), file.reading
@@ -403,6 +416,11 @@
   // Whether the save succeeded.
   const save = async () => {
     if (saving || reading()) return false;
+    if (!draft.scope.type) {
+      refuse("Choose what the Control protects.");
+      el("scope-type").focus();
+      return false;
+    }
     const missing = draft.facts.find((fact) => !fact.facets && !fact.value.trim());
     if (missing) {
       refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
@@ -449,7 +467,7 @@
     h("div", {}, h("label", { class: "field-label", for: "control-name" }, "Name"),
       h("input", { type: "text", id: "control-name", maxlength: limits.name_chars, value: draft.name,
         on: { input: (event) => { draft.name = event.target.value; } } })),
-    rowCard(), scopeCard(), factCard(), evidenceCard(),
+    scopeCard(), factCard(), rowCard(), evidenceCard(),
     editorProblem,
     h("div", { class: "dialog-actions" },
       h("span", { id: "editor-status", class: "hint", role: "status" },

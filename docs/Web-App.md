@@ -365,8 +365,14 @@ it.
   above the table gives the count against `max_controls`, such as "4 of 50
   Controls", and "New Control" is disabled at the limit.
 - **The editor.** "New Control", "Edit" or a click on a name opens the editor
-  above the table: the name, then four cards. Each card keeps its description
-  behind a "?" beside its title. "What it covers" comes first and takes a row
+  above the table: the name, then four cards in this order: "What it
+  protects", "What it does", "What it covers" and "Evidence". Each card shows
+  its place, such as "1 of 4", says when it is optional or required, and keeps
+  its description behind a "?" beside its title. A new Control starts with
+  nothing chosen in "What it protects", and "What it does" asks for that
+  choice first. A Control of the whole application states no fact, so its
+  "What it covers" is required; for a part it is optional, because a fact
+  alone is a Control. "What it covers" takes a row
   by framework and unit, and the row keeps the package version. Each unit's
   label comes from its package's catalog when the page loads. A note shows
   under the rows when the Control does not cover the whole application and a row
