@@ -3668,8 +3668,9 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
         "#control-offer"
     )
     message = (
-        "Two Controls write “encryption_at_rest” on Orders DB with two values:"
-        " “KMS” and “AES-256”. Untick one, or edit one Control so that they agree."
+        "The Controls “KMS” and “AES” write “encryption_at_rest” on Orders DB"
+        " with two values: “KMS” and “AES-256”. Untick one of them, then"
+        " continue."
     )
     page.click("#continue")
     page.wait_for_selector("#answer-problem:not([hidden])")
@@ -3951,6 +3952,26 @@ def test_a_failed_controls_list_blocks_the_start_until_a_retry(zoned_page, failu
     assert page.is_checked(f"#control-{kept}")
     assert page.inner_text("#controls-summary") == "1 ticked: Guard."
     assert page.is_enabled("#go")
+
+
+def test_the_controls_line_says_how_the_controls_apply(zoned_page):
+    page = zoned_page
+    keep_control(page, "Guard", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector("#controls-summary:visible")
+    assert page.is_checked("#ask")
+    assert page.inner_text("#controls-apply") == (
+        "You confirm what each Control protects when the questions open."
+    )
+    page.uncheck("#ask")
+    assert page.inner_text("#controls-apply").startswith(
+        "Questions are off, so your Controls apply with no check by you. A"
+        " Control of the whole application always applies."
+    )
+    page.click("#controls-choose")
+    page.click("#controls-none")
+    page.click("#controls-done")
+    assert page.is_hidden("#controls-apply")
 
 
 def test_a_controls_list_in_flight_holds_the_start(zoned_page):

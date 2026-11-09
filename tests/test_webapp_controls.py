@@ -812,9 +812,9 @@ class TestTheFacts:
         kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
         run_id = owner.paused(aes, kms)
         message = (
-            "Two Controls write “encryption_at_rest” on Orders DB with two values:"
-            " “AES-256” and “KMS”. Untick one, or edit one Control so that they"
-            " agree."
+            "The Controls “Encrypted” and “KMS” write “encryption_at_rest” on"
+            " Orders DB with two values: “AES-256” and “KMS”. Untick one of them,"
+            " then continue."
         )
         both = [
             {"control": control, "element": "store:orders-db"} for control in (aes, kms)
@@ -1026,9 +1026,9 @@ class TestTheAutomaticContinue:
         assert list(frames)[-1] == "questions"
         assert set(frames) <= {"continuing", "questions"}
         message = (
-            "Two Controls write “encryption_at_rest” on Orders DB with two values:"
-            " “AES-256” and “KMS”. Untick one, or edit one Control so that they"
-            " agree."
+            "The Controls “Encrypted” and “KMS” write “encryption_at_rest” on"
+            " Orders DB with two values: “AES-256” and “KMS”. Untick one of them,"
+            " then continue."
         )
         assert frames["questions"]["refusal"] == message
         assert owner.questions(run_id)["refusal"] == message

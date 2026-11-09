@@ -45,8 +45,9 @@ Control writes its open facts and their lines of the answers Source. A refusal
 leaves the job paused and the page shows it: a two-value conflict, a value the
 fact cannot hold, or an admission refusal. The job row keeps the refusal's
 words in `continue_refusal`, so a restart keeps them, and the admission of a
-child of the job clears them. The owner unticks or edits a Control
-and continues, and the extraction does not run again. A submission with no
+child of the job clears them. The owner unticks a Control and continues, and
+the extraction does not run again. The job keeps its own copy of each Control,
+so an edit in Controls changes only a later analysis. A submission with no
 Controls and no questions does not pause. The submission refuses
 `answers_from` without `questions`.
 
