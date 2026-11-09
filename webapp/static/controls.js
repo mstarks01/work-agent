@@ -310,7 +310,7 @@
           on: { input: (event) => { fact.value = event.target.value; } } }) : null);
     };
     const topics = [...new Set(offered.map((one) => one.topic))];
-    return card("What it does", "2 of 4", "Tick each protection the part has. The analysis takes each one as a fact about the part. A fact that the description states stands.",
+    return card("What it does", "2 of 4", "Tick each protection the part has. Each tick fills a fact that the description leaves open; a fact that the description states stands. A Control needs at least one fact or one row.",
       h("div", { class: "statements", id: "statements" }, ...topics.map((topic) => h("fieldset", {}, h("legend", {}, topic),
         h("ul", {}, ...offered.map((one, index) => (one.topic === topic ? item(one, index) : null)))))));
   };
@@ -396,7 +396,7 @@
     const { tree, count } = unitTree(pending.framework);
     const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
-    return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
+    return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against the findings on its unit: it rules out a finding that the Control covers, and refuses a row that does not bear on its unit.",
       required ? h("p", { class: "hint" }, draft.scope.type === "application"
         ? "Add at least one unit. The analysis judges each one against its findings."
         : "Tick a protection above, or add at least one unit.") : null,
@@ -457,7 +457,7 @@
       }
       draw();
     } } });
-    return card("Evidence", "4 of 4 · optional", "A file that shows the protection, as plain text. The analysis quotes it beside a ruling and never reads it as a description.",
+    return card("Evidence", "4 of 4 · optional", "A file that shows the protection, as plain text. The analysis shows it beside the rows above, quotes it beside a ruling and never reads it as a description. With no row, a file has no effect.",
       h("p", { class: "hint", id: "evidence-note" }, "Remove each password, key and token from a file before you add it. The service refuses a file that looks like it holds one, but it does not find every form. A credential that it does not find is saved with the file."),
       h("ul", { class: "lines", id: "evidence-list" }, ...draft.evidence.map((file, index) => h("li", {},
         h("span", {}, h("b", {}, file.name), file.reading

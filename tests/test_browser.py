@@ -3281,6 +3281,10 @@ def test_the_editor_warns_of_a_row_that_a_part_cannot_reach(page):
     assert not about.locator(".question-help-content").is_visible()
     about.locator("summary").click()
     assert "Tick each protection the part has." in about.inner_text()
+    assert "fills a fact that the description leaves open" in about.inner_text()
+    evidence = page.locator(".q-card:has(h3:text-is('Evidence')) .question-help")
+    evidence.locator("summary").click()
+    assert "With no row, a file has no effect." in evidence.inner_text()
 
     page.select_option("#scope-type", "application")
     assert page.locator("#rows-reach").count() == 0
