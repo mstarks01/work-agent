@@ -606,7 +606,7 @@
       // reads the body once here.
       const data = await response.json().catch(() => null);
       const problem = data?.message ?? "The service did not save these answers. Retry.";
-      if (response.ok) {
+      if (response.ok && data) {
         acknowledge(sent);
         // A batch that left edits behind is followed by the next one.
         if (sendable().size) again = true;
@@ -1204,15 +1204,15 @@
           links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
         }),
       });
-      data = await response.json().catch(() => ({}));
+      data = await response.json().catch(() => null);
     } catch {
       answered();
       refuse(unsaved);
       return false;
     }
     try {
-      if (!response.ok) {
-        refuse(data.message ? `${unsaved} ${data.message}` : unsaved);
+      if (!response.ok || !data) {
+        refuse(data?.message ? `${unsaved} ${data.message}` : unsaved);
         return false;
       }
       answerProblem.hidden = true;

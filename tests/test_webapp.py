@@ -1911,14 +1911,14 @@ PAGE_SCRIPTS = {
 
 def test_each_workspace_script_reads_a_refusal_through_message_of():
     """A plain error page is not JSON, so a refusal's message is read only
-    through ``messageOf`` of service_answer.js, which has a fallback."""
+    through ``messageOf`` of service_answer.js, which has a fallback. The
+    lint finds a read of the parsed answer's message in one expression."""
     unguarded = re.compile(
-        r"\.json\(\)\)\.message|\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\.message"
+        r"\.json\(\)\)\??\.message"
+        r"|\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\??\.message"
     )
-    found = {
-        name: unguarded.findall(page_javascript(name))
-        for name in PAGE_SCRIPTS["webapp/main.py"]
-    }
+    served = {*PAGE_SCRIPTS["webapp/main.py"], *PAGE_SCRIPTS["webapp/report_view.html"]}
+    found = {name: unguarded.findall(page_javascript(name)) for name in served}
     assert {name: hits for name, hits in found.items() if hits} == {}
 
 
