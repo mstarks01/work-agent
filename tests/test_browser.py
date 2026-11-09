@@ -3058,6 +3058,44 @@ def test_save_and_open_keeps_a_draft_opened_during_the_reload(page):
     assert page.input_value("#control-name") == "Mine"
 
 
+def test_a_new_control_starts_with_what_it_protects(page):
+    page.goto("/controls")
+    page.click("#new-control")
+    assert page.input_value("#scope-type") == ""
+    steps = page.locator(".editor .card-step").all_inner_texts()
+    assert steps == ["1 of 4", "2 of 4", "3 of 4 · optional", "4 of 4 · optional"]
+    does = page.locator(".q-card:has(h3:text-is('What it does'))")
+    assert does.inner_text().endswith(
+        "Choose what it protects to see the protections it can state."
+    )
+    assert page.locator("#scope-name").count() == 0
+    page.fill("#control-name", "Edge")
+    page.click("#save-control")
+    assert page.inner_text("#editor-problem") == "Choose what the Control protects."
+    assert page.evaluate("document.activeElement.id") == "scope-type"
+    page.select_option("#scope-type", "application")
+    assert "3 of 4 · required" in page.locator(".editor .card-step").all_inner_texts()
+    assert "Add at least one unit." in page.inner_text(
+        ".q-card:has(h3:text-is('What it covers'))"
+    )
+    assert does.inner_text().endswith("It works through the units it covers.")
+    page.select_option("#scope-type", "store")
+    covers = page.locator(".q-card:has(h3:text-is('What it covers'))")
+    assert "3 of 4 · required" in page.locator(".editor .card-step").all_inner_texts()
+    assert "Tick a protection above, or add at least one unit." in covers.inner_text()
+    tick(page, "Encrypts its data at rest.", "AES-256")
+    assert "3 of 4 · optional" in page.locator(".editor .card-step").all_inner_texts()
+    assert "Tick a protection above" not in covers.inner_text()
+    assert page.locator("#scope-name").count() == 1
+
+
+def test_an_existing_control_lists_no_placeholder(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    assert page.input_value("#scope-type") == "application"
+    assert page.locator("#scope-type option[value='']").count() == 0
+
+
 def test_the_evidence_card_asks_the_owner_to_remove_each_credential(page):
     page.goto("/controls")
     new_control(page, "Notes")
@@ -3173,9 +3211,9 @@ def test_the_editor_warns_of_a_row_that_a_part_cannot_reach(page):
     new_control(page, "TLS at the edge")
     cards = page.locator(".editor .q-card h3")
     assert cards.all_inner_texts() == [
-        "What it covers",
         "What it protects",
         "What it does",
+        "What it covers",
         "Evidence",
     ]
     # An empty list takes no space, so no second line shows under the title.
