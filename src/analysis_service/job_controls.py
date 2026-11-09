@@ -646,10 +646,20 @@ def covered_units(
 #: it does not.
 RowVerdict = Literal["applied", "refused"]
 
-#: What became of one row over a job: it covered a draft, the critic refused
-#: it on every draft it was shown, a finding on its unit lay outside the
-#: scope, or no draft was shown it.
-RowOutcome = Literal["applied", "refused", "not-reached", "no-finding"]
+#: What became of one row over a job: it covered every draft it was shown,
+#: it covered some and the critic refused it on the others, the critic
+#: refused it on every draft it was shown, a finding on its unit lay outside
+#: the scope, or no draft was shown it.
+RowOutcome = Literal[
+    "applied", "partly-applied", "refused", "not-reached", "no-finding"
+]
+
+#: The list each ruling sits under in the report and the Markdown export: a
+#: finding the row ruled out, or a finding that stands. ``report_view.js``
+#: holds a copy, which a test checks against this table.
+RULING_LISTS: Mapping[RowVerdict, str] = MappingProxyType(
+    {"applied": "Ruled out", "refused": "Stands"}
+)
 
 
 class RowRuling(BaseModel):
@@ -690,14 +700,18 @@ def row_rulings(
 
 
 def row_outcome(rulings: Sequence[RowRuling], *, unreached: bool) -> RowOutcome:
-    """**The one reader of a row's outcome** (ADR 0126): ``applied`` where a
-    ruling applied it, ``refused`` where every ruling refused it. A row with
+    """**The one reader of a row's outcome** (ADR 0126): ``applied`` where
+    every ruling applied it, ``partly-applied`` where some did and the
+    others refused it, ``refused`` where every ruling refused it. A row with
     no ruling is ``not-reached`` where ``unreached`` says a finding on its
     unit lay outside the scope, and ``no-finding`` where none did."""
     if not rulings:
         return "not-reached" if unreached else "no-finding"
-    if any(ruling.ruling == "applied" for ruling in rulings):
+    verdicts = {ruling.ruling for ruling in rulings}
+    if verdicts == {"applied"}:
         return "applied"
+    if "applied" in verdicts:
+        return "partly-applied"
     return "refused"
 
 
@@ -912,9 +926,14 @@ def refuse_disagreement(
 ROW_MEANINGS: Mapping[RowOutcome, str] = MappingProxyType(
     {
         "applied": (
-            "Applied: the critic ruled out each finding listed here, because you"
-            " state that this Control covers the unit. The service verified"
-            " nothing."
+            "Applied: the critic ruled out the findings listed under Ruled out,"
+            " because you state that this Control covers the unit. The service"
+            " verified nothing."
+        ),
+        "partly-applied": (
+            "Partly applied: the critic ruled out the findings listed under Ruled"
+            " out, because you state that this Control covers the unit. The"
+            " findings listed under Stands remain. The service verified nothing."
         ),
         "refused": (
             "Refused: the critic judged that this Control does not show what each"

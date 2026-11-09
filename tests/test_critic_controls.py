@@ -485,13 +485,21 @@ class TestTheRowOutcome:
             ],
         }
 
-    def test_a_row_that_applied_once_is_applied(self):
+    def test_a_row_applied_on_every_ruling_is_applied(self):
+        rulings = [
+            RowRuling(claim="a", ruling="applied", reason="yes"),
+            RowRuling(claim="b", ruling="applied", reason="yes"),
+        ]
+
+        assert row_outcome(rulings, unreached=False) == "applied"
+
+    def test_a_row_applied_once_and_refused_once_is_partly_applied(self):
         rulings = [
             RowRuling(claim="a", ruling="refused", reason="no"),
             RowRuling(claim="b", ruling="applied", reason="yes"),
         ]
 
-        assert row_outcome(rulings, unreached=False) == "applied"
+        assert row_outcome(rulings, unreached=False) == "partly-applied"
 
     def test_a_row_refused_on_every_ruling_is_refused(self):
         rulings = [

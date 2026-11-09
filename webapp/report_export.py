@@ -31,7 +31,7 @@ from analysis_service.claims import (
 )
 from analysis_service.controls import scope_phrase
 from analysis_service.frameworks import lane_of
-from analysis_service.job_controls import SectionEntry
+from analysis_service.job_controls import RULING_LISTS, SectionEntry
 from analysis_service.open_facts import element_names
 
 #: The characters that start Markdown markup or an HTML tag inline.
@@ -113,10 +113,12 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
                 f"- Row: {_text(row.framework)} {_text(row.unit)}{label} —"
                 f" {row.meaning}"
             )
-            for ruling in row.rulings:
-                lines.append(
-                    f"  - {_text(ruling.claim)}: {ruling.ruling}. {_text(ruling.reason)}"
-                )
+            for verdict, heading in RULING_LISTS.items():
+                lines += [
+                    f"  - {heading}: {_text(ruling.claim)}. {_text(ruling.reason)}"
+                    for ruling in row.rulings
+                    if ruling.ruling == verdict
+                ]
             for line in row.quoted:
                 lines.append(
                     f"  - Evidence: {_text(line.file)} ({line.evidence_class}),"
