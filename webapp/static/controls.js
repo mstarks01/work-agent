@@ -157,6 +157,9 @@
     editorProblem.textContent = text;
     editorProblem.hidden = !text;
   };
+  // The message of a refused request, or `fallback` where the answer is not
+  // the service's JSON, such as a plain error page.
+  const messageOf = async (answer, fallback) => (await answer.json().catch(() => null))?.message ?? fallback;
   // Focus the first element of `ids` that exists and is enabled.
   const focusFirst = (...ids) => ids.map(el).find((node) => node && !node.disabled)?.focus();
   // After a removal, focus goes to the Remove button now at its index, the
@@ -427,14 +430,18 @@
   // The page reads an evidence file and keeps only its text, as Files does.
   // The line keeps its place while the page reads the file. A failed read
   // puts back `previous`, the line that a Replace read over, or drops the
-  // line where there was none.
+  // line where there was none. A Replace disables its button during the
+  // read, so focus waits on the line's Remove button and then goes back.
   const readEvidence = async (file, entry, previous) => {
     const own = draft;
     const mine = session;
     draw();
+    const lost = () => [document.body, el(`evidence-remove-${own.evidence.indexOf(entry)}`)].includes(document.activeElement);
+    if (previous && document.activeElement === document.body) el(`evidence-remove-${own.evidence.indexOf(entry)}`)?.focus();
     const read = await textFile.decode(file, limits.max_evidence_bytes);
     const at = own.evidence.indexOf(entry);
     if (mine !== session || at < 0) return;
+    const refocus = previous && lost();
     if (read.error) {
       if (previous) own.evidence[at] = previous;
       else own.evidence.splice(at, 1);
@@ -449,6 +456,7 @@
       };
     }
     draw();
+    if (refocus) el(`evidence-replace-${at}`)?.focus();
   };
   const evidenceUrl = (file) => `/workspace/controls/${encodeURIComponent(editing)}/evidence/${encodeURIComponent(file.id)}`;
   // View shows a file's text under its line. A new file shows its own text;
@@ -467,7 +475,7 @@
       const sent = await fetch(evidenceUrl(file));
       if (mine !== session) return;
       if (sent.ok) text = await sent.text();
-      else refuse((await sent.json()).message);
+      else refuse(await messageOf(sent, "The service could not read this file. Try View again."));
     } catch {
       if (mine === session) refuse("The connection was interrupted. Try View again.");
     }
@@ -486,9 +494,9 @@
           on: { change: (event) => { file.class = event.target.value; drawEditor(); } } },
         ...PAGE.evidence_classes.map((row) => h("option", { value: row.id, selected: row.id === file.class }, row.label))),
         file.reading ? null : h("button", { type: "button", class: "quiet", id: `evidence-view-${index}`, "aria-expanded": String(shown),
-          "aria-controls": `evidence-text-${index}`, "aria-label": `${shown ? "Hide" : "View"} the file ${file.name}`,
+          "aria-controls": shown ? `evidence-text-${index}` : null, "aria-label": `${shown ? "Hide" : "View"} the file ${file.name}`,
           on: { click: () => view(file) } }, shown ? "Hide" : "View"),
-        file.id && editing !== "new" ? h("a", { class: "button quiet", id: `evidence-download-${index}`, href: evidenceUrl(file),
+        file.id ? h("a", { class: "button quiet", id: `evidence-download-${index}`, href: evidenceUrl(file),
           "aria-label": `Download the file ${file.name}` }, "Download") : null,
         h("button", { type: "button", class: "quiet", id: `evidence-replace-${index}`, disabled: Boolean(file.reading),
           "aria-label": `Replace the file ${file.name}`, on: { click: () => {
@@ -576,10 +584,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(saveBody()),
       });
-      const body = await sent.json();
+      const body = sent.ok ? await sent.json() : null;
+      const message = sent.ok ? "" : await messageOf(sent, "The service could not save the Control. Check Controls before you save again.");
       if (mine === session) {
         if (sent.ok) saved = body;
-        else refuse(body.message);
+        else refuse(message);
       }
     } catch {
       if (mine === session) refuse("The connection was interrupted. Check Controls before you save again.");
@@ -776,7 +785,7 @@
       for (const control of picked) {
         const removed = await fetch(`/workspace/controls/${encodeURIComponent(control.id)}`, { method: "DELETE" });
         if (!removed.ok && removed.status !== 404) {
-          show("controls-problem", (await removed.json()).message);
+          show("controls-problem", await messageOf(removed, "The service could not delete the Control. Reload the page."));
           await load();
           return;
         }

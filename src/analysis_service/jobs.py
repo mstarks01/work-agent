@@ -1903,6 +1903,9 @@ class InMemoryJobStore:
     async def read_evidence(
         self, control_id: str, evidence_id: str, owner_id: str
     ) -> str | None:
+        # Each text here is one that check_texts matched to its digest at the
+        # save, and nothing outside the process can change it, so a read
+        # checks no digest.
         held = self._owned_control(control_id, owner_id)
         return None if held is None else held[1].get(evidence_id)
 

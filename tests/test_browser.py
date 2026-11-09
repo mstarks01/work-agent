@@ -2793,6 +2793,59 @@ def test_a_refused_view_shows_why_and_closes_the_line(page):
     assert page.locator("#evidence-text-0").count() == 0
 
 
+def test_a_view_answer_that_is_not_json_says_the_service_could_not_read(page):
+    _kept_with_a_file(page)
+    page.route(
+        "**/evidence/*",
+        lambda route: route.fulfill(status=500, body="Internal Server Error"),
+    )
+    page.click("#evidence-view-0")
+    page.wait_for_selector(
+        "#editor-problem:has-text('The service could not read this file.')"
+    )
+
+
+def test_a_save_answer_that_is_not_json_says_the_service_could_not_save(page):
+    _kept_with_a_file(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: (
+            route.fulfill(status=502, body="Bad Gateway")
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
+    )
+    page.fill("#control-name", "Orders DB at rest")
+    page.click("#save-control")
+    page.wait_for_selector(
+        "#editor-problem:has-text('The service could not save the Control.')"
+    )
+
+
+def test_a_delete_answer_that_is_not_json_says_the_service_could_not_delete(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: route.fulfill(status=502, body="Bad Gateway"),
+    )
+    page.click('button[aria-label="Delete A"]')
+    page.click("#delete-go")
+    page.wait_for_selector(
+        "#controls-problem:has-text('The service could not delete the Control.')"
+    )
+
+
+def test_focus_goes_back_to_replace_after_the_read(page):
+    _kept_with_a_file(page)
+    _hold_file_reads(page)
+    replace_evidence(page, 0, "kms.tf", "kms = true\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    assert page.evaluate("document.activeElement.id") == "evidence-remove-0"
+    page.evaluate("window.releaseReads()")
+    page.wait_for_selector("#evidence-list li:not(:has-text('Reading…'))")
+    assert page.evaluate("document.activeElement.id") == "evidence-replace-0"
+
+
 def test_download_saves_a_held_file_and_a_new_file_has_none(page):
     page.goto("/controls")
     new_control(page, "Orders DB encryption")

@@ -2116,6 +2116,8 @@ def create_app(
             if held is None
             else await workspace.store.get_control(control_id, held.owner_id)
         )
+        # read_evidence answers the text only, so the name comes from the
+        # document of the same Control.
         listed = [] if stored is None else stored.document.evidence
         file = next((one for one in listed if one.id == evidence_id), None)
         if held is None or file is None:
@@ -2126,8 +2128,8 @@ def create_app(
         if text is None:
             return _message(404, _NO_SUCH_EVIDENCE)
         # RFC 6266: the plain name is a fixed fallback, and filename* carries
-        # the owner's name percent-encoded, so no character of it reaches the
-        # header as itself.
+        # the owner's name percent-encoded, so only letters, digits and
+        # "_.-~" reach the header as themselves.
         disposition = (
             'attachment; filename="evidence.txt";'
             f" filename*=UTF-8''{quote(file.name, safe='')}"

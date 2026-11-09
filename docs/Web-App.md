@@ -409,8 +409,9 @@ it.
   `.cfg` or `.conf` or that starts with `.env.`, a credential name at the start
   of a line counts with any plain value. An empty value, a reference such as
   `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
-  counts as it does in any file. Each line has a list of its class and four
-  buttons. "View" shows the file's text under the line, as plain text.
+  counts as it does in any file. Each line has a list of its class and the
+  buttons "View", "Replace" and "Remove", and a file that the Control holds
+  also has "Download". A line that the page still reads has no "View". "View" shows the file's text under the line, as plain text.
   "Download" saves a file that the Control holds. "Replace" reads a new file
   into the line and keeps its class. "Remove" takes the file out. A change of
   the class or the file takes effect at the save. "Save
@@ -438,7 +439,8 @@ it.
   redacts nothing.
   `GET /workspace/controls/{control_id}/evidence/{evidence_id}` answers the
   text of one file as `text/plain` and as an attachment under the file's name.
-  The service checks the text against the digest that the Control lists. A
+  The service answers only a text that matches the digest that the
+  Control lists. A
   file of another owner, or a file that the Control does not list, answers
   `404`.
 - **Delete.** A dialog says that each analysis that applied the Control keeps
