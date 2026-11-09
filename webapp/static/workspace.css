@@ -900,8 +900,8 @@ summary:hover {
   font-size:13px;
   line-height:1.55
 }
-/* A closed details element keeps its content in the layout, where a hidden
-   panel would widen the page. */
+/* Chromium keeps the content of a closed details element in the layout,
+   where a hidden panel would widen the page. */
 .question-help:not([open]) .question-help-content {
   display:none
 }

@@ -3063,11 +3063,14 @@ def test_a_narrow_screen_shows_each_row_without_a_side_scroll(page):
         for action in ("Edit", "Delete"):
             box = page.locator(f'button[aria-label="{action} {name}"]').bounding_box()
             assert box["x"] + box["width"] <= 390
-    row = page.locator("#controls-list tr", has_text="A").first
+    row = page.locator("#controls-list tr", has=page.locator("a:text-is('A')"))
     assert "The whole application" in row.inner_text()
-    assert row.locator("th, td.wide-only").first.is_hidden()
-    row.locator("summary").click()
+    assert row.locator("td.wide-only").first.is_hidden()
+    assert page.is_visible("th[data-sort='updated'] button")
+    page.click("summary[aria-label='Details of A']")
     assert "stride spoofing" in row.locator(".row-more dl").inner_text()
+    row.locator("input[type=checkbox]").check()
+    assert row.locator(".row-more").get_attribute("open") == ""
     page.click('button[aria-label="Edit A"]')
     assert _fits_the_screen(page)
 

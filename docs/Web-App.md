@@ -369,10 +369,10 @@ it.
   sort. The facts a Control states show on a line under its name. A line
   above the table gives the count against `max_controls`, such as "4 of 50
   Controls", and "New Control" is disabled at the limit. On a screen 640 px
-  wide or less, each row shows the name, what it protects, "Edit" and
-  "Delete", and a "Details" line under the name opens what it covers, the
-  evidence and the last update. The other columns, and the sort by date, do
-  not show there.
+  wide or less, each row keeps its select box, its name and facts, what it
+  protects, the last update, "Edit" and "Delete". A "Details" line under the
+  name opens what it covers and the evidence, and stays open when the table
+  redraws.
 - **The editor.** "New Control", "Edit" or a click on a name opens the editor
   above the table: the name, then four cards in this order: "What it protects",
   "What it does", "What it covers" and "Evidence". Each card shows its place,
