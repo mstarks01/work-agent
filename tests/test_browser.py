@@ -2518,9 +2518,10 @@ def tick(page, statement: str, how: str = "") -> None:
 
 
 def add_row(page, framework: str, unit: str) -> None:
+    """Find ``unit`` in the unit tree of ``framework``, and add it."""
     page.select_option("#row-framework", framework)
-    page.select_option("#row-unit", unit)
-    page.click("#add-row")
+    page.fill("#unit-find", unit)
+    page.click(f"[id='unit-add-{framework}-{unit}']")
 
 
 def add_evidence(page, name: str, text: str, evidence_class: str = "config") -> None:
@@ -2562,8 +2563,10 @@ def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
         page.press("#alias-input", "Enter")
     aliases = page.locator(".aliases .tag").count()
     alias_refusal = page.inner_text("#editor-problem")
-    for _ in range(MAX_CONTROL_ROWS + 1):
-        page.click("#add-row")
+    from analysis_service.frameworks import PACKAGES
+
+    for unit in PACKAGES["asvs"].units[: MAX_CONTROL_ROWS + 1]:
+        add_row(page, "asvs", unit.id)
     rows = page.locator("#rows-list li").count()
     row_refusal = page.inner_text("#editor-problem")
     assert (aliases, alias_refusal) == (MAX_CONTROL_ALIASES, ALIASES_FULL)
@@ -2720,21 +2723,54 @@ def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):
     page.goto("/controls")
     new_control(page, "Rows")
     page.select_option("#row-framework", "asvs")
-    page.select_option("#row-unit", "V11.2")
-    page.focus("#add-row")
+    page.fill("#unit-find", "V11.2")
+    page.focus("[id='unit-add-asvs-V11.2']")
     page.keyboard.press("Enter")
     assert page.input_value("#row-framework") == "asvs"
-    assert page.input_value("#row-unit") == "V11.2"
-    assert page.evaluate("document.activeElement.id") == "add-row"
-    page.select_option("#row-unit", "V11.3")
+    assert page.input_value("#unit-find") == "V11.2"
+    # Focus moves to the next unit that shows.
+    assert page.evaluate("document.activeElement.id") == "unit-add-asvs-V11.2.1"
     page.keyboard.press("Enter")
     rows = page.locator("#rows-list li").all_inner_texts()
-    assert [row.split()[0] for row in rows] == ["asvs", "asvs"]
+    assert [row.split()[:2] for row in rows] == [["asvs", "V11.2"], ["asvs", "V11.2.1"]]
     page.select_option("#evidence-class", "code")
     page.fill("#alias-input", "half typed")
     tick(page, "Encrypts its data at rest.", "AES-256")
     assert page.input_value("#evidence-class") == "code"
     assert page.input_value("#alias-input") == "half typed"
+
+
+def test_the_unit_tree_opens_by_chapter_and_finds_by_words(page):
+    from analysis_service.frameworks import PACKAGES
+
+    page.goto("/controls")
+    new_control(page, "Rows")
+    page.select_option("#row-framework", "asvs")
+    chapters = [unit for unit in PACKAGES["asvs"].units if unit.grain == "chapter"]
+    tree = page.locator("#unit-tree > li")
+    assert tree.count() == len(chapters)
+    assert page.locator("[id='unit-add-asvs-V11.2']").count() == 0
+    page.click("[id='unit-open-asvs-V11']")
+    assert page.get_attribute("[id='unit-open-asvs-V11']", "aria-expanded") == "true"
+    assert page.locator("[id='unit-add-asvs-V11.2']").count() == 1
+    label = PACKAGES["asvs"].record.text_of_unit("V11.2.1")
+    page.fill("#unit-find", label.split()[0] + " " + label.split()[-1])
+    assert "match" in page.inner_text("#unit-count")
+    shown = page.locator("#unit-tree").inner_text()
+    assert f"V11.2.1 · {label}" in shown
+    page.fill("#unit-find", "no unit has this zz")
+    assert page.inner_text("#unit-count") == "No unit matches."
+
+
+def test_a_unit_already_a_row_cannot_be_added_again(page):
+    page.goto("/controls")
+    new_control(page, "Rows")
+    add_row(page, "stride", "spoofing")
+    assert page.locator("[id='unit-add-stride-spoofing']").count() == 0
+    line = page.locator("#unit-tree li", has_text="spoofing")
+    assert line.inner_text().endswith("Added")
+    page.fill("#unit-find", "")
+    assert page.locator("#unit-tree > li").count() == 6
 
 
 def test_removing_a_row_moves_focus_to_its_neighbour(page):
@@ -3271,11 +3307,9 @@ def test_a_repeated_row_and_name_and_a_large_file_are_refused(page):
     page.goto("/controls")
     new_control(page, "WAF")
     add_row(page, "stride", "spoofing")
-    add_row(page, "stride", "spoofing")
-    page.click("#save-control")
-    page.wait_for_selector("#editor-problem:not([hidden])")
-    assert page.inner_text("#editor-problem") == "The row spoofing appears twice."
-    page.click("#rows-list button")
+    # The page offers no second Add for a unit that is a row; the service
+    # refuses a repeated row too (tests/test_controls.py).
+    assert page.locator("[id='unit-add-stride-spoofing']").count() == 0
     save_control(page)
     new_control(page, "WAF")
     add_row(page, "stride", "tampering")

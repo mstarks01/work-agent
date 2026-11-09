@@ -373,8 +373,12 @@ it.
   A Control needs at least one fact or one row, so "What it covers" is required
   while a kind is chosen and no protection is ticked. A Control of the whole
   application states no fact, so it always needs a row. "What it covers" takes
-  a row by framework and unit, and the row keeps the package version. Each
-  unit's label comes from its package's catalog when the page loads. A note
+  a row by framework and unit, and the row keeps the package version. The units
+  of the chosen framework show as a tree, each under the unit it sits inside,
+  as a chapter holds its sections, with each unit's full label from its
+  package's catalog. "Find a unit" shows each unit whose ID or label holds
+  every word, under its chapter and section. Each unit has an "Add" button, and
+  a unit that is a row already shows "Added", so no row goes in twice. A note
   shows under the rows when the Control does not cover the whole application
   and a row names a framework whose findings can name no part, because such a
   finding never reaches the Control. The note also says to choose the whole
