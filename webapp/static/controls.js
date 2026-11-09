@@ -310,7 +310,7 @@
           on: { input: (event) => { fact.value = event.target.value; } } }) : null);
     };
     const topics = [...new Set(offered.map((one) => one.topic))];
-    return card("What it does", "2 of 4", "Tick each protection the part has. Each tick fills a fact that the description leaves open; a fact that the description states stands. A Control needs at least one fact or one row.",
+    return card("What it does", "2 of 4", "Tick each protection the part has. Each tick fills a fact that the description leaves open. A fact that the description states stands. A Control needs at least one fact or one row.",
       h("div", { class: "statements", id: "statements" }, ...topics.map((topic) => h("fieldset", {}, h("legend", {}, topic),
         h("ul", {}, ...offered.map((one, index) => (one.topic === topic ? item(one, index) : null)))))));
   };
@@ -396,7 +396,7 @@
     const { tree, count } = unitTree(pending.framework);
     const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
-    return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against the findings on its unit: it rules out a finding that the Control covers, and refuses a row that does not bear on its unit.",
+    return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against the findings on its unit: it rules out a finding that the Control covers, and refuses a row that does not cover the finding.",
       required ? h("p", { class: "hint" }, draft.scope.type === "application"
         ? "Add at least one unit. The analysis judges each one against its findings."
         : "Tick a protection above, or add at least one unit.") : null,
