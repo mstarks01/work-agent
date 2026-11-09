@@ -347,6 +347,9 @@
   .controls-table .tag { font-size: 0.78rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--hairline); }
   .controls-table .ruling-heading { margin: 6px 0 2px; font-weight: 600; font-size: 0.86rem; }
   .controls-table .ruling-list { margin: 0; padding-left: 18px; }
+  .controls-summary { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 8px 0 12px; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 8px; font-size: 0.9rem; }
+  .controls-summary dt { font-weight: 600; }
+  .controls-summary dd { margin: 0; }
   .controls-table blockquote.excerpt { margin: 4px 0; padding: 4px 10px; border-left: 3px solid var(--hairline); white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.82rem; }
   .exporting #about-view, .exporting #export-questions { border-top: 1px solid var(--hairline);
     margin-top: 32px; padding-top: 8px; }
@@ -459,6 +462,7 @@
 <!-- The Controls section: each Control the job copied, from the job's copy
      and the report's rulings (ADR 0127). -->
 <script type="application/json" id="controls" nonce="__CSP_NONCE__"><!--controls--></script>
+<script type="application/json" id="controls_summary" nonce="__CSP_NONCE__"><!--controls_summary--></script>
 
 <!-- The units each framework answers for, with each one's own text, joined by
      webapp/main.py because the page knows no package. Escaped the same way. -->

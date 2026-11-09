@@ -4190,6 +4190,11 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
         page.wait_for_selector("#controls-section")
         section = page.locator("#controls-section")
         assert page.locator("#controls-section td.name").inner_text() == HOSTILE_CONTROL
+        assert page.locator(".controls-summary dt").all_inner_texts() == [
+            "Match",
+            "Facts",
+            "Rows",
+        ]
         assert section.locator("img, b").count() == 0
         page.click("#controls-section summary:has-text('tampering')")
         assert "It shows no <b>signing</b> at https://evil.example." in (

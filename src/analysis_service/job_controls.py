@@ -31,7 +31,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Annotated, Literal, Self, cast
+from typing import Annotated, Literal, Self, TypeVar, cast, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -992,6 +992,9 @@ class SectionRow(BaseModel):
     version: str
     ticked: bool
     outcome: RowOutcome
+    #: The outcome in words, as the row's tag and the summary show it
+    #: (:data:`ROW_OUTCOME_WORDS`).
+    outcome_text: str
     meaning: str
     #: The count of rulings in each list of :data:`RULING_LISTS` that holds
     #: one, as in "Ruled out: 2 · Refused: 1"; empty where none does.
@@ -1038,6 +1041,72 @@ class SectionEntry(BaseModel):
     elements: list[SectionElement]
     facts: list[SectionFact]
     rows: list[SectionRow]
+
+
+#: How the report names each row outcome: its tag and the summary's count.
+ROW_OUTCOME_WORDS: Mapping[RowOutcome, str] = MappingProxyType(
+    {outcome: outcome.replace("-", " ") for outcome in get_args(RowOutcome)}
+)
+
+#: How the section's summary names each resolution state.
+RESOLUTION_WORDS: Mapping[ResolutionState, str] = MappingProxyType(
+    {"applied": "applied", "left-out": "left out"}
+)
+
+#: How the section's summary names each fact state.
+FACT_COUNT_WORDS: Mapping[FactState, str] = MappingProxyType(
+    {
+        "written": "written",
+        "changed": "under your own answer",
+        "stated": "stated by the description",
+    }
+)
+
+
+_State = TypeVar("_State", bound=str)
+
+
+def _counted(
+    values: Iterable[_State], order: Sequence[_State], words: Mapping[_State, str]
+) -> str:
+    counts = Counter(values)
+    parts = [f"{counts[value]} {words[value]}" for value in order if counts[value]]
+    return f"{', '.join(parts)}." if parts else "none."
+
+
+def section_summary(entries: Sequence[SectionEntry]) -> list[tuple[str, str]]:
+    """**The one writer of the section's summary**: one line for each stage
+    of a job's Controls, in the order the job takes them: the match, the
+    facts and the rows. Each line counts each state in the words the section
+    names it with, and leaves out a state with no count. The report page and
+    the Markdown export show these lines."""
+    return [
+        (
+            "Match",
+            f"{len(entries)} copied: "
+            + _counted(
+                (entry.state for entry in entries),
+                get_args(ResolutionState),
+                RESOLUTION_WORDS,
+            ),
+        ),
+        (
+            "Facts",
+            _counted(
+                (fact.state for entry in entries for fact in entry.facts),
+                get_args(FactState),
+                FACT_COUNT_WORDS,
+            ),
+        ),
+        (
+            "Rows",
+            _counted(
+                (row.outcome for entry in entries for row in entry.rows),
+                get_args(RowOutcome),
+                ROW_OUTCOME_WORDS,
+            ),
+        ),
+    ]
 
 
 #: A quotation in a ruling's reason: the text inside a pair of double quotes,
@@ -1182,6 +1251,7 @@ def controls_section(
                     version=row.version,
                     ticked=row.ticked,
                     outcome=row_result,
+                    outcome_text=ROW_OUTCOME_WORDS[row_result],
                     meaning=ROW_MEANINGS[row_result].format(
                         version=row.version,
                         framework=row.framework,
