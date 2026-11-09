@@ -323,11 +323,11 @@
       return pick;
     };
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
-    // A finding that names no element reaches only a Control of the whole
-    // application. The note names each framework as the rows do.
     // The service needs a fact or a row (ADR 0123), so a chosen scope with
     // no fact needs a row. The whole application states no fact.
     const required = Boolean(draft.scope.type) && !draft.facts.length;
+    // A finding that names no element reaches only a Control of the whole
+    // application. The note names each framework as the rows do.
     const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
     return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",

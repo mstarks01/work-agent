@@ -365,48 +365,46 @@ it.
   above the table gives the count against `max_controls`, such as "4 of 50
   Controls", and "New Control" is disabled at the limit.
 - **The editor.** "New Control", "Edit" or a click on a name opens the editor
-  above the table: the name, then four cards in this order: "What it
-  protects", "What it does", "What it covers" and "Evidence". Each card shows
-  its place, such as "1 of 4", says when it is optional or required, and keeps
-  its description behind a "?" beside its title. A new Control starts with
-  nothing chosen in "What it protects", and "What it does" asks for that
-  choice first. A Control needs at least one fact or one row, so "What it
-  covers" is required while no protection is ticked. A Control of the whole
-  application states no fact, so it always needs a row. "What it covers"
-  takes a row
-  by framework and unit, and the row keeps the package version. Each unit's
-  label comes from its package's catalog when the page loads. A note shows
-  under the rows when the Control does not cover the whole application and a row
-  names a framework whose findings can name no part, because such a finding
-  never reaches the Control. The note also says to choose the whole
-  application only when the protection covers every part, because that
-  choice removes the name and the facts. "What it protects" takes the
-  kind, the name and the aliases. A change of the kind removes the name, the
-  aliases and each fact that the new kind does not take. A notice lists what
-  the change removed and has an "Undo" button. The Undo stays until the next
-  edit of what the Control protects or does. "What it does" is a checklist of
-  protections, grouped by topic, such as "Encrypts its backups and
-  snapshots." or "The internet cannot reach it.". Each tick writes the
-  answer that makes its fact a protection: a Question Kind or one of its
-  facets, the exposure `internal`, or the encryption at rest. "Encrypts its
-  data at rest." also takes how the part does it. The service refuses every other fact and every
-  answer that states a weakness or nothing, because a Control states only a
-  protection. "Evidence" takes a
-  plain text file and its class: Configuration, Code or People. The page
-  reads the file with the checks of an Owner File and sends only its text.
+  above the table: the name, then four cards in this order: "What it protects",
+  "What it does", "What it covers" and "Evidence". Each card shows its place,
+  such as "1 of 4", says when it is optional or required, and keeps its
+  description behind a "?" beside its title. A new Control starts with nothing
+  chosen in "What it protects", and "What it does" asks for that choice first.
+  A Control needs at least one fact or one row, so "What it covers" is required
+  while a kind is chosen and no protection is ticked. A Control of the whole
+  application states no fact, so it always needs a row. "What it covers" takes
+  a row by framework and unit, and the row keeps the package version. Each
+  unit's label comes from its package's catalog when the page loads. A note
+  shows under the rows when the Control does not cover the whole application
+  and a row names a framework whose findings can name no part, because such a
+  finding never reaches the Control. The note also says to choose the whole
+  application only when the protection covers every part, because that choice
+  removes the name and the facts. "What it protects" takes the kind, the name
+  and the aliases. A change of the kind removes the name, the aliases and each
+  fact that the new kind does not take. A notice lists what the change removed
+  and has an "Undo" button. The Undo stays until the next edit of what the
+  Control protects or does. "What it does" is a checklist of protections,
+  grouped by topic, such as "Encrypts its backups and snapshots." or "The
+  internet cannot reach it.". Each tick writes the answer that makes its fact a
+  protection: a Question Kind or one of its facets, the exposure `internal`, or
+  the encryption at rest. "Encrypts its data at rest." also takes how the part
+  does it. The service refuses every other fact and every answer that states a
+  weakness or nothing, because a Control states only a protection. "Evidence"
+  takes a plain text file and its class: Configuration, Code or People. The
+  page reads the file with the checks of an Owner File and sends only its text.
   The service refuses a file that looks like it holds a credential, and names
   the line. The check is a list of shapes and does not find every form, so a
-  note on the card asks you to remove each password, key and token first. In
-  a settings file, a name that ends in `.env`, `.ini`, `.properties`, `.cfg`
-  or `.conf` or that starts with `.env.`, a credential name at the start of a
-  line counts with any plain value. An empty value, a reference such as
-  `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted
-  value counts as it does in any file.
-  Each line has a "Remove" button. "Save Control" sends the Control, and an
-  edit replaces it and keeps no earlier version. When the editor has changes
-  that you did not save, another Control or "New Control" opens a dialog
-  with "Stay", "Discard changes" and "Save and open". The browser also asks
-  before you leave the page with such changes, or during a save.
+  note on the card asks you to remove each password, key and token first. In a
+  settings file, a name that ends in `.env`, `.ini`, `.properties`, `.cfg` or
+  `.conf` or that starts with `.env.`, a credential name at the start of a line
+  counts with any plain value. An empty value, a reference such as
+  `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
+  counts as it does in any file. Each line has a "Remove" button. "Save
+  Control" sends the Control, and an edit replaces it and keeps no earlier
+  version. When the editor has changes that you did not save, another Control
+  or "New Control" opens a dialog with "Stay", "Discard changes" and "Save and
+  open". The browser also asks before you leave the page with such changes, or
+  during a save.
 - **The counts.** A Control holds at most 20 aliases, 50 rows and
   `max_control_evidence` evidence files. The page checks each count before it
   adds an item, and it shows the sentence that the server uses for the same
