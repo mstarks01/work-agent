@@ -41,8 +41,9 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.errors import shown_errors
 from analysis_service.parsing import Sha256Hex
-from analysis_service.sources import carries_line_break, plain_name
+from analysis_service.sources import carries_line_break
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
     MAX_NAME,
@@ -93,10 +94,17 @@ def _one_line(value: str) -> str:
 
 Line = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_one_line)]
 
+
+def _printable_key(value: str) -> str:
+    if not value.isprintable():
+        raise ValueError("a key holds only printable characters")
+    return value
+
+
 #: A key of an envelope: a case ID, a fingerprint or a path. A refusal quotes
-#: the key in one line of a terminal or of a CI log, so the key holds no line
-#: break and no control character.
-Key = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(plain_name)]
+#: the key in one line of a terminal or of a CI log, so the key holds only
+#: printable characters: no line break and no control or format character.
+Key = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_printable_key)]
 
 #: A generous ceiling on one envelope's cases and marks. The corpus is 13
 #: cases with tens of records each; these bound a hostile file rather than a
@@ -218,10 +226,11 @@ def read(path: Path) -> Envelope:
     try:
         envelope = Envelope.model_validate(raw)
     except ValidationError as exc:
-        # The repr of each location, never the location: it quotes a key that
-        # the schema refused, so the key can hold a line break.
+        # The repr of each place, never the place: it quotes a key that the
+        # schema refused, so the key can hold a line break.
         refused = "\n".join(
-            f"{error['loc']!r}: {error['msg']}" for error in exc.errors()
+            f"{error.place!r}: {error.message}" if error.place else error.message
+            for error in shown_errors(exc.errors(include_input=False))
         )
         raise EnvelopeError(f"{path}: not a sitting envelope —\n{refused}") from exc
     if envelope.envelope != VERSION:

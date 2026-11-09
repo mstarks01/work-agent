@@ -365,7 +365,8 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         assert str(refusal.value).replace("\n", "").isprintable()
 
     @pytest.mark.parametrize(
-        "key", ["k\x1b]0;pwned\x07", "k\n::error::forged", "k\u202eforged"]
+        "key",
+        ["k\x1b]0;pwned\x07", "k\n::error::forged", "k\u202eforged", "k\u3000forged"],
     )
     @pytest.mark.parametrize("field", ["cases", "marks", "opened_digests"])
     def test_a_key_of_an_envelope_cannot_forge_a_line(self, tree, tmp_path, field, key):
