@@ -800,7 +800,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
                 ("PUT", "/workspace/runs/{run_id}/title"): {"title": "Orders"},
             },
             headers=SAME_ORIGIN,
-            others=("file_id", "control_id"),
+            others=("file_id", "control_id", "evidence_id"),
         )
 
 

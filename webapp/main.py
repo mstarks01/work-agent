@@ -118,6 +118,7 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Annotated, Any, Literal, TypedDict, TypeVar, get_args
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -176,6 +177,7 @@ from analysis_service.config_files import (
 from analysis_service.controls import (
     CONTROL_ID,
     CONTROL_ID_PATTERN,
+    EVIDENCE_ID_PATTERN,
     MAX_CONTROLS_CEILING,
     Control,
     ControlLimits,
@@ -916,6 +918,7 @@ def _file_view(file: OwnerFile) -> dict[str, object]:
 #: The answer to a delete of a file the operator does not hold.
 _NO_SUCH_FILE = "This file is no longer in Files."
 _NO_SUCH_CONTROL = "This Control is no longer in Controls."
+_NO_SUCH_EVIDENCE = "This evidence file is no longer in the Control."
 
 _CONTROL_STALE = (
     "This Control changed in another tab or window. Reload the page, then edit"
@@ -2096,6 +2099,40 @@ def create_app(
         ):
             return _message(404, _NO_SUCH_CONTROL)
         return Response(status_code=204)
+
+    @app.get("/workspace/controls/{control_id}/evidence/{evidence_id}")
+    async def control_evidence(control_id: str, evidence_id: str) -> Response:
+        """The text of one evidence file of the operator's Control, as an
+        attachment under the file's own name. The store checks the text
+        against the digest the Control lists."""
+        if not (
+            CONTROL_ID_PATTERN.fullmatch(control_id)
+            and EVIDENCE_ID_PATTERN.fullmatch(evidence_id)
+        ):
+            return _message(404, _NO_SUCH_EVIDENCE)
+        held = await workspace.store.principal(OPERATOR)
+        stored = (
+            None
+            if held is None
+            else await workspace.store.get_control(control_id, held.owner_id)
+        )
+        listed = [] if stored is None else stored.document.evidence
+        file = next((one for one in listed if one.id == evidence_id), None)
+        if held is None or file is None:
+            return _message(404, _NO_SUCH_EVIDENCE)
+        text = await workspace.store.read_evidence(
+            control_id, evidence_id, held.owner_id
+        )
+        if text is None:
+            return _message(404, _NO_SUCH_EVIDENCE)
+        # RFC 6266: the plain name is a fixed fallback, and filename* carries
+        # the owner's name percent-encoded, so no character of it reaches the
+        # header as itself.
+        disposition = (
+            'attachment; filename="evidence.txt";'
+            f" filename*=UTF-8''{quote(file.name, safe='')}"
+        )
+        return PlainTextResponse(text, headers={"Content-Disposition": disposition})
 
     @app.post("/workspace/controls/{control_id}/aliases")
     async def keep_this_name(control_id: str, request: Request) -> Response:
