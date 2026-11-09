@@ -96,12 +96,17 @@
     draw();
     el("control-name").focus();
   };
+  // Closing the editor from inside it moves focus to the edited Control's
+  // Edit button, or to New Control.
   const stopEdit = () => {
+    const was = editing;
+    const inside = el("editor").contains(document.activeElement);
     session += 1;
     refuse("");
     editing = null;
     draft = null;
     draw();
+    if (inside) (el(`edit-${was}`) ?? el("new-control"))?.focus();
   };
   const editorProblem = h("div", { id: "editor-problem", class: "problem", role: "alert", hidden: true });
   const refuse = (text) => {
@@ -414,8 +419,8 @@
         : "None"),
       h("td", {}, h("time", { datetime: control.updated_at }, day(control.updated_at))),
       h("td", {}, h("div", { class: "row-actions" },
-        h("button", { type: "button", disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
-        h("button", { type: "button", class: "danger", disabled: saving, "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
+        h("button", { type: "button", id: `edit-${control.id}`, disabled: saving, "aria-label": `Edit ${control.name}`, on: { click: () => startEdit(control) } }, "Edit"),
+        h("button", { type: "button", id: `delete-${control.id}`, class: "danger", disabled: saving, "aria-label": `Delete ${control.name}`, on: { click: () => confirmDelete([control]) } }, "Delete"))));
   };
 
   // Draw `box` again with `children`, and keep focus on the control in it
@@ -494,6 +499,9 @@
     const picked = deleting;
     deleting = [];
     el("delete-dialog").close();
+    // After a delete, focus goes to the row now in the first deleted row's
+    // place, the row before it, or New Control.
+    const at = shownControls().findIndex((control) => picked.some((one) => one.id === control.id));
     try {
       for (const control of picked) {
         const removed = await fetch(`/workspace/controls/${encodeURIComponent(control.id)}`, { method: "DELETE" });
@@ -513,6 +521,9 @@
       ? `“${picked[0].name}” is deleted. The analyses that applied it keep their copy.`
       : `${picked.length} Controls are deleted. The analyses that applied them keep their copy.`);
     await load();
+    const rows = shownControls();
+    const next = rows[at] ?? rows[at - 1];
+    (next ? el(`select-${next.id}`) : el("new-control"))?.focus();
   });
 
   load();

@@ -2767,6 +2767,30 @@ def test_a_row_tick_keeps_its_focus(page):
     )
 
 
+def test_cancel_moves_focus_to_the_edit_button(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.focus("#cancel-control")
+    page.keyboard.press("Enter")
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == (
+        "Edit A"
+    )
+
+
+def test_a_delete_moves_focus_to_the_next_row(page):
+    _two_kept_controls(page)
+    first = page.locator("#controls-list td.name-cell a").first.inner_text()
+    second = page.locator("#controls-list td.name-cell a").nth(1).inner_text()
+    page.focus(f'button[aria-label="Delete {first}"]')
+    page.keyboard.press("Enter")
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    page.wait_for_function(
+        "name => document.activeElement?.getAttribute('aria-label') === 'Select ' + name",
+        arg=second,
+    )
+
+
 def test_a_failed_save_gives_focus_back(page):
     _two_kept_controls(page)
     page.route(
