@@ -2853,8 +2853,17 @@ def test_each_focusable_control_on_the_controls_page_has_an_id(page):
     """The page keeps focus across a redraw by element ID, so a focusable
     element with no ID loses focus when its box draws again."""
     _two_kept_controls(page)
-    page.click('button[aria-label="Edit A"]')
+    # Every part of the editor that holds a focusable element: a named scope
+    # with an alias, a fact with its "how" field, a row and an evidence file.
+    new_control(page, "Every part")
+    page.fill("#alias-input", "orders")
+    page.press("#alias-input", "Enter")
+    tick(page, "Encrypts its data at rest.", "AES-256")
     add_row(page, "stride", "spoofing")
+    add_evidence(page, "rds.tf", "storage_encrypted = true\n")
+    page.wait_for_selector("#evidence-remove-0")
+    ids = page.evaluate("[...document.querySelectorAll('[id]')].map((node) => node.id)")
+    assert len(ids) == len(set(ids)), "an ID occurs twice"
     missing = page.evaluate(
         """() => [...document.querySelectorAll('#editor, #controls-list')]
           .flatMap((box) => [...box.querySelectorAll(
