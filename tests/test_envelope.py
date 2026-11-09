@@ -345,6 +345,22 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         assert recorded == [], "the tree was written before the identity check"
         assert "mallory" in capsys.readouterr().out
 
+    def test_a_refusal_prints_no_control_character_of_the_envelope(
+        self, tree, tmp_path, monkeypatch, capsys
+    ):
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        answers["marks"] = {"k\x1b]0;pwned\x07\x1b[2J": "no such mark"}
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        code, recorded = self._written(tree, path, monkeypatch)
+
+        printed = capsys.readouterr().out
+        assert (code, recorded) == (1, [])
+        assert "pwned" in printed
+        assert printed.replace("\n", "").isprintable()
+
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys
     ):

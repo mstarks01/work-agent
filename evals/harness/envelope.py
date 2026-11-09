@@ -284,6 +284,15 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
     return sorted(envelope.cases)
 
 
+def _printable(text: str) -> str:
+    """``text`` with each character a terminal could act on written as its
+    escape. A refusal quotes the envelope, and the envelope is untrusted."""
+    return "".join(
+        char if char.isprintable() or char == "\n" else ascii(char)[1:-1]
+        for char in text
+    )
+
+
 def command_import(args: argparse.Namespace) -> int:
     """``run sitting-import <file> --submitted-by <login>``: one envelope in.
 
@@ -314,7 +323,7 @@ def command_import(args: argparse.Namespace) -> int:
             )
         written = apply(envelope, root)
     except EnvelopeError as exc:
-        print(f"this envelope was not applied:\n{exc}")
+        print(f"this envelope was not applied:\n{_printable(str(exc))}")
         return 1
 
     names = sittings.naming(envelope.submitted_by, envelope.submitted_for)

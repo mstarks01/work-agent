@@ -1506,8 +1506,11 @@ def _cross_origin(request: Request) -> JSONResponse | None:
     """
     if is_same_origin(request):
         return None
+    # repr of the path, never the path: it is the decoded text of a request
+    # that another site can send, so an escape sequence there would reach the
+    # operator's terminal.
     logger.warning(
-        "refused a %s %s that was not same-origin", request.method, request.url.path
+        "refused a %s %r that was not same-origin", request.method, request.url.path
     )
     return _message(403, "This request did not come from the app's own page.")
 

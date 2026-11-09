@@ -157,9 +157,14 @@ CSV_COLUMNS = (
     "controls",
 )
 
-#: The first characters that make a spreadsheet read a cell as a formula
-#: (OWASP, CSV injection).
-_FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
+#: Each place in a value where a spreadsheet can start a formula (OWASP, CSV
+#: injection): a formula character at the start, or after a ``;``, a tab or a
+#: line break. A spreadsheet that splits on ``;`` or on a tab starts a cell
+#: there, and it does not read the quotes around a cell that starts after a
+#: comma, so a line break in the value starts a row. A tab, a CR or an LF at
+#: the start counts too. The full-width forms count because a spreadsheet
+#: reads them as the ASCII characters.
+_FORMULA_START = re.compile(r"^(?=[\t\r\n])|(?:^|(?<=[;\t\r\n]))(?=[=+\-@＝＋－＠])")
 
 
 def _level(severity: Severity) -> str:
@@ -199,7 +204,7 @@ def judgement_cells(claim: Claim) -> dict[JudgementField, str]:
 
 def _cell(value: str) -> str:
     """``value`` as a spreadsheet shows it as text, never as a formula."""
-    return f"'{value}" if value.startswith(_FORMULA_LEAD) else value
+    return _FORMULA_START.sub("'", value)
 
 
 def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
