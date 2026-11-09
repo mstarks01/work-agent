@@ -51,8 +51,12 @@ the Control. The owner states the class. One neutral declaration,
 `CARRIED_EVIDENCE_KINDS`, feeds the ASVS `needs_evidence` Literal, so the two
 cannot drift. One table in code holds the credential shapes the service knows:
 a private key block, a cloud access key ID, a vendor token prefix, and an
-assignment of `password`, `secret` or `token` to a literal value. A hit refuses
-the upload and names the line. The service redacts nothing, because a redacted
+assignment of a password, key, secret or token name to a literal value. In a
+settings file, such as a `.env` or an `.ini` file, any value of such a name
+counts. A hit refuses the upload and names the line. The table is a list of
+shapes and does not find every credential, so the page asks the owner to remove
+each one before an upload, and a refusal says that the file looks like it holds
+one. The service redacts nothing, because a redacted
 file is a file the owner did not upload. The #484 code scan reuses the table or
 replaces it in that one place.
 

@@ -376,6 +376,7 @@
       draw();
     } } });
     return card("Evidence", "A file that shows the protection, as plain text. The analysis quotes it beside a ruling and never reads it as a description.",
+      h("p", { class: "hint", id: "evidence-note" }, "Remove each password, key and token from a file before you add it. The service refuses a file that looks like it holds one, but it does not find every form. A credential that it does not find is saved with the file."),
       h("ul", { class: "lines", id: "evidence-list" }, ...draft.evidence.map((file, index) => h("li", {},
         h("span", {}, h("b", {}, file.name), file.reading
           ? ` · ${CLASS_LABEL[file.class]} · Reading…`
