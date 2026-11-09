@@ -3036,7 +3036,7 @@ def test_save_and_open_waits_for_a_file_read(page):
     page.wait_for_selector("#evidence-list li:has-text('Reading…')")
     page.click('button[aria-label="Edit B"]')
     assert page.is_disabled("#leave-save")
-    assert page.is_visible("#leave-wait")
+    assert page.inner_text("#leave-wait") == "Save waits for the file read to end."
     page.evaluate("window.releaseReads()")
     page.wait_for_selector("#leave-save:enabled")
     assert page.is_hidden("#leave-wait")

@@ -398,7 +398,7 @@
     ...(editing === "new" ? {} : { updated_at: draft.updated_at }),
   });
   const reading = () => draft.evidence.some((file) => file.reading);
-  const WAITS = "Save waits for the file read to end.";
+  const WAIT_TEXT = "Save waits for the file read to end.";
   // Whether the save succeeded.
   const save = async () => {
     if (saving || reading()) return false;
@@ -452,7 +452,7 @@
     editorProblem,
     h("div", { class: "dialog-actions" },
       h("span", { id: "editor-status", class: "hint", role: "status" },
-        saving ? `Saving “${draft.name}”…` : reading() ? WAITS : ""),
+        saving ? `Saving “${draft.name}”…` : reading() ? WAIT_TEXT : ""),
       h("button", { type: "button", id: "cancel-control", on: { click: stopEdit } }, "Cancel"),
       h("button", { type: "button", id: "save-control", class: "primary", disabled: reading(), on: { click: save } }, "Save Control")));
 
@@ -514,7 +514,7 @@
   const drawEditor = () => {
     redraw(el("editor"), draft ? [editor()] : []);
     el("leave-save").disabled = Boolean(draft) && reading();
-    show("leave-wait", el("leave-save").disabled ? WAITS : "");
+    show("leave-wait", el("leave-save").disabled ? WAIT_TEXT : "");
   };
   const drawTable = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
