@@ -920,10 +920,7 @@ _NO_SUCH_FILE = "This file is no longer in Files."
 _NO_SUCH_CONTROL = "This Control is no longer in Controls."
 _NO_SUCH_EVIDENCE = "This evidence file is no longer in the Control."
 
-_CONTROL_STALE = (
-    "This Control changed in another tab or window. Reload the page, then edit"
-    " it again."
-)
+_CONTROL_STALE = "This Control changed in another tab or window after you opened it."
 
 _CONTROL_ALIAS_IN_USE = (
     "Another Control protects a scope with one of these names. Remove the alias,"
@@ -2048,6 +2045,17 @@ def create_app(
                     409, "Another save started at the same time. Try again."
                 )
 
+    def stale_control(latest: Control) -> JSONResponse:
+        """The ``409`` of an edit that read an older version. It carries the
+        version the store holds now, so the page can show what changed and
+        keep the owner's draft. The route checks the version before the
+        evidence list, because a stale draft can name a file that the newer
+        version removed; the store checks it again under its lock."""
+        return JSONResponse(
+            {"message": _CONTROL_STALE, "current": control_view(latest)},
+            status_code=409,
+        )
+
     @app.put("/workspace/controls/{control_id}")
     async def replace_control(control_id: str, request: Request) -> Response:
         """Replace the operator's Control in place, and keep no earlier
@@ -2068,6 +2076,8 @@ def create_app(
         )
         if stored is None:
             return _message(404, _NO_SUCH_CONTROL)
+        if stored.updated_at != edit.updated_at:
+            return stale_control(stored)
         try:
             control, texts = saved_control(
                 edit,
@@ -2091,7 +2101,10 @@ def create_app(
             case "absent":
                 return _message(404, _NO_SUCH_CONTROL)
             case "stale":
-                return _message(409, _CONTROL_STALE)
+                latest = await workspace.store.get_control(control_id, stored.owner_id)
+                if latest is None:
+                    return _message(404, _NO_SUCH_CONTROL)
+                return stale_control(latest)
             case "name_in_use":
                 return _message(409, _name_taken(edit.name))
             case "alias_in_use":

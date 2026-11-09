@@ -99,6 +99,10 @@ def serve(app):
 def page(browser, served):
     """A fresh page on the app's form; every script error fails the test."""
     context = browser.new_context(base_url=served)
+    # BROWSER_TIMEOUT_MS shortens each wait, for a run that expects tests to
+    # fail, such as the run of new tests against the code before a change.
+    if timeout := os.environ.get("BROWSER_TIMEOUT_MS"):
+        context.set_default_timeout(int(timeout))
     opened = context.new_page()
     errors: list[str] = []
     opened.on("pageerror", lambda error: errors.append(str(error)))
@@ -2915,6 +2919,129 @@ def test_a_failed_replace_keeps_the_file_it_read_over(page):
     page.wait_for_selector("#editor-problem:not([hidden])")
     assert evidence_names(page) == ["rds.tf"]
     assert not changed(page)
+
+
+def _save_elsewhere(page, control: str, **changed) -> None:
+    """Save the Control named ``control`` as another tab would, with
+    ``changed``."""
+    answered = page.evaluate(
+        """async ([name, changed]) => {
+          const [control] = (await (await fetch('/workspace/controls')).json())
+            .filter((one) => one.name === name);
+          const scope = control.scope.type === 'application'
+            ? { type: 'application' } : control.scope;
+          const body = { name: control.name, scope, facts: control.facts,
+            rows: control.rows, updated_at: control.updated_at,
+            evidence: control.evidence.map((file) => ({ id: file.id, class: file.class })),
+            ...changed };
+          const sent = await fetch('/workspace/controls/' + control.id, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body) });
+          return sent.status;
+        }""",
+        [control, changed],
+    )
+    assert answered == 200
+
+
+def test_a_stale_save_shows_what_changed_and_keeps_the_draft(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A mine")
+    _save_elsewhere(page, "A", name="A theirs")
+    with page.expect_response("**/workspace/controls/*"):
+        page.click("#save-control")
+    page.wait_for_selector("#stale-note")
+    assert page.locator("#stale-fields li").all_inner_texts() == ["Name: A theirs"]
+    assert page.input_value("#control-name") == "A mine"
+    assert page.inner_text("#editor-problem") == (
+        "This Control changed in another tab or window after you opened it."
+    )
+    assert page.get_attribute("#stale-note", "role") is None
+    page.wait_for_selector("#controls-list td.name-cell a:text-is('A theirs')")
+
+
+def test_keep_my_changes_replaces_the_saved_version(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A mine")
+    _save_elsewhere(page, "A", name="A theirs")
+    page.click("#save-control")
+    page.click("#stale-keep")
+    assert page.locator("#stale-note").count() == 0
+    assert page.evaluate("document.activeElement.id") == "save-control"
+    save_control(page)
+    names = page.locator("#controls-list td.name-cell a").all_inner_texts()
+    assert sorted(names) == ["A mine", "B"]
+
+
+def test_open_the_saved_version_drops_the_draft(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A mine")
+    _save_elsewhere(page, "A", name="A theirs")
+    page.click("#save-control")
+    page.click("#stale-open")
+    assert page.input_value("#control-name") == "A theirs"
+    assert page.locator("#stale-note").count() == 0
+    assert not changed(page)
+
+
+def test_keep_drops_a_file_the_saved_version_no_longer_holds(page):
+    _kept_with_a_file(page)
+    page.fill("#control-name", "Orders DB mine")
+    _save_elsewhere(page, "Orders DB encryption", evidence=[])
+    page.click("#save-control")
+    page.wait_for_selector("#stale-fields li:has-text('Evidence: None')")
+    page.click("#stale-keep")
+    assert evidence_names(page) == []
+    assert "no longer holds “rds.tf”" in page.inner_text("#controls-notice")
+    save_control(page)
+
+
+def test_keep_keeps_a_file_that_the_other_save_added(page):
+    _kept_with_a_file(page)
+    page.fill("#control-name", "Orders DB mine")
+    added = page.evaluate(
+        """async () => {
+          const [control] = await (await fetch('/workspace/controls')).json();
+          const body = { name: control.name, scope: control.scope,
+            facts: control.facts, rows: control.rows,
+            updated_at: control.updated_at,
+            evidence: [...control.evidence.map((file) => ({ id: file.id, class: file.class })),
+              { name: 'waf.tf', class: 'config', text: 'waf = on\\n' }] };
+          const sent = await fetch('/workspace/controls/' + control.id, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body) });
+          return sent.status;
+        }"""
+    )
+    assert added == 200
+    page.click("#save-control")
+    page.click("#stale-keep")
+    assert evidence_names(page) == ["rds.tf", "waf.tf"]
+    assert "also holds “waf.tf”, so your changes keep it" in page.inner_text(
+        "#controls-notice"
+    )
+    save_control(page)
+    [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert [file["name"] for file in control["evidence"]] == ["rds.tf", "waf.tf"]
+
+
+def test_a_second_stale_save_lists_only_what_changed_since_keep(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A mine")
+    _save_elsewhere(page, "A", name="A theirs")
+    page.click("#save-control")
+    page.click("#stale-keep")
+    tampering = {"framework": "stride", "unit": "tampering", "version": "1.0"}
+    _save_elsewhere(page, "A theirs", rows=[tampering])
+    page.click("#save-control")
+    page.wait_for_selector("#stale-note")
+    assert page.locator("#stale-fields li").all_inner_texts() == [
+        "Rows: stride tampering"
+    ]
 
 
 def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):
