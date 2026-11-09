@@ -563,6 +563,9 @@ CredentialShape = Literal[
     "a password, key, secret or token set to a value",
 ]
 _UNQUOTED = r"[^\s'\"#,;()\[\]{}<>]"
+#: The shape of a credential name set to a value, in a line of any file or in
+#: a settings file.
+_ASSIGNMENT: CredentialShape = "a password, key, secret or token set to a value"
 #: The words that end the name of a credential setting.
 _CREDENTIAL_NAME = (
     r"(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key"
@@ -578,7 +581,7 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
         r"|github_pat_[A-Za-z0-9_]{22,}|xox[abposr]-[A-Za-z0-9-]{10,}"
         r"|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|[rs]k_live_[A-Za-z0-9]{20,})"
     ),
-    "a password, key, secret or token set to a value": re.compile(
+    _ASSIGNMENT: re.compile(
         rf"(?i)(?<![\w.-])[\w.-]*{_CREDENTIAL_NAME}[\"']?\s*[:=]\s*"
         r"(?:\"(?![$<{%\"\s]|\*+\"|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|\"))"
         r"(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
@@ -591,7 +594,8 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
 
 
 #: The name ends of a settings file: a file of ``name = value`` lines, where
-#: a value is always data and never a type name or a variable.
+#: a value is always data and never a type name or a variable. A name that
+#: starts with ``.env.``, as ``.env.production`` does, is one too.
 SETTINGS_FILE_ENDS = (".env", ".ini", ".properties", ".cfg", ".conf")
 
 #: A setting at the start of a line of a settings file that gives a credential
@@ -604,7 +608,8 @@ _SETTING = re.compile(
 
 def settings_file(name: str) -> bool:
     """Whether the file ``name`` is a settings file (:data:`SETTINGS_FILE_ENDS`)."""
-    return name.lower().endswith(SETTINGS_FILE_ENDS)
+    lower = name.lower()
+    return lower.endswith(SETTINGS_FILE_ENDS) or lower.startswith(".env.")
 
 
 def credential_hit(text: str, *, name: str) -> tuple[int, CredentialShape] | None:
@@ -617,7 +622,7 @@ def credential_hit(text: str, *, name: str) -> tuple[int, CredentialShape] | Non
             if pattern.search(line):
                 return number, shape
         if settings and _SETTING.search(line):
-            return number, "a password, key, secret or token set to a value"
+            return number, _ASSIGNMENT
     return None
 
 

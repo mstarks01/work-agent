@@ -392,7 +392,9 @@ it.
   the line. The check is a list of shapes and does not find every form, so a
   note on the card asks you to remove each password, key and token first. In
   a settings file, a name that ends in `.env`, `.ini`, `.properties`, `.cfg`
-  or `.conf`, any value of a credential name counts.
+  or `.conf` or that starts with `.env.`, a credential name at the start of a
+  line counts with any plain value. An empty value, a reference such as
+  `${DB_PASSWORD}`, a mask, a quoted value and a comment do not count there.
   Each line has a "Remove" button. "Save Control" sends the Control, and an
   edit replaces it and keeps no earlier version. When the editor has changes
   that you did not save, another Control or "New Control" opens a dialog

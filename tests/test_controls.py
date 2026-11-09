@@ -460,6 +460,7 @@ def test_a_key_or_credential_name_set_to_a_value_is_refused(line):
     "name",
     [
         ".env",
+        ".env.production",
         "prod.env",
         "app.ini",
         "a.properties",
