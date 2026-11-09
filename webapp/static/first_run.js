@@ -1213,6 +1213,7 @@
         return false;
       }
       answerProblem.hidden = true;
+      formControls.accepted(scopes);
       if (data.early_questions) reconcile(data);
       return true;
     } finally {

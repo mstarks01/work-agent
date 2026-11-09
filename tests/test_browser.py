@@ -3234,6 +3234,24 @@ def test_a_refused_zone_choice_is_not_kept(zoned_page):
     assert page.input_value(f"#apply-{edge}") == ""
 
 
+def test_a_refused_change_of_zone_shows_the_saved_zone(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    save_offer(page, lambda: page.select_option(f"#apply-{edge}", "boundary:dmz"))
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+    page.route(
+        "**/answer/*",
+        lambda route: (
+            route.abort() if route.request.method == "POST" else route.fallback()
+        ),
+    )
+    page.select_option(f"#apply-{edge}", "boundary:internal-network")
+    page.wait_for_selector("#answer-problem:has-text('was not saved')")
+    page.wait_for_selector("#scope-status", state="hidden")
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+
+
 def test_turning_off_a_chosen_zone_shows_no_tick(zoned_page):
     page = zoned_page
     edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})

@@ -223,14 +223,19 @@ const formControls = (() => {
     ? entry.covers
     : entry.choices.find((choice) => choice.id === element)?.covers ?? []);
   const defaultTicks = (candidates) => new Set(candidates.filter((cover) => cover.ticked).map((cover) => cover.element));
-  // The zone the owner chose for a Control on this page, by Control ID. A
-  // zone saved with no ticked part leaves its Control out, and the service
-  // then keeps no element, so the page keeps the choice. A Control with no
-  // saved zone is left out as "missing-element", so after a refused save or
-  // with its top box off, the page shows no zone. The choices belong to one
-  // run: an offer from another run forgets them.
+  // The element of each Control's last accepted save on this page, by
+  // Control ID. A zone saved with no ticked part leaves its Control out, and
+  // the service then keeps no element, so the page keeps it here. A Control
+  // with no saved zone is left out as "missing-element", and shows no zone.
+  // The elements belong to one run: an offer from another run forgets them.
   const targets = new Map();
   let targetsRun = null;
+  // Record what a save the service accepted sent: each Control it names
+  // keeps its element, and a Control it leaves out keeps none.
+  const accepted = (scopes) => {
+    targets.clear();
+    for (const scope of scopes) if (scope.element) targets.set(scope.control, scope.element);
+  };
   // What the owner chose for each copy, by Control ID: whether it applies,
   // its element, and a zone's ticked parts. Drawn from the service's
   // resolution, and sent whole on each change.
@@ -303,8 +308,6 @@ const formControls = (() => {
       if (needsChoice) {
         const choose = h("select", { id: `apply-${entry.id}`, on: { change: (event) => {
           pick.element = event.target.value;
-          if (pick.element) targets.set(entry.id, pick.element);
-          else targets.delete(entry.id);
           pick.ticks = defaultTicks(candidatesOf(entry, pick.element));
           pick.on = Boolean(pick.element);
           send();
@@ -389,5 +392,5 @@ const formControls = (() => {
   };
 
   const onChange = (handler) => { changed = handler; };
-  return { load, ready, onChange, chosen, drawOffer, drawUsed };
+  return { load, ready, onChange, chosen, drawOffer, accepted, drawUsed };
 })();
