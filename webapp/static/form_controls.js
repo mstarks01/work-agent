@@ -226,9 +226,10 @@ const formControls = (() => {
   // The zone the owner chose for a Control on this page, by Control ID. A
   // zone with no ticked part leaves its Control out, and the service then
   // keeps no element, so the page keeps the choice until the owner ticks a
-  // part or chooses "Not this time". A choice counts only while the
-  // Control's choices still hold it.
+  // part or chooses "Not this time". The choices belong to one run: an
+  // offer from another run forgets them.
   const targets = new Map();
+  let targetsRun = null;
   // What the owner chose for each copy, by Control ID: whether it applies,
   // its element, and a zone's ticked parts. Drawn from the service's
   // resolution, and sent whole on each change.
@@ -243,10 +244,7 @@ const formControls = (() => {
     }
     // A Control left out as "unticked" has no tick saved: its top box is
     // off, or its zone has no ticked part. It shows no tick.
-    const target = targets.get(entry.id);
-    const element = entry.choices.some((choice) => choice.id === target)
-      ? target
-      : (entry.element ? entry.element.id : "");
+    const element = targets.get(entry.id) ?? (entry.element ? entry.element.id : "");
     const ticks = resolution.reason === "unticked" ? new Set() : defaultTicks(candidatesOf(entry, element));
     return { on: false, element, ticks };
   };
@@ -266,6 +264,10 @@ const formControls = (() => {
   // service's answer redraws the offer; `actions.refuse(message)` shows a
   // refusal.
   const drawOffer = (box, data, actions) => {
+    if (data.run !== targetsRun) {
+      targets.clear();
+      targetsRun = data.run;
+    }
     const offer = data.controls || [];
     box.hidden = !offer.length;
     if (!offer.length) return box.replaceChildren();

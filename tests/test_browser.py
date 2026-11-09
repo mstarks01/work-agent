@@ -3168,6 +3168,7 @@ def test_a_zone_chosen_in_an_earlier_run_leaves_a_later_match(zoned_page):
         page.select_option(f"#apply-{edge}", "boundary:dmz")
     data = answered.value.json()
     # The next run of an amended description matches the Control's own zone.
+    data["run"] = "job-amended"
     [entry] = data["controls"]
     entry |= {
         "match": "name",
@@ -3191,6 +3192,30 @@ def test_a_zone_chosen_in_an_earlier_run_leaves_a_later_match(zoned_page):
     assert page.locator(f"#apply-{edge}").count() == 0
     assert page.locator(f"#cover-{edge}-process\\:web-app").count() == 1
     assert not page.is_checked(f"#cover-{edge}-process\\:web-app")
+
+
+def test_a_zone_chosen_in_an_earlier_run_is_not_chosen_again(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    with page.expect_response(_post_to_answer) as answered:
+        page.select_option(f"#apply-{edge}", "boundary:dmz")
+    data = answered.value.json()
+    # The next run of an amended description leaves the Control unmatched
+    # again, with the same choices.
+    data["run"] = "job-amended"
+    [entry] = data["controls"]
+    entry["resolution"] = {
+        "state": "left-out",
+        "control": edge,
+        "reason": "missing-element",
+    }
+    page.evaluate(
+        """(data) => formControls.drawOffer(document.getElementById("control-offer"),
+          data, {save() {}, refuse() {}})""",
+        data,
+    )
+    assert page.input_value(f"#apply-{edge}") == ""
 
 
 def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_page):
