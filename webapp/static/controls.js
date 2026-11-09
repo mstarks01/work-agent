@@ -83,18 +83,55 @@
   // unit and evidence kind of the next row or file, and an alias being
   // typed. A redraw keeps them; a new edit starts them afresh.
   let pending = {};
-  const startEdit = (control) => {
-    if (saving) return;
+  // The draft as the edit opened it, to tell a changed draft from one with
+  // no change.
+  let clean = "";
+  const changed = () => draft !== null && JSON.stringify(draft) !== clean;
+  // What the last change of "What it protects" removed, which Undo puts
+  // back: the scope and the facts before the change, the facts it removed,
+  // and the scope and facts after it. Undo lasts until the next edit of the
+  // scope or the facts; it leaves the name, the rows and the evidence as
+  // they are.
+  let removed = null;
+  const undoKey = () => JSON.stringify([draft.scope, draft.facts]);
+  const dropUndo = () => {
+    if (!removed || undoKey() === removed.after) return;
+    removed = null;
+    el("scope-removed")?.remove();
+  };
+  const open = (control) => {
     session += 1;
     refuse("");
     pending = { framework: FRAMEWORKS[0], unit: "", evidenceClass: PAGE.evidence_classes[0].id, alias: "" };
+    removed = null;
     editing = control ? control.id : "new";
     draft = control
       ? JSON.parse(JSON.stringify({ ...control, evidence: control.evidence.map((file) => ({ ...file })) }))
       : blank();
+    clean = JSON.stringify(draft);
     show("controls-notice", "");
     draw();
     el("control-name").focus();
+  };
+  // Opening another Control or New Control over a changed draft asks the
+  // owner to save it, discard it or stay. Opening the open one again keeps
+  // its draft.
+  let leaving = null;
+  const startEdit = (control) => {
+    if (saving) return;
+    if (draft && editing === (control ? control.id : "new")) {
+      el("control-name").focus();
+      return;
+    }
+    if (!changed()) {
+      open(control);
+      return;
+    }
+    leaving = { control };
+    const title = draft.name ? `“${draft.name}”` : editing === "new" ? "The new Control" : "This Control";
+    el("leave-question").textContent = `${title} has changes you have not saved.`;
+    el("leave-save").textContent = control ? `Save and open “${control.name}”` : "Save and open a new Control";
+    el("leave-dialog").showModal();
   };
   // Closing the editor from inside it moves focus to the edited Control's
   // Edit button, to New Control, or to the search field when New Control is
@@ -104,6 +141,7 @@
     const inside = el("editor").contains(document.activeElement);
     session += 1;
     refuse("");
+    removed = null;
     editing = null;
     draft = null;
     draw();
@@ -170,13 +208,23 @@
         drawEditor();
       } },
     });
+    // An alias added or removed draws the editor with no input event, so
+    // the draw ends the Undo too.
+    dropUndo();
     return card("What it protects", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
       h("div", { class: "line" },
         h("div", {},
           h("select", { id: "scope-type", "aria-label": "What it protects", on: { change: (event) => {
+            const before = { scope: draft.scope, facts: draft.facts };
             draft.scope = { type: event.target.value, name: "", aliases: [] };
             draft.facts = draft.facts.filter((fact) => ticks(draft.scope.type, fact).length);
-            draw();
+            const lost = before.facts.filter((fact) => !draft.facts.includes(fact));
+            const after = undoKey();
+            // A change that removes nothing keeps the Undo of the change
+            // before it.
+            if (lost.length || before.scope.name || before.scope.aliases.length) removed = { ...before, lost, after };
+            else if (removed) removed.after = after;
+            drawEditor();
           } } }, ...PAGE.scope_types.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
         named ? h("div", {}, h("label", { class: "field-label", for: "scope-name" }, "Its name in your descriptions"),
           h("input", { type: "text", id: "scope-name", maxlength: limits.name_chars, value: draft.scope.name,
@@ -190,7 +238,27 @@
                   drawEditor();
                   focusNear("alias", index, "alias-input");
                 } } }, "×"))),
-            aliasInput)) : null));
+            aliasInput)) : null),
+      removed ? removedNote() : null);
+  };
+  // The notice of what a change of "What it protects" removed: the name,
+  // the aliases and each fact the new choice does not take.
+  const removedNote = () => {
+    const { scope, facts, lost } = removed;
+    const aliases = scope.aliases.length ? counted(scope.aliases.length, "alias", "aliases") : "";
+    const names = [scope.name ? `its name “${scope.name}”` : "", aliases].filter(Boolean).join(" and ");
+    const statements = lost.flatMap((fact) => ticks(scope.type, fact).map((one) => `“${statementText(fact, one)}”`));
+    return h("div", { class: "notice", id: "scope-removed", role: "status" },
+      "This change removed what does not fit the new choice:",
+      h("ul", {}, names ? h("li", {}, names) : null,
+        lost.length ? h("li", {}, `${counted(lost.length, "fact", "facts")}: ${statements.join(", ")}`) : null),
+      h("button", { type: "button", id: "scope-undo", on: { click: () => {
+        draft.scope = scope;
+        draft.facts = facts;
+        removed = null;
+        drawEditor();
+        el("scope-type").focus();
+      } } }, "Undo"));
   };
 
   // Each statement is a tick. A tick writes the answer that makes it a
@@ -253,7 +321,7 @@
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`, "row", "row-framework")))),
       unplaced.length ? h("p", { class: "notice", id: "rows-reach", role: "note" },
-        `Many findings of ${unplaced.join(" and ")} are about the whole application, not one part of it. This Control protects only part of the application, so the analysis cannot apply it to those findings. To apply it to them, choose “${SCOPES.application.label}” in “What it protects”.`) : null,
+        `Many findings of ${unplaced.join(" and ")} are about the whole application, not one part of it. This Control protects one part, so the analysis does not apply it to those findings. Choose “${SCOPES.application.label}” only when the protection covers every part of the application. That choice removes the name and the facts of this part.`) : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {
@@ -330,12 +398,14 @@
     ...(editing === "new" ? {} : { updated_at: draft.updated_at }),
   });
   const reading = () => draft.evidence.some((file) => file.reading);
+  const WAIT_TEXT = "Save waits for the file read to end.";
+  // Whether the save succeeded.
   const save = async () => {
-    if (saving || reading()) return;
+    if (saving || reading()) return false;
     const missing = draft.facts.find((fact) => !fact.facets && !fact.value.trim());
     if (missing) {
       refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
-      return;
+      return false;
     }
     // The locked editor drops focus: a save that fails gives it back, and
     // one that succeeds moves it to the saved Control's Edit button. Focus
@@ -365,12 +435,13 @@
     if (!saved) {
       draw();
       if (focused && document.activeElement === document.body) el(focused)?.focus();
-      return;
+      return false;
     }
     stopEdit();
     show("controls-notice", `“${saved.name}” is saved.`);
     await load();
     if (inside && document.activeElement === document.body) focusFirst(`edit-${saved.id}`, "new-control", "controls-search");
+    return true;
   };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
@@ -381,7 +452,7 @@
     editorProblem,
     h("div", { class: "dialog-actions" },
       h("span", { id: "editor-status", class: "hint", role: "status" },
-        saving ? `Saving “${draft.name}”…` : reading() ? "Save waits for the file read to end." : ""),
+        saving ? `Saving “${draft.name}”…` : reading() ? WAIT_TEXT : ""),
       h("button", { type: "button", id: "cancel-control", on: { click: stopEdit } }, "Cancel"),
       h("button", { type: "button", id: "save-control", class: "primary", disabled: reading(), on: { click: save } }, "Save Control")));
 
@@ -439,7 +510,12 @@
   };
   // The editor draws again after a change in it. The table draws on its
   // own, so a filter, a sort or a row tick leaves the editor as it is.
-  const drawEditor = () => redraw(el("editor"), draft ? [editor()] : []);
+  // "Save and open" waits for a file read, as Save does.
+  const drawEditor = () => {
+    redraw(el("editor"), draft ? [editor()] : []);
+    el("leave-save").disabled = Boolean(draft) && reading();
+    show("leave-wait", el("leave-save").disabled ? WAIT_TEXT : "");
+  };
   const drawTable = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
     el("new-control").disabled = saving || atLimit() || editing === "new";
@@ -480,6 +556,36 @@
   };
 
   el("new-control").addEventListener("click", () => startEdit(null));
+  el("editor").addEventListener("input", dropUndo);
+  el("editor").addEventListener("change", dropUndo);
+  el("leave-dialog").addEventListener("close", () => { leaving = null; });
+  el("leave-stay").addEventListener("click", () => el("leave-dialog").close());
+  el("leave-discard").addEventListener("click", () => {
+    const { control } = leaving;
+    el("leave-dialog").close();
+    open(control);
+  });
+  el("leave-save").addEventListener("click", async () => {
+    const { control } = leaving;
+    el("leave-dialog").close();
+    if (!(await save())) return;
+    // The list reloaded with the save. The other Control opens as it now
+    // is, and does not open when a delete removed it or when the owner
+    // opened a draft during the reload. The notice of the save stays.
+    if (draft) return;
+    const notice = el("controls-notice").textContent;
+    const next = control && controls.find((one) => one.id === control.id);
+    if (next) open(next);
+    else if (!control && !atLimit()) open(null);
+    show("controls-notice", notice);
+  });
+  // Leaving the page with a changed draft, or during a save, makes the
+  // browser ask the owner to confirm.
+  window.addEventListener("beforeunload", (event) => {
+    if (!saving && !changed()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
   el("controls-search").addEventListener("input", drawTable);
   el("controls-kind").addEventListener("change", drawTable);
   el("controls-framework").addEventListener("change", drawTable);

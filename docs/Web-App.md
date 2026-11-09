@@ -362,8 +362,13 @@ it.
   label comes from its package's catalog when the page loads. A note shows
   under the rows when the Control does not cover the whole application and a row
   names a framework whose findings can name no part, because such a finding
-  never reaches the Control. "What it protects" takes the
-  kind, the name and the aliases. "What it does" is a checklist of
+  never reaches the Control. The note also says to choose the whole
+  application only when the protection covers every part, because that
+  choice removes the name and the facts. "What it protects" takes the
+  kind, the name and the aliases. A change of the kind removes the name, the
+  aliases and each fact that the new kind does not take. A notice lists what
+  the change removed and has an "Undo" button. The Undo stays until the next
+  edit of what the Control protects or does. "What it does" is a checklist of
   protections, grouped by topic, such as "Encrypts its backups and
   snapshots." or "The internet cannot reach it.". Each tick writes the
   answer that makes its fact a protection: a Question Kind or one of its
@@ -375,7 +380,10 @@ it.
   plain text file and its class: Configuration, Code or People. The page
   reads the file with the checks of an Owner File and sends only its text.
   Each line has a "Remove" button. "Save Control" sends the Control, and an
-  edit replaces it and keeps no earlier version.
+  edit replaces it and keeps no earlier version. When the editor has changes
+  that you did not save, another Control or "New Control" opens a dialog
+  with "Stay", "Discard changes" and "Save and open". The browser also asks
+  before you leave the page with such changes, or during a save.
 - **The counts.** A Control holds at most 20 aliases, 50 rows and
   `max_control_evidence` evidence files. The page checks each count before it
   adds an item, and it shows the sentence that the server uses for the same
