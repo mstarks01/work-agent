@@ -2832,6 +2832,23 @@ def test_focus_moved_during_a_save_stays(page):
     assert page.evaluate("document.activeElement.id") == "controls-search"
 
 
+def test_focus_moved_during_a_delete_stays(page):
+    _two_kept_controls(page)
+    held = _hold(page, "**/workspace/controls/*")
+    page.focus('button[aria-label="Delete A"]')
+    page.keyboard.press("Enter")
+    page.click("#delete-go")
+    _wait_for(page, held)
+    page.focus("#controls-search")
+    with page.expect_response("**/workspace/controls/*"):
+        held[0].continue_()
+    page.wait_for_selector("#controls-notice:has-text('is deleted')")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#controls-list tr').length === 1"
+    )
+    assert page.evaluate("document.activeElement.id") == "controls-search"
+
+
 def test_a_failed_save_gives_focus_back(page):
     _two_kept_controls(page)
     page.route(

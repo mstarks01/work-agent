@@ -508,7 +508,9 @@
     el("delete-dialog").close();
     // After a delete, focus goes to the row now in the first deleted row's
     // place, the row before it, New Control, or the search field when New
-    // Control is off.
+    // Control is off. Focus the owner moved elsewhere during the delete
+    // stays where it is.
+    const opener = document.activeElement;
     const at = shownControls().findIndex((control) => picked.some((one) => one.id === control.id));
     try {
       for (const control of picked) {
@@ -530,6 +532,7 @@
       : `${picked.length} Controls are deleted. The analyses that applied them keep their copy.`);
     await load();
     const rows = shownControls();
+    if (document.activeElement !== document.body && document.activeElement !== opener) return;
     focusFirst(`select-${rows[at]?.id}`, `select-${rows[at - 1]?.id}`, "new-control", "controls-search");
   });
 
