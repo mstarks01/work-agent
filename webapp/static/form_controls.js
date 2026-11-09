@@ -226,6 +226,11 @@ const formControls = (() => {
   // What the owner chose for each copy, by Control ID: whether it applies,
   // its element, and a zone's ticked parts. Drawn from the service's
   // resolution, and sent whole on each change.
+  // The zone the owner chose for a Control on this page, by Control ID. A
+  // zone with no ticked part leaves its Control out, and the service then
+  // keeps no element, so the page keeps the choice until the owner ticks a
+  // part or chooses "Not this time".
+  const targets = new Map();
   const chosenOf = (entry) => {
     const resolution = entry.resolution;
     if (resolution.state === "applied") {
@@ -235,7 +240,10 @@ const formControls = (() => {
         ticks: new Set(resolution.covers.filter((cover) => cover.ticked).map((cover) => cover.element)),
       };
     }
-    return { on: false, element: entry.element ? entry.element.id : "", ticks: defaultTicks(entry.covers) };
+    // A zone left out because no part is ticked shows no tick.
+    const element = targets.get(entry.id) ?? (entry.element ? entry.element.id : "");
+    const ticks = resolution.reason === "unticked" ? new Set() : defaultTicks(candidatesOf(entry, element));
+    return { on: false, element, ticks };
   };
   const scopesOf = (offer, picks) => offer
     .filter((entry) => picks.get(entry.id).on)
@@ -284,6 +292,8 @@ const formControls = (() => {
       if (needsChoice) {
         const choose = h("select", { id: `apply-${entry.id}`, on: { change: (event) => {
           pick.element = event.target.value;
+          if (pick.element) targets.set(entry.id, pick.element);
+          else targets.delete(entry.id);
           pick.ticks = defaultTicks(candidatesOf(entry, pick.element));
           pick.on = Boolean(pick.element);
           send();
@@ -296,13 +306,18 @@ const formControls = (() => {
           h("p", { class: "hint" }, "This choice applies to this analysis only. “Keep this name” adds the name to the Control's aliases, so it matches next time.")));
       }
       const candidates = candidatesOf(entry, pick.element);
+      if (candidates.length && !pick.ticks.size) {
+        parts.push(h("p", { class: "hint" }, `Tick each part of the ${names.get(pick.element)} that this Control protects.`));
+      }
       if (candidates.length) {
         parts.push(h("ul", { class: "fanout" }, ...candidates.map((cover) => {
           const tick = h("input", { type: "checkbox", id: `cover-${entry.id}-${cover.element}`, checked: pick.ticks.has(cover.element),
             on: { change: (event) => {
               if (event.target.checked) pick.ticks.add(cover.element);
               else pick.ticks.delete(cover.element);
-              pick.on = pick.ticks.size > 0;
+              // The zone is sent with no tick, so the service says the
+              // Control is left out because no part is ticked.
+              pick.on = true;
               send();
             } } });
           return h("li", {}, tick, " ", h("label", { for: tick.id }, cover.name),

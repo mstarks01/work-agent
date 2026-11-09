@@ -3107,6 +3107,42 @@ def test_an_unmatched_control_takes_a_choice_and_keeps_the_name(zoned_page):
     assert control["scope"]["aliases"] == ["Web App"]
 
 
+def test_a_zone_chosen_with_no_tick_keeps_its_parts_for_a_tick(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    body = save_offer(
+        page, lambda: page.select_option(f"#apply-{edge}", "boundary:dmz")
+    )
+    assert body["control_scopes"] == [
+        {"control": edge, "element": "boundary:dmz", "ticked": []}
+    ]
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+    offer = page.locator("#control-offer")
+    assert "Tick each part of the DMZ that this Control protects." in offer.inner_text()
+    assert not page.is_checked(f"#cover-{edge}-store\\:audit-log")
+    body = save_offer(page, lambda: page.check(f"#cover-{edge}-store\\:audit-log"))
+    assert body["control_scopes"] == [
+        {"control": edge, "element": "boundary:dmz", "ticked": ["store:audit-log"]}
+    ]
+    page.wait_for_selector("#control-offer >> text=matches DMZ")
+    assert page.is_checked(f"#offer-{edge}")
+
+
+def test_unticking_the_last_part_keeps_the_zone_with_no_tick(zoned_page):
+    page = zoned_page
+    zone = keep_control(page, "WAF", {"type": "boundary", "name": "Internal Network"})
+    submit_with_controls(page)
+    body = save_offer(page, lambda: page.uncheck(f"#cover-{zone}-process\\:web-app"))
+    assert body["control_scopes"] == [
+        {"control": zone, "element": "boundary:internal-network", "ticked": []}
+    ]
+    offer = page.locator("#control-offer")
+    assert "left out: it is not ticked" in offer.inner_text()
+    assert not page.is_checked(f"#cover-{zone}-process\\:web-app")
+    assert "Tick each part of the Internal Network" in offer.inner_text()
+
+
 def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_page):
     page = zoned_page
     db = {"type": "store", "name": "Orders DB"}
