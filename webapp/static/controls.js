@@ -143,7 +143,7 @@
   svg("path", { d: "M9.7 9a2.5 2.5 0 0 1 4.6 1.3c0 1.7-2.3 2.1-2.3 3.7" }),
   svg("path", { d: "M12 17h.01" }));
   const help = (title, text) => h("details", { class: "question-help" },
-    h("summary", {}, h("span", { class: "sr-only" }, `About ${title}`), helpIcon()),
+    h("summary", { id: `help-${title.toLowerCase().replace(/[^a-z]+/g, "-")}` }, h("span", { class: "sr-only" }, `About ${title}`), helpIcon()),
     h("div", { class: "question-help-content" }, h("strong", {}, title), h("p", {}, text)));
   const card = (title, about, ...content) => h("section", { class: "q-card" },
     h("div", { class: "card-head" }, h("h3", {}, title), about ? help(title, about) : null), ...content);
@@ -416,7 +416,7 @@
       h("td", {}, h("input", { type: "checkbox", id: `select-${control.id}`, checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); drawTable(); } } })),
       h("td", { class: "name-cell" },
-        h("a", { href: "#", "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
+        h("a", { href: "#", id: `name-${control.id}`, "aria-disabled": saving ? "true" : null, on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
         facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null),
       h("td", {}, scopeText(control.scope_phrase)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },

@@ -2849,6 +2849,22 @@ def test_focus_moved_during_a_delete_stays(page):
     assert page.evaluate("document.activeElement.id") == "controls-search"
 
 
+def test_each_focusable_control_on_the_controls_page_has_an_id(page):
+    """The page keeps focus across a redraw by element ID, so a focusable
+    element with no ID loses focus when its box draws again."""
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    add_row(page, "stride", "spoofing")
+    missing = page.evaluate(
+        """() => [...document.querySelectorAll('#editor, #controls-list')]
+          .flatMap((box) => [...box.querySelectorAll(
+            'a[href], button, input, select, textarea, summary')])
+          .filter((node) => !node.id)
+          .map((node) => node.outerHTML.slice(0, 80))"""
+    )
+    assert missing == []
+
+
 def test_a_failed_save_gives_focus_back(page):
     _two_kept_controls(page)
     page.route(
