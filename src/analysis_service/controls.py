@@ -545,7 +545,9 @@ class EvidenceRefusal:
 
 #: The credential shapes the service knows, by the words a refusal names them
 #: with. An evidence file that holds one is refused by line, and the service
-#: redacts nothing (ADR 0127). An assignment counts only where it sets a
+#: redacts nothing (ADR 0127). The table is a list of shapes: it does not find
+#: every credential, and the page and the refusal say so. An assignment of a
+#: name that ends in one of :data:`_CREDENTIAL_NAME` counts only where it sets a
 #: literal value: a quoted string that closes, a quoted or an unquoted run of
 #: 256 characters, or an unquoted value at the end of its line that holds a
 #: digit or a symbol. A quoted value does not count where it starts with a
@@ -558,9 +560,17 @@ CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
     "a vendor token",
-    "a password, secret or token set to a value",
+    "a password, key, secret or token set to a value",
 ]
 _UNQUOTED = r"[^\s'\"#,;()\[\]{}<>]"
+#: The shape of a credential name set to a value, in a line of any file or in
+#: a settings file.
+_ASSIGNMENT: CredentialShape = "a password, key, secret or token set to a value"
+#: The words that end the name of a credential setting.
+_CREDENTIAL_NAME = (
+    r"(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key"
+    r"|credential)"
+)
 CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
     "a private key block": re.compile(
         r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----"
@@ -571,8 +581,8 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
         r"|github_pat_[A-Za-z0-9_]{22,}|xox[abposr]-[A-Za-z0-9-]{10,}"
         r"|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|[rs]k_live_[A-Za-z0-9]{20,})"
     ),
-    "a password, secret or token set to a value": re.compile(
-        r"(?i)(?<![\w.-])[\w.-]*(?:password|passwd|secret|token)[\"']?\s*[:=]\s*"
+    _ASSIGNMENT: re.compile(
+        rf"(?i)(?<![\w.-])[\w.-]*{_CREDENTIAL_NAME}[\"']?\s*[:=]\s*"
         r"(?:\"(?![$<{%\"\s]|\*+\"|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|\"))"
         r"(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
         r"|'(?![$<{%'\s]|\*+'|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|'))"
@@ -583,13 +593,37 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
 }
 
 
-def credential_hit(text: str) -> tuple[int, CredentialShape] | None:
-    """The number of the first line of ``text`` that holds a credential shape,
-    and the shape, or ``None``."""
+#: The name ends of a settings file: a file of ``name = value`` lines, where
+#: a value is always data and never a type name or a variable. A name that
+#: starts with ``.env.``, as ``.env.production`` does, is one too.
+SETTINGS_FILE_ENDS = (".env", ".ini", ".properties", ".cfg", ".conf")
+
+#: A setting at the start of a line of a settings file that gives a credential
+#: name any value: one that is not empty, a reference, a mask, a quote or a
+#: comment. A quoted value is the table's.
+_SETTING = re.compile(
+    rf"(?i)^\s*(?:export\s+)?[\w.-]*{_CREDENTIAL_NAME}\s*[:=]\s*(?![$<{{%*]){_UNQUOTED}"
+)
+
+
+def settings_file(name: str) -> bool:
+    """Whether the file ``name`` is a settings file: its last part ends in one of
+    :data:`SETTINGS_FILE_ENDS` or starts with ``.env.``."""
+    last = name.lower().rpartition("/")[2]
+    return last.endswith(SETTINGS_FILE_ENDS) or last.startswith(".env.")
+
+
+def credential_hit(text: str, *, name: str) -> tuple[int, CredentialShape] | None:
+    """The number of the first line of the file ``name`` with ``text`` that
+    holds a credential shape, and the shape, or ``None``. In a settings file,
+    a credential name set to any value counts too."""
+    settings = settings_file(name)
     for number, line in enumerate(text_lines(text), start=1):
         for shape, pattern in CREDENTIAL_SHAPES.items():
             if pattern.search(line):
                 return number, shape
+        if settings and _SETTING.search(line):
+            return number, _ASSIGNMENT
     return None
 
 
@@ -636,11 +670,11 @@ def _text_refusal(name: str, text: str, limits: ControlLimits) -> str | None:
     )
     if refusal is not None:
         return refusal
-    hit = credential_hit(text)
+    hit = credential_hit(text, name=name)
     if hit is None:
         return None
     number, shape = hit
     return (
-        f"Line {number} of “{name}” holds {shape}. Remove it, then add the file"
-        " again: the service stores no credential."
+        f"Line {number} of “{name}” looks like it holds {shape}. The service did"
+        " not save the file. Remove the value, then add the file again."
     )

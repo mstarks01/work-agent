@@ -388,6 +388,14 @@ it.
   protection. "Evidence" takes a
   plain text file and its class: Configuration, Code or People. The page
   reads the file with the checks of an Owner File and sends only its text.
+  The service refuses a file that looks like it holds a credential, and names
+  the line. The check is a list of shapes and does not find every form, so a
+  note on the card asks you to remove each password, key and token first. In
+  a settings file, a name that ends in `.env`, `.ini`, `.properties`, `.cfg`
+  or `.conf` or that starts with `.env.`, a credential name at the start of a
+  line counts with any plain value. An empty value, a reference such as
+  `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted
+  value counts as it does in any file.
   Each line has a "Remove" button. "Save Control" sends the Control, and an
   edit replaces it and keeps no earlier version. When the editor has changes
   that you did not save, another Control or "New Control" opens a dialog

@@ -2655,8 +2655,9 @@ class TestControls:
         )
         assert outcome == EvidenceRefusal(
             next(iter(texts)),
-            "Line 2 of “aws.yaml” holds a cloud access key ID. Remove it, then add"
-            " the file again: the service stores no credential.",
+            "Line 2 of “aws.yaml” looks like it holds a cloud access key ID. The"
+            " service did not save the file. Remove the value, then add the file"
+            " again.",
         )
         assert asyncio.run(store.list_controls("alice")) == []
 
@@ -2819,7 +2820,9 @@ class TestControls:
             )
         )
         assert isinstance(refused, EvidenceRefusal)
-        assert refused.message.startswith("Line 1 of “pem.txt” holds a private key")
+        assert refused.message.startswith(
+            "Line 1 of “pem.txt” looks like it holds a private key"
+        )
         assert asyncio.run(store.get_control(held.document.id, "alice")) == held
 
     def test_a_kept_file_with_another_digest_is_a_defect(self, store):

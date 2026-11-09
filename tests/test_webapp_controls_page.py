@@ -249,9 +249,9 @@ class TestCreate:
             (
                 "region = eu\npassword = hunter2!\n",
                 (
-                    "Line 2 of “rds.tf” holds a password, secret or token set to a"
-                    " value. Remove it, then add the file again: the service stores"
-                    " no credential."
+                    "Line 2 of “rds.tf” looks like it holds a password, key, secret"
+                    " or token set to a value. The service did not save the file."
+                    " Remove the value, then add the file again."
                 ),
             ),
         ],

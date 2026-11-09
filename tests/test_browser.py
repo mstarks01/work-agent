@@ -3058,6 +3058,14 @@ def test_save_and_open_keeps_a_draft_opened_during_the_reload(page):
     assert page.input_value("#control-name") == "Mine"
 
 
+def test_the_evidence_card_asks_the_owner_to_remove_each_credential(page):
+    page.goto("/controls")
+    new_control(page, "Notes")
+    note = page.inner_text("#evidence-note")
+    assert note.startswith("Remove each password, key and token from a file")
+    assert "it does not find every form" in note
+
+
 def test_the_reach_note_says_what_the_whole_application_means(page):
     page.goto("/controls")
     new_control(page, "TLS at the edge")

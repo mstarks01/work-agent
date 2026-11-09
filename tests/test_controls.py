@@ -387,18 +387,21 @@ class TestTheEvidenceRules:
             ("OPENAI=sk-proj-abcdefghijklmnopqrstuvwx", "a vendor token"),
             ("auth ghp_" + "a" * 36, "a vendor token"),
             ("bot xoxb-1234567890-abcdefghij", "a vendor token"),
-            ('password = "hunter2"', "a password, secret or token set to a value"),
-            ("client_secret: 'changeme'", "a password, secret or token set to a value"),
-            ("DB_PASSWORD=s3cr3t!", "a password, secret or token set to a value"),
-            ("  token: abc123def", "a password, secret or token set to a value"),
-            ('"apiToken": "abc"', "a password, secret or token set to a value"),
+            ('password = "hunter2"', "a password, key, secret or token set to a value"),
+            (
+                "client_secret: 'changeme'",
+                "a password, key, secret or token set to a value",
+            ),
+            ("DB_PASSWORD=s3cr3t!", "a password, key, secret or token set to a value"),
+            ("  token: abc123def", "a password, key, secret or token set to a value"),
+            ('"apiToken": "abc"', "a password, key, secret or token set to a value"),
         ],
     )
     def test_a_credential_is_refused_by_line_and_shape(self, line, shape):
         message = evidence_message(f"first line\nsecond line\n{line}\nlast line\n")
         assert message == (
-            f"Line 3 of “waf.yaml” holds {shape}. Remove it, then add the file"
-            " again: the service stores no credential."
+            f"Line 3 of “waf.yaml” looks like it holds {shape}. The service did"
+            " not save the file. Remove the value, then add the file again."
         )
 
     @pytest.mark.parametrize(
@@ -436,6 +439,68 @@ class TestTheEvidenceRules:
         assert evidence_message(text).startswith("Line 2 of")
 
 
+SETTING = "a password, key, secret or token set to a value"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "api_key = abc123",
+        "apikey: 'k'",
+        'aws_access_key = "abc"',
+        "private_key: abc123",
+        "DB_CREDENTIAL=s3cr3t!",
+    ],
+)
+def test_a_key_or_credential_name_set_to_a_value_is_refused(line):
+    assert credential_hit(f"{line}\n", name="app.py") == (1, SETTING)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".env",
+        ".env.production",
+        "conf/.env.local",
+        "prod.env",
+        "app.ini",
+        "a.properties",
+        "setup.cfg",
+        "nginx.conf",
+        "APP.ENV",
+    ],
+)
+@pytest.mark.parametrize(
+    "line",
+    ["password = swordfish", "API_KEY=abc", "export TOKEN=abc", "  secret: plain"],
+)
+def test_a_settings_file_refuses_a_credential_name_with_any_value(name, line):
+    assert credential_hit(f"# settings\n{line}\n", name=name) == (2, SETTING)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "DB_PASSWORD=${DB_PASSWORD}",
+        "PASSWORD=",
+        'secret: "********"',
+        "password: ****",
+        "# password = swordfish",
+        "password_file=/etc/app/password",
+        "TOKEN=<your token>",
+    ],
+)
+def test_a_settings_file_passes_a_reference_mask_or_empty_value(line):
+    assert credential_hit(f"{line}\n", name="app.env") is None
+
+
+@pytest.mark.parametrize("name", ["app.py", "values.yaml", "main.tf", "app.envy"])
+def test_another_file_passes_a_plain_word_value(name):
+    """Outside a settings file, ``password = swordfish`` can set a variable, so
+    a plain word value with no digit or symbol passes."""
+    assert credential_hit("password = swordfish\n", name=name) is None
+
+
 def test_a_document_with_no_name_key_is_refused():
     held = document()
     del held["name"]
@@ -455,23 +520,23 @@ def test_the_scope_types_are_the_element_prefixes_but_a_flow():
         ("-----BEGIN PGP PRIVATE KEY BLOCK-----", "a private key block"),
         (
             'password = "' + "x" * 400 + '"',
-            "a password, secret or token set to a value",
+            "a password, key, secret or token set to a value",
         ),
-        ("token: eyJ" + "a" * 400, "a password, secret or token set to a value"),
-        ("secret: '" + "b" * 300, "a password, secret or token set to a value"),
+        ("token: eyJ" + "a" * 400, "a password, key, secret or token set to a value"),
+        ("secret: '" + "b" * 300, "a password, key, secret or token set to a value"),
         (
             'secret: "+q3Zr8vT0aLk9mW2xY7bN1cD4eF6gH8j="',
-            "a password, secret or token set to a value",
+            "a password, key, secret or token set to a value",
         ),
-        ("password: '*Xk9#mQ2!vL'", "a password, secret or token set to a value"),
-        ('password: ")Xk9#mQ2!vL"', "a password, secret or token set to a value"),
-        ('password: ",Xk9#mQ2!vL"', "a password, secret or token set to a value"),
+        ("password: '*Xk9#mQ2!vL'", "a password, key, secret or token set to a value"),
+        ('password: ")Xk9#mQ2!vL"', "a password, key, secret or token set to a value"),
+        ('password: ",Xk9#mQ2!vL"', "a password, key, secret or token set to a value"),
     ],
 )
 def test_a_long_or_unclosed_credential_is_refused(line, shape):
     assert evidence_message(f"{line}\n") == (
-        f"Line 1 of “waf.yaml” holds {shape}. Remove it, then add the file again:"
-        " the service stores no credential."
+        f"Line 1 of “waf.yaml” looks like it holds {shape}. The service did not"
+        " save the file. Remove the value, then add the file again."
     )
 
 
@@ -501,7 +566,10 @@ def test_a_credential_line_counts_each_line_end_a_text_may_hold(end):
     """Each line end that ``text_refusal`` lets through starts a line, as it
     does in an editor."""
     text = end.join(["first line", "second line", "DB_PASSWORD=s3cr3t!", ""])
-    assert credential_hit(text) == (3, "a password, secret or token set to a value")
+    assert credential_hit(text, name="waf.yaml") == (
+        3,
+        "a password, key, secret or token set to a value",
+    )
 
 
 @pytest.mark.parametrize(
@@ -519,7 +587,7 @@ def test_a_hostile_line_is_read_in_linear_time(line):
     and a joined-string check with two unbounded space quantifiers tries each
     split of one run of spaces between them. Each takes seconds."""
     started = time.perf_counter()
-    credential_hit(line)
+    credential_hit(line, name="app.env")
     assert time.perf_counter() - started < 1
 
 
