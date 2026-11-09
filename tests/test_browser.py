@@ -2970,6 +2970,63 @@ def test_a_scope_change_that_removes_nothing_shows_no_notice(page):
     assert page.locator("#scope-removed").count() == 0
 
 
+def test_an_edit_after_a_scope_change_ends_its_undo(page):
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    page.select_option("#scope-type", "application")
+    assert page.locator("#scope-removed").count() == 1
+    page.fill("#control-name", "Edge TLS")
+    assert page.locator("#scope-removed").count() == 0
+    add_row(page, "stride", "spoofing")
+    assert page.locator("#scope-removed").count() == 0
+
+
+def test_a_scope_change_that_removes_nothing_keeps_the_undo(page):
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    page.select_option("#scope-type", "boundary")
+    page.select_option("#scope-type", "store")
+    page.click("#scope-undo")
+    assert page.input_value("#scope-name") == "Orders DB"
+
+
+def test_the_leave_question_names_a_control_with_no_name(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "")
+    page.click('button[aria-label="Edit B"]')
+    assert page.inner_text("#leave-question") == (
+        "This Control has changes you have not saved."
+    )
+
+
+def test_save_and_open_waits_for_a_file_read(page):
+    _two_kept_controls(page)
+    _hold_file_reads(page)
+    page.click('button[aria-label="Edit A"]')
+    add_evidence(page, "a.txt", "for A\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    page.click('button[aria-label="Edit B"]')
+    assert page.is_disabled("#leave-save")
+
+
+def test_save_and_open_keeps_a_draft_opened_during_the_reload(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    page.fill("#control-name", "A2")
+    page.click('button[aria-label="Edit B"]')
+    held = _hold(page, "**/workspace/controls")
+    with page.expect_response("**/workspace/controls/*"):
+        page.click("#leave-save")
+    _wait_for(page, held)
+    page.click("#new-control")
+    page.fill("#control-name", "Mine")
+    with page.expect_response("**/workspace/controls"):
+        held[0].continue_()
+    page.wait_for_selector("#controls-list td.name-cell a:text-is('A2')")
+    assert page.input_value("#control-name") == "Mine"
+
+
 def test_the_reach_note_says_what_the_whole_application_means(page):
     page.goto("/controls")
     new_control(page, "TLS at the edge")

@@ -88,8 +88,14 @@
   let clean = "";
   const changed = () => draft !== null && JSON.stringify(draft) !== clean;
   // What the last change of "What it protects" removed, which Undo puts
-  // back: the scope and the facts before the change.
+  // back: the scope and the facts before the change, the facts it removed,
+  // and the draft after it. Undo lasts until the next edit of the draft.
   let removed = null;
+  const dropUndo = () => {
+    if (!removed || JSON.stringify(draft) === removed.after) return;
+    removed = null;
+    el("scope-removed")?.remove();
+  };
   const open = (control) => {
     session += 1;
     refuse("");
@@ -119,8 +125,10 @@
       return;
     }
     leaving = { control };
-    el("leave-question").textContent = `${draft.name ? `“${draft.name}”` : "The new Control"} has changes you have not saved.`;
+    const title = draft.name ? `“${draft.name}”` : editing === "new" ? "The new Control" : "This Control";
+    el("leave-question").textContent = `${title} has changes you have not saved.`;
     el("leave-save").textContent = control ? `Save and open “${control.name}”` : "Save and open a new Control";
+    el("leave-save").disabled = reading();
     el("leave-dialog").showModal();
   };
   // Closing the editor from inside it moves focus to the edited Control's
@@ -198,6 +206,7 @@
         drawEditor();
       } },
     });
+    dropUndo();
     return card("What it protects", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
       h("div", { class: "line" },
         h("div", {},
@@ -205,8 +214,12 @@
             const before = { scope: draft.scope, facts: draft.facts };
             draft.scope = { type: event.target.value, name: "", aliases: [] };
             draft.facts = draft.facts.filter((fact) => ticks(draft.scope.type, fact).length);
-            const lost = before.facts.length > draft.facts.length;
-            removed = lost || before.scope.name || before.scope.aliases?.length ? before : null;
+            const lost = before.facts.filter((fact) => !draft.facts.includes(fact));
+            const after = JSON.stringify(draft);
+            // A change that removes nothing keeps the Undo of the change
+            // before it.
+            if (lost.length || before.scope.name || before.scope.aliases.length) removed = { ...before, lost, after };
+            else if (removed) removed.after = after;
             drawEditor();
           } } }, ...PAGE.scope_types.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
         named ? h("div", {}, h("label", { class: "field-label", for: "scope-name" }, "Its name in your descriptions"),
@@ -227,10 +240,9 @@
   // The notice of what a change of "What it protects" removed: the name,
   // the aliases and each fact the new choice does not take.
   const removedNote = () => {
-    const { scope, facts } = removed;
-    const aliases = scope.aliases?.length ? counted(scope.aliases.length, "alias", "aliases") : "";
+    const { scope, facts, lost } = removed;
+    const aliases = scope.aliases.length ? counted(scope.aliases.length, "alias", "aliases") : "";
     const names = [scope.name ? `its name “${scope.name}”` : "", aliases].filter(Boolean).join(" and ");
-    const lost = facts.filter((fact) => !draft.facts.includes(fact));
     const statements = lost.flatMap((fact) => ticks(scope.type, fact).map((one) => `“${statementText(fact, one)}”`));
     return h("div", { class: "notice", id: "scope-removed", role: "status" },
       "This change removed what does not fit the new choice:",
@@ -534,6 +546,8 @@
   };
 
   el("new-control").addEventListener("click", () => startEdit(null));
+  el("editor").addEventListener("input", dropUndo);
+  el("editor").addEventListener("change", dropUndo);
   el("leave-dialog").addEventListener("close", () => { leaving = null; });
   el("leave-stay").addEventListener("click", () => el("leave-dialog").close());
   el("leave-discard").addEventListener("click", () => {
@@ -546,8 +560,9 @@
     el("leave-dialog").close();
     if (!(await save())) return;
     // The list reloaded with the save. The other Control opens as it now
-    // is, and does not open when a delete removed it. The notice of the
-    // save stays.
+    // is, and does not open when a delete removed it or when the owner
+    // opened a draft during the reload. The notice of the save stays.
+    if (draft) return;
     const notice = el("controls-notice").textContent;
     const next = control && controls.find((one) => one.id === control.id);
     if (next) open(next);
