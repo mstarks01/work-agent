@@ -31,7 +31,7 @@ from analysis_service.claims import (
 )
 from analysis_service.controls import scope_phrase
 from analysis_service.frameworks import lane_of
-from analysis_service.job_controls import RULING_LISTS, SectionEntry
+from analysis_service.job_controls import RULING_LISTS, SectionEntry, section_summary
 from analysis_service.open_facts import element_names
 
 #: The characters that start Markdown markup or an HTML tag inline.
@@ -86,6 +86,8 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
     lines = ["", "## Controls", ""]
     if not section:
         return [*lines, "This analysis applied no Control."]
+    lines += [f"- {stage}: {line}" for stage, line in section_summary(section)]
+    lines.append("")
     for entry in section:
         lines.append(f"### {_text(entry.name)}")
         lines.append("")

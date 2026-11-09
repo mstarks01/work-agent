@@ -729,6 +729,40 @@ class TestTheReportSection:
         assert "  - Ruled out: A-1. yes" in text
         assert "  - Refused: A-2. no" in text
 
+    def test_the_page_and_the_export_show_one_summary_of_each_stage(self, ruled):
+        from analysis_service.job_controls import SectionEntry, section_summary
+
+        owner, child, _ = ruled
+        sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
+        summary = section_summary([SectionEntry.model_validate(one) for one in sent])
+        assert summary == [
+            ("Match", "3 copied: 2 applied, 1 left out."),
+            ("Facts", "1 written."),
+            ("Rows", "1 applied, 1 refused, 3 no finding, 1 left out."),
+        ]
+        page = owner.client.get(f"/report/{child}").text
+        assert test_webapp._island(page, "controls_summary") == [
+            list(line) for line in summary
+        ]
+        markdown = owner.client.get(f"/report/{child}/export.md").text
+        assert (
+            "## Controls\n\n- Match: 3 copied: 2 applied, 1 left out.\n"
+            "- Facts: 1 written.\n"
+            "- Rows: 1 applied, 1 refused, 3 no finding, 1 left out.\n\n### WAF"
+        ) in markdown
+
+    def test_a_stage_with_no_count_says_none(self, ruled):
+        from analysis_service.job_controls import SectionEntry, section_summary
+
+        owner, child, _ = ruled
+        sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
+        billing = SectionEntry.model_validate(sent[2]).model_copy(update={"rows": []})
+        assert section_summary([billing]) == [
+            ("Match", "1 copied: 1 left out."),
+            ("Facts", "none."),
+            ("Rows", "none."),
+        ]
+
     def test_the_markdown_export_carries_the_section_as_text(self, ruled):
         owner, child, _ = ruled
         exported = owner.client.get(f"/report/{child}/export.md")
@@ -978,6 +1012,7 @@ class TestTheTables:
 
         from analysis_service.controls import ScopeType
         from analysis_service.job_controls import (
+            FACT_COUNT_WORDS,
             LEFT_OUT_MEANINGS,
             ROW_MEANINGS,
             FactState,
@@ -991,6 +1026,7 @@ class TestTheTables:
         assert set(SCOPE_WORDS) == set(get_args(ScopeType))
         assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))
         assert set(ROW_MEANINGS) == set(get_args(RowOutcome))
+        assert set(FACT_COUNT_WORDS) == set(get_args(FactState))
         assert set(MATCH_MEANINGS) == set(get_args(MatchOutcome))
         assert set(LEFT_OUT_MEANINGS) == set(get_args(LeftOutReason))
         assert set(FACT_MEANINGS) == set(get_args(FactState))

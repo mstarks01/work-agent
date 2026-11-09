@@ -1361,6 +1361,8 @@
   // and the scope line starts with the service's phrase (scope_phrase). Each
   // one lands as text.
   const CONTROLS = JSON.parse(document.getElementById("controls").textContent);
+  // One line for each stage, from the service (section_summary).
+  const CONTROLS_SUMMARY = JSON.parse(document.getElementById("controls_summary").textContent);
   const controlMatch = (entry) => {
     const scope = entry.scope_phrase.charAt(0).toUpperCase() + entry.scope_phrase.slice(1);
     if (entry.state === "left-out") return [`${scope}: left out, because ${entry.meaning}`];
@@ -1402,6 +1404,9 @@
     section.id = "controls-section";
     section.append(el("h2", null, "Controls"),
       el("p", "meta", "The Controls this analysis applied, as they were when it ran. The critic judged each row against the findings. A Control settles nothing on its own, and the service verified nothing."));
+    const summary = el("dl", "controls-summary");
+    for (const [stage, line] of CONTROLS_SUMMARY) summary.append(el("dt", null, stage), el("dd", null, line));
+    section.append(summary);
     const table = el("table", "controls-table");
     const head = el("tr");
     ["Control", "Match", "Facts", "Rows and outcomes"].forEach((text) => {

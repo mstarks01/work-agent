@@ -220,6 +220,7 @@ from analysis_service.job_controls import (
     SectionEntry,
     controls_section,
     controls_used,
+    section_summary,
 )
 from analysis_service.jobs import (
     DeleteRefusal,
@@ -1186,6 +1187,7 @@ def render_report(
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
+        controls_summary=script_json(section_summary(controls) if controls else []),
         units=script_json(unit_rows(report)),
         fixes=script_json(
             fixes_by_framework(

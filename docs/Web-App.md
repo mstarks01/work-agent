@@ -218,12 +218,14 @@ page to the section and the open rows you had. A print from the browser prints
 the same export. A print leaves out the sidebar, the tabs and the buttons, and
 it always uses the light colours.
 
-**Controls**, under the findings of a job that copied a Control, is one table
-of each Control: what it matched, the facts it wrote, each with the meaning of
-its state (`written`, `changed` or `stated`), and its rows of the frameworks
-the job ran, each with the outcome `applied`, `partly-applied`, `refused`,
-`not-reached`, `no-finding` or `left-out`. A row is `partly-applied` when the
-critic applied it to some findings and refused it for others. A row is
+**Controls**, under the findings of a job that copied a Control, starts with
+three count lines, one for each stage: the match, the facts and the rows, such
+as "Rows: 2 applied, 1 refused." The Markdown export shows the same lines. Then
+one table holds each Control: what it matched, the facts it wrote, each with
+the meaning of its state (`written`, `changed` or `stated`), and its rows of
+the frameworks the job ran, each with the outcome `applied`, `partly-applied`,
+`refused`, `not-reached`, `no-finding` or `left-out`. A row is `partly-applied`
+when the critic applied it to some findings and refused it for others. A row is
 `not-reached` when no finding on its unit reached the critic with the row, and
 a finding on its unit names no part that the Control's scope holds. A row is
 `left-out` when it names another version of its framework than the version the
