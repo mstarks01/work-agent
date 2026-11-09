@@ -645,6 +645,8 @@ class TestTheReportSection:
             "denial-of-service": "left-out",
         }
         assert rows["spoofing"]["tally"] == "Ruled out: 2"
+        assert rows["denial-of-service"]["outcome_text"] == "left out"
+        assert rows["repudiation"]["outcome_text"] == "no finding"
         assert rows["repudiation"]["tally"] == ""
         assert rows["denial-of-service"]["meaning"] == (
             "Left out: this row names version <b>0.9</b> of stride, and the"

@@ -1378,7 +1378,7 @@
   const controlRow = (row) => {
     const open = el("details", "control-row");
     const summary = el("summary", null, `${row.framework} ${row.unit}${row.label ? ` · ${row.label}` : ""} `);
-    summary.append(el("span", `tag ${row.outcome}`, row.outcome.replaceAll("-", " ")));
+    summary.append(el("span", `tag ${row.outcome}`, row.outcome_text));
     const lists = Object.entries(RULING_LISTS)
       .map(([verdict, heading]) => [heading, row.rulings.filter((ruling) => ruling.ruling === verdict)])
       .filter(([, rulings]) => rulings.length);

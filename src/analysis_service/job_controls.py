@@ -992,6 +992,9 @@ class SectionRow(BaseModel):
     version: str
     ticked: bool
     outcome: RowOutcome
+    #: The outcome in words, as the row's tag and the summary show it
+    #: (:data:`ROW_OUTCOME_WORDS`).
+    outcome_text: str
     meaning: str
     #: The count of rulings in each list of :data:`RULING_LISTS` that holds
     #: one, as in "Ruled out: 2 · Refused: 1"; empty where none does.
@@ -1040,6 +1043,16 @@ class SectionEntry(BaseModel):
     rows: list[SectionRow]
 
 
+#: How the report names each row outcome: its tag and the summary's count.
+ROW_OUTCOME_WORDS: Mapping[RowOutcome, str] = MappingProxyType(
+    {outcome: outcome.replace("-", " ") for outcome in get_args(RowOutcome)}
+)
+
+#: How the section's summary names each resolution state.
+RESOLUTION_WORDS: Mapping[ResolutionState, str] = MappingProxyType(
+    {"applied": "applied", "left-out": "left out"}
+)
+
 #: How the section's summary names each fact state.
 FACT_COUNT_WORDS: Mapping[FactState, str] = MappingProxyType(
     {
@@ -1067,16 +1080,14 @@ def section_summary(entries: Sequence[SectionEntry]) -> list[tuple[str, str]]:
     facts and the rows. Each line counts each state in the words the section
     names it with, and leaves out a state with no count. The report page and
     the Markdown export show these lines."""
-    plain = {
-        value: value.replace("-", " ")
-        for value in (*get_args(ResolutionState), *get_args(RowOutcome))
-    }
     return [
         (
             "Match",
             f"{len(entries)} copied: "
             + _counted(
-                (entry.state for entry in entries), get_args(ResolutionState), plain
+                (entry.state for entry in entries),
+                get_args(ResolutionState),
+                RESOLUTION_WORDS,
             ),
         ),
         (
@@ -1092,7 +1103,7 @@ def section_summary(entries: Sequence[SectionEntry]) -> list[tuple[str, str]]:
             _counted(
                 (row.outcome for entry in entries for row in entry.rows),
                 get_args(RowOutcome),
-                plain,
+                ROW_OUTCOME_WORDS,
             ),
         ),
     ]
@@ -1240,6 +1251,7 @@ def controls_section(
                     version=row.version,
                     ticked=row.ticked,
                     outcome=row_result,
+                    outcome_text=ROW_OUTCOME_WORDS[row_result],
                     meaning=ROW_MEANINGS[row_result].format(
                         version=row.version,
                         framework=row.framework,

@@ -1187,7 +1187,7 @@ def render_report(
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
-        controls_summary=script_json(section_summary(controls) if controls else []),
+        controls_summary=script_json(section_summary(controls)),
         units=script_json(unit_rows(report)),
         fixes=script_json(
             fixes_by_framework(
