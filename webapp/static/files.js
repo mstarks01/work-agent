@@ -155,11 +155,12 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, kind: sending.kind, format: sending.row.format, text: sending.text }),
       });
-      const body = await saved.json();
       if (!saved.ok) {
-        if (pending === sending) show("upload-problem", body.message);
+        const message = await messageOf(saved, "The service could not keep the file. Check Files before you upload again.");
+        if (pending === sending) show("upload-problem", message);
         return;
       }
+      const body = await saved.json();
       if (pending === sending) {
         pending = null;
         el("upload-dialog").close();
@@ -185,7 +186,7 @@
     try {
       const removed = await fetch(`/workspace/files/${encodeURIComponent(file.id)}`, { method: "DELETE" });
       if (!removed.ok && removed.status !== 404) {
-        show("files-problem", (await removed.json()).message);
+        show("files-problem", await messageOf(removed, "The service could not delete the file. Reload the page."));
         return;
       }
     } catch {

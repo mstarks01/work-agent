@@ -2372,6 +2372,24 @@ def test_the_files_page_keeps_lists_and_deletes_a_file_as_text(page):
     assert "keep their copy" in page.inner_text("#files-notice")
 
 
+def test_a_files_answer_that_is_not_json_says_what_failed(page):
+    page.goto("/files")
+    page.route(
+        "**/workspace/files",
+        lambda route: (
+            route.fulfill(status=502, body="Bad Gateway")
+            if route.request.method == "POST"
+            else route.fallback()
+        ),
+    )
+    upload_to_files(page, "notes.txt", "Ana: hi")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.click("#upload-save")
+    page.wait_for_selector(
+        "#upload-problem:has-text('The service could not keep the file.')"
+    )
+
+
 def test_the_files_page_filters_by_name_kind_and_format(page):
     page.goto("/files")
     for name, text in (
@@ -2717,6 +2735,186 @@ def test_a_finished_file_read_opens_save_again(page):
     assert sent.value.post_data_json["evidence"] == [
         {"name": "a.txt", "class": "config", "text": "for A\n"}
     ]
+
+
+def replace_evidence(page, index: int, name: str, text: str) -> None:
+    with page.expect_file_chooser() as chosen:
+        page.click(f"#evidence-replace-{index}")
+    chosen.value.set_files(
+        {"name": name, "mimeType": "text/plain", "buffer": text.encode()}
+    )
+
+
+def _kept_with_a_file(page, text: str = "storage_encrypted = true\n") -> None:
+    """Save a Control with one evidence file of the class Code, and open it."""
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    tick(page, "Encrypts its data at rest.", "AES-256")
+    add_evidence(page, "rds.tf", text, "code")
+    page.wait_for_selector("#evidence-remove-0")
+    save_control(page)
+    page.click('button[aria-label="Edit Orders DB encryption"]')
+
+
+def changed(page) -> bool:
+    """Whether the page asks before the owner leaves: the draft has changes."""
+    return page.evaluate(
+        """() => { const event = new Event('beforeunload', { cancelable: true });
+          window.dispatchEvent(event); return event.defaultPrevented; }"""
+    )
+
+
+def evidence_names(page) -> list[str]:
+    return [
+        line.split(" · ")[0]
+        for line in page.locator(
+            "#evidence-list li > span:first-child"
+        ).all_inner_texts()
+    ]
+
+
+def test_view_shows_a_new_file_and_a_held_file_as_text(page):
+    text = "<b>bold</b> = true\n"
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    add_evidence(page, "rds.tf", text)
+    page.wait_for_selector("#evidence-view-0")
+    page.click("#evidence-view-0")
+    assert page.inner_text("#evidence-text-0") == text
+    assert page.locator("#evidence-text-0 b").count() == 0
+    page.click("#evidence-view-0")
+    assert page.locator("#evidence-text-0").count() == 0
+
+    _kept_with_a_file(page, text)
+    with page.expect_response("**/evidence/*") as answered:
+        page.click("#evidence-view-0")
+    assert answered.value.ok
+    page.wait_for_selector("#evidence-text-0:not(:text-is('Loading…'))")
+    assert page.inner_text("#evidence-text-0") == text
+    assert page.get_attribute("#evidence-view-0", "aria-expanded") == "true"
+    assert not changed(page)
+
+
+def test_a_refused_view_shows_why_and_closes_the_line(page):
+    _kept_with_a_file(page)
+    page.route(
+        "**/evidence/*",
+        lambda route: route.fulfill(
+            status=404,
+            json={"message": "This evidence file is no longer in the Control."},
+        ),
+    )
+    page.click("#evidence-view-0")
+    page.wait_for_selector(
+        "#editor-problem:has-text('This evidence file is no longer in the Control.')"
+    )
+    assert page.locator("#evidence-text-0").count() == 0
+
+
+def test_a_view_answer_that_is_not_json_says_the_service_could_not_read(page):
+    _kept_with_a_file(page)
+    page.route(
+        "**/evidence/*",
+        lambda route: route.fulfill(status=500, body="Internal Server Error"),
+    )
+    page.click("#evidence-view-0")
+    page.wait_for_selector(
+        "#editor-problem:has-text('The service could not read this file.')"
+    )
+
+
+def test_a_save_answer_that_is_not_json_says_the_service_could_not_save(page):
+    _kept_with_a_file(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: (
+            route.fulfill(status=502, body="Bad Gateway")
+            if route.request.method == "PUT"
+            else route.fallback()
+        ),
+    )
+    page.fill("#control-name", "Orders DB at rest")
+    page.click("#save-control")
+    page.wait_for_selector(
+        "#editor-problem:has-text('The service could not save the Control.')"
+    )
+
+
+def test_a_delete_answer_that_is_not_json_says_the_service_could_not_delete(page):
+    _two_kept_controls(page)
+    page.route(
+        "**/workspace/controls/*",
+        lambda route: route.fulfill(status=502, body="Bad Gateway"),
+    )
+    page.click('button[aria-label="Delete A"]')
+    page.click("#delete-go")
+    page.wait_for_selector(
+        "#controls-problem:has-text('The service could not delete the Control.')"
+    )
+
+
+def test_focus_goes_back_to_replace_after_the_read(page):
+    _kept_with_a_file(page)
+    _hold_file_reads(page)
+    replace_evidence(page, 0, "kms.tf", "kms = true\n")
+    page.wait_for_selector("#evidence-list li:has-text('Reading…')")
+    assert page.evaluate("document.activeElement.id") == "evidence-remove-0"
+    page.evaluate("window.releaseReads()")
+    page.wait_for_selector("#evidence-list li:not(:has-text('Reading…'))")
+    assert page.evaluate("document.activeElement.id") == "evidence-replace-0"
+
+
+def test_download_saves_a_held_file_and_a_new_file_has_none(page):
+    page.goto("/controls")
+    new_control(page, "Orders DB encryption")
+    add_evidence(page, "rds.tf", "a = 1\n")
+    page.wait_for_selector("#evidence-remove-0")
+    assert page.locator("#evidence-download-0").count() == 0
+    page.click("#cancel-control")
+
+    _kept_with_a_file(page)
+    with page.expect_download() as saved:
+        page.click("#evidence-download-0")
+    assert saved.value.suggested_filename == "rds.tf"
+    assert Path(saved.value.path()).read_text() == "storage_encrypted = true\n"
+
+
+def test_a_kind_change_of_a_held_file_reaches_the_save(page):
+    _kept_with_a_file(page)
+    assert page.input_value("#evidence-class-0") == "code"
+    page.select_option("#evidence-class-0", "people")
+    assert changed(page)
+    with page.expect_request("**/workspace/controls/*") as sent:
+        save_control(page)
+    [held] = sent.value.post_data_json["evidence"]
+    assert held["class"] == "people" and set(held) == {"id", "class"}
+    [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert control["evidence"][0]["class"] == "people"
+
+
+def test_replace_reads_a_new_file_into_the_line_and_keeps_its_kind(page):
+    _kept_with_a_file(page)
+    add_evidence(page, "waf.yaml", "waf = on\n")
+    page.wait_for_selector("#evidence-remove-1")
+    replace_evidence(page, 0, "kms.tf", "kms = true\n")
+    page.wait_for_selector("#evidence-list li:not(:has-text('Reading…')) >> nth=1")
+    assert evidence_names(page) == ["kms.tf", "waf.yaml"]
+    assert page.input_value("#evidence-class-0") == "code"
+    with page.expect_request("**/workspace/controls/*") as sent:
+        save_control(page)
+    assert sent.value.post_data_json["evidence"][0] == {
+        "name": "kms.tf",
+        "class": "code",
+        "text": "kms = true\n",
+    }
+
+
+def test_a_failed_replace_keeps_the_file_it_read_over(page):
+    _kept_with_a_file(page)
+    replace_evidence(page, 0, "big.txt", "x" * 10_001)
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert evidence_names(page) == ["rds.tf"]
+    assert not changed(page)
 
 
 def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):

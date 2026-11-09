@@ -83,8 +83,9 @@
   let saving = false;
   // The choices of an edit that no draft field holds yet: the framework, the
   // unit search and the open units of the next row, the evidence kind of the
-  // next file, and an alias being typed. A redraw keeps them; a new edit
-  // starts them afresh.
+  // next file, an alias being typed, the evidence lines that show their text,
+  // the text of each held file the edit read, and the line that Replace reads
+  // a file into. A redraw keeps them; a new edit starts them afresh.
   let pending = {};
   // The draft as the edit opened it, to tell a changed draft from one with
   // no change.
@@ -105,7 +106,8 @@
   const open = (control) => {
     session += 1;
     refuse("");
-    pending = { framework: FRAMEWORKS[0], find: "", open: new Set(), evidenceClass: PAGE.evidence_classes[0].id, alias: "" };
+    pending = { framework: FRAMEWORKS[0], find: "", open: new Set(), evidenceClass: PAGE.evidence_classes[0].id, alias: "",
+      shown: new Set(), texts: new Map(), replacing: null };
     removed = null;
     editing = control ? control.id : "new";
     draft = control
@@ -423,10 +425,88 @@
   };
 
   // The page reads an evidence file and keeps only its text, as Files does.
+  // The line keeps its place while the page reads the file. A failed read
+  // puts back `previous`, the line that a Replace read over, or drops the
+  // line where there was none. A Replace disables its button during the
+  // read, so focus waits on the line's Remove button and then goes back.
+  const readEvidence = async (file, entry, previous) => {
+    const own = draft;
+    const mine = session;
+    draw();
+    const lost = () => [document.body, el(`evidence-remove-${own.evidence.indexOf(entry)}`)].includes(document.activeElement);
+    if (previous && document.activeElement === document.body) el(`evidence-remove-${own.evidence.indexOf(entry)}`)?.focus();
+    const read = await textFile.decode(file, limits.max_evidence_bytes);
+    const at = own.evidence.indexOf(entry);
+    if (mine !== session || at < 0) return;
+    const refocus = previous && lost();
+    if (read.error) {
+      if (previous) own.evidence[at] = previous;
+      else own.evidence.splice(at, 1);
+      refuse(read.error);
+    } else {
+      refuse("");
+      own.evidence[at] = {
+        name: entry.name,
+        class: entry.class,
+        size_bytes: new TextEncoder().encode(read.text).length,
+        text: read.text,
+      };
+    }
+    draw();
+    if (refocus) el(`evidence-replace-${at}`)?.focus();
+  };
+  const evidenceUrl = (file) => `/workspace/controls/${encodeURIComponent(editing)}/evidence/${encodeURIComponent(file.id)}`;
+  // View shows a file's text under its line. A new file shows its own text;
+  // a held file's text comes from the service once for each edit.
+  const view = async (file) => {
+    if (pending.shown.delete(file)) {
+      drawEditor();
+      return;
+    }
+    pending.shown.add(file);
+    drawEditor();
+    if (!file.id || pending.texts.has(file.id)) return;
+    const mine = session;
+    let text = null;
+    try {
+      const sent = await fetch(evidenceUrl(file));
+      if (mine !== session) return;
+      if (sent.ok) text = await sent.text();
+      else refuse(await messageOf(sent, "The service could not read this file. Try View again."));
+    } catch {
+      if (mine === session) refuse("The connection was interrupted. Try View again.");
+    }
+    if (mine !== session) return;
+    if (text === null) pending.shown.delete(file);
+    else pending.texts.set(file.id, text);
+    drawEditor();
+  };
+  const evidenceLine = (file, index) => {
+    const text = file.id ? pending.texts.get(file.id) : file.text;
+    const shown = pending.shown.has(file);
+    return h("li", {},
+      h("span", {}, h("b", {}, file.name), file.reading ? " · Reading…" : ` · ${textFile.size(file.size_bytes)}`),
+      h("span", { class: "line-actions" },
+        h("select", { id: `evidence-class-${index}`, "aria-label": `Kind of evidence of ${file.name}`, disabled: Boolean(file.reading),
+          on: { change: (event) => { file.class = event.target.value; drawEditor(); } } },
+        ...PAGE.evidence_classes.map((row) => h("option", { value: row.id, selected: row.id === file.class }, row.label))),
+        file.reading ? null : h("button", { type: "button", class: "quiet", id: `evidence-view-${index}`, "aria-expanded": String(shown),
+          "aria-controls": shown ? `evidence-text-${index}` : null, "aria-label": `${shown ? "Hide" : "View"} the file ${file.name}`,
+          on: { click: () => view(file) } }, shown ? "Hide" : "View"),
+        file.id ? h("a", { class: "button quiet", id: `evidence-download-${index}`, href: evidenceUrl(file),
+          "aria-label": `Download the file ${file.name}` }, "Download") : null,
+        h("button", { type: "button", class: "quiet", id: `evidence-replace-${index}`, disabled: Boolean(file.reading),
+          "aria-label": `Replace the file ${file.name}`, on: { click: () => {
+            pending.replacing = file;
+            el("evidence-replace-file").click();
+          } } }, "Replace"),
+        remove(draft.evidence, index, `the file ${file.name}`, "evidence", "evidence-class")),
+      shown ? h("pre", { class: "evidence-text", id: `evidence-text-${index}` }, text ?? "Loading…") : null);
+  };
   const evidenceCard = () => {
     const classPick = h("select", { id: "evidence-class", on: { change: (event) => { pending.evidenceClass = event.target.value; } } },
       ...PAGE.evidence_classes.map((row) => h("option", { value: row.id, selected: row.id === pending.evidenceClass }, row.label)));
-    const fileInput = h("input", { type: "file", id: "evidence-file", on: { change: async (event) => {
+    const fileInput = h("input", { type: "file", id: "evidence-file", on: { change: (event) => {
       const [file] = event.target.files;
       event.target.value = "";
       if (!file) return;
@@ -434,50 +514,41 @@
         refuse(PAGE.at_limit.evidence);
         return;
       }
-      // The file holds its place in the list while the page reads it.
       const entry = { name: file.name.slice(0, limits.name_chars), class: classPick.value, reading: true };
-      const own = draft;
-      const mine = session;
-      own.evidence.push(entry);
-      draw();
-      const read = await textFile.decode(file, limits.max_evidence_bytes);
-      const at = own.evidence.indexOf(entry);
-      if (mine !== session || at < 0) return;
-      if (read.error) {
-        own.evidence.splice(at, 1);
-        refuse(read.error);
-      } else {
-        refuse("");
-        own.evidence[at] = {
-          name: entry.name,
-          class: entry.class,
-          size_bytes: new TextEncoder().encode(read.text).length,
-          text: read.text,
-        };
-      }
-      draw();
+      draft.evidence.push(entry);
+      readEvidence(file, entry, null);
     } } });
-    return card("Evidence", "4 of 4 · optional", "A file that shows the protection, as plain text. The analysis shows it beside the rows above, quotes it beside a ruling and never reads it as a description. With no row, a file has no effect.",
+    // Replace reads a new file into the line it was clicked on, and keeps the
+    // line's kind.
+    const replaceInput = h("input", { type: "file", id: "evidence-replace-file", hidden: true, on: { change: (event) => {
+      const [file] = event.target.files;
+      event.target.value = "";
+      const previous = pending.replacing;
+      pending.replacing = null;
+      const at = draft.evidence.indexOf(previous);
+      if (!file || at < 0) return;
+      const entry = { name: file.name.slice(0, limits.name_chars), class: previous.class, reading: true };
+      draft.evidence[at] = entry;
+      readEvidence(file, entry, previous);
+    } } });
+    return card("Evidence", "4 of 4 · optional", "A file that shows the protection, as plain text. The analysis shows it beside the rows above, quotes it beside a ruling and never reads it as a description. With no row, a file has no effect. View shows a file's text, Download saves a saved file, and Replace reads a new file into the line. Each change takes effect when you save the Control.",
       h("p", { class: "hint", id: "evidence-note" }, "Remove each password, key and token from a file before you add it. The service refuses a file that looks like it holds one, but it does not find every form. A credential that it does not find is saved with the file."),
-      h("ul", { class: "lines", id: "evidence-list" }, ...draft.evidence.map((file, index) => h("li", {},
-        h("span", {}, h("b", {}, file.name), file.reading
-          ? ` · ${CLASS_LABEL[file.class]} · Reading…`
-          : ` · ${CLASS_LABEL[file.class]} · ${textFile.size(file.size_bytes)}`),
-        remove(draft.evidence, index, `the file ${file.name}`, "evidence", "evidence-class")))),
+      h("ul", { class: "lines", id: "evidence-list" }, ...draft.evidence.map(evidenceLine)),
+      replaceInput,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "evidence-class" }, "Kind of evidence"), classPick),
         h("div", {}, h("label", { class: "field-label", for: "evidence-file" }, "File"), fileInput),
         h("span", {})));
   };
 
-  // What a save sends: the document, each held file by its ID, and each new
-  // file with its text. An edit names the `updated_at` it read.
+  // What a save sends: the document, each held file by its ID and its kind,
+  // and each new file with its text. An edit names the `updated_at` it read.
   const saveBody = () => ({
     name: draft.name,
     scope: draft.scope.type === "application" ? { type: "application" } : draft.scope,
     facts: draft.facts.map((fact) => (fact.facets ? { key: fact.key, facets: fact.facets } : { key: fact.key, value: fact.value.trim() })),
     rows: draft.rows,
-    evidence: draft.evidence.map((file) => (file.id ? { id: file.id } : { name: file.name, class: file.class, text: file.text })),
+    evidence: draft.evidence.map((file) => (file.id ? { id: file.id, class: file.class } : { name: file.name, class: file.class, text: file.text })),
     ...(editing === "new" ? {} : { updated_at: draft.updated_at }),
   });
   const reading = () => draft.evidence.some((file) => file.reading);
@@ -510,10 +581,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(saveBody()),
       });
-      const body = await sent.json();
+      const body = sent.ok ? await sent.json() : null;
+      const message = sent.ok ? "" : await messageOf(sent, "The service could not save the Control. Check Controls before you save again.");
       if (mine === session) {
         if (sent.ok) saved = body;
-        else refuse(body.message);
+        else refuse(message);
       }
     } catch {
       if (mine === session) refuse("The connection was interrupted. Check Controls before you save again.");
@@ -710,7 +782,7 @@
       for (const control of picked) {
         const removed = await fetch(`/workspace/controls/${encodeURIComponent(control.id)}`, { method: "DELETE" });
         if (!removed.ok && removed.status !== 404) {
-          show("controls-problem", (await removed.json()).message);
+          show("controls-problem", await messageOf(removed, "The service could not delete the Control. Reload the page."));
           await load();
           return;
         }

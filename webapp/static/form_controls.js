@@ -376,7 +376,7 @@ const formControls = (() => {
         body: JSON.stringify({ alias: name }),
       });
       if (!kept.ok) {
-        refuse((await kept.json()).message);
+        refuse(await messageOf(kept, "The service could not keep the name. Check Controls before you keep the name again."));
         return;
       }
     } catch {

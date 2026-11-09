@@ -409,8 +409,13 @@ it.
   `.cfg` or `.conf` or that starts with `.env.`, a credential name at the start
   of a line counts with any plain value. An empty value, a reference such as
   `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
-  counts as it does in any file. Each line has a "Remove" button. "Save
-  Control" sends the Control, and an edit replaces it and keeps no earlier
+  counts as it does in any file. Each line has a list of its class and the
+  buttons "View", "Replace" and "Remove", and a file that the Control holds
+  also has "Download". A line that the page still reads has no "View".
+  "View" shows the file's text under the line, as plain text. "Download"
+  saves a file that the Control holds. "Replace" reads a new file into the
+  line and keeps its class. "Remove" takes the file out. A change of the
+  class or the file takes effect at the save. "Save Control" sends the Control, and an edit replaces it and keeps no earlier
   version. When the editor has changes that you did not save, another Control
   or "New Control" opens a dialog with "Stay", "Discard changes" and "Save and
   open". The browser also asks before you leave the page with such changes, or
@@ -427,10 +432,17 @@ it.
   `409`. Each save refuses a document that breaks a rule with `400` and the
   rule's sentence, such as "Give the Control a name.", and refuses a name you
   already use, an alias that another scope holds and a save over the count
-  limit with `409`. An evidence file over the byte limit, with a control
+  limit with `409`. A file that the Control holds is sent as its ID and its
+  class, and keeps its text. An evidence file over the byte limit, with a control
   character, with no text or with a credential shape is refused with `400`.
   The credential refusal names the line and the shape, and the service
   redacts nothing.
+  `GET /workspace/controls/{control_id}/evidence/{evidence_id}` answers the
+  text of one file as `text/plain` and as an attachment under the file's name.
+  The service answers only a text that matches the digest that the
+  Control lists. A
+  file of another owner, or a file that the Control does not list, answers
+  `404`.
 - **Delete.** A dialog says that each analysis that applied the Control keeps
   its own copy. `DELETE /workspace/controls/{control_id}` removes the row and
   each evidence file, and keeps nothing. "Delete selected" asks once for the

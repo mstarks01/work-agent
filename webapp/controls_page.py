@@ -231,11 +231,13 @@ class NewEvidence(BaseModel):
 
 
 class HeldEvidence(BaseModel):
-    """An evidence file the Control holds, which the save keeps as it is."""
+    """An evidence file the Control holds, which the save keeps with its text
+    and gives the class the owner chose."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     id: str = Field(pattern=EVIDENCE_ID)
+    evidence_class: EvidenceClass = Field(alias="class")
 
 
 class ControlBody(BaseModel):
@@ -285,7 +287,9 @@ def saved_control(
         if isinstance(sent, HeldEvidence):
             if sent.id not in kept:
                 raise ValueError("The save names an evidence file this Control lacks.")
-            files.append(kept[sent.id])
+            files.append(
+                kept[sent.id].model_copy(update={"evidence_class": sent.evidence_class})
+            )
             continue
         # The digest encodes strict UTF-8 before the store applies
         # control_refusal, so a lone surrogate is refused here, in the words

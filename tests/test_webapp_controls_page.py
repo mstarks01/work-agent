@@ -421,7 +421,7 @@ class TestReplace:
         sent = body(
             name="Orders DB with KMS",
             evidence=[
-                {"id": kept["id"]},
+                {"id": kept["id"], "class": "code"},
                 {"name": "kms.txt", "class": "config", "text": "key = orders\n"},
             ],
         ) | {"updated_at": control["updated_at"]}
@@ -437,7 +437,7 @@ class TestReplace:
     def test_an_edit_that_read_an_old_version_is_refused(self, owner):
         control = create(owner).json()
         first = body(name="First") | {"updated_at": control["updated_at"]}
-        first["evidence"] = [{"id": control["evidence"][0]["id"]}]
+        first["evidence"] = [{"id": control["evidence"][0]["id"], "class": "code"}]
         assert replace(owner, control["id"], first).status_code == 200
         second = replace(owner, control["id"], first | {"name": "Second"})
         assert second.status_code == 409
@@ -454,10 +454,71 @@ class TestReplace:
 
     def test_an_evidence_id_the_control_does_not_hold_is_refused(self, owner):
         control = create(owner).json()
-        sent = body(evidence=[{"id": f"evidence-{'0' * 32}"}]) | {
+        sent = body(evidence=[{"id": f"evidence-{'0' * 32}", "class": "code"}]) | {
             "updated_at": control["updated_at"]
         }
         assert replace(owner, control["id"], sent).status_code == 400
+
+    def test_an_edit_gives_a_held_file_the_class_it_names(self, owner):
+        control = create(owner).json()
+        [kept] = control["evidence"]
+        sent = body(evidence=[{"id": kept["id"], "class": "people"}]) | {
+            "updated_at": control["updated_at"]
+        }
+        replaced = replace(owner, control["id"], sent)
+        assert replaced.status_code == 200, replaced.text
+        assert replaced.json()["evidence"] == [kept | {"class": "people"}]
+        text = asyncio.run(
+            owner.store.read_evidence(control["id"], kept["id"], owner.owner_id())
+        )
+        assert text == "encrypted = on\n"
+
+    def test_a_held_file_with_no_class_is_refused(self, owner):
+        control = create(owner).json()
+        sent = body(evidence=[{"id": control["evidence"][0]["id"]}]) | {
+            "updated_at": control["updated_at"]
+        }
+        assert replace(owner, control["id"], sent).status_code == 400
+
+
+def evidence(owner, control_id: str, evidence_id: str):
+    return owner.client.get(f"/workspace/controls/{control_id}/evidence/{evidence_id}")
+
+
+class TestEvidenceRead:
+    def test_a_file_is_an_attachment_of_plain_text_under_its_name(self, owner):
+        name = 'rds "orders"; filename=x ü.tf'
+        control = create(
+            owner, evidence=[{"name": name, "class": "code", "text": "a = 1\n"}]
+        ).json()
+        [file] = control["evidence"]
+        answered = evidence(owner, control["id"], file["id"])
+        assert answered.status_code == 200
+        assert answered.text == "a = 1\n"
+        assert answered.headers["content-type"] == "text/plain; charset=utf-8"
+        assert answered.headers["x-content-type-options"] == "nosniff"
+        assert answered.headers["content-disposition"] == (
+            'attachment; filename="evidence.txt";'
+            " filename*=UTF-8''rds%20%22orders%22%3B%20filename%3Dx%20%C3%BC.tf"
+        )
+
+    def test_a_file_the_owner_cannot_read_is_missing(self, owner):
+        control = create(owner).json()
+        [file] = control["evidence"]
+        foreign = owner.keep("Theirs", {"type": "application"}, identity=BOB)
+        missing = [
+            evidence(owner, control["id"], f"evidence-{'0' * 32}"),
+            evidence(owner, foreign, file["id"]),
+            evidence(owner, f"control-{'0' * 32}", file["id"]),
+            evidence(owner, control["id"], "evidence-x"),
+            evidence(owner, "control-x", file["id"]),
+        ]
+        assert [answered.status_code for answered in missing] == [404] * 5
+        assert missing[0].json()["message"] == (
+            "This evidence file is no longer in the Control."
+        )
+        assert delete(owner, control["id"]).status_code == 204
+        assert evidence(owner, control["id"], file["id"]).status_code == 404
 
 
 class TestDelete:

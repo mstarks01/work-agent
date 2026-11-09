@@ -656,6 +656,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
             "answer_editor.js",
             "question_list.js",
             "text_file.js",
+            "service_answer.js",
             "form_controls.js",
             "first_run.js",
         )
