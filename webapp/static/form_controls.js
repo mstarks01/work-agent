@@ -223,6 +223,19 @@ const formControls = (() => {
     ? entry.covers
     : entry.choices.find((choice) => choice.id === element)?.covers ?? []);
   const defaultTicks = (candidates) => new Set(candidates.filter((cover) => cover.ticked).map((cover) => cover.element));
+  // The element of each Control's last accepted save on this page, by
+  // Control ID. A zone saved with no ticked part leaves its Control out, and
+  // the service then keeps no element, so the page keeps it here. A Control
+  // with no saved zone is left out as "missing-element", and shows no zone.
+  // The elements belong to one run: an offer from another run forgets them.
+  const targets = new Map();
+  let targetsRun = null;
+  // Record what a save the service accepted sent: each Control it names
+  // keeps its element, and a Control it leaves out keeps none.
+  const accepted = (scopes) => {
+    targets.clear();
+    for (const scope of scopes) if (scope.element) targets.set(scope.control, scope.element);
+  };
   // What the owner chose for each copy, by Control ID: whether it applies,
   // its element, and a zone's ticked parts. Drawn from the service's
   // resolution, and sent whole on each change.
@@ -235,7 +248,9 @@ const formControls = (() => {
         ticks: new Set(resolution.covers.filter((cover) => cover.ticked).map((cover) => cover.element)),
       };
     }
-    return { on: false, element: entry.element ? entry.element.id : "", ticks: defaultTicks(entry.covers) };
+    // A Control left out has no tick saved, so it shows no tick.
+    const target = resolution.reason === "missing-element" ? undefined : targets.get(entry.id);
+    return { on: false, element: target ?? (entry.element ? entry.element.id : ""), ticks: new Set() };
   };
   const scopesOf = (offer, picks) => offer
     .filter((entry) => picks.get(entry.id).on)
@@ -253,6 +268,10 @@ const formControls = (() => {
   // service's answer redraws the offer; `actions.refuse(message)` shows a
   // refusal.
   const drawOffer = (box, data, actions) => {
+    if (data.run !== targetsRun) {
+      targets.clear();
+      targetsRun = data.run;
+    }
     const offer = data.controls || [];
     box.hidden = !offer.length;
     if (!offer.length) return box.replaceChildren();
@@ -271,7 +290,12 @@ const formControls = (() => {
       const resolution = entry.resolution;
       const needsChoice = entry.match === "missing-element";
       const box = h("input", { type: "checkbox", id: `offer-${entry.id}`, checked: pick.on, disabled: needsChoice && !pick.element,
-        on: { change: (event) => { pick.on = event.target.checked; send(); } } });
+        on: { change: (event) => {
+          pick.on = event.target.checked;
+          // A zone ticked on again with no part takes its default ticks.
+          if (pick.on && !pick.ticks.size) pick.ticks = defaultTicks(candidatesOf(entry, pick.element));
+          send();
+        } } });
       const chip = resolution.state === "applied"
         ? (resolution.outcome === "application" ? entry.meaning : `matches ${names.get(resolution.element)}: ${entry.meaning}`)
         : `left out: ${entry.meaning}`;
@@ -296,13 +320,18 @@ const formControls = (() => {
           h("p", { class: "hint" }, "This choice applies to this analysis only. “Keep this name” adds the name to the Control's aliases, so it matches next time.")));
       }
       const candidates = candidatesOf(entry, pick.element);
+      if (candidates.length && !pick.ticks.size) {
+        parts.push(h("p", { class: "hint" }, `Tick each part of the ${names.get(pick.element)} that this Control protects.`));
+      }
       if (candidates.length) {
         parts.push(h("ul", { class: "fanout" }, ...candidates.map((cover) => {
           const tick = h("input", { type: "checkbox", id: `cover-${entry.id}-${cover.element}`, checked: pick.ticks.has(cover.element),
             on: { change: (event) => {
               if (event.target.checked) pick.ticks.add(cover.element);
               else pick.ticks.delete(cover.element);
-              pick.on = pick.ticks.size > 0;
+              // The zone is sent with no tick, so the service says the
+              // Control is left out because no part is ticked.
+              pick.on = true;
               send();
             } } });
           return h("li", {}, tick, " ", h("label", { for: tick.id }, cover.name),
@@ -363,5 +392,5 @@ const formControls = (() => {
   };
 
   const onChange = (handler) => { changed = handler; };
-  return { load, ready, onChange, chosen, drawOffer, drawUsed };
+  return { load, ready, onChange, chosen, drawOffer, accepted, drawUsed };
 })();

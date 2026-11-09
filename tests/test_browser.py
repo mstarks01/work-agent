@@ -3107,6 +3107,164 @@ def test_an_unmatched_control_takes_a_choice_and_keeps_the_name(zoned_page):
     assert control["scope"]["aliases"] == ["Web App"]
 
 
+def test_a_zone_chosen_with_no_tick_keeps_its_parts_for_a_tick(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    body = save_offer(
+        page, lambda: page.select_option(f"#apply-{edge}", "boundary:dmz")
+    )
+    assert body["control_scopes"] == [
+        {"control": edge, "element": "boundary:dmz", "ticked": []}
+    ]
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+    offer = page.locator("#control-offer")
+    assert "Tick each part of the DMZ that this Control protects." in offer.inner_text()
+    assert not page.is_checked(f"#cover-{edge}-store\\:audit-log")
+    body = save_offer(page, lambda: page.check(f"#cover-{edge}-store\\:audit-log"))
+    assert body["control_scopes"] == [
+        {"control": edge, "element": "boundary:dmz", "ticked": ["store:audit-log"]}
+    ]
+    page.wait_for_selector("#control-offer >> text=matches DMZ")
+    assert page.is_checked(f"#offer-{edge}")
+
+
+def test_unticking_the_last_part_keeps_the_zone_with_no_tick(zoned_page):
+    page = zoned_page
+    zone = keep_control(page, "WAF", {"type": "boundary", "name": "Internal Network"})
+    submit_with_controls(page)
+    body = save_offer(page, lambda: page.uncheck(f"#cover-{zone}-process\\:web-app"))
+    assert body["control_scopes"] == [
+        {"control": zone, "element": "boundary:internal-network", "ticked": []}
+    ]
+    offer = page.locator("#control-offer")
+    assert "left out: it is not ticked" in offer.inner_text()
+    assert not page.is_checked(f"#cover-{zone}-process\\:web-app")
+    assert "Tick each part of the Internal Network" in offer.inner_text()
+
+
+def test_ticking_a_zone_control_on_again_restores_its_default_ticks(zoned_page):
+    page = zoned_page
+    zone = keep_control(page, "WAF", {"type": "boundary", "name": "Internal Network"})
+    submit_with_controls(page)
+    save_offer(page, lambda: page.uncheck(f"#offer-{zone}"))
+    body = save_offer(page, lambda: page.check(f"#offer-{zone}"))
+    assert body["control_scopes"] == [
+        {
+            "control": zone,
+            "element": "boundary:internal-network",
+            "ticked": ["process:web-app"],
+        }
+    ]
+    page.wait_for_selector("#control-offer >> text=matches Internal Network")
+    assert page.is_checked(f"#cover-{zone}-process\\:web-app")
+
+
+def test_a_zone_chosen_in_an_earlier_run_leaves_a_later_match(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    with page.expect_response(_post_to_answer) as answered:
+        page.select_option(f"#apply-{edge}", "boundary:dmz")
+    data = answered.value.json()
+    # The next run of an amended description matches the Control's own zone.
+    data["run"] = "job-amended"
+    [entry] = data["controls"]
+    entry |= {
+        "match": "name",
+        "element": {"id": "boundary:internal-network", "name": "Internal Network"},
+        "choices": [],
+        "covers": [
+            {
+                "element": "process:web-app",
+                "name": "Web App",
+                "reason": "stated-zone",
+                "ticked": True,
+            }
+        ],
+        "resolution": {"state": "left-out", "control": edge, "reason": "unticked"},
+    }
+    page.evaluate(
+        """(data) => formControls.drawOffer(document.getElementById("control-offer"),
+          data, {save() {}, refuse() {}})""",
+        data,
+    )
+    assert page.locator(f"#apply-{edge}").count() == 0
+    assert page.locator(f"#cover-{edge}-process\\:web-app").count() == 1
+    assert not page.is_checked(f"#cover-{edge}-process\\:web-app")
+
+
+def test_a_zone_chosen_in_an_earlier_run_is_not_chosen_again(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    with page.expect_response(_post_to_answer) as answered:
+        page.select_option(f"#apply-{edge}", "boundary:dmz")
+    data = answered.value.json()
+    # The next run of an amended description leaves the Control unmatched
+    # again, with the same choices.
+    data["run"] = "job-amended"
+    [entry] = data["controls"]
+    entry["resolution"] = {
+        "state": "left-out",
+        "control": edge,
+        "reason": "missing-element",
+    }
+    page.evaluate(
+        """(data) => formControls.drawOffer(document.getElementById("control-offer"),
+          data, {save() {}, refuse() {}})""",
+        data,
+    )
+    assert page.input_value(f"#apply-{edge}") == ""
+
+
+def test_a_refused_zone_choice_is_not_kept(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    page.route(
+        "**/answer/*",
+        lambda route: (
+            route.abort() if route.request.method == "POST" else route.fallback()
+        ),
+    )
+    page.select_option(f"#apply-{edge}", "boundary:dmz")
+    page.wait_for_selector("#answer-problem:has-text('was not saved')")
+    page.wait_for_selector("#scope-status", state="hidden")
+    assert page.input_value(f"#apply-{edge}") == ""
+
+
+def test_a_refused_change_of_zone_shows_the_saved_zone(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    save_offer(page, lambda: page.select_option(f"#apply-{edge}", "boundary:dmz"))
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+    page.route(
+        "**/answer/*",
+        lambda route: (
+            route.abort() if route.request.method == "POST" else route.fallback()
+        ),
+    )
+    page.select_option(f"#apply-{edge}", "boundary:internal-network")
+    page.wait_for_selector("#answer-problem:has-text('was not saved')")
+    page.wait_for_selector("#scope-status", state="hidden")
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+
+
+def test_turning_off_a_chosen_zone_shows_no_tick(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    save_offer(
+        page,
+        lambda: page.select_option(f"#apply-{edge}", "boundary:internal-network"),
+    )
+    page.wait_for_selector("#control-offer >> text=matches Internal Network")
+    save_offer(page, lambda: page.uncheck(f"#offer-{edge}"))
+    assert page.locator("#control-offer .fanout input:checked").count() == 0
+
+
 def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_page):
     page = zoned_page
     db = {"type": "store", "name": "Orders DB"}
