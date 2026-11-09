@@ -303,7 +303,7 @@
     gate();
   };
 
-  // The question toggle is on the page only where the install can ask.
+  // The question toggle. Every install can pause, so the form always has it.
   const ask = document.getElementById("ask");
   const asked = document.getElementById("asked");
   const questions = document.getElementById("questions");

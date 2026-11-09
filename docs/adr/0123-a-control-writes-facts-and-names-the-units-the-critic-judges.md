@@ -12,6 +12,10 @@
   that no state carries a pass;
   [ADR 0039](0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md), whose
   rule 1 says that a match nobody stated is a placement nobody stated
+- **Amended by**: [ADR 0124](0124-a-control-s-scope-matches-by-element-id-and-the-owner-confirms-it.md)
+  and [ADR 0125](0125-a-control-fills-only-an-open-fact.md), on when the owner
+  confirms a match; [ADR 0126](0126-the-critic-judges-each-control-row-in-a-control-step.md),
+  on the excerpt ground
 
 ## Context
 

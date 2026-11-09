@@ -80,7 +80,7 @@ const formControls = (() => {
   // name holds its text.
   const APPLY = {
     asked: "You confirm what each Control protects when the questions open.",
-    unasked: "Questions are off, so each Control applies where its name or an alias matches a part, with no check by you. A zone covers only the parts that a source places in it. A Control that matches nothing is left out. The report says what each Control did.",
+    unasked: "Questions are off, so your Controls apply with no check by you. A Control of the whole application always applies. A Control of a part or a zone applies where its name or an alias matches, and a zone covers only the parts that a source places in it. A Control that covers no part is left out. The report says what each Control did.",
   };
   const drawChecklist = () => {
     const focused = document.activeElement?.id;
@@ -124,10 +124,10 @@ const formControls = (() => {
       missing.length ? h("span", { class: "hint" }, ` ${counted(missing.length, "ticked Control is", "ticked Controls are")} missing.`) : null,
     ].filter(Boolean));
     // How a ticked Control applies: the owner confirms each match at the
-    // pause, or, with the questions off or absent, the default resolution
-    // applies it with no check (ADR 0125).
+    // pause, or, with the questions off, the default resolution applies it
+    // with no check (ADR 0125).
     el("controls-apply").textContent = !names.length ? ""
-      : el("ask")?.checked ? APPLY.asked : APPLY.unasked;
+      : el("ask").checked ? APPLY.asked : APPLY.unasked;
     const known = state === "loaded";
     // Until a good read, the operator's choice decides what the line says.
     const view = !known && declined ? "declined" : state;
@@ -206,7 +206,7 @@ const formControls = (() => {
     el("controls-retry").focus();
   });
   el("frameworks")?.addEventListener("change", drawChecklist);
-  el("ask")?.addEventListener("change", drawChecklist);
+  el("ask").addEventListener("change", drawChecklist);
   // The IDs a submission sends, or nothing where none is ticked. A Control
   // that does not fit the selected frameworks stays ticked for later, but
   // goes with no submission.

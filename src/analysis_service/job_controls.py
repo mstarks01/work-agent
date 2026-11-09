@@ -905,7 +905,9 @@ def refuse_disagreement(
 
     Each Control's written facts take the answer check of
     :func:`~analysis_service.fact_writes.check_fact_answers` (ADR 0125), and
-    the refusal names the Control.
+    the refusal names the Control. A two-value refusal names both Controls,
+    each beside its value. The job keeps its own copy of each Control, so the
+    owner unticks one; an edit in Controls changes only a later analysis.
     """
     for entry in entries:
         written = [fact.answer for fact in entry.facts if fact.state == "written"]
@@ -913,20 +915,20 @@ def refuse_disagreement(
             check_fact_answers(written, model, catalog, reopen=True)
         except ValueError as exc:
             raise ValueError(f"The Control “{entry.name}” cannot apply: {exc}") from exc
-    first: dict[tuple[str, ...], tuple[str, FactAnswer]] = {}
+    first: dict[tuple[str, ...], tuple[ControlFacts, FactAnswer]] = {}
     for entry in entries:
         for fact in entry.writes():
-            control, earlier = first.setdefault(fact.key, (entry.control, fact))
-            if control == entry.control or not _disagree(earlier, fact):
+            writer, earlier = first.setdefault(fact.key, (entry, fact))
+            if writer.control == entry.control or not _disagree(earlier, fact):
                 continue
             ref = key_ref(fact.key)
             element = model.get(ref.element_id)
             place = ref.element_id if element is None else element.name
             subject = ref.attribute or ref.question
             raise ValueError(
-                f"Two Controls write “{subject}” on {place} with two values:"
-                f" “{earlier.value}” and “{fact.value}”. Untick one, or edit one"
-                " Control so that they agree."
+                f"The Controls “{writer.name}” and “{entry.name}” write “{subject}”"
+                f" on {place} with two values: “{earlier.value}” and"
+                f" “{fact.value}”. Untick one of them, then continue."
             )
 
 

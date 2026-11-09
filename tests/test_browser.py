@@ -3668,8 +3668,9 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
         "#control-offer"
     )
     message = (
-        "Two Controls write “encryption_at_rest” on Orders DB with two values:"
-        " “KMS” and “AES-256”. Untick one, or edit one Control so that they agree."
+        "The Controls “KMS” and “AES” write “encryption_at_rest” on Orders DB"
+        " with two values: “KMS” and “AES-256”. Untick one of them, then"
+        " continue."
     )
     page.click("#continue")
     page.wait_for_selector("#answer-problem:not([hidden])")
@@ -3964,8 +3965,8 @@ def test_the_controls_line_says_how_the_controls_apply(zoned_page):
     )
     page.uncheck("#ask")
     assert page.inner_text("#controls-apply").startswith(
-        "Questions are off, so each Control applies where its name or an alias"
-        " matches a part, with no check by you."
+        "Questions are off, so your Controls apply with no check by you. A"
+        " Control of the whole application always applies."
     )
     page.click("#controls-choose")
     page.click("#controls-none")
