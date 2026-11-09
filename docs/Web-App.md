@@ -370,9 +370,10 @@ it.
   its place, such as "1 of 4", says when it is optional or required, and keeps
   its description behind a "?" beside its title. A new Control starts with
   nothing chosen in "What it protects", and "What it does" asks for that
-  choice first. A Control of the whole application states no fact, so its
-  "What it covers" is required; for a part it is optional, because a fact
-  alone is a Control. "What it covers" takes a row
+  choice first. A Control needs at least one fact or one row, so "What it
+  covers" is required while no protection is ticked. A Control of the whole
+  application states no fact, so it always needs a row. "What it covers"
+  takes a row
   by framework and unit, and the row keeps the package version. Each unit's
   label comes from its package's catalog when the page loads. A note shows
   under the rows when the Control does not cover the whole application and a row
@@ -388,8 +389,7 @@ it.
   snapshots." or "The internet cannot reach it.". Each tick writes the
   answer that makes its fact a protection: a Question Kind or one of its
   facets, the exposure `internal`, or the encryption at rest. "Encrypts its
-  data at rest." also takes how the part does it. A Control of the whole
-  application states no fact. The service refuses every other fact and every
+  data at rest." also takes how the part does it. The service refuses every other fact and every
   answer that states a weakness or nothing, because a Control states only a
   protection. "Evidence" takes a
   plain text file and its class: Configuration, Code or People. The page

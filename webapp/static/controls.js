@@ -231,7 +231,7 @@
             else if (removed) removed.after = after;
             drawEditor();
           } } },
-          h("option", { value: "", disabled: true, selected: !draft.scope.type }, "Choose what it protects"),
+          draft.scope.type ? null : h("option", { value: "", disabled: true, selected: true }, "Choose what it protects"),
           ...PAGE.scope_types.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
         named ? h("div", {}, h("label", { class: "field-label", for: "scope-name" }, "Its name in your descriptions"),
           h("input", { type: "text", id: "scope-name", maxlength: limits.name_chars, value: draft.scope.name,
@@ -325,11 +325,15 @@
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
     // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
-    const whole = draft.scope.type === "application";
-    const unplaced = whole || !draft.scope.type ? []
+    // The service needs a fact or a row (ADR 0123), so a chosen scope with
+    // no fact needs a row. The whole application states no fact.
+    const required = Boolean(draft.scope.type) && !draft.facts.length;
+    const unplaced = draft.scope.type === "application" || !draft.scope.type ? []
       : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
-    return card("What it covers", whole ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
-      whole ? h("p", { class: "hint" }, "Add at least one unit. The analysis judges each one against its findings.") : null,
+    return card("What it covers", required ? "3 of 4 · required" : "3 of 4 · optional", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
+      required ? h("p", { class: "hint" }, draft.scope.type === "application"
+        ? "Add at least one unit. The analysis judges each one against its findings."
+        : "Tick a protection above, or add at least one unit.") : null,
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`, "row", "row-framework")))),

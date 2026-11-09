@@ -3080,8 +3080,20 @@ def test_a_new_control_starts_with_what_it_protects(page):
     )
     assert does.inner_text().endswith("It works through the units it covers.")
     page.select_option("#scope-type", "store")
+    covers = page.locator(".q-card:has(h3:text-is('What it covers'))")
+    assert "3 of 4 · required" in page.locator(".editor .card-step").all_inner_texts()
+    assert "Tick a protection above, or add at least one unit." in covers.inner_text()
+    tick(page, "Encrypts its data at rest.", "AES-256")
     assert "3 of 4 · optional" in page.locator(".editor .card-step").all_inner_texts()
+    assert "Tick a protection above" not in covers.inner_text()
     assert page.locator("#scope-name").count() == 1
+
+
+def test_an_existing_control_lists_no_placeholder(page):
+    _two_kept_controls(page)
+    page.click('button[aria-label="Edit A"]')
+    assert page.input_value("#scope-type") == "application"
+    assert page.locator("#scope-type option[value='']").count() == 0
 
 
 def test_the_evidence_card_asks_the_owner_to_remove_each_credential(page):
