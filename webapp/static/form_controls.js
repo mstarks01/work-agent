@@ -224,10 +224,11 @@ const formControls = (() => {
     : entry.choices.find((choice) => choice.id === element)?.covers ?? []);
   const defaultTicks = (candidates) => new Set(candidates.filter((cover) => cover.ticked).map((cover) => cover.element));
   // The zone the owner chose for a Control on this page, by Control ID. A
-  // zone with no ticked part leaves its Control out, and the service then
-  // keeps no element, so the page keeps the choice until the owner ticks a
-  // part or chooses "Not this time". The choices belong to one run: an
-  // offer from another run forgets them.
+  // zone saved with no ticked part leaves its Control out, and the service
+  // then keeps no element, so the page keeps the choice. A Control with no
+  // saved zone is left out as "missing-element", so after a refused save or
+  // with its top box off, the page shows no zone. The choices belong to one
+  // run: an offer from another run forgets them.
   const targets = new Map();
   let targetsRun = null;
   // What the owner chose for each copy, by Control ID: whether it applies,
@@ -242,11 +243,9 @@ const formControls = (() => {
         ticks: new Set(resolution.covers.filter((cover) => cover.ticked).map((cover) => cover.element)),
       };
     }
-    // A Control left out as "unticked" has no tick saved: its top box is
-    // off, or its zone has no ticked part. It shows no tick.
-    const element = targets.get(entry.id) ?? (entry.element ? entry.element.id : "");
-    const ticks = resolution.reason === "unticked" ? new Set() : defaultTicks(candidatesOf(entry, element));
-    return { on: false, element, ticks };
+    // A Control left out has no tick saved, so it shows no tick.
+    const target = resolution.reason === "missing-element" ? undefined : targets.get(entry.id);
+    return { on: false, element: target ?? (entry.element ? entry.element.id : ""), ticks: new Set() };
   };
   const scopesOf = (offer, picks) => offer
     .filter((entry) => picks.get(entry.id).on)

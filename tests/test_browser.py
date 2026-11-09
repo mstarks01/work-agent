@@ -3218,6 +3218,35 @@ def test_a_zone_chosen_in_an_earlier_run_is_not_chosen_again(zoned_page):
     assert page.input_value(f"#apply-{edge}") == ""
 
 
+def test_a_refused_zone_choice_is_not_kept(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    page.route(
+        "**/answer/*",
+        lambda route: (
+            route.abort() if route.request.method == "POST" else route.fallback()
+        ),
+    )
+    page.select_option(f"#apply-{edge}", "boundary:dmz")
+    page.wait_for_selector("#answer-problem:has-text('was not saved')")
+    page.wait_for_selector("#scope-status", state="hidden")
+    assert page.input_value(f"#apply-{edge}") == ""
+
+
+def test_turning_off_a_chosen_zone_shows_no_tick(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    submit_with_controls(page)
+    save_offer(
+        page,
+        lambda: page.select_option(f"#apply-{edge}", "boundary:internal-network"),
+    )
+    page.wait_for_selector("#control-offer >> text=matches Internal Network")
+    save_offer(page, lambda: page.uncheck(f"#offer-{edge}"))
+    assert page.locator("#control-offer .fanout input:checked").count() == 0
+
+
 def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_page):
     page = zoned_page
     db = {"type": "store", "name": "Orders DB"}
