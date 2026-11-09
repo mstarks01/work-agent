@@ -97,7 +97,8 @@
     el("control-name").focus();
   };
   // Closing the editor from inside it moves focus to the edited Control's
-  // Edit button, or to New Control.
+  // Edit button, to New Control, or to the search field when New Control is
+  // off.
   const stopEdit = () => {
     const was = editing;
     const inside = el("editor").contains(document.activeElement);
@@ -337,7 +338,8 @@
       return;
     }
     // The locked editor drops focus: a save that fails gives it back, and
-    // one that succeeds moves it to the saved Control's Edit button.
+    // one that succeeds moves it to the saved Control's Edit button. Focus
+    // the owner moved elsewhere during the save stays where it is.
     const focused = document.activeElement?.id;
     const inside = el("editor").contains(document.activeElement);
     saving = true;
@@ -362,13 +364,13 @@
     }
     if (!saved) {
       draw();
-      if (focused) el(focused)?.focus();
+      if (focused && document.activeElement === document.body) el(focused)?.focus();
       return;
     }
     stopEdit();
     show("controls-notice", `“${saved.name}” is saved.`);
     await load();
-    if (inside) focusFirst(`edit-${saved.id}`, "new-control", "controls-search");
+    if (inside && document.activeElement === document.body) focusFirst(`edit-${saved.id}`, "new-control", "controls-search");
   };
   const editor = () => h("fieldset", { class: "editor", disabled: saving },
     h("h2", {}, editing === "new" ? "New Control" : `Edit “${draft.name}”`),
@@ -505,7 +507,8 @@
     deleting = [];
     el("delete-dialog").close();
     // After a delete, focus goes to the row now in the first deleted row's
-    // place, the row before it, or New Control.
+    // place, the row before it, New Control, or the search field when New
+    // Control is off.
     const at = shownControls().findIndex((control) => picked.some((one) => one.id === control.id));
     try {
       for (const control of picked) {

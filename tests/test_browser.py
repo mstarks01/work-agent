@@ -2817,6 +2817,21 @@ def test_a_delete_with_new_control_off_moves_focus_to_search(page):
     page.wait_for_function("() => document.activeElement?.id === 'controls-search'")
 
 
+def test_focus_moved_during_a_save_stays(page):
+    _two_kept_controls(page)
+    held = _hold(page, "**/workspace/controls/*")
+    page.click('button[aria-label="Edit A"]')
+    page.focus("#save-control")
+    page.keyboard.press("Enter")
+    _wait_for(page, held)
+    page.focus("#controls-search")
+    with page.expect_response("**/workspace/controls/*"):
+        held[0].continue_()
+    page.wait_for_selector("#controls-notice:has-text('is saved')")
+    page.wait_for_selector('button[aria-label="Edit A"]:enabled')
+    assert page.evaluate("document.activeElement.id") == "controls-search"
+
+
 def test_a_failed_save_gives_focus_back(page):
     _two_kept_controls(page)
     page.route(
