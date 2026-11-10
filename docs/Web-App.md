@@ -265,7 +265,7 @@ STRIDE finding's category is its STRIDE category. The severity and the
 mitigation cells come from the record's own fields, through `JUDGEMENT_CELLS`
 in `webapp/report_export.py`. A record that declares no such field leaves that
 cell empty. The `controls` cell names each Control row that ruled on the finding,
-and its ruling. A `=`, `+`, `-` or `@`, or its full-width form, at the start of
+as `Control name (unit, version X): ruling`, with ` | ` between two rows. A `=`, `+`, `-` or `@`, or its full-width form, at the start of
 a cell, or after a `;`, a tab or a line break, also behind quote marks, gets an
 apostrophe first, and so does a cell that starts with a tab or a line break. So
 a line of a cell that starts with a hyphen shows an apostrophe. A spreadsheet
