@@ -108,7 +108,7 @@ def test_a_run_in_progress_answers_with_its_progress_line_on_each_read(tiers):
         line = detail["progress"]
         assert line == {
             "stage": 1,
-            "words": STEP_PROGRESS["extract"].words,
+            "words": STEP_PROGRESS["extract"].words["to-questions"],
             "seq": line["seq"],
         }
         again = client.get(f"/workspace/runs/{run}").json()

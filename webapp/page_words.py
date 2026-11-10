@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Literal, NamedTuple
+from typing import Any, Literal, NamedTuple, TypeVar
 
 from analysis_service.answer_state import EmptyListReason
 from analysis_service.claims import (
@@ -235,67 +235,89 @@ def progress_mode(asks: bool) -> ProgressMode:
     return "to-questions" if asks else "to-report"
 
 
-#: What the progress line says before the first step of a run completes. A
-#: page that starts a run from a description shows the ``to-questions`` words
-#: in each mode.
-INITIAL_PROGRESS_WORDS: Mapping[ProgressMode, str] = MappingProxyType(
+#: What a run does first: it reads a description, or it is a **Resumed Job**
+#: and starts from the model of the job it resumes.
+RunStart = Literal["description", "resumption"]
+
+
+def run_start_of(resumed: bool) -> RunStart:
+    """What a **Resumed Job** does first, or what each other run does first.
+    ``tests/test_progress_words.py`` holds the answer to
+    :func:`~analysis_service.pipeline.entry_of`."""
+    return "resumption" if resumed else "description"
+
+
+#: What the progress line says before the first step of a run completes. The
+#: page starts a run only from a description, and reads the ``description``
+#: row for it.
+INITIAL_PROGRESS_WORDS: Mapping[RunStart, str] = MappingProxyType(
     {
-        "to-questions": (
+        "description": (
             "Reading your description and identifying the parts of your system…"
         ),
-        "to-report": "Preparing the analysis…",
+        "resumption": "Preparing the analysis…",
     }
 )
 
 
+_T = TypeVar("_T")
+
+
+def _by_mode(to_questions: _T, to_report: _T) -> Mapping[ProgressMode, _T]:
+    return MappingProxyType({"to-questions": to_questions, "to-report": to_report})
+
+
 class StepProgress(NamedTuple):
-    """What the progress line shows when one step completes."""
+    """What the progress line shows when one step completes, in each mode."""
 
     #: The work that follows the step.
-    words: str
-    #: The count of stages that are complete, in each mode.
+    words: Mapping[ProgressMode, str]
+    #: The count of stages that are complete.
     stages: Mapping[ProgressMode, int]
 
 
-def _stages(to_questions: int, to_report: int) -> Mapping[ProgressMode, int]:
-    return MappingProxyType({"to-questions": to_questions, "to-report": to_report})
+def _step(words: str, to_questions: int, to_report: int) -> StepProgress:
+    """A step that names the same work in each mode."""
+    return StepProgress(_by_mode(words, words), _by_mode(to_questions, to_report))
 
 
 _CHECKING_MAP = "Checking the system map for gaps or conflicting details…"
 _NOTING_MEASURES = "Noting the security measures you’ve already described…"
 _IDENTIFYING_DETAILS = "Identifying details that would make the analysis more precise…"
-_GENERATING_QUESTIONS = "Generating questions…"
 _EXAMINING = "Examining your system against the selected frameworks…"
 _CHECKING_FINDINGS = "Bringing the results together and checking the findings…"
+#: The work at the end of a run that pauses. A run to the report pauses only
+#: for its Controls, and asks no question (ADR 0125).
+_PAUSING = _by_mode("Generating questions…", "Preparing your Controls…")
 
-#: The progress of each step. Each quarter of the bar marks a completed stage,
-#: not a share of elapsed time. A run that the ``reject`` step ends shows its
-#: refusal, and its row completes no stage.
+#: The progress of each step. The bar counts completed stages, not a share of
+#: elapsed time. A run that the ``reject`` step ends shows its refusal, and its
+#: row completes no stage. A run that asks ends at ``catalog`` or at ``pause``,
+#: never at both, so each of the two completes the last two stages and fills
+#: the bar.
 STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
     {
-        "extract": StepProgress(_CHECKING_MAP, _stages(1, 1)),
-        "repair": StepProgress(_CHECKING_MAP, _stages(2, 2)),
-        "validate": StepProgress(_NOTING_MEASURES, _stages(2, 2)),
-        "revalidate": StepProgress(_NOTING_MEASURES, _stages(2, 2)),
-        "reject": StepProgress("Continuing the analysis…", _stages(0, 0)),
-        "capabilities": StepProgress(_IDENTIFYING_DETAILS, _stages(2, 2)),
-        "stated": StepProgress(_IDENTIFYING_DETAILS, _stages(2, 2)),
-        "read": StepProgress(_IDENTIFYING_DETAILS, _stages(2, 2)),
-        "assert": StepProgress(
-            "Choosing the relevant checks for your system…", _stages(2, 2)
-        ),
-        "catalog": StepProgress(_GENERATING_QUESTIONS, _stages(3, 0)),
-        "pause": StepProgress(_GENERATING_QUESTIONS, _stages(4, 0)),
-        "prepare": StepProgress(_EXAMINING, _stages(0, 2)),
-        "analyze": StepProgress(_EXAMINING, _stages(0, 0)),
-        "join": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "merge": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "critic": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "router": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "recritic": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "rereview": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "critic_failed": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
-        "assemble": StepProgress("Putting your report together…", _stages(0, 4)),
+        "extract": _step(_CHECKING_MAP, 1, 1),
+        "repair": _step(_CHECKING_MAP, 2, 2),
+        "validate": _step(_NOTING_MEASURES, 2, 2),
+        "revalidate": _step(_NOTING_MEASURES, 2, 2),
+        "reject": _step("Continuing the analysis…", 0, 0),
+        "capabilities": _step(_IDENTIFYING_DETAILS, 2, 2),
+        "stated": _step(_IDENTIFYING_DETAILS, 2, 2),
+        "read": _step(_IDENTIFYING_DETAILS, 2, 2),
+        "assert": _step("Choosing the relevant checks for your system…", 2, 2),
+        "catalog": StepProgress(_PAUSING, _by_mode(4, 0)),
+        "pause": StepProgress(_PAUSING, _by_mode(4, 0)),
+        "prepare": _step(_EXAMINING, 0, 2),
+        "analyze": _step(_EXAMINING, 0, 0),
+        "join": _step(_CHECKING_FINDINGS, 0, 3),
+        "merge": _step(_CHECKING_FINDINGS, 0, 3),
+        "critic": _step(_CHECKING_FINDINGS, 0, 3),
+        "router": _step(_CHECKING_FINDINGS, 0, 3),
+        "recritic": _step(_CHECKING_FINDINGS, 0, 3),
+        "rereview": _step(_CHECKING_FINDINGS, 0, 3),
+        "critic_failed": _step(_CHECKING_FINDINGS, 0, 3),
+        "assemble": _step("Putting your report together…", 0, 4),
     }
 )
 
@@ -306,22 +328,53 @@ STAGE_COUNT = max(
 
 
 def progress_after(
-    nodes: Sequence[str], frameworks: Sequence[FrameworkName], mode: ProgressMode
+    nodes: Sequence[str],
+    frameworks: Sequence[FrameworkName],
+    mode: ProgressMode,
+    start: RunStart,
 ) -> dict[str, object]:
     """The progress line after ``nodes`` completed, in order, in a run of
-    ``frameworks``: the count of complete stages and the words of the work
-    that follows. Raises :class:`KeyError` on a name that is not a node of a
-    graph of ``frameworks``."""
+    ``frameworks`` that does ``start`` first: the count of complete stages and
+    the words of the work that follows. Raises :class:`KeyError` on a name
+    that is not a node of a graph of ``frameworks``."""
     steps = step_by_graph_node(frameworks)
     completed = [STEP_PROGRESS[steps[node]] for node in nodes]
     return {
         "stage": max((progress.stages[mode] for progress in completed), default=0),
-        "words": completed[-1].words if completed else INITIAL_PROGRESS_WORDS[mode],
+        "words": (
+            completed[-1].words[mode] if completed else INITIAL_PROGRESS_WORDS[start]
+        ),
     }
 
 
+#: A line of the progress panel that the page chooses: the words while the
+#: service continues a job with the answers of the owner or with its Controls
+#: alone, the count of complete stages, and the time on one step.
+ProgressPanelLine = Literal[
+    "continues-with-answers",
+    "continues-with-controls",
+    "stages-complete",
+    "still-working",
+]
+
+#: The words of each line of the progress panel that the page chooses.
+#: ``{complete}`` and ``{count}`` stand for the complete stages and the stages
+#: of a run, and ``{clock}`` for the minutes and seconds on the step.
+PROGRESS_PANEL_WORDS: Mapping[ProgressPanelLine, str] = MappingProxyType(
+    {
+        "continues-with-answers": "Using your answers to continue the analysis…",
+        "continues-with-controls": "Continuing with your Controls…",
+        "stages-complete": "{complete} of {count} stages complete",
+        "still-working": (
+            "Still working on this step · {clock}. Some steps take a few minutes."
+        ),
+    }
+)
+
 #: The keys of the ``form_words`` island, as the form scripts read them.
-FormTable = Literal["page_status", "gate_notes", "empty_list", "progress_start"]
+FormTable = Literal[
+    "page_status", "gate_notes", "empty_list", "progress_start", "progress_panel"
+]
 
 #: Every table the form page reads, by its key in the ``form_words`` island.
 FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
@@ -330,6 +383,7 @@ FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
         "gate_notes": GATE_NOTES,
         "empty_list": EMPTY_LIST_REASONS,
         "progress_start": INITIAL_PROGRESS_WORDS,
+        "progress_panel": PROGRESS_PANEL_WORDS,
     }
 )
 

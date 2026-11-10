@@ -33,7 +33,8 @@ FORM_TABLES = {
     "PAGE_STATUS_LABELS": page_words.PageStatus,
     "GATE_NOTES": PreconditionResult,
     "EMPTY_LIST_REASONS": EmptyListReason,
-    "INITIAL_PROGRESS_WORDS": page_words.ProgressMode,
+    "INITIAL_PROGRESS_WORDS": page_words.RunStart,
+    "PROGRESS_PANEL_WORDS": page_words.ProgressPanelLine,
 }
 
 REPORT_TABLES = {
@@ -210,8 +211,10 @@ def test_a_table_that_an_answer_carries_names_its_set_and_has_no_copy(
 
 
 def test_each_template_holds_only_the_fields_its_script_fills():
-    """A script fills ``{name}`` of a gate note and ``{held_back}`` of an
-    empty-list reason. A field with another name shows as its braces."""
+    """A script fills ``{name}`` of a gate note, ``{held_back}`` of an
+    empty-list reason, and ``{clock}``, ``{complete}`` and ``{count}`` of the
+    lines of the progress panel. A field with another name shows as its
+    braces."""
     fields = {
         name: set(re.findall(r"\{(\w+)\}", " ".join(_texts(dict(table)))))
         for name, table in page_words.FORM_WORDS.items()
@@ -221,7 +224,14 @@ def test_each_template_holds_only_the_fields_its_script_fills():
         "gate_notes": {"name"},
         "empty_list": {"held_back"},
         "progress_start": set(),
+        "progress_panel": {"clock", "complete", "count"},
     }
+    panel = page_javascript("workspace.js")
+    assert '["still-working"].replace("{clock}", clock)' in panel
+    assert (
+        '["stages-complete"].replace("{complete}", progress.value)'
+        '.replace("{count}", progress.max)'
+    ) in panel
     script = page_javascript("first_run.js")
     assert 'gate_notes[state].replace("{name}", name)' in script
     assert 'empty_list[data.early_stop].replace("{held_back}", heldBack)' in script

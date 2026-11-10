@@ -31,9 +31,10 @@ const workspace = (() => {
     if (className) item.className = className;
     return item;
   };
-  // The label of each page status, from the service
-  // (webapp.page_words.PAGE_STATUS_LABELS).
-  const labels = JSON.parse(document.getElementById("form_words").textContent).page_status;
+  // The words for each value of a closed service set, from the service
+  // (webapp.page_words.FORM_WORDS).
+  const FORM_WORDS = JSON.parse(document.getElementById("form_words").textContent);
+  const labels = FORM_WORDS.page_status;
   const message = (text) => { el("workspace-message").textContent = text; };
   const metadata = (data) => {
     el("description").readOnly = true;
@@ -318,7 +319,7 @@ const workspace = (() => {
         el("status").hidden = false;
         processing(data.progress, undefined, data.run);
         // The service continues a job with Controls and no questions at its pause.
-        if (data.continuing) el("status-text").textContent = "Continuing with your Controls…";
+        if (data.continuing) el("status-text").textContent = FORM_WORDS.progress_panel["continues-with-controls"];
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (view === "description") {
         show("description-panel");
@@ -372,7 +373,7 @@ const workspace = (() => {
     }
     const seconds = Math.floor((Date.now() - stepStarted) / 1000);
     const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-    el("status-elapsed").textContent = `Still working on this step · ${clock}. Some steps take a few minutes.`;
+    el("status-elapsed").textContent = FORM_WORDS.progress_panel["still-working"].replace("{clock}", clock);
   };
   // Show the progress line of the run. `sent` is the line the service sends:
   // its count of complete stages, its words (webapp.page_words) and the
@@ -391,7 +392,7 @@ const workspace = (() => {
       progress.value = Math.max(progress.value, sent.stage);
       if (sent.seq > (sentLine?.seq ?? -1)) sentLine = sent;
     }
-    const complete = `${progress.value} of ${progress.max} stages complete`;
+    const complete = FORM_WORDS.progress_panel["stages-complete"].replace("{complete}", progress.value).replace("{count}", progress.max);
     progress.setAttribute("aria-valuetext", complete);
     const status = sentLine?.words ?? initialWords;
     el("status-text").textContent = `${complete} · ${status}`;

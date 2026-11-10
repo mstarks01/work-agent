@@ -7,18 +7,21 @@ each selection and hold each node of it to a row. No page script names a node.
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import json
 import re
 import threading
 import time
-from typing import get_args
+from typing import NamedTuple, get_args
 
 import pytest
 
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
+from analysis_service.jobs import JobRecord, Resumption
+from analysis_service.pipeline import entry_of
 from tests import test_webapp
 from tests.factories import scripted_pipeline
 from tests.test_page_words import _copies
@@ -35,12 +38,15 @@ from webapp.page_words import (
     STAGE_COUNT,
     STEP_PROGRESS,
     ProgressMode,
+    RunStart,
     progress_after,
+    run_start_of,
 )
 
 tiers = test_webapp.tiers
 
 MODES: tuple[ProgressMode, ...] = get_args(ProgressMode)
+STARTS: tuple[RunStart, ...] = get_args(RunStart)
 
 #: Each selection of one package, and the selection of every package.
 SELECTIONS: list[tuple[FrameworkName, ...]] = [
@@ -56,10 +62,19 @@ OTHER_MEANINGS = {
 }
 
 
-def built_node_names(selection: tuple[FrameworkName, ...]) -> list[set[str]]:
-    """The node names of each graph that ``build_pipeline`` builds for
-    ``selection``: one graph for each entry and each pair of pass switches
-    that the builder admits."""
+class BuiltGraph(NamedTuple):
+    """One graph that ``build_pipeline`` builds."""
+
+    entry: graph.Entry
+    #: The name of each node but the start.
+    nodes: set[str]
+    #: The name of each node that no edge leaves.
+    ends: set[str]
+
+
+def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
+    """Each graph that ``build_pipeline`` builds for ``selection``: one graph
+    for each entry and each pair of pass switches that the builder admits."""
     graphs = []
     for entry, assertions, capability_reader in itertools.product(
         get_args(graph.Entry), (False, True), (False, True)
@@ -75,9 +90,17 @@ def built_node_names(selection: tuple[FrameworkName, ...]) -> list[set[str]]:
         except ValueError:
             # The builder refuses a pass that the entry cannot hold.
             continue
-        nodes = built.workflow.graph.nodes  # type: ignore[union-attr]
-        graphs.append({node.name for node in nodes} - {graph.START.name})
+        workflow = built.workflow.graph
+        assert workflow is not None
+        nodes = {node.name for node in workflow.nodes} - {graph.START.name}
+        left = {edge.from_node.name for edge in workflow.edges}
+        graphs.append(BuiltGraph(entry, nodes, nodes - left))
     return graphs
+
+
+def built_node_names(selection: tuple[FrameworkName, ...]) -> list[set[str]]:
+    """The node names of each graph of ``selection``."""
+    return [built.nodes for built in built_graphs(selection)]
 
 
 def test_the_table_names_each_step():
@@ -111,7 +134,7 @@ def test_each_name_with_a_step_is_a_node_of_a_built_graph():
 @pytest.mark.parametrize("selection", SELECTIONS, ids="+".join)
 def test_each_node_of_each_built_graph_has_a_progress_line(selection, mode):
     for node in set().union(*built_node_names(selection)):
-        line = progress_after([node], selection, mode)
+        line = progress_after([node], selection, mode, "description")
         assert line["stage"] in range(STAGE_COUNT + 1), node
         assert line["words"], node
 
@@ -123,24 +146,120 @@ def test_the_stand_in_runner_names_only_shared_nodes():
 
 def test_a_name_that_is_no_node_of_the_selection_raises():
     with pytest.raises(KeyError):
-        progress_after(["analyze_spoofing"], tuple(PACKAGES), "to-report")
+        progress_after(
+            ["analyze_spoofing"], tuple(PACKAGES), "to-report", "description"
+        )
 
 
+@pytest.mark.parametrize("start", STARTS)
 @pytest.mark.parametrize("mode", MODES)
-def test_each_mode_starts_at_no_stage_and_ends_at_the_stage_count(mode):
-    assert progress_after([], tuple(PACKAGES), mode) == {
+def test_a_run_starts_at_no_stage_with_the_words_of_what_it_does_first(mode, start):
+    """The start words follow what the run does first, in each mode."""
+    assert progress_after([], tuple(PACKAGES), mode, start) == {
         "stage": 0,
-        "words": INITIAL_PROGRESS_WORDS[mode],
+        "words": INITIAL_PROGRESS_WORDS[start],
     }
-    assert STAGE_COUNT == max(row.stages[mode] for row in STEP_PROGRESS.values())
+
+
+#: The steps that end a run with no report and no pause: a refused
+#: description, and a critic that failed.
+FAILED_ENDS = {"reject", "critic_failed"}
+
+
+@pytest.mark.parametrize("selection", SELECTIONS, ids="+".join)
+def test_the_last_step_of_each_graph_of_a_job_fills_the_bar(selection):
+    """A graph that pauses ends at the catalog or at the pause, never at both,
+    and a graph that writes a report ends at ``assemble``."""
+    steps = graph.step_by_graph_node(selection)
+    ends: dict[graph.Entry, list[set[str]]] = {
+        entry: [
+            {node for node in built.ends if steps[node] not in FAILED_ENDS}
+            for built in built_graphs(selection)
+            if built.entry == entry
+        ]
+        for entry in (graph.ENTRY_HEAD_ONLY, graph.ENTRY_EXTRACT, graph.ENTRY_RESUME)
+    }
+
+    assert {frozenset(end) for end in ends[graph.ENTRY_HEAD_ONLY]} == {
+        frozenset({graph.CATALOG_NODE}),
+        frozenset({graph.PAUSE_NODE}),
+    }
+    for built in built_graphs(selection):
+        pauses = built.nodes & {graph.CATALOG_NODE, graph.PAUSE_NODE}
+        assert bool(pauses) == (built.entry == graph.ENTRY_HEAD_ONLY)
+    for end in ends[graph.ENTRY_HEAD_ONLY]:
+        line = progress_after(sorted(end), selection, "to-questions", "description")
+        assert line["stage"] == STAGE_COUNT, end
+    for entry, start in (
+        (graph.ENTRY_EXTRACT, "description"),
+        (graph.ENTRY_RESUME, "resumption"),
+    ):
+        assert ends[entry]
+        for end in ends[entry]:
+            assert end == {graph.ASSEMBLE_NODE}
+            line = progress_after(sorted(end), selection, "to-report", start)
+            assert line["stage"] == STAGE_COUNT, entry
+
+
+def test_a_run_to_the_report_reaches_the_pause_only_for_its_controls():
+    """The ``to-report`` words of the pause are the words of a run that pauses
+    for its Controls alone, so no other run to the report builds a pause."""
+    resumption = Resumption.model_construct()
+    reaches = {
+        (asks, continues, resumed): (
+            entry_of(record) == graph.ENTRY_HEAD_ONLY and not record.pauses_to_ask()
+        )
+        for asks, continues, resumed in itertools.product((False, True), repeat=3)
+        for record in [
+            JobRecord.model_construct(
+                ask_questions=asks,
+                continues_at_pause=continues,
+                resumption=resumption if resumed else None,
+            )
+        ]
+    }
+
+    assert {key for key, reached in reaches.items() if reached} == {
+        (False, True, False)
+    }
+
+
+@pytest.mark.parametrize(
+    ("asks", "continues", "resumed"), itertools.product((False, True), repeat=3)
+)
+def test_a_run_starts_from_a_resumption_where_its_graph_has_the_resume_entry(
+    asks, continues, resumed
+):
+    """``entry_of`` and ``run_start_of`` read one fact of a job."""
+    record = JobRecord.model_construct(
+        ask_questions=asks,
+        continues_at_pause=continues,
+        resumption=Resumption.model_construct() if resumed else None,
+    )
+    start = run_start_of(record.resumption is not None)
+
+    assert (start == "resumption") == (entry_of(record) == graph.ENTRY_RESUME)
+
+
+@pytest.mark.parametrize("node", [graph.CATALOG_NODE, graph.PAUSE_NODE])
+def test_a_run_that_pauses_for_its_controls_alone_names_the_controls(node):
+    lines = {
+        mode: progress_after([node], tuple(PACKAGES), mode, "description")["words"]
+        for mode in MODES
+    }
+
+    assert lines == {
+        "to-questions": "Generating questions…",
+        "to-report": "Preparing your Controls…",
+    }
 
 
 def test_the_line_keeps_the_highest_stage_and_the_words_of_the_last_node():
     lane = graph.Lane("stride", next(iter(PACKAGES["stride"].lanes))).node_name
     nodes = ["extract", "validate", "prepare", lane]
-    assert progress_after(nodes, ("stride",), "to-report") == {
+    assert progress_after(nodes, ("stride",), "to-report", "description") == {
         "stage": 2,
-        "words": STEP_PROGRESS["analyze"].words,
+        "words": STEP_PROGRESS["analyze"].words["to-report"],
     }
 
 
@@ -152,7 +271,7 @@ def test_no_page_script_names_a_node_or_copies_the_words_of_a_step(script):
     # A quoted step is a shared node name. A step before an underscore, at the
     # start of a quoted string, is the prefix of a node name of a framework.
     named = set(re.findall(rf"""["'`](?:{steps})(?:["'`]|_)""", code))
-    words = [row.words for row in STEP_PROGRESS.values()]
+    words = [text for row in STEP_PROGRESS.values() for text in row.words.values()]
 
     assert named == OTHER_MEANINGS.get(script, set())
     assert _copies([*words, *INITIAL_PROGRESS_WORDS.values()], code) == []
@@ -163,9 +282,9 @@ def test_the_form_page_carries_the_stage_count_and_the_start_words(tiers):
         page = client.get("/").text
     assert f'<progress id="analysis-progress" value="0" max="{STAGE_COUNT}"' in page
     assert _island(page, "form_words")["progress_start"] == dict(INITIAL_PROGRESS_WORDS)
-    assert 'FORM_WORDS.progress_start["to-questions"]' in page_javascript(
-        "first_run.js"
-    )
+    script = page_javascript("first_run.js")
+    assert script.count("FORM_WORDS.progress_start.description") == 2
+    assert script.count("progress_start") == 2
     assert "progress.max" in page_javascript("workspace.js")
 
 
@@ -179,12 +298,14 @@ def lines_of(client, runner: HeldAfterExtract, run: str) -> tuple[str, list[dict
     return stream, [json.loads(data) for data in frames]
 
 
-def assert_lines(frames: list[dict], nodes: list[str], mode: ProgressMode) -> None:
+def assert_lines(
+    frames: list[dict], nodes: list[str], mode: ProgressMode, start: RunStart
+) -> None:
     """Each frame is the progress line after its node, and a later frame has
     a larger ``seq``."""
     selection = [item["name"] for item in BODY["frameworks"]]
     sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
-    assert sent == [progress_after([node], selection, mode) for node in nodes]
+    assert sent == [progress_after([node], selection, mode, start) for node in nodes]
     seqs = [frame["seq"] for frame in frames]
     assert seqs == sorted(set(seqs))
 
@@ -206,8 +327,40 @@ def test_the_stream_of_a_run_in_progress_carries_each_progress_line_and_no_node_
         assert started.status_code == 200, started.text
         stream, frames = lines_of(client, runner, started.json()["run"])
 
-    assert_lines(frames, runner.sent, mode)
+    assert_lines(frames, runner.sent, mode, "description")
     assert "extract" not in stream
+
+
+def progress_at_start(client, run: str) -> dict:
+    """The progress line of ``run`` in the status answer."""
+    return client.get(f"/workspace/runs/{run}").json()["progress"]
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_a_reload_at_the_start_shows_the_words_the_page_showed_at_submit(tiers, mode):
+    """The page shows the ``description`` row at submit, in each mode."""
+
+    class HeldBeforeExtract(HeldAfterExtract):
+        async def run(self, job, on_node):
+            while not self.release.is_set():
+                await asyncio.sleep(0.01)
+            return await super().run(job, on_node)
+
+    runner = HeldBeforeExtract()
+    with client_for(tiers, runner) as client:
+        started = client.post(
+            "/analyze",
+            json=BODY | {"questions": mode == "to-questions"},
+            headers=SAME_ORIGIN,
+        )
+        line = progress_at_start(client, started.json()["run"])
+        runner.release.set()
+
+    assert line == {
+        "stage": 0,
+        "words": INITIAL_PROGRESS_WORDS["description"],
+        "seq": 0,
+    }
 
 
 def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report(
@@ -237,8 +390,8 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
             time.sleep(0.01)
         _, frames = lines_of(client, runner, child)
 
-    assert_lines(frames, runner.sent, "to-report")
-    assert_lines([read["progress"]], ["extract"], "to-report")
+    assert_lines(frames, runner.sent, "to-report", "resumption")
+    assert_lines([read["progress"]], ["extract"], "to-report", "resumption")
     assert read["pauses"] is False
     assert frames[-1]["stage"] == STAGE_COUNT
 

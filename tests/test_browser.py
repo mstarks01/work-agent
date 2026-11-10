@@ -668,7 +668,9 @@ def test_a_run_to_the_report_shows_the_stage_and_the_words_the_service_sends(
             "1 of 4 stages complete · Checking the system map for gaps or conflicting details…"
         )
         runner.release.set()
-        examining = f"2 of 4 stages complete · {STEP_PROGRESS['prepare'].words}"
+        examining = (
+            f"2 of 4 stages complete · {STEP_PROGRESS['prepare'].words['to-report']}"
+        )
         line(examining)
         assert bar.get_attribute("value") == "2"
         assert bar.get_attribute("max") == "4"
