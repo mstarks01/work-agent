@@ -5162,10 +5162,6 @@ def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
     page.click("#finish")
     _wait_for(page, finishes)
     drafts = _hold(page, "**/api/draft")
-    # Each press rejects, as its draft save does; the fixture reads page errors.
-    page.evaluate(
-        "addEventListener('unhandledrejection', (event) => event.preventDefault())"
-    )
     _press_case(page, other)
     _press_case(page, other)
     for _ in range(250):
@@ -5179,6 +5175,64 @@ def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
     with page.expect_response("**/api/rail"):
         finishes[0].continue_()
     page.wait_for_selector("#done", state="visible", timeout=3000)
+    assert page.evaluate("current") == case
+
+
+def _lose(route) -> None:
+    route.abort()
+
+
+def _refuse(route) -> None:
+    route.fulfill(**ERROR_PAGE)
+
+
+_NOT_SAVED = "#saveStatus:has-text('Your draft did not save.')"
+
+
+@pytest.mark.parametrize("fail", [_lose, _refuse])
+def test_a_press_whose_draft_save_fails_stays_on_the_case_and_says_so(
+    sitting_page, fail
+):
+    """A press of another case saves the draft first. Where that save fails,
+    the stage keeps its case and says that the draft did not save. The next
+    press that saves moves on."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    page.route("**/api/draft", fail)
+    _press_case(page, other)
+    page.wait_for_selector(_NOT_SAVED, timeout=3000)
+    assert "Try again." in page.inner_text("#saveStatus")
+    assert page.evaluate("current") == case
+    assert page.is_visible("#two")
+    page.unroute("**/api/draft")
+    _open_case(page, other)
+    assert page.inner_text("#saveStatus") == ""
+
+
+@pytest.mark.parametrize("fail", [_lose, _refuse])
+def test_a_queued_draft_save_that_fails_says_so_until_a_save_lands(sitting_page, fail):
+    page, _, (case, _) = sitting_page
+    _open_case(page, case)
+    page.route("**/api/draft", fail)
+    page.fill("#notes", "a note")
+    page.wait_for_selector(_NOT_SAVED, timeout=3000)
+    page.unroute("**/api/draft")
+    with page.expect_response("**/api/draft") as saved:
+        page.evaluate("saveDraft()")
+    assert saved.value.ok
+    page.wait_for_function(
+        "() => document.getElementById('saveStatus').textContent === ''"
+    )
+
+
+@pytest.mark.parametrize("fail", [_lose, _refuse])
+def test_the_guide_opens_and_says_that_the_draft_did_not_save(sitting_page, fail):
+    page, _, (case, _) = sitting_page
+    _open_case(page, case)
+    page.route("**/api/draft", fail)
+    page.click("#helpToggle")
+    page.wait_for_selector(_NOT_SAVED, timeout=3000)
+    page.wait_for_selector("#guide", state="visible", timeout=3000)
     assert page.evaluate("current") == case
 
 
