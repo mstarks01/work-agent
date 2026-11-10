@@ -603,9 +603,10 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
         )
 
 
+_ABSENT = object()
+
 #: Each shape a JSON value takes, as a saved file can hold it in a field. The
 #: record shapes use the key ``a``, which the one target of the harness holds.
-_ABSENT = object()
 JSON_SHAPES: tuple[object, ...] = (
     _ABSENT,
     None,
