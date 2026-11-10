@@ -7,7 +7,7 @@ const workspace = (() => {
   // The runs whose stop is in flight: a redraw keeps their Stop button off.
   const stopping = new Set();
   let progressRun = null;
-  let sentWords = null;
+  let sentLine = null;
   let stepStatus = null;
   let stepStarted = 0;
   let elapsedTimer = null;
@@ -375,23 +375,25 @@ const workspace = (() => {
     el("status-elapsed").textContent = `Still working on this step · ${clock}. Some steps take a few minutes.`;
   };
   // Show the progress line of the run. `sent` is the line the service sends:
-  // its count of complete stages and its words (webapp.page_words). Before
-  // the service sends a line, the page shows `initialWords`.
+  // its count of complete stages, its words (webapp.page_words) and the
+  // number of its last event. The stream and the status answer both send
+  // lines, so the page keeps the line of the latest event. Before the service
+  // sends a line, the page shows `initialWords`.
   const processing = (sent, initialWords, runId) => {
     const progress = el("analysis-progress");
     if (runId && progressRun !== runId) {
       progressRun = runId;
-      sentWords = null;
+      sentLine = null;
       stepStatus = null;
       progress.value = 0;
     }
     if (sent) {
       progress.value = Math.max(progress.value, sent.stage);
-      sentWords = sent.words;
+      if (sent.seq > (sentLine?.seq ?? -1)) sentLine = sent;
     }
     const complete = `${progress.value} of ${progress.max} stages complete`;
     progress.setAttribute("aria-valuetext", complete);
-    const status = sentWords ?? initialWords;
+    const status = sentLine?.words ?? initialWords;
     el("status-text").textContent = `${complete} · ${status}`;
     if (status !== stepStatus) {
       stepStatus = status;

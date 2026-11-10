@@ -307,7 +307,12 @@ class JobEvent(BaseModel):
     def sse_frame(self) -> str:
         """The event as one server-sent frame: ``seq`` as the id, the kind as
         the event name, and the rest as data. :func:`event_frames` writes it."""
-        data = self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        return self.framed(
+            self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        )
+
+    def framed(self, data: str) -> str:
+        """One server-sent frame of the event with ``data`` as its data."""
         return f"id: {self.seq}\nevent: {self.kind}\ndata: {data}\n\n"
 
 

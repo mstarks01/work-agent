@@ -7,9 +7,12 @@ each selection and hold each node of it to a row. No page script names a node.
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import json
 import re
+import threading
+import time
 from typing import get_args
 
 import pytest
@@ -27,7 +30,7 @@ from tests.test_webapp import (
     page_javascript,
     posted,
 )
-from tests.test_webapp_questions import client_for
+from tests.test_webapp_questions import PausingRunner, client_for
 from webapp.page_words import (
     INITIAL_PROGRESS_WORDS,
     STAGE_COUNT,
@@ -172,25 +175,109 @@ def test_the_form_page_carries_the_stage_count_and_the_start_words(tiers):
     assert "progress.max" in page_javascript("workspace.js")
 
 
-@pytest.mark.parametrize("questions", [False, True])
-def test_each_node_frame_of_the_stream_carries_its_progress_and_no_node_name(
-    tiers, questions
+class HeldAfterExtract(PausingRunner):
+    """Holds each run after its first node until the test releases it, and
+    records each node that the run sends."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.release = threading.Event()
+        self.sent: list[str] = []
+
+    async def run(self, job, on_node):
+        async def recorded(node):
+            self.sent.append(node)
+            await on_node(node)
+
+        await recorded("extract")
+        while not self.release.is_set():
+            await asyncio.sleep(0.01)
+        return await super().run(job, recorded)
+
+
+def lines_of(client, runner: HeldAfterExtract, run: str) -> tuple[str, list[dict]]:
+    """The stream of ``run``, opened while the runner holds it, and the data
+    of each node frame of the stream."""
+    runner.release.clear()
+    threading.Timer(0.3, runner.release.set).start()
+    stream = client.get(f"/events/{run}").text
+    frames = re.findall(r"event: node\ndata: (.*)\n", stream)
+    return stream, [json.loads(data) for data in frames]
+
+
+def assert_lines(frames: list[dict], nodes: list[str], mode: ProgressMode) -> None:
+    """Each frame is the progress line after its node, and a later frame has
+    a larger ``seq``."""
+    selection = [item["name"] for item in BODY["frameworks"]]
+    sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
+    assert sent == [progress_after([node], selection, mode) for node in nodes]
+    seqs = [frame["seq"] for frame in frames]
+    assert seqs == sorted(set(seqs))
+
+
+BODY = posted("A web app talks to a database.")
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_the_stream_of_a_run_in_progress_carries_each_progress_line_and_no_node_name(
+    tiers, mode
 ):
-    with client_for(tiers, StubPipelineRunner()) as client:
+    runner = HeldAfterExtract()
+    with client_for(tiers, runner) as client:
         started = client.post(
             "/analyze",
-            json=posted("A web app talks to a database.") | {"questions": questions},
+            json=BODY | {"questions": mode == "to-questions"},
             headers=SAME_ORIGIN,
         )
         assert started.status_code == 200, started.text
-        stream = client.get(f"/events/{started.json()['run']}").text
-    frames = [
-        json.loads(data) for data in re.findall(r"event: node\ndata: (.*)\n", stream)
-    ]
-    selection = [item["name"] for item in posted("")["frameworks"]]
-    expected: ProgressMode = "to-questions" if questions else "to-report"
+        stream, frames = lines_of(client, runner, started.json()["run"])
 
-    assert frames == [
-        progress_after([node], selection, expected) for node in StubPipelineRunner.nodes
-    ]
-    assert all(set(frame) == {"stage", "words"} for frame in frames)
+    assert_lines(frames, runner.sent, mode)
+    assert "extract" not in stream
+
+
+def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report(
+    tiers,
+):
+    """The Resumed Job never stops to ask, so its last node fills the bar."""
+    runner = HeldAfterExtract()
+    with client_for(tiers, runner) as client:
+        started = client.post(
+            "/analyze", json=BODY | {"questions": True}, headers=SAME_ORIGIN
+        )
+        lines_of(client, runner, started.json()["run"])
+        runner.release.clear()
+        runner.sent.clear()
+        continued = client.post(
+            f"/answer/{started.json()['run']}",
+            json={"revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert continued.status_code == 200, continued.text
+        child = continued.json()["run"]
+        deadline = time.monotonic() + 5
+        while "progress" not in (read := client.get(f"/workspace/runs/{child}").json()):
+            assert time.monotonic() < deadline, read
+            time.sleep(0.01)
+        _, frames = lines_of(client, runner, child)
+
+    assert_lines(frames, runner.sent, "to-report")
+    assert_lines([read["progress"]], ["extract"], "to-report")
+    assert frames[-1]["stage"] == STAGE_COUNT
+
+
+def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
+    """A run that ended before the request can be a record of an earlier
+    build, and no graph of this build names its nodes."""
+    with client_for(tiers, StubPipelineRunner()) as client:
+        started = client.post(
+            "/analyze",
+            json=posted("A web app talks to a database.") | {"questions": False},
+            headers=SAME_ORIGIN,
+        )
+        run = started.json()["run"]
+        client.get(f"/events/{run}")
+        ended = client.get(f"/events/{run}").text
+
+    assert "event: node" not in ended
+    assert "event: done" in ended

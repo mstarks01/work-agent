@@ -487,12 +487,11 @@ def test_each_write_route_refuses_a_body_too_deep_to_parse(client):
         assert response.status_code == 400, (method, path, response.text)
 
 
-def test_a_run_streams_one_tick_per_node_then_redirects(client):
+def test_the_stream_of_a_run_ends_on_its_terminal_status(client):
     started = client.post("/analyze", json=posted("A web app."), headers=SAME_ORIGIN)
     run_id = started.json()["run"]
     events = client.get(f"/events/{run_id}").text
 
-    assert events.count("event: node\n") == len(StubPipelineRunner.nodes)
     assert '"status":"completed"' in events, "the stream ends on the terminal status"
 
 

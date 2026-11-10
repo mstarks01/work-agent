@@ -114,15 +114,18 @@ def test_a_run_in_progress_answers_with_its_progress_line_on_each_read(tiers):
     with web.client_for(tiers, runner) as client:
         body = posted("A web app talks to a database.") | {"questions": True}
         run = client.post("/analyze", json=body, headers=SAME_ORIGIN).json()["run"]
-        expected = {"stage": 1, "words": STEP_PROGRESS["extract"].words}
         deadline = time.monotonic() + 5
-        while (detail := client.get(f"/workspace/runs/{run}").json()).get(
-            "progress"
-        ) != expected:
+        while "progress" not in (detail := client.get(f"/workspace/runs/{run}").json()):
             assert time.monotonic() < deadline, detail
             time.sleep(0.01)
+        line = detail["progress"]
+        assert line == {
+            "stage": 1,
+            "words": STEP_PROGRESS["extract"].words,
+            "seq": line["seq"],
+        }
         again = client.get(f"/workspace/runs/{run}").json()
-        assert again["progress"] == expected, "A read must not consume progress"
+        assert again["progress"] == line, "A read must not consume progress"
         runner.release.set()
         client.get(f"/events/{run}")
         assert "progress" not in client.get(f"/workspace/runs/{run}").json()
