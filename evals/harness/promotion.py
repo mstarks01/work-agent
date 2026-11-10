@@ -31,8 +31,8 @@ scale arrives with the measurement.
 ``tests/test_evals_promotion.py`` holds every name against a real artifact, so
 a gate cannot quietly read a key nothing writes.
 
-**An absent figure is never a zero.** An artifact written before a field
-existed, or a job that ran no assertion pass, leaves the gate over that figure
+**An absent figure is never a zero.** An artifact that holds no value
+for a field, or a job that ran no assertion pass, leaves the gate over that figure
 *unread* rather than failing it. A gate that read an absence as a measurement
 would refuse a promotion for a reason nobody measured.
 
@@ -186,7 +186,7 @@ AnyGateName = Literal[GateName, PendingName, GainGateName]
 
 
 # Each reader returns ``None`` where the artifact does not carry the figure at
-# all — an artifact written before the field existed, or a job that ran no
+# all — an artifact that holds no value for the field, or a job that ran no
 # assertion pass. **That is not a zero.** A gate over a figure nobody recorded
 # is unread, and :func:`read_gate` reports it as such rather than letting an
 # absence read as a measurement.

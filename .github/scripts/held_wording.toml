@@ -79,3 +79,13 @@ file = "prompts/recritic.md"
 phrase = "a `rejected` ruling owes its reader"
 rule = "money"
 reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+# --- Ruled held on 2026-11-10, from the reviewed/2026-11-10 round ---
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "This flow crosses a privilege or tenant boundary"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""

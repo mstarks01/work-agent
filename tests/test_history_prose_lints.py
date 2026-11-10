@@ -141,7 +141,13 @@ DIAGRAMS = without(
 #: * "moved from" matches only after a comma, as a heading of what changed,
 #:   because a tier row is moved from one vendor to another;
 #: * a commit matches only after a capital "At" that opens a sentence;
-#: * "what changed" matches only before "is".
+#: * "what changed" matches only before "is";
+#: * "until ... existed" matches only "this"; "before ... existed" matches
+#:   only "this", a quoted name with or without
+#:   a role, or a part of a record (a field, a key, a mark, an instrument, a
+#:   cause, a block or a table, one or many, after "the", "a", "an", "those",
+#:   "these" or "its"), because a guide says what holds before a new package
+#:   existed.
 #:
 #: "legacy" is not matched, because a vendor's legacy name order and a legacy
 #: client are facts of the present. "now" before a verb is not matched,
@@ -167,7 +173,11 @@ HISTORY = re.compile(
     r"|since (report )?schema \d|before this was enforced|how (\S+ ){1,5}came to"
     r"|when \w+ retired|(was|were) removed rather than|, moved from"
     r"|(?-i:(?<![\w,] )At (?=[0-9a-f]*\d)[0-9a-f]{7,40})|what changed is"
-    r"|(was|were) the \w+ here)\b",
+    r"|(was|were) the \w+ here"
+    r"|until this (\w+ )?existed"
+    r"|before (the|a|an|those|these|its)"
+    r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
+    r"|before (:\w+:)?`+[\w.~]+`+ existed)\b",
     re.IGNORECASE,
 )
 
@@ -363,11 +373,18 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "At 2fae7d3 the page kept a part hidden.",
         "What changed is that the score says so.",
         "`endsWith` was the spelling here.",
+        "A draft that a run wrote before the field existed states none.",
+        "A sweep recorded before the instrument existed carries no block.",
+        "A run wrote it before ``attacker_position`` existed.",
+        "A report written before those fields existed reads as no schema.",
+        "A rule about writes read both as writes until this field existed.",
+        "It cost 13.5 seconds of CPU before :data:`HISTORY` existed.",
     )
     for text in history:
         assert HISTORY.search(text), text
     present = (
         "It puts each element back as it was before the repair.",
+        "The loop reads each row until this one.",
         "It runs on every merge rather than before a release.",
         "Every vote cast on an earlier version of the finding.",
         "The note replaced the agent's wording.",
@@ -385,6 +402,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "What changed in the list since the last payload.",
         "The vendor's legacy order puts the generation first.",
         "The price map now disagrees with the Baseline.",
+        "They certify against fingerprints blessed before the package existed.",
     )
     for text in present:
         assert not HISTORY.search(text), text

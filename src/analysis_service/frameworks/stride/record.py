@@ -220,7 +220,7 @@ class DraftThreat(Claim):
     #: names no action leaves the first half of that unanswerable.
     verb: ActionVerb
     #: The agent's choice, required on :class:`ThreatProposal`. ``None`` only on
-    #: a draft that a run wrote before the field existed, which states no
+    #: a draft that a run's archive holds with no position, which states no
     #: position and so matches no reference that a person ruled a position on.
     attacker_position: AttackerPosition | None = None
     severity: Severity
@@ -503,8 +503,8 @@ class ThreatProposals(ProposalBatch):
 class ArchivedThreatProposal(ThreatProposal):
     """A :class:`ThreatProposal` read back from a run's archive.
 
-    A run that a lane answered before ``attacker_position`` existed stored no
-    position, and the record says so with ``None``, as :class:`DraftThreat`
+    A run's archive may hold a proposal with no ``attacker_position``: the run
+    stored no position, and the record says so with ``None``, as :class:`DraftThreat`
     does. The agent's own schema stays :class:`ThreatProposal`, which requires
     the field, so only a read of stored output takes this one.
     """

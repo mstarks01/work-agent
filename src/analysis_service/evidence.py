@@ -234,9 +234,9 @@ def evidence_catalog(
     rule 4 says a crossing the model could not decide establishes nothing — not
     that a crossing occurred, not that a control is missing. It confers
     eligibility for analysis, which the crossing block and the candidate rules
-    already carry. The zones behind it are unstated on their own elements, so
-    each publishes its own ``unknown`` entry above and the fact a reader needs
-    is offered there, in the words that say it is a question.
+    already carry. Each unplaced endpoint publishes an ``unknown`` entry for
+    its ``trust_zone`` above, and the fact a reader needs is offered there, in
+    the words that say it is a question.
 
     A third enumeration follows where the job carried an assertion pass:
     every row :func:`~analysis_service.assertions.offered` returns — settled,

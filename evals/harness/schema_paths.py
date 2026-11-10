@@ -8,8 +8,8 @@ archived report under a root, so a paired run of the native and tool paths
 (#1413) reads its re-ask rate and its fallbacks from the record rather than
 from a log.
 
-A node execution that sent no schema counts under the path ``none``. A report
-written before the fields existed reads as ``none`` with no re-ask, because
+A node execution that sent no schema counts under the path ``none``. A stored
+report that holds no such fields reads as ``none`` with no re-ask, because
 that is what their defaults say, so read the counts only over runs made after
 ADR 0058.
 """

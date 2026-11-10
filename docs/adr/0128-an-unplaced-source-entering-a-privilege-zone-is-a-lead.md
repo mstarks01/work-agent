@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-11-06
 - **Amends**: [ADR 0039](0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md),
-  whose rule 3 now covers STRIDE's privilege-zone transition for a flow into a
+  whose rule 3 covers STRIDE's privilege-zone transition for a flow into a
   placed zone
 
 ## Context

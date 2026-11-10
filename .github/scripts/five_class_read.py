@@ -100,7 +100,7 @@ PACKAGE = "{package}"
 HELD = Path(__file__).with_name("held_wording.toml")
 
 #: A rule that a held row may name.
-HeldRule = Literal["spend", "money", "element-term"]
+HeldRule = Literal["spend", "money", "element-term", "boundary-term"]
 
 #: Each rule a held row may name, against what the rule is.
 RULES: dict[HeldRule, str] = {
@@ -109,6 +109,10 @@ RULES: dict[HeldRule, str] = {
     "element-term": (
         "the GLOSSARY.md Element entry: code and model text say element, and"
         " only page copy says part"
+    ),
+    "boundary-term": (
+        "the GLOSSARY.md Boundary Crossing entry: an undecidable crossing does"
+        " not establish that a flow crosses a boundary"
     ),
 }
 
