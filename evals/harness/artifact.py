@@ -234,8 +234,8 @@ class EvalArtifact:
         """
         if not self.carries(key):
             raise ProvenanceError(
-                f"{self.path}: carries no {key!r} block, so it predates the"
-                f" instrument that writes one; a sweep today writes it at"
+                f"{self.path}: carries no {key!r} block, so no instrument"
+                f" wrote one into it; a sweep writes that block at"
                 f" artifact_version {ARTIFACT_VERSION}"
             )
         return self.raw[key]
@@ -255,8 +255,8 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     :func:`~analysis_service.certification.load_manifest` does: an artifact from
     another schema should be named as such, not reported as a heap of stray
     keys. There is no best-effort read of an unversioned artifact — those
-    predate served identities entirely, so anything recovered from one would be
-    a guess at what answered.
+    record no served identities, so anything recovered from one would be a
+    guess at what answered.
     """
     path = Path(path)
     try:
@@ -273,7 +273,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     if not is_version(version, ARTIFACT_VERSION):
         raise ProvenanceError(
             f"{path}: unsupported artifact_version {version!r}; expected"
-            f" {ARTIFACT_VERSION}. An artifact without one predates recorded"
+            f" {ARTIFACT_VERSION}. An artifact without one records no"
             " served identities and cannot be promoted — re-run the sweep"
         )
 
@@ -292,7 +292,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         # naming the wrong cause.
         raise ProvenanceError(
             f"{path}: the provenance block records no identity_version, so it"
-            " predates execution-identity versioning. Its fingerprints hash a"
+            " states no version of the execution identity. Its fingerprints hash a"
             f" payload this build cannot recompute (version {IDENTITY_VERSION});"
             " the run's recall, precision and spread still read"
         )

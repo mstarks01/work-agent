@@ -809,7 +809,7 @@ def _classes_holding(match: Callable[[ast.AST], bool]) -> list[Site]:
 def test_a_drafts_direction_has_one_field():
     """Only ``RequirementProposal`` requires a draft's direction. The claim
     that the service resolves from it carries a copy with a default, for a
-    report written before the field, so each direction that code reads comes
+    report with no such field, so each direction that code reads comes
     from this one field."""
     assert _classes_holding(_states_a_direction) == [
         ("src/analysis_service/frameworks/asvs/record.py", "RequirementProposal")

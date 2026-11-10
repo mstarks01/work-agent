@@ -389,7 +389,7 @@ class TestReadingABlockFailsClosed:
 
         assert artifact.carries("scores") is True
         assert artifact.carries("losses") is False
-        with pytest.raises(ProvenanceError, match="predates the instrument"):
+        with pytest.raises(ProvenanceError, match="no instrument wrote one"):
             artifact.block("losses")
         with pytest.raises(ProvenanceError, match="not a key an artifact declares"):
             artifact.carries("nope")

@@ -218,10 +218,10 @@ def joined_runs(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
 
 def comment_runs(path: Path) -> list[tuple[int, str]]:
     """Each run of comment lines in the Python file at ``path``, joined into
-    one text without its ``#`` marks, at its first line."""
+    one text without its ``#`` and ``#:`` marks, at its first line."""
     source = path.read_text(encoding="utf-8")
     comments = [
-        (token.start[0], token.string.lstrip("#").strip())
+        (token.start[0], token.string.lstrip("#:").strip())
         for token in tokenize.generate_tokens(io.StringIO(source).readline)
         if token.type == tokenize.COMMENT
     ]

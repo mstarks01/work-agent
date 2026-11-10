@@ -638,7 +638,7 @@ _BEDROCK_CLAUDE_ID = re.compile(
 #   more branch.
 # * **The 2023 names** ``claude-v1``, ``claude-v2:1`` and ``claude-instant-v1``.
 #   The shape requires a family name and a generation, because those two
-#   segments are what a later reader keys on, and these three predate that
+#   segments are what a later reader keys on, and these three do not follow that
 #   naming.
 # * **A Claude that omits ``anthropic.``**, per the shared family above. It is
 #   the shape a config copying an anthropic-direct tier row into the bedrock row

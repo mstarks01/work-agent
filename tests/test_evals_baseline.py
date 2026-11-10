@@ -284,8 +284,8 @@ class TestTheEndpointTheOperatorChose:
     def test_an_unpinned_gateway_is_not_a_sweep_that_recorded_no_pin(
         self, name, tmp_path
     ):
-        """``[]`` is a deployment that let the gateway choose. No key at all is
-        a sweep taken before the pin was recorded, which says nothing."""
+        """``[]`` is a deployment that let the gateway choose. A sweep with no
+        key at all says nothing."""
         unpinned = BaselineIdentity.from_artifact(self.sweep(tmp_path, name, (), "u"))
         unrecorded = BaselineIdentity.from_artifact(
             self.sweep(tmp_path, name, None, "n")

@@ -308,9 +308,9 @@ carries guarantees it was never written under. So an old report is readable by
 the version that wrote it and by nothing else, and a reader who needs both keeps
 both.
 
-That is also the whole answer for the assertion layer. It is part of 3.0, 3.0
-has never shipped, and so no report exists that predates it — `assertions:
-null` means a deployment that ran no pass, never a file older than the field.
+That is also the whole answer for the assertion layer. It is part of 3.0, so
+each 3.0 report carries the field — `assertions: null` means a deployment that
+ran no pass, never a file with no such field.
 
 [Schema versions](#schema-versions), at the end of this page, states what each
 version holds.
@@ -703,7 +703,7 @@ restored from the model the issues were computed against, with its ID in
 `restored`. When an issue named no element, a fault over the whole object,
 `scope` is `whole` and nothing is restored, because no narrower patch could
 answer it. A report whose `nodes` name the repair node and carry `None` here
-predates the field.
+holds no record of the repair.
 
 ## `coverage` — what each lane was offered
 

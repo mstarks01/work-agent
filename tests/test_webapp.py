@@ -1307,8 +1307,7 @@ def test_the_viewer_renders_a_backticked_identifier_as_code():
 
     The prompt hands identifiers to the lane agent in backticks and the agent
     writes them back the same way, so every description, rationale and
-    mitigation carries them. The page showed them as characters until `prose`
-    turned each span into a `code` element.
+    mitigation carries them. `prose` turns each span into a `code` element.
     """
     written = "The `encryption_in_transit` state of `flow:process:a>process:b>sync` is unknown."
     rendered = run_viewer_helpers(

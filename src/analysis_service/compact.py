@@ -89,7 +89,7 @@ Three properties make the expansion safe to put in front of the gate:
 
 The one deliberate divergence from :class:`~analysis_service.system_model.DataFlow`
 is ``operations``, which is required here and defaulted there. The default exists
-so archived artifacts written before the field keep loading; nothing archived is
+so archived artifacts with no such field keep loading; nothing archived is
 in this format, and #938's rule 4 is that an omitted epistemic field is malformed
 output rather than an unknown fact.
 """
