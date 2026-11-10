@@ -1883,8 +1883,8 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
 #: here rather than derived: a page added without an entry fails the sweep
 #: below, which is the point.
 PAGE_SCRIPTS = {
-    "webapp/sitting.py": "sitting.js",
-    "webapp/review.py": ("review_queue.js", "review_finding.js"),
+    "webapp/sitting.py": ("service_answer.js", "sitting.js"),
+    "webapp/review.py": ("service_answer.js", "review_queue.js", "review_finding.js"),
     "webapp/main.py": (
         "theme.js",
         "sidebar.js",
@@ -1933,6 +1933,23 @@ STATIC_SCRIPTS = sorted(
         for name in ((value,) if isinstance(value, str) else value)
     }
 )
+
+#: The scripts another pull request edits now. Each holds a bare read.
+_BARE_READS_LEFT = {"controls.js", "form_controls.js", "report_view.js"}
+
+
+def test_each_script_reads_json_with_a_catch():
+    """An answer of a proxy can be a plain page, and ``.json()`` of it throws.
+    The lint finds each ``.json()`` with no ``.catch(`` directly on it.
+    ``jsonOf`` of service_answer.js is the read with one."""
+    bare = re.compile(r"\.json\(\)(?!\s*\.catch\()")
+    found = {
+        name: len(bare.findall(page_javascript(name)))
+        for name in STATIC_SCRIPTS
+        if name not in _BARE_READS_LEFT
+    }
+    assert {name: hits for name, hits in found.items() if hits} == {}
+
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
 #: holds values rather than code: a page's injected values keep their escape

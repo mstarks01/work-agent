@@ -73,8 +73,11 @@ const workspace = (() => {
   };
   const fetchRun = async (id) => {
     const response = await fetch("/workspace/runs/" + encodeURIComponent(id));
-    if (!response.ok) throw new Error(await messageOf(response, "Could not load this analysis. Try again."));
-    return response.json();
+    const problem = "Could not load this analysis. Try again.";
+    if (!response.ok) throw new Error(await messageOf(response, problem));
+    const data = await jsonOf(response);
+    if (!data) throw new Error(problem);
+    return data;
   };
   // Ask once with the native dialog; resolves true on Delete.
   const confirmDelete = (text) => new Promise((resolve) => {
@@ -124,6 +127,7 @@ const workspace = (() => {
     input.value = run.name;
     input.maxLength = el("analysis-name").maxLength;
     input.setAttribute("aria-label", "New name for " + run.name);
+    renaming = input;
     let settled = false;
     const save = async (keep) => {
       if (settled) return;
@@ -132,8 +136,15 @@ const workspace = (() => {
         const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/title", {
           method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: input.value}),
         });
-        if (!response.ok) { const refusal = await messageOf(response, "Could not rename it."); await library(); message(refusal); return; }
+        if (!response.ok) {
+          const refusal = await messageOf(response, "Could not rename it.");
+          renaming = null;
+          await library();
+          message(refusal);
+          return;
+        }
       }
+      renaming = null;
       await library();
     };
     input.onkeydown = (event) => {
@@ -145,6 +156,13 @@ const workspace = (() => {
     input.focus();
     input.select();
   };
+  // The list keeps its sort, its ticked rows and an open rename input across
+  // each read, so the answer to a Stop, a Delete or a Rename changes only the
+  // rows.
+  let sortBy = "date";
+  let descending = true;
+  const selected = new Set();
+  let renaming = null;
   const library = async () => {
     const ticket = ++generation;
     show("library-panel");
@@ -152,13 +170,15 @@ const workspace = (() => {
     history.replaceState(null, "", "/?view=analyses");
     try {
       const response = await fetch("/workspace/runs");
-      if (!response.ok) throw new Error("Could not load analyses. Try again.");
-      const data = await response.json();
+      const data = response.ok ? await jsonOf(response) : null;
+      if (!data) throw new Error("Could not load analyses. Try again.");
       // A later load, or another view, owns the page now.
       if (ticket !== generation) return;
-      let sortBy = "date";
-      let descending = true;
-      const selected = new Set();
+      // The owner types a new name. The read after the rename draws the rows.
+      if (renaming?.isConnected) return;
+      for (const run of [...selected]) {
+        if (!data.some((row) => row.run === run)) selected.delete(run);
+      }
       const fill = (select, values, label) => {
         const chosen = select.value;
         select.replaceChildren(select.options[0], ...values.map((value) => {
@@ -269,7 +289,7 @@ const workspace = (() => {
       el("analysis-status").onchange = render;
       el("analysis-framework").onchange = render;
       render();
-    } catch (error) { message(error.message); }
+    } catch (error) { if (ticket === generation) message(error.message); }
   };
   // Reopening polls snapshots, never competes with the original SSE consumer.
   const open = async (id) => {
@@ -311,7 +331,7 @@ const workspace = (() => {
         if (data.status === "stopped") message("You stopped the analysis. Open an earlier paused run to retry, or start a new analysis.");
         if (data.status === "completed" && !served) message("The report of this analysis is withheld.");
       }
-    } catch (error) { message(error.message); }
+    } catch (error) { if (ticket === generation) message(error.message); }
   };
   // The link opens the list in place; library() writes the same URL.
   el("library-nav").addEventListener("click", (event) => {
@@ -341,7 +361,7 @@ const workspace = (() => {
     try {
       const data = await fetchRun(id);
       if (ticket === generation) metadata(data);
-    } catch (error) { message(error.message); }
+    } catch (error) { if (ticket === generation) message(error.message); }
   };
   // Each quarter marks a completed stage, not a share of elapsed time.
   const completedStage = (step, pauses) => {
@@ -433,7 +453,7 @@ const workspace = (() => {
   queueMicrotask(() => {
     if (params.get("run")) open(params.get("run"));
     else if (params.get("view") === "analyses") library();
-    fetch("/workspace/runs").then((response) => response.ok ? response.json() : []).then((runs) => {
+    fetch("/workspace/runs").then((response) => response.ok ? jsonOf(response) : []).then((runs) => {
       runs.slice(0, 5).forEach((run) => {
         const link = node("a", run.name);
         link.href = "/?run=" + encodeURIComponent(run.run);

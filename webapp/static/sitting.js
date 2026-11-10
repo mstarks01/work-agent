@@ -11,6 +11,12 @@ let submitting = false;
 let rows = [];
 let queued = 0;
 let contributionMode = "browser";
+// The press that owns the stage, and the last read of the rail, of the
+// results stage and of the preview. An answer to an older one is dropped.
+let turn = 0;
+let railAsked = 0;
+let stageAsked = 0;
+let previewAsked = 0;
 
 function hide(id) { $(id).classList.add("hidden"); }
 function show(id) { $(id).classList.remove("hidden"); }
@@ -19,6 +25,24 @@ const headers = {"Content-Type": "application/json", "X-Sitting-Token": TOKEN};
 
 function post(path, body) {
   return fetch(path, {method: "POST", headers: headers, body: JSON.stringify(body)});
+}
+
+// The one reader of an answer of this app. An answer that is ok gives its
+// `body`. Each other answer gives a sentence in `problem`: the `detail` of a
+// refusal of the app, `refused` for a refusal that is not the app's JSON, and
+// the interrupted sentence for a request that did not arrive or an ok answer
+// that is not JSON. `again` says what the reader does next.
+async function answerOf(request, refused, again = "Try again.") {
+  const lost = {problem: "The connection was interrupted. " + again};
+  let res;
+  try {
+    res = await request;
+  } catch {
+    return lost;
+  }
+  const body = await jsonOf(res);
+  if (res.ok) return body === null ? lost : {body};
+  return {refused: true, problem: typeof body?.detail === "string" ? body.detail : refused};
 }
 
 // Every field in part two saves on a short delay, and the walk flushes before
@@ -95,20 +119,23 @@ function railRow(row) {
 // A refusal is said where the count would go, rather than left as a page
 // that reads "reading the cases…" forever.
 async function getJson(path, withToken = false) {
-  const res = await fetch(path, withToken ? {headers: headers} : {});
-  const d = await res.json();
-  if (!res.ok) throw new Error(d.detail || path + " refused");
-  return d;
+  const {body, problem} = await answerOf(
+    fetch(path, withToken ? {headers: headers} : {}),
+    "The review did not load. Reload the page.", "Reload the page.");
+  if (problem) throw new Error(problem);
+  return body;
 }
 
 async function loadRail() {
+  const asked = ++railAsked;
   let d, states;
   try {
     [d, states] = await Promise.all([getJson("/api/rail"), getJson("/api/review-states")]);
   } catch (err) {
-    $("left").textContent = err.message;
+    if (asked === railAsked) $("left").textContent = err.message;
     return {};
   }
+  if (asked !== railAsked) return {};
   rows = d.cases.map(r => ({...r, review: states.states[r.case]}));
   const remaining = rows.filter(r => !DONE.includes(r.review.state)).length;
   $("left").textContent = remaining + " remaining";
@@ -207,7 +234,10 @@ function warn(files) {
 }
 
 async function openCase(id) {
+  const mine = ++turn;
   await saveDraft();
+  // A press made while the draft saved owns the stage.
+  if (mine !== turn) return;
   current = id;
   select(id);
   blank();
@@ -217,11 +247,11 @@ async function openCase(id) {
   hide("readOnly");
   show("case");
   updateWalk(id);
-  const res = await fetch("/api/part-one?case=" + encodeURIComponent(id), {headers: headers});
-  const d = await res.json();
-  // A second click while this one was in flight owns the stage now.
-  if (current !== id) return;
-  if (!res.ok) { $("partOne").textContent = d.detail; return; }
+  const {body: d, problem} = await answerOf(
+    fetch("/api/part-one?case=" + encodeURIComponent(id), {headers: headers}),
+    "The case did not load. Open it again.", "Open the case again.");
+  if (mine !== turn) return;
+  if (problem) { $("partOne").textContent = problem; return; }
   $("caseTitle").textContent = d.title;
   layout($("partOne"), d.blocks);
   warn(d.moved);
@@ -236,11 +266,13 @@ async function openCase(id) {
   lock();
   finishedNow(d.state === "finished");
   await showSets(id);
-  if (current === id) setMarks(d.marks);
+  if (mine === turn) setMarks(d.marks);
 }
 
 async function openReadOnly(id) {
+  const mine = ++turn;
   await saveDraft();
+  if (mine !== turn) return;
   current = id;
   select(id);
   closeGuide();
@@ -248,10 +280,11 @@ async function openReadOnly(id) {
   hide("case");
   hide("submitStage");
   show("readOnly");
-  const res = await fetch("/api/read-only?case=" + encodeURIComponent(id));
-  const d = await res.json();
-  if (current !== id) return;
-  if (!res.ok) { $("readOnlyDocument").textContent = d.detail; return; }
+  const {body: d, problem} = await answerOf(
+    fetch("/api/read-only?case=" + encodeURIComponent(id)),
+    "The case did not load. Open it again.", "Open the case again.");
+  if (mine !== turn) return;
+  if (problem) { $("readOnlyDocument").textContent = problem; return; }
   $("readOnlyTitle").textContent = d.title;
   $("readOnlyMeta").textContent = "Reviewed by " + d.reviewed_by + " · " + d.date;
   layout($("readOnlyPartOne"), d.blocks);
@@ -259,7 +292,9 @@ async function openReadOnly(id) {
 }
 
 async function openSubmit() {
+  const mine = ++turn;
   await saveDraft();
+  if (mine !== turn) return;
   current = null;
   select(null);
   closeGuide();
@@ -426,12 +461,13 @@ function frameworkChoice(name, details) {
 }
 
 async function showSets(id) {
-  const res = await fetch("/api/part-two?case=" + encodeURIComponent(id), {headers: headers});
-  const sets = await res.json();
+  const {body: sets, problem} = await answerOf(
+    fetch("/api/part-two?case=" + encodeURIComponent(id), {headers: headers}),
+    "The findings did not load. Open the case again.", "Open the case again.");
   if (current !== id) return;
   // Said beside the case rather than swallowed: a reader who cannot see why
   // the sets stay closed cannot act on it.
-  if (!res.ok) { $("ownHint").textContent = sets.detail; return; }
+  if (problem) { $("ownHint").textContent = problem; return; }
   const byClaim = new Map();
   for (const target of sets.marks) {
     for (const claim of target.claims) byClaim.set(claim, target);
@@ -530,10 +566,11 @@ $("own").addEventListener("input", gate);
 
 $("lock").addEventListener("click", async () => {
   const id = current;
-  const res = await post("/api/own-list", {case: id, items: lines("own")});
+  const {problem} = await answerOf(
+    post("/api/own-list", {case: id, items: lines("own")}), "Not locked. Try again.");
   // A case opened meanwhile owns the stage: the answer changes only the rail.
-  if (current !== id) { if (res.ok) await loadRail(); return; }
-  if (!res.ok) { $("ownHint").textContent = (await res.json()).detail; return; }
+  if (current !== id) { if (!problem) await loadRail(); return; }
+  if (problem) { $("ownHint").textContent = problem; return; }
   lock();
   await loadRail();
   await showSets(id);
@@ -553,22 +590,15 @@ $("finish").addEventListener("click", async () => {
   const was = $("finish").textContent === "Save changes";
   finishing = true;
   updateMarkCounts();
-  let res, d;
-  try {
-    res = await post("/api/finish", {
+  const {body: d, problem} = await answerOf(
+    post("/api/finish", {
       case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
-    });
-    // Only a refusal may come back as a page that is not JSON.
-    d = res.ok ? await res.json() : await res.json().catch(() => ({}));
-  } catch {
-    res = null;
-  } finally {
-    finishing = false;
-    updateMarkCounts();
-  }
-  if (current !== id) { if (res?.ok) await loadRail(); return; }
-  if (!res) { $("saveStatus").textContent = "The connection was interrupted. Record the review again."; return; }
-  if (!res.ok) { $("saveStatus").textContent = d.detail || "Not recorded. Try again."; return; }
+    }),
+    "Not recorded. Try again.", "Record the review again.");
+  finishing = false;
+  updateMarkCounts();
+  if (current !== id) { if (!problem) await loadRail(); return; }
+  if (problem) { $("saveStatus").textContent = problem; return; }
   warn(d.moved);
   $("summary").textContent = markSummary();
   $("doneTitle").textContent = was ? "Changes saved" : "Recorded";
@@ -581,9 +611,9 @@ $("resetReview").addEventListener("click", async () => {
   const id = current;
   if (!id) return;
   if (!confirm("Reset your Part 2 answers for this case? Your independent list will stay locked.")) return;
-  const res = await post("/api/reset", {case: id});
-  if (current !== id) { if (res.ok) await loadRail(); return; }
-  if (!res.ok) { $("saveStatus").textContent = (await res.json()).detail; return; }
+  const {problem} = await answerOf(post("/api/reset", {case: id}), "Not reset. Try again.");
+  if (current !== id) { if (!problem) await loadRail(); return; }
+  if (problem) { $("saveStatus").textContent = problem; return; }
   for (const s of allSelects()) s.value = "";
   $("missing").value = "";
   $("notes").value = "";
@@ -608,8 +638,8 @@ function stageRow(row, label, act) {
 }
 
 async function stageAct(path, id) {
-  const res = await post(path, {case: id});
-  if (!res.ok) { $("ready").textContent = (await res.json()).detail; return; }
+  const {problem} = await answerOf(post(path, {case: id}), "Not changed. Try again.");
+  if (problem) { $("ready").textContent = problem; return; }
   await loadRail();
   await loadStage();
 }
@@ -623,15 +653,17 @@ function submitGate() {
 }
 
 async function loadStage() {
+  const asked = ++stageAsked;
   let d, status;
   try {
     [d, status] = await Promise.all([
       getJson("/api/stage"), getJson("/api/contribution-status", true),
     ]);
   } catch (err) {
-    $("ready").textContent = err.message;
+    if (asked === stageAsked) $("ready").textContent = err.message;
     return;
   }
+  if (asked !== stageAsked) return;
   contributionMode = status.mode;
   $("ready").textContent = d.ready.length + " cases are recorded locally. "
     + d.unfinished + " cases remain unfinished.";
@@ -643,7 +675,7 @@ async function loadStage() {
   submitGate();
   $("browserIdentity").classList.toggle("hidden", status.mode !== "browser");
   if (status.author) $("githubAuthor").value = status.author;
-  hide("filePreview");
+  closePreview();
   hide("result");
   hide("thanks");
   hide("browserSteps");
@@ -668,12 +700,21 @@ function requireBrowserAuthor(choice) {
   return true;
 }
 
+// The preview shows one choice of attribution and author. A change of that
+// choice closes it, and an answer about the old choice stays off the page.
+function closePreview() {
+  previewAsked++;
+  hide("filePreview");
+}
+
 async function showFiles() {
   const choice = contributionChoice();
   if (!requireBrowserAuthor(choice)) return;
-  const res = await post("/api/contribution-preview", choice);
-  const d = await res.json();
-  if (!res.ok) { $("contributeStatus").textContent = d.detail; return; }
+  const asked = ++previewAsked;
+  const {body: d, problem} = await answerOf(
+    post("/api/contribution-preview", choice), "The preview did not load. Try again.");
+  if (asked !== previewAsked) return;
+  if (problem) { $("contributeStatus").textContent = problem; return; }
   $("previewPath").textContent = d.path;
   $("previewContent").textContent = d.content;
   show("filePreview");
@@ -681,9 +722,9 @@ async function showFiles() {
 
 $("showFiles").addEventListener("click", showFiles);
 for (const input of document.querySelectorAll('input[name="reviewerAttribution"]')) {
-  input.addEventListener("change", () => hide("filePreview"));
+  input.addEventListener("change", closePreview);
 }
-$("githubAuthor").addEventListener("input", () => hide("filePreview"));
+$("githubAuthor").addEventListener("input", closePreview);
 
 $("submit").addEventListener("click", async () => {
   const choice = contributionChoice();
@@ -691,28 +732,14 @@ $("submit").addEventListener("click", async () => {
   submitting = true;
   $("submit").disabled = true;
   // The preview is the reader's to reopen; the way out must not sit below it.
-  hide("filePreview");
+  closePreview();
   $("contributeStatus").textContent = "Preparing contribution…";
-  let res, d;
-  try {
-    res = await post("/api/contribute", choice);
-    // Only a refusal may come back as a page that is not JSON.
-    d = res.ok ? await res.json() : await res.json().catch(() => ({}));
-  } catch {
-    res = null;
-  } finally {
-    submitting = false;
-    submitGate();
-  }
-  if (!res) {
-    $("contributeStatus").textContent = "The connection was interrupted. Contribute again.";
-    return;
-  }
-  show("thanks");
-  if (!res.ok) {
-    $("contributeStatus").textContent = d.detail || "Contribution needs attention";
-    return;
-  }
+  const {body: d, problem, refused} = await answerOf(
+    post("/api/contribute", choice), "Contribution needs attention", "Contribute again.");
+  submitting = false;
+  submitGate();
+  if (d || refused) show("thanks");
+  if (problem) { $("contributeStatus").textContent = problem; return; }
   if (d.mode === "direct") {
     $("contributeStatus").textContent = "Pull request opened";
     // A draft that would not delete stops nothing: the pull request is open,

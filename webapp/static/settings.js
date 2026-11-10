@@ -72,7 +72,7 @@ function askStoreRows() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ changes: sent }),
   })
-    .then((response) => (response.ok ? response.json() : null))
+    .then((response) => (response.ok ? response.json().catch(() => null) : null))
     .then((payload) => {
       if (asked !== storeAsked || !payload) return;
       storeShown = new Set(payload.shown);
@@ -509,7 +509,11 @@ async function save() {
       showErrors([{ message: "The app did not answer. Check that it runs, then try again." }]);
       return;
     }
-    const payload = await response.json().catch(() => ({}));
+    const payload = await response.json().catch(() => null);
+    if (response.ok && !payload) {
+      showErrors([{ message: "The page could not read the answer of the app. Reload the page to see whether the save landed." }]);
+      return;
+    }
     if (response.ok) {
       SETTINGS = payload.settings;
       for (const key of sentChanges.keys()) changes.delete(key);
@@ -520,7 +524,7 @@ async function save() {
       showSaved(payload.restart);
       return;
     }
-    showErrors(payload.errors ?? [{ message: payload.message ?? `The save failed with status ${response.status}.` }]);
+    showErrors(payload?.errors ?? [{ message: payload?.message ?? `The save failed with status ${response.status}.` }]);
   } finally {
     saving = false;
     layout.inert = false;

@@ -169,7 +169,7 @@
     let body = null;
     try {
       const listed = await fetch("/workspace/files");
-      if (listed.ok) body = await listed.json();
+      if (listed.ok) body = await jsonOf(listed);
     } catch {
       // A failed read leaves `body` null.
     }
@@ -369,7 +369,9 @@
         formControls.load();
         return;
       }
-      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
+      const run = (await jsonOf(started))?.run;
+      if (!run) throw new Error("the answer names no run");
+      follow(run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -604,7 +606,7 @@
       });
       // A refusal can carry a contradiction beside its message, so the page
       // reads the body once here.
-      const data = await response.json().catch(() => null);
+      const data = await jsonOf(response);
       const problem = data?.message ?? "The service did not save these answers. Retry.";
       if (response.ok && data) {
         acknowledge(sent);
@@ -666,8 +668,8 @@
     let payload;
     try {
       const response = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
-      payload = await response.json();
-      if (!response.ok) throw new Error();
+      payload = await jsonOf(response);
+      if (!response.ok || !payload) throw new Error();
     } catch {
       setStatus("failed", "Could not read the saved answers. Retry.");
       return;
@@ -1170,7 +1172,11 @@
       refuse(await messageOf(response, "The service did not keep this change."));
       return;
     }
-    const data = await response.json();
+    const data = await jsonOf(response);
+    if (!data) {
+      refuse("The connection was interrupted. Reload this analysis to check whether the change was saved.");
+      return;
+    }
     answerProblem.hidden = true;
     if (data.early_questions) reconcile(data);
   });
@@ -1206,7 +1212,7 @@
           links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
         }),
       });
-      data = await response.json().catch(() => null);
+      data = await jsonOf(response);
     } catch {
       answered();
       refuse(unsaved);
@@ -1238,8 +1244,10 @@
           const next = wantedScopes;
           wantedScopes = null;
           saved = false;
-          // Another action may take the turn first: wait, then try again.
-          while (!await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
+          // Another action may take the turn first: wait, then try again. A
+          // start or an amendment that ended the pause leaves no run to save
+          // the change to.
+          while (!asked.hidden && !await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
         }
       } finally {
         wantedScopes = null;
@@ -1426,10 +1434,14 @@
         refuse(await messageOf(amended, "The service could not read the corrected description. Try again."));
         return;
       }
-      const body = await amended.json();
+      const run = (await jsonOf(amended))?.run;
+      if (!run) {
+        refuse("The connection was interrupted. Reload this analysis to check whether the service reads the description again.");
+        return;
+      }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow(body.run, "Reading your description and identifying the parts of your system…", true);
+      follow(run, "Reading your description and identifying the parts of your system…", true);
     }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     if (data.asks) tail.append(fix);
@@ -1621,10 +1633,17 @@
       if (!row.compact && row.read) registerEdit(row);
     }
   };
+  // The job that a start of the paused run made, read from the snapshot of
+  // the run. Null where the snapshot names no such job or does not arrive.
+  const startedRun = async () => {
+    const snapshot = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun)).catch(() => null);
+    const run = snapshot?.ok ? (await jsonOf(snapshot))?.run : null;
+    return run && run !== pausedRun ? run : null;
+  };
   // Start the analysis once: every unsaved answer is saved first, at the
-  // revision the save returns, and the start names that revision. A lost
-  // response is read back from the run, so a second click cannot start a
-  // second run.
+  // revision the save returns, and the start names that revision. A response
+  // that is lost, or that is not JSON, is read back from the run, so a second
+  // click cannot start a second run.
   let starting = false;
   const startAnalysis = async () => {
     if (starting) return;
@@ -1642,33 +1661,25 @@
           return;
         }
       }
-      let resumed;
-      try {
-        resumed = await fetch("/answer/" + pausedRun, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ links: [], facts: [], presented: presented(), revision }),
-        });
-      } catch {
-        // The response was lost. Where the start landed, the run now names
-        // the job it started; follow it instead of starting again.
-        const snapshot = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
-        const payload = snapshot.ok ? await snapshot.json() : null;
-        if (payload && payload.run !== pausedRun) {
-          asked.hidden = true;
-          follow(payload.run, "Using your answers to continue the analysis…", false);
-          return;
-        }
-        refuse("The connection was interrupted. Reload this analysis to check whether it started.");
+      const resumed = await fetch("/answer/" + pausedRun, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ links: [], facts: [], presented: presented(), revision }),
+      }).catch(() => null);
+      if (resumed && !resumed.ok) {
+        refuse(await messageOf(resumed, "The service could not continue the analysis. Try again."));
         return;
       }
-      if (!resumed.ok) {
-        refuse(await messageOf(resumed, "The service could not continue the analysis. Try again."));
+      // Where the start landed, the run names the job it started; follow it
+      // instead of starting again.
+      const run = (resumed && (await jsonOf(resumed))?.run) || await startedRun();
+      if (!run) {
+        refuse("The connection was interrupted. Reload this analysis to check whether it started.");
         return;
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow((await resumed.json()).run, "Using your answers to continue the analysis…", false);
+      follow(run, "Using your answers to continue the analysis…", false);
     } finally {
       starting = false;
       startButton.disabled = false;
