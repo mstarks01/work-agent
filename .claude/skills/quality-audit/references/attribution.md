@@ -87,7 +87,7 @@ A scored artifact carries both, and they are where a ceiling comes from.
 causes, decided in this order: `verb` (a claim cites the same place with
 another action), `position` (the action against another attacker than the one
 a person ruled), `unstated` (as `position`, but no draft or proposal there
-states a position, because a run wrote it before the field existed),
+states a position, because the archive holds it with no `attacker_position`),
 `merged`, `misfiled` (right finding, wrong lane), `critic` (a draft cited it
 and was rejected), `place` (a rule led there, nothing was drafted), `unled`
 (nothing sent the lane there). `fan-in` sits between

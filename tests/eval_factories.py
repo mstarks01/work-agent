@@ -417,7 +417,7 @@ def cast(*args: object, **kwargs: object) -> Vote:
     """:func:`evals.harness.ledger.cast` with the two digests defaulted.
 
     Shadows the ledger's own name on purpose, so a test that does not care what
-    was voted on reads exactly as it did before the fields existed. A test
+    was voted on names no digest. A test
     *about* the digests passes them itself, or calls the ledger directly.
     """
     kwargs.setdefault("content", SAMPLE_CONTENT)

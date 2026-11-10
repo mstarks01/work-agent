@@ -30,8 +30,8 @@ order, and the first that finds the finding charges it; ``position`` and
   they state its ruled position, so a stage that finds the action at the place
   and only other positions charges ``position``, not itself.
 * ``unstated``: as ``position``, except that none of those items states any
-  position. A run wrote them before ``attacker_position`` existed, so the
-  archive cannot read the position rule there, and the row is not a lane's
+  position. The archive holds them with no ``attacker_position``, so it
+  cannot read the position rule there, and the row is not a lane's
   choice of attacker.
 * ``merged``: a surviving claim cites the place with the reference's own
   action, read through the equivalence table the identity rule reads, and the

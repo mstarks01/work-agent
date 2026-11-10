@@ -474,3 +474,24 @@ def a_control_rejection_that_quotes_neither_comes_back_to_the_critic():
 
     assert isinstance(outcome, Reask)
     assert [problem.kind for problem in outcome.problems] == ["control-row"]
+
+
+@decides
+def an_evidence_entry_with_no_excerpt_names_an_earlier_entry():
+    drafts = [
+        controls._asvs_draft(unit, "store:orders-db") for unit in ("V11.2.1", "V11.2.2")
+    ]
+
+    view = controls._view(drafts, controls._applied(controls._db(controls._row("V11"))))
+
+    entries = [
+        entry
+        for draft in view
+        for control in draft["controls"]
+        for entry in control["evidence"]
+    ]
+    assert any("excerpt" not in entry for entry in entries)
+    excerpted: set[str] = set()
+    for entry in entries:
+        assert ("excerpt" in entry) == (entry["sha256"] not in excerpted)
+        excerpted.add(entry["sha256"])

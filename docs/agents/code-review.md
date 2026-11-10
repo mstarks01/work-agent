@@ -242,8 +242,9 @@ and the test holds the rows to that set. Where a prompt can take a sentence
 from a table that the code reads, render the sentence from the table instead,
 as `render_predicates` does.
 
-Wording in model text that breaks a wording rule, such as the SPEND lint or
-the GLOSSARY Element term, changes only with a measured prompt change. The
+Wording in model text that breaks a wording rule, such as the SPEND lint, the
+MONEY lint, the GLOSSARY Element term or the GLOSSARY Boundary Crossing term,
+changes only with a measured prompt change. The
 maintainer rules such wording held until that change lands, and
 `.github/scripts/held_wording.toml` holds one row for each held phrase, with
 the rule and the reason. A round

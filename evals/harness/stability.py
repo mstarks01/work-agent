@@ -117,9 +117,8 @@ class ScoredRun:
     references: dict[Scope, int]
     recall: dict[Scope, float]
     #: Each missed reference's charged cause, per scope, off the ``losses``
-    #: block. ``None`` where the artifact carries no such block, which every
-    #: sweep before the instrument existed does: an absent record is not a run
-    #: whose causes all agreed.
+    #: block. ``None`` where the artifact carries no such block: an absent record is
+    #: not a run whose causes all agreed.
     causes: dict[Scope, dict[str, str]] | None = None
     #: Each matched reference's content, per scope: the matching claim's
     #: severity band and its endpoint-resolved place, off the report bundle.

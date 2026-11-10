@@ -611,7 +611,7 @@ def extractions_from_reports(
             extracted=model,
             issues=tuple(issues),
             raw=written["raw"],
-            # ``.get``: an emission archived before the key existed came from
+            # ``.get``: an archived emission that holds no such key came from
             # a sweep that ran no repair, which is what an absent key means.
             repair=written.get("repair"),
         )

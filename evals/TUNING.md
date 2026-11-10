@@ -452,8 +452,8 @@ it as a number: must-finds of 129.
 each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
 place and wrote another action), `position` (the lane wrote the action against
 another attacker than the one a person ruled), `unstated` (as `position`, but
-the drafts state no position, because a run wrote them before the field
-existed), `merged`, `misfiled` (the finding sits in
+the drafts state no position, because the archive holds them with no
+`attacker_position`), `merged`, `misfiled` (the finding sits in
 another lane), the critic, `fan-in` (the lane proposed it and the fan-in
 removed it, or narrowed its elements off the place), the place (a rule led
 there and nothing was drafted), or `unled`. A `place` or `unled` row also says

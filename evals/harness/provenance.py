@@ -126,8 +126,8 @@ class NodeExecution(BaseModel):
     instruction_sha256: Sha256Hex
     generation_fingerprint: Sha256Hex
     #: The serving organisation the provider named, where it named one. Absent
-    #: from every direct route and from every sweep recorded before the field
-    #: existed, which is why it defaults rather than being required: an absent
+    #: from every direct route and from an archived sweep that recorded no such
+    #: field, which is why it defaults rather than being required: an absent
     #: value is a real answer here, and demanding one would refuse the archive.
     served_upstream: str | None = Field(default=None, max_length=UPSTREAM_MAX_CHARS)
 
