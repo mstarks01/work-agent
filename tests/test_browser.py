@@ -3991,6 +3991,38 @@ def test_unticking_the_last_part_keeps_the_zone_with_no_tick(zoned_page):
     assert "Tick each part of the Internal Network" in offer.inner_text()
 
 
+def test_a_change_to_a_second_control_keeps_a_zone_chosen_with_no_tick(zoned_page):
+    page = zoned_page
+    edge = keep_control(page, "Edge", {"type": "boundary", "name": "Perimeter"})
+    other = keep_control(page, "Other", {"type": "application"})
+    submit_with_controls(page)
+    save_offer(page, lambda: page.select_option(f"#apply-{edge}", "boundary:dmz"))
+    body = save_offer(page, lambda: page.uncheck(f"#offer-{other}"))
+    assert page.input_value(f"#apply-{edge}") == "boundary:dmz"
+    assert "left out: it is not ticked" in page.inner_text("#control-offer")
+    assert body["control_scopes"] == [
+        {"control": edge, "element": "boundary:dmz", "ticked": []}
+    ]
+    body = save_offer(page, lambda: page.check(f"#cover-{edge}-store\\:audit-log"))
+    assert body["control_scopes"] == [
+        {"control": edge, "element": "boundary:dmz", "ticked": ["store:audit-log"]}
+    ]
+
+
+def test_a_change_to_a_second_control_keeps_a_matched_zone_with_no_tick(zoned_page):
+    page = zoned_page
+    zone = keep_control(page, "WAF", {"type": "boundary", "name": "Internal Network"})
+    other = keep_control(page, "Other", {"type": "application"})
+    submit_with_controls(page)
+    save_offer(page, lambda: page.uncheck(f"#cover-{zone}-process\\:web-app"))
+    body = save_offer(page, lambda: page.uncheck(f"#offer-{other}"))
+    assert body["control_scopes"] == [
+        {"control": zone, "element": "boundary:internal-network", "ticked": []}
+    ]
+    assert not page.is_checked(f"#cover-{zone}-process\\:web-app")
+    assert not page.is_checked(f"#offer-{zone}")
+
+
 def test_ticking_a_zone_control_on_again_restores_its_default_ticks(zoned_page):
     page = zoned_page
     zone = keep_control(page, "WAF", {"type": "boundary", "name": "Internal Network"})

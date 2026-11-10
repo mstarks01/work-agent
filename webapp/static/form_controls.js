@@ -263,15 +263,17 @@ const formControls = (() => {
     const target = resolution.reason === "missing-element" ? undefined : targets.get(entry.id);
     return { on: false, element: target ?? (entry.element ? entry.element.id : ""), ticks: new Set() };
   };
-  const scopesOf = (offer, picks) => offer
-    .filter((entry) => picks.get(entry.id).on)
-    .map((entry) => {
-      const pick = picks.get(entry.id);
-      if (entry.scope.type === "application") return { control: entry.id };
-      return entry.scope.type === "boundary"
-        ? { control: entry.id, element: pick.element, ticked: [...pick.ticks] }
-        : { control: entry.id, element: pick.element };
-    });
+  // A zone Control with an element goes in each save, with no tick while it
+  // is off: the service then leaves it out as "unticked", and `accepted`
+  // keeps its zone. Any other Control that is off stays out of the save.
+  const scopesOf = (offer, picks) => offer.flatMap((entry) => {
+    const pick = picks.get(entry.id);
+    if (entry.scope.type === "boundary") {
+      return pick.element ? [{ control: entry.id, element: pick.element, ticked: pick.on ? [...pick.ticks] : [] }] : [];
+    }
+    if (!pick.on) return [];
+    return [entry.scope.type === "application" ? { control: entry.id } : { control: entry.id, element: pick.element }];
+  });
 
   // A note that "Keep this name" leaves for the next draw of the offer.
   let keptNote = "";
