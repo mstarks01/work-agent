@@ -62,6 +62,7 @@ from tests.test_webapp_questions import (
     ran,
 )
 from webapp.main import _NOT_CONTINUED, OPERATOR, Workspace
+from webapp.page_words import INITIAL_PROGRESS_WORDS
 
 tiers = test_webapp.tiers
 
@@ -1005,7 +1006,10 @@ class TestTheAutomaticContinue:
             release.cancel()
             owner.runner.held.set()
         lines = re.findall(r"event: node\ndata: (.*)\n", stream)
-        assert [json.loads(line)["words"] for line in lines] == [words]
+        assert [json.loads(line)["words"] for line in lines] == [
+            INITIAL_PROGRESS_WORDS["description"],
+            words,
+        ]
 
     def test_the_paused_job_reads_as_its_resumed_job(self, owner):
         """The parent waits with no task, and its Resumed Job locks it, so the

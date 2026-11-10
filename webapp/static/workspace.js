@@ -319,7 +319,7 @@ const workspace = (() => {
         el("status").hidden = false;
         processing(data.progress, undefined, data.run);
         // The service continues a job with Controls and no questions at its pause.
-        if (data.continuing) el("status-text").textContent = FORM_WORDS.progress_panel["continues-with-controls"];
+        if (data.continuing) el("status-text").textContent = FORM_WORDS.progress_start.controls;
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (view === "description") {
         show("description-panel");

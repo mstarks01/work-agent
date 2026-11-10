@@ -25,6 +25,7 @@ from analysis_service.claims import (
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.graph import NodeStep, step_by_graph_node
+from analysis_service.jobs import JobRecord
 from analysis_service.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
@@ -236,26 +237,30 @@ def progress_mode(asks: bool) -> ProgressMode:
 
 
 #: What a run does first: it reads a description, or it is a **Resumed Job**
-#: and starts from the model of the job it resumes.
-RunStart = Literal["description", "resumption"]
+#: and continues the job it resumes, with answers or with Controls alone.
+RunStart = Literal["description", "answers", "controls"]
 
 
-def run_start_of(resumed: bool) -> RunStart:
-    """What a **Resumed Job** does first, or what each other run does first.
-    ``tests/test_progress_words.py`` holds the answer to
+def run_start_of(parent: JobRecord | None) -> RunStart:
+    """What a run does first, from the job it resumes: ``None`` for a run
+    that resumes no job. A parent that waits to continue for its Controls
+    alone (``continues_at_pause``) gives ``controls``. Each other parent gave
+    answers. ``tests/test_progress_words.py`` holds the answer to
     :func:`~analysis_service.pipeline.entry_of`."""
-    return "resumption" if resumed else "description"
+    if parent is None:
+        return "description"
+    return "controls" if parent.continues_at_pause else "answers"
 
 
 #: What the progress line says before the first step of a run completes. The
-#: page starts a run only from a description, and reads the ``description``
-#: row for it.
+#: page reads the same row when it starts or follows a run.
 INITIAL_PROGRESS_WORDS: Mapping[RunStart, str] = MappingProxyType(
     {
         "description": (
             "Reading your description and identifying the parts of your system…"
         ),
-        "resumption": "Preparing the analysis…",
+        "answers": "Using your answers to continue the analysis…",
+        "controls": "Continuing with your Controls…",
     }
 )
 
@@ -327,6 +332,16 @@ STAGE_COUNT = max(
 )
 
 
+def stage_after(
+    nodes: Sequence[str], frameworks: Sequence[FrameworkName], mode: ProgressMode
+) -> int:
+    """The count of stages that are complete after ``nodes`` completed in a
+    run of ``frameworks``. Raises :class:`KeyError` on a name that is not a
+    node of a graph of ``frameworks``."""
+    steps = step_by_graph_node(frameworks)
+    return max((STEP_PROGRESS[steps[node]].stages[mode] for node in nodes), default=0)
+
+
 def progress_after(
     nodes: Sequence[str],
     frameworks: Sequence[FrameworkName],
@@ -337,33 +352,23 @@ def progress_after(
     ``frameworks`` that does ``start`` first: the count of complete stages and
     the words of the work that follows. Raises :class:`KeyError` on a name
     that is not a node of a graph of ``frameworks``."""
-    steps = step_by_graph_node(frameworks)
-    completed = [STEP_PROGRESS[steps[node]] for node in nodes]
-    return {
-        "stage": max((progress.stages[mode] for progress in completed), default=0),
-        "words": (
-            completed[-1].words[mode] if completed else INITIAL_PROGRESS_WORDS[start]
-        ),
-    }
+    words = (
+        STEP_PROGRESS[step_by_graph_node(frameworks)[nodes[-1]]].words[mode]
+        if nodes
+        else INITIAL_PROGRESS_WORDS[start]
+    )
+    return {"stage": stage_after(nodes, frameworks, mode), "words": words}
 
 
-#: A line of the progress panel that the page chooses: the words while the
-#: service continues a job with the answers of the owner or with its Controls
-#: alone, the count of complete stages, and the time on one step.
-ProgressPanelLine = Literal[
-    "continues-with-answers",
-    "continues-with-controls",
-    "stages-complete",
-    "still-working",
-]
+#: A line of the progress panel that the page chooses: the count of complete
+#: stages, and the time on one step.
+ProgressPanelLine = Literal["stages-complete", "still-working"]
 
 #: The words of each line of the progress panel that the page chooses.
 #: ``{complete}`` and ``{count}`` stand for the complete stages and the stages
 #: of a run, and ``{clock}`` for the minutes and seconds on the step.
 PROGRESS_PANEL_WORDS: Mapping[ProgressPanelLine, str] = MappingProxyType(
     {
-        "continues-with-answers": "Using your answers to continue the analysis…",
-        "continues-with-controls": "Continuing with your Controls…",
         "stages-complete": "{complete} of {count} stages complete",
         "still-working": (
             "Still working on this step · {clock}. Some steps take a few minutes."
