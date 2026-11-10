@@ -816,7 +816,8 @@ def test_settings_env_has_one_writer():
 
 
 def test_an_evidence_file_by_id_has_one_reader():
-    """Only ``ControlDocument.file`` finds an evidence file by its ID.
+    """Only ``ControlDocument.file`` compares the ID of an evidence file with
+    an ``evidence_id``.
 
     A second lookup can answer for a different list, so a route and a store
     would disagree on whether a Control holds a file.

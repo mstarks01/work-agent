@@ -393,8 +393,8 @@ const formControls = (() => {
   };
 
   const onChange = (handler) => { changed = handler; };
-  // While a start is in flight, the Controls of the form take no input, so
-  // the job copies the Controls that the page shows.
+  // While the page starts or follows a run, the Controls of the form take no
+  // input, so the job copies the Controls that the page shows.
   const hold = (on) => { el("controls-offer").inert = on; };
   return { load, ready, onChange, chosen, drawOffer, accepted, drawUsed, hold };
 })();

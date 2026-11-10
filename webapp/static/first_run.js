@@ -289,7 +289,8 @@
   ];
 
   // The start button is off while a submission or a run is under way, and
-  // while the Controls of a submission are unknown.
+  // while the Controls of a submission are unknown. The Controls of the form
+  // take no input while a submission or a run is under way.
   let running = false;
   const gate = () => {
     go.disabled = running || !formControls.ready();

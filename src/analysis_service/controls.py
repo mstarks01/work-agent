@@ -558,8 +558,8 @@ class EvidenceRefusal:
 #: ends a type, as in ``token: bytes32, n: int``, or a clause of a sentence. A
 #: space and then another character does not end it either, so
 #: ``Password: 12 characters`` and ``password = pw1 + salt`` pass. The rule
-#: has a limit: ``connect(password=pw1, host=h)`` counts, because ``pw1``
-#: reads as a value. A quoted value does not count where it starts with a
+#: has a limit: ``connect(password=pw1, host=h)`` and ``self.token = token1;``
+#: count, because ``pw1`` and ``token1`` read as values. A quoted value does not count where it starts with a
 #: reference or a space, where it is only a mask of ``*``, or where it joins a
 #: name to another string, as ``"token=" + tok + "x"`` does. So a type name, a
 #: masked value and a joined log string pass. An empty string does not count

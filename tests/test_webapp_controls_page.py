@@ -809,8 +809,9 @@ class TestTheReportSection:
         assert "  - Refused: A-2. no" in text
 
     def test_the_page_and_the_markdown_export_read_the_title_of_a_row(self):
-        """``SectionRow.title`` is the one place that states a row's framework,
-        unit and version as a phrase, so neither reader spells a version."""
+        """The page and the Markdown export read ``SectionRow.title`` for the
+        framework, unit and version of a row, so neither spells that phrase.
+        The CSV export has its own phrase, which ``docs/Web-App.md`` states."""
         import inspect
 
         from webapp.report_export import controls_markdown

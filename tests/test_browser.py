@@ -5491,6 +5491,23 @@ def test_the_controls_take_no_input_while_a_pause_ends(zoned_page, path, press):
     )
 
 
+def test_a_control_change_behind_the_hold_goes_to_no_run(zoned_page):
+    """A change that an event of a script makes while Start is in flight waits
+    for the start. Where the start ended the pause, the paused run takes no
+    save."""
+    page = zoned_page
+    first = keep_control(page, "First", {"type": "application"})
+    submit_with_controls(page)
+    held = _hold_answers(page)
+    page.click("#continue")
+    _wait_for(page, held)
+    page.dispatch_event(f"#offer-{first}", "click")
+    with page.expect_response(_post_to_answer):
+        held[0].continue_()
+    page.wait_for_url("**/report/**")
+    assert len(held) == 1
+
+
 def test_a_settings_save_whose_answer_is_not_json_says_to_reload(browser, tmp_path):
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app

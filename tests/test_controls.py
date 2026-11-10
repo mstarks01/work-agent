@@ -506,6 +506,11 @@ def test_a_keyword_argument_with_a_digit_before_a_comma_is_refused():
     assert credential_hit(line, name="notes.txt") == (1, SETTING)
 
 
+def test_a_statement_with_a_digit_before_a_semicolon_is_refused():
+    """The same limit at the end of a statement: ``token1`` is a variable."""
+    assert credential_hit("self.token = token1;\n", name="notes.txt") == (1, SETTING)
+
+
 @pytest.mark.parametrize(
     "name",
     [
@@ -631,13 +636,14 @@ def test_a_credential_line_counts_each_line_end_a_text_may_hold(end):
         "password: ')" + " " * 100_000,
         "token=a1" + " " * 100_000 + "x",
         ("token=a1" + " " * 250 + "x") * 400,
+        "token=" * 42 + "a1" + " " * 200_000 + "x",
     ],
 )
 def test_a_hostile_line_is_read_in_linear_time(line):
     """Each line holds a hostile run after an assignment. An unquoted value
     with no 256-character bound reads each value to the end of the first line,
     and a joined-string check with two unbounded space quantifiers tries each
-    split of one run of spaces between them. Each takes seconds. The last two
+    split of one run of spaces between them. Each takes seconds. The last three
     lines hold an unquoted value, a run of spaces and no end of the value."""
     started = time.perf_counter()
     credential_hit(line, name="app.env")
