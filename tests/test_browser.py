@@ -573,13 +573,13 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         )
         tab = opened.locator("#questions-nav")
         assert opened.is_visible("#progress-panel")
+        # The bar shows a count once the service sends the first line.
+        opened.wait_for_function(
+            "() => document.querySelector('#status-text').textContent === '0 of 4 stages complete · Reading your description and identifying the parts of your system…'"
+        )
         assert opened.locator("#analysis-progress").count() == 1
         assert opened.locator("#analysis-progress").get_attribute("value") == "0"
         assert opened.locator("#analysis-progress").get_attribute("max") == "4"
-        assert (
-            opened.locator("#status-text").inner_text()
-            == "0 of 4 stages complete · Reading your description and identifying the parts of your system…"
-        )
         elapsed = opened.locator("#status-elapsed")
         assert elapsed.inner_text().startswith("Still working on this step · 0:0")
         assert elapsed.get_attribute("role") is None
@@ -684,6 +684,57 @@ def test_a_run_to_the_report_shows_the_stage_and_the_words_the_service_sends(
         runner.finish.set()
         opened.wait_for_selector("#progress-panel", state="hidden")
         context.close()
+
+
+class HeldResumedJob(web.PausingRunner):
+    """Completes two steps before its pause, and holds each Resumed Job
+    before its first node until the test releases it."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.release = threading.Event()
+
+    async def run(self, job, on_node):
+        if job.pauses():
+            await on_node("extract")
+            await on_node("validate")
+        elif job.resumption is not None:
+            while not self.release.is_set():
+                await asyncio.sleep(0.05)
+        return await super().run(job, on_node)
+
+
+def test_the_bar_of_a_resumed_job_never_shows_a_stage_below_its_lowest_stage(
+    browser, tiers
+):
+    """The parent stopped after two stages, so the bar of its Resumed Job
+    starts at 2. Until the service sends the first line, the bar shows no
+    count, and no value it shows is below 2."""
+    runner = HeldResumedJob()
+    for base in serve(web.app_for(tiers, runner, catalog=False)):
+        context = browser.new_context(base_url=base)
+        opened = context.new_page()
+        opened.goto("/")
+        pause(opened, opened=False)
+        opened.evaluate(
+            """() => {
+              const bar = document.querySelector('#analysis-progress');
+              window.shown = [];
+              new MutationObserver(() => window.shown.push(bar.getAttribute('value')))
+                .observe(bar, {attributes: true, attributeFilter: ['value']});
+            }"""
+        )
+        opened.click("#continue")
+        opened.wait_for_function(
+            "text => document.querySelector('#status-text').textContent === text",
+            arg="2 of 4 stages complete · Using your answers to continue the analysis…",
+        )
+        shown = opened.evaluate("() => window.shown")
+        runner.release.set()
+        opened.wait_for_url("**/report/**")
+        context.close()
+
+    assert [value for value in shown if value is not None] == ["2"]
 
 
 def test_one_shared_answer_saves_the_answer_for_every_element_ticked(page):

@@ -13,10 +13,12 @@ import json
 import re
 import threading
 import time
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Callable, Iterator, Sequence
 from typing import NamedTuple, get_args
 
 import pytest
+from fastapi.testclient import TestClient
 
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
@@ -40,13 +42,14 @@ from tests.factories import (
 )
 from tests.test_page_words import _copies
 from tests.test_webapp import (
+    LOOPBACK,
     SAME_ORIGIN,
     STATIC_SCRIPTS,
     _island,
     page_javascript,
     posted,
 )
-from tests.test_webapp_questions import HeldAfterExtract, client_for
+from tests.test_webapp_questions import HeldAfterExtract, app_for, client_for
 from webapp.main import Workspace
 from webapp.page_words import (
     INITIAL_PROGRESS_WORDS,
@@ -82,10 +85,14 @@ class BuiltGraph(NamedTuple):
     """One graph that ``build_pipeline`` builds."""
 
     entry: graph.Entry
+    #: Whether the graph holds the assertion pass.
+    assertions: bool
     #: The name of each node but the start.
     nodes: set[str]
     #: The name of each node that no edge leaves.
     ends: set[str]
+    #: Each edge, as the names of its two nodes.
+    edges: set[tuple[str, str]]
 
 
 def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
@@ -109,8 +116,9 @@ def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
         workflow = built.workflow.graph
         assert workflow is not None
         nodes = {node.name for node in workflow.nodes} - {graph.START.name}
-        left = {edge.from_node.name for edge in workflow.edges}
-        graphs.append(BuiltGraph(entry, nodes, nodes - left))
+        edges = {(edge.from_node.name, edge.to_node.name) for edge in workflow.edges}
+        left = {start for start, _ in edges}
+        graphs.append(BuiltGraph(entry, assertions, nodes, nodes - left, edges))
     return graphs
 
 
@@ -230,6 +238,51 @@ def test_the_last_step_of_each_graph_of_a_job_fills_the_bar(selection):
             assert line["stage"] == STAGE_COUNT, entry
 
 
+def stages_on_each_path(
+    built: BuiltGraph, selection: tuple[FrameworkName, ...]
+) -> set[tuple[int, ...]]:
+    """The stages that the bar of a run that asks shows on each path of
+    ``built`` from the start to an end that is not a failed end, in order.
+    ``built`` is a graph with no cycle, as each graph of a run that asks is."""
+    steps = graph.step_by_graph_node(selection)
+    after: defaultdict[str, list[str]] = defaultdict(list)
+    for start, end in built.edges:
+        after[start].append(end)
+
+    def paths(node: str, seen: frozenset[str]) -> Iterator[list[str]]:
+        assert node not in seen, f"the graph has a cycle through {node}"
+        if not after[node]:
+            yield []
+        for following in after[node]:
+            for rest in paths(following, seen | {node}):
+                yield [following, *rest]
+
+    shown = set()
+    for path in paths(graph.START.name, frozenset()):
+        if steps[path[-1]] in FAILED_ENDS:
+            continue
+        stages = (STEP_PROGRESS[steps[node]].stages["to-questions"] for node in path)
+        shown.add(tuple(dict.fromkeys(itertools.accumulate(stages, max))))
+    return shown
+
+
+@pytest.mark.parametrize("selection", SELECTIONS, ids="+".join)
+def test_a_run_that_asks_shows_each_stage_where_the_assertion_pass_runs(selection):
+    """The ``assert`` step completes stage 3. A deployment that turns
+    ``ANALYSIS_ASSERTIONS`` off builds no ``assert`` step, so the bar of its
+    run that asks goes from 2 to 4. That is a stated limit."""
+    asking = [
+        built
+        for built in built_graphs(selection)
+        if built.entry == graph.ENTRY_HEAD_ONLY
+    ]
+
+    assert {built.assertions for built in asking} == {False, True}
+    for built in asking:
+        shown = (1, 2, 3, 4) if built.assertions else (1, 2, 4)
+        assert stages_on_each_path(built, selection) == {shown}, built.nodes
+
+
 def test_a_run_to_the_report_reaches_the_pause_only_for_its_controls():
     """The ``to-report`` words of the pause are the words of a run that pauses
     for its Controls alone, so no other run to the report builds a pause."""
@@ -310,7 +363,7 @@ def test_no_page_script_names_a_node_or_copies_the_words_of_a_step(script):
 def test_the_form_page_carries_the_stage_count_and_the_start_words(tiers):
     with client_for(tiers, StubPipelineRunner()) as client:
         page = client.get("/").text
-    assert f'<progress id="analysis-progress" value="0" max="{STAGE_COUNT}"' in page
+    assert f'<progress id="analysis-progress" max="{STAGE_COUNT}"' in page
     assert _island(page, "form_words")["progress_start"] == dict(INITIAL_PROGRESS_WORDS)
     script = page_javascript("first_run.js")
     assert script.count("FORM_WORDS.progress_start.description") == 2
@@ -333,18 +386,19 @@ def assert_lines(
     nodes: list[str],
     mode: ProgressMode,
     start: RunStart,
-    stopped: int = 0,
+    lowest: int = 0,
 ) -> None:
     """The first frame is the line before any node, each later frame is the
     progress line after its node, and a later frame has a larger ``seq``. No
-    stage falls below ``stopped``, the stage where the parent stopped."""
+    stage falls below ``lowest``, the lowest stage of the bar of a Resumed
+    Job."""
     selection = [item["name"] for item in BODY["frameworks"]]
     sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
     lines = [
         progress_after(done, selection, mode, start)
         for done in [[], *([node] for node in nodes)]
     ]
-    assert sent == [line | {"stage": max(line["stage"], stopped)} for line in lines]
+    assert sent == [line | {"stage": max(line["stage"], lowest)} for line in lines]
     seqs = [frame["seq"] for frame in frames]
     assert seqs == sorted(set(seqs))
 
@@ -370,6 +424,15 @@ def test_the_stream_of_a_run_in_progress_carries_each_progress_line_and_no_node_
     assert "extract" not in stream
 
 
+class HeldBeforeExtract(HeldAfterExtract):
+    """Holds each run before its first node until the test releases it."""
+
+    async def run(self, job, on_node):
+        while not self.release.is_set():
+            await asyncio.sleep(0.01)
+        return await super().run(job, on_node)
+
+
 def progress_at_start(client, run: str) -> dict:
     """The progress line of ``run`` in the status answer."""
     return client.get(f"/workspace/runs/{run}").json()["progress"]
@@ -378,12 +441,6 @@ def progress_at_start(client, run: str) -> dict:
 @pytest.mark.parametrize("mode", MODES)
 def test_a_reload_at_the_start_shows_the_words_the_page_showed_at_submit(tiers, mode):
     """The page shows the ``description`` row at submit, in each mode."""
-
-    class HeldBeforeExtract(HeldAfterExtract):
-        async def run(self, job, on_node):
-            while not self.release.is_set():
-                await asyncio.sleep(0.01)
-            return await super().run(job, on_node)
 
     runner = HeldBeforeExtract()
     with client_for(tiers, runner) as client:
@@ -402,6 +459,25 @@ def test_a_reload_at_the_start_shows_the_words_the_page_showed_at_submit(tiers, 
     }
 
 
+def resume(
+    client, runner: HeldAfterExtract, parent: str, ready: Callable[[dict], bool]
+) -> tuple[str, dict]:
+    """The Resumed Job that continues ``parent`` with no answers, and the
+    first status answer of it that ``ready`` accepts."""
+    runner.release.clear()
+    runner.sent.clear()
+    continued = client.post(
+        f"/answer/{parent}", json={"revision": 0}, headers=SAME_ORIGIN
+    )
+    assert continued.status_code == 200, continued.text
+    child = continued.json()["run"]
+    deadline = time.monotonic() + 5
+    while not ready(read := client.get(f"/workspace/runs/{child}").json()):
+        assert time.monotonic() < deadline, read
+        time.sleep(0.01)
+    return child, read
+
+
 def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report(
     tiers,
 ):
@@ -413,28 +489,44 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
         )
         lines_of(client, runner, started.json()["run"])
         selection = [item["name"] for item in BODY["frameworks"]]
-        stopped = stage_after(runner.sent, selection, "to-report")
-        runner.release.clear()
-        runner.sent.clear()
-        continued = client.post(
-            f"/answer/{started.json()['run']}",
-            json={"revision": 0},
-            headers=SAME_ORIGIN,
+        lowest = stage_after(runner.sent, selection, "to-report")
+        child, read = resume(
+            client,
+            runner,
+            started.json()["run"],
+            lambda read: read["progress"]["seq"] > 0,
         )
-        assert continued.status_code == 200, continued.text
-        child = continued.json()["run"]
-        deadline = time.monotonic() + 5
-        while not (read := client.get(f"/workspace/runs/{child}").json())["progress"][
-            "seq"
-        ]:
-            assert time.monotonic() < deadline, read
-            time.sleep(0.01)
         _, frames = lines_of(client, runner, child)
 
-    assert_lines(frames, runner.sent, "to-report", "answers", stopped)
-    assert read["progress"]["stage"] == max(stopped, 1)
+    assert_lines(frames, runner.sent, "to-report", "answers", lowest)
+    assert read["progress"]["stage"] == max(lowest, 1)
     assert read["pauses"] is False
     assert frames[-1]["stage"] == STAGE_COUNT
+
+
+def test_a_parent_with_a_node_of_no_graph_of_this_build_gives_a_bar_at_0(tiers):
+    """A parent of an earlier build can hold a node name that no graph of
+    this build holds. The bar of its Resumed Job then starts at 0, and the
+    status answer and the stream both answer."""
+    store = InMemoryJobStore()
+    runner = HeldBeforeExtract()
+    app = app_for(tiers, runner, workspace=Workspace(store=store))
+    with TestClient(app, base_url=LOOPBACK) as client:
+        started = client.post(
+            "/analyze", json=BODY | {"questions": True}, headers=SAME_ORIGIN
+        )
+        parent = started.json()["run"]
+        lines_of(client, runner, parent)
+        store._records[parent].record_node("a_retired_node")
+        child, read = resume(client, runner, parent, lambda read: "progress" in read)
+        _, frames = lines_of(client, runner, child)
+
+    assert read["progress"] == {
+        "stage": 0,
+        "words": INITIAL_PROGRESS_WORDS["answers"],
+        "seq": 0,
+    }
+    assert_lines(frames, runner.sent, "to-report", "answers")
 
 
 def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
@@ -454,9 +546,11 @@ def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
     assert "event: done" in ended
 
 
-#: The nodes of a parent that stopped, by how its Resumed Job starts and the
-#: mode of the parent, with the stage where the parent stopped, counted in the
-#: ``to-report`` mode of the Resumed Job.
+#: The nodes of a parent, by how its Resumed Job starts and the mode of the
+#: parent, with the stage below which the bar of the Resumed Job never goes:
+#: the stage where a paused parent stopped, counted in the ``to-report`` mode
+#: of the Resumed Job. The parent in the ``to-report`` mode that asked for
+#: answers is a finished report, and the bar of its follow-up starts at 0.
 PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
     ("answers", "to-questions"): (
         [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "catalog"],
@@ -464,7 +558,7 @@ PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
     ),
     ("answers", "to-report"): (
         [graph.EXTRACT_NODE, graph.PREPARE_NODE, graph.ASSEMBLE_NODE],
-        STAGE_COUNT,
+        0,
     ),
     ("controls", "to-report"): (
         [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "pause"],
@@ -528,22 +622,22 @@ def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
 def test_a_resumed_job_starts_with_the_words_the_page_shows_at_its_start(start, mode):
     """The status answer and the page read one row of one table."""
-    _, stopped = PARENT_RUNS[start, mode]
+    _, lowest = PARENT_RUNS[start, mode]
     assert _line(start, mode, []) == {
-        "stage": stopped,
+        "stage": lowest,
         "words": INITIAL_PROGRESS_WORDS[start],
         "seq": 0,
     }
 
 
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
-def test_the_bar_of_a_resumed_job_never_goes_below_the_stage_of_its_parent(start, mode):
-    _, stopped = PARENT_RUNS[start, mode]
+def test_the_bar_of_a_resumed_job_never_goes_below_its_lowest_stage(start, mode):
+    _, lowest = PARENT_RUNS[start, mode]
     for nodes in ([graph.EXTRACT_NODE], [graph.EXTRACT_NODE, graph.PREPARE_NODE]):
         expected = progress_after(
             nodes, [each.name for each in sample_selection()], "to-report", start
         )["stage"]
-        assert _line(start, mode, nodes)["stage"] == max(expected, stopped)
+        assert _line(start, mode, nodes)["stage"] == max(expected, lowest)
 
 
 def test_the_page_reads_the_start_words_of_a_resumed_job_from_the_start_table():

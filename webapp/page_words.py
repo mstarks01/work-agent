@@ -25,7 +25,12 @@ from analysis_service.claims import (
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.graph import NodeStep, step_by_graph_node
-from analysis_service.jobs import JobRecord
+from analysis_service.jobs import (
+    JobRecord,
+    Resumption,
+    completed_nodes,
+    is_follow_up,
+)
 from analysis_service.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
@@ -297,9 +302,11 @@ _PAUSING = _by_mode("Generating questions…", "Preparing your Controls…")
 
 #: The progress of each step. The bar counts completed stages, not a share of
 #: elapsed time. A run that the ``reject`` step ends shows its refusal, and its
-#: row completes no stage. A run that asks ends at ``catalog`` or at ``pause``,
-#: never at both, so each of the two completes the last two stages and fills
-#: the bar.
+#: row completes no stage. In a run that asks, ``assert`` completes the third
+#: stage. A run that asks ends at ``catalog`` or at ``pause``, never at both, so
+#: each of the two fills the bar. A deployment that turns the assertion pass
+#: off builds no ``assert`` step, and the bar of its run that asks goes from
+#: the second stage to the last.
 STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
     {
         "extract": _step(_CHECKING_MAP, 1, 1),
@@ -310,7 +317,7 @@ STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
         "capabilities": _step(_IDENTIFYING_DETAILS, 2, 2),
         "stated": _step(_IDENTIFYING_DETAILS, 2, 2),
         "read": _step(_IDENTIFYING_DETAILS, 2, 2),
-        "assert": _step("Choosing the relevant checks for your system…", 2, 2),
+        "assert": _step("Choosing the relevant checks for your system…", 3, 2),
         "catalog": StepProgress(_PAUSING, _by_mode(4, 0)),
         "pause": StepProgress(_PAUSING, _by_mode(4, 0)),
         "prepare": _step(_EXAMINING, 0, 2),
@@ -354,6 +361,31 @@ def words_after(
     if not nodes:
         return INITIAL_PROGRESS_WORDS[start]
     return STEP_PROGRESS[step_by_graph_node(frameworks)[nodes[-1]]].words[mode]
+
+
+def lowest_stage(
+    resumption: Resumption | None,
+    parent: JobRecord | None,
+    frameworks: Sequence[FrameworkName],
+    mode: ProgressMode,
+) -> int:
+    """The stage below which the bar of a Resumed Job never goes: the stage
+    where its paused parent stopped, counted in ``mode``
+    (:func:`stage_after`). ``None`` and ``None`` stand for a job that
+    resumes no job, and give 0.
+
+    The bar of a follow-up of a finished report starts at 0. So does the bar
+    of a job whose parent holds a node that no graph of ``frameworks`` holds,
+    a record of an earlier build. The bar is a display value, so this reader
+    answers 0 for such a name. :func:`stage_after` and :func:`words_after`,
+    which map a node name to its step, raise :class:`KeyError` for it.
+    """
+    if parent is None or is_follow_up(resumption):
+        return 0
+    nodes = completed_nodes(parent.events)
+    if not set(nodes) <= step_by_graph_node(frameworks).keys():
+        return 0
+    return stage_after(nodes, frameworks, mode)
 
 
 #: A line of the progress panel that the page chooses: the count of complete

@@ -128,16 +128,22 @@ further framework adds its own lane nodes to that. The page shows a progress bar
 of four stages and one status line, for example
 `1 of 4 stages complete · Checking the system map for gaps or conflicting details…`.
 The bar counts completed stages, not elapsed time. A run that stops for your
-answers counts the extraction and the checks of the system model, and its last
-step fills the bar. A run toward a report counts the extraction, the
-preparation, the review of the findings and the report assembly. The status line
-names the next stage in plain words, and the page shows no graph node name.
+answers counts the extraction, the checks of the system model and the choice of
+the checks for your system, and its last step fills the bar. Where a deployment
+turns `ANALYSIS_ASSERTIONS` off, the run makes no choice of checks, so its bar
+goes from the second stage to the last. A run toward a report counts the
+extraction, the preparation, the review of the findings and the report
+assembly. The status line names the next stage in plain words, and the page
+shows no graph node name. Until the service sends the first line of a run, the
+bar shows no count.
 A run that continues a paused job starts its bar at the stage where that job
 stopped, counted in the stages of a run toward a report, and the bar does not
 go below it. Its first line reads "Using your
 answers to continue the analysis…" after your answers, or "Continuing with
 your Controls…" after a pause for your Controls alone. A reload shows the same
-line.
+line. The bar of a follow-up starts at 0. So does the bar of a run that
+continues a job of an earlier version of the app, where that job holds a step
+that this version does not have.
 
 **The report** has three sections under its title: **Report**, **Questions**
 and **About the analysis**. The page opens on **Report**, and `?view=questions`

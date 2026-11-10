@@ -234,7 +234,9 @@ from analysis_service.jobs import (
     JobStore,
     PipelineRunner,
     RefusalOutcome,
+    Resumption,
     StopSignal,
+    completed_nodes,
     ended,
     event_frames,
     execute_job,
@@ -324,6 +326,7 @@ from webapp.page_words import (
     RunStart,
     change_line,
     island_tables,
+    lowest_stage,
     progress_mode,
     run_start_of,
     stage_after,
@@ -551,24 +554,27 @@ class Workspace:
             return record.status == "awaiting-answers"
         return await self.starts_from(record) == "description"
 
-    async def _parent(self, record: Envelope) -> JobRecord | None:
-        """The job that ``record``, a job in flight, resumes, or ``None``
-        where it resumes no job. The envelope leaves the resumption out, so
-        this reads it by name. A Resumed Job locks its parent, so the store
-        holds the parent."""
+    async def _resumed(
+        self, record: Envelope
+    ) -> tuple[Resumption, JobRecord] | tuple[None, None]:
+        """The resumption of ``record``, a job in flight, and the job it
+        resumes, or ``None`` and ``None`` where it resumes no job. The envelope
+        leaves the resumption out, so this reads it by name. A Resumed Job
+        locks its parent, so the store holds the parent."""
         resumption = await self.store.resumption(record.id, record.owner_id)
         if resumption is None:
-            return None
+            return None, None
         parent = await self.store.owned(resumption.parent_id, record.owner_id)
         if parent is None:
             raise LookupError(f"job {record.id} resumes a job the store lacks")
         if not isinstance(parent, JobRecord):
             raise UnreadableSchema(f"job {record.id} resumes an unreadable job")
-        return parent
+        return resumption, parent
 
     async def starts_from(self, record: Envelope) -> RunStart:
         """What the run of ``record``, a job in flight, does first."""
-        return run_start_of(await self._parent(record))
+        _, parent = await self._resumed(record)
+        return run_start_of(parent)
 
     async def progress_line(
         self, record: JobRecord, asks: bool
@@ -578,28 +584,22 @@ class Workspace:
         :func:`webapp.page_words.words_after`), with the
         ``seq`` of the last event, so the page keeps the latest line it got.
 
-        The bar of a Resumed Job starts at the stage where its parent stopped,
-        counted in the mode of the Resumed Job
-        (:func:`webapp.page_words.stage_after` over the parent's nodes), and
-        never goes below it.
+        The bar of a Resumed Job never goes below its lowest stage
+        (:func:`webapp.page_words.lowest_stage`).
 
         ``record`` is a job in flight that :func:`readable` accepts, and
         ``asks`` is the answer of :meth:`asks` for it.
         """
         mode = progress_mode(asks)
-        parent = await self._parent(record)
-        start = run_start_of(parent)
         frameworks = [selection.name for selection in record.whole_frameworks()]
-        stopped = (
-            0
-            if parent is None
-            else stage_after(_node_names(parent.events), frameworks, mode)
-        )
+        resumption, parent = await self._resumed(record)
+        start = run_start_of(parent)
+        lowest = lowest_stage(resumption, parent, frameworks, mode)
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
-            nodes = _node_names(events)
+            nodes = completed_nodes(events)
             return {
-                "stage": max(stage_after(nodes, frameworks, mode), stopped),
+                "stage": max(stage_after(nodes, frameworks, mode), lowest),
                 "words": words_after(nodes, frameworks, mode, start),
                 "seq": events[-1].seq if events else 0,
             }
@@ -2830,11 +2830,6 @@ EndFrame = Literal[
 ]
 
 
-def _node_names(events: Sequence[JobEvent]) -> list[str]:
-    """The name of each node of ``events``, in order."""
-    return [event.node for event in events if event.node is not None]
-
-
 def _frame(event: EndFrame, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
@@ -2849,7 +2844,8 @@ async def _stream(
     then one frame for how it ended. Where ``progress`` is given, each node
     event gets a frame too: the progress line after that node, and no node
     name. The first frame is then the progress line before any node, so the
-    bar of a Resumed Job starts at the stage where its parent stopped.
+    bar of a Resumed Job starts at its lowest stage
+    (:func:`webapp.page_words.lowest_stage`).
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions

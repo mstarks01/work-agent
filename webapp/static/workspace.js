@@ -379,23 +379,29 @@ const workspace = (() => {
   // its count of complete stages, its words (webapp.page_words) and the
   // number of its last event. The stream and the status answer both send
   // lines, so the page keeps the line of the latest event. Before the service
-  // sends a line, the page shows `initialWords`.
+  // sends a line, the page shows `initialWords` and the bar shows no count,
+  // because only the service knows the stage where a run starts.
   const processing = (sent, initialWords, runId) => {
     const progress = el("analysis-progress");
     if (runId && progressRun !== runId) {
       progressRun = runId;
       sentLine = null;
       stepStatus = null;
-      progress.value = 0;
+      progress.removeAttribute("value");
+      progress.removeAttribute("aria-valuetext");
     }
     if (sent) {
       progress.value = Math.max(progress.value, sent.stage);
       if (sent.seq > (sentLine?.seq ?? -1)) sentLine = sent;
     }
-    const complete = FORM_WORDS.progress_panel["stages-complete"].replace("{complete}", progress.value).replace("{count}", progress.max);
-    progress.setAttribute("aria-valuetext", complete);
     const status = sentLine?.words ?? initialWords;
-    el("status-text").textContent = `${complete} · ${status}`;
+    if (sentLine) {
+      const complete = FORM_WORDS.progress_panel["stages-complete"].replace("{complete}", progress.value).replace("{count}", progress.max);
+      progress.setAttribute("aria-valuetext", complete);
+      el("status-text").textContent = `${complete} · ${status}`;
+    } else {
+      el("status-text").textContent = status;
+    }
     if (status !== stepStatus) {
       stepStatus = status;
       stepStarted = Date.now();
