@@ -479,7 +479,7 @@ def test_the_way_out_sits_above_the_file_preview():
     assert page.index('id="result"') < page.index('id="filePreview"')
     assert ".file-preview pre { max-height:40vh; overflow:auto; }" in page
     script = client_script("sitting.js")
-    assert 'hide("filePreview");' in script.split('$("submit").addEventListener', 1)[1]
+    assert "closePreview();" in script.split('$("submit").addEventListener', 1)[1]
     assert "$(steps).scrollIntoView" in script
     assert page.index('id="uploadSteps"') < page.index('id="filePreview"')
 

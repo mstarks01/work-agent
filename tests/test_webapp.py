@@ -1883,8 +1883,8 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
 #: here rather than derived: a page added without an entry fails the sweep
 #: below, which is the point.
 PAGE_SCRIPTS = {
-    "webapp/sitting.py": "sitting.js",
-    "webapp/review.py": ("review_queue.js", "review_finding.js"),
+    "webapp/sitting.py": ("service_answer.js", "sitting.js"),
+    "webapp/review.py": ("service_answer.js", "review_queue.js", "review_finding.js"),
     "webapp/main.py": (
         "theme.js",
         "sidebar.js",
@@ -1933,6 +1933,35 @@ STATIC_SCRIPTS = sorted(
         for name in ((value,) if isinstance(value, str) else value)
     }
 )
+
+#: Each script that calls ``.json()``, with the count of its calls and the
+#: count of them that have no ``.catch(`` directly on them. ``jsonOf`` of
+#: service_answer.js is the one read. The Settings page loads sidebar.js and
+#: settings.js only, so settings.js holds its own catch. Each other row is a
+#: read that does not go through ``jsonOf``.
+JSON_READS: dict[str, tuple[int, int]] = {
+    "service_answer.js": (1, 0),
+    "settings.js": (2, 0),
+    "controls.js": (2, 1),
+    "form_controls.js": (1, 1),
+    "report_view.js": (1, 1),
+}
+
+
+def test_each_script_reads_json_through_json_of():
+    """An answer of a proxy can be a plain page, and ``.json()`` of it throws.
+    The lint counts each ``.json()`` of each script, and each one with no
+    catch, against :data:`JSON_READS`. A script with no row holds none, and a
+    row holds no more than its script does."""
+    found = {}
+    for name in STATIC_SCRIPTS:
+        script = page_javascript(name)
+        reads = len(re.findall(r"\.json\(\)", script))
+        bare = len(re.findall(r"\.json\(\)(?!\s*\.catch\()", script))
+        if reads:
+            found[name] = (reads, bare)
+    assert found == JSON_READS
+
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
 #: holds values rather than code: a page's injected values keep their escape

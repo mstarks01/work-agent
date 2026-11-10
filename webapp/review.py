@@ -168,6 +168,11 @@ if _unasked:
 _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 
 
+def _script(name: str) -> str:
+    """The script of one review page, after the reader of an answer it calls."""
+    return "\n".join(client_script(part) for part in ("service_answer.js", name))
+
+
 class VoteBody(BaseModel):
     """What the page posts. Closed, so an unknown field is a 422 not a silent drop."""
 
@@ -299,7 +304,7 @@ def create_app(session: Session) -> FastAPI:
             render(
                 _QUEUE_PAGE,
                 _PAGE_GRANTS,
-                script=client_script("review_queue.js"),
+                script=_script("review_queue.js"),
                 voter=escape(session.voter),
             )
         )
@@ -310,7 +315,7 @@ def create_app(session: Session) -> FastAPI:
             render(
                 _REVIEW_PAGE,
                 _PAGE_GRANTS,
-                script=client_script("review_finding.js"),
+                script=_script("review_finding.js"),
                 voter=escape(session.voter),
                 token=script_json(session.token),
             )

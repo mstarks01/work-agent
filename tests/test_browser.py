@@ -5018,3 +5018,409 @@ def test_the_list_keeps_stop_off_while_the_header_stops_the_run(browser, hanging
     held[0].fulfill(status=409, json={"message": "Not now."})
     page.wait_for_selector('[aria-label="Stop Hangs"]:enabled')
     context.close()
+
+
+# --- an answer that is not JSON, and an answer that comes late ---------------
+
+#: A refusal as a proxy words it: a plain error page, not the app's JSON.
+ERROR_PAGE = {"status": 502, "body": "<html>Bad gateway</html>"}
+
+
+def _answer_with_an_error_page(page, path: str) -> None:
+    page.route(path, lambda route: route.fulfill(**ERROR_PAGE))
+
+
+def _reload(page, case: str) -> None:
+    page.reload()
+
+
+def _press_case(page, case: str) -> None:
+    page.click(f'#cases li[data-case="{case}"] button')
+
+
+def _reset(page, case: str) -> None:
+    page.click("#resetReview")
+
+
+def _drop(page, case: str) -> None:
+    page.locator("#carrying button").first.click()
+
+
+def _preview(page, case: str) -> None:
+    page.click("#showFiles")
+
+
+@pytest.mark.parametrize(
+    ("path", "stage", "act", "said"),
+    [
+        ("**/api/rail", None, _reload, "#left:has-text('did not load')"),
+        ("**/api/part-one*", None, _press_case, "#partOne:has-text('did not load')"),
+        ("**/api/part-two*", None, _press_case, "#ownHint:has-text('did not load')"),
+        ("**/api/reset", "case", _reset, "#saveStatus:has-text('Not reset')"),
+        ("**/api/drop", "submit", _drop, "#ready:has-text('Not changed')"),
+        (
+            "**/api/contribution-preview",
+            "submit",
+            _preview,
+            "#contributeStatus:has-text('did not load')",
+        ),
+    ],
+)
+def test_a_sitting_refusal_that_is_not_json_says_so(
+    sitting_page, path, stage, act, said
+):
+    page, _, (case, _) = sitting_page
+    if stage == "case":
+        _open_case(page, case)
+    elif stage == "submit":
+        _open_submit(page)
+    _answer_with_an_error_page(page, path)
+    act(page, case)
+    page.wait_for_selector(said, state="attached")
+
+
+def test_a_late_preview_stays_closed_after_the_author_changes(sitting_page):
+    page, _, _ = sitting_page
+    _count_reads(page, "/api/contribution-preview")
+    held = _hold(page, "**/api/contribution-preview")
+    _open_submit(page)
+    page.click("#showFiles")
+    _wait_for(page, held)
+    page.fill("#githubAuthor", "another-reviewer")
+    held[0].continue_()
+    page.wait_for_function("() => window.readsDone >= 1")
+    assert page.is_hidden("#filePreview")
+
+
+def test_an_older_rail_answer_leaves_the_newer_rail(sitting_page):
+    page, _, _ = sitting_page
+    _count_reads(page, "/api/rail")
+    held: list = []
+    page.route(
+        "**/api/rail",
+        lambda route: held.append(route) if not held else route.fallback(),
+    )
+    page.evaluate("() => { loadRail(); }")
+    _wait_for(page, held)
+    page.evaluate("loadRail()")
+    held[0].fulfill(json={"cases": [], "ready": 0})
+    page.wait_for_function("() => window.readsDone >= 2")
+    assert page.locator("#cases li").count() == 2
+
+
+def test_the_last_case_pressed_owns_the_stage(sitting_page):
+    """Each press saves the draft first. A press whose save answers late
+    leaves the stage to the press after it."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    held: list = []
+    page.route(
+        "**/api/draft",
+        lambda route: held.append(route) if not held else route.fallback(),
+    )
+    _press_case(page, other)
+    _wait_for(page, held)
+    _press_case(page, case)
+    with page.expect_response("**/api/draft"):
+        held[0].continue_()
+    page.wait_for_timeout(300)
+    assert page.evaluate("current") == case
+    _open_case(page, case)
+
+
+def test_a_record_pressed_while_the_next_case_opens_leaves_it(sitting_page):
+    """A press of a case saves the draft before the stage changes. A record
+    pressed in that time belongs to the case that the stage shows then."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    drafts: list = []
+    page.route(
+        "**/api/draft",
+        lambda route: drafts.append(route) if not drafts else route.fallback(),
+    )
+    finishes = _hold(page, "**/api/finish")
+    _press_case(page, other)
+    _wait_for(page, drafts)
+    page.click("#finish")
+    _wait_for(page, finishes)
+    drafts[0].continue_()
+    page.wait_for_function("id => current === id", arg=other)
+    with page.expect_response("**/api/rail"):
+        finishes[0].continue_()
+    page.wait_for_timeout(300)
+    assert page.is_hidden("#done")
+
+
+def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
+    sitting_page,
+):
+    """A press of a case whose draft save does not arrive leaves the stage on
+    its case, so a record that answers then draws there."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    finishes = _hold(page, "**/api/finish")
+    page.click("#finish")
+    _wait_for(page, finishes)
+    drafts = _hold(page, "**/api/draft")
+    # Each press rejects, as its draft save does; the fixture reads page errors.
+    page.evaluate(
+        "addEventListener('unhandledrejection', (event) => event.preventDefault())"
+    )
+    _press_case(page, other)
+    _press_case(page, other)
+    for _ in range(250):
+        if len(drafts) == 2:
+            break
+        page.wait_for_timeout(20)
+    assert len(drafts) == 2
+    for draft in drafts:
+        with page.expect_event("requestfailed"):
+            draft.abort()
+    with page.expect_response("**/api/rail"):
+        finishes[0].continue_()
+    page.wait_for_selector("#done", state="visible", timeout=3000)
+    assert page.evaluate("current") == case
+
+
+def test_a_drop_keeps_the_author_the_reader_typed(sitting_page):
+    page, _, _ = sitting_page
+    _open_submit(page)
+    page.fill("#githubAuthor", "typed-author")
+    rows = page.locator("#carrying button").count()
+    with page.expect_response("**/api/contribution-status"):
+        _drop(page, "")
+    page.wait_for_function(
+        "n => document.querySelectorAll('#carrying button').length < n", arg=rows
+    )
+    assert page.input_value("#githubAuthor") == "typed-author"
+
+
+def _upload(page, name: str) -> None:
+    upload_to_files(page, name, "Ana: hi")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.click("#upload-save")
+
+
+def test_an_older_files_answer_leaves_the_newer_list(page):
+    """A delete and an upload each read the list again. The read of the
+    delete answers last here, with a list that the upload made old."""
+    page.goto("/files")
+    _upload(page, "first.txt")
+    page.wait_for_selector("#files-list td.name >> text=first.txt")
+    _upload(page, "second.txt")
+    page.wait_for_selector("#files-list td.name >> text=second.txt")
+    _count_reads(page, "/workspace/files")
+    held: list = []
+    page.route(
+        "**/workspace/files",
+        lambda route: (
+            held.append(route)
+            if route.request.method == "GET" and not held
+            else route.fallback()
+        ),
+    )
+    page.locator("#files-list button").first.click()
+    page.click("#delete-go")
+    _wait_for(page, held)
+    _upload(page, "third.txt")
+    page.wait_for_selector("#files-list td.name >> text=third.txt")
+    held[0].fulfill(json=[])
+    page.wait_for_function("() => window.readsDone >= 2")
+    assert page.locator("#files-list td.name").count() == 2
+
+
+def test_a_kept_file_whose_answer_is_not_json_closes_the_dialog(page):
+    page.goto("/files")
+    upload_to_files(page, "kept.txt", "Ana: hi")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.route(
+        "**/workspace/files",
+        lambda route: (
+            route.fulfill(body="<html>ok</html>")
+            if route.request.method == "POST"
+            else route.fallback()
+        ),
+    )
+    page.click("#upload-save")
+    page.wait_for_selector("#files-notice:has-text('“kept.txt” is in Files.')")
+    assert page.is_hidden("#upload-dialog")
+
+
+def test_a_list_answer_that_is_not_json_says_so_in_plain_words(page):
+    page.goto("/")
+    page.route("**/workspace/runs", lambda route: route.fulfill(body="<html></html>"))
+    page.click("#library-nav")
+    page.wait_for_selector(
+        "#workspace-message:has-text('Could not load analyses. Try again.')"
+    )
+
+
+def test_an_analysis_answer_that_is_not_json_says_so_in_plain_words(page):
+    page.goto("/")
+    submitted(page, "Read me")
+    page.goto("/?view=analyses")
+    page.route("**/workspace/runs/*", lambda route: route.fulfill(body="<html></html>"))
+    page.click("#analysis-rows a:text-is('Read me')")
+    page.wait_for_selector(
+        "#workspace-message:has-text('Could not load this analysis. Try again.')"
+    )
+
+
+def _hanging_list(browser, hanging):
+    """A page on the list of a run that hangs."""
+    context = browser.new_context(base_url=hanging)
+    if timeout := os.environ.get("BROWSER_TIMEOUT_MS"):
+        context.set_default_timeout(int(timeout))
+    page = context.new_page()
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.wait_for_selector('[aria-label="Stop Hangs"]')
+    return context, page
+
+
+def test_a_late_stop_answer_keeps_the_ticks_the_sort_and_a_rename(browser, hanging):
+    context, page = _hanging_list(browser, hanging)
+    page.check('[aria-label="Select Hangs"]')
+    page.click('[data-sort="name"]')
+    held = _hold(page, "**/stop")
+    page.click('[aria-label="Stop Hangs"]')
+    _wait_for(page, held)
+    page.click('[aria-label="Rename Hangs"]')
+    page.fill('[aria-label="New name for Hangs"]', "Hangs no")
+    _count_reads(page, "/workspace/runs")
+    held[0].continue_()
+    page.wait_for_function("() => window.readsDone >= 1")
+    assert page.input_value('[aria-label="New name for Hangs"]') == "Hangs no"
+    page.press('[aria-label="New name for Hangs"]', "Escape")
+    page.wait_for_selector("#analysis-rows .badge:text-is('Stopped')")
+    assert page.is_checked('[aria-label="Select Hangs"]')
+    assert page.get_attribute("#sort-name", "aria-sort") == "ascending"
+    context.close()
+
+
+def test_a_rename_that_loses_its_connection_says_so_and_the_list_draws(
+    browser, hanging
+):
+    context, page = _hanging_list(browser, hanging)
+    page.route("**/title", lambda route: route.abort())
+    page.click('[aria-label="Rename Hangs"]')
+    page.fill('[aria-label="New name for Hangs"]', "Hangs no")
+    page.press('[aria-label="New name for Hangs"]', "Enter")
+    page.wait_for_selector("#workspace-message:has-text('Not renamed')")
+    assert page.locator('[aria-label="New name for Hangs"]').count() == 0
+    assert page.locator("#analysis-rows a:text-is('Hangs')").count() == 1
+    context.close()
+
+
+def test_a_rename_that_ends_leaves_a_later_rename_open(browser, hanging):
+    context, page = _hanging_list(browser, hanging)
+    page.click('[aria-label="Stop Hangs"]')
+    page.wait_for_selector("#analysis-rows .badge:text-is('Stopped')")
+    page.goto("/")
+    submitted(page, "Other")
+    page.goto("/?view=analyses")
+    page.wait_for_selector('[aria-label="Rename Other"]')
+    held = _hold(page, "**/title")
+    page.click('[aria-label="Rename Hangs"]')
+    page.fill('[aria-label="New name for Hangs"]', "Hangs no")
+    page.press('[aria-label="New name for Hangs"]', "Enter")
+    _wait_for(page, held)
+    page.click('[aria-label="Rename Other"]')
+    page.fill('[aria-label="New name for Other"]', "Other no")
+    with page.expect_response("**/title"):
+        held[0].continue_()
+    page.wait_for_timeout(300)
+    assert page.input_value('[aria-label="New name for Other"]') == "Other no"
+    page.unroute("**/title")
+    page.press('[aria-label="New name for Other"]', "Enter")
+    page.wait_for_selector("#analysis-rows a:text-is('Other no')")
+    assert page.locator("#analysis-rows a:text-is('Hangs no')").count() == 1
+    context.close()
+
+
+@pytest.mark.parametrize("lost", ["no answer", "an answer that is not JSON"])
+def test_a_start_with_no_readable_answer_says_to_check_the_run(page, lost):
+    pause(page)
+
+    def lose(route):
+        if lost == "no answer":
+            route.abort()
+        else:
+            route.fulfill(body="<html></html>")
+
+    page.route(
+        "**/answer/*",
+        lambda route: (
+            lose(route) if route.request.method == "POST" else route.fallback()
+        ),
+    )
+    if lost == "no answer":
+        page.route("**/workspace/runs/*", lambda route: route.abort())
+    page.click("#continue")
+    page.wait_for_selector("#answer-problem:has-text('check whether it started')")
+    assert page.is_enabled("#continue")
+
+
+def test_a_control_change_during_a_start_goes_to_no_run(zoned_page):
+    """A change made while Start is in flight waits for it. Where the start
+    ended the pause, the paused run takes no save."""
+    page = zoned_page
+    first = keep_control(page, "First", {"type": "application"})
+    submit_with_controls(page)
+    held = _hold_answers(page)
+    page.click("#continue")
+    _wait_for(page, held)
+    page.click(f"#offer-{first}")
+    with page.expect_response(_post_to_answer):
+        held[0].continue_()
+    page.wait_for_url("**/report/**")
+    assert len(held) == 1
+
+
+def test_a_settings_save_whose_answer_is_not_json_says_to_reload(browser, tmp_path):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written())
+    timeout = 'tr[data-key="resilience.timeout_ms"]'
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.route(
+            "**/settings",
+            lambda route: (
+                route.fulfill(body="<html></html>")
+                if route.request.method == "POST"
+                else route.fallback()
+            ),
+        )
+        page.locator(f"{timeout} input").fill("5000")
+        page.click("#save-changes")
+        page.wait_for_selector("#save-errors", state="visible", timeout=3000)
+        said = page.locator("#save-errors").inner_text()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert "Reload the page" in said
+
+
+def test_the_review_pages_say_that_a_read_failed(browser, tmp_path):
+    from tests import test_review_app as review
+    from webapp.review import build_session, create_app
+
+    session = build_session(
+        [[review.STEADY]],
+        voter="ada",
+        ledger_path=tmp_path / "votes",
+        configs={review.STEADY.case: "engine-1.2.3"},
+    )
+    said = {"/": "#counts", "/review": "#left"}
+    for url in serve(create_app(session)):
+        for path, line in said.items():
+            page = browser.new_page()
+            errors: list[str] = []
+            page.on("pageerror", lambda error, errors=errors: errors.append(str(error)))
+            page.route("**/api/*", lambda route: route.fulfill(**ERROR_PAGE))
+            page.goto(url + path)
+            page.wait_for_selector(f"{line}:has-text('did not load')", timeout=3000)
+            page.close()
+            assert errors == [], f"{path} raised: {errors}"
