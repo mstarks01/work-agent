@@ -324,10 +324,10 @@ from webapp.page_words import (
     RunStart,
     change_line,
     island_tables,
-    progress_after,
     progress_mode,
     run_start_of,
     stage_after,
+    words_after,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -563,7 +563,7 @@ class Workspace:
         if parent is None:
             raise LookupError(f"job {record.id} resumes a job the store lacks")
         if not isinstance(parent, JobRecord):
-            raise TypeError(f"job {record.id} resumes an unreadable job")
+            raise UnreadableSchema(f"job {record.id} resumes an unreadable job")
         return parent
 
     async def starts_from(self, record: Envelope) -> RunStart:
@@ -574,10 +574,12 @@ class Workspace:
         self, record: JobRecord, asks: bool
     ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
         """The reader of the progress line of ``record`` after a list of its
-        node events (:func:`webapp.page_words.progress_after`), with the
+        node events (:func:`webapp.page_words.stage_after` and
+        :func:`webapp.page_words.words_after`), with the
         ``seq`` of the last event, so the page keeps the latest line it got.
 
-        The bar of a Resumed Job starts at the stage where its parent stopped
+        The bar of a Resumed Job starts at the stage where its parent stopped,
+        counted in the mode of the Resumed Job
         (:func:`webapp.page_words.stage_after` over the parent's nodes), and
         never goes below it.
 
@@ -591,19 +593,16 @@ class Workspace:
         stopped = (
             0
             if parent is None
-            else stage_after(
-                [event.node for event in parent.events if event.node is not None],
-                frameworks,
-                progress_mode(parent.pauses_to_ask()),
-            )
+            else stage_after(_node_names(parent.events), frameworks, mode)
         )
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
-            nodes = [event.node for event in events if event.node is not None]
-            seq = events[-1].seq if events else 0
-            words = progress_after(nodes, frameworks, mode, start)["words"]
-            stage = max(stage_after(nodes, frameworks, mode), stopped)
-            return {"stage": stage, "words": words, "seq": seq}
+            nodes = _node_names(events)
+            return {
+                "stage": max(stage_after(nodes, frameworks, mode), stopped),
+                "words": words_after(nodes, frameworks, mode, start),
+                "seq": events[-1].seq if events else 0,
+            }
 
         return line
 
@@ -2829,6 +2828,11 @@ async def _refusal_words(
 EndFrame = Literal[
     "failed", "questions", "done", "rejected", "stopped", "continuing", "continued"
 ]
+
+
+def _node_names(events: Sequence[JobEvent]) -> list[str]:
+    """The name of each node of ``events``, in order."""
+    return [event.node for event in events if event.node is not None]
 
 
 def _frame(event: EndFrame, data: dict[str, object]) -> str:

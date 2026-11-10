@@ -133,7 +133,8 @@ step fills the bar. A run toward a report counts the extraction, the
 preparation, the review of the findings and the report assembly. The status line
 names the next stage in plain words, and the page shows no graph node name.
 A run that continues a paused job starts its bar at the stage where that job
-stopped, and the bar does not go below it. Its first line reads "Using your
+stopped, counted in the stages of a run toward a report, and the bar does not
+go below it. Its first line reads "Using your
 answers to continue the analysis…" after your answers, or "Continuing with
 your Controls…" after a pause for your Controls alone. A reload shows the same
 line.

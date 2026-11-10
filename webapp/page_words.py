@@ -342,22 +342,18 @@ def stage_after(
     return max((STEP_PROGRESS[steps[node]].stages[mode] for node in nodes), default=0)
 
 
-def progress_after(
+def words_after(
     nodes: Sequence[str],
     frameworks: Sequence[FrameworkName],
     mode: ProgressMode,
     start: RunStart,
-) -> dict[str, object]:
-    """The progress line after ``nodes`` completed, in order, in a run of
-    ``frameworks`` that does ``start`` first: the count of complete stages and
-    the words of the work that follows. Raises :class:`KeyError` on a name
-    that is not a node of a graph of ``frameworks``."""
-    words = (
-        STEP_PROGRESS[step_by_graph_node(frameworks)[nodes[-1]]].words[mode]
-        if nodes
-        else INITIAL_PROGRESS_WORDS[start]
-    )
-    return {"stage": stage_after(nodes, frameworks, mode), "words": words}
+) -> str:
+    """The words of the work that follows ``nodes`` in a run of
+    ``frameworks`` that does ``start`` first. Raises :class:`KeyError` on a
+    name that is not a node of a graph of ``frameworks``."""
+    if not nodes:
+        return INITIAL_PROGRESS_WORDS[start]
+    return STEP_PROGRESS[step_by_graph_node(frameworks)[nodes[-1]]].words[mode]
 
 
 #: A line of the progress panel that the page chooses: the count of complete

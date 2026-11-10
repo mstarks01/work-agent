@@ -13,7 +13,8 @@ import json
 import re
 import threading
 import time
-from typing import NamedTuple, cast, get_args
+from collections.abc import Sequence
+from typing import NamedTuple, get_args
 
 import pytest
 
@@ -53,9 +54,9 @@ from webapp.page_words import (
     STEP_PROGRESS,
     ProgressMode,
     RunStart,
-    progress_after,
     run_start_of,
     stage_after,
+    words_after,
 )
 
 tiers = test_webapp.tiers
@@ -116,6 +117,19 @@ def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
 def built_node_names(selection: tuple[FrameworkName, ...]) -> list[set[str]]:
     """The node names of each graph of ``selection``."""
     return [built.nodes for built in built_graphs(selection)]
+
+
+def progress_after(
+    nodes: list[str],
+    frameworks: Sequence[FrameworkName],
+    mode: ProgressMode,
+    start: RunStart,
+) -> dict:
+    """The progress line after ``nodes``, before the stage of a parent."""
+    return {
+        "stage": stage_after(nodes, frameworks, mode),
+        "words": words_after(nodes, frameworks, mode, start),
+    }
 
 
 def test_the_table_names_each_step():
@@ -330,9 +344,7 @@ def assert_lines(
         progress_after(done, selection, mode, start)
         for done in [[], *([node] for node in nodes)]
     ]
-    assert sent == [
-        line | {"stage": max(cast(int, line["stage"]), stopped)} for line in lines
-    ]
+    assert sent == [line | {"stage": max(line["stage"], stopped)} for line in lines]
     seqs = [frame["seq"] for frame in frames]
     assert seqs == sorted(set(seqs))
 
@@ -401,7 +413,7 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
         )
         lines_of(client, runner, started.json()["run"])
         selection = [item["name"] for item in BODY["frameworks"]]
-        stopped = stage_after(runner.sent, selection, "to-questions")
+        stopped = stage_after(runner.sent, selection, "to-report")
         runner.release.clear()
         runner.sent.clear()
         continued = client.post(
@@ -443,11 +455,12 @@ def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
 
 
 #: The nodes of a parent that stopped, by how its Resumed Job starts and the
-#: mode of the parent, with the stage where the parent stopped.
+#: mode of the parent, with the stage where the parent stopped, counted in the
+#: ``to-report`` mode of the Resumed Job.
 PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
     ("answers", "to-questions"): (
         [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "catalog"],
-        STAGE_COUNT,
+        2,
     ),
     ("answers", "to-report"): (
         [graph.EXTRACT_NODE, graph.PREPARE_NODE, graph.ASSEMBLE_NODE],
@@ -535,6 +548,6 @@ def test_the_bar_of_a_resumed_job_never_goes_below_the_stage_of_its_parent(start
 
 def test_the_page_reads_the_start_words_of_a_resumed_job_from_the_start_table():
     script = page_javascript("first_run.js") + page_javascript("workspace.js")
-    for start in ("answers", "controls"):
+    for start in set(STARTS) - {"description"}:
         assert f"FORM_WORDS.progress_start.{start}" in script
     assert "continues-with-" not in script
