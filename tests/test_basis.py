@@ -427,7 +427,7 @@ def test_a_control_is_undecided_when_one_of_its_tokens_went_unsearched():
 
 
 def test_one_token_is_searched_once_however_many_values_carry_it():
-    """The memo: one call searches one source for one token one time.
+    """One call of ``read_controls`` searches one source for one token one time.
 
     Measured through the budget rather than through a call count: two values
     naming the same token spend one token's worth of it.
