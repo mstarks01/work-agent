@@ -416,7 +416,12 @@ it.
   `.cfg` or `.conf` or that starts with `.env.`, a credential name at the start
   of a line counts with any plain value. An empty value, a reference such as
   `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
-  counts as it does in any file. Each line has a list of its class and the
+  counts as it does in any file. In every other file, a credential name set to
+  a value with no quotes counts where the value holds a digit or a symbol and
+  ends its line or its statement: at the end of the line, before a `#` or a
+  `;`, or, after `=`, before a `,`. The check has a limit there. A keyword
+  argument such as `connect(password=pw1, host=h)` counts, although `pw1` is a
+  variable. Each line has a list of its class and the
   buttons "View", "Replace" and "Remove", and a file that the Control holds
   also has "Download". A line that the page still reads has no "View".
   "View" shows the file's text under the line, as plain text. "Download"

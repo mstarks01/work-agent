@@ -549,8 +549,15 @@ class EvidenceRefusal:
 #: every credential, and the page and the refusal say so. An assignment of a
 #: name that ends in one of :data:`_CREDENTIAL_NAME` counts only where it sets a
 #: literal value: a quoted string that closes, a quoted or an unquoted run of
-#: 256 characters, or an unquoted value at the end of its line that holds a
-#: digit or a symbol. A quoted value does not count where it starts with a
+#: 256 characters, or an unquoted value that holds a digit or a symbol and
+#: ends its line or its statement. Such a value ends at optional spaces and
+#: then the end of the line, a ``#`` or a ``;``, and after ``=`` at a ``,``
+#: too. A comma after a value that follows ``:`` does not end it, because it
+#: ends a type, as in ``token: bytes32, n: int``, or a clause of a sentence. A
+#: space and then another character does not end it either, so
+#: ``Password: 12 characters`` and ``password = pw1 + salt`` pass. The rule
+#: has a limit: ``connect(password=pw1, host=h)`` counts, because ``pw1``
+#: reads as a value. A quoted value does not count where it starts with a
 #: reference or a space, where it is only a mask of ``*``, or where it joins a
 #: name to another string, as ``"token=" + tok + "x"`` does. So a type name, a
 #: masked value and a joined log string pass. An empty string does not count
@@ -582,12 +589,13 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
         r"|glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|[rs]k_live_[A-Za-z0-9]{20,})"
     ),
     _ASSIGNMENT: re.compile(
-        rf"(?i)(?<![\w.-])[\w.-]*{_CREDENTIAL_NAME}[\"']?\s*[:=]\s*"
+        rf"(?i)(?<![\w.-])[\w.-]*{_CREDENTIAL_NAME}[\"']?\s*(?:(?P<equals>=)|:)\s*"
         r"(?:\"(?![$<{%\"\s]|\*+\"|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|\"))"
         r"(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
         r"|'(?![$<{%'\s]|\*+'|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|'))"
         r"(?:[^'\n]{1,256}'|[^'\n]{256})"
-        rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}\s*$"
+        rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}"
+        r"\s*(?:$|[#;]|(?(equals),|(?!)))"
         rf"|{_UNQUOTED}{{256}}))"
     ),
 }
