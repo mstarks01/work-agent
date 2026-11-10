@@ -3561,16 +3561,18 @@ class TestTheFunctionNodesStayOffTheEventLoop:
                 async with asyncio.timeout(10) as deadline:
                     run = asyncio.ensure_future(node._func())
                     await asyncio.to_thread(started.wait, 10)
+                    held_by_the_body = graph._NODE_THREADS.borrowed_tokens
                     deadline.reschedule(0)
                     await run
             except TimeoutError:
                 pass
-            at_deadline = (ended.is_set(), graph._NODE_THREADS.borrowed_tokens)
+            held_at_deadline = graph._NODE_THREADS.borrowed_tokens
+            ended_at_deadline = ended.is_set()
             release.set()
             await asyncio.to_thread(ended.wait, 10)
-            return at_deadline
+            return held_by_the_body, held_at_deadline, ended_at_deadline
 
-        assert asyncio.run(scenario()) == (False, 0)
+        assert asyncio.run(scenario()) == (1, 0, False)
         assert ended.is_set()
 
 
