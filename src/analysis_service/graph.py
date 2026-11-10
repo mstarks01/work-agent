@@ -1256,7 +1256,8 @@ def unfence(rendered: str) -> str:
 
 
 #: How many node bodies the live jobs of the process may await on a worker
-#: thread at once. A body whose job the deadline settled holds no token.
+#: thread at once. A body whose job the deadline or a stop settled holds no
+#: token.
 #: Separate from anyio's default limiter on purpose: that one is
 #: also what `require_identity` verifies a bearer token through, and a graph that
 #: could fill it would make every arriving caller wait for a node body.
@@ -1281,9 +1282,10 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     ADK awaits a body that is a coroutine function, so wrapping it in one moves
     the work to a worker thread and gives the loop back. It does **not** make
     the deadline able to stop a running body -- nothing can, short of a process
-    boundary. The job deadline is an ``asyncio.timeout``, so at the deadline the
-    await ends at once, the token goes back to :data:`_NODE_THREADS` and the
-    thread runs on until its body ends. The
+    boundary. The job deadline is an ``asyncio.timeout``, and a stop ends that
+    same scope. So at the deadline or a stop the await ends at once, the token
+    goes back to :data:`_NODE_THREADS` and the thread runs on until its body
+    ends. The
     wrapper keeps the wrapped signature, which is what ADK binds parameters
     from, and touches nothing else: a node reaches the session only through
     :class:`SessionState`, whose writes are plain dict writes, and only one
