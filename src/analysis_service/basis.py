@@ -29,10 +29,8 @@ decision with its own evidence (#470), and this module does not make it.
 
 **The cost is submitted text times submitted text**, which is the one thing
 here worth reading twice. A search costs the length of a source, and the number
-of searches is how many different words a model's controls name — so a
-150-element model of invented controls over a 100 KiB source would cost 13.5
-seconds of CPU if each search ran again. Memoizing takes the repeated half of
-that away and :data:`MAX_SCAN_WORK` bounds the rest. Stopping is affordable for the
+of searches is how many different words a model's controls name. Memoizing
+takes the repeated searches away and :data:`MAX_SCAN_WORK` bounds the rest. Stopping is affordable for the
 same reason the whole module is safe: nothing downstream reads the result.
 
 Scope

@@ -154,7 +154,7 @@ DIAGRAMS = without(
 #: because "the price map now disagrees" and "the part now has another name"
 #: describe run-time data.
 HISTORY = re.compile(
-    r"\b(used to|was written for|(before|until) this (\w+ )?(existed|one)|previously"
+    r"\b(used to|was written for|before this (\w+ )?(existed|one)|previously"
     r"|had been|until now|the old |now that|in the past|formerly|originally"
     r"|historically|once (had|took|wrote|sat|listed|lacked|missed|floored|ended)"
     r"|before this[,:.]|until #\d+|this replaced|(branch|if`?|list) it replaced"
@@ -174,6 +174,7 @@ HISTORY = re.compile(
     r"|when \w+ retired|(was|were) removed rather than|, moved from"
     r"|(?-i:(?<![\w,] )At (?=[0-9a-f]*\d)[0-9a-f]{7,40})|what changed is"
     r"|(was|were) the \w+ here"
+    r"|until this (\w+ )?existed"
     r"|before (the|a|an|those|these|its)"
     r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
     r"|before (:\w+:)?`+[\w.~]+`+ existed)\b",
@@ -383,6 +384,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         assert HISTORY.search(text), text
     present = (
         "It puts each element back as it was before the repair.",
+        "The loop reads each row until this one.",
         "It runs on every merge rather than before a release.",
         "Every vote cast on an earlier version of the finding.",
         "The note replaced the agent's wording.",
