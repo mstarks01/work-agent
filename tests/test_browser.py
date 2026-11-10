@@ -5362,20 +5362,77 @@ def test_a_start_with_no_readable_answer_says_to_check_the_run(page, lost):
     assert page.is_enabled("#continue")
 
 
-def test_a_control_change_during_a_start_goes_to_no_run(zoned_page):
-    """A change made while Start is in flight waits for it. Where the start
-    ended the pause, the paused run takes no save."""
+def _takes_no_press(page, selector: str) -> bool:
+    """Whether a press on ``selector`` reaches nothing, as on an inert part."""
+    from playwright.sync_api import TimeoutError as NoPress
+
+    try:
+        page.click(selector, timeout=500)
+    except NoPress:
+        return True
+    return False
+
+
+_REFUSED = {
+    "status": 503,
+    "content_type": "application/json",
+    "body": '{"message": "The service is busy. Try again."}',
+}
+
+
+def test_the_controls_take_no_input_while_a_submission_starts(zoned_page):
+    """From the press of Start to the answer, the Controls of the form take no
+    press. A refusal gives them back."""
+    page = zoned_page
+    keep_control(page, "First", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector("#controls-offer:not([hidden])")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Controls analysis")
+    open_frameworks(page)
+    page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
+    held = _hold(page, "**/analyze")
+    page.click("#go")
+    _wait_for(page, held)
+    assert _takes_no_press(page, "#controls-choose")
+    assert page.is_hidden("#controls-dialog")
+    held[0].fulfill(**_REFUSED)
+    page.wait_for_selector("#problem:has-text('The service is busy')")
+    page.click("#controls-choose", timeout=3000)
+    page.wait_for_selector("#controls-dialog[open]")
+
+
+def _start(page) -> None:
+    page.click("#continue")
+
+
+def _amend(page) -> None:
+    page.click(".amend summary")
+    page.fill(".amend textarea", "The database is encrypted.")
+    page.click(".amend button")
+
+
+@pytest.mark.parametrize(
+    ("path", "press"), [("**/answer/*", _start), ("**/amend/*", _amend)]
+)
+def test_the_controls_take_no_input_while_a_pause_ends(zoned_page, path, press):
+    """From the press that can end the pause to its answer, the Controls of
+    the pause take no press, so no change goes to a run that ended. A refusal
+    gives them back."""
     page = zoned_page
     first = keep_control(page, "First", {"type": "application"})
     submit_with_controls(page)
-    held = _hold_answers(page)
-    page.click("#continue")
+    held = _hold(page, path)
+    press(page)
     _wait_for(page, held)
-    page.click(f"#offer-{first}")
-    with page.expect_response(_post_to_answer):
-        held[0].continue_()
-    page.wait_for_url("**/report/**")
-    assert len(held) == 1
+    assert _takes_no_press(page, f"#offer-{first}")
+    held[0].fulfill(**_REFUSED)
+    page.wait_for_selector("#answer-problem:has-text('The service is busy')")
+    page.unroute(path)
+    assert "control_scopes" in save_offer(
+        page, lambda: page.click(f"#offer-{first}", timeout=3000)
+    )
 
 
 def test_a_settings_save_whose_answer_is_not_json_says_to_reload(browser, tmp_path):
