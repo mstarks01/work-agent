@@ -898,3 +898,46 @@ class TestTheRunCompletesItself:
         assert set(proposals) == set(STRIDE_CATEGORIES)
         assert [claim["sequence"] for claim in proposals["spoofing"]["claims"]] == [1]
         assert proposals["tampering"]["claims"] == []
+
+
+def test_a_deadline_in_a_node_body_returns_the_node_token(monkeypatch):
+    # The deadline cancels the job task, and ADK cancels the node task in its
+    # cleanup. The body holds one token while it runs. At the deadline the
+    # token is back and the body is not at its end.
+    started = threading.Event()
+    release = threading.Event()
+    ended = threading.Event()
+    after_gate = graph.after_gate
+
+    def held_body(model):
+        started.set()
+        release.wait(10)
+        ended.set()
+        return after_gate(model)
+
+    monkeypatch.setattr(graph, "after_gate", held_body)
+    pipeline, _ = scripted_pipeline(happy_replies())
+
+    async def scenario():
+        limiter = graph._NODE_THREADS
+        held_by_the_body = None
+        try:
+            async with asyncio.timeout(30) as deadline:
+                run = asyncio.ensure_future(
+                    GraphExecutor(pipeline, app_name="stride-test").run(
+                        [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+                    )
+                )
+                await asyncio.to_thread(started.wait, 20)
+                held_by_the_body = limiter.borrowed_tokens
+                deadline.reschedule(0)
+                await run
+        except TimeoutError:
+            pass
+        at_deadline = (held_by_the_body, limiter.borrowed_tokens, ended.is_set())
+        release.set()
+        await asyncio.to_thread(ended.wait, 10)
+        return at_deadline
+
+    assert asyncio.run(scenario()) == (1, 0, False)
+    assert ended.is_set()
