@@ -378,7 +378,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A run wrote it before ``attacker_position`` existed.",
         "A report written before those fields existed reads as no schema.",
         "A rule about writes read both as writes until this field existed.",
-        "It cost 13.5 seconds of CPU before :class:`_Scan` existed.",
+        "It cost 13.5 seconds of CPU before :data:`HISTORY` existed.",
     )
     for text in history:
         assert HISTORY.search(text), text
