@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import threading
 import time
 
 import pytest
@@ -95,27 +94,15 @@ def test_workspace_missing_run_and_cross_origin_write(tiers):
         assert client.get("/workspace/runs").json() == []
 
 
-class HeldAfterExtract(web.PausingRunner):
-    """Holds each run after its first node until the test releases it."""
-
-    def __init__(self) -> None:
-        super().__init__(catalog=False)
-        self.release = threading.Event()
-
-    async def run(self, job, on_node):
-        await on_node("extract")
-        while not self.release.is_set():
-            await asyncio.sleep(0.01)
-        return await super().run(job, on_node)
-
-
 def test_a_run_in_progress_answers_with_its_progress_line_on_each_read(tiers):
-    runner = HeldAfterExtract()
+    runner = web.HeldAfterExtract()
     with web.client_for(tiers, runner) as client:
         body = posted("A web app talks to a database.") | {"questions": True}
         run = client.post("/analyze", json=body, headers=SAME_ORIGIN).json()["run"]
         deadline = time.monotonic() + 5
-        while "progress" not in (detail := client.get(f"/workspace/runs/{run}").json()):
+        while not (detail := client.get(f"/workspace/runs/{run}").json())["progress"][
+            "seq"
+        ]:
             assert time.monotonic() < deadline, detail
             time.sleep(0.01)
         line = detail["progress"]

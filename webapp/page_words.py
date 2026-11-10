@@ -25,7 +25,6 @@ from analysis_service.claims import (
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.graph import NodeStep, step_by_graph_node
-from analysis_service.jobs import JobRecord
 from analysis_service.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
@@ -228,11 +227,6 @@ EMPTY_LIST_REASONS: Mapping[EmptyListReason, str] = MappingProxyType(
 #: Which progress line a run gets: ``to-questions`` where the run stops to ask
 #: a person, and ``to-report`` for each other run.
 ProgressMode = Literal["to-questions", "to-report"]
-
-
-def progress_mode(record: JobRecord) -> ProgressMode:
-    """The progress mode of one job."""
-    return "to-questions" if record.pauses_to_ask() else "to-report"
 
 
 #: What the progress line says before the first step of a run completes. A

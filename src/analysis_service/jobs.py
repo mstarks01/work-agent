@@ -1943,10 +1943,11 @@ async def event_frames(
     seen: int = 0,
     *,
     gone: Callable[[], Awaitable[bool]] | None = None,
-    frame: Callable[[JobEvent], str] = JobEvent.sse_frame,
+    frame: Callable[[JobEvent], str | None] = JobEvent.sse_frame,
 ) -> AsyncIterator[str]:
     """The job's events past ``seen``, as server-sent frames, as the store
-    records them. ``frame`` writes the frame of one event.
+    records them. ``frame`` writes the frame of one event, or gives ``None``
+    for an event that gets no frame.
 
     **The one reader of "when does a job's stream end".** It ends when the job
     reaches a terminal status, when the store holds no such job, when the
@@ -1965,7 +1966,8 @@ async def event_frames(
         status, events = progress
         for event in events:
             seen = event.seq
-            yield frame(event)
+            if (written := frame(event)) is not None:
+                yield written
         if status in TERMINAL_STATUSES or (gone is not None and await gone()):
             return
         await asyncio.sleep(POLL_SECONDS)

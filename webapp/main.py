@@ -321,10 +321,10 @@ from webapp.page_words import (
     REPORT_WORDS,
     STAGE_COUNT,
     PageStatus,
+    ProgressMode,
     change_line,
     island_tables,
     progress_after,
-    progress_mode,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -533,6 +533,17 @@ class Workspace:
             return "running"
         return _page_status(record)
 
+    async def asks(self, record: Envelope) -> bool:
+        """Whether the run of ``record`` stops to ask a person.
+
+        The envelope leaves the resumption out, and a Resumed Job never stops
+        to ask, so this reads the resumption by name. A record that
+        :func:`readable` refuses has ended, and its resumption is never read.
+        """
+        if not (readable(record) and record.pauses_to_ask()):
+            return False
+        return await self.store.resumption(record.id, record.owner_id) is None
+
     async def progress_line(
         self, record: JobRecord
     ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
@@ -540,11 +551,9 @@ class Workspace:
         node events (:func:`webapp.page_words.progress_after`), with the
         ``seq`` of the last event, so the page keeps the latest line it got.
 
-        ``record`` is one that :func:`readable` accepts. The envelope leaves
-        the resumption out, and a Resumed Job never stops to ask.
+        ``record`` is one that :func:`readable` accepts.
         """
-        resumption = await self.store.resumption(record.id, record.owner_id)
-        mode = progress_mode(record.model_copy(update={"resumption": resumption}))
+        mode: ProgressMode = "to-questions" if await self.asks(record) else "to-report"
         frameworks = [selection.name for selection in record.whole_frameworks()]
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
@@ -767,7 +776,7 @@ class Workspace:
             "status": self.page_status(record),
             # Whether the run stops to ask a person, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": isinstance(record, JobRecord) and record.pauses_to_ask(),
+            "pauses": await self.asks(record),
             "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {
@@ -2266,7 +2275,7 @@ def create_app(
         if record is None:
             return no_such_run()
         payload = await workspace.snapshot(answers, record)
-        if payload["status"] == "running" and readable(record):
+        if payload["status"] == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
             line = await workspace.progress_line(record)
@@ -2794,16 +2803,15 @@ async def _stream(
     description was refused, or why a run failed.
     """
 
-    def frame(event: JobEvent) -> str:
+    def frame(event: JobEvent) -> str | None:
         if event.node is None:
             return event.sse_frame()
         if progress is None:
-            return ""
+            return None
         return event.framed(json.dumps(progress([event])))
 
     async for written in event_frames(workspace.store, run_id, frame=frame):
-        if written:
-            yield written
+        yield written
     try:
         record = await workspace.envelope(answers, run_id)
     except UnreadableSchema as refusal:

@@ -7,7 +7,6 @@ each selection and hold each node of it to a row. No page script names a node.
 
 from __future__ import annotations
 
-import asyncio
 import itertools
 import json
 import re
@@ -30,7 +29,7 @@ from tests.test_webapp import (
     page_javascript,
     posted,
 )
-from tests.test_webapp_questions import PausingRunner, client_for
+from tests.test_webapp_questions import HeldAfterExtract, client_for
 from webapp.page_words import (
     INITIAL_PROGRESS_WORDS,
     STAGE_COUNT,
@@ -175,26 +174,6 @@ def test_the_form_page_carries_the_stage_count_and_the_start_words(tiers):
     assert "progress.max" in page_javascript("workspace.js")
 
 
-class HeldAfterExtract(PausingRunner):
-    """Holds each run after its first node until the test releases it, and
-    records each node that the run sends."""
-
-    def __init__(self) -> None:
-        super().__init__(catalog=False)
-        self.release = threading.Event()
-        self.sent: list[str] = []
-
-    async def run(self, job, on_node):
-        async def recorded(node):
-            self.sent.append(node)
-            await on_node(node)
-
-        await recorded("extract")
-        while not self.release.is_set():
-            await asyncio.sleep(0.01)
-        return await super().run(job, recorded)
-
-
 def lines_of(client, runner: HeldAfterExtract, run: str) -> tuple[str, list[dict]]:
     """The stream of ``run``, opened while the runner holds it, and the data
     of each node frame of the stream."""
@@ -256,13 +235,16 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
         assert continued.status_code == 200, continued.text
         child = continued.json()["run"]
         deadline = time.monotonic() + 5
-        while "progress" not in (read := client.get(f"/workspace/runs/{child}").json()):
+        while not (read := client.get(f"/workspace/runs/{child}").json())["progress"][
+            "seq"
+        ]:
             assert time.monotonic() < deadline, read
             time.sleep(0.01)
         _, frames = lines_of(client, runner, child)
 
     assert_lines(frames, runner.sent, "to-report")
     assert_lines([read["progress"]], ["extract"], "to-report")
+    assert read["pauses"] is False
     assert frames[-1]["stage"] == STAGE_COUNT
 
 
