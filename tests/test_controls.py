@@ -487,6 +487,19 @@ def test_a_value_with_no_digit_or_another_end_passes(line):
 
 
 @pytest.mark.parametrize(
+    "line",
+    [
+        "connect(password=pw1, host=h)",
+        "def f(token: bytes32, n: int):",
+        "password = pw1 + salt",
+    ],
+)
+def test_a_name_with_a_digit_in_a_line_of_code_reads_as_a_value(line):
+    """The pattern cannot tell a variable from a value, so it refuses the line."""
+    assert credential_hit(f"{line}\n", name="notes.txt") == (1, SETTING)
+
+
+@pytest.mark.parametrize(
     "name",
     [
         ".env",

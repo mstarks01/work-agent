@@ -553,10 +553,11 @@ class EvidenceRefusal:
 #: at a space, a ``#``, a ``;``, a ``,`` or the end of its line. A quoted value
 #: does not count where it starts with a reference or a space, where it is only
 #: a mask of ``*``, or where it joins a name to another string, as
-#: ``"token=" + tok + "x"`` does. So a type name, a masked value and a joined
-#: log string pass. An empty string does not count
-#: either. Each start reads at most 257 characters of a value, so one scan of
-#: a line stays linear.
+#: ``"token=" + tok + "x"`` does. So a masked value, a joined log string and a
+#: type name with no digit pass. An unquoted name that holds a digit reads as a
+#: value, so a line of code such as ``f(token=tok2, user=u)`` is refused. An
+#: empty string does not count either. Each start reads at most 257 characters
+#: of a value, so one scan of a line stays linear.
 CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
