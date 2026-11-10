@@ -2929,7 +2929,7 @@ def test_two_merged_marks_that_fold_and_disagree_refuse_the_case_with_a_409(
     assert "two marks name one recorded finding" in response.json()["detail"]
 
 
-def test_the_first_problem_names_no_key_the_caller_invented():
+def test_the_first_problem_names_no_extra_field():
     """A sitting route returns this message, so it names no extra field."""
     with pytest.raises(ValidationError) as caught:
         envelopes.CaseAnswers.model_validate({"own_list": ["one line"], "hunter2": 1})
