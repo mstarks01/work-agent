@@ -5172,6 +5172,7 @@ def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
         if len(drafts) == 2:
             break
         page.wait_for_timeout(20)
+    assert len(drafts) == 2
     for draft in drafts:
         with page.expect_event("requestfailed"):
             draft.abort()
@@ -5265,7 +5266,7 @@ def test_an_analysis_answer_that_is_not_json_says_so_in_plain_words(page):
     )
 
 
-def _stopping(browser, hanging):
+def _hanging_list(browser, hanging):
     """A page on the list of a run that hangs."""
     context = browser.new_context(base_url=hanging)
     if timeout := os.environ.get("BROWSER_TIMEOUT_MS"):
@@ -5279,7 +5280,7 @@ def _stopping(browser, hanging):
 
 
 def test_a_late_stop_answer_keeps_the_ticks_the_sort_and_a_rename(browser, hanging):
-    context, page = _stopping(browser, hanging)
+    context, page = _hanging_list(browser, hanging)
     page.check('[aria-label="Select Hangs"]')
     page.click('[data-sort="name"]')
     held = _hold(page, "**/stop")
@@ -5301,7 +5302,7 @@ def test_a_late_stop_answer_keeps_the_ticks_the_sort_and_a_rename(browser, hangi
 def test_a_rename_that_loses_its_connection_says_so_and_the_list_draws(
     browser, hanging
 ):
-    context, page = _stopping(browser, hanging)
+    context, page = _hanging_list(browser, hanging)
     page.route("**/title", lambda route: route.abort())
     page.click('[aria-label="Rename Hangs"]')
     page.fill('[aria-label="New name for Hangs"]', "Hangs no")
@@ -5313,7 +5314,7 @@ def test_a_rename_that_loses_its_connection_says_so_and_the_list_draws(
 
 
 def test_a_rename_that_ends_leaves_a_later_rename_open(browser, hanging):
-    context, page = _stopping(browser, hanging)
+    context, page = _hanging_list(browser, hanging)
     page.click('[aria-label="Stop Hangs"]')
     page.wait_for_selector("#analysis-rows .badge:text-is('Stopped')")
     page.goto("/")
