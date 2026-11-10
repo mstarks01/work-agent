@@ -353,6 +353,11 @@ class Resumption(BaseModel):
     certification: CertifyResult | None = None
 
 
+def completed_nodes(events: Sequence[JobEvent]) -> list[str]:
+    """The name of the node of each node event of ``events``, in order."""
+    return [event.node for event in events if event.node is not None]
+
+
 def is_follow_up(resumption: Resumption | None) -> TypeGuard[Resumption]:
     """Whether a job resumed as a report's one follow-up, so its report is
     final (ADR 0054)."""
@@ -2263,7 +2268,7 @@ async def execute_job(
                 stop.bind(None)
     except TimeoutError:
         elapsed = (datetime.now(UTC) - started).total_seconds()
-        completed = [event.node for event in record.events if event.kind == "node"]
+        completed = completed_nodes(record.events)
         if stop.requested:
             logger.info(
                 "job %s stopped by its owner after %.1fs; nodes completed: %s",

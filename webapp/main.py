@@ -236,6 +236,7 @@ from analysis_service.jobs import (
     RefusalOutcome,
     Resumption,
     StopSignal,
+    completed_nodes,
     ended,
     event_frames,
     execute_job,
@@ -326,7 +327,6 @@ from webapp.page_words import (
     change_line,
     island_tables,
     lowest_stage,
-    node_names,
     progress_mode,
     run_start_of,
     stage_after,
@@ -554,14 +554,16 @@ class Workspace:
             return record.status == "awaiting-answers"
         return await self.starts_from(record) == "description"
 
-    async def _resumed(self, record: Envelope) -> tuple[Resumption, JobRecord] | None:
+    async def _resumed(
+        self, record: Envelope
+    ) -> tuple[Resumption, JobRecord] | tuple[None, None]:
         """The resumption of ``record``, a job in flight, and the job it
-        resumes, or ``None`` where it resumes no job. The envelope leaves the
-        resumption out, so this reads it by name. A Resumed Job locks its
-        parent, so the store holds the parent."""
+        resumes, or ``None`` and ``None`` where it resumes no job. The envelope
+        leaves the resumption out, so this reads it by name. A Resumed Job
+        locks its parent, so the store holds the parent."""
         resumption = await self.store.resumption(record.id, record.owner_id)
         if resumption is None:
-            return None
+            return None, None
         parent = await self.store.owned(resumption.parent_id, record.owner_id)
         if parent is None:
             raise LookupError(f"job {record.id} resumes a job the store lacks")
@@ -571,10 +573,7 @@ class Workspace:
 
     async def starts_from(self, record: Envelope) -> RunStart:
         """What the run of ``record``, a job in flight, does first."""
-        resumed = await self._resumed(record)
-        if resumed is None:
-            return run_start_of(None)
-        _, parent = resumed
+        _, parent = await self._resumed(record)
         return run_start_of(parent)
 
     async def progress_line(
@@ -593,16 +592,12 @@ class Workspace:
         """
         mode = progress_mode(asks)
         frameworks = [selection.name for selection in record.whole_frameworks()]
-        resumed = await self._resumed(record)
-        if resumed is None:
-            start, lowest = run_start_of(None), 0
-        else:
-            resumption, parent = resumed
-            start = run_start_of(parent)
-            lowest = lowest_stage(resumption, parent, frameworks, mode)
+        resumption, parent = await self._resumed(record)
+        start = run_start_of(parent)
+        lowest = lowest_stage(resumption, parent, frameworks, mode)
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
-            nodes = node_names(events)
+            nodes = completed_nodes(events)
             return {
                 "stage": max(stage_after(nodes, frameworks, mode), lowest),
                 "words": words_after(nodes, frameworks, mode, start),

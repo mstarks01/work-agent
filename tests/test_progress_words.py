@@ -14,7 +14,7 @@ import re
 import threading
 import time
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from typing import NamedTuple, get_args
 
 import pytest
@@ -242,21 +242,23 @@ def stages_on_each_path(
     built: BuiltGraph, selection: tuple[FrameworkName, ...]
 ) -> set[tuple[int, ...]]:
     """The stages that the bar of a run that asks shows on each path of
-    ``built`` from the start to an end that is not a failed end, in order."""
+    ``built`` from the start to an end that is not a failed end, in order.
+    ``built`` is a graph with no cycle, as each graph of a run that asks is."""
     steps = graph.step_by_graph_node(selection)
     after: defaultdict[str, list[str]] = defaultdict(list)
     for start, end in built.edges:
         after[start].append(end)
 
-    def paths(node: str) -> Iterator[list[str]]:
+    def paths(node: str, seen: frozenset[str]) -> Iterator[list[str]]:
+        assert node not in seen, f"the graph has a cycle through {node}"
         if not after[node]:
             yield []
         for following in after[node]:
-            for rest in paths(following):
+            for rest in paths(following, seen | {node}):
                 yield [following, *rest]
 
     shown = set()
-    for path in paths(graph.START.name):
+    for path in paths(graph.START.name, frozenset()):
         if steps[path[-1]] in FAILED_ENDS:
             continue
         stages = (STEP_PROGRESS[steps[node]].stages["to-questions"] for node in path)
@@ -457,6 +459,25 @@ def test_a_reload_at_the_start_shows_the_words_the_page_showed_at_submit(tiers, 
     }
 
 
+def resume(
+    client, runner: HeldAfterExtract, parent: str, ready: Callable[[dict], bool]
+) -> tuple[str, dict]:
+    """The Resumed Job that continues ``parent`` with no answers, and the
+    first status answer of it that ``ready`` accepts."""
+    runner.release.clear()
+    runner.sent.clear()
+    continued = client.post(
+        f"/answer/{parent}", json={"revision": 0}, headers=SAME_ORIGIN
+    )
+    assert continued.status_code == 200, continued.text
+    child = continued.json()["run"]
+    deadline = time.monotonic() + 5
+    while not ready(read := client.get(f"/workspace/runs/{child}").json()):
+        assert time.monotonic() < deadline, read
+        time.sleep(0.01)
+    return child, read
+
+
 def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report(
     tiers,
 ):
@@ -469,21 +490,12 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
         lines_of(client, runner, started.json()["run"])
         selection = [item["name"] for item in BODY["frameworks"]]
         lowest = stage_after(runner.sent, selection, "to-report")
-        runner.release.clear()
-        runner.sent.clear()
-        continued = client.post(
-            f"/answer/{started.json()['run']}",
-            json={"revision": 0},
-            headers=SAME_ORIGIN,
+        child, read = resume(
+            client,
+            runner,
+            started.json()["run"],
+            lambda read: read["progress"]["seq"] > 0,
         )
-        assert continued.status_code == 200, continued.text
-        child = continued.json()["run"]
-        deadline = time.monotonic() + 5
-        while not (read := client.get(f"/workspace/runs/{child}").json())["progress"][
-            "seq"
-        ]:
-            assert time.monotonic() < deadline, read
-            time.sleep(0.01)
         _, frames = lines_of(client, runner, child)
 
     assert_lines(frames, runner.sent, "to-report", "answers", lowest)
@@ -506,21 +518,10 @@ def test_a_parent_with_a_node_of_no_graph_of_this_build_gives_a_bar_at_0(tiers):
         parent = started.json()["run"]
         lines_of(client, runner, parent)
         store._records[parent].record_node("a_retired_node")
-        runner.release.clear()
-        runner.sent.clear()
-        continued = client.post(
-            f"/answer/{parent}", json={"revision": 0}, headers=SAME_ORIGIN
-        )
-        assert continued.status_code == 200, continued.text
-        child = continued.json()["run"]
-        deadline = time.monotonic() + 5
-        while "progress" not in (read := client.get(f"/workspace/runs/{child}")).json():
-            assert read.status_code == 200, read.text
-            assert time.monotonic() < deadline, read.text
-            time.sleep(0.01)
+        child, read = resume(client, runner, parent, lambda read: "progress" in read)
         _, frames = lines_of(client, runner, child)
 
-    assert read.json()["progress"] == {
+    assert read["progress"] == {
         "stage": 0,
         "words": INITIAL_PROGRESS_WORDS["answers"],
         "seq": 0,
