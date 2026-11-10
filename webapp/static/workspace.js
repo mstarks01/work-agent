@@ -31,7 +31,9 @@ const workspace = (() => {
     if (className) item.className = className;
     return item;
   };
-  const labels = {"running": "In progress", "awaiting-answers": "Questions ready", "completed": "Report ready", "failed": "Failed", "stopped": "Stopped", "unreadable": "Cannot be read"};
+  // The label of each page status, from the service
+  // (webapp.page_words.PAGE_STATUS_LABELS).
+  const labels = JSON.parse(document.getElementById("form_words").textContent).page_status;
   const message = (text) => { el("workspace-message").textContent = text; };
   const metadata = (data) => {
     el("description").readOnly = true;
@@ -55,7 +57,7 @@ const workspace = (() => {
     el("new-analysis-title").hidden = true;
     el("description-remaining").hidden = true;
     el("analysis-title").textContent = data.name;
-    el("analysis-state").textContent = labels[data.status] || data.status;
+    el("analysis-state").textContent = labels[data.status];
     el("analysis-frameworks").textContent = data.frameworks.join(" · ");
     el("questions-nav").disabled = !(data.status === "awaiting-answers" || (data.status === "running" && data.pauses));
     el("stop-run").hidden = data.status !== "running";
@@ -246,7 +248,7 @@ const workspace = (() => {
           selectCell.append(box);
           nameCell.append(link);
           dateCell.append(created);
-          statusCell.append(node("span", labels[run.status] || run.status, "badge"));
+          statusCell.append(node("span", labels[run.status], "badge"));
           actionCell.append(actions);
           row.append(selectCell, nameCell, dateCell, statusCell, actionCell);
           el("analysis-rows").append(row);

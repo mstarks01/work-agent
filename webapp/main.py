@@ -192,6 +192,7 @@ from analysis_service.element_hues import element_hues
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
+    FACET_ANSWERS,
     FactAnswer,
     SkipKey,
     answer_facets,
@@ -307,11 +308,19 @@ from webapp.page import (
     RenderedPage,
     SecurityHeaders,
     client_script,
+    client_scripts,
     escape,
     is_same_origin,
     render,
     response,
     script_json,
+)
+from webapp.page_words import (
+    FORM_WORDS,
+    REPORT_WORDS,
+    PageStatus,
+    change_line,
+    island_tables,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -967,12 +976,6 @@ def _selection_of(record: Envelope) -> list[FrameworkSelection]:
     return []
 
 
-#: A job's status as the pages read it. ``workspace.js`` labels each one.
-PageStatus = Literal[
-    "running", "awaiting-answers", "completed", "failed", "stopped", "unreadable"
-]
-
-
 def _page_status(record: Envelope) -> PageStatus:
     """A job's status as the pages read it: a queued job is running, and a
     rejected one stopped. A job whose envelope does not parse is
@@ -1173,20 +1176,18 @@ def render_report(
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
-        script="\n".join(
-            client_script(name)
-            for name in (
-                "sidebar.js",
-                "service_answer.js",
-                "answer_editor.js",
-                "question_list.js",
-                "report_view.js",
-            )
+        script=client_scripts(
+            "sidebar.js",
+            "service_answer.js",
+            "answer_editor.js",
+            "question_list.js",
+            "report_view.js",
         ),
         workspace_style=WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
         theme=_THEME,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
+        facet_answers=script_json(list(FACET_ANSWERS)),
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
         controls_summary=script_json(section_summary(controls)),
@@ -1231,7 +1232,8 @@ def render_report(
         changes=script_json(
             {
                 "findings": [
-                    change.to_json() for change in report_changes(previous, report)
+                    change.to_json() | {"line": change_line(change)}
+                    for change in report_changes(previous, report)
                 ]
             }
             if previous is not None
@@ -1240,6 +1242,7 @@ def render_report(
         severity_order=script_json(list(SEVERITY_ORDER)),
         verdict_labels=script_json(dict(VERDICT_LABELS)),
         unit_verdict_words=script_json(dict(UNIT_VERDICT_WORDS)),
+        report_words=script_json(island_tables(REPORT_WORDS)),
         element_type_nouns=script_json(dict(ELEMENT_TYPE_NOUNS)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
         mermaid=script_json(styled_mermaid(report.system_model)),
@@ -1721,20 +1724,19 @@ def create_app(
             render(
                 _FORM_PAGE,
                 _FORM_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "service_answer.js",
-                        "workspace.js",
-                        "answer_editor.js",
-                        "question_list.js",
-                        "text_file.js",
-                        "form_controls.js",
-                        "first_run.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js",
+                    "service_answer.js",
+                    "workspace.js",
+                    "answer_editor.js",
+                    "question_list.js",
+                    "text_file.js",
+                    "form_controls.js",
+                    "first_run.js",
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
+                facet_answers=script_json(list(FACET_ANSWERS)),
+                form_words=script_json(island_tables(FORM_WORDS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 theme=_THEME,
@@ -1767,9 +1769,7 @@ def create_app(
             render(
                 _SETTINGS_PAGE,
                 _SETTINGS_GRANTS,
-                script="\n".join(
-                    client_script(name) for name in ("sidebar.js", "settings.js")
-                ),
+                script=client_scripts("sidebar.js", "service_answer.js", "settings.js"),
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
@@ -1860,14 +1860,8 @@ def create_app(
             render(
                 _FILES_PAGE,
                 _FILES_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "text_file.js",
-                        "service_answer.js",
-                        "files.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js", "text_file.js", "service_answer.js", "files.js"
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
@@ -1969,14 +1963,8 @@ def create_app(
             render(
                 _CONTROLS_PAGE,
                 _CONTROLS_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "text_file.js",
-                        "service_answer.js",
-                        "controls.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js", "text_file.js", "service_answer.js", "controls.js"
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,

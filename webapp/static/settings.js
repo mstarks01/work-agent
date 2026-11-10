@@ -72,7 +72,7 @@ function askStoreRows() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ changes: sent }),
   })
-    .then((response) => (response.ok ? response.json().catch(() => null) : null))
+    .then((response) => (response.ok ? jsonOf(response) : null))
     .then((payload) => {
       if (asked !== storeAsked || !payload) return;
       storeShown = new Set(payload.shown);
@@ -327,13 +327,14 @@ function notes(row) {
   ];
 }
 
-// One entry for each source that settings_view.ValueOrigin names.
+// One entry for each source that settings_view.ValueOrigin names. The words
+// of a source come with its row (settings_view.ORIGIN_WORDS).
 const sources = {
-  "process": (row) => [h("span", { class: "tag outside" }, "process environment"), hint(h("code", {}, row.variable))],
-  "page": () => h("span", { class: "tag" }, "this page"),
+  "process": (row) => [h("span", { class: "tag outside" }, row.source_text), hint(h("code", {}, row.variable))],
+  "page": (row) => h("span", { class: "tag" }, row.source_text),
   "file": (row) => h("code", {}, row.file),
-  "refused": (row) => [h("span", { class: "tag outside" }, "refused"), hint(h("code", {}, row.refusal))],
-  "default": () => h("span", { class: "tag" }, "default"),
+  "refused": (row) => [h("span", { class: "tag outside" }, row.source_text), hint(h("code", {}, row.refusal))],
+  "default": (row) => h("span", { class: "tag" }, row.source_text),
 };
 
 function source(row) {
@@ -509,7 +510,7 @@ async function save() {
       showErrors([{ message: "The app did not answer. Check that it runs, then try again." }]);
       return;
     }
-    const payload = await response.json().catch(() => null);
+    const payload = await jsonOf(response);
     if (response.ok && !payload) {
       showErrors([{ message: "The page could not read the answer of the app. Reload the page to see whether the save landed." }]);
       return;

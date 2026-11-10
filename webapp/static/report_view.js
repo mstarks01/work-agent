@@ -95,15 +95,11 @@
   const ANSWERED_ATTRIBUTES = new Set(
     (PROVENANCE.answered_attributes || []).map(([element, attribute]) => `${element}>${attribute}`));
   const CONDITIONS = PROVENANCE.conditions || {};
+  // The words for each value of a closed service set, from the service
+  // (webapp.page_words.REPORT_WORDS).
+  const WORDS = JSON.parse(document.getElementById("report_words").textContent);
   // Why an open fact is still open, as the owner reads it.
-  const WHY_OPEN = {
-    unknown: "nobody knew: an answer said \"I don't know\"",
-    partial: "you answered part of it, and the parts left open keep it conditional",
-    skipped: "skipped before the analysis",
-    unanswered: "shown before the analysis and left blank",
-    answered: "you answered it, and the analysis still did not find it settled",
-    open: "not asked yet",
-  };
+  const WHY_OPEN = WORDS.why_open;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -176,29 +172,14 @@
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
-  // What a scope state means to a reader, and the class that colours it. The
-  // wording is the point: `not-raised` must not read as `applicable`, because
-  // the only fact is that no lane filed on the unit (#659). Each says what
-  // happened, and none of them says "satisfied".
-  const SCOPE_STATE = {
-    "not-raised": ["No claim filed",
-      "The lane ran and raised nothing on this unit. That is not a finding that it is met, and not a ruling that it applies."],
-    "not-applicable": ["Does not apply",
-      "Ruled out for a system of this shape."],
-    "undecidable": ["Never decided",
-      "The input never said whether this framework applies at all, so no lane ran."],
-    "needs-other-evidence": ["Needs other evidence",
-      "The unit applies and this input cannot settle it. Supplying the evidence named below can."],
-  };
+  // The label of a scope state and what it means to a reader.
+  const SCOPE_STATE = WORDS.scope_state;
 
-  // A claim the critic rejected for `evidence` rules its unit out, and the
-  // page says which reader did it: the lane excluded it and the critic
-  // agreed, while "Does it apply here?" on the same row still carries the
-  // rule's own answer, which may be unknown.
-  const REVIEW_EXCLUDED = ["Excluded by review",
-    "A lane excluded it and the critic agreed. The rule's own answer is above."];
-  const CONTROL_COVERED = ["Covered by a Control",
-    "The owner states that a Control covers it. The service verified nothing."];
+  // The label and the meaning of a rejected claim that rules on its unit, by
+  // the step that ended it. For `evidence` the page says which reader ruled:
+  // the lane excluded it and the critic agreed, while "Does it apply here?" on
+  // the same row still carries the rule's own answer, which may be unknown.
+  const UNIT_RULING = WORDS.unit_ruling;
 
   // The same for a claim's verdict, in the service's words (UNIT_VERDICT_WORDS).
   const UNIT_VERDICT = JSON.parse(document.getElementById("unit_verdict_words").textContent);
@@ -213,24 +194,17 @@
   // rejection with no cause, from a report read back, is a ruling too, as
   // `RuledClaim.rules_on_unit` reads it.
   const answersInUnits = (block) => (UNITS[block.framework] || []).length > 0;
+  const rulingStep = (c) => c.verdict.rejected_because ?? "evidence";
   const rulesOnUnit = (block, c) =>
     answersInUnits(block) && c.verdict.status === "rejected"
-    && ["evidence", "control"].includes(c.verdict.rejected_because ?? "evidence");
+    && Object.hasOwn(UNIT_RULING, rulingStep(c));
   const coveredByControl = (c) => c.verdict.rejected_because === "control";
 
   // Each kind named in its own words, so they read as different *kinds* of
   // justification rather than formattings of one. The two attribute kinds
   // carry identical fields, and so do the two assertion kinds, so this line is
   // the only place a reader can tell "nobody said" from "somebody said".
-  const GROUND_KIND = {
-    "quote": "Quoted from the submission",
-    "unknown-attribute": "Unstated in the submission",
-    "absent-attribute": "Stated absent in the submission",
-    "derived-fact": "Derived from the model",
-    "absent-element": "Named nowhere in the submission",
-    "assertion": "Stated as a fact in the submission",
-    "unknown-assertion": "Left open by the submission",
-  };
+  const GROUND_KIND = WORDS.ground_kind;
   // Past this, a quote is clamped to three lines behind a toggle. Short quotes
   // are the common case and get no affordance.
   const CLAMP_OVER = 220;
@@ -305,10 +279,9 @@
     return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled, returned };
   }
 
-  const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
-  // Every severity level, most severe first: the service's own order. SEV
-  // holds a label and a colour for each level, and a test holds its keys to
-  // the same set.
+  // The label of each severity level.
+  const SEV = WORDS.severity;
+  // Every severity level, most severe first: the service's own order.
   const SEV_ORDER = JSON.parse(document.getElementById("severity_order").textContent);
   // A finding's severity level and its mitigations' summaries, or nothing
   // where its record declares no such field. The CSV export reads the same
@@ -321,15 +294,8 @@
   // and the glyph beside it on a finding's row.
   const VERDICT = JSON.parse(document.getElementById("verdict_labels").textContent);
   const VERDICT_GLYPH = { "confirmed": "✓", "needs-info": "?", "rejected": "✕" };
-  // What the tally says for each kind of change. A kind the table does not
-  // hold throws, so it cannot render as a verdict.
-  const CHANGE_LINE = {
-    new: () => "new",
-    unchanged: () => "unchanged",
-    changed: (c) => `${VERDICT[c.before]} \u2192 ${VERDICT[c.after]}`,
-    gone: () => "no longer raised",
-  };
-  const svar = (lvl) => `var(${SEV[lvl][1]})`;
+  // The colour of a severity level: the style sheet names one for each level.
+  const svar = (lvl) => `var(--sev-${lvl})`;
 
   // The run ID of a served report: this page's own path, /report/{run}.
   // Undefined for an exported page.
@@ -380,7 +346,7 @@
   // so this renders identically in every block.
   function groundEntry(marks, claimId, ground, index) {
     const row = el("div", "ground " + ground.kind);
-    row.append(el("div", "kind", GROUND_KIND[ground.kind] || ground.kind));
+    row.append(el("div", "kind", GROUND_KIND[ground.kind]));
     const body = el("div", "body");
     if (ground.kind === "quote") {
       const unverified = marks.unverified.get(`${claimId}#${index}`);
@@ -466,11 +432,7 @@
   // The heading over a finding's two recommendations, by its verdict: a
   // conditional finding's are not actions yet, and a dismissed one's are not
   // actions at all.
-  const RECOMMENDATIONS = {
-    "confirmed": "Recommended actions",
-    "needs-info": "Potential mitigations · if confirmed",
-    "rejected": "Original proposed mitigations · not active actions",
-  };
+  const RECOMMENDATIONS = WORDS.recommendations;
   // The first thing a reader can do about a finding, for its closed row.
   const nextAction = (t) => {
     const waits = CONDITIONS[findingKey(t)] || [];
@@ -509,7 +471,7 @@
       const sev = el("span", "chip");
       const swatch = el("span", "swatch");
       swatch.style.background = svar(level);
-      sev.append(swatch, SEV[level][0]);
+      sev.append(swatch, SEV[level]);
       // A property assignment, not an attribute: there is no markup context
       // to escape out of.
       sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${level}`;
@@ -541,7 +503,7 @@
         } else {
           item.append(w.label);
         }
-        item.append(el("span", "meta", ` — ${WHY_OPEN[w.status] || w.status}`));
+        item.append(el("span", "meta", ` — ${WHY_OPEN[w.status]}`));
         list.append(item);
       });
       needed.append(list);
@@ -632,7 +594,7 @@
     if (level) {
       const swatch = el("span", "swatch");
       swatch.style.background = svar(level);
-      sev.append(swatch, SEV[level][0]);
+      sev.append(swatch, SEV[level]);
     }
     const what = el("span", "finding-what");
     what.append(proseEl("span", "finding-title", t.title));
@@ -698,9 +660,9 @@
       const entry = byUnit[row.unit];
       const [label, meaning] = claim
         ? (rulesOnUnit(block, claim)
-            ? (coveredByControl(claim) ? CONTROL_COVERED : REVIEW_EXCLUDED)
+            ? UNIT_RULING[rulingStep(claim)]
             : UNIT_VERDICT[claim.verdict.status])
-        : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
+        : SCOPE_STATE[entry ? entry.state : "not-raised"];
 
       const box = el("details", "unit");
       const head = el("summary");
@@ -761,7 +723,7 @@
     const graded = block.summary.by_severity_confirmed;
     if (graded && confirmed) {
       lead += ": " + SEV_ORDER.filter(l => graded[l])
-        .map(l => `${graded[l]} ${SEV[l][0].toLowerCase()}`).join(", ");
+        .map(l => `${graded[l]} ${SEV[l].toLowerCase()}`).join(", ");
     }
     first.append(el("b", null, `${lead}.`));
     box.append(first);
@@ -862,14 +824,7 @@
   // reaches agree.
   const QUESTION_ROWS = new Map();
   // What became of a question before this report, in the words its row shows.
-  const HISTORY = {
-    open: "New question from this analysis",
-    unanswered: "Earlier answer: left blank",
-    skipped: "Earlier answer: skipped",
-    partial: "Earlier answer: answered in part",
-    unknown: "Earlier answer: I don't know",
-    answered: "Earlier answer: given, and the analysis did not find it settled",
-  };
+  const HISTORY = WORDS.question_history;
   const questionTotal = FACT_QUESTIONS.length + LINK_QUESTIONS.length;
   $("questions-tab").textContent = questionTotal ? `Questions (${questionTotal})` : "Questions";
 
@@ -1164,7 +1119,7 @@
       },
       notes: (row) => {
         const lines = [];
-        if (row.q.history) lines.push(el("div", "meta question-history", HISTORY[row.q.history] || row.q.history));
+        if (row.q.history) lines.push(el("div", "meta question-history", HISTORY[row.q.history]));
         if ((row.q.findings || []).length) lines.push(usedBy(row.q.findings));
         return lines;
       },
@@ -1180,7 +1135,9 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        reply = response.ok ? await response.json() : null;
+        reply = response.ok ? await jsonOf(response) : null;
+        // An accepted answer that is not JSON reads as a lost connection.
+        if (response.ok && !reply) throw new Error();
       } catch {
         throw new Error("The connection was interrupted. Your answers are still on this page;"
           + " reload it to check what was saved, or try again.");
@@ -1335,8 +1292,7 @@
   if (CHANGES.length) {
     const tally = new Map();
     CHANGES.forEach(c => {
-      const line = CHANGE_LINE[c.change](c);
-      tally.set(line, (tally.get(line) || 0) + 1);
+      tally.set(c.line, (tally.get(c.line) || 0) + 1);
     });
     const box = el("div", "meta");
     box.append(`Since the report your answers came from, ${counted(CHANGES.length, "finding", "findings")}: ` +
@@ -2208,7 +2164,7 @@
         if (share) item.append(el("div", "meta", `One shared answer for ${counted(coveredCount([share]), "part", "parts")}`));
       }
       item.append(...correctionNote(q));
-      if (q.history) item.append(el("div", "meta", HISTORY[q.history] || q.history));
+      if (q.history) item.append(el("div", "meta", HISTORY[q.history]));
       if ((q.findings || []).length) {
         item.append(el("div", "meta", "Used by: " +
           q.findings.map(f => (FINDINGS.get(f) || { id: f }).id).join(" \u00b7 ")));

@@ -2135,6 +2135,19 @@ class _OneReader:
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "the join of a page's scripts": _OneReader(
+        lambda node: _calls(node, "client_script"),
+        ("webapp/page.py", "client_scripts"),
+        {
+            ("webapp/main.py", MODULE_OWNER): (
+                "it reads the one theme script, which each page carries by itself"
+            ),
+            ("webapp/offline_sitting.py", "build"): (
+                "the offline file has one script, so it reads that script and joins none"
+            ),
+        },
+        "webapp/",
+    ),
     "the position rule": _OneReader(
         _compares_a_position,
         ("evals/harness/scorer.py", "position_fate"),
@@ -2365,6 +2378,10 @@ ONE_READERS: dict[str, _OneReader] = {
         {
             ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the FactStatus type that declares the set of histories"
+            ),
+            ("webapp/page_words.py", MODULE_OWNER): (
+                "the word tables of the report page, keyed by FactStatus and held"
+                " to it by tests/test_page_words.py"
             ),
         },
         "",

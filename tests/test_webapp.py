@@ -262,6 +262,20 @@ def test_the_form_page_reads_the_service_s_element_type_nouns(client):
     )
 
 
+def test_the_form_page_reads_its_word_tables_from_the_service(client):
+    """The form page carries each table of ``FORM_WORDS`` and the facet
+    answers, and its scripts read them from the islands."""
+    from analysis_service.fact_answers import FACET_ANSWERS
+    from webapp.page_words import FORM_WORDS, island_tables
+
+    page = client.get("/").text
+    assert _island(page, "form_words") == island_tables(FORM_WORDS)
+    assert _island(page, "facet_answers") == list(FACET_ANSWERS)
+    scripts = page_javascript("workspace.js") + page_javascript("first_run.js")
+    assert not [name for name in FORM_WORDS if f".{name}" not in scripts]
+    assert 'getElementById("facet_answers")' in page_javascript("answer_editor.js")
+
+
 def test_the_page_reads_the_format_table_the_server_renders(client):
     """The form page gets the format table and its ``accept`` value from
     :data:`FORMATS`, and no page file holds a copy of an extension (ADR 0120)."""
@@ -1095,18 +1109,6 @@ def viewer_javascript() -> str:
     return page_javascript("report_view.js")
 
 
-def test_the_workspace_labels_each_page_status():
-    """``workspace.js`` labels every status that ``_page_status`` sends, and
-    no other. A status the table lacks renders as its raw key."""
-    from webapp.main import PageStatus
-
-    body = re.search(r"const labels = \{(.*?)\};", page_javascript("workspace.js"))
-    assert body is not None, "workspace.js holds no labels table"
-    assert set(re.findall(r'"([\w-]+)"\s*:', body.group(1))) == set(
-        get_args(PageStatus)
-    )
-
-
 def _table_keys(page: str, table: str) -> set[str]:
     """The quoted keys of the object literal ``const <table> = {...};`` in a
     page's script, one key at the start of each line."""
@@ -1115,17 +1117,6 @@ def _table_keys(page: str, table: str) -> set[str]:
     )
     assert body is not None, f"{page} holds no {table} table"
     return set(re.findall(r'^\s*"([\w-]+)"\s*:', body.group(1), re.MULTILINE))
-
-
-def test_the_first_run_page_words_each_empty_list_reason():
-    """``first_run.js`` has a sentence for each
-    :data:`~analysis_service.answer_state.EmptyListReason` and no other. A
-    reason the table lacks renders as ``undefined``."""
-    from analysis_service.answer_state import EmptyListReason
-
-    assert _table_keys("first_run.js", "emptyListReasons") == set(
-        get_args(EmptyListReason)
-    )
 
 
 def test_the_first_run_page_reads_each_carried_reason():
@@ -1936,16 +1927,8 @@ STATIC_SCRIPTS = sorted(
 
 #: Each script that calls ``.json()``, with the count of its calls and the
 #: count of them that have no ``.catch(`` directly on them. ``jsonOf`` of
-#: service_answer.js is the one read. The Settings page loads sidebar.js and
-#: settings.js only, so settings.js holds its own catch. Each other row is a
-#: read that does not go through ``jsonOf``.
-JSON_READS: dict[str, tuple[int, int]] = {
-    "service_answer.js": (1, 0),
-    "settings.js": (2, 0),
-    "controls.js": (2, 1),
-    "form_controls.js": (1, 1),
-    "report_view.js": (1, 1),
-}
+#: service_answer.js is the one read, and each page loads that script.
+JSON_READS: dict[str, tuple[int, int]] = {"service_answer.js": (1, 0)}
 
 
 def test_each_script_reads_json_through_json_of():
@@ -2230,7 +2213,7 @@ def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
     source = (PROJECT_ROOT / "webapp" / "main.py").read_text(encoding="utf-8")
     served = [
         re.findall(r'"(\w+\.js)"', block)
-        for block in re.findall(r"for name in \(([^)]*)\)", source)
+        for block in re.findall(r"client_scripts\(([^)]*)\)", source)
     ]
     lists = [names for names in served if "question_list.js" in names]
 
@@ -2385,19 +2368,12 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     from webapp.main import client_script
 
     script = client_script("report_view.js")
-    assert (
-        '["evidence", "control"].includes(c.verdict.rejected_because ?? "evidence")'
-        in script
-    )
+    assert "Object.hasOwn(UNIT_RULING, rulingStep(c))" in script
     assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
     assert (
-        "REVIEW_EXCLUDED"
+        "UNIT_RULING[rulingStep(claim)]"
         in script.split("function unitTable")[1].split("function renderBlock")[0]
-    ), "the requirement row reads the ruling as Excluded by review"
-    assert (
-        "CONTROL_COVERED"
-        in script.split("function unitTable")[1].split("function renderBlock")[0]
-    ), "the requirement row reads a control ruling as Covered by a Control"
+    ), "the requirement row reads the words of the step that ruled"
     assert "block.rejected_claims.filter(c => !rulesOnUnit(block, c))" in script, (
         "the dismissed list is the rest"
     )
