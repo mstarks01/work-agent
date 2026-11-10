@@ -379,13 +379,14 @@ def test_a_sitting_422_shows_the_first_problems_and_counts_the_rest(tmp_path):
 
 
 def test_a_sitting_422_stops_at_marks_for_a_key_that_is_not_text(tmp_path):
-    """Pydantic writes a lone surrogate in another form, so the key has no
-    position to name."""
+    """Pydantic writes U+FFFD for a lone surrogate. A second key can hold
+    that same text, so the place names no position."""
     app = browser(session_for(build_tree(tmp_path), "ada", CASE))
+    marks = b'{"\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbdk": "agree", "\\ud800k": "agree"}'
 
     response = app.post(
         "/api/finish",
-        content=b'{"case": "%s", "marks": {"\\ud800k": "agree"}}' % CASE.encode(),
+        content=b'{"case": "%s", "marks": %s}' % (CASE.encode(), marks),
         headers={"Content-Type": "application/json"},
     )
 

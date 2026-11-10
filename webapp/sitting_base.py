@@ -173,19 +173,16 @@ def _mark_by_position(
 
     A mark's key is caller text, and a response names a mark as
     :func:`~evals.harness.sitting.mark_position` does. The place stops at
-    ``marks`` for a key that ``positions`` does not hold: pydantic writes a key
-    that is not valid UTF-8 text in another form.
+    ``marks`` for a key with U+FFFD: pydantic writes that character for each
+    byte of a key that is not valid UTF-8 text, so the key names no one mark.
     """
     loc = error["loc"]
     if loc[:2] != ("body", "marks") or len(loc) < 3:
         return error
-    position = positions.get(loc[2])
-    if position is None:
+    if "\ufffd" in loc[2]:
         return {**error, "loc": ("body", "marks", *loc[3:])}
-    return {
-        **error,
-        "loc": ("body", sittings.mark_position(position, loc[2]), *loc[3:]),
-    }
+    mark = sittings.mark_position(positions[loc[2]], loc[2])
+    return {**error, "loc": ("body", mark, *loc[3:])}
 
 
 async def _invalid_request(request: Request, exc: RequestValidationError):
@@ -197,8 +194,8 @@ async def _invalid_request(request: Request, exc: RequestValidationError):
         if isinstance(marks, dict)
         else {}
     )
-    # Only the errors that the line shows, and one more so that the line
-    # counts the rest: a body can fail in each of its marks.
+    # Only the errors that the line shows get a position: a body can fail in
+    # each of its marks. The rest go on as they are, and the line counts them.
     errors = exc.errors()
     shown = [
         _mark_by_position(error, positions) for error in errors[:MAX_RENDERED_ERRORS]
