@@ -329,8 +329,9 @@ def first_problem(error: ValidationError) -> str:
     one field and one reason is what carries them there. The place comes from
     :func:`~analysis_service.errors.error_place`, because a sitting route
     returns this message, and the place stops before an extra field that the
-    caller made up. The place does name a key of a declared mapping, such as a
-    mark's fingerprint, because that key is the line the reader must find.
+    caller made up. The place does name a key of a declared mapping, such as
+    the fingerprint that keys a mark, because that key names the entry that is
+    wrong.
     """
     first = error.errors()[0]
     where = error_place(first) or "the file"
