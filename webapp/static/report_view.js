@@ -194,9 +194,10 @@
   // rejection with no cause, from a report read back, is a ruling too, as
   // `RuledClaim.rules_on_unit` reads it.
   const answersInUnits = (block) => (UNITS[block.framework] || []).length > 0;
+  const rulingStep = (c) => c.verdict.rejected_because ?? "evidence";
   const rulesOnUnit = (block, c) =>
     answersInUnits(block) && c.verdict.status === "rejected"
-    && Object.hasOwn(UNIT_RULING, c.verdict.rejected_because ?? "evidence");
+    && Object.hasOwn(UNIT_RULING, rulingStep(c));
   const coveredByControl = (c) => c.verdict.rejected_because === "control";
 
   // Each kind named in its own words, so they read as different *kinds* of
@@ -659,7 +660,7 @@
       const entry = byUnit[row.unit];
       const [label, meaning] = claim
         ? (rulesOnUnit(block, claim)
-            ? UNIT_RULING[claim.verdict.rejected_because ?? "evidence"]
+            ? UNIT_RULING[rulingStep(claim)]
             : UNIT_VERDICT[claim.verdict.status])
         : SCOPE_STATE[entry ? entry.state : "not-raised"];
 

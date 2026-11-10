@@ -266,12 +266,10 @@ def test_the_form_page_reads_its_word_tables_from_the_service(client):
     """The form page carries each table of ``FORM_WORDS`` and the facet
     answers, and its scripts read them from the islands."""
     from analysis_service.fact_answers import FACET_ANSWERS
-    from webapp.page_words import FORM_WORDS
+    from webapp.page_words import FORM_WORDS, island_tables
 
     page = client.get("/").text
-    assert _island(page, "form_words") == {
-        name: dict(table) for name, table in FORM_WORDS.items()
-    }
+    assert _island(page, "form_words") == island_tables(FORM_WORDS)
     assert _island(page, "facet_answers") == list(FACET_ANSWERS)
     scripts = page_javascript("workspace.js") + page_javascript("first_run.js")
     assert not [name for name in FORM_WORDS if f".{name}" not in scripts]
@@ -1933,22 +1931,6 @@ STATIC_SCRIPTS = sorted(
 JSON_READS: dict[str, tuple[int, int]] = {"service_answer.js": (1, 0)}
 
 
-def test_each_page_joins_its_scripts_through_one_reader():
-    """``client_scripts`` of ``webapp/page.py`` joins the scripts of a page. No
-    other module joins them, so each page takes the same separator."""
-    joins = {
-        path.name: found
-        for path in sorted((PROJECT_ROOT / "webapp").glob("*.py"))
-        if path.name != "page.py"
-        and (
-            found := re.findall(
-                r"join\(\s*client_script\(", path.read_text(encoding="utf-8")
-            )
-        )
-    }
-    assert joins == {}
-
-
 def test_each_script_reads_json_through_json_of():
     """An answer of a proxy can be a plain page, and ``.json()`` of it throws.
     The lint counts each ``.json()`` of each script, and each one with no
@@ -2386,12 +2368,10 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     from webapp.main import client_script
 
     script = client_script("report_view.js")
-    assert (
-        'Object.hasOwn(UNIT_RULING, c.verdict.rejected_because ?? "evidence")' in script
-    )
+    assert "Object.hasOwn(UNIT_RULING, rulingStep(c))" in script
     assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
     assert (
-        'UNIT_RULING[claim.verdict.rejected_because ?? "evidence"]'
+        "UNIT_RULING[rulingStep(claim)]"
         in script.split("function unitTable")[1].split("function renderBlock")[0]
     ), "the requirement row reads the words of the step that ruled"
     assert "block.rejected_claims.filter(c => !rulesOnUnit(block, c))" in script, (

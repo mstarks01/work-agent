@@ -18,6 +18,7 @@ from analysis_service.claims import (
     GroundKind,
     ScopeState,
     SeverityLevel,
+    UnitRuling,
     VerdictStatus,
 )
 from analysis_service.fact_answers import FactStatus
@@ -79,11 +80,6 @@ SCOPE_STATE_WORDS: Mapping[ScopeState, tuple[str, str]] = MappingProxyType(
         ),
     }
 )
-
-#: The rejection steps that rule on the unit a draft names, as
-#: :meth:`~analysis_service.claims.RuledClaim.rules_on_unit` reads them. A test
-#: holds this set to that method.
-UnitRuling = Literal["evidence", "control"]
 
 #: The label and the meaning of a rejected claim that rules on its unit, by the
 #: step that ended it. The page says which reader ruled.
@@ -154,9 +150,19 @@ def change_line(change: FindingChange) -> str:
     )
 
 
-#: Every table the report page reads, by the name of its key in the
-#: ``report_words`` island.
-REPORT_WORDS: Mapping[str, Mapping[Any, object]] = MappingProxyType(
+#: The keys of the ``report_words`` island, as ``report_view.js`` reads them.
+ReportTable = Literal[
+    "why_open",
+    "question_history",
+    "scope_state",
+    "unit_ruling",
+    "ground_kind",
+    "severity",
+    "recommendations",
+]
+
+#: Every table the report page reads, by its key in the ``report_words`` island.
+REPORT_WORDS: Mapping[ReportTable, Mapping[Any, object]] = MappingProxyType(
     {
         "why_open": WHY_OPEN,
         "question_history": QUESTION_HISTORY,
@@ -216,12 +222,19 @@ EMPTY_LIST_REASONS: Mapping[EmptyListReason, str] = MappingProxyType(
     }
 )
 
-#: Every table the form page reads, by the name of its key in the
-#: ``form_words`` island.
-FORM_WORDS: Mapping[str, Mapping[Any, object]] = MappingProxyType(
+#: The keys of the ``form_words`` island, as the form scripts read them.
+FormTable = Literal["page_status", "gate_notes", "empty_list"]
+
+#: Every table the form page reads, by its key in the ``form_words`` island.
+FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
     {
         "page_status": PAGE_STATUS_LABELS,
         "gate_notes": GATE_NOTES,
         "empty_list": EMPTY_LIST_REASONS,
     }
 )
+
+
+def island_tables(words: Mapping[Any, Mapping[Any, object]]) -> dict[str, dict]:
+    """The tables of one island in the form that ``script_json`` takes."""
+    return {name: dict(table) for name, table in words.items()}

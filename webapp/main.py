@@ -315,7 +315,13 @@ from webapp.page import (
     response,
     script_json,
 )
-from webapp.page_words import FORM_WORDS, REPORT_WORDS, PageStatus, change_line
+from webapp.page_words import (
+    FORM_WORDS,
+    REPORT_WORDS,
+    PageStatus,
+    change_line,
+    island_tables,
+)
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
@@ -1236,9 +1242,7 @@ def render_report(
         severity_order=script_json(list(SEVERITY_ORDER)),
         verdict_labels=script_json(dict(VERDICT_LABELS)),
         unit_verdict_words=script_json(dict(UNIT_VERDICT_WORDS)),
-        report_words=script_json(
-            {name: dict(table) for name, table in REPORT_WORDS.items()}
-        ),
+        report_words=script_json(island_tables(REPORT_WORDS)),
         element_type_nouns=script_json(dict(ELEMENT_TYPE_NOUNS)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
         mermaid=script_json(styled_mermaid(report.system_model)),
@@ -1732,9 +1736,7 @@ def create_app(
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 facet_answers=script_json(list(FACET_ANSWERS)),
-                form_words=script_json(
-                    {name: dict(table) for name, table in FORM_WORDS.items()}
-                ),
+                form_words=script_json(island_tables(FORM_WORDS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 theme=_THEME,

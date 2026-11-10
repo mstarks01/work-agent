@@ -431,10 +431,11 @@ def _reason_payload() -> list[dict[str, str]]:
         {
             "code": code,
             "gloss": REASON_GLOSS[code],
-            "kind": (kind := _reason_kind(code)),
+            "kind": kind,
             "heading": REASON_KIND_HEADINGS[kind],
         }
         for code in sorted(SUBSTANCE_REASONS) + sorted(STYLE_REASONS)
+        for kind in (_reason_kind(code),)
     ]
 
 

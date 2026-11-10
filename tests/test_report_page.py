@@ -384,7 +384,7 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
     javascript = viewer_javascript()
     rule = "\n".join(
         re.search(rf"const {name} = .*?;\n", javascript, re.DOTALL)[0]
-        for name in ("answersInUnits", "rulesOnUnit")
+        for name in ("answersInUnits", "rulingStep", "rulesOnUnit")
     )
     verdict = {"status": "rejected", "rejected_because": step}
     program = (

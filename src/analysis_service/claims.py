@@ -110,6 +110,10 @@ VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 # it answers for a package nobody has written.
 RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate", "control"]
 
+#: The steps whose rejection rules on the unit a draft names.
+#: :meth:`RuledClaim.rules_on_unit` reads them, and the report page words each.
+UnitRuling = Literal["evidence", "control"]
+
 # The steps a critic may fail a draft on. ``duplicate`` is not among them: the
 # critic rules every draft on its own, because every duplicate rejection on
 # record dropped a different finding (QA-2026-10-03-02-E3). It stays in
@@ -1442,7 +1446,7 @@ class RuledClaim(Claim):
         """
         if self.verdict.status != "rejected":
             return True
-        return self.verdict.rejected_because in (None, "evidence", "control")
+        return self.verdict.rejected_because in (None, *get_args(UnitRuling))
 
 
 class QuoteCandidate(BaseModel):

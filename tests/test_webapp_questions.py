@@ -65,7 +65,7 @@ from tests.test_webapp import (
     startup_for,
 )
 from webapp.main import PAGE_SOURCE_LABELS, create_app, file_refusals
-from webapp.page_words import FORM_WORDS
+from webapp.page_words import FORM_WORDS, island_tables
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -670,9 +670,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         .replace("FACET_LIST", json.dumps(json.dumps(list(FACET_ANSWERS))))
         .replace(
             "FORM_WORD_TABLES",
-            json.dumps(
-                json.dumps({name: dict(table) for name, table in FORM_WORDS.items()})
-            ),
+            json.dumps(json.dumps(island_tables(FORM_WORDS))),
         )
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
         .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64, 3))))

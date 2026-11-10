@@ -14,7 +14,13 @@ from typing import get_args
 import pytest
 
 from analysis_service.answer_state import EmptyListReason
-from analysis_service.claims import GroundKind, ScopeState, SeverityLevel, VerdictStatus
+from analysis_service.claims import (
+    GroundKind,
+    ScopeState,
+    SeverityLevel,
+    UnitRuling,
+    VerdictStatus,
+)
 from analysis_service.fact_answers import FACET_ANSWERS, FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.report_changes import Change, FindingChange
@@ -33,7 +39,7 @@ REPORT_TABLES = {
     "WHY_OPEN": FactStatus,
     "QUESTION_HISTORY": FactStatus,
     "SCOPE_STATE_WORDS": ScopeState,
-    "UNIT_RULING_WORDS": page_words.UnitRuling,
+    "UNIT_RULING_WORDS": UnitRuling,
     "GROUND_KIND_WORDS": GroundKind,
     "SEVERITY_LABELS": SeverityLevel,
     "RECOMMENDATION_HEADINGS": VerdictStatus,
@@ -98,6 +104,23 @@ def test_the_report_words_hold_each_report_table():
         name for name in REPORT_TABLES if id(getattr(page_words, name)) not in held
     ]
     assert absent == ["CHANGE_LINES"]
+
+
+def test_the_form_words_hold_each_form_table():
+    held = {id(table) for table in page_words.FORM_WORDS.values()}
+    assert all(id(getattr(page_words, name)) in held for name in FORM_TABLES)
+
+
+@pytest.mark.parametrize(
+    ("words", "keys"),
+    [
+        (page_words.REPORT_WORDS, page_words.ReportTable),
+        (page_words.FORM_WORDS, page_words.FormTable),
+    ],
+)
+def test_each_island_names_each_of_its_keys(words, keys):
+    """A script reads each table by its key in the island."""
+    assert set(words) == set(get_args(keys))
 
 
 def test_the_report_script_copies_no_word_of_a_table():
