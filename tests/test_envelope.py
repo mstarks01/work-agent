@@ -389,6 +389,27 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         assert all(line.isprintable() for line in lines)
         assert not [line for line in lines if line.startswith("::")]
 
+    def test_a_refusal_at_the_top_of_an_envelope_says_so(self, tree, tmp_path):
+        # An extra field has no name in a refusal, so the line names the
+        # object that holds it.
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        path.write_text(
+            json.dumps(
+                document | {"extra": 1, "cases": {"a case": answers | {"x": 1}}}
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+
+        assert str(refusal.value).splitlines()[1:] == [
+            "'cases.a case': Extra inputs are not permitted",
+            "the top of the file: Extra inputs are not permitted",
+        ]
+
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys
     ):

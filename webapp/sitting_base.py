@@ -39,18 +39,20 @@ from __future__ import annotations
 
 import secrets
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from analysis_service.errors import shown_errors
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
@@ -162,6 +164,36 @@ class Session:
         return prepared
 
 
+def _mark_by_position(
+    error: Mapping[str, Any], keys: Sequence[str]
+) -> Mapping[str, Any]:
+    """``error`` with its mark named by its position in ``keys``, the keys of
+    the ``marks`` sent.
+
+    A mark's key is caller text, and a response names a mark as
+    :func:`~evals.harness.sitting.mark_position` does.
+    """
+    loc = error["loc"]
+    if loc[:2] != ("body", "marks") or len(loc) < 3:
+        return error
+    mark = sittings.mark_position(keys.index(loc[2]), loc[2])
+    return {**error, "loc": ("body", mark, *loc[3:])}
+
+
+async def _invalid_request(request: Request, exc: RequestValidationError):
+    """The ``422`` of a request the schema refuses: each place and its rule in
+    one line, and no value that the caller sent."""
+    marks = exc.body.get("marks") if isinstance(exc.body, dict) else None
+    keys = list(marks) if isinstance(marks, dict) else []
+    detail = "; ".join(
+        f"{error.place}: {error.message}" if error.place else error.message
+        for error in shown_errors(
+            [_mark_by_position(error, keys) for error in exc.errors()]
+        )
+    )
+    return JSONResponse({"detail": detail}, status_code=422)
+
+
 def create_app(session: Session, page: str, script: str) -> FastAPI:
     """The routes a sitting needs, over one surface's own page.
 
@@ -176,6 +208,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     app = FastAPI(title="Case sitting", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
+    app.exception_handler(RequestValidationError)(_invalid_request)
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:

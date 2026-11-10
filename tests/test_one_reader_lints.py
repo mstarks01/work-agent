@@ -674,6 +674,10 @@ LOC_READERS: dict[Site, str] = {
         "it asks whether the error sits on a list of the body itself, and"
         " makes no place"
     ),
+    ("webapp/sitting_base.py", "_mark_by_position"): (
+        "it names a mark by its position where the place holds the mark's key,"
+        " because the key is caller text; ``error_place`` then makes the place"
+    ),
     ("src/analysis_service/api.py", "_body_refused"): (
         "it puts the reader's places under ``body``, where every other"
         " refusal of a request body sits; ``error_place`` then makes the place"
