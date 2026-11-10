@@ -138,12 +138,12 @@ shows no graph node name. Until the service sends the first line of a run, the
 bar shows no count.
 A run that continues a paused job starts its bar at the stage where that job
 stopped, counted in the stages of a run toward a report, and the bar does not
-go below it. The bar of a follow-up starts at 0. So does the bar of a run that
-continues a job of an earlier version of the app, where that job holds a step
-that this version does not have. Its first line reads "Using your
+go below it. Its first line reads "Using your
 answers to continue the analysis…" after your answers, or "Continuing with
 your Controls…" after a pause for your Controls alone. A reload shows the same
-line.
+line. The bar of a follow-up starts at 0. So does the bar of a run that
+continues a job of an earlier version of the app, where that job holds a step
+that this version does not have.
 
 **The report** has three sections under its title: **Report**, **Questions**
 and **About the analysis**. The page opens on **Report**, and `?view=questions`

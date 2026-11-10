@@ -203,7 +203,6 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fixes import fixes_by_framework
 from analysis_service.frameworks import PACKAGES, package_for
-from analysis_service.graph import step_by_graph_node
 from analysis_service.job_answers import (
     Answerable,
     DraftSaved,
@@ -240,7 +239,6 @@ from analysis_service.jobs import (
     ended,
     event_frames,
     execute_job,
-    is_follow_up,
     parent_of,
     readable,
 )
@@ -324,10 +322,11 @@ from webapp.page_words import (
     REPORT_WORDS,
     STAGE_COUNT,
     PageStatus,
-    ProgressMode,
     RunStart,
     change_line,
     island_tables,
+    lowest_stage,
+    node_names,
     progress_mode,
     run_start_of,
     stage_after,
@@ -573,7 +572,10 @@ class Workspace:
     async def starts_from(self, record: Envelope) -> RunStart:
         """What the run of ``record``, a job in flight, does first."""
         resumed = await self._resumed(record)
-        return run_start_of(None if resumed is None else resumed[1])
+        if resumed is None:
+            return run_start_of(None)
+        _, parent = resumed
+        return run_start_of(parent)
 
     async def progress_line(
         self, record: JobRecord, asks: bool
@@ -583,8 +585,8 @@ class Workspace:
         :func:`webapp.page_words.words_after`), with the
         ``seq`` of the last event, so the page keeps the latest line it got.
 
-        The bar of a Resumed Job never goes below its floor
-        (:func:`_stage_floor`).
+        The bar of a Resumed Job never goes below its lowest stage
+        (:func:`webapp.page_words.lowest_stage`).
 
         ``record`` is a job in flight that :func:`readable` accepts, and
         ``asks`` is the answer of :meth:`asks` for it.
@@ -593,16 +595,16 @@ class Workspace:
         frameworks = [selection.name for selection in record.whole_frameworks()]
         resumed = await self._resumed(record)
         if resumed is None:
-            start, floor = run_start_of(None), 0
+            start, lowest = run_start_of(None), 0
         else:
             resumption, parent = resumed
             start = run_start_of(parent)
-            floor = _stage_floor(resumption, parent, frameworks, mode)
+            lowest = lowest_stage(resumption, parent, frameworks, mode)
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
-            nodes = _node_names(events)
+            nodes = node_names(events)
             return {
-                "stage": max(stage_after(nodes, frameworks, mode), floor),
+                "stage": max(stage_after(nodes, frameworks, mode), lowest),
                 "words": words_after(nodes, frameworks, mode, start),
                 "seq": events[-1].seq if events else 0,
             }
@@ -2833,33 +2835,6 @@ EndFrame = Literal[
 ]
 
 
-def _node_names(events: Sequence[JobEvent]) -> list[str]:
-    """The name of each node of ``events``, in order."""
-    return [event.node for event in events if event.node is not None]
-
-
-def _stage_floor(
-    resumption: Resumption,
-    parent: JobRecord,
-    frameworks: Sequence[FrameworkName],
-    mode: ProgressMode,
-) -> int:
-    """The stage below which the bar of a Resumed Job never goes: the stage
-    where its paused parent stopped, counted in ``mode``
-    (:func:`webapp.page_words.stage_after`).
-
-    The bar of a follow-up of a finished report starts at 0. So does the bar
-    of a job whose parent holds a node that no graph of ``frameworks`` holds,
-    a record of an earlier build. The bar is a display value, so this reader
-    answers 0 for such a name, and each other reader of node names raises.
-    """
-    nodes = _node_names(parent.events)
-    known = set(nodes) <= step_by_graph_node(frameworks).keys()
-    if is_follow_up(resumption) or not known:
-        return 0
-    return stage_after(nodes, frameworks, mode)
-
-
 def _frame(event: EndFrame, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
@@ -2874,7 +2849,8 @@ async def _stream(
     then one frame for how it ended. Where ``progress`` is given, each node
     event gets a frame too: the progress line after that node, and no node
     name. The first frame is then the progress line before any node, so the
-    bar of a Resumed Job starts at its floor (:func:`_stage_floor`).
+    bar of a Resumed Job starts at its lowest stage
+    (:func:`webapp.page_words.lowest_stage`).
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions

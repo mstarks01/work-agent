@@ -25,7 +25,7 @@ from analysis_service.claims import (
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.graph import NodeStep, step_by_graph_node
-from analysis_service.jobs import JobRecord
+from analysis_service.jobs import JobEvent, JobRecord, Resumption, is_follow_up
 from analysis_service.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
@@ -356,6 +356,33 @@ def words_after(
     if not nodes:
         return INITIAL_PROGRESS_WORDS[start]
     return STEP_PROGRESS[step_by_graph_node(frameworks)[nodes[-1]]].words[mode]
+
+
+def node_names(events: Sequence[JobEvent]) -> list[str]:
+    """The name of each node of ``events``, in order."""
+    return [event.node for event in events if event.node is not None]
+
+
+def lowest_stage(
+    resumption: Resumption,
+    parent: JobRecord,
+    frameworks: Sequence[FrameworkName],
+    mode: ProgressMode,
+) -> int:
+    """The stage below which the bar of a Resumed Job never goes: the stage
+    where its paused parent stopped, counted in ``mode``
+    (:func:`stage_after`).
+
+    The bar of a follow-up of a finished report starts at 0. So does the bar
+    of a job whose parent holds a node that no graph of ``frameworks`` holds,
+    a record of an earlier build. The bar is a display value, so this reader
+    answers 0 for such a name, and each other reader of node names raises.
+    """
+    nodes = node_names(parent.events)
+    known = set(nodes) <= step_by_graph_node(frameworks).keys()
+    if is_follow_up(resumption) or not known:
+        return 0
+    return stage_after(nodes, frameworks, mode)
 
 
 #: A line of the progress panel that the page chooses: the count of complete

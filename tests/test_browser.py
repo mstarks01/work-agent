@@ -704,7 +704,9 @@ class HeldResumedJob(web.PausingRunner):
         return await super().run(job, on_node)
 
 
-def test_the_bar_of_a_resumed_job_never_shows_a_stage_below_its_floor(browser, tiers):
+def test_the_bar_of_a_resumed_job_never_shows_a_stage_below_its_lowest_stage(
+    browser, tiers
+):
     """The parent stopped after two stages, so the bar of its Resumed Job
     starts at 2. Until the service sends the first line, the bar shows no
     count, and no value it shows is below 2."""

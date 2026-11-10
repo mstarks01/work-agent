@@ -384,18 +384,19 @@ def assert_lines(
     nodes: list[str],
     mode: ProgressMode,
     start: RunStart,
-    floor: int = 0,
+    lowest: int = 0,
 ) -> None:
     """The first frame is the line before any node, each later frame is the
     progress line after its node, and a later frame has a larger ``seq``. No
-    stage falls below ``floor``, the floor of the bar of a Resumed Job."""
+    stage falls below ``lowest``, the lowest stage of the bar of a Resumed
+    Job."""
     selection = [item["name"] for item in BODY["frameworks"]]
     sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
     lines = [
         progress_after(done, selection, mode, start)
         for done in [[], *([node] for node in nodes)]
     ]
-    assert sent == [line | {"stage": max(line["stage"], floor)} for line in lines]
+    assert sent == [line | {"stage": max(line["stage"], lowest)} for line in lines]
     seqs = [frame["seq"] for frame in frames]
     assert seqs == sorted(set(seqs))
 
@@ -467,7 +468,7 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
         )
         lines_of(client, runner, started.json()["run"])
         selection = [item["name"] for item in BODY["frameworks"]]
-        stopped = stage_after(runner.sent, selection, "to-report")
+        lowest = stage_after(runner.sent, selection, "to-report")
         runner.release.clear()
         runner.sent.clear()
         continued = client.post(
@@ -485,8 +486,8 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
             time.sleep(0.01)
         _, frames = lines_of(client, runner, child)
 
-    assert_lines(frames, runner.sent, "to-report", "answers", stopped)
-    assert read["progress"]["stage"] == max(stopped, 1)
+    assert_lines(frames, runner.sent, "to-report", "answers", lowest)
+    assert read["progress"]["stage"] == max(lowest, 1)
     assert read["pauses"] is False
     assert frames[-1]["stage"] == STAGE_COUNT
 
@@ -620,22 +621,22 @@ def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
 def test_a_resumed_job_starts_with_the_words_the_page_shows_at_its_start(start, mode):
     """The status answer and the page read one row of one table."""
-    _, floor = PARENT_RUNS[start, mode]
+    _, lowest = PARENT_RUNS[start, mode]
     assert _line(start, mode, []) == {
-        "stage": floor,
+        "stage": lowest,
         "words": INITIAL_PROGRESS_WORDS[start],
         "seq": 0,
     }
 
 
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
-def test_the_bar_of_a_resumed_job_never_goes_below_its_floor(start, mode):
-    _, floor = PARENT_RUNS[start, mode]
+def test_the_bar_of_a_resumed_job_never_goes_below_its_lowest_stage(start, mode):
+    _, lowest = PARENT_RUNS[start, mode]
     for nodes in ([graph.EXTRACT_NODE], [graph.EXTRACT_NODE, graph.PREPARE_NODE]):
         expected = progress_after(
             nodes, [each.name for each in sample_selection()], "to-report", start
         )["stage"]
-        assert _line(start, mode, nodes)["stage"] == max(expected, floor)
+        assert _line(start, mode, nodes)["stage"] == max(expected, lowest)
 
 
 def test_the_page_reads_the_start_words_of_a_resumed_job_from_the_start_table():
