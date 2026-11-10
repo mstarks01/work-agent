@@ -410,6 +410,20 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
             "the top of the file: Extra inputs are not permitted",
         ]
 
+    def test_the_line_that_counts_the_rest_names_no_place(self, tree, tmp_path):
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        extras = {f"extra {number}": 1 for number in range(25)}
+        path.write_text(json.dumps(document | extras), encoding="utf-8")
+
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+
+        assert str(refusal.value).splitlines()[20:] == [
+            "the top of the file: Extra inputs are not permitted",
+            "and 5 more problems not shown",
+        ]
+
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys
     ):

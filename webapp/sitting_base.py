@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import secrets
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any
@@ -52,7 +52,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from analysis_service.errors import shown_errors
+from analysis_service.errors import MAX_RENDERED_ERRORS
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
@@ -62,6 +62,7 @@ from webapp.page import (
     WORKSPACE_STYLE,
     Grants,
     SecurityHeaders,
+    invalid_request,
     refuse_cross_origin,
     render,
     response,
@@ -165,33 +166,44 @@ class Session:
 
 
 def _mark_by_position(
-    error: Mapping[str, Any], keys: Sequence[str]
+    error: Mapping[str, Any], positions: Mapping[str, int]
 ) -> Mapping[str, Any]:
-    """``error`` with its mark named by its position in ``keys``, the keys of
-    the ``marks`` sent.
+    """``error`` with its mark named by its position, read from ``positions``,
+    the position of each key of the ``marks`` sent.
 
     A mark's key is caller text, and a response names a mark as
-    :func:`~evals.harness.sitting.mark_position` does.
+    :func:`~evals.harness.sitting.mark_position` does. The place stops at
+    ``marks`` for a key that ``positions`` does not hold: pydantic writes a key
+    that is not valid UTF-8 text in another form.
     """
     loc = error["loc"]
     if loc[:2] != ("body", "marks") or len(loc) < 3:
         return error
-    mark = sittings.mark_position(keys.index(loc[2]), loc[2])
-    return {**error, "loc": ("body", mark, *loc[3:])}
+    position = positions.get(loc[2])
+    if position is None:
+        return {**error, "loc": ("body", "marks", *loc[3:])}
+    return {
+        **error,
+        "loc": ("body", sittings.mark_position(position, loc[2]), *loc[3:]),
+    }
 
 
 async def _invalid_request(request: Request, exc: RequestValidationError):
     """The ``422`` of a request the schema refuses: each place and its rule in
     one line, and no value that the caller sent."""
     marks = exc.body.get("marks") if isinstance(exc.body, dict) else None
-    keys = list(marks) if isinstance(marks, dict) else []
-    detail = "; ".join(
-        f"{error.place}: {error.message}" if error.place else error.message
-        for error in shown_errors(
-            [_mark_by_position(error, keys) for error in exc.errors()]
-        )
+    positions = (
+        {key: position for position, key in enumerate(marks)}
+        if isinstance(marks, dict)
+        else {}
     )
-    return JSONResponse({"detail": detail}, status_code=422)
+    # Only the errors that the line shows, and one more so that the line
+    # counts the rest: a body can fail in each of its marks.
+    errors = exc.errors()
+    shown = [
+        _mark_by_position(error, positions) for error in errors[:MAX_RENDERED_ERRORS]
+    ]
+    return invalid_request([*shown, *errors[MAX_RENDERED_ERRORS:]])
 
 
 def create_app(session: Session, page: str, script: str) -> FastAPI:
