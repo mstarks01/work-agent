@@ -178,7 +178,7 @@ const formControls = (() => {
     let body = null;
     try {
       const listed = await fetch("/workspace/controls");
-      if (listed.ok) body = await listed.json();
+      if (listed.ok) body = await jsonOf(listed);
     } catch {
       // A failed read leaves `body` null.
     }

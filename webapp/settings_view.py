@@ -34,6 +34,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Literal, TypedDict, get_args
 
 from analysis_service import resilience
@@ -99,6 +100,18 @@ from webapp.settings_page import (
 #: Where a row's value comes from. ``refused`` is a file the loader refuses,
 #: which a row shows in place of a value. ``settings.js`` shows each one.
 ValueOrigin = Literal["process", "page", "file", "refused", "default"]
+
+#: The words ``settings.js`` shows for each source. A value from a file shows
+#: the path of the file in their place.
+ORIGIN_WORDS: Mapping[ValueOrigin, str | None] = MappingProxyType(
+    {
+        "process": "process environment",
+        "page": "this page",
+        "file": None,
+        "refused": "refused",
+        "default": "default",
+    }
+)
 
 #: The numbers a numeric row takes. ``settings.js`` checks each one.
 Numeric = Literal["integer", "decimal"]
@@ -462,7 +475,12 @@ def _sourced(
     source: ValueOrigin, value: str | None, **detail: str | None
 ) -> dict[str, Any]:
     """A row's value, where it comes from, and the detail that source shows."""
-    return {"value": value, "source": source, **detail}
+    return {
+        "value": value,
+        "source": source,
+        "source_text": ORIGIN_WORDS[source],
+        **detail,
+    }
 
 
 def _override_form(value: object) -> str:
