@@ -1255,8 +1255,9 @@ def unfence(rendered: str) -> str:
 # become the session's state delta.
 
 
-#: How many node bodies may hold a worker thread at once, across every job in
-#: the process. Separate from anyio's default limiter on purpose: that one is
+#: How many node bodies the live jobs of the process may await on a worker
+#: thread at once. A body whose job the deadline settled holds no token.
+#: Separate from anyio's default limiter on purpose: that one is
 #: also what `require_identity` verifies a bearer token through, and a graph that
 #: could fill it would make every arriving caller wait for a node body.
 #:
