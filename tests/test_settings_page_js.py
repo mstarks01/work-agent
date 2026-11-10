@@ -60,7 +60,7 @@ globalThis.fetch = (_url, request) => {
   sent = JSON.parse(request.body);
   return new Promise((resolve) => { resolveSave = resolve; });
 };
-const scriptText = fs.readFileSync(process.argv[1], "utf8");
+const scriptText = process.argv.slice(1).map((file) => fs.readFileSync(file, "utf8")).join("\n");
 eval(scriptText + `
 (async () => {
   assert.strictEqual(document.getElementById("changes-column").hidden, true);
@@ -98,7 +98,13 @@ eval(scriptText + `
 `);
 """
     result = subprocess.run(
-        [node, "-e", harness, str(SETTINGS_SCRIPT)],
+        [
+            node,
+            "-e",
+            harness,
+            str(SETTINGS_SCRIPT.with_name("service_answer.js")),
+            str(SETTINGS_SCRIPT),
+        ],
         capture_output=True,
         text=True,
         check=False,

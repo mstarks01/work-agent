@@ -308,6 +308,7 @@ from webapp.page import (
     RenderedPage,
     SecurityHeaders,
     client_script,
+    client_scripts,
     escape,
     is_same_origin,
     render,
@@ -1169,15 +1170,12 @@ def render_report(
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
-        script="\n".join(
-            client_script(name)
-            for name in (
-                "sidebar.js",
-                "service_answer.js",
-                "answer_editor.js",
-                "question_list.js",
-                "report_view.js",
-            )
+        script=client_scripts(
+            "sidebar.js",
+            "service_answer.js",
+            "answer_editor.js",
+            "question_list.js",
+            "report_view.js",
         ),
         workspace_style=WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
@@ -1722,18 +1720,15 @@ def create_app(
             render(
                 _FORM_PAGE,
                 _FORM_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "service_answer.js",
-                        "workspace.js",
-                        "answer_editor.js",
-                        "question_list.js",
-                        "text_file.js",
-                        "form_controls.js",
-                        "first_run.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js",
+                    "service_answer.js",
+                    "workspace.js",
+                    "answer_editor.js",
+                    "question_list.js",
+                    "text_file.js",
+                    "form_controls.js",
+                    "first_run.js",
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 facet_answers=script_json(list(FACET_ANSWERS)),
@@ -1772,9 +1767,7 @@ def create_app(
             render(
                 _SETTINGS_PAGE,
                 _SETTINGS_GRANTS,
-                script="\n".join(
-                    client_script(name) for name in ("sidebar.js", "settings.js")
-                ),
+                script=client_scripts("sidebar.js", "service_answer.js", "settings.js"),
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
@@ -1865,14 +1858,8 @@ def create_app(
             render(
                 _FILES_PAGE,
                 _FILES_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "text_file.js",
-                        "service_answer.js",
-                        "files.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js", "text_file.js", "service_answer.js", "files.js"
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
@@ -1974,14 +1961,8 @@ def create_app(
             render(
                 _CONTROLS_PAGE,
                 _CONTROLS_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "text_file.js",
-                        "service_answer.js",
-                        "controls.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js", "text_file.js", "service_answer.js", "controls.js"
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,

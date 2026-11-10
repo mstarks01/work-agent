@@ -1134,7 +1134,9 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        reply = response.ok ? await response.json() : null;
+        reply = response.ok ? await jsonOf(response) : null;
+        // An accepted answer that is not JSON reads as a lost connection.
+        if (response.ok && !reply) throw new Error();
       } catch {
         throw new Error("The connection was interrupted. Your answers are still on this page;"
           + " reload it to check what was saved, or try again.");

@@ -188,6 +188,12 @@ def client_script(name: str) -> str:
     return (_STATIC / name).read_text(encoding="utf-8")
 
 
+def client_scripts(*names: str) -> str:
+    """The client scripts of one page as one text, in the order a caller names
+    them. A script reads the globals of each script before it."""
+    return "\n".join(client_script(name) for name in names)
+
+
 def render(
     template: str, grants: Grants, *, script: str = "", **fields: str
 ) -> RenderedPage:

@@ -601,7 +601,7 @@
       });
       // A stale refusal carries the saved version beside its message, so
       // the page reads a refusal's body once here.
-      const body = await sent.json().catch(() => null);
+      const body = await jsonOf(sent);
       if (mine === session) {
         if (sent.ok && body) saved = body;
         else if (sent.status === 409 && body?.current) {
@@ -779,8 +779,9 @@
   const load = async () => {
     try {
       const listed = await fetch("/workspace/controls");
-      if (!listed.ok) throw new Error();
-      controls = await listed.json();
+      const read = listed.ok ? await jsonOf(listed) : null;
+      if (!read) throw new Error();
+      controls = read;
     } catch {
       show("controls-problem", "Could not load Controls. Reload the page.");
       return;

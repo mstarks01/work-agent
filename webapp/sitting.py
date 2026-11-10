@@ -30,7 +30,7 @@ from evals.harness.reference import (
     is_submitted_for,
 )
 from webapp import sitting_base as base
-from webapp.page import client_script
+from webapp.page import client_scripts
 
 sittings = base.sittings
 REPO_ROOT = base.REPO_ROOT
@@ -440,9 +440,7 @@ def create_app(session: Session) -> FastAPI:
     page = _PAGE.replace("<!--noteschars-->", str(base.NOTES_MAX_CHARS)).replace(
         "<!--authorchars-->", str(AUTHOR_MAX_CHARS)
     )
-    script = "\n".join(
-        client_script(name) for name in ("service_answer.js", "sitting.js")
-    )
+    script = client_scripts("service_answer.js", "sitting.js")
     app = base.create_app(session, page, script)
     app.title = "Review"
 

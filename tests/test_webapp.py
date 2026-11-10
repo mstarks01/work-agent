@@ -1929,16 +1929,24 @@ STATIC_SCRIPTS = sorted(
 
 #: Each script that calls ``.json()``, with the count of its calls and the
 #: count of them that have no ``.catch(`` directly on them. ``jsonOf`` of
-#: service_answer.js is the one read. The Settings page loads sidebar.js and
-#: settings.js only, so settings.js holds its own catch. Each other row is a
-#: read that does not go through ``jsonOf``.
-JSON_READS: dict[str, tuple[int, int]] = {
-    "service_answer.js": (1, 0),
-    "settings.js": (2, 0),
-    "controls.js": (2, 1),
-    "form_controls.js": (1, 1),
-    "report_view.js": (1, 1),
-}
+#: service_answer.js is the one read, and each page loads that script.
+JSON_READS: dict[str, tuple[int, int]] = {"service_answer.js": (1, 0)}
+
+
+def test_each_page_joins_its_scripts_through_one_reader():
+    """``client_scripts`` of ``webapp/page.py`` joins the scripts of a page. No
+    other module joins them, so each page takes the same separator."""
+    joins = {
+        path.name: found
+        for path in sorted((PROJECT_ROOT / "webapp").glob("*.py"))
+        if path.name != "page.py"
+        and (
+            found := re.findall(
+                r"join\(\s*client_script\(", path.read_text(encoding="utf-8")
+            )
+        )
+    }
+    assert joins == {}
 
 
 def test_each_script_reads_json_through_json_of():
@@ -2223,7 +2231,7 @@ def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
     source = (PROJECT_ROOT / "webapp" / "main.py").read_text(encoding="utf-8")
     served = [
         re.findall(r'"(\w+\.js)"', block)
-        for block in re.findall(r"for name in \(([^)]*)\)", source)
+        for block in re.findall(r"client_scripts\(([^)]*)\)", source)
     ]
     lists = [names for names in served if "question_list.js" in names]
 

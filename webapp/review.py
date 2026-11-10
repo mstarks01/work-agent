@@ -105,7 +105,7 @@ from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
     SecurityHeaders,
-    client_script,
+    client_scripts,
     escape,
     invalid_request,
     refuse_cross_origin,
@@ -170,7 +170,7 @@ _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 
 def _script(name: str) -> str:
     """The script of one review page, after the reader of an answer it calls."""
-    return "\n".join(client_script(part) for part in ("service_answer.js", name))
+    return client_scripts("service_answer.js", name)
 
 
 class VoteBody(BaseModel):
