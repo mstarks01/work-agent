@@ -440,7 +440,10 @@ def create_app(session: Session) -> FastAPI:
     page = _PAGE.replace("<!--noteschars-->", str(base.NOTES_MAX_CHARS)).replace(
         "<!--authorchars-->", str(AUTHOR_MAX_CHARS)
     )
-    app = base.create_app(session, page, client_script("sitting.js"))
+    script = "\n".join(
+        client_script(name) for name in ("service_answer.js", "sitting.js")
+    )
+    app = base.create_app(session, page, script)
     app.title = "Review"
 
     @app.get("/api/review-states")

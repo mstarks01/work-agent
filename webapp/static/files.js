@@ -77,15 +77,19 @@
     }));
   };
 
+  // An upload and a delete each read the list again. Only the answer to the
+  // last read draws, so an older list never replaces a newer one.
+  let loads = 0;
   const load = async () => {
-    try {
-      const listed = await fetch("/workspace/files");
-      if (!listed.ok) throw new Error();
-      files = await listed.json();
-    } catch {
+    const asked = ++loads;
+    const listed = await fetch("/workspace/files")
+      .then((answer) => (answer.ok ? jsonOf(answer) : null), () => null);
+    if (asked !== loads) return;
+    if (!listed) {
       show("files-problem", "Could not load Files. Reload the page.");
       return;
     }
+    files = listed;
     draw();
   };
 
@@ -160,12 +164,12 @@
         if (pending === sending) show("upload-problem", message);
         return;
       }
-      const body = await saved.json();
+      const body = await jsonOf(saved);
       if (pending === sending) {
         pending = null;
         el("upload-dialog").close();
       }
-      show("files-notice", `“${body.name}” is in Files.`);
+      show("files-notice", `“${body?.name ?? name}” is in Files.`);
       await load();
     } catch {
       if (pending === sending) show("upload-problem", "The connection was interrupted. Check Files before you upload again.");
