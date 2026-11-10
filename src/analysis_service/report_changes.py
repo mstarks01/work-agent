@@ -31,7 +31,7 @@ from analysis_service.claim_identity import (
     mechanism_of,
     report_rows,
 )
-from analysis_service.claims import RuledClaim
+from analysis_service.claims import RuledClaim, VerdictStatus
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 
@@ -50,9 +50,9 @@ class FindingChange:
     title: str
     change: Change
     #: The verdict in the earlier report, or ``None`` for a new finding.
-    before: str | None
+    before: VerdictStatus | None
     #: The verdict in the follow-up, or ``None`` for a finding that is gone.
-    after: str | None
+    after: VerdictStatus | None
 
     def to_json(self) -> dict[str, str | None]:
         return {
