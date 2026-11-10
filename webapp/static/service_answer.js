@@ -1,6 +1,5 @@
 // The JSON body of an answer, or null where the answer is not JSON, such as a
-// plain error page of a proxy. Each page that loads this script reads each
-// body through it.
+// plain error page of a proxy.
 const jsonOf = (answer) => answer.json().catch(() => null);
 
 // The message of a refused request to this service, or `fallback` where the

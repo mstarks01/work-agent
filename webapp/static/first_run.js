@@ -388,6 +388,10 @@
   let pausedRun = null;
   // Whether a start or an amendment ended the pause of `pausedRun`.
   let pauseEnded = false;
+  const pauseOf = (run) => {
+    pausedRun = run;
+    pauseEnded = false;
+  };
   // The revision this page last read. Every save and the start send it, so a
   // page left open on an earlier revision cannot write over a later one.
   let revision = 0;
@@ -1574,8 +1578,7 @@
     // between. After a save, or after a refused continue, only the start
     // button starts it.
     if (!left && !saved && !gates.length && !optional && !data.refusal) {
-      pausedRun = data.run;
-      pauseEnded = false;
+      pauseOf(data.run);
       revision = data.revision;
       startAnalysis();
       return;
@@ -1592,8 +1595,7 @@
       detectedBox.replaceChildren();
       view = null;
     }
-    pausedRun = data.run;
-    pauseEnded = false;
+    pauseOf(data.run);
     frame();
     skipButton.hidden = false;
     reconcile(data);

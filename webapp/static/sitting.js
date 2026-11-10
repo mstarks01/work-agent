@@ -233,10 +233,22 @@ function warn(files) {
     : "";
 }
 
-async function openCase(id) {
+// Take the turn of a press and save the draft. A press made while the draft
+// saved owns the stage, so the caller compares the turn it gets with `turn`.
+// A draft save that fails leaves the stage on its case, so the turn goes back.
+async function takeTurn() {
   const mine = ++turn;
-  await saveDraft();
-  // A press made while the draft saved owns the stage.
+  try {
+    await saveDraft();
+  } catch (error) {
+    if (mine === turn) turn -= 1;
+    throw error;
+  }
+  return mine;
+}
+
+async function openCase(id) {
+  const mine = await takeTurn();
   if (mine !== turn) return;
   current = id;
   select(id);
@@ -270,8 +282,7 @@ async function openCase(id) {
 }
 
 async function openReadOnly(id) {
-  const mine = ++turn;
-  await saveDraft();
+  const mine = await takeTurn();
   if (mine !== turn) return;
   current = id;
   select(id);
@@ -292,8 +303,7 @@ async function openReadOnly(id) {
 }
 
 async function openSubmit() {
-  const mine = ++turn;
-  await saveDraft();
+  const mine = await takeTurn();
   if (mine !== turn) return;
   current = null;
   select(null);
@@ -464,7 +474,7 @@ async function showSets(id, mine) {
   const {body: sets, problem} = await answerOf(
     fetch("/api/part-two?case=" + encodeURIComponent(id), {headers: headers}),
     "The findings did not load. Open the case again.", "Open the case again.");
-  if (mine !== turn) return;
+  if (movedOn(id, mine)) return;
   // Said beside the case rather than swallowed: a reader who cannot see why
   // the sets stay closed cannot act on it.
   if (problem) { $("ownHint").textContent = problem; return; }
@@ -579,6 +589,7 @@ $("lock").addEventListener("click", async () => {
   lock();
   await loadRail();
   await showSets(id, mine);
+  if (movedOn(id, mine)) return;
   $("two").scrollIntoView({behavior: "smooth"});
 });
 
@@ -749,7 +760,10 @@ $("submit").addEventListener("click", async () => {
   try {
     ({body: d, problem, refused} = await answerOf(
       post("/api/contribute", choice), "Contribution needs attention",
-      "Check whether a pull request opened before you contribute again."));
+      // In mode "direct" the service opens the pull request before it answers.
+      contributionMode === "direct"
+        ? "Check whether a pull request opened before you contribute again."
+        : "Contribute again."));
   } finally {
     submitting = false;
     submitGate();

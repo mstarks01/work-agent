@@ -5078,6 +5078,30 @@ def test_a_record_pressed_while_the_next_case_opens_leaves_it(sitting_page):
     assert page.is_hidden("#done")
 
 
+def test_a_record_keeps_its_stage_when_the_draft_save_of_a_press_fails(
+    sitting_page,
+):
+    """A press of a case whose draft save does not arrive leaves the stage on
+    its case, so a record that answers then draws there."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    finishes = _hold(page, "**/api/finish")
+    page.click("#finish")
+    _wait_for(page, finishes)
+    page.route("**/api/draft", lambda route: route.abort())
+    # The press rejects, as its draft save does; the fixture reads page errors.
+    page.evaluate(
+        "addEventListener('unhandledrejection', (event) => event.preventDefault())"
+    )
+    with page.expect_event("requestfailed"):
+        _press_case(page, other)
+    page.wait_for_timeout(100)
+    with page.expect_response("**/api/rail"):
+        finishes[0].continue_()
+    page.wait_for_selector("#done", state="visible", timeout=3000)
+    assert page.evaluate("current") == case
+
+
 def test_a_drop_keeps_the_author_the_reader_typed(sitting_page):
     page, _, _ = sitting_page
     _open_submit(page)
@@ -5206,6 +5230,32 @@ def test_a_rename_that_loses_its_connection_says_so_and_the_list_draws(
     page.wait_for_selector("#workspace-message:has-text('Not renamed')")
     assert page.locator('[aria-label="New name for Hangs"]').count() == 0
     assert page.locator("#analysis-rows a:text-is('Hangs')").count() == 1
+    context.close()
+
+
+def test_a_rename_that_ends_leaves_a_later_rename_open(browser, hanging):
+    context, page = _stopping(browser, hanging)
+    page.click('[aria-label="Stop Hangs"]')
+    page.wait_for_selector("#analysis-rows .badge:text-is('Stopped')")
+    page.goto("/")
+    submitted(page, "Other")
+    page.goto("/?view=analyses")
+    page.wait_for_selector('[aria-label="Rename Other"]')
+    held = _hold(page, "**/title")
+    page.click('[aria-label="Rename Hangs"]')
+    page.fill('[aria-label="New name for Hangs"]', "Hangs no")
+    page.press('[aria-label="New name for Hangs"]', "Enter")
+    _wait_for(page, held)
+    page.click('[aria-label="Rename Other"]')
+    page.fill('[aria-label="New name for Other"]', "Other no")
+    with page.expect_response("**/title"):
+        held[0].continue_()
+    page.wait_for_timeout(300)
+    assert page.input_value('[aria-label="New name for Other"]') == "Other no"
+    page.unroute("**/title")
+    page.press('[aria-label="New name for Other"]', "Enter")
+    page.wait_for_selector("#analysis-rows a:text-is('Other no')")
+    assert page.locator("#analysis-rows a:text-is('Hangs no')").count() == 1
     context.close()
 
 
