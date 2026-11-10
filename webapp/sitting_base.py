@@ -93,7 +93,9 @@ NOTES_MAX_CHARS = 4000
 class Progress(BaseModel):
     model_config = ConfigDict(extra="forbid")
     case: CaseId
-    marks: dict[Line, sittings.Mark] = Field(default_factory=dict, max_length=200)
+    marks: dict[envelopes.Key, sittings.Mark] = Field(
+        default_factory=dict, max_length=200
+    )
     missing: list[Line] = Field(default_factory=list, max_length=200)
     notes: str = Field(default="", max_length=NOTES_MAX_CHARS)
 

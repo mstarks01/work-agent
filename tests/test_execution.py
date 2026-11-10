@@ -12,14 +12,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from datetime import UTC, datetime
 
 import pytest
 from google.adk.sessions import InMemorySessionService
 
-from analysis_service import graph
+from analysis_service import execution, graph
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
-from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun, _NodeFinish
+from analysis_service.execution import (
+    GraphExecutor,
+    GraphFailed,
+    GraphRun,
+    _NodeFinish,
+    seed_state,
+)
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
 from analysis_service.report import InputRef, Job, Report
 from analysis_service.sampling import (
@@ -542,6 +549,28 @@ class TestSourceRendering:
         drive(pipeline, sources=sources)
 
         assert render_sources(sources) in models[graph.EXTRACT_NODE].seen[0]
+
+    def test_the_sources_are_read_off_the_event_loop(self, monkeypatch):
+        # A diagram read is a subprocess that blocks its thread, and on the
+        # loop's thread it stops each other request of the service.
+        pipeline, _ = scripted_pipeline(happy_replies())
+        threads = []
+
+        def seeding(*args):
+            threads.append(threading.get_ident())
+            return seed_state(*args)
+
+        monkeypatch.setattr(execution, "seed_state", seeding)
+
+        async def scenario():
+            await GraphExecutor(pipeline, app_name="stride-test").run(
+                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+            )
+            return threading.get_ident()
+
+        loop_thread = asyncio.run(scenario())
+
+        assert threads and loop_thread not in threads
 
     def test_seeding_the_input_text_directly_is_refused(self):
         # Seeding raw text is what would let the service and the eval harness

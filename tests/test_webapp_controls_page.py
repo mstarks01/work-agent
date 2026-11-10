@@ -1014,7 +1014,7 @@ def test_the_report_page_reads_the_judgement_cells_the_csv_writes(framework):
     ]
 
 
-@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
+@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r", "\n", "＝", "＋"])
 def test_a_csv_cell_that_reads_as_a_formula_starts_with_an_apostrophe(ruled, lead):
     owner, child, _ = ruled
     body = owner.client.get(f"/report/{child}/export.json").json()["report"]
@@ -1025,6 +1025,40 @@ def test_a_csv_cell_that_reads_as_a_formula_starts_with_an_apostrophe(ruled, lea
     row = list(csv.reader(io.StringIO(text)))[1]
     assert row[2] == f'\'{lead}HYPERLINK("https://evil.example", "a, b")'
     assert row[7] == 'Two lines,\nwith "quotes".'
+
+
+@pytest.mark.parametrize(
+    ("title", "cell"),
+    [
+        # A spreadsheet that splits on ";" or on a tab starts a cell there, and
+        # it starts a row at a line break, because the quote is not at the
+        # start of its cell.
+        ("Spoofed login;=cmd|' /C calc'!A0;", "Spoofed login;'=cmd|' /C calc'!A0;"),
+        ("Spoofed login\t@SUM(1)", "Spoofed login\t'@SUM(1)"),
+        ("Spoofed login;＝1", "Spoofed login;'＝1"),
+        ("Spoofed login;+1", "Spoofed login;'+1"),
+        ('Spoofed login;"=1+1;x', "Spoofed login;'\"=1+1;x"),
+        ('Spoofed login\t"@SUM(1)\tx', "Spoofed login\t'\"@SUM(1)\tx"),
+        ('Spoofed login\n"=1+1\nx', "Spoofed login\n'\"=1+1\nx"),
+        ("A well-known key; a second point", "A well-known key; a second point"),
+        ("Tokens = secrets - salt", "Tokens = secrets - salt"),
+        ("Two lines\r\n\n=text\n- a bullet", "Two lines\r\n\n'=text\n'- a bullet"),
+        ("Two lines\r\n\nof text - plain", "Two lines\r\n\nof text - plain"),
+    ],
+)
+def test_a_csv_cell_has_no_formula_after_a_separator(ruled, title, cell):
+    owner, child, _ = ruled
+    body = owner.client.get(f"/report/{child}/export.json").json()["report"]
+    body["analyses"][0]["rejected_claims"][0]["title"] = title
+    text = report_csv(Report.model_validate(body), [])
+    for delimiter in ",;\t":
+        cells = [
+            part
+            for row in csv.reader(io.StringIO(text), delimiter=delimiter)
+            for part in row
+        ]
+        assert not [part for part in cells if part.startswith(tuple("=+-@＝＋－＠"))]
+    assert list(csv.reader(io.StringIO(text)))[1][2] == cell
 
 
 @pytest.mark.parametrize(

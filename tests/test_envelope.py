@@ -345,6 +345,50 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         assert recorded == [], "the tree was written before the identity check"
         assert "mallory" in capsys.readouterr().out
 
+    def test_a_refusal_prints_no_control_character_of_the_envelope(
+        self, tree, tmp_path, monkeypatch, capsys
+    ):
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        answers["marks"] = {"k\x1b]0;pwned\x07\x1b[2J": "no such mark"}
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        code, recorded = self._written(tree, path, monkeypatch)
+
+        printed = capsys.readouterr().out
+        assert (code, recorded) == (1, [])
+        assert "pwned" in printed
+        assert printed.replace("\n", "").isprintable()
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+        assert str(refusal.value).replace("\n", "").isprintable()
+
+    @pytest.mark.parametrize(
+        "key",
+        ["k\x1b]0;pwned\x07", "k\n::error::forged", "k\u202eforged", "k\u3000forged"],
+    )
+    @pytest.mark.parametrize("field", ["cases", "marks", "opened_digests"])
+    def test_a_key_of_an_envelope_cannot_forge_a_line(self, tree, tmp_path, field, key):
+        # The value under the key is valid, so only the key can refuse. A key
+        # that passed would reach each later refusal that quotes it.
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        if field == "cases":
+            document["cases"] = {key: answers}
+        else:
+            answers[field] = {key: "agree" if field == "marks" else "0" * 64}
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        with pytest.raises(reviews_module.ReviewSubmissionError) as refusal:
+            reviews_module._read(path)
+
+        lines = str(refusal.value).splitlines()
+        assert "forged" in lines[-1] or "pwned" in lines[-1]
+        assert all(line.isprintable() for line in lines)
+        assert not [line for line in lines if line.startswith("::")]
+
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys
     ):

@@ -10,6 +10,7 @@ that holds now.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -254,3 +255,18 @@ def test_a_cross_origin_post_is_refused_before_the_empty_cell(tiers, path):
     response = client.post(path, json={}, headers={"Sec-Fetch-Site": "cross-site"})
 
     assert response.status_code == 403
+
+
+def test_a_refused_path_reaches_the_log_with_no_control_character(tiers, caplog):
+    client = TestClient(create_app(broken(tiers)), base_url=LOOPBACK)
+    with caplog.at_level(logging.WARNING, logger="webapp"):
+        response = client.post(
+            "/answer/x%1b%5B2J%1b%5D0;pwned%07",
+            json={},
+            headers={"Sec-Fetch-Site": "cross-site"},
+        )
+
+    assert response.status_code == 403
+    (record,) = caplog.records
+    assert "pwned" in record.getMessage()
+    assert record.getMessage().isprintable()

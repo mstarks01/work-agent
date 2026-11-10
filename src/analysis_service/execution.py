@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import anyio.to_thread
 from google.adk import Runner
 from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
@@ -166,6 +167,14 @@ def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
         for key, value in state.items()
         if key not in (STATE_INPUT_TEXT, STATE_SOURCE_TEXTS, STATE_DIAGRAM_READINGS)
     }
+
+
+#: How many runs read their diagrams at one time. A read is a Node process
+#: that blocks its thread for up to ``READ_TIMEOUT_SECONDS``, so it runs on a
+#: worker thread and never on the event loop. The limiter is its own, so a
+#: queue of reads takes no slot of the default limiter from the request path.
+#: Small because each Node process holds about 140 MB.
+_DIAGRAM_READS = anyio.CapacityLimiter(2)
 
 
 def seed_state(
@@ -378,7 +387,9 @@ class GraphExecutor:
         run means, and nothing here converts a failure into a run that looks
         short or into one that looks free.
         """
-        seed = seed_state(sources, extra_state)
+        seed = await anyio.to_thread.run_sync(
+            seed_state, sources, extra_state, limiter=_DIAGRAM_READS
+        )
         rendered = seed[STATE_INPUT_TEXT]
 
         session = await self._session_service.create_session(
