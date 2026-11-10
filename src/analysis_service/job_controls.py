@@ -294,9 +294,9 @@ ControlResolution = Annotated[AppliedScope | LeftOutScope, Field(discriminator="
 
 
 class ControlScopeEntry(BaseModel):
-    """One applied Control in a pause save's ``control_scopes``: the element
-    it resolves to, ``""`` for the whole application, and for a zone the
-    elements the owner ticked."""
+    """One Control in a pause save's ``control_scopes``: the element it
+    resolves to, ``""`` for the whole application, and for a zone the elements
+    the owner ticked. A zone with no ticked element is left out."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
