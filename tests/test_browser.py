@@ -901,9 +901,11 @@ def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
     written.write_text(build(corpus, "ada", ANONYMOUS), encoding="utf-8")
     page, errors = opened(browser, written.as_uri())
     text = page.inner_text("body")
+    states = set(page.locator("#rows .s").all_inner_texts())
     page.close()
     assert errors == [], f"the offline sitting page raised: {errors}"
     assert case_title(corpus) in text
+    assert states == {"Not reviewed"}
 
 
 def test_the_offline_sitting_page_shows_a_restored_mark_keyed_by_an_alias(

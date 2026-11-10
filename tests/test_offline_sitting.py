@@ -22,6 +22,7 @@ import subprocess
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -31,10 +32,12 @@ from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION
 from evals.harness.reference import ANONYMOUS, CorpusError
+from tests.test_page_words import _copies
 from tests.test_sitting_app import CASE, build_tree
 from webapp.offline_sitting import build, payload
 from webapp.offline_sitting import main as offline_main
 from webapp.page import client_script
+from webapp.sitting import REVIEW_LABELS
 
 
 @pytest.fixture
@@ -110,6 +113,29 @@ class TestThePageCarriesTheWholeMethod:
         assert body["submitted_by"] == "ada"
         assert body["submitted_for"] == ANONYMOUS
         assert body["envelope"] == VERSION
+
+
+class TestTheRailWordsComeFromTheServiceTable:
+    """The page has no server, so ``REVIEW_LABELS`` travels in the payload."""
+
+    def test_the_payload_carries_a_label_for_each_row_state(self, body):
+        assert body["review_labels"] == REVIEW_LABELS
+        assert set(body["review_labels"]) == set(get_args(sittings.RowState))
+
+    def test_the_script_names_row_states_and_reads_their_labels(self):
+        script = client_script("offline_sitting.js")
+        states = script.split("function state(id) {")[1].split("\n}\n")[0]
+        assert set(re.findall(r'return "(\w+)";', states)) == {
+            "todo",
+            "draft",
+            "finished",
+        }
+        assert "DATA.review_labels[state(" in script
+
+    def test_the_script_copies_no_label(self):
+        script = client_script("offline_sitting.js")
+        assert _copies([*REVIEW_LABELS.values()], script) == []
+        assert re.findall(r'"(?:to do|in progress|every record marked)"', script) == []
 
 
 class TestThePayloadCannotEndItsOwnBlock:
@@ -481,7 +507,7 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
             "const BY_ID = {c: DATA.cases[0]};\n"
             f"const answers = {{c: {{own_list: [], marks: {json.dumps(marks)}}}}};\n"
             f"{block}\n"
-            "process.stdout.write(state('c')[0]);\n"
+            "process.stdout.write(state('c'));\n"
         )
         with tempfile.TemporaryDirectory() as scratch:
             path = Path(scratch) / "state.cjs"
