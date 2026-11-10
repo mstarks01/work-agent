@@ -65,6 +65,7 @@ from tests.test_webapp import (
     startup_for,
 )
 from webapp.main import PAGE_SOURCE_LABELS, create_app, file_refusals
+from webapp.page_words import FORM_WORDS
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -586,7 +587,7 @@ const ids = {};
 for (const id of ["analyze","description","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
-                  "answer_limits","save-status","changes","upload","upload-file",
+                  "answer_limits","facet_answers","form_words","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
                   "description-remaining","source_formats","file_refusals","page_labels","element_type_nouns",
@@ -605,6 +606,8 @@ ids.description.dataset.maxBytes = "1000000";
 ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
+ids.facet_answers.textContent = FACET_LIST;
+ids.form_words.textContent = FORM_WORD_TABLES;
 ids.source_formats.textContent = FORMATS;
 ids.file_refusals.textContent = REFUSALS;
 ids.page_labels.textContent = PAGE_LABELS;
@@ -664,6 +667,13 @@ def _run_form_script(steps: str, search: str = "") -> dict:
     program = (
         _FORM_HARNESS.replace("SEARCH", json.dumps(search))
         .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
+        .replace("FACET_LIST", json.dumps(json.dumps(list(FACET_ANSWERS))))
+        .replace(
+            "FORM_WORD_TABLES",
+            json.dumps(
+                json.dumps({name: dict(table) for name, table in FORM_WORDS.items()})
+            ),
+        )
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
         .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64, 3))))
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
@@ -748,7 +758,8 @@ class Node {
 const text = (n) => typeof n === "string" ? n
   : [n.textContent, ...n.children.map(text)].join("");
 globalThis.document = {
-  getElementById: (id) => Object.assign(new Node("script"), { textContent: LIMITS }),
+  getElementById: (id) => Object.assign(new Node("script"),
+    { textContent: { answer_limits: LIMITS, facet_answers: FACET_LIST }[id] }),
   createElement: (tag) => new Node(tag),
 };
 const box = (heading, ...rows) => {
@@ -785,7 +796,9 @@ def test_the_index_hides_an_empty_box_and_counts_the_rows_of_each_other():
         for name in ("answer_editor.js", "question_list.js")
     )
     program = (
-        _INDEX_HARNESS.replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
+        _INDEX_HARNESS.replace(
+            "LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS)))
+        ).replace("FACET_LIST", json.dumps(json.dumps(list(FACET_ANSWERS))))
         + script
         + """
 const clicked = [];

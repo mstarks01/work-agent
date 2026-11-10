@@ -192,6 +192,7 @@ from analysis_service.element_hues import element_hues
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
+    FACET_ANSWERS,
     FactAnswer,
     SkipKey,
     answer_facets,
@@ -313,7 +314,7 @@ from webapp.page import (
     response,
     script_json,
 )
-from webapp.page_words import REPORT_WORDS, change_line
+from webapp.page_words import FORM_WORDS, REPORT_WORDS, PageStatus, change_line
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
@@ -968,12 +969,6 @@ def _selection_of(record: Envelope) -> list[FrameworkSelection]:
     return []
 
 
-#: A job's status as the pages read it. ``workspace.js`` labels each one.
-PageStatus = Literal[
-    "running", "awaiting-answers", "completed", "failed", "stopped", "unreadable"
-]
-
-
 def _page_status(record: Envelope) -> PageStatus:
     """A job's status as the pages read it: a queued job is running, and a
     rejected one stopped. A job whose envelope does not parse is
@@ -1188,6 +1183,7 @@ def render_report(
         sidebar=_SIDEBAR,
         theme=_THEME,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
+        facet_answers=script_json(list(FACET_ANSWERS)),
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
         controls_summary=script_json(section_summary(controls)),
@@ -1740,6 +1736,10 @@ def create_app(
                     )
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
+                facet_answers=script_json(list(FACET_ANSWERS)),
+                form_words=script_json(
+                    {name: dict(table) for name, table in FORM_WORDS.items()}
+                ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 theme=_THEME,

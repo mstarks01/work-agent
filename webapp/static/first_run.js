@@ -107,6 +107,9 @@
   // under the label the server names for it.
   const uploadFile = document.getElementById("upload-file");
   const PAGE_LABELS = JSON.parse(document.getElementById("page_labels").textContent);
+  // The words for each value of a closed service set, from the service
+  // (webapp.page_words.FORM_WORDS).
+  const FORM_WORDS = JSON.parse(document.getElementById("form_words").textContent);
   const maxUploadBytes = Number(uploadFile.dataset.maxBytes);
   const maxDescriptionBytes = Number(box.dataset.maxBytes);
   const remainingNote = document.getElementById("description-remaining");
@@ -1042,12 +1045,7 @@
     for (const [name, state] of gates) {
       const note = document.createElement("p");
       note.className = "hint gate-note";
-      note.textContent = state === "refuted"
-        ? `The system model rules out the ${name} analysis, so it will not run and`
-          + " none of its questions are asked."
-        : `The ${name} analysis runs only once the system model shows that it applies.`
-          + " The questions that decide this come first; its other questions follow"
-          + " once an answer settles it.";
+      note.textContent = FORM_WORDS.gate_notes[state].replace("{name}", name);
       intro.append(note);
     }
     if (!left) {
@@ -1055,17 +1053,11 @@
       ready.className = "hint";
       // The service's own reason decides the sentence (QuestionSet.empty_list_reason).
       // No reason says every fact is settled, so the page lists what stays open.
-      const emptyListReasons = {
-        "budget-exhausted": `The question limit is reached, so ${counted((data.early_held_back || []).length,
-          "more question is", "more questions are")} not in the list. `,
-        "below-floor": "No recommended question is left. ",
-        "skipped": "You skipped every question that is left. ",
-        "nothing-left": "No question is left to ask. ",
-      };
+      const heldBack = counted((data.early_held_back || []).length, "more question is", "more questions are");
       ready.textContent = data.asks === false
         ? "This analysis asks no questions. Untick or resolve a Control, then choose Start the analysis."
-        : emptyListReasons[data.early_stop]
-          + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
+        : FORM_WORDS.empty_list[data.early_stop].replace("{held_back}", heldBack)
+          + " You can still change an answer below. Nothing runs until you choose Start the analysis.";
       intro.append(ready);
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".

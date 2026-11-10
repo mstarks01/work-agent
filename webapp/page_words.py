@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Literal
+from typing import Any, Literal
 
+from analysis_service.answer_state import EmptyListReason
 from analysis_service.claims import (
     VERDICT_LABELS,
     GroundKind,
@@ -20,6 +21,7 @@ from analysis_service.claims import (
     VerdictStatus,
 )
 from analysis_service.fact_answers import FactStatus
+from analysis_service.frameworks import PreconditionResult
 from analysis_service.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
@@ -55,19 +57,25 @@ SCOPE_STATE_WORDS: Mapping[ScopeState, tuple[str, str]] = MappingProxyType(
     {
         "not-raised": (
             "No claim filed",
-            "The lane ran and raised nothing on this unit. That is not a finding"
-            " that it is met, and not a ruling that it applies.",
+            (
+                "The lane ran and raised nothing on this unit. That is not a"
+                " finding that it is met, and not a ruling that it applies."
+            ),
         ),
         "not-applicable": ("Does not apply", "Ruled out for a system of this shape."),
         "undecidable": (
             "Never decided",
-            "The input never said whether this framework applies at all, so no"
-            " lane ran.",
+            (
+                "The input never said whether this framework applies at all, so"
+                " no lane ran."
+            ),
         ),
         "needs-other-evidence": (
             "Needs other evidence",
-            "The unit applies and this input cannot settle it. Supplying the"
-            " evidence named below can.",
+            (
+                "The unit applies and this input cannot settle it. Supplying the"
+                " evidence named below can."
+            ),
         ),
     }
 )
@@ -137,10 +145,9 @@ CHANGE_LINES: Mapping[Change, str] = MappingProxyType(
 
 def change_line(change: FindingChange) -> str:
     """The tally line of one finding's change, with its verdict labels."""
-    labels: Mapping[str, str] = VERDICT_LABELS
     return CHANGE_LINES[change.change].format(
         **{
-            name: labels[status]
+            name: VERDICT_LABELS[status]
             for name, status in (("before", change.before), ("after", change.after))
             if status is not None
         }
@@ -149,7 +156,7 @@ def change_line(change: FindingChange) -> str:
 
 #: Every table the report page reads, by the name of its key in the
 #: ``report_words`` island.
-REPORT_WORDS: Mapping[str, Mapping[str, object]] = MappingProxyType(
+REPORT_WORDS: Mapping[str, Mapping[Any, object]] = MappingProxyType(
     {
         "why_open": WHY_OPEN,
         "question_history": QUESTION_HISTORY,
@@ -158,5 +165,63 @@ REPORT_WORDS: Mapping[str, Mapping[str, object]] = MappingProxyType(
         "ground_kind": GROUND_KIND_WORDS,
         "severity": SEVERITY_LABELS,
         "recommendations": RECOMMENDATION_HEADINGS,
+    }
+)
+
+#: A job's status as the pages read it.
+PageStatus = Literal[
+    "running", "awaiting-answers", "completed", "failed", "stopped", "unreadable"
+]
+
+#: The label of each page status, in the order the status filter lists them.
+PAGE_STATUS_LABELS: Mapping[PageStatus, str] = MappingProxyType(
+    {
+        "running": "In progress",
+        "awaiting-answers": "Questions ready",
+        "completed": "Report ready",
+        "failed": "Failed",
+        "stopped": "Stopped",
+        "unreadable": "Cannot be read",
+    }
+)
+
+#: What the pause says about a selected analysis, by the state of its
+#: **Precondition**. ``{name}`` stands for the framework. A satisfied
+#: precondition gets no note.
+GATE_NOTES: Mapping[PreconditionResult, str | None] = MappingProxyType(
+    {
+        "satisfied": None,
+        "refuted": (
+            "The system model rules out the {name} analysis, so it will not run"
+            " and none of its questions are asked."
+        ),
+        "undecidable": (
+            "The {name} analysis runs only once the system model shows that it"
+            " applies. The questions that decide this come first; its other"
+            " questions follow once an answer settles it."
+        ),
+    }
+)
+
+#: Why the pause's list is empty, as the page says it. ``{held_back}`` stands
+#: for the count of questions the limit holds back, with its noun and verb.
+EMPTY_LIST_REASONS: Mapping[EmptyListReason, str] = MappingProxyType(
+    {
+        "budget-exhausted": (
+            "The question limit is reached, so {held_back} not in the list."
+        ),
+        "below-floor": "No recommended question is left.",
+        "skipped": "You skipped every question that is left.",
+        "nothing-left": "No question is left to ask.",
+    }
+)
+
+#: Every table the form page reads, by the name of its key in the
+#: ``form_words`` island.
+FORM_WORDS: Mapping[str, Mapping[Any, object]] = MappingProxyType(
+    {
+        "page_status": PAGE_STATUS_LABELS,
+        "gate_notes": GATE_NOTES,
+        "empty_list": EMPTY_LIST_REASONS,
     }
 )

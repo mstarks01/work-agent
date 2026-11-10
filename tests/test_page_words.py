@@ -7,18 +7,27 @@ of the words.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from typing import get_args
 
 import pytest
 
+from analysis_service.answer_state import EmptyListReason
 from analysis_service.claims import GroundKind, ScopeState, SeverityLevel, VerdictStatus
-from analysis_service.fact_answers import FactStatus
+from analysis_service.fact_answers import FACET_ANSWERS, FactStatus
+from analysis_service.frameworks import PreconditionResult
 from analysis_service.report_changes import Change, FindingChange
 from tests.factories import report_state, sample_report
 from tests.test_webapp import _island, page_javascript
 from webapp import page_words
 from webapp.main import render_report
+
+FORM_TABLES = {
+    "PAGE_STATUS_LABELS": page_words.PageStatus,
+    "GATE_NOTES": PreconditionResult,
+    "EMPTY_LIST_REASONS": EmptyListReason,
+}
 
 REPORT_TABLES = {
     "WHY_OPEN": FactStatus,
@@ -36,6 +45,8 @@ def _texts(table: object) -> Iterator[str]:
     """Every string a table holds, at any depth."""
     if isinstance(table, str):
         yield table
+    elif table is None:
+        return
     elif isinstance(table, dict):
         for value in table.values():
             yield from _texts(value)
@@ -57,7 +68,7 @@ def _copies(words: object, script: str) -> list[str]:
     ]
 
 
-@pytest.mark.parametrize(("table", "vocabulary"), REPORT_TABLES.items())
+@pytest.mark.parametrize(("table", "vocabulary"), (REPORT_TABLES | FORM_TABLES).items())
 def test_each_table_names_each_member_of_its_set(table, vocabulary):
     """A value the table lacks shows as ``undefined`` on the page."""
     assert set(getattr(page_words, table)) == set(get_args(vocabulary))
@@ -109,3 +120,46 @@ def test_a_change_line_carries_the_verdict_labels():
     assert page_words.change_line(change("changed", "needs-info", "rejected")) == (
         "Needs info → Rejected"
     )
+
+
+def test_the_report_page_carries_the_facet_answers():
+    """The answer editor reads the facet answers on each page that loads it."""
+    report = sample_report()
+    page = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
+    assert _island(page, "facet_answers") == list(FACET_ANSWERS)
+
+
+def test_the_form_scripts_copy_no_word_of_a_table():
+    scripts = "".join(
+        page_javascript(name)
+        for name in ("workspace.js", "first_run.js", "answer_editor.js")
+    )
+    tables = {name: dict(getattr(page_words, name)) for name in FORM_TABLES}
+    sentences = [
+        part
+        for text in _texts(tables)
+        for part in re.split(r"\{\w+\}", text)
+        if " " in part.strip()
+    ]
+
+    assert _copies(sentences, scripts) == []
+    assert _copies([*FACET_ANSWERS], page_javascript("answer_editor.js")) == []
+
+
+def test_each_template_holds_only_the_fields_its_script_fills():
+    """A script fills ``{name}`` of a gate note and ``{held_back}`` of an
+    empty-list reason. A field with another name shows as its braces."""
+    fields = {
+        name: set(re.findall(r"\{(\w+)\}", " ".join(_texts(dict(table)))))
+        for name, table in page_words.FORM_WORDS.items()
+    }
+    assert fields == {
+        "page_status": set(),
+        "gate_notes": {"name"},
+        "empty_list": {"held_back"},
+    }
+    script = page_javascript("first_run.js")
+    assert 'gate_notes[state].replace("{name}", name)' in script
+    assert 'empty_list[data.early_stop].replace("{held_back}", heldBack)' in script
