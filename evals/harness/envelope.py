@@ -41,7 +41,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.errors import shown_errors
+from analysis_service.errors import MAX_RENDERED_ERRORS, shown_errors
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import carries_line_break
 from evals.harness import sitting as sittings
@@ -103,7 +103,9 @@ def _printable_key(value: str) -> str:
 
 #: A key of an envelope: a case ID, a fingerprint or a path. A refusal quotes
 #: the key in one line of a terminal or of a CI log, so the key holds only
-#: printable characters: no line break and no control or format character.
+#: printable characters, as ``str.isprintable`` reads them: no line break, no
+#: control, format, surrogate, private-use or unassigned character, and no
+#: space other than the ASCII space.
 Key = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_printable_key)]
 
 #: A generous ceiling on one envelope's cases and marks. The corpus is 13
@@ -227,10 +229,16 @@ def read(path: Path) -> Envelope:
         envelope = Envelope.model_validate(raw)
     except ValidationError as exc:
         # The repr of each place, never the place: it quotes a key that the
-        # schema refused, so the key can hold a line break.
+        # schema refused, so the key can hold a line break. An empty place is
+        # the top of the file. The entry after the limit has no place either:
+        # it counts the errors not shown.
         refused = "\n".join(
-            f"{error.place!r}: {error.message}" if error.place else error.message
-            for error in shown_errors(exc.errors(include_input=False))
+            f"{error.place!r}: {error.message}"
+            if error.place
+            else f"the top of the file: {error.message}"
+            if index < MAX_RENDERED_ERRORS
+            else error.message
+            for index, error in enumerate(shown_errors(exc.errors(include_input=False)))
         )
         raise EnvelopeError(f"{path}: not a sitting envelope —\n{refused}") from exc
     if envelope.envelope != VERSION:

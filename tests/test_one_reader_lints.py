@@ -674,6 +674,10 @@ LOC_READERS: dict[Site, str] = {
         "it asks whether the error sits on a list of the body itself, and"
         " makes no place"
     ),
+    ("webapp/sitting_base.py", "_mark_by_position"): (
+        "it names a mark by its position where the place holds the mark's key,"
+        " because the key is caller text; ``error_place`` then makes the place"
+    ),
     ("src/analysis_service/api.py", "_body_refused"): (
         "it puts the reader's places under ``body``, where every other"
         " refusal of a request body sits; ``error_place`` then makes the place"
@@ -685,6 +689,28 @@ def _reads_loc(node: ast.AST) -> bool:
     return isinstance(node, ast.Subscript) and (
         isinstance(node.slice, ast.Constant) and node.slice.value == "loc"
     )
+
+
+#: Each function that renders the entries of ``shown_errors`` itself, and why
+#: it does not ask ``refusal_line``.
+SHOWN_ERROR_READERS: dict[Site, str] = {
+    ("src/analysis_service/api.py", "_invalid_body"): (
+        "it returns each place and rule as one object of a problem response,"
+        " and makes no line"
+    ),
+    ("evals/harness/envelope.py", "read"): (
+        "it writes one line for each error with the repr of the place, because"
+        " the place quotes a key of a file"
+    ),
+}
+
+
+def test_the_line_of_a_refusal_has_one_maker():
+    """Only ``refusal_line`` joins the entries of ``shown_errors`` into a line."""
+    readers = set(_sites(lambda node: _calls(node, "shown_errors")))
+    assert readers - SHOWN_ERROR_READERS.keys() == {
+        ("src/analysis_service/errors.py", "refusal_line")
+    }, "make the line of a refusal with refusal_line"
 
 
 def test_an_archived_report_has_one_reader():
@@ -720,6 +746,9 @@ def _parses_a_report(node: ast.AST) -> bool:
 def test_each_declared_site_still_reads_the_rule_itself():
     assert FIELD_PAIR_READERS.keys() <= set(_sites(_tests_two_spelling_fields))
     assert LOC_READERS.keys() <= set(_sites(_reads_loc))
+    assert SHOWN_ERROR_READERS.keys() <= set(
+        _sites(lambda node: _calls(node, "shown_errors"))
+    )
     assert CONFIG_DEFAULT_READERS.keys() <= set(_sites(_reads_a_config_default))
     assert ID_DERIVERS.keys() <= set(_sites(_derives_an_id))
     assert STORED_ANSWER_READERS.keys() <= set(_sites(_validates_an_answer))

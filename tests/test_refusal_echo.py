@@ -339,6 +339,61 @@ def test_a_sitting_refusal_names_a_mark_by_its_position(tmp_path):
     assert f"marks[{len(marks) - 1}]" in response.json()["detail"]
 
 
+@pytest.mark.parametrize(
+    ("part", "place"),
+    [
+        ({"marks": {f"{MARKER}\t": "agree"}}, "body.marks[0].[key]"),
+        ({"marks": {"a": "agree", MARKER: "maybe"}}, "body.marks[1]"),
+        ({"notes": MARKER * 200}, "body.notes"),
+        ({"missing": [f"{MARKER}\n"]}, "body.missing.0"),
+        ({MARKER: 1}, "body"),
+    ],
+)
+def test_a_sitting_422_names_the_place_and_never_what_was_sent(tmp_path, part, place):
+    """A body the schema refuses gets one line of places and rules. A mark has
+    its position there, as in a 409, because its key is caller text."""
+    app = browser(session_for(build_tree(tmp_path), "ada", CASE))
+    body = {"case": CASE, "marks": {}, "missing": [], "notes": ""} | part
+
+    response = app.post("/api/finish", json=body)
+
+    assert response.status_code == 422, response.text
+    assert "echomarker" not in response.text.lower(), response.text
+    assert response.json()["detail"].startswith(f"{place}: ")
+
+
+def test_a_sitting_422_shows_the_first_problems_and_counts_the_rest(tmp_path):
+    """Each mark of a body can fail, so the line stops at the limit."""
+    app = browser(session_for(build_tree(tmp_path), "ada", CASE))
+    marks = {f"{MARKER}{position}": "maybe" for position in range(30)}
+
+    response = app.post(
+        "/api/finish", json={"case": CASE, "marks": marks, "missing": [], "notes": ""}
+    )
+
+    assert response.status_code == 422, response.text
+    assert "echomarker" not in response.text.lower(), response.text
+    lines = response.json()["detail"].split("; ")
+    assert lines[MAX_RENDERED_ERRORS - 1].startswith("body.marks[19]: ")
+    assert lines[MAX_RENDERED_ERRORS:] == ["and 10 more problems not shown"]
+
+
+def test_a_sitting_422_stops_at_marks_for_a_key_that_is_not_text(tmp_path):
+    """Pydantic writes U+FFFD for a lone surrogate. A second key can hold
+    that same text, so the place names no position."""
+    app = browser(session_for(build_tree(tmp_path), "ada", CASE))
+    marks = b'{"\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbdk": "agree", "\\ud800k": "agree"}'
+
+    response = app.post(
+        "/api/finish",
+        content=b'{"case": "%s", "marks": %s}' % (CASE.encode(), marks),
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"].startswith("body.marks.[key]: ")
+
+
 def test_a_package_refusal_names_a_saved_mark_by_its_position(tmp_path):
     """A recorded draft can take a mark later, and the package check refuses it."""
     app = browser(session_for(build_tree(tmp_path), "ada", CASE))

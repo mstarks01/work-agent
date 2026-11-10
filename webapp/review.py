@@ -65,6 +65,7 @@ from pathlib import Path
 from typing import Literal, get_args
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -106,6 +107,7 @@ from webapp.page import (
     SecurityHeaders,
     client_script,
     escape,
+    invalid_request,
     refuse_cross_origin,
     render,
     response,
@@ -286,6 +288,10 @@ def create_app(session: Session) -> FastAPI:
     # judgement. See LOOPBACK_HOSTS for what binding alone does not stop.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
+
+    @app.exception_handler(RequestValidationError)
+    async def _invalid_request(request: Request, exc: RequestValidationError):
+        return invalid_request(exc.errors())
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:

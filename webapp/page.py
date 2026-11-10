@@ -43,14 +43,18 @@ import html
 import json
 import re
 import secrets
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from fastapi import HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from analysis_service.errors import refusal_line
 
 #: Every template carries this in each inline ``<style>`` and ``<script>`` tag.
 #: A block added later without one simply stops running rather than running
@@ -258,6 +262,12 @@ def refuse_cross_origin(request: Request) -> None:
         raise HTTPException(
             status_code=403, detail="this request did not come from the app's page"
         )
+
+
+def invalid_request(errors: Sequence[Mapping[str, Any]]) -> JSONResponse:
+    """The ``422`` of a request the schema refuses: each place and its rule in
+    one line, and no value that the caller sent."""
+    return JSONResponse({"detail": refusal_line(errors)}, status_code=422)
 
 
 class SecurityHeaders:

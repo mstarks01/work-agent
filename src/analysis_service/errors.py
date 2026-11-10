@@ -92,6 +92,14 @@ def shown_errors(errors: Sequence[Mapping[str, Any]]) -> list[ShownError]:
     return shown
 
 
+def refusal_line(errors: Sequence[Mapping[str, Any]]) -> str:
+    """Each place and rule of :func:`shown_errors` for ``errors``, in one line."""
+    return "; ".join(
+        f"{error.place}: {error.message}" if error.place else error.message
+        for error in shown_errors(errors)
+    )
+
+
 def refusal_text(exc: ValueError) -> str:
     """What a refusal says for ``exc``.
 
@@ -99,8 +107,5 @@ def refusal_text(exc: ValueError) -> str:
     is read as each place and rule instead, through :func:`shown_errors`.
     """
     if isinstance(exc, ValidationError):
-        return "; ".join(
-            f"{error.place}: {error.message}" if error.place else error.message
-            for error in shown_errors(exc.errors(include_input=False))
-        )
+        return refusal_line(exc.errors(include_input=False))
     return str(exc)
