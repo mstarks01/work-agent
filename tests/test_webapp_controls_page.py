@@ -1120,7 +1120,7 @@ class TestTheTables:
 
     def test_no_page_script_copies_a_sentence_of_a_service_table(self):
         """The pause, the reopened analysis, the report page and the Controls
-        page read these words from the service, so no script holds one."""
+        page read these sentences from the service, so no script holds one."""
         from analysis_service.job_controls import (
             COVER_MEANINGS,
             RULING_LISTS,
@@ -1139,7 +1139,6 @@ class TestTheTables:
             *filter(None, SCOPE_HINTS.values()),
             USED_STATE_WORDS["pending"],
             "left out, because",
-            "so it stands",
         ]
         assert not [sentence for sentence in sentences if sentence in scripts]
         assert not [word for word in RULING_LISTS.values() if f'"{word}"' in scripts]

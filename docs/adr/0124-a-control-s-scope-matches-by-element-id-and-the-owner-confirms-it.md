@@ -61,7 +61,7 @@ owner can tick its elements. An application-scoped Control always matches.
 
 **A pause save carries `control_scopes`, one entry per applied Control**: the
 Control's ID, the element it resolves to, and for a zone the element IDs the
-owner ticked. The service refuses an entry that crosses the scope's type, that
+owner ticked. A zone Control that is off sends its zone with no ticked element. The service refuses an entry that crosses the scope's type, that
 names an element the model does not have, that ticks an element outside the
 candidate list, and two entries for one Control. Two Controls may resolve to
 one element, because a system has many protections on one part.

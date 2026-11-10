@@ -533,8 +533,10 @@ ADR 0123 notes where a later ADR changed it.
 | The service restarts while a job waits | The job stays paused for your answers. | The job stays paused. The page says that the app did not continue it, and you continue it. |
 
 A save sends `control_scopes` to `/answer/{run}`: one entry for each Control
-that applies, with its element and, for a zone, the ticked elements. A
-Control with no entry is left out. A later save can tick it again. "Keep this
+that applies, with its element and, for a zone, the ticked elements. A zone
+Control that is off keeps its entry, with its zone and no ticked element, so
+the service keeps the zone. A Control with no entry, or a zone Control with no
+ticked element, is left out. A later save can tick it again. "Keep this
 name" sends `POST /workspace/controls/{control_id}/aliases`, which appends the
 name to the Control's aliases. Each line names the facts the Control
 answers, and says where the description already states one. A save that
