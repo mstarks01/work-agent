@@ -265,7 +265,8 @@ STRIDE finding's category is its STRIDE category. The severity and the
 mitigation cells come from the record's own fields, through `JUDGEMENT_CELLS`
 in `webapp/report_export.py`. A record that declares no such field leaves that
 cell empty. The `controls` cell names each Control row that ruled on the finding,
-and its ruling. A `=`, `+`, `-` or `@`, or its full-width form, at the start of
+as `Control name (unit, version X): ruling`, with ` | ` between two rows. A
+`=`, `+`, `-` or `@`, or its full-width form, at the start of
 a cell, or after a `;`, a tab or a line break, also behind quote marks, gets an
 apostrophe first, and so does a cell that starts with a tab or a line break. So
 a line of a cell that starts with a hyphen shows an apostrophe. A spreadsheet
@@ -416,9 +417,15 @@ it.
   `.cfg` or `.conf` or that starts with `.env.`, a credential name at the start
   of a line counts with any plain value. An empty value, a reference such as
   `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
-  counts as it does in any file. Each line has a list of its class and the
-  buttons "View", "Replace" and "Remove", and a file that the Control holds
-  also has "Download". A line that the page still reads has no "View".
+  counts as it does in any file. In every other file, a credential name set to
+  a value with no quotes counts where the value holds a digit or a symbol and
+  ends its line or its statement: at the end of the line, before a `#` or a
+  `;`, or, after `=`, before a `,`. The check has a limit there. A keyword
+  argument such as `connect(password=pw1, host=h)` counts, although `pw1` is a
+  variable, and so does a statement such as `self.token = token1;`. Each line
+  has a list of its class and the buttons "View", "Replace" and "Remove", and
+  a file that the Control holds also has "Download". A line that the page
+  still reads has no "View".
   "View" shows the file's text under the line, as plain text. "Download"
   saves a file that the Control holds. "Replace" reads a new file into the
   line and keeps its class. "Remove" takes the file out. A change of the

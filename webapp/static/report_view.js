@@ -1329,7 +1329,7 @@
   const RULING_LISTS = JSON.parse(document.getElementById("ruling_lists").textContent);
   const controlRow = (row) => {
     const open = el("details", "control-row");
-    const summary = el("summary", null, `${row.framework} ${row.unit} (version ${row.version})${row.label ? ` · ${row.label}` : ""} `);
+    const summary = el("summary", null, `${row.title}${row.label ? ` · ${row.label}` : ""} `);
     summary.append(el("span", `tag ${row.outcome}`, row.outcome_text));
     const lists = Object.entries(RULING_LISTS)
       .map(([verdict, heading]) => [heading, row.rulings.filter((ruling) => ruling.ruling === verdict)])

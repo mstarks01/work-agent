@@ -289,9 +289,13 @@
   ];
 
   // The start button is off while a submission or a run is under way, and
-  // while the Controls of a submission are unknown.
+  // while the Controls of a submission are unknown. The Controls of the form
+  // take no input while a submission or a run is under way.
   let running = false;
-  const gate = () => { go.disabled = running || !formControls.ready(); };
+  const gate = () => {
+    go.disabled = running || !formControls.ready();
+    formControls.hold(running);
+  };
   formControls.onChange(gate);
   // Nodes and strings, never markup. replaceChildren() inserts a string as a
   // text node, so a source label or a validator message that spells markup
@@ -451,6 +455,13 @@
   const controlsBox = document.createElement("div");
   controlsBox.className = "control-offer";
   controlsBox.id = "control-offer";
+  // An action that can end the pause runs here. The Controls of the pause
+  // take no input until it answers, so no change goes to a run that ended.
+  const holdControls = async (action) => {
+    controlsBox.inert = true;
+    try { await action(); }
+    finally { controlsBox.inert = false; }
+  };
   // Says that the Control choices are saving, below the offer.
   const scopeStatus = document.createElement("p");
   scopeStatus.className = "hint";
@@ -1412,7 +1423,7 @@
       + " are kept.";
     const fixText = document.createElement("textarea");
     fixText.rows = 3;
-    const fixButton = button("Read the description again with this", () => answerAction(async () => {
+    const fixButton = button("Read the description again with this", () => answerAction(() => holdControls(async () => {
       const text = fixText.value.trim();
       if (!text) {
         refuse("Write the amendment first.");
@@ -1441,7 +1452,7 @@
       asked.hidden = true;
       pauseEnded = true;
       follow(run, "Reading your description and identifying the parts of your system…", true);
-    }), "");
+    })), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     if (data.asks) tail.append(fix);
   };
@@ -1572,7 +1583,7 @@
     if (!left && !saved && !gates.length && !optional && !data.refusal) {
       startPause(data.run);
       revision = data.revision;
-      startAnalysis();
+      holdControls(startAnalysis);
       return;
     }
     if (pausedRun !== data.run) {
@@ -1706,7 +1717,7 @@
     }
     return true;
   };
-  startButton.addEventListener("click", () => answerAction(startAnalysis));
+  startButton.addEventListener("click", () => answerAction(() => holdControls(startAnalysis)));
 
   // Answer "no" to each of them, as each row's own answer, saved as any
   // answer is. Each one stays in its place and can be changed.

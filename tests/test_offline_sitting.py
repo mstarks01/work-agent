@@ -22,6 +22,7 @@ import subprocess
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -31,10 +32,12 @@ from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION
 from evals.harness.reference import ANONYMOUS, CorpusError
+from tests.test_page_words import _copies
 from tests.test_sitting_app import CASE, build_tree
 from webapp.offline_sitting import build, payload
 from webapp.offline_sitting import main as offline_main
 from webapp.page import client_script
+from webapp.sitting import REVIEW_LABELS
 
 
 @pytest.fixture
@@ -110,6 +113,26 @@ class TestThePageCarriesTheWholeMethod:
         assert body["submitted_by"] == "ada"
         assert body["submitted_for"] == ANONYMOUS
         assert body["envelope"] == VERSION
+
+
+class TestTheRailWordsComeFromTheServiceTable:
+    """The page has no server, so ``REVIEW_LABELS`` travels in the payload."""
+
+    def test_the_payload_carries_a_label_for_each_row_state(self, body):
+        assert body["review_labels"] == REVIEW_LABELS
+        assert set(body["review_labels"]) == set(get_args(sittings.RowState))
+
+    def test_the_script_names_row_states_and_reads_their_labels(self):
+        script = client_script("offline_sitting.js")
+        states = script.split("function state(id) {")[1].split("\n}\n")[0]
+        named = set(re.findall(r'"(\w+)"', states))
+        assert named == {"todo", "draft", "finished"}
+        assert named <= set(get_args(sittings.RowState))
+        assert "DATA.review_labels[state(" in script
+
+    def test_the_script_copies_no_label(self):
+        script = client_script("offline_sitting.js")
+        assert _copies([*REVIEW_LABELS.values()], script) == []
 
 
 class TestThePayloadCannotEndItsOwnBlock:
@@ -467,7 +490,9 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     from an older corpus can carry a mark for a target that is gone, and a
     count of marks then passes a case the merge refuses."""
 
-    def state_of(self, marks: dict) -> str:
+    def state_of(
+        self, marks: dict, notes: object = "", missing: Sequence[str] = ()
+    ) -> str:
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -479,9 +504,10 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
             "const DATA = {min_own_list: 1, cases: [{case: 'c', targets:"
             " [{fingerprint: 'a', claims: []}, {fingerprint: 'b', claims: []}]}]};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
-            f"const answers = {{c: {{own_list: [], marks: {json.dumps(marks)}}}}};\n"
+            f"const answers = {{c: {{own_list: ['one'], marks: {json.dumps(marks)},"
+            f" missing: {json.dumps([*missing])}, notes: {json.dumps(notes)}}}}};\n"
             f"{block}\n"
-            "process.stdout.write(state('c')[0]);\n"
+            "process.stdout.write(state('c'));\n"
         )
         with tempfile.TemporaryDirectory() as scratch:
             path = Path(scratch) / "state.cjs"
@@ -498,6 +524,21 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
 
     def test_every_target_marked_is_finished(self):
         assert self.state_of({"a": "found", "b": "missed"}) == "finished"
+
+    def test_an_own_list_and_nothing_else_is_not_started(self):
+        """The rule of ``_review_state``: the review is what follows the list."""
+        assert self.state_of({}) == "todo"
+        assert self.state_of({}, notes=" \n") == "todo"
+
+    def test_a_note_or_a_missed_threat_starts_the_review(self):
+        assert self.state_of({}, notes="unsure") == "draft"
+        assert self.state_of({}, missing=["a threat"]) == "draft"
+
+    def test_a_note_that_is_not_text_draws_the_rail(self):
+        """A file that another tool wrote can hold a number as its note. The
+        number starts no review, and it does not stop the rail."""
+        assert self.state_of({}, notes=5) == "todo"
+        assert self.state_of({"a": "found"}, notes=5) == "draft"
 
     def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
         assert self.state_of({"a": "found", "stale": "found"}) == "draft"

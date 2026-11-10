@@ -114,8 +114,7 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
             label = f" · {_text(row.label)}" if row.label else ""
             tally = f"{_text(row.tally)}. " if row.tally else ""
             lines.append(
-                f"- Row: {_text(row.framework)} {_text(row.unit)}"
-                f" (version {_text(row.version)}){label} — {tally}{_text(row.meaning)}"
+                f"- Row: {_text(row.title)}{label} — {tally}{_text(row.meaning)}"
             )
             for verdict, heading in RULING_LISTS.items():
                 lines += [
@@ -215,8 +214,8 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
 
     The category is the claim's lane, as :func:`lane_of` reads it. The
     severity and the mitigation come from :func:`judgement_cells`. The
-    controls cell names each Control row that ruled on the finding, with its
-    ruling.
+    controls cell names each Control row that ruled on the finding, as
+    ``Control name (unit, version X): ruling``.
     """
     names = element_names(report.system_model)
     rulings: dict[tuple[str, str], list[str]] = {}
@@ -224,7 +223,7 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
         for row in entry.rows:
             for ruling in row.rulings:
                 rulings.setdefault((row.framework, ruling.claim), []).append(
-                    f"{entry.name}: {ruling.ruling}"
+                    f"{entry.name} ({row.unit}, version {row.version}): {ruling.ruling}"
                 )
     out = io.StringIO()
     writer = csv.writer(out)

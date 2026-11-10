@@ -20,24 +20,29 @@ const written = id => answers[id] && typed(answers[id].own_list) >= DATA.min_own
 const marked = id => BY_ID[id].targets.length > 0
   && BY_ID[id].targets.every(t => t.fingerprint in answers[id].marks);
 
+// The row state of a case, in the vocabulary of the rail (RowState). The
+// payload carries the words for each state (DATA.review_labels). An own list
+// and nothing else is not a review, as in _review_state of the app. A
+// restored file can hold a note that is not text, which starts no review.
+const reviewStarted = held => Object.keys(held.marks).length > 0
+  || held.missing.length > 0
+  || (typeof held.notes === "string" && held.notes.trim() !== "");
 function state(id) {
-  if (!answers[id]) return ["", "to do"];
-  if (marked(id)) return ["finished", "every record marked"];
-  return ["draft", "in progress"];
+  if (!answers[id] || !reviewStarted(answers[id])) return "todo";
+  return marked(id) ? "finished" : "draft";
 }
 
 function rail() {
   const box = document.getElementById("rows");
   box.textContent = "";
   for (const c of DATA.cases) {
-    const [cls, label] = state(c.case);
     const b = el("button", "row");
     b.setAttribute("aria-current", c.case === current);
     const t = el("div", "t");
-    t.appendChild(el("span", "dot " + cls));
+    t.appendChild(el("span", "dot " + state(c.case)));
     t.appendChild(el("span", null, c.number + "  " + c.title));
     b.appendChild(t);
-    b.appendChild(el("div", "s", label));
+    b.appendChild(el("div", "s", DATA.review_labels[state(c.case)]));
     b.onclick = () => { current = c.case; draw(); };
     box.appendChild(b);
   }
@@ -219,7 +224,7 @@ function draw() {
 // finding it read, so a case still in progress may be saved and may not be
 // published — the same split the app makes between a draft and the stage.
 function finished() {
-  return Object.keys(answers).filter(id => state(id)[0] === "finished");
+  return Object.keys(answers).filter(id => state(id) === "finished");
 }
 
 function envelope(only) {

@@ -895,15 +895,18 @@ def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
     from evals.harness.reference import ANONYMOUS
     from tests import test_sitting_app as sitting
     from webapp.offline_sitting import build
+    from webapp.sitting import REVIEW_LABELS
 
     corpus = sitting.build_tree(tmp_path) / "evals" / "corpus"
     written = tmp_path / "sitting.html"
     written.write_text(build(corpus, "ada", ANONYMOUS), encoding="utf-8")
     page, errors = opened(browser, written.as_uri())
     text = page.inner_text("body")
+    states = set(page.locator("#rows .s").all_inner_texts())
     page.close()
     assert errors == [], f"the offline sitting page raised: {errors}"
     assert case_title(corpus) in text
+    assert states == {REVIEW_LABELS["todo"]}
 
 
 def test_the_offline_sitting_page_shows_a_restored_mark_keyed_by_an_alias(
@@ -5162,10 +5165,6 @@ def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
     page.click("#finish")
     _wait_for(page, finishes)
     drafts = _hold(page, "**/api/draft")
-    # Each press rejects, as its draft save does; the fixture reads page errors.
-    page.evaluate(
-        "addEventListener('unhandledrejection', (event) => event.preventDefault())"
-    )
     _press_case(page, other)
     _press_case(page, other)
     for _ in range(250):
@@ -5179,6 +5178,64 @@ def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
     with page.expect_response("**/api/rail"):
         finishes[0].continue_()
     page.wait_for_selector("#done", state="visible", timeout=3000)
+    assert page.evaluate("current") == case
+
+
+def _lose(route) -> None:
+    route.abort()
+
+
+def _refuse(route) -> None:
+    route.fulfill(**ERROR_PAGE)
+
+
+_NOT_SAVED = "#saveStatus:has-text('Your draft did not save.')"
+
+
+@pytest.mark.parametrize("fail", [_lose, _refuse])
+def test_a_press_whose_draft_save_fails_stays_on_the_case_and_says_so(
+    sitting_page, fail
+):
+    """A press of another case saves the draft first. Where that save fails,
+    the stage keeps its case and says that the draft did not save. The next
+    press that saves moves on."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    page.route("**/api/draft", fail)
+    _press_case(page, other)
+    page.wait_for_selector(_NOT_SAVED, timeout=3000)
+    assert "Try again." in page.inner_text("#saveStatus")
+    assert page.evaluate("current") == case
+    assert page.is_visible("#two")
+    page.unroute("**/api/draft")
+    _open_case(page, other)
+    assert page.inner_text("#saveStatus") == ""
+
+
+@pytest.mark.parametrize("fail", [_lose, _refuse])
+def test_a_queued_draft_save_that_fails_says_so_until_a_save_lands(sitting_page, fail):
+    page, _, (case, _) = sitting_page
+    _open_case(page, case)
+    page.route("**/api/draft", fail)
+    page.fill("#notes", "a note")
+    page.wait_for_selector(_NOT_SAVED, timeout=3000)
+    page.unroute("**/api/draft")
+    with page.expect_response("**/api/draft") as saved:
+        page.evaluate("saveDraft()")
+    assert saved.value.ok
+    page.wait_for_function(
+        "() => document.getElementById('saveStatus').textContent === ''"
+    )
+
+
+@pytest.mark.parametrize("fail", [_lose, _refuse])
+def test_the_guide_opens_and_says_that_the_draft_did_not_save(sitting_page, fail):
+    page, _, (case, _) = sitting_page
+    _open_case(page, case)
+    page.route("**/api/draft", fail)
+    page.click("#helpToggle")
+    page.wait_for_selector(_NOT_SAVED, timeout=3000)
+    page.wait_for_selector("#guide", state="visible", timeout=3000)
     assert page.evaluate("current") == case
 
 
@@ -5362,16 +5419,90 @@ def test_a_start_with_no_readable_answer_says_to_check_the_run(page, lost):
     assert page.is_enabled("#continue")
 
 
-def test_a_control_change_during_a_start_goes_to_no_run(zoned_page):
-    """A change made while Start is in flight waits for it. Where the start
-    ended the pause, the paused run takes no save."""
+def _takes_no_press(page, selector: str) -> bool:
+    """Whether a press on ``selector`` reaches nothing, as on an inert part."""
+    from playwright.sync_api import TimeoutError as NoPress
+
+    try:
+        page.click(selector, timeout=500)
+    except NoPress:
+        return True
+    return False
+
+
+_REFUSED = {
+    "status": 503,
+    "content_type": "application/json",
+    "body": '{"message": "The service is busy. Try again."}',
+}
+
+
+def test_the_controls_take_no_input_while_a_submission_starts(zoned_page):
+    """From the press of Start to the answer, the Controls of the form take no
+    press. A refusal gives them back."""
+    page = zoned_page
+    keep_control(page, "First", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector("#controls-offer:not([hidden])")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Controls analysis")
+    open_frameworks(page)
+    page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
+    held = _hold(page, "**/analyze")
+    page.click("#go")
+    _wait_for(page, held)
+    assert _takes_no_press(page, "#controls-choose")
+    assert page.is_hidden("#controls-dialog")
+    held[0].fulfill(**_REFUSED)
+    page.wait_for_selector("#problem:has-text('The service is busy')")
+    page.click("#controls-choose", timeout=3000)
+    page.wait_for_selector("#controls-dialog[open]")
+
+
+def _start(page) -> None:
+    page.click("#continue")
+
+
+def _amend(page) -> None:
+    page.click(".amend summary")
+    page.fill(".amend textarea", "The database is encrypted.")
+    page.click(".amend button")
+
+
+@pytest.mark.parametrize(
+    ("path", "press"), [("**/answer/*", _start), ("**/amend/*", _amend)]
+)
+def test_the_controls_take_no_input_while_a_pause_ends(zoned_page, path, press):
+    """From the press that can end the pause to its answer, the Controls of
+    the pause take no press, so no change goes to a run that ended. A refusal
+    gives them back."""
+    page = zoned_page
+    first = keep_control(page, "First", {"type": "application"})
+    submit_with_controls(page)
+    held = _hold(page, path)
+    press(page)
+    _wait_for(page, held)
+    assert _takes_no_press(page, f"#offer-{first}")
+    held[0].fulfill(**_REFUSED)
+    page.wait_for_selector("#answer-problem:has-text('The service is busy')")
+    page.unroute(path)
+    assert "control_scopes" in save_offer(
+        page, lambda: page.click(f"#offer-{first}", timeout=3000)
+    )
+
+
+def test_a_control_change_behind_the_hold_goes_to_no_run(zoned_page):
+    """A change that an event of a script makes while Start is in flight waits
+    for the start. Where the start ended the pause, the paused run takes no
+    save."""
     page = zoned_page
     first = keep_control(page, "First", {"type": "application"})
     submit_with_controls(page)
     held = _hold_answers(page)
     page.click("#continue")
     _wait_for(page, held)
-    page.click(f"#offer-{first}")
+    page.dispatch_event(f"#offer-{first}", "click")
     with page.expect_response(_post_to_answer):
         held[0].continue_()
     page.wait_for_url("**/report/**")
