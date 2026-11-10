@@ -456,6 +456,18 @@ class TestARecordOfAnotherSchemaVersion:
         linked = {item["run"] for snapshot in listed for item in snapshot["reports"]}
         assert run not in linked
 
+    def test_the_stream_of_such_a_record_ends_with_no_node_frame(self, tiers, durable):
+        with app(tiers) as client:
+            run = completed(client)
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(
+                "UPDATE jobs SET schema_version = '0.1' WHERE id = ?", (run,)
+            )
+        with app(tiers) as client:
+            stream = client.get(f"/events/{run}")
+        assert stream.status_code == 200, stream.text
+        assert "event: node" not in stream.text
+
     def test_an_unparsable_resumption_is_never_parsed(self, tiers, durable):
         with app(tiers) as client:
             answered = completed(client)

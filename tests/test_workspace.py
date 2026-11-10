@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
 from tests.test_webapp import BREAKOUT, LOOPBACK, SAME_ORIGIN, posted
 from webapp.main import DEFAULT_NAME
+from webapp.page_words import STEP_PROGRESS
 
 tiers = web.tiers
 
@@ -92,18 +94,28 @@ def test_workspace_missing_run_and_cross_origin_write(tiers):
         assert client.get("/workspace/runs").json() == []
 
 
-def test_completed_processing_steps_survive_snapshot_reads(tiers):
-    from analysis_service import StubPipelineRunner
-    from tests.test_webapp import run_to_completion
-
-    with web.client_for(tiers, StubPipelineRunner()) as client:
-        run = run_to_completion(client)
-        detail = client.get(f"/workspace/runs/{run}").json()
-        assert detail["completed_steps"] == list(StubPipelineRunner.nodes)
+def test_a_run_in_progress_answers_with_its_progress_line_on_each_read(tiers):
+    runner = web.HeldAfterExtract()
+    with web.client_for(tiers, runner) as client:
+        body = posted("A web app talks to a database.") | {"questions": True}
+        run = client.post("/analyze", json=body, headers=SAME_ORIGIN).json()["run"]
+        deadline = time.monotonic() + 5
+        while not (detail := client.get(f"/workspace/runs/{run}").json())["progress"][
+            "seq"
+        ]:
+            assert time.monotonic() < deadline, detail
+            time.sleep(0.01)
+        line = detail["progress"]
+        assert line == {
+            "stage": 1,
+            "words": STEP_PROGRESS["extract"].words,
+            "seq": line["seq"],
+        }
         again = client.get(f"/workspace/runs/{run}").json()
-        assert again["completed_steps"] == detail["completed_steps"], (
-            "Snapshot reads must not consume progress"
-        )
+        assert again["progress"] == line, "A read must not consume progress"
+        runner.release.set()
+        client.get(f"/events/{run}")
+        assert "progress" not in client.get(f"/workspace/runs/{run}").json()
 
 
 TITLE = "My orders board"

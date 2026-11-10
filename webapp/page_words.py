@@ -8,13 +8,14 @@ a raw key.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from analysis_service.answer_state import EmptyListReason
 from analysis_service.claims import (
     VERDICT_LABELS,
+    FrameworkName,
     GroundKind,
     ScopeState,
     SeverityLevel,
@@ -23,6 +24,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
+from analysis_service.graph import NodeStep, step_by_graph_node
 from analysis_service.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
@@ -222,8 +224,104 @@ EMPTY_LIST_REASONS: Mapping[EmptyListReason, str] = MappingProxyType(
     }
 )
 
+#: Which progress line a run gets: ``to-questions`` where the run stops to ask
+#: a person, and ``to-report`` for each other run.
+ProgressMode = Literal["to-questions", "to-report"]
+
+
+def progress_mode(asks: bool) -> ProgressMode:
+    """The progress mode of a run that stops to ask a person, or of one that
+    does not."""
+    return "to-questions" if asks else "to-report"
+
+
+#: What the progress line says before the first step of a run completes. A
+#: page that starts a run from a description shows the ``to-questions`` words
+#: in each mode.
+INITIAL_PROGRESS_WORDS: Mapping[ProgressMode, str] = MappingProxyType(
+    {
+        "to-questions": (
+            "Reading your description and identifying the parts of your system…"
+        ),
+        "to-report": "Preparing the analysis…",
+    }
+)
+
+
+class StepProgress(NamedTuple):
+    """What the progress line shows when one step completes."""
+
+    #: The work that follows the step.
+    words: str
+    #: The count of stages that are complete, in each mode.
+    stages: Mapping[ProgressMode, int]
+
+
+def _stages(to_questions: int, to_report: int) -> Mapping[ProgressMode, int]:
+    return MappingProxyType({"to-questions": to_questions, "to-report": to_report})
+
+
+_CHECKING_MAP = "Checking the system map for gaps or conflicting details…"
+_NOTING_MEASURES = "Noting the security measures you’ve already described…"
+_IDENTIFYING_DETAILS = "Identifying details that would make the analysis more precise…"
+_GENERATING_QUESTIONS = "Generating questions…"
+_EXAMINING = "Examining your system against the selected frameworks…"
+_CHECKING_FINDINGS = "Bringing the results together and checking the findings…"
+
+#: The progress of each step. Each quarter of the bar marks a completed stage,
+#: not a share of elapsed time. A run that the ``reject`` step ends shows its
+#: refusal, and its row completes no stage.
+STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
+    {
+        "extract": StepProgress(_CHECKING_MAP, _stages(1, 1)),
+        "repair": StepProgress(_CHECKING_MAP, _stages(2, 2)),
+        "validate": StepProgress(_NOTING_MEASURES, _stages(2, 2)),
+        "revalidate": StepProgress(_NOTING_MEASURES, _stages(2, 2)),
+        "reject": StepProgress("Continuing the analysis…", _stages(0, 0)),
+        "capabilities": StepProgress(_IDENTIFYING_DETAILS, _stages(2, 2)),
+        "stated": StepProgress(_IDENTIFYING_DETAILS, _stages(2, 2)),
+        "read": StepProgress(_IDENTIFYING_DETAILS, _stages(2, 2)),
+        "assert": StepProgress(
+            "Choosing the relevant checks for your system…", _stages(2, 2)
+        ),
+        "catalog": StepProgress(_GENERATING_QUESTIONS, _stages(3, 0)),
+        "pause": StepProgress(_GENERATING_QUESTIONS, _stages(4, 0)),
+        "prepare": StepProgress(_EXAMINING, _stages(0, 2)),
+        "analyze": StepProgress(_EXAMINING, _stages(0, 0)),
+        "join": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "merge": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "critic": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "router": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "recritic": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "rereview": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "critic_failed": StepProgress(_CHECKING_FINDINGS, _stages(0, 3)),
+        "assemble": StepProgress("Putting your report together…", _stages(0, 4)),
+    }
+)
+
+#: The count of stages of a run, which is the length of the progress bar.
+STAGE_COUNT = max(
+    stage for progress in STEP_PROGRESS.values() for stage in progress.stages.values()
+)
+
+
+def progress_after(
+    nodes: Sequence[str], frameworks: Sequence[FrameworkName], mode: ProgressMode
+) -> dict[str, object]:
+    """The progress line after ``nodes`` completed, in order, in a run of
+    ``frameworks``: the count of complete stages and the words of the work
+    that follows. Raises :class:`KeyError` on a name that is not a node of a
+    graph of ``frameworks``."""
+    steps = step_by_graph_node(frameworks)
+    completed = [STEP_PROGRESS[steps[node]] for node in nodes]
+    return {
+        "stage": max((progress.stages[mode] for progress in completed), default=0),
+        "words": completed[-1].words if completed else INITIAL_PROGRESS_WORDS[mode],
+    }
+
+
 #: The keys of the ``form_words`` island, as the form scripts read them.
-FormTable = Literal["page_status", "gate_notes", "empty_list"]
+FormTable = Literal["page_status", "gate_notes", "empty_list", "progress_start"]
 
 #: Every table the form page reads, by its key in the ``form_words`` island.
 FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
@@ -231,6 +329,7 @@ FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
         "page_status": PAGE_STATUS_LABELS,
         "gate_notes": GATE_NOTES,
         "empty_list": EMPTY_LIST_REASONS,
+        "progress_start": INITIAL_PROGRESS_WORDS,
     }
 )
 

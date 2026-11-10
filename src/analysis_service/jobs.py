@@ -307,7 +307,12 @@ class JobEvent(BaseModel):
     def sse_frame(self) -> str:
         """The event as one server-sent frame: ``seq`` as the id, the kind as
         the event name, and the rest as data. :func:`event_frames` writes it."""
-        data = self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        return self.framed(
+            self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        )
+
+    def framed(self, data: str) -> str:
+        """One server-sent frame of the event with ``data`` as its data."""
         return f"id: {self.seq}\nevent: {self.kind}\ndata: {data}\n\n"
 
 
@@ -1938,9 +1943,11 @@ async def event_frames(
     seen: int = 0,
     *,
     gone: Callable[[], Awaitable[bool]] | None = None,
+    frame: Callable[[JobEvent], str | None] = JobEvent.sse_frame,
 ) -> AsyncIterator[str]:
     """The job's events past ``seen``, as server-sent frames, as the store
-    records them.
+    records them. ``frame`` writes the frame of one event, or gives ``None``
+    for an event that gets no frame.
 
     **The one reader of "when does a job's stream end".** It ends when the job
     reaches a terminal status, when the store holds no such job, when the
@@ -1959,7 +1966,8 @@ async def event_frames(
         status, events = progress
         for event in events:
             seen = event.seq
-            yield event.sse_frame()
+            if (written := frame(event)) is not None:
+                yield written
         if status in TERMINAL_STATUSES or (gone is not None and await gone()):
             return
         await asyncio.sleep(POLL_SECONDS)

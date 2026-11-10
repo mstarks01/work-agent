@@ -33,6 +33,7 @@ FORM_TABLES = {
     "PAGE_STATUS_LABELS": page_words.PageStatus,
     "GATE_NOTES": PreconditionResult,
     "EMPTY_LIST_REASONS": EmptyListReason,
+    "INITIAL_PROGRESS_WORDS": page_words.ProgressMode,
 }
 
 REPORT_TABLES = {
@@ -219,6 +220,7 @@ def test_each_template_holds_only_the_fields_its_script_fills():
         "page_status": set(),
         "gate_notes": {"name"},
         "empty_list": {"held_back"},
+        "progress_start": set(),
     }
     script = page_javascript("first_run.js")
     assert 'gate_notes[state].replace("{name}", name)' in script

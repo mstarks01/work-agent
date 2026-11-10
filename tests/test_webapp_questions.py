@@ -13,6 +13,7 @@ import json
 import re
 import shutil
 import subprocess
+import threading
 from dataclasses import asdict, replace
 from types import MappingProxyType
 
@@ -121,6 +122,26 @@ class PausingRunner(StubPipelineRunner):
             }
         )
         return PipelineCompleted(report=report)
+
+
+class HeldAfterExtract(PausingRunner):
+    """Holds each run after its first node until the test releases it, and
+    records each node that the run sends."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.release = threading.Event()
+        self.sent: list[str] = []
+
+    async def run(self, job, on_node):
+        async def recorded(node):
+            self.sent.append(node)
+            await on_node(node)
+
+        await recorded("extract")
+        while not self.release.is_set():
+            await asyncio.sleep(0.01)
+        return await super().run(job, recorded)
 
 
 @pytest.fixture
