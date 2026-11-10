@@ -2581,7 +2581,7 @@ calls.push({{ rows: table.children.length, shared: top.length }});
 
 @pytest.mark.parametrize("value", ["yes", "no", "not applicable", "unknown"])
 def test_every_facet_answer_the_page_offers_is_one_the_service_takes(value):
-    """The page's FACET_CHOICES and the service's FACET_ANSWERS are two readers."""
+    """Each answer the page offers for a facet is one that the service takes."""
     store = valid_model().data_stores[0]
     facts = [facet_fact(store)]
     steps = f"""

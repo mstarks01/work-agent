@@ -208,8 +208,9 @@ def render(
     This cannot choose for the caller, because only the template says where a
     placeholder sits.
 
-    ``script`` is the page's client code, from :func:`client_script`. It fills
-    ``<!--script-->`` and takes no escape, for the reason that function gives.
+    ``script`` is the page's client code, from :func:`client_scripts`. It fills
+    ``<!--script-->`` and takes no escape, for the reason :func:`client_script`
+    gives.
     It lands before the fields do, so a template is free to put a placeholder
     inside the code as well as beside it.
 

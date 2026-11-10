@@ -8,7 +8,7 @@ of the words.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import get_args
 
 import pytest
@@ -25,7 +25,7 @@ from analysis_service.fact_answers import FACET_ANSWERS, FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.report_changes import Change, FindingChange
 from tests.factories import report_state, sample_report
-from tests.test_webapp import _island, page_javascript
+from tests.test_webapp import PROJECT_ROOT, _island, page_javascript
 from webapp import page_words, review, settings_view
 from webapp.main import render_report
 
@@ -45,6 +45,17 @@ REPORT_TABLES = {
     "RECOMMENDATION_HEADINGS": VerdictStatus,
     "CHANGE_LINES": Change,
 }
+
+
+def _held(words: Mapping[str, object]) -> set[int]:
+    """The identity of each table an island holds."""
+    return {id(table) for table in words.values()}
+
+
+def _named(tables: Mapping[str, object]) -> set[int]:
+    """The identity of each table a list of this file names, so a table that
+    an island holds and no list names fails a test."""
+    return {id(getattr(page_words, name)) for name in tables}
 
 
 def _texts(table: object) -> Iterator[str]:
@@ -99,16 +110,19 @@ def test_the_report_page_reads_each_table_from_its_island():
 def test_the_report_words_hold_each_report_table():
     """Each table of this file reaches the page: in the island, or as the
     ``line`` of a change."""
-    held = {id(table) for table in page_words.REPORT_WORDS.values()}
-    absent = [
-        name for name in REPORT_TABLES if id(getattr(page_words, name)) not in held
-    ]
-    assert absent == ["CHANGE_LINES"]
+    assert _held(page_words.REPORT_WORDS) == _named(REPORT_TABLES) - {
+        id(page_words.CHANGE_LINES)
+    }
 
 
 def test_the_form_words_hold_each_form_table():
-    held = {id(table) for table in page_words.FORM_WORDS.values()}
-    assert all(id(getattr(page_words, name)) in held for name in FORM_TABLES)
+    assert _held(page_words.FORM_WORDS) == _named(FORM_TABLES)
+
+
+def test_the_style_sheet_names_a_colour_for_each_severity_level():
+    """``report_view.js`` reads the colour of a level as ``--sev-<level>``."""
+    sheet = (PROJECT_ROOT / "webapp" / "report_view.html").read_text(encoding="utf-8")
+    assert set(re.findall(r"--sev-([\w-]+):", sheet)) == set(get_args(SeverityLevel))
 
 
 @pytest.mark.parametrize(

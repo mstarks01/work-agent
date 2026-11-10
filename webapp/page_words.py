@@ -97,8 +97,8 @@ UNIT_RULING_WORDS: Mapping[UnitRuling, tuple[str, str]] = MappingProxyType(
 )
 
 #: Each kind of ground in its own words. The two attribute kinds carry the same
-#: fields, and so do the two assertion kinds, so this line is the only place a
-#: reader can tell "nobody said" from "somebody said".
+#: fields, and so do the two assertion kinds, so these words tell "nobody said"
+#: from "somebody said".
 GROUND_KIND_WORDS: Mapping[GroundKind, str] = MappingProxyType(
     {
         "quote": "Quoted from the submission",
