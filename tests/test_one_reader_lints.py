@@ -474,8 +474,8 @@ def test_kept_text_has_one_reader():
     assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
 
 
-#: Each site that splits a text on ``"\n"`` alone, with the reason. A line
-#: split of an uploaded text calls
+#: Each site that cuts a text at a separator in ``_NEWLINE_SEPARATORS``, with
+#: the reason. A line split of an uploaded text calls
 #: :func:`~analysis_service.owner_files.text_lines`.
 NEWLINE_SPLITS: dict[Site, str] = {
     (".github/scripts/five_class_read.py", "rendered"): (
@@ -496,15 +496,45 @@ NEWLINE_SPLITS: dict[Site, str] = {
 }
 
 
+#: Each separator, or pattern for ``re.split``, that cuts a text at the end
+#: of a line and reads no other line ending that ``splitlines`` reads.
+_NEWLINE_SEPARATORS = frozenset({"\n", "\r\n", b"\n", b"\r\n", r"\n", r"\r?\n"})
+
+#: The calls that cut a text at a separator.
+_SPLIT_CALLS = ("split", "rsplit", "partition", "rpartition")
+
+
 def _splits_on_newline(node: ast.AST) -> bool:
-    if not (_calls(node, "split") or _calls(node, "rsplit")):
-        return False
-    separators = node.args[:1] + [
-        keyword.value for keyword in node.keywords if keyword.arg == "sep"
-    ]
-    return any(
-        isinstance(sep, ast.Constant) and sep.value == "\n" for sep in separators
+    return (
+        isinstance(node, ast.Call)
+        and any(_calls(node, name) for name in _SPLIT_CALLS)
+        and any(
+            isinstance(arg, ast.Constant) and arg.value in _NEWLINE_SEPARATORS
+            for arg in (*node.args, *(keyword.value for keyword in node.keywords))
+        )
     )
+
+
+@pytest.mark.parametrize(
+    ("expression", "refused"),
+    [
+        ('text.split("\\n")', True),
+        ('text.rsplit(sep="\\n", maxsplit=1)', True),
+        ('text.partition("\\n")', True),
+        ('text.rpartition("\\n")', True),
+        ('data.split(b"\\n")', True),
+        ('text.split("\\r\\n")', True),
+        ('re.split("\\n", text)', True),
+        ('re.split(r"\\n", text)', True),
+        ('re.split(r"\\r?\\n", text)', True),
+        ("text.splitlines()", False),
+        ('text.split(",")', False),
+        ('"\\n".join(lines)', False),
+    ],
+)
+def test_the_line_split_lint_reads_each_spelling(expression: str, refused: bool):
+    found = any(_splits_on_newline(node) for node in ast.walk(ast.parse(expression)))
+    assert found is refused
 
 
 def test_a_text_has_one_line_split():
@@ -1824,9 +1854,18 @@ def _parses_a_version_segment(node: ast.AST) -> bool:
 
 
 def _reads_an_answer_status(node: ast.AST) -> bool:
-    """Whether ``node`` reads the answered statuses, or an unanswered count."""
+    """Whether ``node`` reads the answered statuses, or an unanswered count,
+    or adds the two unanswered counts."""
     if _loads(node, "_ANSWERED"):
         return True
+    if isinstance(node, ast.BinOp):
+        return isinstance(node.op, ast.Add) and {
+            getattr(node.left, "attr", ""),
+            getattr(node.right, "attr", ""),
+        } == {
+            "unvoted_count",
+            "stale_count",
+        }
     if isinstance(node, ast.Subscript):
         key = node.slice
     elif _calls(node, "get") and node.args:
@@ -1834,6 +1873,25 @@ def _reads_an_answer_status(node: ast.AST) -> bool:
     else:
         return False
     return _is_constant(key, "unvoted") or _is_constant(key, "stale")
+
+
+@pytest.mark.parametrize(
+    ("expression", "refused"),
+    [
+        ("score.unvoted_count + score.stale_count", True),
+        ("score.stale_count + score.unvoted_count", True),
+        ('counts["unvoted"]', True),
+        ('counts.get("stale", 0)', True),
+        ("score.unvoted_count - score.stale_count", False),
+        ("score.unvoted_count + score.flagged_count", False),
+        ("score.stale_count", False),
+    ],
+)
+def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bool):
+    found = any(
+        _reads_an_answer_status(node) for node in ast.walk(ast.parse(expression))
+    )
+    assert found is refused
 
 
 def _reads_a_flow_label(node: ast.AST) -> bool:
@@ -2198,8 +2256,8 @@ ONE_READERS: dict[str, _OneReader] = {
         ("evals/harness/scorer.py", "review_coverage"),
         {
             ("evals/harness/scorer.py", "unvoted_count"): (
-                "counts the findings nobody voted on at all, which the review"
-                " prompt asks for, and claims nothing about what was answered"
+                "counts the findings nobody voted on at all, which a sweep"
+                " prints for each case, and claims nothing about what was answered"
             ),
             ("evals/harness/scorer.py", "stale_count"): (
                 "counts the findings whose votes judged an earlier argument, which"

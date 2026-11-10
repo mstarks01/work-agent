@@ -85,8 +85,8 @@ it names: it fires on a flow into a placed privilege or tenant zone whatever
 the source's placement, and on a flow out of a tenant zone only when the
 crossing is decided
 ([ADR 0128](adr/0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md)).
-It is not in the evidence catalog either: the
-two unplaced zones offer their own `unknown` entries instead.
+An undecidable crossing is not in the evidence catalog either: each unplaced
+end publishes an `unknown` entry for its `trust_zone` instead.
 
 **Flow direction is who initiates.** A data flow records the initiator, not a
 one-directional movement of bytes. A service reading a store and a service

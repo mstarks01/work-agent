@@ -177,7 +177,7 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.run_record import run_record, sweep_inputs
-from evals.harness.scorer import CaseScore
+from evals.harness.scorer import CaseScore, review_coverage
 from evals.harness.stability import (
     Band,
     CaseStability,
@@ -1175,9 +1175,8 @@ def command_run(args: argparse.Namespace) -> int:
     if mode_run.runs:
         by_series = _scored_sweep(sweep, ran, mode_run.runs, votes, table)
         sweep = by_series[standings.PRIMARY]
-        unanswered = sum(
-            score.unvoted_count + score.stale_count for score in sweep.scores
-        )
+        coverage = [review_coverage(score.status_counts) for score in sweep.scores]
+        unanswered = sum(eligible - answered for answered, eligible in coverage)
         if unanswered:
             print(
                 f"{unanswered} unlisted finding(s) have no live vote; run"

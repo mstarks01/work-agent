@@ -460,8 +460,9 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
     """(answered, eligible) over one score row's vote-status counts.
 
     The one reader of which statuses answer a finding. The scorer's
-    ``reviewed`` count, the published table's coverage and the gain gate's
-    unanswered count all read it, so the three agree on one population.
+    ``reviewed`` count, the published table's coverage, the gain gate's
+    unanswered count and the count that ``command_run`` prints all read it, so
+    the four agree on one population.
     """
     answered = sum(counts.get(status, 0) for status in _ANSWERED)
     eligible = sum(counts.get(status, 0) for status in _VOTE_STATUSES)
@@ -595,8 +596,8 @@ def _match_in_lane(
 
 #: How a draft's stated position stands to a reference's ruled one. ``holds``:
 #: the draft can answer the reference. ``other``: it states another position.
-#: ``unstated``: it states none, because a run wrote it before
-#: ``attacker_position`` existed.
+#: ``unstated``: it states none, because the archive holds it with no
+#: ``attacker_position``.
 PositionFate = Literal["holds", "other", "unstated"]
 
 

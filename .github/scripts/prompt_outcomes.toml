@@ -244,6 +244,13 @@ modules = [
 ]
 check = "a_control_rejection_that_quotes_neither_comes_back_to_the_critic"
 
+[[outcome]]
+prompt = "prompts/critic.md"
+sentence = """The drafts carry each text once: an entry with no `excerpt` is
+the document with the same `sha256` in an earlier entry."""
+modules = ["src/analysis_service/critic.py"]
+check = "an_evidence_entry_with_no_excerpt_names_an_earlier_entry"
+
 # --- Modules with no pinned sentence yet ---------------------------------------
 
 [[reader]]

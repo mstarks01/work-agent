@@ -143,8 +143,8 @@ def flagged_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
     Read from the rows rather than from today's corpus, because a development case
     can be flagged after the sweep ran, and the sweep's figure was taken under
     the flag it carried then. Framework-neutral: any per-case block whose rows
-    carry ``holdout`` answers. A row written before the field existed carries
-    none, and no such sweep scored a holdout case.
+    carry ``holdout`` answers. An archived row may carry none, and no
+    sweep with such a row scored a holdout case.
     """
     return frozenset(
         row["case"]

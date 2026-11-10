@@ -643,7 +643,7 @@ class TestReportInvariants:
     def test_a_crossing_that_drops_its_assumed_endpoints_is_rejected(self):
         """The archive's own failure, kept as the guard (#468).
 
-        A report written before the mark existed carries a crossing with no
+        An archived report may carry a crossing with no
         ``assumed_endpoints``, and the envelope refuses it rather than reading
         a zone the service placed as one the input stated.
         """

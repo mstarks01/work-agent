@@ -564,10 +564,9 @@ class DataFlow(_Element):
     #:
     #: **This default is honest.** Every other
     #: attribute is required, so an extraction that omits one fails rather than
-    #: reading as silence. This one carries ``unknown`` because a report written
-    #: before the field existed has to keep loading — every artifact under
-    #: ``evals/runs/`` predates it — and ``unknown`` is exactly what those
-    #: models say about operations: nobody stated them. A live extraction is
+    #: reading as silence. This one carries ``unknown`` because a stored report
+    #: that holds no ``operations`` key has to keep loading, and ``unknown`` is
+    #: exactly what such a model says about operations: nobody stated them. A live extraction is
     #: still asked for the value by ``prompts/extract.md`` and graded on it by
     #: the extraction scorer, so omitting it loses an attribute against the
     #: blessed model rather than passing unnoticed.
@@ -827,8 +826,11 @@ class BoundaryCrossing(BaseModel):
     **An undecidable crossing establishes nothing.** It confers eligibility for
     analysis and no more: not that a crossing occurred, not that a control is
     missing, not that an attack succeeds. A rule whose premise is the crossing
-    itself fires on one and says so; a rule whose premise is what the zones
-    *are* cannot, and skips it.
+    itself fires on one and says so. A rule whose premise is the kind of a zone
+    reads the kind of a placed endpoint's zone only: it fires where that zone
+    states the premise, and not where the premise needs the unplaced
+    endpoint's zone
+    ([ADR 0128](../../docs/adr/0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md)).
 
     ``assumed_endpoints`` names the endpoints whose zone the service *inferred*
     rather than read, in source-then-destination order, and is empty for a
