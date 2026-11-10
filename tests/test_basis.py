@@ -427,7 +427,7 @@ def test_a_control_is_undecided_when_one_of_its_tokens_went_unsearched():
 
 
 def test_one_token_is_searched_once_however_many_values_carry_it():
-    """The memo, which is what takes the 150-element worst case off 13 seconds.
+    """The memo: a search for one token in one source runs one time.
 
     Measured through the budget rather than through a call count: three values
     naming the same token spend one token's worth of it.
