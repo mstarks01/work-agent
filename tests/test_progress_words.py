@@ -13,6 +13,7 @@ import json
 import re
 import threading
 import time
+from collections.abc import Sequence
 from typing import NamedTuple, get_args
 
 import pytest
@@ -20,10 +21,23 @@ import pytest
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import JobRecord, Resumption
+from analysis_service.jobs import (
+    Checkpoint,
+    InMemoryJobStore,
+    JobEvent,
+    JobRecord,
+    Resumption,
+)
 from analysis_service.pipeline import entry_of
+from analysis_service.sources import Source
 from tests import test_webapp
-from tests.factories import scripted_pipeline
+from tests.factories import (
+    DESCRIPTION_TEXT,
+    admit,
+    sample_report,
+    sample_selection,
+    scripted_pipeline,
+)
 from tests.test_page_words import _copies
 from tests.test_webapp import (
     SAME_ORIGIN,
@@ -33,14 +47,16 @@ from tests.test_webapp import (
     posted,
 )
 from tests.test_webapp_questions import HeldAfterExtract, client_for
+from webapp.main import Workspace
 from webapp.page_words import (
     INITIAL_PROGRESS_WORDS,
     STAGE_COUNT,
     STEP_PROGRESS,
     ProgressMode,
     RunStart,
-    progress_after,
     run_start_of,
+    stage_after,
+    words_after,
 )
 
 tiers = test_webapp.tiers
@@ -101,6 +117,19 @@ def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
 def built_node_names(selection: tuple[FrameworkName, ...]) -> list[set[str]]:
     """The node names of each graph of ``selection``."""
     return [built.nodes for built in built_graphs(selection)]
+
+
+def progress_after(
+    nodes: list[str],
+    frameworks: Sequence[FrameworkName],
+    mode: ProgressMode,
+    start: RunStart,
+) -> dict:
+    """The progress line after ``nodes``, before the stage of a parent."""
+    return {
+        "stage": stage_after(nodes, frameworks, mode),
+        "words": words_after(nodes, frameworks, mode, start),
+    }
 
 
 def test_the_table_names_each_step():
@@ -192,7 +221,7 @@ def test_the_last_step_of_each_graph_of_a_job_fills_the_bar(selection):
         assert line["stage"] == STAGE_COUNT, end
     for entry, start in (
         (graph.ENTRY_EXTRACT, "description"),
-        (graph.ENTRY_RESUME, "resumption"),
+        (graph.ENTRY_RESUME, "answers"),
     ):
         assert ends[entry]
         for end in ends[entry]:
@@ -236,9 +265,10 @@ def test_a_run_starts_from_a_resumption_where_its_graph_has_the_resume_entry(
         continues_at_pause=continues,
         resumption=Resumption.model_construct() if resumed else None,
     )
-    start = run_start_of(record.resumption is not None)
+    parent = JobRecord.model_construct(continues_at_pause=continues)
+    start = run_start_of(parent if resumed else None)
 
-    assert (start == "resumption") == (entry_of(record) == graph.ENTRY_RESUME)
+    assert (start != "description") == (entry_of(record) == graph.ENTRY_RESUME)
 
 
 @pytest.mark.parametrize("node", [graph.CATALOG_NODE, graph.PAUSE_NODE])
@@ -284,7 +314,7 @@ def test_the_form_page_carries_the_stage_count_and_the_start_words(tiers):
     assert _island(page, "form_words")["progress_start"] == dict(INITIAL_PROGRESS_WORDS)
     script = page_javascript("first_run.js")
     assert script.count("FORM_WORDS.progress_start.description") == 2
-    assert script.count("progress_start") == 2
+    assert script.count("progress_start") == 6
     assert "progress.max" in page_javascript("workspace.js")
 
 
@@ -299,13 +329,22 @@ def lines_of(client, runner: HeldAfterExtract, run: str) -> tuple[str, list[dict
 
 
 def assert_lines(
-    frames: list[dict], nodes: list[str], mode: ProgressMode, start: RunStart
+    frames: list[dict],
+    nodes: list[str],
+    mode: ProgressMode,
+    start: RunStart,
+    stopped: int = 0,
 ) -> None:
-    """Each frame is the progress line after its node, and a later frame has
-    a larger ``seq``."""
+    """The first frame is the line before any node, each later frame is the
+    progress line after its node, and a later frame has a larger ``seq``. No
+    stage falls below ``stopped``, the stage where the parent stopped."""
     selection = [item["name"] for item in BODY["frameworks"]]
     sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
-    assert sent == [progress_after([node], selection, mode, start) for node in nodes]
+    lines = [
+        progress_after(done, selection, mode, start)
+        for done in [[], *([node] for node in nodes)]
+    ]
+    assert sent == [line | {"stage": max(line["stage"], stopped)} for line in lines]
     seqs = [frame["seq"] for frame in frames]
     assert seqs == sorted(set(seqs))
 
@@ -373,6 +412,8 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
             "/analyze", json=BODY | {"questions": True}, headers=SAME_ORIGIN
         )
         lines_of(client, runner, started.json()["run"])
+        selection = [item["name"] for item in BODY["frameworks"]]
+        stopped = stage_after(runner.sent, selection, "to-report")
         runner.release.clear()
         runner.sent.clear()
         continued = client.post(
@@ -390,8 +431,8 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
             time.sleep(0.01)
         _, frames = lines_of(client, runner, child)
 
-    assert_lines(frames, runner.sent, "to-report", "resumption")
-    assert_lines([read["progress"]], ["extract"], "to-report", "resumption")
+    assert_lines(frames, runner.sent, "to-report", "answers", stopped)
+    assert read["progress"]["stage"] == max(stopped, 1)
     assert read["pauses"] is False
     assert frames[-1]["stage"] == STAGE_COUNT
 
@@ -411,3 +452,102 @@ def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
 
     assert "event: node" not in ended
     assert "event: done" in ended
+
+
+#: The nodes of a parent that stopped, by how its Resumed Job starts and the
+#: mode of the parent, with the stage where the parent stopped, counted in the
+#: ``to-report`` mode of the Resumed Job.
+PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
+    ("answers", "to-questions"): (
+        [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "catalog"],
+        2,
+    ),
+    ("answers", "to-report"): (
+        [graph.EXTRACT_NODE, graph.PREPARE_NODE, graph.ASSEMBLE_NODE],
+        STAGE_COUNT,
+    ),
+    ("controls", "to-report"): (
+        [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "pause"],
+        2,
+    ),
+}
+
+
+def resumed_job(start: RunStart, mode: ProgressMode) -> tuple[Workspace, JobRecord]:
+    """A Resumed Job in flight, with its parent in the store. A parent in the
+    ``to-report`` mode that asked for answers is a finished report, and its
+    Resumed Job is the follow-up."""
+    store = InMemoryJobStore()
+    nodes, _ = PARENT_RUNS[start, mode]
+    parent = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+        ask_questions=mode == "to-questions",
+        continues_at_pause=start == "controls",
+    )
+    parent.transition("running")
+    for node in nodes:
+        parent.record_node(node)
+    report = sample_report([])
+    if graph.ASSEMBLE_NODE in nodes:
+        parent.report = report
+        parent.transition("completed")
+    else:
+        parent.transition("awaiting-answers")
+    asyncio.run(admit(store, parent))
+    child = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+        resumption=Resumption(
+            parent_id=parent.id,
+            checkpoint=Checkpoint(system_model=report.system_model, assertions=None),
+            follow_up=graph.ASSEMBLE_NODE in nodes,
+        ),
+        parent_revision=parent.revision,
+    )
+    child.transition("running")
+    asyncio.run(admit(store, child))
+    return Workspace(store=store), child
+
+
+def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
+    workspace, child = resumed_job(start, mode)
+    events = [
+        JobEvent.model_construct(seq=seq, node=node)
+        for seq, node in enumerate(nodes, 1)
+    ]
+
+    async def read():
+        return (await workspace.progress_line(child, False))(events)
+
+    return asyncio.run(read())
+
+
+@pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
+def test_a_resumed_job_starts_with_the_words_the_page_shows_at_its_start(start, mode):
+    """The status answer and the page read one row of one table."""
+    _, stopped = PARENT_RUNS[start, mode]
+    assert _line(start, mode, []) == {
+        "stage": stopped,
+        "words": INITIAL_PROGRESS_WORDS[start],
+        "seq": 0,
+    }
+
+
+@pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
+def test_the_bar_of_a_resumed_job_never_goes_below_the_stage_of_its_parent(start, mode):
+    _, stopped = PARENT_RUNS[start, mode]
+    for nodes in ([graph.EXTRACT_NODE], [graph.EXTRACT_NODE, graph.PREPARE_NODE]):
+        expected = progress_after(
+            nodes, [each.name for each in sample_selection()], "to-report", start
+        )["stage"]
+        assert _line(start, mode, nodes)["stage"] == max(expected, stopped)
+
+
+def test_the_page_reads_the_start_words_of_a_resumed_job_from_the_start_table():
+    script = page_javascript("first_run.js") + page_javascript("workspace.js")
+    for start in set(STARTS) - {"description"}:
+        assert f"FORM_WORDS.progress_start.{start}" in script
+    assert "continues-with-" not in script
