@@ -117,6 +117,15 @@ LEFT_OUT_MEANINGS: Mapping[LeftOutReason, str] = MappingProxyType(
 #: zone is an inference, or no source placed it.
 CoverReason = Literal["stated-zone", "zone-inferred", "no-zone-stated"]
 
+#: How the pause reads each reason, beside a candidate.
+COVER_MEANINGS: Mapping[CoverReason, str] = MappingProxyType(
+    {
+        "stated-zone": "a source places this part in the zone",
+        "zone-inferred": "the service inferred this placement",
+        "no-zone-stated": "no source places this part",
+    }
+)
+
 #: The refusal of a submission that names a Control the owner does not
 #: hold. One sentence for a deleted Control and for another owner's ID,
 #: which names no ID.
@@ -285,9 +294,9 @@ ControlResolution = Annotated[AppliedScope | LeftOutScope, Field(discriminator="
 
 
 class ControlScopeEntry(BaseModel):
-    """One applied Control in a pause save's ``control_scopes``: the element
-    it resolves to, ``""`` for the whole application, and for a zone the
-    elements the owner ticked."""
+    """One Control in a pause save's ``control_scopes``: the element it
+    resolves to, ``""`` for the whole application, and for a zone the elements
+    the owner ticked. A zone with no ticked element is left out."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -499,7 +508,8 @@ def control_offer(
 
     def covers(found: Sequence[CoveredElement]) -> list[dict[str, object]]:
         return [
-            cover.model_dump(mode="json") | {"name": names[cover.element]}
+            cover.model_dump(mode="json")
+            | {"name": names[cover.element], "meaning": COVER_MEANINGS[cover.reason]}
             for cover in found
         ]
 
@@ -658,8 +668,8 @@ RowOutcome = Literal[
 
 #: The list each ruling sits under in the report and the Markdown export, by
 #: what the row did: it ruled the finding out, or the critic refused it. A
-#: refusal says nothing of the finding, which another row can rule out.
-#: ``report_view.js`` holds a copy, which a test checks against this table.
+#: refusal says nothing of the finding, which another row can rule out. The
+#: report page reads the table from its ``ruling_lists`` island.
 RULING_LISTS: Mapping[RowVerdict, str] = MappingProxyType(
     {"applied": "Ruled out", "refused": "Refused"}
 )
@@ -735,15 +745,21 @@ def controls_used(
     scopes: Sequence[ControlResolution] | None,
     model: SystemModel | None,
 ) -> list[dict[str, str]]:
-    """Each copied Control of a job, read-only, with its :data:`UsedState`.
-    ``model`` is the job's model, or ``None`` where the read gets none."""
+    """Each copied Control of a job, read-only, with its :data:`UsedState`
+    and the words of that state (:data:`USED_STATE_WORDS`). ``model`` is the
+    job's model, or ``None`` where the read gets none."""
     states: list[UsedState] = (
         ["pending"] * len(copies)
         if model is None
         else [resolution.state for resolution in resolutions(copies, scopes, model)]
     )
     return [
-        {"id": copy.id, "name": copy.document.name, "state": state}
+        {
+            "id": copy.id,
+            "name": copy.document.name,
+            "state": state,
+            "state_text": USED_STATE_WORDS[state],
+        }
         for copy, state in zip(copies, states, strict=True)
     ]
 
@@ -1035,6 +1051,8 @@ class SectionEntry(BaseModel):
     #: The words that name the scope in a sentence (:func:`scope_phrase`).
     scope_phrase: str
     state: ResolutionState
+    #: The words of the state (:data:`RESOLUTION_WORDS`).
+    state_text: str
     outcome: MatchOutcome | None
     reason: LeftOutReason | None
     meaning: str
@@ -1048,9 +1066,19 @@ ROW_OUTCOME_WORDS: Mapping[RowOutcome, str] = MappingProxyType(
     {outcome: outcome.replace("-", " ") for outcome in get_args(RowOutcome)}
 )
 
-#: How the section's summary names each resolution state.
+#: How the section names each resolution state, in its summary and in the
+#: line of a Control.
 RESOLUTION_WORDS: Mapping[ResolutionState, str] = MappingProxyType(
     {"applied": "applied", "left-out": "left out"}
+)
+
+#: How a reopened analysis names each state of a Control it lists.
+USED_STATE_WORDS: Mapping[UsedState, str] = MappingProxyType(
+    {
+        "applied": RESOLUTION_WORDS["applied"],
+        "left-out": RESOLUTION_WORDS["left-out"],
+        "pending": "not matched yet",
+    }
 )
 
 #: How the section's summary names each fact state.
@@ -1281,6 +1309,7 @@ def controls_section(
                 scope=copy.document.scope,
                 scope_phrase=scope_phrase(copy.document.scope),
                 state=resolution.state,
+                state_text=RESOLUTION_WORDS[resolution.state],
                 outcome=outcome,
                 reason=reason,
                 meaning=resolution.meaning,

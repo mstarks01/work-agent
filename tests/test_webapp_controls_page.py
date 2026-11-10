@@ -899,6 +899,20 @@ class TestTheReportSection:
             assert entry["scope_phrase"] == phrase
             assert f"Protects {phrase}: " in markdown
 
+    def test_the_page_reads_the_state_words_and_the_ruling_lists(self, ruled):
+        """The page gets the words of each state and the name of each ruling
+        list from the tables that the Markdown export reads."""
+        from analysis_service.job_controls import RESOLUTION_WORDS, RULING_LISTS
+
+        owner, child, _ = ruled
+        page = owner.client.get(f"/report/{child}").text
+        assert test_webapp._island(page, "ruling_lists") == dict(RULING_LISTS)
+        states = {
+            entry["state"]: entry["state_text"]
+            for entry in test_webapp._island(page, "controls")
+        }
+        assert states == dict(RESOLUTION_WORDS)
+
     def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
         owner, child, _ = ruled
         exported = owner.client.get(f"/report/{child}/export.csv")
@@ -1079,20 +1093,55 @@ def test_the_markdown_export_escapes_markup_and_autolinks(value, escaped):
     assert _text(value) == escaped
 
 
+@pytest.mark.parametrize(
+    "sent",
+    [
+        {"name": "waf.yaml", "evidence_class": "config", "text": "waf: on\n"},
+        {"id": "evidence-" + "0" * 32, "evidence_class": "config"},
+    ],
+)
+def test_an_evidence_entry_names_its_class_by_the_key_the_page_sends(sent):
+    """The body's key is ``class``. The field name is no second key."""
+    from pydantic import TypeAdapter, ValidationError
+
+    from webapp.controls_page import HeldEvidence, NewEvidence
+
+    entry = TypeAdapter(NewEvidence | HeldEvidence)
+    with pytest.raises(ValidationError):
+        entry.validate_python(sent)
+    entry.validate_python(
+        {key.replace("evidence_class", "class"): value for key, value in sent.items()}
+    )
+
+
 class TestTheTables:
     """Each table of the pages names each member of its set, so no value
     shows as ``undefined``."""
 
-    def test_the_form_words_each_reason_and_state(self):
-        from typing import get_args
-
-        from analysis_service.job_controls import CoverReason, UsedState
-        from tests.test_webapp import _table_keys
-
-        assert _table_keys("form_controls.js", "COVER_REASONS") == set(
-            get_args(CoverReason)
+    def test_no_page_script_copies_a_sentence_of_a_service_table(self):
+        """The pause, the reopened analysis, the report page and the Controls
+        page read these sentences from the service, so no script holds one."""
+        from analysis_service.job_controls import (
+            COVER_MEANINGS,
+            RULING_LISTS,
+            USED_STATE_WORDS,
         )
-        assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
+        from tests.test_webapp import page_javascript
+        from webapp.controls_page import SCOPE_HINTS
+
+        scripts = "".join(
+            page_javascript(name)
+            for name in ("form_controls.js", "report_view.js", "controls.js")
+        )
+        sentences = [
+            *COVER_MEANINGS.values(),
+            *FACT_MEANINGS.values(),
+            *filter(None, SCOPE_HINTS.values()),
+            USED_STATE_WORDS["pending"],
+            "left out, because",
+        ]
+        assert not [sentence for sentence in sentences if sentence in scripts]
+        assert not [word for word in RULING_LISTS.values() if f'"{word}"' in scripts]
 
     def test_each_row_meaning_formats_with_the_row_values(self):
         """The section formats every meaning with the row's version, its
@@ -1103,36 +1152,35 @@ class TestTheTables:
         for meaning in ROW_MEANINGS.values():
             meaning.format(version="v", framework="f", ran="r")
 
-    def test_the_report_page_copies_each_ruling_list_name(self):
-        """``report_view.js`` names each list as
-        :data:`~analysis_service.job_controls.RULING_LISTS` does,
-        so the page and the Markdown export use the same words."""
-        from typing import get_args
-
-        from analysis_service.job_controls import RULING_LISTS, RowVerdict
-        from tests.test_webapp import _table_keys, page_javascript
-
-        assert set(RULING_LISTS) == set(get_args(RowVerdict))
-        assert _table_keys("report_view.js", "RULING_LISTS") == set(RULING_LISTS)
-        script = page_javascript("report_view.js")
-        for verdict, heading in RULING_LISTS.items():
-            assert f'"{verdict}": "{heading}",' in script
-
     def test_the_page_tables_name_each_member(self):
         from typing import get_args
 
         from analysis_service.controls import ScopeType
         from analysis_service.job_controls import (
+            COVER_MEANINGS,
             FACT_COUNT_WORDS,
             LEFT_OUT_MEANINGS,
+            RESOLUTION_WORDS,
             ROW_MEANINGS,
+            RULING_LISTS,
+            USED_STATE_WORDS,
+            CoverReason,
             FactState,
             LeftOutReason,
             MatchOutcome,
+            ResolutionState,
             RowOutcome,
+            RowVerdict,
+            UsedState,
         )
         from analysis_service.sources import EvidenceClass
-        from webapp.controls_page import EVIDENCE_LABELS
+        from webapp.controls_page import EVIDENCE_LABELS, SCOPE_HINTS
+
+        assert set(SCOPE_HINTS) == set(get_args(ScopeType))
+        assert set(COVER_MEANINGS) == set(get_args(CoverReason))
+        assert set(RESOLUTION_WORDS) == set(get_args(ResolutionState))
+        assert set(USED_STATE_WORDS) == set(get_args(UsedState))
+        assert set(RULING_LISTS) == set(get_args(RowVerdict))
 
         assert set(SCOPE_WORDS) == set(get_args(ScopeType))
         assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))

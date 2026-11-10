@@ -135,8 +135,31 @@ _FACT_OFFERS: Mapping[
 )
 
 
+_PART_HINT = (
+    "The name must match the part after case and punctuation. A similar name"
+    " matches nothing."
+)
+
+#: What the editor says of the name of each scope type. The whole
+#: application has no name.
+SCOPE_HINTS: Mapping[ScopeType, str] = MappingProxyType(
+    {
+        "application": "",
+        "boundary": (
+            f"The name must match the {SCOPE_WORDS['boundary'].noun} after case"
+            " and punctuation. The Control applies to each part the description"
+            " places in it."
+        ),
+        "process": _PART_HINT,
+        "store": _PART_HINT,
+        "entity": _PART_HINT,
+    }
+)
+
+
 def scope_types() -> list[dict[str, object]]:
-    """Each scope type, with the protections a Control of that scope may state.
+    """Each scope type, with its words and the protections a Control of that
+    scope may state.
 
     The kinds come from :data:`~analysis_service.controls.SCOPE_FACT_KINDS`.
     """
@@ -144,6 +167,7 @@ def scope_types() -> list[dict[str, object]]:
         {
             "type": scope_type,
             "label": words.label,
+            "hint": SCOPE_HINTS[scope_type],
             "statements": [
                 statement
                 for kind in sorted(SCOPE_FACT_KINDS[scope_type])
@@ -223,7 +247,7 @@ class NewEvidence(BaseModel):
     """An evidence file the save adds, with its text. The page reads the file
     and sends its text, so no route takes a file."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(max_length=MAX_LABEL_CHARS)
     evidence_class: EvidenceClass = Field(alias="class")
@@ -234,7 +258,7 @@ class HeldEvidence(BaseModel):
     """An evidence file the Control holds, which the save keeps with its text
     and gives the class the owner chose."""
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=EVIDENCE_ID)
     evidence_class: EvidenceClass = Field(alias="class")

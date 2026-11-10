@@ -56,10 +56,14 @@
     ? control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ")
     : "None";
   const unitOf = (row) => units[row.framework]?.units.find((unit) => unit.id === row.unit);
+  // A row by its framework and unit, and the same with the unit's title.
+  const unitRef = (row) => `${row.framework} ${row.unit}`;
   const unitText = (row) => {
     const label = unitOf(row)?.label;
-    return label ? `${row.framework} ${row.unit} · ${label}` : `${row.framework} ${row.unit}`;
+    return label ? `${unitRef(row)} · ${label}` : unitRef(row);
   };
+  // Each row of a Control in one line, or "None".
+  const rowList = (control) => control.rows.map(unitText).join(", ") || "None";
 
   let controls = [];
   let editing = null;
@@ -212,10 +216,6 @@
     h("div", { class: "card-head" }, h("h3", {}, title), h("span", { class: "card-step" }, step),
       about ? help(title, about) : null), ...content);
 
-  const SCOPE_HINTS = {
-    boundary: "The name must match the trust boundary after case and punctuation. The Control applies to each part the description places in it.",
-    other: "The name must match the part after case and punctuation. A similar name matches nothing.",
-  };
   const scopeCard = () => {
     const named = Boolean(draft.scope.type) && draft.scope.type !== "application";
     const aliasInput = h("input", {
@@ -237,7 +237,7 @@
     // An alias added or removed draws the editor with no input event, so
     // the draw ends the Undo too.
     dropUndo();
-    return card("What it protects", "1 of 4", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
+    return card("What it protects", "1 of 4", named ? SCOPES[draft.scope.type].hint : null,
       h("div", { class: "line" },
         h("div", {},
           h("select", { id: "scope-type", "aria-label": "What it protects", on: { change: (event) => {
@@ -630,9 +630,9 @@
   // The table's cells use the same texts for facts and evidence.
   const FIELDS = [
     ["Name", (control) => control.name],
-    ["What it protects", (control) => [SCOPES[control.scope.type]?.label, control.scope.name, ...control.scope.aliases].filter(Boolean).join(", ")],
+    ["What it protects", (control) => scopeText(control.scope_phrase) + (control.scope.aliases.length ? ` (aliases: ${control.scope.aliases.join(", ")})` : "")],
     ["What it does", (control) => factTexts(control).join("; ") || "None"],
-    ["Rows", (control) => control.rows.map((one) => `${one.framework} ${one.unit}`).join(", ") || "None"],
+    ["Rows", rowList],
     ["Evidence", evidenceText],
   ];
   // The notice of a stale save: each field of the saved version that differs
@@ -724,11 +724,11 @@
           on: { toggle: (event) => { if (event.target.open) detailed.add(control.id); else detailed.delete(control.id); } } },
         h("summary", { id: `more-${control.id}`, "aria-label": `Details of ${control.name}` }, "Details"),
         h("dl", {},
-          h("dt", {}, "Covers"), h("dd", {}, control.rows.map((one) => `${one.framework} ${one.unit}`).join(", ")),
+          h("dt", {}, "Covers"), h("dd", {}, rowList(control)),
           h("dt", {}, "Evidence"), h("dd", {}, evidenceText(control))))),
       h("td", { class: "wide-only" }, scopeText(control.scope_phrase)),
       h("td", { class: "wide-only" }, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
-        `${one.framework} ${one.unit}`)))),
+        unitRef(one))))),
       h("td", { class: "wide-only" }, evidenceText(control)),
       h("td", {}, h("time", { datetime: control.updated_at }, day(control.updated_at))),
       h("td", {}, h("div", { class: "row-actions" },
@@ -786,7 +786,7 @@
       return;
     }
     const held = new Set(controls.map((control) => control.id));
-    for (const id of chosen) if (!held.has(id)) chosen.delete(id);
+    for (const ids of [chosen, detailed]) for (const id of ids) if (!held.has(id)) ids.delete(id);
     draw();
   };
 

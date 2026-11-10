@@ -218,6 +218,7 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.job_controls import (
+    RULING_LISTS,
     ControlScopeEntry,
     SectionEntry,
     controls_section,
@@ -1189,6 +1190,7 @@ def render_report(
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
         controls_summary=script_json(section_summary(controls)),
+        ruling_lists=script_json(dict(RULING_LISTS)),
         units=script_json(unit_rows(report)),
         fixes=script_json(
             fixes_by_framework(

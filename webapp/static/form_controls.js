@@ -222,12 +222,6 @@ const formControls = (() => {
   };
 
   // ---- The pause -----------------------------------------------------------
-  // Each reason a zone lists a part (CoverReason).
-  const COVER_REASONS = {
-    "zone-inferred": "the service inferred this placement",
-    "no-zone-stated": "no source places this part",
-    "stated-zone": "a source places this part in the zone",
-  };
   // The candidates of a zone Control on `element`: the zone it matched, or a
   // zone the owner chose from its choices. Empty for any other element.
   const candidatesOf = (entry, element) => (element === entry.element?.id
@@ -263,15 +257,18 @@ const formControls = (() => {
     const target = resolution.reason === "missing-element" ? undefined : targets.get(entry.id);
     return { on: false, element: target ?? (entry.element ? entry.element.id : ""), ticks: new Set() };
   };
-  const scopesOf = (offer, picks) => offer
-    .filter((entry) => picks.get(entry.id).on)
-    .map((entry) => {
-      const pick = picks.get(entry.id);
-      if (entry.scope.type === "application") return { control: entry.id };
-      return entry.scope.type === "boundary"
-        ? { control: entry.id, element: pick.element, ticked: [...pick.ticks] }
-        : { control: entry.id, element: pick.element };
-    });
+  // A zone Control with an element goes in each save, with no tick while it
+  // is off: the service then leaves it out as "unticked" or "empty-zone",
+  // and `accepted` keeps its zone. Any other Control that is off stays out
+  // of the save.
+  const scopesOf = (offer, picks) => offer.flatMap((entry) => {
+    const pick = picks.get(entry.id);
+    if (entry.scope.type === "boundary") {
+      return pick.element ? [{ control: entry.id, element: pick.element, ticked: pick.on ? [...pick.ticks] : [] }] : [];
+    }
+    if (!pick.on) return [];
+    return [entry.scope.type === "application" ? { control: entry.id } : { control: entry.id, element: pick.element }];
+  });
 
   // A note that "Keep this name" leaves for the next draw of the offer.
   let keptNote = "";
@@ -346,14 +343,13 @@ const formControls = (() => {
               send();
             } } });
           return h("li", {}, tick, " ", h("label", { for: tick.id }, cover.name),
-            h("span", { class: "hint" }, ` — ${COVER_REASONS[cover.reason]}`));
+            h("span", { class: "hint" }, ` — ${cover.meaning}`));
         })));
       }
       const own = facts.filter((fact) => fact.control === entry.id);
       if (own.length) {
-        parts.push(h("ul", { class: "hint" }, ...own.map((fact) => h("li", {}, fact.state === "stated"
-          ? `${fact.label}: your description states “${fact.stated}”, so it stands`
-          : `${fact.label}: ${fact.answer.value}`))));
+        // Each fact reads as it does on the report page, in the service's words.
+        parts.push(h("ul", { class: "hint" }, ...own.map((fact) => h("li", {}, `${fact.label}: ${fact.answer.value} — ${fact.meaning}.${fact.stated ? ` The description states “${fact.stated}”.` : ""}`))));
       }
       return h("li", { class: "offer-line" }, ...parts);
     };
@@ -388,17 +384,11 @@ const formControls = (() => {
   };
 
   // ---- A reopened analysis -------------------------------------------------
-  // Each state of a Control a reopened analysis lists (UsedState).
-  const STATES = {
-    "applied": "applied",
-    "left-out": "left out",
-    "pending": "not matched yet",
-  };
   const drawUsed = (used) => {
     reopened = true;
     el("controls-offer").hidden = true;
     holdStart();
-    el("controls-used-list").replaceChildren(...(used || []).map((control) => h("li", {}, `${control.name} (${STATES[control.state]})`)));
+    el("controls-used-list").replaceChildren(...(used || []).map((control) => h("li", {}, `${control.name} (${control.state_text})`)));
     el("controls-used").hidden = !(used || []).length;
   };
 
