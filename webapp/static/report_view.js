@@ -1364,19 +1364,16 @@
   const CONTROLS_SUMMARY = JSON.parse(document.getElementById("controls_summary").textContent);
   const controlMatch = (entry) => {
     const scope = entry.scope_phrase.charAt(0).toUpperCase() + entry.scope_phrase.slice(1);
-    if (entry.state === "left-out") return [`${scope}: left out, because ${entry.meaning}`];
+    if (entry.state === "left-out") return [`${scope}: ${entry.state_text}, because ${entry.meaning}`];
     if (!entry.elements.length) return [`${scope} (${entry.meaning})`];
     return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),
       ` (${entry.meaning})`];
   };
-  // The list each ruling sits under, a copy of the service's RULING_LISTS.
-  const RULING_LISTS = {
-    "applied": "Ruled out",
-    "refused": "Refused",
-  };
+  // The list each ruling sits under, from the service (RULING_LISTS).
+  const RULING_LISTS = JSON.parse(document.getElementById("ruling_lists").textContent);
   const controlRow = (row) => {
     const open = el("details", "control-row");
-    const summary = el("summary", null, `${row.framework} ${row.unit}${row.label ? ` · ${row.label}` : ""} `);
+    const summary = el("summary", null, `${row.framework} ${row.unit} (version ${row.version})${row.label ? ` · ${row.label}` : ""} `);
     summary.append(el("span", `tag ${row.outcome}`, row.outcome_text));
     const lists = Object.entries(RULING_LISTS)
       .map(([verdict, heading]) => [heading, row.rulings.filter((ruling) => ruling.ruling === verdict)])

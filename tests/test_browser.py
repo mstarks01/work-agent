@@ -3075,6 +3075,46 @@ def test_a_narrow_screen_shows_each_row_without_a_side_scroll(page):
     assert _fits_the_screen(page)
 
 
+def test_a_narrow_screen_names_each_row_as_the_wide_chip_does(page):
+    """The details of a Control name each row with its title, and say "None"
+    for a Control with no row."""
+    page.set_viewport_size({"width": 390, "height": 844})
+    _two_kept_controls(page)
+    key = ["", "encryption_at_rest", "", "", "", ""]
+    store = {"type": "store", "name": "Orders DB"}
+    keep_control(page, "F", store, facts=[{"key": key, "value": "AES-256"}], rows=[])
+    encoding = {"framework": "asvs", "unit": "V1", "version": "5.0.0"}
+    keep_control(page, "V", {"type": "application"}, rows=[encoding])
+    page.reload()
+    page.wait_for_selector("#controls-list tr")
+
+    def covers(name: str) -> str:
+        row = page.locator(
+            "#controls-list tr", has=page.locator(f"a:text-is('{name}')")
+        )
+        page.click(f"summary[aria-label='Details of {name}']")
+        return row.locator(".row-more dd").first.inner_text()
+
+    assert covers("F") == "None"
+    assert covers("V") == "asvs V1 · Encoding and Sanitization"
+
+
+def test_a_stale_save_names_the_scope_in_the_words_of_the_service(page):
+    page.goto("/controls")
+    store = {"type": "store", "name": "Orders DB"}
+    keep_control(page, "S", store)
+    page.reload()
+    page.wait_for_selector("#controls-list tr")
+    page.click('button[aria-label="Edit S"]')
+    page.fill("#control-name", "S mine")
+    _save_elsewhere(page, "S", scope=store | {"aliases": ["orders"]})
+    page.click("#save-control")
+    page.wait_for_selector("#stale-note")
+    assert page.locator("#stale-fields li").all_inner_texts() == [
+        "What it protects: The data store “Orders DB” (aliases: orders)"
+    ]
+
+
 def test_a_wide_screen_shows_the_columns_and_no_details(page):
     page.set_viewport_size({"width": 1280, "height": 800})
     _two_kept_controls(page)
@@ -4637,6 +4677,7 @@ def test_a_row_applied_to_some_findings_shows_partly_applied(browser, tiers):
         row = page.locator("#controls-section details.control-row", has_text="spoofing")
         summary = row.locator("summary").inner_text()
         assert "partly applied" in summary
+        assert "stride spoofing (version 1.0)" in summary
         assert "Ruled out: 2 · Refused: 1" in summary
         row.locator("summary").click()
         assert row.locator(".ruling-heading").all_inner_texts() == [
