@@ -89,3 +89,27 @@ rule = "boundary-term"
 reason = """a model reads the rule question with each candidate, also with one
 whose crossing is undecided, so an edit changes model input; change it with a
 measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "This flow crosses a trust boundary and states no verified caller"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "This flow crosses a trust boundary with no verified transport"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/asvs/rules.py"
+phrase = "A party outside the system's control submits this flow across a"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
