@@ -738,8 +738,8 @@ class AsvsAnalysis(FrameworkAnalysis):
         # Appearing and being answered are two facts. A draft the critic sent
         # back for its lane or as a duplicate still appears, in the audit array,
         # and answers nothing — so its requirement is listed in ``scope`` as
-        # well, and that pair is not a duplication. A stored block that lists
-        # no such requirement still appears once.
+        # well, and that pair is not a duplication. A requirement of
+        # such a draft that a stored block does not list still appears once.
         ruled = {requirement_of(claim.id) for claim in every if claim.rules_on_unit()}
         listed = {entry.unit for entry in self.scope}
         issues = []

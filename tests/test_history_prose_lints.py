@@ -148,17 +148,19 @@ DIAGRAMS = without(
 #:   cause, a block or a table, one or many, after "the", "a", "an", "those",
 #:   "these" or "its"), because a guide says what holds before a new package
 #:   existed.
-#: * "predates" and "written before" match only before a noun for a part of a
-#:   record (a field, a key, a pin, a block, an instrument, a quoted name). A
-#:   signature that predates a revocation and a ledger written before a rule
-#:   change are time relations that the code reads.
+#: * "predates", "written before", "taken before" and "recorded before" match
+#:   only before a noun of :data:`_DATED`, and "predates" also before a quoted
+#:   name. A signature that predates a revocation, a ledger written before a
+#:   rule change and an object written before a quoted time are time relations
+#:   that the code reads.
 #:
 #: "legacy" is not matched, because a vendor's legacy name order and a legacy
 #: client are facts of the present. "now" before a verb is not matched,
 #: because "the price map now disagrees" and "the part now has another name"
 #: describe run-time data.
-#: A part of a record, as the "predates" and "written before" template names it.
-_PART = (
+#: What a record carries or names, as the "predates" template reads it after
+#: the verb: the thing whose absence the sentence dates.
+_DATED = (
     r"(fields?|keys?|pin|map|instruments?|blocks?|generator|naming|versioning"
     r"|identities)"
 )
@@ -187,9 +189,9 @@ HISTORY = re.compile(
     r"|before (the|a|an|those|these|its)"
     r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
     r"|before (:\w+:)?`+[\w.~]+`+ existed"
-    r"|(predat(es?|ed|ing) ([\w-]+ ){0,2}(`+[\w.~]+|" + _PART + ")"
-    r"|(written|taken|recorded|made) before"
-    r" (this was recorded|([\w-]+ ){0,2}" + _PART + ")))\\b",
+    r"|(predat(es?|ed|ing) ([\w-]+ ){0,2}(`+[\w.~]+|" + _DATED + ")"
+    r"|(written|taken|recorded) before"
+    r" ((this|that) was recorded|([\w-]+ ){0,2}" + _DATED + ")))\\b",
     re.IGNORECASE,
 )
 
@@ -242,11 +244,28 @@ def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
     """Each text that narrates an earlier state, as ``path:line phrase``."""
     where = path.relative_to(REPO_ROOT)
     return [
-        f"{where}:{lineno + text[: match.start()].count(chr(10))} {match.group(0)!r}"
+        f"{where}:{lineno + _breaks_before(text, flat[: match.start()])}"
+        f" {match.group(0)!r}"
         for lineno, text in texts
-        for match in [HISTORY.search(" ".join(text.split("\n")))]
+        for flat in [" ".join(text.split())]
+        for match in [HISTORY.search(flat)]
         if match
     ]
+
+
+def _breaks_before(text: str, read: str) -> int:
+    """The line breaks of ``text`` before the last character of ``read``, which
+    is a start of ``text`` with each run of white space as one space."""
+    left = len("".join(read.split()))
+    breaks = 0
+    for char in text:
+        if not left:
+            break
+        if char == "\n":
+            breaks += 1
+        elif not char.isspace():
+            left -= 1
+    return breaks
 
 
 def history() -> list[str]:
@@ -393,6 +412,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A sweep that predates the instrument omits the key.",
         "It predates `AssertionBacking`, so it backs nothing.",
         "A sweep taken before the pin was recorded carries no key.",
+        "A sweep taken before that was recorded carries no pin.",
         "A rule about writes read both as writes until this field existed.",
         "It cost 13.5 seconds of CPU before :data:`HISTORY` existed.",
     )
@@ -413,6 +433,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A ledger written before a rule change is re-keyed.",
         "A bump never reuses a blessing taken before it.",
         "It removes each object written before ``before``.",
+        "A request made before the key expires is served.",
         "It waits for every predecessor of the node.",
         "V6's opening section asks for the design.",
         "What one proposal came to against the graph.",

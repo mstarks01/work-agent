@@ -23,7 +23,9 @@ const marked = id => BY_ID[id].targets.length > 0
 // The row state of a case, in the vocabulary of the rail (RowState). The
 // payload carries the words for each state (DATA.review_labels). An own list
 // and nothing else is not a review, as in _review_state of the app.
-// `tests/test_offline_sitting.py` runs one table of answers through both.
+// `tests/test_offline_sitting.py` runs one table of answers through both. The
+// accepted limit: `trim` here and `strip` there read six characters apart
+// (NOTES_READ_APART of that test).
 const reviewStarted = held => Object.keys(held.marks).length > 0
   || held.missing.length > 0
   || held.notes.trim() !== "";
@@ -347,10 +349,10 @@ function restore(text) {
     return;
   }
   const offered = Object.entries(isRecord(held.cases) ? held.cases : {})
-    .filter(([id]) => BY_ID[id]);
+    .filter(([id]) => Object.hasOwn(BY_ID, id));
   // The whole file is refused before an answer changes, so a file with one
   // bad case leaves the page as it was.
-  if (!offered.every(([, a]) => readableCase(a))) {
+  if (!isRecord(held.cases) || !offered.every(([, a]) => readableCase(a))) {
     alert("That file holds an answer that this page cannot read.");
     return;
   }
@@ -390,8 +392,10 @@ const isLines = v => Array.isArray(v) && v.every(s => typeof s === "string");
 const isRecordOf = (v, holds) => isRecord(v) && Object.values(v).every(holds);
 const absentOr = (v, holds) => v === undefined || holds(v);
 const SHA256_HEX = /^[0-9a-f]{64}$/;
+const CASE_FIELDS = ["own_list", "marks", "missing", "notes", "opened_digests"];
 function readableCase(a) {
   return isRecord(a)
+    && Object.keys(a).every(key => CASE_FIELDS.includes(key))
     && isLines(a.own_list) && a.own_list.length > 0
     && absentOr(a.marks, v => isRecordOf(v, mark => DATA.marks.includes(mark)))
     && absentOr(a.missing, isLines)

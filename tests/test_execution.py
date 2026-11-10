@@ -572,16 +572,14 @@ class TestSourceRendering:
 
         assert threads and loop_thread not in threads
 
-    def test_a_cancelled_run_holds_its_read_token_until_the_thread_ends(
-        self, monkeypatch
-    ):
-        # The deadline and the stop control cancel a run with a native cancel.
-        # The read thread and its Node process continue, so the token must too:
-        # a third read may start only when one of the two threads ends.
+    @staticmethod
+    def held_reads(monkeypatch):
+        """A run whose read waits in its thread, the event that lets each read
+        end, a semaphore that counts each started read, and the started reads."""
         pipeline, _ = scripted_pipeline(happy_replies())
         release = threading.Event()
         reading = threading.Semaphore(0)
-        in_flight = []
+        in_flight: list[int] = []
 
         def seeding(*args):
             in_flight.append(threading.get_ident())
@@ -595,6 +593,16 @@ class TestSourceRendering:
             await GraphExecutor(pipeline, app_name="stride-test").run(
                 [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
             )
+
+        return run, release, reading, in_flight
+
+    def test_a_cancelled_run_holds_its_read_token_until_the_thread_ends(
+        self, monkeypatch
+    ):
+        # The deadline and the stop control cancel a run with a native cancel.
+        # The read thread and its Node process continue, so the token must too:
+        # a third read may start only when one of the two threads ends.
+        run, release, reading, in_flight = self.held_reads(monkeypatch)
 
         async def scenario():
             limiter = execution._DIAGRAM_READS
@@ -620,23 +628,7 @@ class TestSourceRendering:
         assert held_at_end == 0
 
     def test_a_run_cancelled_in_the_queue_starts_no_read(self, monkeypatch):
-        pipeline, _ = scripted_pipeline(happy_replies())
-        release = threading.Event()
-        reading = threading.Semaphore(0)
-        in_flight = []
-
-        def seeding(*args):
-            in_flight.append(threading.get_ident())
-            reading.release()
-            release.wait(10)
-            return seed_state(*args)
-
-        monkeypatch.setattr(execution, "seed_state", seeding)
-
-        async def run():
-            await GraphExecutor(pipeline, app_name="stride-test").run(
-                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
-            )
+        run, release, reading, in_flight = self.held_reads(monkeypatch)
 
         async def scenario():
             limiter = execution._DIAGRAM_READS

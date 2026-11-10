@@ -682,8 +682,8 @@ class TestTheVoteRecordsWhatItJudged:
         assert not reworded.reviewed_prose(SAMPLE_PROSE)
 
     def test_an_empty_digest_reads_live(self):
-        """Recording nothing is truthful, and it is what a row written before
-        the field would say (ADR 0029). No row here carries one."""
+        """Recording nothing is truthful, and it is what a row with no
+        captured claim says (ADR 0029). No row here carries one."""
         vote = self._vote(content="", prose="")
 
         assert vote.answers_for(other_content())

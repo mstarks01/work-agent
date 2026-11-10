@@ -636,9 +636,14 @@ def _case_with(field: str, shape: object) -> dict:
     return case
 
 
-#: Every field in every shape, then a case that is no record at all.
+#: Every field in every shape, a key outside the five, digests that are near
+#: the pattern, then a case that is no record at all.
 SAVED_CASES = (
     *(_case_with(field, shape) for field in CASE_FIELDS for shape in JSON_SHAPES),
+    {"own_list": ["one line"], "a_sixth_field": 1},
+    {"own_list": ["one line"], "opened_digests": {"a": "A" * 64}},
+    {"own_list": ["one line"], "opened_digests": {"a": "a" * 63}},
+    {"own_list": ["one line"], "opened_digests": {"a": "a" * 64 + "\n"}},
     None,
     5,
     "text",
@@ -659,7 +664,7 @@ class TestARestoredFileHoldsTheShapesTheMergeAccepts:
     only, so the table holds no such value.
     """
 
-    def outcomes(self) -> list[str]:
+    def outcomes(self, files: list[str]) -> list[str]:
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -679,14 +684,6 @@ class TestARestoredFileHoldsTheShapesTheMergeAccepts:
                 for case in ("c", "other")
             ],
         }
-        # The good case comes first, so a refusal that follows a kept case
-        # shows a file that the page took in part.
-        files = [
-            json.dumps(
-                {"envelope": 1, "cases": {"other": {"own_list": ["one"]}, "c": case}}
-            )
-            for case in SAVED_CASES
-        ]
         harness = (
             f"const DATA = {json.dumps(data)};\n"
             "const BY_ID = Object.fromEntries(DATA.cases.map(c => [c.case, c]));\n"
@@ -732,11 +729,38 @@ class TestARestoredFileHoldsTheShapesTheMergeAccepts:
         return "kept"
 
     def test_the_page_keeps_what_the_merge_accepts_and_refuses_the_rest(self):
-        page = dict(zip(map(json.dumps, SAVED_CASES), self.outcomes(), strict=True))
+        # The good case comes first, so a refusal that follows a kept case
+        # shows a file that the page took in part.
+        files = [
+            json.dumps(
+                {"envelope": 1, "cases": {"other": {"own_list": ["one"]}, "c": case}}
+            )
+            for case in SAVED_CASES
+        ]
+        page = dict(
+            zip(map(json.dumps, SAVED_CASES), self.outcomes(files), strict=True)
+        )
         merge = {json.dumps(case): self.merge_reads(case) for case in SAVED_CASES}
 
         assert page == merge
         assert {"kept", "refused"} == set(merge.values())
+
+    @pytest.mark.parametrize("name", ["constructor", "toString", "__proto__"])
+    def test_a_case_named_as_an_inherited_key_is_not_offered(self, name):
+        """The page offers a case that is an own key of ``BY_ID``. A plain
+        record also answers a lookup of each key that it inherits."""
+        good = {"own_list": ["one"]}
+        cases = {"other": good, "c": good, name: good}
+        text = json.dumps({"envelope": 1, "cases": cases})
+
+        assert self.outcomes([text]) == ["kept"]
+
+    @pytest.mark.parametrize("cases", [_ABSENT, None, 5, "text", [{"own_list": ["x"]}]])
+    def test_a_file_whose_cases_are_no_record_is_refused(self, cases):
+        """The merge requires a record of cases (``Envelope.cases``)."""
+        held = {"envelope": 1} if cases is _ABSENT else {"envelope": 1, "cases": cases}
+
+        assert self.outcomes([json.dumps(held)]) == ["refused"]
 
 
 #: The answers of a case that hold an own list: each field empty and not.
