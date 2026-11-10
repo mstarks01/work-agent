@@ -233,23 +233,23 @@ function warn(files) {
     : "";
 }
 
-// Take the turn of a press and save the draft. A press made while the draft
-// saved owns the stage, so the caller compares the turn it gets with `turn`.
-// A draft save that fails leaves the stage on its case, so the turn goes back.
+// Save the draft, then take the turn of a press. The last press owns the
+// stage, so an earlier press gets null. `turn` rises only where the stage
+// changes: a draft save that fails leaves it, and the stage, as they were.
+let pressed = 0;
 async function takeTurn() {
-  const mine = ++turn;
-  try {
-    await saveDraft();
-  } catch (error) {
-    if (mine === turn) turn -= 1;
-    throw error;
-  }
-  return mine;
+  const press = ++pressed;
+  await saveDraft();
+  return press === pressed ? ++turn : null;
 }
+
+// Whether the stage left the case of a press. `turn` rises with each change
+// of the stage, and `current` names the case that the stage shows.
+const movedOn = (id, mine) => current !== id || mine !== turn;
 
 async function openCase(id) {
   const mine = await takeTurn();
-  if (mine !== turn) return;
+  if (mine === null) return;
   current = id;
   select(id);
   blank();
@@ -283,7 +283,7 @@ async function openCase(id) {
 
 async function openReadOnly(id) {
   const mine = await takeTurn();
-  if (mine !== turn) return;
+  if (mine === null) return;
   current = id;
   select(id);
   closeGuide();
@@ -304,7 +304,7 @@ async function openReadOnly(id) {
 
 async function openSubmit() {
   const mine = await takeTurn();
-  if (mine !== turn) return;
+  if (mine === null) return;
   current = null;
   select(null);
   closeGuide();
@@ -573,10 +573,6 @@ function finishedNow(done) {
 }
 
 $("own").addEventListener("input", gate);
-
-// Whether the stage left the case of a press. A press that opens a case raises
-// `turn` before its draft save and sets `current` after it, so each one is read.
-const movedOn = (id, mine) => current !== id || mine !== turn;
 
 $("lock").addEventListener("click", async () => {
   const id = current;

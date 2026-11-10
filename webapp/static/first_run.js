@@ -388,7 +388,7 @@
   let pausedRun = null;
   // Whether a start or an amendment ended the pause of `pausedRun`.
   let pauseEnded = false;
-  const pauseOf = (run) => {
+  const startPause = (run) => {
     pausedRun = run;
     pauseEnded = false;
   };
@@ -1578,7 +1578,7 @@
     // between. After a save, or after a refused continue, only the start
     // button starts it.
     if (!left && !saved && !gates.length && !optional && !data.refusal) {
-      pauseOf(data.run);
+      startPause(data.run);
       revision = data.revision;
       startAnalysis();
       return;
@@ -1595,7 +1595,7 @@
       detectedBox.replaceChildren();
       view = null;
     }
-    pauseOf(data.run);
+    startPause(data.run);
     frame();
     skipButton.hidden = false;
     reconcile(data);

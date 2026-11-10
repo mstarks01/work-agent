@@ -5078,7 +5078,7 @@ def test_a_record_pressed_while_the_next_case_opens_leaves_it(sitting_page):
     assert page.is_hidden("#done")
 
 
-def test_a_record_keeps_its_stage_when_the_draft_save_of_a_press_fails(
+def test_a_record_keeps_its_stage_when_the_draft_saves_of_two_presses_fail(
     sitting_page,
 ):
     """A press of a case whose draft save does not arrive leaves the stage on
@@ -5088,14 +5088,20 @@ def test_a_record_keeps_its_stage_when_the_draft_save_of_a_press_fails(
     finishes = _hold(page, "**/api/finish")
     page.click("#finish")
     _wait_for(page, finishes)
-    page.route("**/api/draft", lambda route: route.abort())
-    # The press rejects, as its draft save does; the fixture reads page errors.
+    drafts = _hold(page, "**/api/draft")
+    # Each press rejects, as its draft save does; the fixture reads page errors.
     page.evaluate(
         "addEventListener('unhandledrejection', (event) => event.preventDefault())"
     )
-    with page.expect_event("requestfailed"):
-        _press_case(page, other)
-    page.wait_for_timeout(100)
+    _press_case(page, other)
+    _press_case(page, other)
+    for _ in range(250):
+        if len(drafts) == 2:
+            break
+        page.wait_for_timeout(20)
+    for draft in drafts:
+        with page.expect_event("requestfailed"):
+            draft.abort()
     with page.expect_response("**/api/rail"):
         finishes[0].continue_()
     page.wait_for_selector("#done", state="visible", timeout=3000)
@@ -5187,7 +5193,7 @@ def test_an_analysis_answer_that_is_not_json_says_so_in_plain_words(page):
 
 
 def _stopping(browser, hanging):
-    """A page on the list of a run that hangs, its Stop pressed and held."""
+    """A page on the list of a run that hangs."""
     context = browser.new_context(base_url=hanging)
     if timeout := os.environ.get("BROWSER_TIMEOUT_MS"):
         context.set_default_timeout(int(timeout))
