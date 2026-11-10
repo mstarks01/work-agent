@@ -361,7 +361,7 @@ def test_no_page_script_names_a_node_or_copies_the_words_of_a_step(script):
 def test_the_form_page_carries_the_stage_count_and_the_start_words(tiers):
     with client_for(tiers, StubPipelineRunner()) as client:
         page = client.get("/").text
-    assert f'<progress id="analysis-progress" value="0" max="{STAGE_COUNT}"' in page
+    assert f'<progress id="analysis-progress" max="{STAGE_COUNT}"' in page
     assert _island(page, "form_words")["progress_start"] == dict(INITIAL_PROGRESS_WORDS)
     script = page_javascript("first_run.js")
     assert script.count("FORM_WORDS.progress_start.description") == 2
@@ -384,18 +384,18 @@ def assert_lines(
     nodes: list[str],
     mode: ProgressMode,
     start: RunStart,
-    stopped: int = 0,
+    floor: int = 0,
 ) -> None:
     """The first frame is the line before any node, each later frame is the
     progress line after its node, and a later frame has a larger ``seq``. No
-    stage falls below ``stopped``, the floor of the bar of a Resumed Job."""
+    stage falls below ``floor``, the floor of the bar of a Resumed Job."""
     selection = [item["name"] for item in BODY["frameworks"]]
     sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
     lines = [
         progress_after(done, selection, mode, start)
         for done in [[], *([node] for node in nodes)]
     ]
-    assert sent == [line | {"stage": max(line["stage"], stopped)} for line in lines]
+    assert sent == [line | {"stage": max(line["stage"], floor)} for line in lines]
     seqs = [frame["seq"] for frame in frames]
     assert seqs == sorted(set(seqs))
 
@@ -620,9 +620,9 @@ def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
 def test_a_resumed_job_starts_with_the_words_the_page_shows_at_its_start(start, mode):
     """The status answer and the page read one row of one table."""
-    _, stopped = PARENT_RUNS[start, mode]
+    _, floor = PARENT_RUNS[start, mode]
     assert _line(start, mode, []) == {
-        "stage": stopped,
+        "stage": floor,
         "words": INITIAL_PROGRESS_WORDS[start],
         "seq": 0,
     }
@@ -630,12 +630,12 @@ def test_a_resumed_job_starts_with_the_words_the_page_shows_at_its_start(start, 
 
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
 def test_the_bar_of_a_resumed_job_never_goes_below_its_floor(start, mode):
-    _, stopped = PARENT_RUNS[start, mode]
+    _, floor = PARENT_RUNS[start, mode]
     for nodes in ([graph.EXTRACT_NODE], [graph.EXTRACT_NODE, graph.PREPARE_NODE]):
         expected = progress_after(
             nodes, [each.name for each in sample_selection()], "to-report", start
         )["stage"]
-        assert _line(start, mode, nodes)["stage"] == max(expected, stopped)
+        assert _line(start, mode, nodes)["stage"] == max(expected, floor)
 
 
 def test_the_page_reads_the_start_words_of_a_resumed_job_from_the_start_table():

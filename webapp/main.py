@@ -203,6 +203,7 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fixes import fixes_by_framework
 from analysis_service.frameworks import PACKAGES, package_for
+from analysis_service.graph import step_by_graph_node
 from analysis_service.job_answers import (
     Answerable,
     DraftSaved,
@@ -589,15 +590,19 @@ class Workspace:
         ``asks`` is the answer of :meth:`asks` for it.
         """
         mode = progress_mode(asks)
-        resumed = await self._resumed(record)
-        start = run_start_of(None if resumed is None else resumed[1])
         frameworks = [selection.name for selection in record.whole_frameworks()]
-        stopped = 0 if resumed is None else _stage_floor(*resumed, frameworks, mode)
+        resumed = await self._resumed(record)
+        if resumed is None:
+            start, floor = run_start_of(None), 0
+        else:
+            resumption, parent = resumed
+            start = run_start_of(parent)
+            floor = _stage_floor(resumption, parent, frameworks, mode)
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
             nodes = _node_names(events)
             return {
-                "stage": max(stage_after(nodes, frameworks, mode), stopped),
+                "stage": max(stage_after(nodes, frameworks, mode), floor),
                 "words": words_after(nodes, frameworks, mode, start),
                 "seq": events[-1].seq if events else 0,
             }
@@ -2848,12 +2853,11 @@ def _stage_floor(
     a record of an earlier build. The bar is a display value, so this reader
     answers 0 for such a name, and each other reader of node names raises.
     """
-    if is_follow_up(resumption):
+    nodes = _node_names(parent.events)
+    known = set(nodes) <= step_by_graph_node(frameworks).keys()
+    if is_follow_up(resumption) or not known:
         return 0
-    try:
-        return stage_after(_node_names(parent.events), frameworks, mode)
-    except KeyError:
-        return 0
+    return stage_after(nodes, frameworks, mode)
 
 
 def _frame(event: EndFrame, data: dict[str, object]) -> str:
