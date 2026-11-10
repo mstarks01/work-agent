@@ -27,7 +27,7 @@ function post(path, body) {
   return fetch(path, {method: "POST", headers: headers, body: JSON.stringify(body)});
 }
 
-// The one reader of an answer of this app. An answer that is ok gives its
+// The one reader of each answer that the page reads. An answer that is ok gives its
 // `body`. Each other answer gives a sentence in `problem`: the `detail` of a
 // refusal of the app, `refused` for a refusal that is not the app's JSON, and
 // the interrupted sentence for a request that did not arrive or an ok answer
@@ -265,7 +265,7 @@ async function openCase(id) {
   $("notes").value = d.notes;
   lock();
   finishedNow(d.state === "finished");
-  await showSets(id);
+  await showSets(id, mine);
   if (mine === turn) setMarks(d.marks);
 }
 
@@ -460,11 +460,11 @@ function frameworkChoice(name, details) {
   return label;
 }
 
-async function showSets(id) {
+async function showSets(id, mine) {
   const {body: sets, problem} = await answerOf(
     fetch("/api/part-two?case=" + encodeURIComponent(id), {headers: headers}),
     "The findings did not load. Open the case again.", "Open the case again.");
-  if (current !== id) return;
+  if (mine !== turn) return;
   // Said beside the case rather than swallowed: a reader who cannot see why
   // the sets stay closed cannot act on it.
   if (problem) { $("ownHint").textContent = problem; return; }
@@ -566,14 +566,15 @@ $("own").addEventListener("input", gate);
 
 $("lock").addEventListener("click", async () => {
   const id = current;
+  const mine = turn;
   const {problem} = await answerOf(
     post("/api/own-list", {case: id, items: lines("own")}), "Not locked. Try again.");
   // A case opened meanwhile owns the stage: the answer changes only the rail.
-  if (current !== id) { if (!problem) await loadRail(); return; }
+  if (mine !== turn) { if (!problem) await loadRail(); return; }
   if (problem) { $("ownHint").textContent = problem; return; }
   lock();
   await loadRail();
-  await showSets(id);
+  await showSets(id, mine);
   $("two").scrollIntoView({behavior: "smooth"});
 });
 
@@ -587,17 +588,22 @@ for (const event of ["input", "change"]) {
 
 $("finish").addEventListener("click", async () => {
   const id = current;
+  const mine = turn;
   const was = $("finish").textContent === "Save changes";
   finishing = true;
   updateMarkCounts();
-  const {body: d, problem} = await answerOf(
-    post("/api/finish", {
-      case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
-    }),
-    "Not recorded. Try again.", "Record the review again.");
-  finishing = false;
-  updateMarkCounts();
-  if (current !== id) { if (!problem) await loadRail(); return; }
+  let d, problem;
+  try {
+    ({body: d, problem} = await answerOf(
+      post("/api/finish", {
+        case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
+      }),
+      "Not recorded. Try again.", "Record the review again."));
+  } finally {
+    finishing = false;
+    updateMarkCounts();
+  }
+  if (mine !== turn) { if (!problem) await loadRail(); return; }
   if (problem) { $("saveStatus").textContent = problem; return; }
   warn(d.moved);
   $("summary").textContent = markSummary();
@@ -609,10 +615,11 @@ $("finish").addEventListener("click", async () => {
 
 $("resetReview").addEventListener("click", async () => {
   const id = current;
+  const mine = turn;
   if (!id) return;
   if (!confirm("Reset your Part 2 answers for this case? Your independent list will stay locked.")) return;
   const {problem} = await answerOf(post("/api/reset", {case: id}), "Not reset. Try again.");
-  if (current !== id) { if (!problem) await loadRail(); return; }
+  if (mine !== turn) { if (!problem) await loadRail(); return; }
   if (problem) { $("saveStatus").textContent = problem; return; }
   for (const s of allSelects()) s.value = "";
   $("missing").value = "";
@@ -734,10 +741,14 @@ $("submit").addEventListener("click", async () => {
   // The preview is the reader's to reopen; the way out must not sit below it.
   closePreview();
   $("contributeStatus").textContent = "Preparing contribution…";
-  const {body: d, problem, refused} = await answerOf(
-    post("/api/contribute", choice), "Contribution needs attention", "Contribute again.");
-  submitting = false;
-  submitGate();
+  let d, problem, refused;
+  try {
+    ({body: d, problem, refused} = await answerOf(
+      post("/api/contribute", choice), "Contribution needs attention", "Contribute again."));
+  } finally {
+    submitting = false;
+    submitGate();
+  }
   if (d || refused) show("thanks");
   if (problem) { $("contributeStatus").textContent = problem; return; }
   if (d.mode === "direct") {

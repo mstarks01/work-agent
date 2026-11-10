@@ -386,6 +386,8 @@
   // Every label and option is untrusted and lands as text.
   // ------------------------------------------------------------------------
   let pausedRun = null;
+  // Whether a start or an amendment ended the pause of `pausedRun`.
+  let pauseEnded = false;
   // The revision this page last read. Every save and the start send it, so a
   // page left open on an earlier revision cannot write over a later one.
   let revision = 0;
@@ -1247,7 +1249,7 @@
           // Another action may take the turn first: wait, then try again. A
           // start or an amendment that ended the pause leaves no run to save
           // the change to.
-          while (!asked.hidden && !await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
+          while (!pauseEnded && !await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
         }
       } finally {
         wantedScopes = null;
@@ -1441,6 +1443,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
+      pauseEnded = true;
       follow(run, "Reading your description and identifying the parts of your system…", true);
     }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
@@ -1589,6 +1592,7 @@
       view = null;
     }
     pausedRun = data.run;
+    pauseEnded = false;
     frame();
     skipButton.hidden = false;
     reconcile(data);
@@ -1679,6 +1683,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
+      pauseEnded = true;
       follow(run, "Using your answers to continue the analysis…", false);
     } finally {
       starting = false;

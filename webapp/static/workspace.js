@@ -132,20 +132,17 @@ const workspace = (() => {
     const save = async (keep) => {
       if (settled) return;
       settled = true;
+      let refusal = "";
       if (keep && input.value !== run.name) {
         const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/title", {
           method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: input.value}),
-        });
-        if (!response.ok) {
-          const refusal = await messageOf(response, "Could not rename it.");
-          renaming = null;
-          await library();
-          message(refusal);
-          return;
-        }
+        }).catch(() => null);
+        if (!response) refusal = "Not renamed. The connection was interrupted.";
+        else if (!response.ok) refusal = await messageOf(response, "Could not rename it.");
       }
       renaming = null;
       await library();
+      if (refusal) message(refusal);
     };
     input.onkeydown = (event) => {
       if (event.key === "Enter") save(true);
@@ -304,10 +301,10 @@ const workspace = (() => {
       el("description").value = data.description;
       el("analysis-name").value = data.name;
       for (const checkbox of boxes) {
-        const selected = data.selection.find((item) => item.name === checkbox.value);
-        checkbox.checked = Boolean(selected);
-        if (selected) optionsOf(checkbox).forEach((control) => {
-          control.value = JSON.stringify(selected.options[control.dataset.option]);
+        const chosen = data.selection.find((item) => item.name === checkbox.value);
+        checkbox.checked = Boolean(chosen);
+        if (chosen) optionsOf(checkbox).forEach((control) => {
+          control.value = JSON.stringify(chosen.options[control.dataset.option]);
         });
         sync(checkbox);
       }

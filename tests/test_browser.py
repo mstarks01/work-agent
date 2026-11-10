@@ -5172,6 +5172,20 @@ def test_a_late_stop_answer_keeps_the_ticks_the_sort_and_a_rename(browser, hangi
     context.close()
 
 
+def test_a_rename_that_loses_its_connection_says_so_and_the_list_draws(
+    browser, hanging
+):
+    context, page = _stopping(browser, hanging)
+    page.route("**/title", lambda route: route.abort())
+    page.click('[aria-label="Rename Hangs"]')
+    page.fill('[aria-label="New name for Hangs"]', "Hangs no")
+    page.press('[aria-label="New name for Hangs"]', "Enter")
+    page.wait_for_selector("#workspace-message:has-text('Not renamed')")
+    assert page.locator('[aria-label="New name for Hangs"]').count() == 0
+    assert page.locator("#analysis-rows a:text-is('Hangs')").count() == 1
+    context.close()
+
+
 @pytest.mark.parametrize("lost", ["no answer", "an answer that is not JSON"])
 def test_a_start_with_no_readable_answer_says_to_check_the_run(page, lost):
     pause(page)

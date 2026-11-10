@@ -1934,21 +1934,33 @@ STATIC_SCRIPTS = sorted(
     }
 )
 
-#: The scripts another pull request edits now. Each holds a bare read.
-_BARE_READS_LEFT = {"controls.js", "form_controls.js", "report_view.js"}
+#: Each script that calls ``.json()``, with the count of its calls and the
+#: count of them that have no ``.catch(`` directly on them. ``jsonOf`` of
+#: service_answer.js is the one read. The Settings page loads sidebar.js and
+#: settings.js only, so settings.js holds its own catch. Each other row is a
+#: read that does not go through ``jsonOf``.
+JSON_READS: dict[str, tuple[int, int]] = {
+    "service_answer.js": (1, 0),
+    "settings.js": (2, 0),
+    "controls.js": (2, 1),
+    "form_controls.js": (1, 1),
+    "report_view.js": (1, 1),
+}
 
 
-def test_each_script_reads_json_with_a_catch():
+def test_each_script_reads_json_through_json_of():
     """An answer of a proxy can be a plain page, and ``.json()`` of it throws.
-    The lint finds each ``.json()`` with no ``.catch(`` directly on it.
-    ``jsonOf`` of service_answer.js is the read with one."""
-    bare = re.compile(r"\.json\(\)(?!\s*\.catch\()")
-    found = {
-        name: len(bare.findall(page_javascript(name)))
-        for name in STATIC_SCRIPTS
-        if name not in _BARE_READS_LEFT
-    }
-    assert {name: hits for name, hits in found.items() if hits} == {}
+    The lint counts each ``.json()`` of each script, and each one with no
+    catch, against :data:`JSON_READS`. A script with no row holds none, and a
+    row holds no more than its script does."""
+    found = {}
+    for name in STATIC_SCRIPTS:
+        script = page_javascript(name)
+        reads = len(re.findall(r"\.json\(\)", script))
+        bare = len(re.findall(r"\.json\(\)(?!\s*\.catch\()", script))
+        if reads:
+            found[name] = (reads, bare)
+    assert found == JSON_READS
 
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
