@@ -52,13 +52,24 @@ function queueSave() {
   queued = setTimeout(saveDraft, 600);
 }
 
+// Resolves to whether the stage holds nothing unsaved. A save that fails says
+// so beside the record button, while the stage shows the case of the save. The
+// next save that lands takes the sentence away.
+let unsaved = "";
 async function saveDraft() {
   clearTimeout(queued);
-  if (!current || $("two").classList.contains("hidden")) return;
-  await post("/api/draft", {
-    case: current, marks: marksNow(), missing: lines("missing"),
-    notes: $("notes").value,
-  });
+  if (!current || $("two").classList.contains("hidden")) return true;
+  const id = current;
+  const {problem} = await answerOf(
+    post("/api/draft", {
+      case: id, marks: marksNow(), missing: lines("missing"), notes: $("notes").value,
+    }),
+    "Try again.");
+  if (current !== id) return !problem;
+  if (problem) $("saveStatus").textContent = "Your draft did not save. " + problem;
+  else if ($("saveStatus").textContent === unsaved) $("saveStatus").textContent = "";
+  unsaved = problem ? $("saveStatus").textContent : "";
+  return !problem;
 }
 
 // --- The rail --------------------------------------------------------------
@@ -235,12 +246,13 @@ function warn(files) {
 
 // Save the draft, then take the turn of a press. The last press owns the
 // stage, so an earlier press gets null. `turn` rises only where the stage
-// changes: a draft save that fails leaves it, and the stage, as they were.
+// changes: a press whose draft save fails gets null, and the stage stays on
+// its case with what the reader wrote.
 let pressed = 0;
 async function takeTurn() {
   const press = ++pressed;
-  await saveDraft();
-  return press === pressed ? ++turn : null;
+  const saved = await saveDraft();
+  return saved && press === pressed ? ++turn : null;
 }
 
 // Whether the stage left the case of a press. `turn` rises with each change

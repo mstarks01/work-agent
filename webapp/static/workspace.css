@@ -1573,6 +1573,9 @@ a.analysis-row:hover {
 .controls-offer h2, .control-offer h2 {
   margin:16px 0 4px
 }
+.controls-offer[inert], .control-offer[inert] {
+  opacity:.5
+}
 .controls-line {
   margin:4px 0 10px;
   font-size:14px;

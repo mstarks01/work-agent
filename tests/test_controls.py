@@ -90,6 +90,14 @@ def copied_control() -> CopiedControl:
     )
 
 
+def test_a_document_answers_an_evidence_file_by_its_id():
+    held = ControlDocument.model_validate(document())
+    found = held.file(EVIDENCE_ID)
+    assert found is not None
+    assert found.name == "rds.tf"
+    assert held.file("evidence-" + "f" * 32) is None
+
+
 def refusal(**changed: Any) -> str:
     with pytest.raises(ValidationError) as refused:
         ControlDocument.model_validate(document(**changed))
@@ -457,6 +465,53 @@ def test_a_key_or_credential_name_set_to_a_value_is_refused(line):
 
 
 @pytest.mark.parametrize(
+    "line",
+    [
+        "api_key = abc123 # prod",
+        "api_key = abc123;",
+        "api_key = abc123,",
+        "api_key = abc123 ;",
+        "api_key = abc123\t# prod",
+        "token: abc123 # prod",
+        "token: abc123;",
+    ],
+)
+def test_an_unquoted_value_ends_at_a_comment_a_semicolon_or_a_comma(line):
+    """The file is not a settings file, so only the table reads the line."""
+    assert credential_hit(f"{line}\n", name="notes.txt") == (1, SETTING)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Password: 12 characters minimum",
+        "Token: 15 minute lifetime",
+        "token: n/a for this system",
+        "def f(token: bytes32, n: int):",
+        "password = pw1 + salt",
+        "Password: 12, then a symbol",
+        "    token: u32,",
+    ],
+)
+def test_an_unquoted_value_does_not_end_at_a_space_or_at_a_comma_after_a_colon(line):
+    """A space after the value starts prose or an expression. A comma after a
+    value that follows a colon ends a type or a clause of a sentence."""
+    assert credential_hit(f"{line}\n", name="notes.txt") is None
+
+
+def test_a_keyword_argument_with_a_digit_before_a_comma_is_refused():
+    """A known limit of the table: ``pw1`` is a variable, and the line reads
+    as ``password=pw1,`` in a settings list does."""
+    line = "connect(password=pw1, host=h)\n"
+    assert credential_hit(line, name="notes.txt") == (1, SETTING)
+
+
+def test_a_statement_with_a_digit_before_a_semicolon_is_refused():
+    """The same limit at the end of a statement: ``token1`` is a variable."""
+    assert credential_hit("self.token = token1;\n", name="notes.txt") == (1, SETTING)
+
+
+@pytest.mark.parametrize(
     "name",
     [
         ".env",
@@ -579,13 +634,16 @@ def test_a_credential_line_counts_each_line_end_a_text_may_hold(end):
         ("token=" * 42 + " ") * 400,
         'token="+' + " " * 100_000,
         "password: ')" + " " * 100_000,
+        "token=a1" + " " * 100_000 + "x",
+        ("token=a1" + " " * 250 + "x") * 400,
     ],
 )
 def test_a_hostile_line_is_read_in_linear_time(line):
     """Each line holds a hostile run after an assignment. An unquoted value
     with no 256-character bound reads each value to the end of the first line,
     and a joined-string check with two unbounded space quantifiers tries each
-    split of one run of spaces between them. Each takes seconds."""
+    split of one run of spaces between them. Each takes seconds. The last two
+    lines hold an unquoted value, a run of spaces and no end of the value."""
     started = time.perf_counter()
     credential_hit(line, name="app.env")
     assert time.perf_counter() - started < 1

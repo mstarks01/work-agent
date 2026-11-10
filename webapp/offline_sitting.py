@@ -66,6 +66,7 @@ from evals.harness.reference import (
     is_submitted_for,
 )
 from webapp.page import WORKSPACE_STYLE, client_script, script_json
+from webapp.sitting import REVIEW_LABELS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -118,6 +119,8 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
         "editor_url_limit": review_submissions.EDITOR_URL_LIMIT,
         "min_own_list": sittings.MIN_OWN_LIST,
         "marks": list(sittings.MARKS),
+        # The words for each row state. The page has no server to ask.
+        "review_labels": REVIEW_LABELS,
         "cases": cases,
     }
 

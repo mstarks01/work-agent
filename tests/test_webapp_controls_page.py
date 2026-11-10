@@ -720,6 +720,10 @@ class TestTheReportSection:
             "denial-of-service": "left-out",
         }
         assert rows["spoofing"]["tally"] == "Ruled out: 2"
+        assert rows["spoofing"]["title"] == "stride spoofing (version 1.0)"
+        assert rows["denial-of-service"]["title"] == (
+            "stride denial-of-service (version <b>0.9</b>)"
+        )
         assert rows["denial-of-service"]["outcome_text"] == "left out"
         assert rows["repudiation"]["outcome_text"] == "no finding"
         assert rows["repudiation"]["tally"] == ""
@@ -779,6 +783,7 @@ class TestTheReportSection:
             template.model_copy(
                 update={
                     "unit": outcome,
+                    "title": f"stride {outcome} (version {template.version})",
                     "outcome": outcome,
                     "meaning": f"The sentence of {outcome}.",
                     "quoted": [],
@@ -799,12 +804,22 @@ class TestTheReportSection:
         for one in rows:
             label = f" · {one.label}" if one.label else ""
             tally = f"{one.tally}. " if one.tally else ""
-            assert (
-                f"- Row: stride {one.unit} (version {one.version})"
-                f"{label} — {tally}{one.meaning}" in text
-            )
+            assert f"- Row: {one.title}{label} — {tally}{one.meaning}" in text
         assert "  - Ruled out: A-1. yes" in text
         assert "  - Refused: A-2. no" in text
+
+    def test_the_page_and_the_markdown_export_read_the_title_of_a_row(self):
+        """The page and the Markdown export read ``SectionRow.title`` for the
+        framework, unit and version of a row, so neither spells that phrase.
+        The CSV export has its own phrase, which ``docs/Web-App.md`` states."""
+        import inspect
+
+        from webapp.report_export import controls_markdown
+
+        script = test_webapp.page_javascript("report_view.js")
+        assert "${row.title}" in script
+        assert "row.title" in inspect.getsource(controls_markdown)
+        assert "(version " not in script + inspect.getsource(controls_markdown)
 
     def test_the_page_and_the_export_show_one_summary_of_each_stage(self, ruled):
         from analysis_service.job_controls import SectionEntry, section_summary
@@ -933,7 +948,7 @@ class TestTheReportSection:
             "description": "Stolen session cookies let an attacker impersonate"
             " the customer against the web app.",
             "mitigation": "Set HttpOnly and Secure on cookies",
-            "controls": "WAF: applied",
+            "controls": "WAF (spoofing, version 1.0): applied",
         }
         assert [one[1] for one in rows] == ["S-01", "S-01-2"]
 

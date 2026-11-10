@@ -2162,8 +2162,7 @@ def create_app(
         )
         # read_evidence answers the text only, so the name comes from the
         # document of the same Control.
-        listed = [] if stored is None else stored.document.evidence
-        file = next((one for one in listed if one.id == evidence_id), None)
+        file = None if stored is None else stored.document.file(evidence_id)
         if held is None or file is None:
             return _message(404, _NO_SUCH_EVIDENCE)
         text = await workspace.store.read_evidence(

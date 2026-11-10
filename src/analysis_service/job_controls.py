@@ -1004,6 +1004,10 @@ class SectionRow(BaseModel):
 
     framework: str
     unit: str
+    #: The framework, the unit and the version as one phrase, as in "stride
+    #: spoofing (version 1.0)". The report page and the Markdown export name
+    #: the row with it.
+    title: str
     label: str
     version: str
     ticked: bool
@@ -1275,6 +1279,7 @@ def controls_section(
                 SectionRow(
                     framework=row.framework,
                     unit=row.unit,
+                    title=f"{row.framework} {row.unit} (version {row.version})",
                     label=package.record.text_of_unit(row.unit),
                     version=row.version,
                     ticked=row.ticked,
