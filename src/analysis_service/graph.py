@@ -270,6 +270,39 @@ logger = logging.getLogger(__name__)
 
 # --- Node names -------------------------------------------------------------
 
+#: The name of each shared node.
+SharedNode = Literal[
+    "extract",
+    "assert",
+    "capabilities",
+    "stated",
+    "catalog",
+    "pause",
+    "read",
+    "validate",
+    "repair",
+    "revalidate",
+    "reject",
+    "prepare",
+    "assemble",
+]
+#: Each :data:`SharedNode`.
+SHARED_NODES: tuple[SharedNode, ...] = get_args(SharedNode)
+
+#: What a node of one framework does. :meth:`FrameworkNodes.node` gives the
+#: name of the node.
+NodeRole = Literal[
+    "join", "merge", "critic", "router", "recritic", "rereview", "critic_failed"
+]
+
+#: The step of each lane agent.
+LANE_STEP: Literal["analyze"] = "analyze"
+
+#: What a graph node does, whichever framework or lane it serves: a shared node
+#: by its name, a lane agent as ``analyze``, and a node of one framework by its
+#: role. :func:`step_by_graph_node` gives the step of each node name.
+NodeStep = Literal[SharedNode, NodeRole, "analyze"]
+
 # The shared half of the topology: one extraction, one validity gate, one
 # preparation, one assembly. #162 ruled that one **Valid System Model** serves
 # every framework a job selects, so nothing here is per-framework.
@@ -321,15 +354,7 @@ CRITIC_FAILED_ROLE = "critic_failed"
 #: Every per-framework role, so :meth:`FrameworkNodes.node` names a set rather
 #: than a count. A tuple is a fact ``tests/test_graph.py`` reads; a count in
 #: prose is not.
-ROLES: tuple[str, ...] = (
-    JOIN_ROLE,
-    MERGE_ROLE,
-    CRITIC_ROLE,
-    ROUTER_ROLE,
-    RECRITIC_ROLE,
-    REREVIEW_ROLE,
-    CRITIC_FAILED_ROLE,
-)
+ROLES: tuple[NodeRole, ...] = get_args(NodeRole)
 
 
 #: An artifact a lane agent is given, by the prompt placeholder it fills.
@@ -527,6 +552,18 @@ def tier_node_by_graph_node(
             for name in frameworks
             for node, tier in FrameworkNodes(name).tier_nodes.items()
         },
+    }
+
+
+def step_by_graph_node(frameworks: Sequence[FrameworkName]) -> dict[str, NodeStep]:
+    """Graph node name -> its step, for each node that a graph of this
+    selection can hold, whichever entry builds the graph.
+    ``tests/test_progress_words.py`` holds the names to each built graph."""
+    selected = [FrameworkNodes(name) for name in frameworks]
+    return {
+        **{node: node for node in SHARED_NODES},
+        **{nodes.node(role): role for nodes in selected for role in ROLES},
+        **{lane.node_name: LANE_STEP for nodes in selected for lane in nodes.lanes},
     }
 
 

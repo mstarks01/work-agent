@@ -176,10 +176,6 @@ TEST_ONLY: dict[str, str] = {
         "who reviewed each ASVS applicability row, which the applicability test"
         " holds to one entry per row"
     ),
-    "ROLES": (
-        "every per-framework role, which the graph tests check against the"
-        " declared role constants and the node name each role gives"
-    ),
     "default_base_ref": (
         "the ref the repo-wide Baseline walk measures ancestry against:"
         " origin/main where the clone has a remote, as in CI, and main where it"
@@ -454,7 +450,9 @@ def test_a_public_service_name_only_a_test_reaches_is_reported():
     package root does not export is judged, and one it exports is not."""
     reported = test_only()
 
-    assert reported["ROLES"].startswith("src/analysis_service/graph.py:")
+    assert reported["PROMPT_SECTION_HEADINGS"].startswith(
+        "src/analysis_service/prompts.py:"
+    )
     assert "Deployment" in _definitions() and "Deployment" not in reported
 
 

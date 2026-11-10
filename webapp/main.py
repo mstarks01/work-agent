@@ -229,6 +229,7 @@ from analysis_service.job_controls import (
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
+    JobEvent,
     JobRecord,
     JobStore,
     PipelineRunner,
@@ -318,9 +319,12 @@ from webapp.page import (
 from webapp.page_words import (
     FORM_WORDS,
     REPORT_WORDS,
+    STAGE_COUNT,
     PageStatus,
     change_line,
     island_tables,
+    progress_after,
+    progress_mode,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -1737,6 +1741,7 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 facet_answers=script_json(list(FACET_ANSWERS)),
                 form_words=script_json(island_tables(FORM_WORDS)),
+                stage_count=str(STAGE_COUNT),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 theme=_THEME,
@@ -2241,9 +2246,12 @@ def create_app(
         if record is None:
             return no_such_run()
         payload = await workspace.snapshot(answers, record)
-        payload["completed_steps"] = [
-            event.node for event in record.events if event.kind == "node"
-        ]
+        if payload["status"] == "running":
+            # A job that runs is a job of this process, so each node of its
+            # events is a node of a graph of its selection.
+            payload["progress"] = _progress(record)(
+                [event.node for event in record.events if event.node is not None]
+            )
         payload["selection"] = [
             {"name": selection.name, "options": dict(selection.options)}
             for selection in record.whole_frameworks()
@@ -2510,10 +2518,11 @@ def create_app(
             return PlainTextResponse("no such run", status_code=404)
 
         current = cell.read(no_stream)
-        if await workspace.envelope(current.answers, run_id) is None:
+        record = await workspace.envelope(current.answers, run_id)
+        if record is None:
             return no_stream()
         return StreamingResponse(
-            _stream(workspace, current.answers, run_id),
+            _stream(workspace, current.answers, run_id, _progress(record)),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
@@ -2740,19 +2749,37 @@ def _frame(event: EndFrame, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+def _progress(record: JobRecord) -> Callable[[Sequence[str]], dict[str, object]]:
+    """The reader of the progress line of ``record`` after a list of its
+    completed nodes (:func:`webapp.page_words.progress_after`)."""
+    frameworks = [selection.name for selection in record.whole_frameworks()]
+    return partial(progress_after, frameworks=frameworks, mode=progress_mode(record))
+
+
 async def _stream(
-    workspace: Workspace, answers: JobAnswers, run_id: str
+    workspace: Workspace,
+    answers: JobAnswers,
+    run_id: str,
+    progress: Callable[[Sequence[str]], dict[str, object]],
 ) -> AsyncIterator[str]:
     """Every event the store records for the job, as it records them, then
-    one frame for how it ended.
+    one frame for how it ended. The frame of a node event carries the progress
+    line after that node, and no node name.
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions
     a pause asks, where a report is, why a report is withheld, why a
     description was refused, or why a run failed.
     """
-    async for frame in event_frames(workspace.store, run_id):
-        yield frame
+
+    def frame(event: JobEvent) -> str:
+        if event.node is None:
+            return event.sse_frame()
+        data = json.dumps(progress([event.node]))
+        return f"id: {event.seq}\nevent: {event.kind}\ndata: {data}\n\n"
+
+    async for written in event_frames(workspace.store, run_id, frame=frame):
+        yield written
     try:
         record = await workspace.envelope(answers, run_id)
     except UnreadableSchema as refusal:

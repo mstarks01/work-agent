@@ -38,6 +38,7 @@ from analysis_service.system_model import (
     make_element_id,
 )
 from tests import test_webapp_questions as web
+from webapp.page_words import STEP_PROGRESS
 
 tiers = web.tiers
 
@@ -601,6 +602,10 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
             "() => document.querySelector('#status-text').textContent === '1 of 4 stages complete · Checking the system map for gaps or conflicting details…'"
         )
         assert opened.locator("#analysis-progress").get_attribute("value") == "1"
+        assert (
+            opened.locator("#analysis-progress").get_attribute("aria-valuetext")
+            == "1 of 4 stages complete"
+        )
         assert elapsed.inner_text().startswith("Still working on this step · 0:0")
         opened.click("#description-nav")
         assert not opened.is_visible("#progress-panel")
@@ -610,6 +615,72 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
 
         runner.release.set()
         opened.wait_for_selector("#asked", state="visible")
+        context.close()
+
+
+class HeldToReport(HeldRunner):
+    """Holds each run again after the node that starts the lanes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.finish = threading.Event()
+
+    async def run(self, job, on_node):
+        async def held(node):
+            await on_node(node)
+            while node == "prepare" and not self.finish.is_set():
+                await asyncio.sleep(0.05)
+
+        return await super().run(job, held)
+
+
+def test_a_run_to_the_report_shows_the_stage_and_the_words_the_service_sends(
+    browser, tiers
+):
+    """The stream moves the line, and a page that loads again reads the same
+    line from the status answer."""
+    runner = HeldToReport()
+    for base in serve(web.app_for(tiers, runner, catalog=False)):
+        context = browser.new_context(base_url=base)
+        opened = context.new_page()
+        opened.goto("/")
+        opened.fill("#analysis-name", "Test analysis")
+        opened.fill("#description", "A web app talks to a database.")
+        open_frameworks(opened)
+        for framework in opened.locator('input[name="framework"]').all():
+            framework.check()
+        close_frameworks(opened)
+        opened.uncheck("#ask")
+        opened.click("#go")
+        bar = opened.locator("#analysis-progress")
+
+        def line(text, opened=opened):
+            opened.wait_for_function(
+                "text => document.querySelector('#status-text').textContent === text",
+                arg=text,
+            )
+
+        line(
+            "0 of 4 stages complete · Reading your description and identifying the parts of your system…"
+        )
+        runner.step.set()
+        line(
+            "1 of 4 stages complete · Checking the system map for gaps or conflicting details…"
+        )
+        runner.release.set()
+        examining = f"2 of 4 stages complete · {STEP_PROGRESS['prepare'].words}"
+        line(examining)
+        assert bar.get_attribute("value") == "2"
+        assert bar.get_attribute("max") == "4"
+        assert bar.get_attribute("aria-valuetext") == "2 of 4 stages complete"
+
+        opened.reload()
+        line(examining)
+        assert bar.get_attribute("value") == "2"
+        assert bar.get_attribute("aria-valuetext") == "2 of 4 stages complete"
+
+        runner.finish.set()
+        opened.wait_for_selector("#progress-panel", state="hidden")
         context.close()
 
 

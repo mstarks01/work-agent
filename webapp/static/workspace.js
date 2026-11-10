@@ -7,7 +7,7 @@ const workspace = (() => {
   // The runs whose stop is in flight: a redraw keeps their Stop button off.
   const stopping = new Set();
   let progressRun = null;
-  let completedSteps = [];
+  let sentWords = null;
   let stepStatus = null;
   let stepStarted = 0;
   let elapsedTimer = null;
@@ -316,7 +316,7 @@ const workspace = (() => {
       else if (data.status === "running" || data.continuing) {
         show("progress-panel");
         el("status").hidden = false;
-        processing(data.completed_steps, data.pauses, undefined, data.run);
+        processing(data.progress, undefined, data.run);
         // The service continues a job with Controls and no questions at its pause.
         if (data.continuing) el("status-text").textContent = "Continuing with your Controls…";
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
@@ -362,42 +362,6 @@ const workspace = (() => {
       if (ticket === generation) metadata(data);
     } catch (error) { if (ticket === generation) message(error.message); }
   };
-  // Each quarter marks a completed stage, not a share of elapsed time.
-  const completedStage = (step, pauses) => {
-    if (step === "extract") return 1;
-    if (["validate", "repair", "revalidate", "capabilities", "stated", "read", "assert"].includes(step)) return 2;
-    if (pauses && step === "catalog") return 3;
-    if (pauses && step === "pause") return 4;
-    if (!pauses && step === "prepare") return 2;
-    if (!pauses && (step.startsWith("join_") || step.startsWith("merge_")
-        || step.startsWith("critic_") || step.startsWith("critic_failed_")
-        || step.startsWith("router_") || step.startsWith("recritic_")
-        || step.startsWith("rereview_"))) return 3;
-    if (!pauses && step === "assemble") return 4;
-    return 0;
-  };
-  const stageAfter = (step, pauses) => {
-    if (!step) return pauses ? "Reading your description and identifying the parts of your system…"
-      : "Preparing the analysis…";
-    if (step === "extract" || step === "repair") return "Checking the system map for gaps or conflicting details…";
-    if (step === "validate" || step === "revalidate") return "Noting the security measures you’ve already described…";
-    if (step === "capabilities" || step === "stated" || step === "read") {
-      return "Identifying details that would make the analysis more precise…";
-    }
-    if (step === "assert") return "Choosing the relevant checks for your system…";
-    if (step === "catalog" || step === "pause") return "Generating questions…";
-    if (step === "prepare" || step.startsWith("analyze_")) {
-      return "Examining your system against the selected frameworks…";
-    }
-    if (step.startsWith("join_") || step.startsWith("merge_") || step.startsWith("critic_")
-        || step.startsWith("critic_failed_")
-        || step.startsWith("router_") || step.startsWith("recritic_")
-        || step.startsWith("rereview_")) {
-      return "Bringing the results together and checking the findings…";
-    }
-    if (step === "assemble") return "Putting your report together…";
-    return "Continuing the analysis…";
-  };
   // A one-second count shows that a long step still runs. It sits outside
   // the status region, so a screen reader hears only a change of step.
   const elapsed = () => {
@@ -410,24 +374,25 @@ const workspace = (() => {
     const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     el("status-elapsed").textContent = `Still working on this step · ${clock}. Some steps take a few minutes.`;
   };
-  const processing = (steps, pauses, initialStage, runId) => {
+  // Show the progress line of the run. `sent` is the line the service sends:
+  // its count of complete stages and its words (webapp.page_words). Before
+  // the service sends a line, the page shows `initialWords`.
+  const processing = (sent, initialWords, runId) => {
+    const progress = el("analysis-progress");
     if (runId && progressRun !== runId) {
       progressRun = runId;
-      completedSteps = [];
+      sentWords = null;
       stepStatus = null;
-      el("analysis-progress").value = 0;
+      progress.value = 0;
     }
-    if (steps?.length === 1 && !completedSteps.includes(steps[0])) {
-      completedSteps.push(steps[0]);
-    } else if (steps?.length > completedSteps.length) {
-      completedSteps = steps;
+    if (sent) {
+      progress.value = Math.max(progress.value, sent.stage);
+      sentWords = sent.words;
     }
-    const latest = completedSteps.at(-1);
-    const progress = el("analysis-progress");
-    progress.value = Math.max(progress.value, ...completedSteps.map((step) => completedStage(step, pauses)));
-    progress.setAttribute("aria-valuetext", `${progress.value} of 4 stages complete`);
-    const status = latest ? stageAfter(latest, pauses) : initialStage || stageAfter(null, pauses);
-    el("status-text").textContent = `${progress.value} of 4 stages complete · ${status}`;
+    const complete = `${progress.value} of ${progress.max} stages complete`;
+    progress.setAttribute("aria-valuetext", complete);
+    const status = sentWords ?? initialWords;
+    el("status-text").textContent = `${complete} · ${status}`;
     if (status !== stepStatus) {
       stepStatus = status;
       stepStarted = Date.now();

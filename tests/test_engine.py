@@ -60,7 +60,7 @@ class RecordingRunner:
 
     async def run(self, job, on_node) -> PipelineOutcome:
         self.jobs.append(job)
-        for node in ("extract", "critic"):
+        for node in ("extract", "validate"):
             self.nodes.append(node)
             await on_node(node)
         if isinstance(self._outcome, Exception):
@@ -140,7 +140,7 @@ def test_on_node_receives_every_node():
 
     asyncio.run(engine.analyze([Source.description("text")], on_node=on_node))
 
-    assert seen == ["extract", "critic"]
+    assert seen == ["extract", "validate"]
 
 
 def test_a_caller_maps_to_one_principal_under_the_local_issuer(caplog):
