@@ -719,7 +719,7 @@ function requireBrowserAuthor(choice) {
 }
 
 // The preview shows one choice of attribution and author. A change of that
-// choice closes it, and an answer about the old choice stays off the page.
+// choice closes it, and an answer about a different choice stays off the page.
 function closePreview() {
   previewAsked++;
   hide("filePreview");
