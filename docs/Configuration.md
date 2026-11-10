@@ -296,8 +296,8 @@ there is nothing to pin.
 
 The sweep records the pin per tier, and the Baseline identity carries it. A
 tier you leave unpinned records an empty list, which says the gateway chose;
-that is a configuration of its own and not the same as a sweep taken before
-this was recorded.
+that is a configuration of its own and not the same as a sweep that carries
+no pin key.
 
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the

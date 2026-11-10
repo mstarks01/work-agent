@@ -13,6 +13,7 @@ import pytest
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import ProvenanceError
+from evals.harness.run import _print_stability
 from evals.harness.stability import (
     Band,
     aggregate_stability,
@@ -401,6 +402,80 @@ class TestCauseStability:
         assert (entry.cause_stable, entry.cause_moving) == (2, 1)
         assert aggregate_stability([entry])["cause_stable"] == 2
 
+    @pytest.mark.parametrize(
+        ("first", "second", "counts"),
+        [
+            ("verb", "verb", (1, 0, 0)),
+            ("verb", "place", (0, 1, 0)),
+            ("position", "unstated", (0, 0, 1)),
+            ("unstated", "position", (0, 0, 1)),
+            ("unstated", "unstated", (0, 0, 1)),
+            ("unstated", "verb", (0, 0, 1)),
+        ],
+    )
+    def test_a_reference_any_run_charges_unstated_is_unread(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+        first,
+        second,
+        counts,
+    ):
+        """``unstated`` says the archive holds no position to read, so the
+        pair shows neither one cause nor two."""
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: first}),
+        )
+        b = write_run(
+            tmp_path,
+            "b.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: second}),
+        )
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert (entry.cause_stable, entry.cause_moving, entry.cause_unread) == counts
+        assert sum(counts) == entry.never
+        assert aggregate_stability([entry])["cause_unread"] == counts[2]
+        assert entry.to_json()["cause_unread"] == counts[2]
+
+    @pytest.mark.parametrize(
+        ("second", "cell"), [("unstated", " 0/0 +1 "), ("verb", " 1/1 ")]
+    )
+    def test_the_printed_cause_cell_adds_the_unread_count_where_there_is_one(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+        capsys,
+        second,
+        cell,
+    ):
+        record = provenance(sampling)
+        paths = [
+            write_run(
+                tmp_path,
+                f"{name}.json",
+                record,
+                [score(self.CASE, 2, [0])],
+                losses=losses_block(self.CASE, {1: cause}),
+            )
+            for name, cause in (("a", "verb"), ("b", second))
+        ]
+        runs = load_runs(paths)
+
+        _print_stability(runs, compare_runs(runs))
+
+        row = next(
+            line for line in capsys.readouterr().out.splitlines() if self.CASE in line
+        )
+        assert cell in row and ("+" in row) == ("+" in cell)
+
     def test_a_reference_missed_in_one_run_only_has_no_cause_to_compare(
         self,
         tmp_path,
@@ -443,15 +518,17 @@ class TestCauseStability:
         entry = compare_runs(load_runs([a, b]))[0]
 
         assert entry.cause_stable is None and entry.cause_moving is None
+        assert entry.cause_unread is None
         assert aggregate_stability([entry])["cause_stable"] is None
+        assert aggregate_stability([entry])["cause_unread"] is None
 
     def test_a_run_that_omits_the_block_reads_unread_rather_than_refusing(
         self,
         tmp_path,
         sampling,  # noqa: F811
     ):
-        """The shape of the first merged Baseline: a sweep taken before #729,
-        which carries this version and omits a key the version declares.
+        """The shape of the first merged Baseline: a sweep that carries
+        this version and omits a key the version declares.
 
         The two readers are driven against each other here. A test of
         ``block`` for raising and a test of ``_causes`` for returning ``None``
@@ -474,7 +551,7 @@ class TestCauseStability:
 
         (older,) = load_runs([b])
         assert older.causes is None
-        with pytest.raises(ProvenanceError, match="predates the instrument"):
+        with pytest.raises(ProvenanceError, match="no instrument wrote one"):
             load_artifact(b).block("losses")
         assert load_artifact(b).carries("losses") is False
 

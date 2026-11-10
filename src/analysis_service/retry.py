@@ -326,8 +326,8 @@ def _clears_with_time(exc: BaseException) -> bool:
     """Whether the limit this error names is one that reopens on its own.
 
     ``True`` where the provider named no dimension, which is the ordinary case
-    and the safe one: an unstated limit is judged by its status code exactly as
-    before, and a genuine throttle must survive a vocabulary this table has not
+    and the safe one: an unstated limit is judged by its status code alone,
+    and a genuine throttle must survive a vocabulary this table has not
     met.
 
     The value arrives as an enum member or as its string — litellm ships

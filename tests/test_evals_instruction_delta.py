@@ -207,8 +207,8 @@ class TestTheMeasurementSide:
 
 class TestAnOlderSweep:
     def test_a_block_one_sweep_lacks_is_named_and_the_rest_compared(self, tmp_path):
-        """A sweep that predates an instrument carries no block for it, so
-        that block's numbers are not compared and the rest still are."""
+        """Where one sweep carries no block for an instrument, that block's
+        numbers are not compared and the rest still are."""
         rows = [row("stride", "critic_stride", 4_326, "a")]
         before = write_run(tmp_path, "b.json", rows, coverage_totals={"drafts": 40})
         payload = json.loads(before.read_text(encoding="utf-8"))

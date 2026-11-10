@@ -46,10 +46,10 @@ and every reader takes the one its question needs.
 
 An empty digest is a legal value and reads live against anything. It records
 that nothing was captured, for a caller that holds a claim it cannot digest. It
-is **not** how a row written before the field reads: :meth:`Vote.from_json`
+is **not** how a row with no digest key reads: :meth:`Vote.from_json`
 requires both keys, so such a row raises :class:`LedgerError` rather than
 loading with the question silently open. No row in this repository carries an
-empty digest, and none predates the field.
+empty digest, and each row carries both keys.
 
 A vote carries one reason code, from a closed set, and it decides where the vote
 lands. A reviewer who dislikes a finding's writing and a reviewer who says it is

@@ -88,7 +88,7 @@ def sweep_document(
 
     ``upstream_pins`` is what the deployment pinned the strong tier's requests
     to, which the models block records for every tier on an aggregator route.
-    ``None`` is a sweep taken before the pin was recorded and carries no key;
+    ``None`` is a sweep that carries no key;
     ``()`` is an aggregator the deployment left unpinned. The two are different
     identities, so the factory keeps them apart.
     """

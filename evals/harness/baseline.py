@@ -121,8 +121,8 @@ class BaselineIdentity:
     endpoints — ``openai/flex`` and ``openai`` both report ``OpenAI`` while
     differing 2.1x in price and 46% in latency. Without the pin those two
     sweeps compute one identity and pool into one directory. Read from the
-    ``models`` block, which records the declaration per tier, so a sweep taken
-    before that was recorded carries no pin and keeps the identity it had.
+    ``models`` block, which records the declaration per tier, so a sweep with
+    no declaration there carries no pin and keeps its identity.
     """
 
     repo_commit: str
@@ -291,8 +291,8 @@ def declared_pins(
     The one reader of the recorded pin. Keyed like
     :func:`recorded_upstreams`, by the tiers whose vendor reaches more than one
     provider, because only those have an endpoint to choose. A tier whose
-    record carries no declaration is absent rather than empty: a sweep taken
-    before the pin was recorded does not know what it ran under, and reading
+    record carries no declaration is absent rather than empty: a sweep with
+    no declaration does not state what it ran under, and reading
     that as "the gateway chose" would give it an identity it cannot support.
     """
     recorded = _tiers_recorded(artifact)

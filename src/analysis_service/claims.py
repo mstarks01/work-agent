@@ -1827,7 +1827,7 @@ class RepairedQuote(BaseModel):
 
     ``scan_complete`` is whether the rung ranked every window before it
     answered. ``None`` is *not recorded*: the 18 repairs archived under
-    ``evals/runs/`` predate the field, and a default of ``True`` would claim a
+    ``evals/runs/`` carry no such field, and a default of ``True`` would claim a
     fact about a scan nobody measured.
     """
 

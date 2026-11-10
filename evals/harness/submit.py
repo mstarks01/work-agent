@@ -448,8 +448,8 @@ def _stale_keys(rel: str, rows: list[ledger.Vote]) -> list[str]:
     because a ledger written before a rule change still has to load -- `rekey`
     is the command that moves it, and it reads the file first. That leaves one
     gap, and it is here: a row written *today* under a version the table has
-    moved past. It is self-consistent, so it loads and scores under the old
-    rule, and `rekey` then refuses to move it and takes the whole ledger with
+    moved past. It is self-consistent, so it loads and scores under the
+    rule of that version, and `rekey` then refuses to move it and takes the whole ledger with
     it. An added row is the only row this repository can insist is current.
     """
     problems = []

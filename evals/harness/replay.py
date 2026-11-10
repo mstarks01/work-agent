@@ -1323,7 +1323,7 @@ class SweepReplay:
     artifact: str
     arm: Arm
     commit: str
-    #: ``None`` where the sweep predates the tree state being recorded.
+    #: ``None`` where the sweep records no tree state.
     clean: bool | None
     corpus_digest: str
     extractions: tuple[ExtractionReplay, ...] = ()

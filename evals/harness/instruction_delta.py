@@ -30,9 +30,8 @@ arithmetic over records rather than a re-run.
 
 The measurement half reads :data:`~evals.harness.instruments.INSTRUMENTS` and
 walks each entry's declared ``keys``. An instrument added to that table appears
-here with no edit. A block that one sweep does not carry, because the sweep
-predates the instrument that writes it, is named as absent and not compared,
-rather than reported as a change to zero.
+here with no edit. A block that one sweep does not carry is named as absent and
+not compared, rather than reported as a change to zero.
 """
 
 from __future__ import annotations

@@ -572,6 +572,100 @@ class TestSourceRendering:
 
         assert threads and loop_thread not in threads
 
+    @staticmethod
+    def held_reads(monkeypatch):
+        """A run whose read waits in its thread, the event that lets each read
+        end, a semaphore that counts each started read, and the started reads."""
+        pipeline, _ = scripted_pipeline(happy_replies())
+        release = threading.Event()
+        reading = threading.Semaphore(0)
+        in_flight: list[int] = []
+
+        def seeding(*args):
+            in_flight.append(threading.get_ident())
+            reading.release()
+            release.wait(10)
+            return seed_state(*args)
+
+        monkeypatch.setattr(execution, "seed_state", seeding)
+
+        async def run():
+            await GraphExecutor(pipeline, app_name="stride-test").run(
+                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+            )
+
+        return run, release, reading, in_flight
+
+    def test_a_cancelled_run_holds_its_read_token_until_the_thread_ends(
+        self, monkeypatch
+    ):
+        # The deadline and the stop control cancel a run with a native cancel.
+        # The read thread and its Node process continue, so the token must too:
+        # a third read may start only when one of the two threads ends.
+        run, release, reading, in_flight = self.held_reads(monkeypatch)
+
+        async def scenario():
+            limiter = execution._DIAGRAM_READS
+            total = int(limiter.total_tokens)
+            cancelled = [asyncio.create_task(run()) for _ in range(total)]
+            for _ in cancelled:
+                await asyncio.to_thread(reading.acquire)
+            for task in cancelled:
+                task.cancel()
+            await asyncio.wait(cancelled)
+            held_after_cancel = limiter.borrowed_tokens
+            later = asyncio.create_task(run())
+            await asyncio.sleep(0.3)
+            threads_while_held = len(in_flight)
+            release.set()
+            await later
+            return held_after_cancel, threads_while_held, limiter.borrowed_tokens
+
+        held_after_cancel, threads_while_held, held_at_end = asyncio.run(scenario())
+
+        assert held_after_cancel == 2
+        assert threads_while_held == 2
+        assert held_at_end == 0
+
+    def test_a_run_cancelled_as_it_takes_a_free_token_returns_it(self, monkeypatch):
+        # The limiter grants a free token and then yields once. A cancel that
+        # arrives at that yield must leave no token held. The one started read
+        # shows that the run took its token before the cancel.
+        run, release, _, in_flight = self.held_reads(monkeypatch)
+        release.set()
+
+        async def scenario():
+            task = asyncio.create_task(run())
+            await asyncio.sleep(0)
+            task.cancel()
+            (ended,), _ = await asyncio.wait([task])
+            await asyncio.sleep(0.3)
+            return ended.cancelled(), execution._DIAGRAM_READS.borrowed_tokens
+
+        assert asyncio.run(scenario()) == (True, 0)
+        assert len(in_flight) == 1
+
+    def test_a_run_cancelled_in_the_queue_starts_no_read(self, monkeypatch):
+        run, release, reading, in_flight = self.held_reads(monkeypatch)
+
+        async def scenario():
+            limiter = execution._DIAGRAM_READS
+            first = [
+                asyncio.create_task(run()) for _ in range(int(limiter.total_tokens))
+            ]
+            for _ in first:
+                await asyncio.to_thread(reading.acquire)
+            queued = asyncio.create_task(run())
+            await asyncio.sleep(0.1)
+            queued.cancel()
+            await asyncio.wait([queued])
+            release.set()
+            await asyncio.gather(*first)
+            await asyncio.sleep(0.1)
+            return len(in_flight), limiter.borrowed_tokens
+
+        assert asyncio.run(scenario()) == (2, 0)
+
     def test_seeding_the_input_text_directly_is_refused(self):
         # Seeding raw text is what would let the service and the eval harness
         # show one job to a model differently, so it is inexpressible.

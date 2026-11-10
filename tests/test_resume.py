@@ -233,7 +233,7 @@ class TestTheAnswersRoute:
 
 
 def test_a_resumption_is_absent_on_an_ordinary_job():
-    """The field is optional, so every record written before it still loads."""
+    """The field is optional, so a record with no such field loads."""
     record = JobRecord.create(
         ask_questions=True,
         owner_id="a",

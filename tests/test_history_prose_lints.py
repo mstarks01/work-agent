@@ -114,6 +114,14 @@ DIAGRAMS = without(
     },
 )
 
+#: What a record carries or names, as the "predates" and "written before"
+#: templates of :data:`HISTORY` read it after the verb: the thing whose absence
+#: the sentence dates.
+_DATED = (
+    r"(fields?|keys?|pin|map|instruments?|blocks?|generator|naming|versioning"
+    r"|identities)"
+)
+
 #: Each phrase names an earlier state of the code. Case-insensitive. A phrase
 #: that also describes run-time data is held to its history reading:
 #:
@@ -148,6 +156,13 @@ DIAGRAMS = without(
 #:   cause, a block or a table, one or many, after "the", "a", "an", "those",
 #:   "these" or "its"), because a guide says what holds before a new package
 #:   existed.
+#: * "predates", "written before", "taken before" and "recorded before" match
+#:   only before a noun of :data:`_DATED`, with two words or fewer between;
+#:   "predates" also matches before a quoted name, and the three "before"
+#:   forms before "this was recorded" or "that was recorded". A signature
+#:   that predates a revocation, a ledger written before a rule change and an
+#:   object written before a quoted time are time relations that the code
+#:   reads.
 #:
 #: "legacy" is not matched, because a vendor's legacy name order and a legacy
 #: client are facts of the present. "now" before a verb is not matched,
@@ -177,7 +192,10 @@ HISTORY = re.compile(
     r"|until this (\w+ )?existed"
     r"|before (the|a|an|those|these|its)"
     r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
-    r"|before (:\w+:)?`+[\w.~]+`+ existed)\b",
+    r"|before (:\w+:)?`+[\w.~]+`+ existed"
+    r"|(predat(es?|ed|ing) ([\w-]+ ){0,2}(`+[\w.~]+|" + _DATED + ")"
+    r"|(written|taken|recorded) before"
+    r" ((this|that) was recorded|([\w-]+ ){0,2}" + _DATED + ")))\\b",
     re.IGNORECASE,
 )
 
@@ -230,10 +248,38 @@ def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
     """Each text that narrates an earlier state, as ``path:line phrase``."""
     where = path.relative_to(REPO_ROOT)
     return [
-        f"{where}:{lineno + text[: match.start()].count(chr(10))} {match.group(0)!r}"
+        f"{where}:{lineno + _breaks_before(text, flat[: match.start()])}"
+        f" {match.group(0)!r}"
         for lineno, text in texts
-        for match in [HISTORY.search(" ".join(text.split("\n")))]
+        for flat in [" ".join(text.split())]
+        for match in [HISTORY.search(flat)]
         if match
+    ]
+
+
+def _breaks_before(text: str, read: str) -> int:
+    """The line breaks of ``text`` before the phrase that follows ``read``.
+
+    ``read`` is a start of ``text`` with each run of white space as one space,
+    and it ends where the phrase starts."""
+    left = len("".join(read.split()))
+    breaks = 0
+    for char in text:
+        if char == "\n":
+            breaks += 1
+        elif not char.isspace():
+            if not left:
+                break
+            left -= 1
+    return breaks
+
+
+def test_a_hit_names_the_line_its_phrase_starts_on():
+    texts = [(7, "One line.\nIt used to hold a key\n    written before\n  the field.")]
+
+    assert _hits(REPO_ROOT / "x.py", texts) == ["x.py:8 'used to'"]
+    assert _hits(REPO_ROOT / "x.py", [(7, "A row\n  written before\n the field.")]) == [
+        "x.py:8 'written before the field'"
     ]
 
 
@@ -377,6 +423,11 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A sweep recorded before the instrument existed carries no block.",
         "A run wrote it before ``attacker_position`` existed.",
         "A report written before those fields existed reads as no schema.",
+        "A report written before the field carries no answer.",
+        "A sweep that predates the instrument omits the key.",
+        "It predates `AssertionBacking`, so it backs nothing.",
+        "A sweep taken before the pin was recorded carries no key.",
+        "A sweep taken before that was recorded carries no pin.",
         "A rule about writes read both as writes until this field existed.",
         "It cost 13.5 seconds of CPU before :data:`HISTORY` existed.",
     )
@@ -393,6 +444,11 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A record that names no finding any more is dropped.",
         "A retired model is refused.",
         "A retired key still verifies what it signed.",
+        "It refuses signatures that predate the revocation.",
+        "A ledger written before a rule change is re-keyed.",
+        "A bump never reuses a blessing taken before it.",
+        "It removes each object written before ``before``.",
+        "A request made before the key expires is served.",
         "It waits for every predecessor of the node.",
         "V6's opening section asks for the design.",
         "What one proposal came to against the graph.",

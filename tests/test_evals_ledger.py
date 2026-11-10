@@ -682,8 +682,8 @@ class TestTheVoteRecordsWhatItJudged:
         assert not reworded.reviewed_prose(SAMPLE_PROSE)
 
     def test_an_empty_digest_reads_live(self):
-        """Recording nothing is truthful, and it is what a row written before
-        the field would say (ADR 0029). No row here carries one."""
+        """Recording nothing is truthful, and it is what a row with no
+        captured claim says (ADR 0029). No row here carries one."""
         vote = self._vote(content="", prose="")
 
         assert vote.answers_for(other_content())
@@ -708,7 +708,7 @@ class TestTheVoteRecordsWhatItJudged:
         assert (back.content, back.prose) == (SAMPLE_CONTENT, SAMPLE_PROSE)
 
     def test_a_row_without_the_keys_is_refused_rather_than_defaulted(self):
-        """No shim: a file predating the fields does not load as though it
+        """No shim: a file with no such keys does not load as though it
         carried them."""
         raw = self._vote().to_json()
         del raw["prose"]

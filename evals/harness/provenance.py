@@ -234,8 +234,8 @@ class RunProvenance(BaseModel):
     #: the framework selection a case declares, so it rides on each execution.
     build: dict[str, str]
     #: The checkout the sweep ran from: the commit, with ``-dirty`` when the
-    #: working tree differed from it, or empty for an artifact written before
-    #: this was recorded. The installed versions above name a release; a sweep
+    #: working tree differed from it, or empty for an artifact that records no
+    #: checkout. The installed versions above name a release; a sweep
     #: runs from a checkout. Two merges on one day share a release, so only the
     #: commit names the tree (#657).
     tree: str = ""
