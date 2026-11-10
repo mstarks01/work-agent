@@ -22,7 +22,7 @@ import subprocess
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 import pytest
 
@@ -491,7 +491,7 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     count of marks then passes a case the merge refuses."""
 
     def state_of(
-        self, marks: dict, notes: object = "", missing: Sequence[str] = ()
+        self, marks: dict, notes: str = "", missing: Sequence[str] = ()
     ) -> str:
         node = shutil.which("node")
         if node is None:
@@ -534,18 +534,20 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
         assert self.state_of({}, notes="unsure") == "draft"
         assert self.state_of({}, missing=["a threat"]) == "draft"
 
-    def test_a_note_that_is_not_text_draws_the_rail(self):
-        """A file that another tool wrote can hold a number as its note."""
-        assert self.state_of({}, notes=5) == "draft"
-
     def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
         assert self.state_of({"a": "found", "stale": "found"}) == "draft"
 
     #: One target ``a`` whose older key is ``old``.
     TARGETS = ({"fingerprint": "a", "aliases": ["old"], "claims": []},)
 
-    def restored(self, marks: dict, targets: Sequence[dict] = TARGETS) -> dict:
-        """The marks the page's own restore block keeps for one case."""
+    def restored(
+        self,
+        marks: dict,
+        targets: Sequence[dict] = TARGETS,
+        field: str = "marks",
+        **fields: object,
+    ) -> Any:
+        """What the page's own restore block keeps in one field of one case."""
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -556,14 +558,14 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
             "envelope": 1,
             "cases": [{"case": "c", "digests": {}, "targets": list(targets)}],
         }
-        saved = {"envelope": 1, "cases": {"c": {"marks": marks}}}
+        saved = {"envelope": 1, "cases": {"c": {"marks": marks, **fields}}}
         harness = (
             f"const DATA = {json.dumps(data)};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
             "const answers = {};\nconst draw = () => {};\nconst alert = () => {};\n"
             f"{block}\n"
             f"restore({json.dumps(json.dumps(saved))});\n"
-            "process.stdout.write(JSON.stringify(answers.c.marks));\n"
+            f"process.stdout.write(JSON.stringify(answers.c.{field}));\n"
         )
         with tempfile.TemporaryDirectory() as scratch:
             path = Path(scratch) / "restore.cjs"
@@ -580,6 +582,26 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
 
     def test_a_restored_file_drops_a_mark_for_a_target_that_is_gone(self):
         assert self.restored({"a": "found", "stale": "found"}) == {"a": "found"}
+
+    @pytest.mark.parametrize(
+        ("field", "saved", "kept"),
+        [
+            ("notes", 5, ""),
+            ("notes", {}, ""),
+            ("notes", "unsure", "unsure"),
+            ("missing", 5, []),
+            ("missing", "abc", []),
+            ("missing", ["a threat", 5], ["a threat"]),
+            ("own_list", [5, "one"], ["one"]),
+            ("own_list", None, []),
+        ],
+    )
+    def test_a_restored_field_has_the_shape_that_the_page_writes(
+        self, field, saved, kept
+    ):
+        """``CaseAnswers`` refuses a note that is not text and a list that
+        holds anything else, so the page carries neither into a submission."""
+        assert self.restored({}, field=field, **{field: saved}) == kept
 
     def test_a_restored_mark_under_an_alias_marks_its_finding(self):
         assert self.restored({"old": "missed"}) == {"a": "missed"}

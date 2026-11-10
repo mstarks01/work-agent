@@ -23,10 +23,10 @@ const marked = id => BY_ID[id].targets.length > 0
 // The row state of a case, in the vocabulary of the rail (RowState). The
 // payload carries the words for each state (DATA.review_labels). An own list
 // and nothing else is not a review, as in _review_state of the app.
-const reviewed = held => Object.keys(held.marks).length > 0
-  || held.missing.length > 0 || String(held.notes).trim() !== "";
+const reviewStarted = held => Object.keys(held.marks).length > 0
+  || held.missing.length > 0 || held.notes.trim() !== "";
 function state(id) {
-  if (!answers[id] || !reviewed(answers[id])) return "todo";
+  if (!answers[id] || !reviewStarted(answers[id])) return "todo";
   return marked(id) ? "finished" : "draft";
 }
 
@@ -364,8 +364,12 @@ function restore(text) {
       marks[finding] = mark;
     }
     for (const finding of disputed) delete marks[finding];
-    answers[id] = {own_list: a.own_list || [], marks,
-                   missing: a.missing || [], notes: a.notes || "",
+    // Each field gets the shape that the page writes: a list of text lines,
+    // or text. The merge refuses a submission with another shape.
+    const textLines = value => Array.isArray(value) ? value.filter(s => typeof s === "string") : [];
+    answers[id] = {own_list: textLines(a.own_list), marks,
+                   missing: textLines(a.missing),
+                   notes: typeof a.notes === "string" ? a.notes : "",
                    opened_digests: a.opened_digests || BY_ID[id].digests};
   }
   draw();
