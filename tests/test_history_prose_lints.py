@@ -171,8 +171,9 @@ HISTORY = re.compile(
     r"|when \w+ retired|(was|were) removed rather than|, moved from"
     r"|(?-i:(?<![\w,] )At (?=[0-9a-f]*\d)[0-9a-f]{7,40})|what changed is"
     r"|(was|were) the \w+ here"
-    r"|before (the|a) (fields?|keys?|marks?|instrument|causes?) existed"
-    r"|before `+[\w.]+`+ existed)\b",
+    r"|before (the|a|an|those|these|its)"
+    r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
+    r"|before (:\w+:)?`+[\w.~]+`+ existed)\b",
     re.IGNORECASE,
 )
 
@@ -371,6 +372,8 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A draft that a run wrote before the field existed states none.",
         "A sweep recorded before the instrument existed carries no block.",
         "A run wrote it before ``attacker_position`` existed.",
+        "A report written before those fields existed reads as no schema.",
+        "It cost 13.5 seconds of CPU before :class:`_Scan` existed.",
     )
     for text in history:
         assert HISTORY.search(text), text

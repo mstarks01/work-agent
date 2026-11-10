@@ -498,7 +498,7 @@ NEWLINE_SPLITS: dict[Site, str] = {
 
 #: Each separator, or pattern for ``re.split``, that ends a line only at
 #: ``"\n"``.
-_NEWLINE_SEPARATORS = frozenset({"\n", b"\n", r"\n", r"\r?\n"})
+_NEWLINE_SEPARATORS = frozenset({"\n", "\r\n", b"\n", b"\r\n", r"\n", r"\r?\n"})
 
 #: The calls that cut a text at a separator.
 _SPLIT_CALLS = ("split", "rsplit", "partition", "rpartition")
@@ -523,6 +523,7 @@ def _splits_on_newline(node: ast.AST) -> bool:
         ('text.partition("\\n")', True),
         ('text.rpartition("\\n")', True),
         ('data.split(b"\\n")', True),
+        ('text.split("\\r\\n")', True),
         ('re.split("\\n", text)', True),
         ('re.split(r"\\n", text)', True),
         ('re.split(r"\\r?\\n", text)', True),
