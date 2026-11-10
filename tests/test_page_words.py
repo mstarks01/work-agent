@@ -211,8 +211,10 @@ def test_a_table_that_an_answer_carries_names_its_set_and_has_no_copy(
 
 
 def test_each_template_holds_only_the_fields_its_script_fills():
-    """A script fills ``{name}`` of a gate note and ``{held_back}`` of an
-    empty-list reason. A field with another name shows as its braces."""
+    """A script fills ``{name}`` of a gate note, ``{held_back}`` of an
+    empty-list reason, and ``{clock}``, ``{complete}`` and ``{count}`` of the
+    lines of the progress panel. A field with another name shows as its
+    braces."""
     fields = {
         name: set(re.findall(r"\{(\w+)\}", " ".join(_texts(dict(table)))))
         for name, table in page_words.FORM_WORDS.items()

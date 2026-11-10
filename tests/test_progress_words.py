@@ -40,6 +40,7 @@ from webapp.page_words import (
     ProgressMode,
     RunStart,
     progress_after,
+    run_start_of,
 )
 
 tiers = test_webapp.tiers
@@ -221,6 +222,19 @@ def test_a_run_to_the_report_reaches_the_pause_only_for_its_controls():
     assert {key for key, reached in reaches.items() if reached} == {
         (False, True, False)
     }
+
+
+@pytest.mark.parametrize("resumed", [False, True])
+def test_a_run_starts_from_a_resumption_where_its_graph_has_the_resume_entry(resumed):
+    """``entry_of`` and ``run_start_of`` read one fact of a job."""
+    record = JobRecord.model_construct(
+        ask_questions=False,
+        continues_at_pause=False,
+        resumption=Resumption.model_construct() if resumed else None,
+    )
+    start = run_start_of(record.resumption is not None)
+
+    assert (start == "resumption") == (entry_of(record) == graph.ENTRY_RESUME)
 
 
 @pytest.mark.parametrize("node", [graph.CATALOG_NODE, graph.PAUSE_NODE])

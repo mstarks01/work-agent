@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Literal, NamedTuple
+from typing import Any, Literal, NamedTuple, TypeVar
 
 from analysis_service.answer_state import EmptyListReason
 from analysis_service.claims import (
@@ -240,13 +240,16 @@ def progress_mode(asks: bool) -> ProgressMode:
 RunStart = Literal["description", "resumption"]
 
 
-def run_start(resumed: bool) -> RunStart:
-    """What a **Resumed Job** does first, or what each other run does first."""
+def run_start_of(resumed: bool) -> RunStart:
+    """What a **Resumed Job** does first, or what each other run does first.
+    ``tests/test_progress_words.py`` holds the answer to
+    :func:`~analysis_service.pipeline.entry_of`."""
     return "resumption" if resumed else "description"
 
 
 #: What the progress line says before the first step of a run completes. The
-#: page reads the same row when it starts a run from a description.
+#: page starts a run only from a description, and reads the ``description``
+#: row for it.
 INITIAL_PROGRESS_WORDS: Mapping[RunStart, str] = MappingProxyType(
     {
         "description": (
@@ -257,11 +260,10 @@ INITIAL_PROGRESS_WORDS: Mapping[RunStart, str] = MappingProxyType(
 )
 
 
-def _by_mode(to_questions: int, to_report: int) -> Mapping[ProgressMode, int]:
-    return MappingProxyType({"to-questions": to_questions, "to-report": to_report})
+_T = TypeVar("_T")
 
 
-def _words(to_questions: str, to_report: str) -> Mapping[ProgressMode, str]:
+def _by_mode(to_questions: _T, to_report: _T) -> Mapping[ProgressMode, _T]:
     return MappingProxyType({"to-questions": to_questions, "to-report": to_report})
 
 
@@ -276,7 +278,7 @@ class StepProgress(NamedTuple):
 
 def _step(words: str, to_questions: int, to_report: int) -> StepProgress:
     """A step that names the same work in each mode."""
-    return StepProgress(_words(words, words), _by_mode(to_questions, to_report))
+    return StepProgress(_by_mode(words, words), _by_mode(to_questions, to_report))
 
 
 _CHECKING_MAP = "Checking the system map for gaps or conflicting details…"
@@ -286,12 +288,13 @@ _EXAMINING = "Examining your system against the selected frameworks…"
 _CHECKING_FINDINGS = "Bringing the results together and checking the findings…"
 #: The work at the end of a run that pauses. A run to the report pauses only
 #: for its Controls, and asks no question (ADR 0125).
-_PAUSING = _words("Generating questions…", "Preparing your Controls…")
+_PAUSING = _by_mode("Generating questions…", "Preparing your Controls…")
 
-#: The progress of each step. Each quarter of the bar marks a completed stage,
-#: not a share of elapsed time. A run that the ``reject`` step ends shows its
-#: refusal, and its row completes no stage. A run that asks ends at ``catalog``
-#: or at ``pause``, never at both, so each of the two fills the bar.
+#: The progress of each step. The bar counts completed stages, not a share of
+#: elapsed time. A run that the ``reject`` step ends shows its refusal, and its
+#: row completes no stage. A run that asks ends at ``catalog`` or at ``pause``,
+#: never at both, so each of the two completes the last two stages and fills
+#: the bar.
 STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
     {
         "extract": _step(_CHECKING_MAP, 1, 1),
