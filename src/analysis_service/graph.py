@@ -1280,8 +1280,9 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     ADK awaits a body that is a coroutine function, so wrapping it in one moves
     the work to a worker thread and gives the loop back. It does **not** make
     the deadline able to stop a running body -- nothing can, short of a process
-    boundary -- so the wrapper holds the task until the body ends and the
-    deadline lands between nodes. The
+    boundary. The job deadline is an ``asyncio.timeout``, so at the deadline the
+    await ends at once, the token goes back to :data:`_NODE_THREADS` and the
+    thread runs on until its body ends. The
     wrapper keeps the wrapped signature, which is what ADK binds parameters
     from, and touches nothing else: a node reaches the session only through
     :class:`SessionState`, whose writes are plain dict writes, and only one
@@ -1295,13 +1296,17 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
         # filling all forty slots put an arriving caller behind a whole body
         # before their token was even read.
         #
-        # A cancelled await here does NOT stop the body. `run_sync` takes its
-        # token outside the scope `abandon_on_cancel=False` shields, so the
-        # deadline returns the token, settles the job and frees its subject's
-        # slot while the thread runs on. Nothing in-process can stop a running
-        # Python call, so what keeps that harmless is that a body is short:
-        # `grounding.MAX_REPAIR_SECONDS_PER_BODY` is the bound that makes it
-        # so, and it is the reason this is a wrapper and not a supervisor.
+        # A cancelled await here does NOT stop the body. The job deadline and
+        # the stop control cancel the task with a native asyncio cancel, and
+        # the shield of `abandon_on_cancel=False` holds only against an anyio
+        # scope. So the await ends at the deadline, the token returns, the job
+        # settles and its subject's slot is free while the thread runs on.
+        # `_NODE_THREADS` therefore bounds the bodies that a live job awaits,
+        # not the threads that a settled job left. Nothing in-process can stop
+        # a running Python call, so what keeps that harmless is that a body is
+        # short: `grounding.MAX_REPAIR_SECONDS_PER_BODY` is the bound that
+        # makes it so, and it is the reason this is a wrapper and not a
+        # supervisor.
         return await anyio.to_thread.run_sync(
             functools.partial(func, **kwargs), limiter=_NODE_THREADS
         )

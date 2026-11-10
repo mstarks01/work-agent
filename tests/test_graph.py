@@ -3539,6 +3539,40 @@ class TestTheFunctionNodesStayOffTheEventLoop:
         assert result == {"claims": 2}
         assert seen["state"] == {"a": 1}
 
+    def test_the_deadline_returns_the_token_while_the_thread_runs_on(self):
+        """The job deadline is an ``asyncio.timeout``. It ends the await at
+        once and returns the token; the body ends later, on its own."""
+        import asyncio
+        import threading
+
+        started = threading.Event()
+        release = threading.Event()
+        ended = threading.Event()
+
+        def body():
+            started.set()
+            release.wait(timeout=10)
+            ended.set()
+
+        node = graph._node(body, "some_node")
+
+        async def scenario():
+            try:
+                async with asyncio.timeout(10) as deadline:
+                    run = asyncio.ensure_future(node._func())
+                    await asyncio.to_thread(started.wait)
+                    deadline.reschedule(0)
+                    await run
+            except TimeoutError:
+                pass
+            at_deadline = (ended.is_set(), graph._NODE_THREADS.borrowed_tokens)
+            release.set()
+            await asyncio.to_thread(ended.wait)
+            return at_deadline
+
+        assert asyncio.run(scenario()) == (False, 0)
+        assert ended.is_set()
+
 
 class TestNoPromptWritesItsOwnFence:
     """A fence in a prompt file is only ever as long as itself.
