@@ -332,7 +332,7 @@ subtraction: a file added to a case counts until somebody rules it out. Only
 `corrections.md` and the reading documents are outside it, since no number
 reads them.
 
-An artifact taken before this was recorded carries `unrecorded` in both, which
+An artifact with no record of the two carries `unrecorded` in both, which
 is a required field honestly stating a deficient provenance — the design
 `bootstrap` uses on `case.json`. A commit inferred from a run's date would be a
 guess, and indistinguishable from an observation once written down.

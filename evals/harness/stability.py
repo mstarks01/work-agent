@@ -25,7 +25,7 @@ whether the matching claims kept one severity band and one resolved place
 across the runs. Five case 01 runs matched reference 17 every time and rated
 it high four times and critical once; recall called that stable. Both read
 what an artifact and its report bundle already hold, and each says
-``unread`` where a run predates the block it needs rather than reporting a
+``unread`` where a run lacks the block it needs rather than reporting a
 zero. Wording is not compared: it moves every run, and comparing it as prose
 would measure the tokenizer.
 
@@ -313,7 +313,7 @@ def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
     """Each missed reference's charged cause, off the ``losses`` block, or ``None`` without one.
 
     Two artifacts have no causes to read and they are different files: one
-    predates the instrument and omits the key, and one ran it over a mode that
+    omits the key, and one ran it over a mode that
     charges nothing and writes ``None``. Both read ``unread`` here, and neither
     may take the rest of the comparison down with it — recall and content need
     no losses block.

@@ -1269,7 +1269,7 @@ tables only. It never changes a stored report, checkpoint or sources object.
 The startup stops when the schema is not at the latest revision.
 
 A schema change edits the first revision in place, so it adds no revision.
-A database made before the change is at the latest revision, and the command
+A database with another schema can be at the latest revision, and the command
 does not change it. The startup compares each table and column with the ones
 the service needs, and it stops on a difference. To repair the database,
 remove it and make it again. For SQLite, delete the file. For PostgreSQL,

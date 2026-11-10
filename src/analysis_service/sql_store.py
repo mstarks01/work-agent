@@ -1265,13 +1265,13 @@ class SqlJobStore:
         async with self._transaction() as connection:
             differences = await connection.run_sync(_schema_differences)
         if differences:
-            # A schema change edits revision 0001 in place, so a database made
-            # before it is at the head revision, and a migration changes
+            # A schema change edits revision 0001 in place, so a database with
+            # another schema can be at the head revision, and a migration changes
             # nothing in it.
             raise StoreConfigError(
                 f"the database schema differs from the one this service needs"
-                f" ({'; '.join(differences)}): the database was made before a"
-                f" schema change, and a migration does not change it, so"
+                f" ({'; '.join(differences)}): the database holds another"
+                f" schema at the head revision, and a migration does not change it, so"
                 f" {REMAKE[self._migrator]}"
             )
         await self._objects.check()

@@ -495,8 +495,8 @@ class TestCauseStability:
         tmp_path,
         sampling,  # noqa: F811
     ):
-        """The shape of the first merged Baseline: a sweep taken before #729,
-        which carries this version and omits a key the version declares.
+        """The shape of the first merged Baseline: a sweep that carries
+        this version and omits a key the version declares.
 
         The two readers are driven against each other here. A test of
         ``block`` for raising and a test of ``_causes`` for returning ``None``
@@ -519,7 +519,7 @@ class TestCauseStability:
 
         (older,) = load_runs([b])
         assert older.causes is None
-        with pytest.raises(ProvenanceError, match="predates the instrument"):
+        with pytest.raises(ProvenanceError, match="no instrument wrote one"):
             load_artifact(b).block("losses")
         assert load_artifact(b).carries("losses") is False
 

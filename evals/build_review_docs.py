@@ -44,8 +44,8 @@ from evals.harness.reference import read_digest
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"
 
-#: Case 01's sitting document predates this generator and is the template it
-#: was derived from; regenerating it would overwrite the historical record.
+#: Case 01's sitting document is hand-written and is the template of this
+#: generator; regenerating it would overwrite that record.
 HAND_WRITTEN = frozenset({"01-payments-checkout"})
 
 #: What this generator writes beside each case. Named rather than spelled at

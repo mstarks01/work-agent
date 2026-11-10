@@ -23,7 +23,7 @@ import tempfile
 import types
 from collections.abc import Sequence
 from pathlib import Path
-from typing import get_args
+from typing import Any, cast, get_args
 
 import pytest
 from pydantic import ValidationError
@@ -606,7 +606,7 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
 #: Each shape a JSON value takes, as a saved file can hold it in a field. The
 #: record shapes use the key ``a``, which the one target of the harness holds.
 _ABSENT = object()
-JSON_SHAPES = (
+JSON_SHAPES: tuple[object, ...] = (
     _ABSENT,
     None,
     True,
@@ -790,7 +790,8 @@ class TestThePageAndTheAppStartAReviewOnTheSameAnswers:
         held = sittings.Draft(case=CASE, own_list=["one line"], **answers)
         session = types.SimpleNamespace(draft=lambda case_id: held)
         row = types.SimpleNamespace(case_id=CASE, state="draft")
-        return _review_state(session, row).state == "draft"
+        reads = _review_state(cast("Any", session), cast("Any", row))
+        return reads.state == "draft"
 
     def test_one_table_of_answers_reads_the_same_in_both(self):
         app = [self.app_reads(answers) for answers in STARTED_ANSWERS]

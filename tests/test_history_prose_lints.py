@@ -148,11 +148,20 @@ DIAGRAMS = without(
 #:   cause, a block or a table, one or many, after "the", "a", "an", "those",
 #:   "these" or "its"), because a guide says what holds before a new package
 #:   existed.
+#: * "predates" and "written before" match only before a noun for a part of a
+#:   record (a field, a key, a pin, a block, an instrument, a quoted name). A
+#:   signature that predates a revocation and a ledger written before a rule
+#:   change are time relations that the code reads.
 #:
 #: "legacy" is not matched, because a vendor's legacy name order and a legacy
 #: client are facts of the present. "now" before a verb is not matched,
 #: because "the price map now disagrees" and "the part now has another name"
 #: describe run-time data.
+#: A part of a record, as the "predates" and "written before" template names it.
+_PART = (
+    r"(fields?|keys?|pin|map|instruments?|blocks?|generator|naming|versioning"
+    r"|identities)"
+)
 HISTORY = re.compile(
     r"\b(used to|was written for|before this (\w+ )?(existed|one)|previously"
     r"|had been|until now|the old |now that|in the past|formerly|originally"
@@ -177,7 +186,10 @@ HISTORY = re.compile(
     r"|until this (\w+ )?existed"
     r"|before (the|a|an|those|these|its)"
     r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
-    r"|before (:\w+:)?`+[\w.~]+`+ existed)\b",
+    r"|before (:\w+:)?`+[\w.~]+`+ existed"
+    r"|(predat(es?|ed|ing) ([\w-]+ ){0,2}(`+[\w.~]+|" + _PART + ")"
+    r"|(written|taken|recorded|made) before"
+    r" (this was recorded|([\w-]+ ){0,2}" + _PART + ")))\\b",
     re.IGNORECASE,
 )
 
@@ -377,6 +389,10 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A sweep recorded before the instrument existed carries no block.",
         "A run wrote it before ``attacker_position`` existed.",
         "A report written before those fields existed reads as no schema.",
+        "A report written before the field carries no answer.",
+        "A sweep that predates the instrument omits the key.",
+        "It predates `AssertionBacking`, so it backs nothing.",
+        "A sweep taken before the pin was recorded carries no key.",
         "A rule about writes read both as writes until this field existed.",
         "It cost 13.5 seconds of CPU before :data:`HISTORY` existed.",
     )
@@ -393,6 +409,10 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A record that names no finding any more is dropped.",
         "A retired model is refused.",
         "A retired key still verifies what it signed.",
+        "It refuses signatures that predate the revocation.",
+        "A ledger written before a rule change is re-keyed.",
+        "A bump never reuses a blessing taken before it.",
+        "It removes each object written before ``before``.",
         "It waits for every predecessor of the node.",
         "V6's opening section asks for the design.",
         "What one proposal came to against the graph.",

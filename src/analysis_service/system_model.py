@@ -745,8 +745,8 @@ class Assumption(BaseModel):
     # The provider-facing schema lists the legal names, on the rule
     # :class:`~analysis_service.claims.Ground` already follows: a model asked
     # for a bounded string writes prose into it, and one wrote a 100-character
-    # sentence here. The enum is a schema fact and not a validator, so a model
-    # written before it still loads and a value outside the set stays an
+    # sentence here. The enum is a schema fact and not a validator, so a stored
+    # model loads with the name it holds and a value outside the set stays an
     # ``invalid-reference`` the repair pass can answer narrowly, rather than a
     # schema fault that condemns the whole object. Whether the named attribute
     # belongs to the *named element* stays with the gate.

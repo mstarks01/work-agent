@@ -172,8 +172,8 @@ class DraftRequirementRuling(Claim):
     # the proposal so the critic reads it beside the grounds: an ``excluded``
     # on a verified absent element is the framework's exclusion, and a critic
     # that cannot see the direction rejected 96 of 99 of them as inferences.
-    # Empty only on a claim read back from a report written before the field,
-    # the precedent ``rejected_because`` set: the service fills it from the
+    # Empty only on a claim read back from a report with no such field,
+    # as ``rejected_because`` is: the service fills it from the
     # proposal, whose schema requires it, and recording nothing is truthful
     # where inventing a direction the lane never stated is not.
     direction: Literal["", "gap", "question", "excluded"] = ""
@@ -738,8 +738,8 @@ class AsvsAnalysis(FrameworkAnalysis):
         # Appearing and being answered are two facts. A draft the critic sent
         # back for its lane or as a duplicate still appears, in the audit array,
         # and answers nothing — so its requirement is listed in ``scope`` as
-        # well, and that pair is not a duplication. A block written before the
-        # cause was read lists no such requirement, and still appears once.
+        # well, and that pair is not a duplication. A stored block that lists
+        # no such requirement still appears once.
         ruled = {requirement_of(claim.id) for claim in every if claim.rules_on_unit()}
         listed = {entry.unit for entry in self.scope}
         issues = []

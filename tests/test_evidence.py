@@ -143,14 +143,14 @@ class TestEvidenceCatalog:
     def test_an_undecidable_crossing_offers_its_unplaced_endpoint_instead(
         self, unplaced
     ):
-        """The row ``prompts/analyze.md`` sends a lane agent to, tested here.
+        """The entry ``prompts/analyze.md`` sends a lane agent to, tested here.
 
         The prompt tells an agent that an undecidable crossing cannot be cited
         and that the unplaced endpoint's ``trust_zone`` can. That is a claim
         about this catalog, so the two readers are tested against each other
         rather than each against its own expectation: for every undecidable
         crossing, every endpoint the sources left unplaced publishes its own
-        ``unknown`` row.
+        ``unknown`` entry.
         """
         model = valid_model()
         by_id = {element.id: element for element in model.zoned_elements()}

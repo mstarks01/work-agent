@@ -504,8 +504,8 @@ class TestTheDriftDisclosure:
     def test_a_moved_cache_rate_shows_as_its_own_figure(self, tmp_path, priced):
         """The line prints every rate the comparison reads, cache rate included.
 
-        A Baseline recorded before the map stated a cache rate carries ``None``
-        there; one recorded as ``0.0`` differs from a map that now says
+        A Baseline whose map states no cache rate carries ``None``
+        there; one recorded as ``0.0`` differs from a map that says
         ``None``. Either way the line has to show where the difference is,
         not two equal input/output pairs.
         """

@@ -1,8 +1,8 @@
 """A STRIDE lane states where its attacker stands, from a closed set.
 
 A verb and a place do not decide a threat's mechanism (QA-2026-11-02-05-E8),
-so each proposal names an :data:`AttackerPosition`, and a stored proposal from
-a run before the field reads with none.
+so each proposal names an :data:`AttackerPosition`, and a stored proposal with
+no such field reads with none.
 """
 
 from __future__ import annotations

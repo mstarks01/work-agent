@@ -36,8 +36,8 @@ from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLOW = "flow:entity:shopper>process:storefront-api>place-order"
 #: A sealed Baseline: `analysis` mode, scored, with its reports beside it. It
-#: predates `AssertionBacking`, which is what makes it the right artifact to
-#: hold the readers against — a gate must survive an artifact older than itself.
+#: carries no `AssertionBacking` field, which makes it the right artifact to
+#: hold the readers against — a gate must read an artifact with no such field.
 SEALED = (
     REPO_ROOT
     / "evals"
@@ -152,7 +152,7 @@ class TestAnAbsentFigureIsNotAZero:
     """The rule the table rests on, and the one an artifact can break quietly."""
 
     def test_an_artifact_without_the_backing_field_is_unread(self, sealed) -> None:
-        """The sealed Baseline predates `AssertionBacking`, so it backs nothing."""
+        """The sealed Baseline carries no `AssertionBacking` field, so it backs nothing."""
         artifact, report = sealed
         reading = promotion.read_gate("backs-claims", artifact, report, spread=None)
 

@@ -708,7 +708,7 @@ class TestTheVoteRecordsWhatItJudged:
         assert (back.content, back.prose) == (SAMPLE_CONTENT, SAMPLE_PROSE)
 
     def test_a_row_without_the_keys_is_refused_rather_than_defaulted(self):
-        """No shim: a file predating the fields does not load as though it
+        """No shim: a file with no such keys does not load as though it
         carried them."""
         raw = self._vote().to_json()
         del raw["prose"]

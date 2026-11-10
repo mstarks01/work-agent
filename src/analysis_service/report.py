@@ -839,7 +839,7 @@ class Report(BaseModel):
     elements_analyzed: int = Field(default=0, ge=0)
     # How the model was repaired, where it was. ``None`` where no repair pass
     # ran; a report whose ``nodes`` name the repair node and carry ``None``
-    # here predates the field. Envelope-level because it is about the shared
+    # here holds no record of the repair. Envelope-level because it is about the shared
     # model, like ``shared_element_names``.
     model_repair: ModelRepair | None = None
     # What the job's assertion pass produced, where the deployment ran one:
