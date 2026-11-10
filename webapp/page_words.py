@@ -297,9 +297,11 @@ _PAUSING = _by_mode("Generating questions…", "Preparing your Controls…")
 
 #: The progress of each step. The bar counts completed stages, not a share of
 #: elapsed time. A run that the ``reject`` step ends shows its refusal, and its
-#: row completes no stage. A run that asks ends at ``catalog`` or at ``pause``,
-#: never at both, so each of the two completes the last two stages and fills
-#: the bar.
+#: row completes no stage. In a run that asks, ``assert`` completes the third
+#: stage. A run that asks ends at ``catalog`` or at ``pause``, never at both, so
+#: each of the two fills the bar. A deployment that turns the assertion pass
+#: off builds no ``assert`` step, and the bar of its run that asks goes from
+#: the second stage to the last.
 STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
     {
         "extract": _step(_CHECKING_MAP, 1, 1),
@@ -310,7 +312,7 @@ STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
         "capabilities": _step(_IDENTIFYING_DETAILS, 2, 2),
         "stated": _step(_IDENTIFYING_DETAILS, 2, 2),
         "read": _step(_IDENTIFYING_DETAILS, 2, 2),
-        "assert": _step("Choosing the relevant checks for your system…", 2, 2),
+        "assert": _step("Choosing the relevant checks for your system…", 3, 2),
         "catalog": StepProgress(_PAUSING, _by_mode(4, 0)),
         "pause": StepProgress(_PAUSING, _by_mode(4, 0)),
         "prepare": _step(_EXAMINING, 0, 2),

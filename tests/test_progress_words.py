@@ -13,10 +13,12 @@ import json
 import re
 import threading
 import time
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Iterator, Sequence
 from typing import NamedTuple, get_args
 
 import pytest
+from fastapi.testclient import TestClient
 
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
@@ -40,13 +42,14 @@ from tests.factories import (
 )
 from tests.test_page_words import _copies
 from tests.test_webapp import (
+    LOOPBACK,
     SAME_ORIGIN,
     STATIC_SCRIPTS,
     _island,
     page_javascript,
     posted,
 )
-from tests.test_webapp_questions import HeldAfterExtract, client_for
+from tests.test_webapp_questions import HeldAfterExtract, app_for, client_for
 from webapp.main import Workspace
 from webapp.page_words import (
     INITIAL_PROGRESS_WORDS,
@@ -82,10 +85,14 @@ class BuiltGraph(NamedTuple):
     """One graph that ``build_pipeline`` builds."""
 
     entry: graph.Entry
+    #: Whether the graph holds the assertion pass.
+    assertions: bool
     #: The name of each node but the start.
     nodes: set[str]
     #: The name of each node that no edge leaves.
     ends: set[str]
+    #: Each edge, as the names of its two nodes.
+    edges: set[tuple[str, str]]
 
 
 def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
@@ -109,8 +116,9 @@ def built_graphs(selection: tuple[FrameworkName, ...]) -> list[BuiltGraph]:
         workflow = built.workflow.graph
         assert workflow is not None
         nodes = {node.name for node in workflow.nodes} - {graph.START.name}
-        left = {edge.from_node.name for edge in workflow.edges}
-        graphs.append(BuiltGraph(entry, nodes, nodes - left))
+        edges = {(edge.from_node.name, edge.to_node.name) for edge in workflow.edges}
+        left = {start for start, _ in edges}
+        graphs.append(BuiltGraph(entry, assertions, nodes, nodes - left, edges))
     return graphs
 
 
@@ -230,6 +238,49 @@ def test_the_last_step_of_each_graph_of_a_job_fills_the_bar(selection):
             assert line["stage"] == STAGE_COUNT, entry
 
 
+def stages_on_each_path(
+    built: BuiltGraph, selection: tuple[FrameworkName, ...]
+) -> set[tuple[int, ...]]:
+    """The stages that the bar of a run that asks shows on each path of
+    ``built`` from the start to an end that is not a failed end, in order."""
+    steps = graph.step_by_graph_node(selection)
+    after: defaultdict[str, list[str]] = defaultdict(list)
+    for start, end in built.edges:
+        after[start].append(end)
+
+    def paths(node: str) -> Iterator[list[str]]:
+        if not after[node]:
+            yield []
+        for following in after[node]:
+            for rest in paths(following):
+                yield [following, *rest]
+
+    shown = set()
+    for path in paths(graph.START.name):
+        if steps[path[-1]] in FAILED_ENDS:
+            continue
+        stages = (STEP_PROGRESS[steps[node]].stages["to-questions"] for node in path)
+        shown.add(tuple(dict.fromkeys(itertools.accumulate(stages, max))))
+    return shown
+
+
+@pytest.mark.parametrize("selection", SELECTIONS, ids="+".join)
+def test_a_run_that_asks_shows_each_stage_where_the_assertion_pass_runs(selection):
+    """The ``assert`` step completes stage 3. A deployment that turns
+    ``ANALYSIS_ASSERTIONS`` off builds no ``assert`` step, so the bar of its
+    run that asks goes from 2 to 4. That is a stated limit."""
+    asking = [
+        built
+        for built in built_graphs(selection)
+        if built.entry == graph.ENTRY_HEAD_ONLY
+    ]
+
+    assert {built.assertions for built in asking} == {False, True}
+    for built in asking:
+        shown = (1, 2, 3, 4) if built.assertions else (1, 2, 4)
+        assert stages_on_each_path(built, selection) == {shown}, built.nodes
+
+
 def test_a_run_to_the_report_reaches_the_pause_only_for_its_controls():
     """The ``to-report`` words of the pause are the words of a run that pauses
     for its Controls alone, so no other run to the report builds a pause."""
@@ -337,7 +388,7 @@ def assert_lines(
 ) -> None:
     """The first frame is the line before any node, each later frame is the
     progress line after its node, and a later frame has a larger ``seq``. No
-    stage falls below ``stopped``, the stage where the parent stopped."""
+    stage falls below ``stopped``, the floor of the bar of a Resumed Job."""
     selection = [item["name"] for item in BODY["frameworks"]]
     sent = [{key: frame[key] for key in ("stage", "words")} for frame in frames]
     lines = [
@@ -370,6 +421,15 @@ def test_the_stream_of_a_run_in_progress_carries_each_progress_line_and_no_node_
     assert "extract" not in stream
 
 
+class HeldBeforeExtract(HeldAfterExtract):
+    """Holds each run before its first node until the test releases it."""
+
+    async def run(self, job, on_node):
+        while not self.release.is_set():
+            await asyncio.sleep(0.01)
+        return await super().run(job, on_node)
+
+
 def progress_at_start(client, run: str) -> dict:
     """The progress line of ``run`` in the status answer."""
     return client.get(f"/workspace/runs/{run}").json()["progress"]
@@ -378,12 +438,6 @@ def progress_at_start(client, run: str) -> dict:
 @pytest.mark.parametrize("mode", MODES)
 def test_a_reload_at_the_start_shows_the_words_the_page_showed_at_submit(tiers, mode):
     """The page shows the ``description`` row at submit, in each mode."""
-
-    class HeldBeforeExtract(HeldAfterExtract):
-        async def run(self, job, on_node):
-            while not self.release.is_set():
-                await asyncio.sleep(0.01)
-            return await super().run(job, on_node)
 
     runner = HeldBeforeExtract()
     with client_for(tiers, runner) as client:
@@ -437,6 +491,42 @@ def test_a_resumed_job_of_a_run_that_asked_gets_the_lines_of_a_run_to_the_report
     assert frames[-1]["stage"] == STAGE_COUNT
 
 
+def test_a_parent_with_a_node_of_no_graph_of_this_build_gives_a_bar_at_0(tiers):
+    """A parent of an earlier build can hold a node name that no graph of
+    this build holds. The bar of its Resumed Job then starts at 0, and the
+    status answer and the stream both answer."""
+    store = InMemoryJobStore()
+    runner = HeldBeforeExtract()
+    app = app_for(tiers, runner, workspace=Workspace(store=store))
+    with TestClient(app, base_url=LOOPBACK) as client:
+        started = client.post(
+            "/analyze", json=BODY | {"questions": True}, headers=SAME_ORIGIN
+        )
+        parent = started.json()["run"]
+        lines_of(client, runner, parent)
+        store._records[parent].record_node("a_retired_node")
+        runner.release.clear()
+        runner.sent.clear()
+        continued = client.post(
+            f"/answer/{parent}", json={"revision": 0}, headers=SAME_ORIGIN
+        )
+        assert continued.status_code == 200, continued.text
+        child = continued.json()["run"]
+        deadline = time.monotonic() + 5
+        while "progress" not in (read := client.get(f"/workspace/runs/{child}")).json():
+            assert read.status_code == 200, read.text
+            assert time.monotonic() < deadline, read.text
+            time.sleep(0.01)
+        _, frames = lines_of(client, runner, child)
+
+    assert read.json()["progress"] == {
+        "stage": 0,
+        "words": INITIAL_PROGRESS_WORDS["answers"],
+        "seq": 0,
+    }
+    assert_lines(frames, runner.sent, "to-report", "answers")
+
+
 def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
     """A run that ended before the request can be a record of an earlier
     build, and no graph of this build names its nodes."""
@@ -454,9 +544,11 @@ def test_the_stream_of_a_run_that_ended_carries_no_node_frame(tiers):
     assert "event: done" in ended
 
 
-#: The nodes of a parent that stopped, by how its Resumed Job starts and the
-#: mode of the parent, with the stage where the parent stopped, counted in the
-#: ``to-report`` mode of the Resumed Job.
+#: The nodes of a parent, by how its Resumed Job starts and the mode of the
+#: parent, with the stage below which the bar of the Resumed Job never goes:
+#: the stage where a paused parent stopped, counted in the ``to-report`` mode
+#: of the Resumed Job. The parent in the ``to-report`` mode that asked for
+#: answers is a finished report, and the bar of its follow-up starts at 0.
 PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
     ("answers", "to-questions"): (
         [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "catalog"],
@@ -464,7 +556,7 @@ PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
     ),
     ("answers", "to-report"): (
         [graph.EXTRACT_NODE, graph.PREPARE_NODE, graph.ASSEMBLE_NODE],
-        STAGE_COUNT,
+        0,
     ),
     ("controls", "to-report"): (
         [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "pause"],
@@ -537,7 +629,7 @@ def test_a_resumed_job_starts_with_the_words_the_page_shows_at_its_start(start, 
 
 
 @pytest.mark.parametrize(("start", "mode"), PARENT_RUNS)
-def test_the_bar_of_a_resumed_job_never_goes_below_the_stage_of_its_parent(start, mode):
+def test_the_bar_of_a_resumed_job_never_goes_below_its_floor(start, mode):
     _, stopped = PARENT_RUNS[start, mode]
     for nodes in ([graph.EXTRACT_NODE], [graph.EXTRACT_NODE, graph.PREPARE_NODE]):
         expected = progress_after(
