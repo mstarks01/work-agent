@@ -2366,6 +2366,10 @@ ONE_READERS: dict[str, _OneReader] = {
             ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the FactStatus type that declares the set of histories"
             ),
+            ("webapp/page_words.py", MODULE_OWNER): (
+                "the word tables of the report page, keyed by FactStatus and held"
+                " to it by tests/test_page_words.py"
+            ),
         },
         "",
     ),
