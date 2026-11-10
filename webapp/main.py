@@ -560,8 +560,10 @@ class Workspace:
         if resumption is None:
             return None
         parent = await self.store.owned(resumption.parent_id, record.owner_id)
+        if parent is None:
+            raise LookupError(f"job {record.id} resumes a job the store lacks")
         if not isinstance(parent, JobRecord):
-            raise TypeError(f"job {record.id} resumes no readable job")
+            raise TypeError(f"job {record.id} resumes an unreadable job")
         return parent
 
     async def starts_from(self, record: Envelope) -> RunStart:
@@ -599,9 +601,9 @@ class Workspace:
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
             nodes = [event.node for event in events if event.node is not None]
             seq = events[-1].seq if events else 0
+            words = progress_after(nodes, frameworks, mode, start)["words"]
             stage = max(stage_after(nodes, frameworks, mode), stopped)
-            sent = progress_after(nodes, frameworks, mode, start)
-            return sent | {"stage": stage, "seq": seq}
+            return {"stage": stage, "words": words, "seq": seq}
 
         return line
 
