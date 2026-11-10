@@ -815,6 +815,27 @@ def test_settings_env_has_one_writer():
     assert sites == [("webapp/settings_save.py", "_commit")]
 
 
+def test_an_evidence_file_by_id_has_one_reader():
+    """Only ``ControlDocument.file`` finds an evidence file by its ID.
+
+    A second lookup can answer for a different list, so a route and a store
+    would disagree on whether a Control holds a file.
+    """
+
+    def compares(node: ast.AST) -> bool:
+        return (
+            isinstance(node, ast.Compare)
+            and any(
+                _is_attribute(side, "id") for side in (node.left, *node.comparators)
+            )
+            and any(
+                _is_name(side, "evidence_id") for side in (node.left, *node.comparators)
+            )
+        )
+
+    assert _sites(compares) == [("src/analysis_service/controls.py", "file")]
+
+
 def test_a_served_report_has_one_reader():
     """Only ``served`` asks the app whether a job's report may be served.
 

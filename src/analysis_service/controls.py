@@ -366,6 +366,10 @@ class ControlDocument(BaseModel):
     rows: list[ControlRow]
     evidence: list[EvidenceFile]
 
+    def file(self, evidence_id: str) -> EvidenceFile | None:
+        """The evidence file ``evidence_id`` of the document, or ``None``."""
+        return next((file for file in self.evidence if file.id == evidence_id), None)
+
     @field_validator("name")
     @classmethod
     def _a_name(cls, value: str) -> str:
@@ -494,9 +498,7 @@ def check_texts(
     """
     kept = {file.id: file for file in held}
     for evidence_id in texts:
-        if evidence_id in kept or all(
-            file.id != evidence_id for file in document.evidence
-        ):
+        if evidence_id in kept or document.file(evidence_id) is None:
             raise ValueError(f"evidence {evidence_id} is not a new file of the save")
     for file in document.evidence:
         if file.id in kept:

@@ -2469,11 +2469,7 @@ class SqlJobStore:
 
 def _listed(held: Control | None, evidence_id: str) -> EvidenceFile | None:
     """The evidence file ``evidence_id`` that ``held`` lists, or ``None``."""
-    if held is None:
-        return None
-    return next(
-        (file for file in held.document.evidence if file.id == evidence_id), None
-    )
+    return None if held is None else held.document.file(evidence_id)
 
 
 def _document(document: str) -> ControlDocument:

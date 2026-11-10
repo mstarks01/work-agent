@@ -90,6 +90,14 @@ def copied_control() -> CopiedControl:
     )
 
 
+def test_a_document_answers_an_evidence_file_by_its_id():
+    held = ControlDocument.model_validate(document())
+    found = held.file(EVIDENCE_ID)
+    assert found is not None
+    assert found.name == "rds.tf"
+    assert held.file("evidence-" + "f" * 32) is None
+
+
 def refusal(**changed: Any) -> str:
     with pytest.raises(ValidationError) as refused:
         ControlDocument.model_validate(document(**changed))
