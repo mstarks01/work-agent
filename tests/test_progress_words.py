@@ -224,12 +224,16 @@ def test_a_run_to_the_report_reaches_the_pause_only_for_its_controls():
     }
 
 
-@pytest.mark.parametrize("resumed", [False, True])
-def test_a_run_starts_from_a_resumption_where_its_graph_has_the_resume_entry(resumed):
+@pytest.mark.parametrize(
+    ("asks", "continues", "resumed"), itertools.product((False, True), repeat=3)
+)
+def test_a_run_starts_from_a_resumption_where_its_graph_has_the_resume_entry(
+    asks, continues, resumed
+):
     """``entry_of`` and ``run_start_of`` read one fact of a job."""
     record = JobRecord.model_construct(
-        ask_questions=False,
-        continues_at_pause=False,
+        ask_questions=asks,
+        continues_at_pause=continues,
         resumption=Resumption.model_construct() if resumed else None,
     )
     start = run_start_of(record.resumption is not None)

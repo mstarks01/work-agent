@@ -997,8 +997,13 @@ class TestTheAutomaticContinue:
         owner.runner.held = threading.Event()
         control = owner.keep("Encrypted", ORDERS_DB)
         started = owner.submit(control, questions=questions)
-        threading.Timer(0.3, owner.runner.held.set).start()
-        stream = owner.client.get(f"/events/{started.json()['run']}").text
+        release = threading.Timer(0.3, owner.runner.held.set)
+        release.start()
+        try:
+            stream = owner.client.get(f"/events/{started.json()['run']}").text
+        finally:
+            release.cancel()
+            owner.runner.held.set()
         lines = re.findall(r"event: node\ndata: (.*)\n", stream)
         assert [json.loads(line)["words"] for line in lines] == [words]
 
