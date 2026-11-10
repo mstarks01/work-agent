@@ -52,11 +52,13 @@ def config_refusal(exc: ConfigError | StoreConfigError) -> str:
 
 
 def error_place(error: Mapping[str, Any]) -> str:
-    """Where one pydantic error sits: a dotted path of declared names and indexes.
+    """Where one pydantic error sits: a dotted path of names, keys and indexes.
 
-    **A refusal names the field, never what the caller sent.** An
-    ``extra_forbidden`` error sits at a key the caller made up, so its path
-    stops at the object that holds that key.
+    **A place never names an extra field.** An ``extra_forbidden`` error sits
+    at a key the caller made up, so its path stops at the object that holds
+    that key. A key of a declared mapping stays in the path, because it names
+    the entry that is wrong, and pydantic adds the part ``[key]`` after a key
+    that the mapping refuses. The place of an error at the top is empty.
     """
     loc = error["loc"][:-1] if error["type"] == "extra_forbidden" else error["loc"]
     return ".".join(str(part) for part in loc)

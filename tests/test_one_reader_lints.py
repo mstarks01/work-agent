@@ -647,8 +647,7 @@ _OWN_FILE = (
 
 #: Each function that reads the ``loc`` of a pydantic error itself, and why it
 #: does not ask ``error_place``. ``error_place`` drops the key of an
-#: ``extra_forbidden`` error, so that a refusal never repeats a key a caller
-#: sent.
+#: ``extra_forbidden`` error, so that a place never names an extra field.
 LOC_READERS: dict[Site, str] = {
     ("src/analysis_service/claims.py", "of"): _MODEL_KEY,
     ("src/analysis_service/compact.py", "expand"): _MODEL_KEY,
