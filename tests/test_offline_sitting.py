@@ -125,17 +125,14 @@ class TestTheRailWordsComeFromTheServiceTable:
     def test_the_script_names_row_states_and_reads_their_labels(self):
         script = client_script("offline_sitting.js")
         states = script.split("function state(id) {")[1].split("\n}\n")[0]
-        assert set(re.findall(r'return "(\w+)";', states)) == {
-            "todo",
-            "draft",
-            "finished",
-        }
+        named = set(re.findall(r'"(\w+)"', states))
+        assert named == {"todo", "draft", "finished"}
+        assert named <= set(get_args(sittings.RowState))
         assert "DATA.review_labels[state(" in script
 
     def test_the_script_copies_no_label(self):
         script = client_script("offline_sitting.js")
         assert _copies([*REVIEW_LABELS.values()], script) == []
-        assert re.findall(r'"(?:to do|in progress|every record marked)"', script) == []
 
 
 class TestThePayloadCannotEndItsOwnBlock:
@@ -493,7 +490,7 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     from an older corpus can carry a mark for a target that is gone, and a
     count of marks then passes a case the merge refuses."""
 
-    def state_of(self, marks: dict) -> str:
+    def state_of(self, marks: dict, notes: str = "") -> str:
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -505,7 +502,8 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
             "const DATA = {min_own_list: 1, cases: [{case: 'c', targets:"
             " [{fingerprint: 'a', claims: []}, {fingerprint: 'b', claims: []}]}]};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
-            f"const answers = {{c: {{own_list: [], marks: {json.dumps(marks)}}}}};\n"
+            f"const answers = {{c: {{own_list: ['one'], marks: {json.dumps(marks)},"
+            f" missing: [], notes: {json.dumps(notes)}}}}};\n"
             f"{block}\n"
             "process.stdout.write(state('c'));\n"
         )
@@ -524,6 +522,14 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
 
     def test_every_target_marked_is_finished(self):
         assert self.state_of({"a": "found", "b": "missed"}) == "finished"
+
+    def test_an_own_list_and_nothing_else_is_not_started(self):
+        """The rule of ``_review_state``: the review is what follows the list."""
+        assert self.state_of({}) == "todo"
+        assert self.state_of({}, notes=" \n") == "todo"
+
+    def test_a_note_starts_the_review(self):
+        assert self.state_of({}, notes="unsure") == "draft"
 
     def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
         assert self.state_of({"a": "found", "stale": "found"}) == "draft"

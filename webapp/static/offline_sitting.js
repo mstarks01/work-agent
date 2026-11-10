@@ -21,11 +21,13 @@ const marked = id => BY_ID[id].targets.length > 0
   && BY_ID[id].targets.every(t => t.fingerprint in answers[id].marks);
 
 // The row state of a case, in the vocabulary of the rail (RowState). The
-// payload carries the words for each state (DATA.review_labels).
+// payload carries the words for each state (DATA.review_labels). An own list
+// and nothing else is not a started review, as in _review_state of the app.
+const started = held => Object.keys(held.marks).length > 0
+  || held.missing.length > 0 || held.notes.trim() !== "";
 function state(id) {
-  if (!answers[id]) return "todo";
-  if (marked(id)) return "finished";
-  return "draft";
+  if (!answers[id] || !started(answers[id])) return "todo";
+  return marked(id) ? "finished" : "draft";
 }
 
 function rail() {

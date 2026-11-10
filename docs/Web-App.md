@@ -422,9 +422,9 @@ it.
   ends its line or its statement: at the end of the line, before a `#` or a
   `;`, or, after `=`, before a `,`. The check has a limit there. A keyword
   argument such as `connect(password=pw1, host=h)` counts, although `pw1` is a
-  variable, and so does a statement such as `self.token = token1;`. Each line has a list of its class and the
-  buttons "View", "Replace" and "Remove", and a file that the Control holds
-  also has "Download". A line that the page still reads has no "View".
+  variable, and so does a statement such as `self.token = token1;`. Each line
+  has a list of its class and the buttons "View", "Replace" and "Remove", and
+  a file that the Control holds also has "Download". A line that the page still reads has no "View".
   "View" shows the file's text under the line, as plain text. "Download"
   saves a file that the Control holds. "Replace" reads a new file into the
   line and keeps its class. "Remove" takes the file out. A change of the

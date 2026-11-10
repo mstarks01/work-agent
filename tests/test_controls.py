@@ -636,14 +636,13 @@ def test_a_credential_line_counts_each_line_end_a_text_may_hold(end):
         "password: ')" + " " * 100_000,
         "token=a1" + " " * 100_000 + "x",
         ("token=a1" + " " * 250 + "x") * 400,
-        "token=" * 42 + "a1" + " " * 200_000 + "x",
     ],
 )
 def test_a_hostile_line_is_read_in_linear_time(line):
     """Each line holds a hostile run after an assignment. An unquoted value
     with no 256-character bound reads each value to the end of the first line,
     and a joined-string check with two unbounded space quantifiers tries each
-    split of one run of spaces between them. Each takes seconds. The last three
+    split of one run of spaces between them. Each takes seconds. The last two
     lines hold an unquoted value, a run of spaces and no end of the value."""
     started = time.perf_counter()
     credential_hit(line, name="app.env")

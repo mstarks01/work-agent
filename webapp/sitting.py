@@ -51,6 +51,7 @@ ContributionMode = Literal["direct", "browser"]
 #: :data:`~evals.harness.sitting.RowState`. ``/api/review-states`` hands the
 #: page the state and the label together, so the page keys its own behaviour
 #: on the state vocabulary the rail already speaks and spells no label itself.
+#: The offline page has no server, so its payload carries the whole table.
 REVIEW_LABELS: dict[sittings.RowState, str] = {
     "todo": "Not reviewed",
     "draft": "In progress",

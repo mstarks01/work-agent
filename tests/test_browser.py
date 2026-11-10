@@ -895,6 +895,7 @@ def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
     from evals.harness.reference import ANONYMOUS
     from tests import test_sitting_app as sitting
     from webapp.offline_sitting import build
+    from webapp.sitting import REVIEW_LABELS
 
     corpus = sitting.build_tree(tmp_path) / "evals" / "corpus"
     written = tmp_path / "sitting.html"
@@ -905,7 +906,7 @@ def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
     page.close()
     assert errors == [], f"the offline sitting page raised: {errors}"
     assert case_title(corpus) in text
-    assert states == {"Not reviewed"}
+    assert states == {REVIEW_LABELS["todo"]}
 
 
 def test_the_offline_sitting_page_shows_a_restored_mark_keyed_by_an_alias(
