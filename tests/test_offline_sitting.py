@@ -490,7 +490,9 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     from an older corpus can carry a mark for a target that is gone, and a
     count of marks then passes a case the merge refuses."""
 
-    def state_of(self, marks: dict, notes: str = "") -> str:
+    def state_of(
+        self, marks: dict, notes: object = "", missing: Sequence[str] = ()
+    ) -> str:
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -503,7 +505,7 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
             " [{fingerprint: 'a', claims: []}, {fingerprint: 'b', claims: []}]}]};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
             f"const answers = {{c: {{own_list: ['one'], marks: {json.dumps(marks)},"
-            f" missing: [], notes: {json.dumps(notes)}}}}};\n"
+            f" missing: {json.dumps([*missing])}, notes: {json.dumps(notes)}}}}};\n"
             f"{block}\n"
             "process.stdout.write(state('c'));\n"
         )
@@ -528,8 +530,13 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
         assert self.state_of({}) == "todo"
         assert self.state_of({}, notes=" \n") == "todo"
 
-    def test_a_note_starts_the_review(self):
+    def test_a_note_or_a_missed_threat_starts_the_review(self):
         assert self.state_of({}, notes="unsure") == "draft"
+        assert self.state_of({}, missing=["a threat"]) == "draft"
+
+    def test_a_note_that_is_not_text_draws_the_rail(self):
+        """A file that another tool wrote can hold a number as its note."""
+        assert self.state_of({}, notes=5) == "draft"
 
     def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
         assert self.state_of({"a": "found", "stale": "found"}) == "draft"
