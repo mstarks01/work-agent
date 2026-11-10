@@ -457,6 +457,36 @@ def test_a_key_or_credential_name_set_to_a_value_is_refused(line):
 
 
 @pytest.mark.parametrize(
+    "line",
+    [
+        "api_key = abc123 # prod",
+        "api_key = abc123;",
+        "api_key = abc123,",
+        "token: abc123 then more words",
+        "password=s3cr3t!\t# rotate me",
+    ],
+)
+def test_an_unquoted_value_ends_at_a_space_a_comment_or_a_separator(line):
+    assert credential_hit(f"{line}\n", name="notes.txt") == (1, SETTING)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "the password = the one in the vault, not this",
+        "password = swordfish, as the runbook says",
+        "token = name; rotate()",
+        "connect(password=pw1)",
+        "password: Optional[str2] = None",
+    ],
+)
+def test_a_value_with_no_digit_or_another_end_passes(line):
+    """A plain word before a separator stays a word, and a value that ends at
+    a bracket is a call or a type."""
+    assert credential_hit(f"{line}\n", name="notes.txt") is None
+
+
+@pytest.mark.parametrize(
     "name",
     [
         ".env",
