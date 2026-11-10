@@ -629,8 +629,9 @@ class TestSourceRendering:
 
     def test_a_run_cancelled_as_it_takes_a_free_token_returns_it(self, monkeypatch):
         # The limiter grants a free token and then yields once. A cancel that
-        # arrives at that yield must leave no token held.
-        run, release, *_ = self.held_reads(monkeypatch)
+        # arrives at that yield must leave no token held. The one started read
+        # shows that the run took its token before the cancel.
+        run, release, _, in_flight = self.held_reads(monkeypatch)
         release.set()
 
         async def scenario():
@@ -642,6 +643,7 @@ class TestSourceRendering:
             return ended.cancelled(), execution._DIAGRAM_READS.borrowed_tokens
 
         assert asyncio.run(scenario()) == (True, 0)
+        assert len(in_flight) == 1
 
     def test_a_run_cancelled_in_the_queue_starts_no_read(self, monkeypatch):
         run, release, reading, in_flight = self.held_reads(monkeypatch)

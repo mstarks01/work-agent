@@ -706,14 +706,14 @@ def _content_stability(
     runs: Sequence[ScoredRun], scope: Scope, sets: Sequence[frozenset[str]]
 ) -> dict[str, int | None]:
     """Over the references two or more runs matched: one band and one place, or not."""
-    unread: dict[str, int | None] = {
+    no_record: dict[str, int | None] = {
         "severity_held": None,
         "severity_moved": None,
         "place_held": None,
         "place_moved": None,
     }
     if IDENTIFIER_OF[scope[0]] is not None or any(run.content is None for run in runs):
-        return unread
+        return no_record
     counts = Counter(reference for matched in sets for reference in matched)
     severity_held = severity_moved = place_held = place_moved = 0
     for reference, seen in counts.items():

@@ -159,9 +159,10 @@ _DATED = (
 #: * "predates", "written before", "taken before" and "recorded before" match
 #:   only before a noun of :data:`_DATED`, with two words or fewer between;
 #:   "predates" also matches before a quoted name, and the three "before"
-#:   forms before "this was recorded" or "that was recorded". A signature that predates a revocation, a ledger written before a
-#:   rule change and an object written before a quoted time are time relations
-#:   that the code reads.
+#:   forms before "this was recorded" or "that was recorded". A signature
+#:   that predates a revocation, a ledger written before a rule change and an
+#:   object written before a quoted time are time relations that the code
+#:   reads.
 #:
 #: "legacy" is not matched, because a vendor's legacy name order and a legacy
 #: client are facts of the present. "now" before a verb is not matched,
@@ -257,9 +258,10 @@ def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
 
 
 def _breaks_before(text: str, read: str) -> int:
-    """The line breaks of ``text`` before the last character of ``read``, which
-    is a start of ``text`` with each run of white space as one space and
-    ends where a phrase starts."""
+    """The line breaks of ``text`` before the phrase that follows ``read``.
+
+    ``read`` is a start of ``text`` with each run of white space as one space,
+    and it ends where the phrase starts."""
     left = len("".join(read.split()))
     breaks = 0
     for char in text:

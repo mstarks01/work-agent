@@ -13,6 +13,7 @@ import pytest
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import ProvenanceError
+from evals.harness.run import _print_stability
 from evals.harness.stability import (
     Band,
     aggregate_stability,
@@ -443,6 +444,37 @@ class TestCauseStability:
         assert sum(counts) == entry.never
         assert aggregate_stability([entry])["cause_unread"] == counts[2]
         assert entry.to_json()["cause_unread"] == counts[2]
+
+    @pytest.mark.parametrize(
+        ("second", "cell"), [("unstated", " 0/0 +1 "), ("verb", " 1/1 ")]
+    )
+    def test_the_printed_cause_cell_adds_the_unread_count_where_there_is_one(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+        capsys,
+        second,
+        cell,
+    ):
+        record = provenance(sampling)
+        paths = [
+            write_run(
+                tmp_path,
+                f"{name}.json",
+                record,
+                [score(self.CASE, 2, [0])],
+                losses=losses_block(self.CASE, {1: cause}),
+            )
+            for name, cause in (("a", "verb"), ("b", second))
+        ]
+        runs = load_runs(paths)
+
+        _print_stability(runs, compare_runs(runs))
+
+        row = next(
+            line for line in capsys.readouterr().out.splitlines() if self.CASE in line
+        )
+        assert cell in row and ("+" in row) == ("+" in cell)
 
     def test_a_reference_missed_in_one_run_only_has_no_cause_to_compare(
         self,

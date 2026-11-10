@@ -187,9 +187,10 @@ async def _seed_off_the_loop(
 ) -> dict[str, Any]:
     """:func:`seed_state` on a worker thread, under :data:`_DIAGRAM_READS`.
 
-    The token stays held until the thread ends. A cancel of the caller cannot
-    stop the thread or its Node process, so the read runs in a task of its own
-    that the cancel does not reach, and that task returns the token. A caller
+    The token stays held until the read task ends, and that task ends with the
+    thread unless the loop closes. A cancel of the caller cannot stop the
+    thread or its Node process, so the read runs in a task of its own that the
+    cancel does not reach, and the end of that task returns the token. A caller
     cancelled while it waits for a token starts no read. A free token is taken
     with no yield: the limiter yields after it grants one, and a cancel at that
     yield leaves the token with a holder that nothing returns it for.
@@ -199,24 +200,17 @@ async def _seed_off_the_loop(
         _DIAGRAM_READS.acquire_on_behalf_of_nowait(holder)
     except anyio.WouldBlock:
         await _DIAGRAM_READS.acquire_on_behalf_of(holder)
-    read = asyncio.ensure_future(_held_read(holder, sources, extra_state))
-    _READS_IN_FLIGHT.add(read)
-    read.add_done_callback(_READS_IN_FLIGHT.discard)
-    return await asyncio.shield(read)
-
-
-async def _held_read(
-    holder: object, sources: Sequence[Source], extra_state: Mapping[str, Any] | None
-) -> dict[str, Any]:
-    """Run the read for the caller that took the token, then return the token."""
-    try:
-        # A limiter of one for this call: `_DIAGRAM_READS` already counts this
-        # read, and the default limiter belongs to the request path.
-        return await anyio.to_thread.run_sync(
+    # A limiter of one for this call: `_DIAGRAM_READS` already counts this
+    # read, and the default limiter belongs to the request path.
+    read = asyncio.ensure_future(
+        anyio.to_thread.run_sync(
             seed_state, sources, extra_state, limiter=anyio.CapacityLimiter(1)
         )
-    finally:
-        _DIAGRAM_READS.release_on_behalf_of(holder)
+    )
+    _READS_IN_FLIGHT.add(read)
+    read.add_done_callback(_READS_IN_FLIGHT.discard)
+    read.add_done_callback(lambda _: _DIAGRAM_READS.release_on_behalf_of(holder))
+    return await asyncio.shield(read)
 
 
 def seed_state(
