@@ -59,6 +59,7 @@ from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import CaseFlows, endpoint_form
+from evals.harness.losses import Cause
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import MUST_FIND
@@ -155,11 +156,15 @@ class CaseStability:
     sometimes: int
     never: int
     mean_jaccard: float
-    #: Of the references every run missed, how many were charged to one cause
-    #: in every run and how many to more than one. ``None`` for both where any
-    #: run carries no loss rows, because an absent cause is not an agreeing one.
+    #: The references every run missed, in three counts that sum to ``never``:
+    #: charged to one cause in every run, charged to more than one, and charged
+    #: ``unstated`` by any run. ``unstated`` says the archive holds no position
+    #: to read, so such a reference shows neither one cause nor two. ``None``
+    #: for all three where any run carries no loss rows, because an absent
+    #: cause is not an agreeing one.
     cause_stable: int | None = None
     cause_moving: int | None = None
+    cause_unread: int | None = None
     #: Of the references two or more runs matched, how many kept one severity
     #: band across every run that matched them, and how many kept one
     #: resolved place. ``None`` where any run has no report bundle to read, or
@@ -192,6 +197,7 @@ class CaseStability:
             "mean_jaccard": round(self.mean_jaccard, 3),
             "cause_stable": self.cause_stable,
             "cause_moving": self.cause_moving,
+            "cause_unread": self.cause_unread,
             "severity_held": self.severity_held,
             "severity_moved": self.severity_moved,
             "place_held": self.place_held,
@@ -654,17 +660,26 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
     return stability
 
 
+#: The cause that says an archive holds no position to read.
+_UNREAD_CAUSE: Cause = "unstated"
+
+
 def _cause_stability(
     runs: Sequence[ScoredRun],
     scope: Scope,
     references: int,
     sets: Sequence[frozenset[str]],
 ) -> dict[str, int | None]:
-    """Over the references every run missed: one cause each time, or several."""
+    """Over the references every run missed: one cause, several, or unread.
+
+    A reference that any run charges :data:`_UNREAD_CAUSE` is unread, whatever
+    the other runs charge.
+    """
     if any(run.causes is None for run in runs):
-        return {"cause_stable": None, "cause_moving": None}
+        return {"cause_stable": None, "cause_moving": None, "cause_unread": None}
     never = {str(index) for index in range(references)} - frozenset.union(*sets)
     stable = 0
+    unread = 0
     for reference in never:
         causes = set()
         for run in runs:
@@ -676,8 +691,15 @@ def _cause_stability(
                     f" {reference} and its losses block charges it to nothing"
                 )
             causes.add(charged)
-        stable += len(causes) == 1
-    return {"cause_stable": stable, "cause_moving": len(never) - stable}
+        if _UNREAD_CAUSE in causes:
+            unread += 1
+        else:
+            stable += len(causes) == 1
+    return {
+        "cause_stable": stable,
+        "cause_moving": len(never) - stable - unread,
+        "cause_unread": unread,
+    }
 
 
 def _content_stability(
@@ -779,6 +801,7 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
         "cases": len(stability),
         "cause_stable": pooled("cause_stable"),
         "cause_moving": pooled("cause_moving"),
+        "cause_unread": pooled("cause_unread"),
         "severity_held": pooled("severity_held"),
         "severity_moved": pooled("severity_moved"),
         "place_held": pooled("place_held"),

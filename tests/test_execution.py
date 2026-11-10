@@ -572,6 +572,90 @@ class TestSourceRendering:
 
         assert threads and loop_thread not in threads
 
+    def test_a_cancelled_run_holds_its_read_token_until_the_thread_ends(
+        self, monkeypatch
+    ):
+        # The deadline and the stop control cancel a run with a native cancel.
+        # The read thread and its Node process continue, so the token must too:
+        # a third read may start only when one of the two threads ends.
+        pipeline, _ = scripted_pipeline(happy_replies())
+        release = threading.Event()
+        reading = threading.Semaphore(0)
+        in_flight = []
+
+        def seeding(*args):
+            in_flight.append(threading.get_ident())
+            reading.release()
+            release.wait(10)
+            return seed_state(*args)
+
+        monkeypatch.setattr(execution, "seed_state", seeding)
+
+        async def run():
+            await GraphExecutor(pipeline, app_name="stride-test").run(
+                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+            )
+
+        async def scenario():
+            limiter = execution._DIAGRAM_READS
+            total = int(limiter.total_tokens)
+            cancelled = [asyncio.create_task(run()) for _ in range(total)]
+            for _ in cancelled:
+                await asyncio.to_thread(reading.acquire)
+            for task in cancelled:
+                task.cancel()
+            await asyncio.wait(cancelled)
+            held_after_cancel = limiter.borrowed_tokens
+            later = asyncio.create_task(run())
+            await asyncio.sleep(0.3)
+            threads_while_held = len(in_flight)
+            release.set()
+            await later
+            return held_after_cancel, threads_while_held, limiter.borrowed_tokens
+
+        held_after_cancel, threads_while_held, held_at_end = asyncio.run(scenario())
+
+        assert held_after_cancel == 2
+        assert threads_while_held == 2
+        assert held_at_end == 0
+
+    def test_a_run_cancelled_in_the_queue_starts_no_read(self, monkeypatch):
+        pipeline, _ = scripted_pipeline(happy_replies())
+        release = threading.Event()
+        reading = threading.Semaphore(0)
+        in_flight = []
+
+        def seeding(*args):
+            in_flight.append(threading.get_ident())
+            reading.release()
+            release.wait(10)
+            return seed_state(*args)
+
+        monkeypatch.setattr(execution, "seed_state", seeding)
+
+        async def run():
+            await GraphExecutor(pipeline, app_name="stride-test").run(
+                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+            )
+
+        async def scenario():
+            limiter = execution._DIAGRAM_READS
+            first = [
+                asyncio.create_task(run()) for _ in range(int(limiter.total_tokens))
+            ]
+            for _ in first:
+                await asyncio.to_thread(reading.acquire)
+            queued = asyncio.create_task(run())
+            await asyncio.sleep(0.1)
+            queued.cancel()
+            await asyncio.wait([queued])
+            release.set()
+            await asyncio.gather(*first)
+            await asyncio.sleep(0.1)
+            return len(in_flight), limiter.borrowed_tokens
+
+        assert asyncio.run(scenario()) == (2, 0)
+
     def test_seeding_the_input_text_directly_is_refused(self):
         # Seeding raw text is what would let the service and the eval harness
         # show one job to a model differently, so it is inexpressible.

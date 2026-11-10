@@ -21,6 +21,7 @@ seam, so a render one level up would be two renders that have to agree.
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -175,6 +176,42 @@ def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
 #: queue of reads takes no slot of the default limiter from the request path.
 #: Small because each Node process holds about 140 MB.
 _DIAGRAM_READS = anyio.CapacityLimiter(2)
+
+#: The reads that hold a token, so that no task of a cancelled caller is
+#: collected before its thread ends.
+_READS_IN_FLIGHT: set[asyncio.Task[dict[str, Any]]] = set()
+
+
+async def _seed_off_the_loop(
+    sources: Sequence[Source], extra_state: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """:func:`seed_state` on a worker thread, under :data:`_DIAGRAM_READS`.
+
+    The token stays held until the thread ends. A cancel of the caller cannot
+    stop the thread or its Node process, so the read runs in a task of its own
+    that the cancel does not reach, and that task returns the token. A caller
+    cancelled while it waits for a token starts no read.
+    """
+    holder = object()
+    await _DIAGRAM_READS.acquire_on_behalf_of(holder)
+    read = asyncio.ensure_future(_held_read(holder, sources, extra_state))
+    _READS_IN_FLIGHT.add(read)
+    read.add_done_callback(_READS_IN_FLIGHT.discard)
+    return await asyncio.shield(read)
+
+
+async def _held_read(
+    holder: object, sources: Sequence[Source], extra_state: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """Run the read for the caller that took the token, then return the token."""
+    try:
+        # A limiter of one for this call: `_DIAGRAM_READS` already counts this
+        # read, and the default limiter belongs to the request path.
+        return await anyio.to_thread.run_sync(
+            seed_state, sources, extra_state, limiter=anyio.CapacityLimiter(1)
+        )
+    finally:
+        _DIAGRAM_READS.release_on_behalf_of(holder)
 
 
 def seed_state(
@@ -387,9 +424,7 @@ class GraphExecutor:
         run means, and nothing here converts a failure into a run that looks
         short or into one that looks free.
         """
-        seed = await anyio.to_thread.run_sync(
-            seed_state, sources, extra_state, limiter=_DIAGRAM_READS
-        )
+        seed = await _seed_off_the_loop(sources, extra_state)
         rendered = seed[STATE_INPUT_TEXT]
 
         session = await self._session_service.create_session(

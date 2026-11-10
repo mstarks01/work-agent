@@ -2024,13 +2024,18 @@ def _print_stability(
         """``kept/compared``, or ``-`` where a run predates the record it needs."""
         return "-" if kept is None or moved is None else f"{kept}/{kept + moved}"
 
+    def cause(entry: CaseStability) -> str:
+        """The cause cell: ``kept/compared``, then ``+unread`` where there is one."""
+        compared = held(entry.cause_stable, entry.cause_moving)
+        return f"{compared} +{entry.cause_unread}" if entry.cause_unread else compared
+
     for entry in stability:
         recalls = " ".join(f"{recall:.2f}" for recall in entry.recalls)
         always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
         print(
             f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
             f" {entry.recall_spread:8.2f} {always:>16} {entry.mean_jaccard:9.2f}"
-            f" {held(entry.cause_stable, entry.cause_moving):>10}"
+            f" {cause(entry):>10}"
             f" {held(entry.severity_held, entry.severity_moved):>10}"
             f" {held(entry.place_held, entry.place_moved):>10}"
         )
@@ -2044,7 +2049,8 @@ def _print_stability(
         " (instrument, non-gating)"
     )
     print(
-        "  the cause column is references every run missed that kept one cause;"
+        "  the cause column is references every run missed that kept one cause,"
+        " and +n is those a run charged unstated, which show no cause to compare;"
         " severity and place are references two or more runs matched that kept"
         " one band and one resolved place; - means a run predates the record"
     )

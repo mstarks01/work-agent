@@ -401,6 +401,49 @@ class TestCauseStability:
         assert (entry.cause_stable, entry.cause_moving) == (2, 1)
         assert aggregate_stability([entry])["cause_stable"] == 2
 
+    @pytest.mark.parametrize(
+        ("first", "second", "counts"),
+        [
+            ("verb", "verb", (1, 0, 0)),
+            ("verb", "place", (0, 1, 0)),
+            ("position", "unstated", (0, 0, 1)),
+            ("unstated", "position", (0, 0, 1)),
+            ("unstated", "unstated", (0, 0, 1)),
+            ("unstated", "verb", (0, 0, 1)),
+        ],
+    )
+    def test_a_reference_any_run_charges_unstated_is_unread(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+        first,
+        second,
+        counts,
+    ):
+        """``unstated`` says the archive holds no position to read, so the
+        pair shows neither one cause nor two."""
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: first}),
+        )
+        b = write_run(
+            tmp_path,
+            "b.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: second}),
+        )
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert (entry.cause_stable, entry.cause_moving, entry.cause_unread) == counts
+        assert sum(counts) == entry.never
+        assert aggregate_stability([entry])["cause_unread"] == counts[2]
+        assert entry.to_json()["cause_unread"] == counts[2]
+
     def test_a_reference_missed_in_one_run_only_has_no_cause_to_compare(
         self,
         tmp_path,
@@ -443,7 +486,9 @@ class TestCauseStability:
         entry = compare_runs(load_runs([a, b]))[0]
 
         assert entry.cause_stable is None and entry.cause_moving is None
+        assert entry.cause_unread is None
         assert aggregate_stability([entry])["cause_stable"] is None
+        assert aggregate_stability([entry])["cause_unread"] is None
 
     def test_a_run_that_omits_the_block_reads_unread_rather_than_refusing(
         self,
