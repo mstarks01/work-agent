@@ -627,6 +627,22 @@ class TestSourceRendering:
         assert threads_while_held == 2
         assert held_at_end == 0
 
+    def test_a_run_cancelled_as_it_takes_a_free_token_returns_it(self, monkeypatch):
+        # The limiter grants a free token and then yields once. A cancel that
+        # arrives at that yield must leave no token held.
+        run, release, *_ = self.held_reads(monkeypatch)
+        release.set()
+
+        async def scenario():
+            task = asyncio.create_task(run())
+            await asyncio.sleep(0)
+            task.cancel()
+            (ended,), _ = await asyncio.wait([task])
+            await asyncio.sleep(0.3)
+            return ended.cancelled(), execution._DIAGRAM_READS.borrowed_tokens
+
+        assert asyncio.run(scenario()) == (True, 0)
+
     def test_a_run_cancelled_in_the_queue_starts_no_read(self, monkeypatch):
         run, release, reading, in_flight = self.held_reads(monkeypatch)
 

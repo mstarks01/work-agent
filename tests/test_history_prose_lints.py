@@ -114,6 +114,14 @@ DIAGRAMS = without(
     },
 )
 
+#: What a record carries or names, as the "predates" and "written before"
+#: templates of :data:`HISTORY` read it after the verb: the thing whose absence
+#: the sentence dates.
+_DATED = (
+    r"(fields?|keys?|pin|map|instruments?|blocks?|generator|naming|versioning"
+    r"|identities)"
+)
+
 #: Each phrase names an earlier state of the code. Case-insensitive. A phrase
 #: that also describes run-time data is held to its history reading:
 #:
@@ -149,8 +157,9 @@ DIAGRAMS = without(
 #:   "these" or "its"), because a guide says what holds before a new package
 #:   existed.
 #: * "predates", "written before", "taken before" and "recorded before" match
-#:   only before a noun of :data:`_DATED`, and "predates" also before a quoted
-#:   name. A signature that predates a revocation, a ledger written before a
+#:   only before a noun of :data:`_DATED`, with two words or fewer between;
+#:   "predates" also matches before a quoted name, and the three "before"
+#:   forms before "this was recorded" or "that was recorded". A signature that predates a revocation, a ledger written before a
 #:   rule change and an object written before a quoted time are time relations
 #:   that the code reads.
 #:
@@ -158,12 +167,6 @@ DIAGRAMS = without(
 #: client are facts of the present. "now" before a verb is not matched,
 #: because "the price map now disagrees" and "the part now has another name"
 #: describe run-time data.
-#: What a record carries or names, as the "predates" template reads it after
-#: the verb: the thing whose absence the sentence dates.
-_DATED = (
-    r"(fields?|keys?|pin|map|instruments?|blocks?|generator|naming|versioning"
-    r"|identities)"
-)
 HISTORY = re.compile(
     r"\b(used to|was written for|before this (\w+ )?(existed|one)|previously"
     r"|had been|until now|the old |now that|in the past|formerly|originally"
@@ -255,17 +258,27 @@ def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
 
 def _breaks_before(text: str, read: str) -> int:
     """The line breaks of ``text`` before the last character of ``read``, which
-    is a start of ``text`` with each run of white space as one space."""
+    is a start of ``text`` with each run of white space as one space and
+    ends where a phrase starts."""
     left = len("".join(read.split()))
     breaks = 0
     for char in text:
-        if not left:
-            break
         if char == "\n":
             breaks += 1
         elif not char.isspace():
+            if not left:
+                break
             left -= 1
     return breaks
+
+
+def test_a_hit_names_the_line_its_phrase_starts_on():
+    texts = [(7, "One line.\nIt used to hold a key\n    written before\n  the field.")]
+
+    assert _hits(REPO_ROOT / "x.py", texts) == ["x.py:8 'used to'"]
+    assert _hits(REPO_ROOT / "x.py", [(7, "A row\n  written before\n the field.")]) == [
+        "x.py:8 'written before the field'"
+    ]
 
 
 def history() -> list[str]:

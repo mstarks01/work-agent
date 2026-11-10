@@ -24,8 +24,8 @@ with it. **Content stability**: for a reference two or more runs matched,
 whether the matching claims kept one severity band and one resolved place
 across the runs. Five case 01 runs matched reference 17 every time and rated
 it high four times and critical once; recall called that stable. Both read
-what an artifact and its report bundle already hold, and each says
-``unread`` where a run lacks the block it needs rather than reporting a
+what an artifact and its report bundle already hold, and each gives
+``None`` where a run lacks the block it needs rather than reporting a
 zero. Wording is not compared: it moves every run, and comparing it as prose
 would measure the tokenizer.
 
@@ -314,7 +314,7 @@ def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
 
     Two artifacts have no causes to read and they are different files: one
     omits the key, and one ran it over a mode that
-    charges nothing and writes ``None``. Both read ``unread`` here, and neither
+    charges nothing and writes ``None``. Both read ``None`` here, and neither
     may take the rest of the comparison down with it — recall and content need
     no losses block.
     """

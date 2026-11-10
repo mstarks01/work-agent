@@ -190,10 +190,15 @@ async def _seed_off_the_loop(
     The token stays held until the thread ends. A cancel of the caller cannot
     stop the thread or its Node process, so the read runs in a task of its own
     that the cancel does not reach, and that task returns the token. A caller
-    cancelled while it waits for a token starts no read.
+    cancelled while it waits for a token starts no read. A free token is taken
+    with no yield: the limiter yields after it grants one, and a cancel at that
+    yield leaves the token with a holder that nothing returns it for.
     """
     holder = object()
-    await _DIAGRAM_READS.acquire_on_behalf_of(holder)
+    try:
+        _DIAGRAM_READS.acquire_on_behalf_of_nowait(holder)
+    except anyio.WouldBlock:
+        await _DIAGRAM_READS.acquire_on_behalf_of(holder)
     read = asyncio.ensure_future(_held_read(holder, sources, extra_state))
     _READS_IN_FLIGHT.add(read)
     read.add_done_callback(_READS_IN_FLIGHT.discard)
