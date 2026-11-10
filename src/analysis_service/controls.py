@@ -549,15 +549,13 @@ class EvidenceRefusal:
 #: every credential, and the page and the refusal say so. An assignment of a
 #: name that ends in one of :data:`_CREDENTIAL_NAME` counts only where it sets a
 #: literal value: a quoted string that closes, a quoted or an unquoted run of
-#: 256 characters, or an unquoted value that holds a digit or a symbol and ends
-#: at a space, a ``#``, a ``;``, a ``,`` or the end of its line. A quoted value
-#: does not count where it starts with a reference or a space, where it is only
-#: a mask of ``*``, or where it joins a name to another string, as
-#: ``"token=" + tok + "x"`` does. So a masked value, a joined log string and a
-#: type name with no digit pass. An unquoted name that holds a digit reads as a
-#: value, so a line of code such as ``f(token=tok2, user=u)`` is refused. An
-#: empty string does not count either. Each start reads at most 257 characters
-#: of a value, so one scan of a line stays linear.
+#: 256 characters, or an unquoted value at the end of its line that holds a
+#: digit or a symbol. A quoted value does not count where it starts with a
+#: reference or a space, where it is only a mask of ``*``, or where it joins a
+#: name to another string, as ``"token=" + tok + "x"`` does. So a type name, a
+#: masked value and a joined log string pass. An empty string does not count
+#: either. Each start reads at most 257 characters of a value, so one scan of
+#: a line stays linear.
 CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
@@ -589,8 +587,7 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
         r"(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
         r"|'(?![$<{%'\s]|\*+'|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|'))"
         r"(?:[^'\n]{1,256}'|[^'\n]{256})"
-        rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}"
-        rf"(?=[\s#;,]|$)"
+        rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}\s*$"
         rf"|{_UNQUOTED}{{256}}))"
     ),
 }

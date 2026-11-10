@@ -258,8 +258,9 @@ const formControls = (() => {
     return { on: false, element: target ?? (entry.element ? entry.element.id : ""), ticks: new Set() };
   };
   // A zone Control with an element goes in each save, with no tick while it
-  // is off: the service then leaves it out as "unticked", and `accepted`
-  // keeps its zone. Any other Control that is off stays out of the save.
+  // is off: the service then leaves it out as "unticked" or "empty-zone",
+  // and `accepted` keeps its zone. Any other Control that is off stays out
+  // of the save.
   const scopesOf = (offer, picks) => offer.flatMap((entry) => {
     const pick = picks.get(entry.id);
     if (entry.scope.type === "boundary") {
