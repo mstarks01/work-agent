@@ -534,26 +534,31 @@ class Workspace:
         return _page_status(record)
 
     async def asks(self, record: Envelope) -> bool:
-        """Whether the run of ``record`` stops to ask a person.
+        """Whether the run of ``record`` stops to ask a person: a job in
+        flight that will stop, or a job that waits for answers.
 
         The envelope leaves the resumption out, and a Resumed Job never stops
-        to ask, so this reads the resumption by name. A record that
-        :func:`readable` refuses has ended, and its resumption is never read.
+        to ask, so this reads the resumption of a job in flight by name. A job
+        in flight is a job of this process, so its resumption parses. The
+        resumption of a job that ended is never read.
         """
         if not (readable(record) and record.pauses_to_ask()):
             return False
+        if ended(record):
+            return record.status == "awaiting-answers"
         return await self.store.resumption(record.id, record.owner_id) is None
 
-    async def progress_line(
-        self, record: JobRecord
+    def progress_line(
+        self, record: JobRecord, asks: bool
     ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
         """The reader of the progress line of ``record`` after a list of its
         node events (:func:`webapp.page_words.progress_after`), with the
         ``seq`` of the last event, so the page keeps the latest line it got.
 
-        ``record`` is one that :func:`readable` accepts.
+        ``record`` is one that :func:`readable` accepts, and ``asks`` is the
+        answer of :meth:`asks` for it.
         """
-        mode = progress_mode(await self.asks(record))
+        mode = progress_mode(asks)
         frameworks = [selection.name for selection in record.whole_frameworks()]
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
@@ -2278,7 +2283,7 @@ def create_app(
         if payload["status"] == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
-            line = await workspace.progress_line(record)
+            line = workspace.progress_line(record, payload["pauses"] is True)
             payload["progress"] = line(
                 [event for event in record.events if event.kind == "node"]
             )
@@ -2541,8 +2546,9 @@ def create_app(
 
     @app.get("/events/{run_id}")
     async def events(run_id: str) -> Response:
-        """The job's status and node events, as the store records them, until
-        the job reaches a terminal status."""
+        """The job's status events, as the store records them, until the job
+        reaches a terminal status, with the progress line after each node
+        event of a job that has not ended."""
 
         def no_stream() -> Response:
             return PlainTextResponse("no such run", status_code=404)
@@ -2558,7 +2564,9 @@ def create_app(
                 run_id,
                 # A job that ended before this request can be a record of an
                 # earlier build, with node names that no graph holds.
-                None if ended(record) else await workspace.progress_line(record),
+                None
+                if ended(record)
+                else workspace.progress_line(record, await workspace.asks(record)),
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},

@@ -1746,12 +1746,12 @@
   asked.addEventListener("click", () => updateQuestionActions());
 
   // Follow one run's progress to its end: a report, questions, or a failure.
-  const follow = (runId, initialStage) => {
+  const follow = (runId, initialWords) => {
     running = true;
     gate();
     if (typeof workspace !== "undefined") workspace.track(runId);
-    working(initialStage);
-    if (typeof workspace !== "undefined") workspace.processing(null, initialStage, runId);
+    working(initialWords);
+    if (typeof workspace !== "undefined") workspace.processing(null, initialWords, runId);
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
