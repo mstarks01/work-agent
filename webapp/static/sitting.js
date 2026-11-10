@@ -27,12 +27,12 @@ function post(path, body) {
   return fetch(path, {method: "POST", headers: headers, body: JSON.stringify(body)});
 }
 
-// The one reader of each answer that the page reads. An answer that is ok gives its
-// `body`. Each other answer gives a sentence in `problem`: the `detail` of a
-// refusal of the app, `refused` for a refusal that is not the app's JSON, and
-// the interrupted sentence for a request that did not arrive or an ok answer
-// that is not JSON. `again` says what the reader does next.
-async function answerOf(request, refused, again = "Try again.") {
+// What one answer gives the page. An answer that is ok gives its `body`. Each
+// other answer gives a sentence in `problem`: the `detail` of a refusal of the
+// app, `fallback` for a refusal that is not the app's JSON, and the
+// interrupted sentence for a request that did not arrive or an ok answer that
+// is not JSON. `again` says what the reader does next.
+async function answerOf(request, fallback, again = "Try again.") {
   const lost = {problem: "The connection was interrupted. " + again};
   let res;
   try {
@@ -42,7 +42,7 @@ async function answerOf(request, refused, again = "Try again.") {
   }
   const body = await jsonOf(res);
   if (res.ok) return body === null ? lost : {body};
-  return {refused: true, problem: typeof body?.detail === "string" ? body.detail : refused};
+  return {refused: true, problem: typeof body?.detail === "string" ? body.detail : fallback};
 }
 
 // Every field in part two saves on a short delay, and the walk flushes before
@@ -564,13 +564,17 @@ function finishedNow(done) {
 
 $("own").addEventListener("input", gate);
 
+// Whether the stage left the case of a press. A press that opens a case raises
+// `turn` before its draft save and sets `current` after it, so each one is read.
+const movedOn = (id, mine) => current !== id || mine !== turn;
+
 $("lock").addEventListener("click", async () => {
   const id = current;
   const mine = turn;
   const {problem} = await answerOf(
     post("/api/own-list", {case: id, items: lines("own")}), "Not locked. Try again.");
   // A case opened meanwhile owns the stage: the answer changes only the rail.
-  if (mine !== turn) { if (!problem) await loadRail(); return; }
+  if (movedOn(id, mine)) { if (!problem) await loadRail(); return; }
   if (problem) { $("ownHint").textContent = problem; return; }
   lock();
   await loadRail();
@@ -603,7 +607,7 @@ $("finish").addEventListener("click", async () => {
     finishing = false;
     updateMarkCounts();
   }
-  if (mine !== turn) { if (!problem) await loadRail(); return; }
+  if (movedOn(id, mine)) { if (!problem) await loadRail(); return; }
   if (problem) { $("saveStatus").textContent = problem; return; }
   warn(d.moved);
   $("summary").textContent = markSummary();
@@ -619,7 +623,7 @@ $("resetReview").addEventListener("click", async () => {
   if (!id) return;
   if (!confirm("Reset your Part 2 answers for this case? Your independent list will stay locked.")) return;
   const {problem} = await answerOf(post("/api/reset", {case: id}), "Not reset. Try again.");
-  if (mine !== turn) { if (!problem) await loadRail(); return; }
+  if (movedOn(id, mine)) { if (!problem) await loadRail(); return; }
   if (problem) { $("saveStatus").textContent = problem; return; }
   for (const s of allSelects()) s.value = "";
   $("missing").value = "";
@@ -744,7 +748,8 @@ $("submit").addEventListener("click", async () => {
   let d, problem, refused;
   try {
     ({body: d, problem, refused} = await answerOf(
-      post("/api/contribute", choice), "Contribution needs attention", "Contribute again."));
+      post("/api/contribute", choice), "Contribution needs attention",
+      "Check whether a pull request opened before you contribute again."));
   } finally {
     submitting = false;
     submitGate();

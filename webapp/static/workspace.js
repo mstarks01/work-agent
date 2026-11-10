@@ -140,7 +140,7 @@ const workspace = (() => {
         if (!response) refusal = "Not renamed. The connection was interrupted.";
         else if (!response.ok) refusal = await messageOf(response, "Could not rename it.");
       }
-      renaming = null;
+      if (renaming === input) renaming = null;
       await library();
       if (refusal) message(refusal);
     };

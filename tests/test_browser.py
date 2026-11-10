@@ -5055,6 +5055,29 @@ def test_the_last_case_pressed_owns_the_stage(sitting_page):
     _open_case(page, case)
 
 
+def test_a_record_pressed_while_the_next_case_opens_leaves_it(sitting_page):
+    """A press of a case saves the draft before the stage changes. A record
+    pressed in that time belongs to the case that the stage shows then."""
+    page, _, (case, other) = sitting_page
+    _open_case(page, case)
+    drafts: list = []
+    page.route(
+        "**/api/draft",
+        lambda route: drafts.append(route) if not drafts else route.fallback(),
+    )
+    finishes = _hold(page, "**/api/finish")
+    _press_case(page, other)
+    _wait_for(page, drafts)
+    page.click("#finish")
+    _wait_for(page, finishes)
+    drafts[0].continue_()
+    page.wait_for_function("id => current === id", arg=other)
+    with page.expect_response("**/api/rail"):
+        finishes[0].continue_()
+    page.wait_for_timeout(300)
+    assert page.is_hidden("#done")
+
+
 def test_a_drop_keeps_the_author_the_reader_typed(sitting_page):
     page, _, _ = sitting_page
     _open_submit(page)

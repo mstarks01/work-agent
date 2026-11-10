@@ -1575,6 +1575,7 @@
     // button starts it.
     if (!left && !saved && !gates.length && !optional && !data.refusal) {
       pausedRun = data.run;
+      pauseEnded = false;
       revision = data.revision;
       startAnalysis();
       return;
