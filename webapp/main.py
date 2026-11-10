@@ -321,10 +321,10 @@ from webapp.page_words import (
     REPORT_WORDS,
     STAGE_COUNT,
     PageStatus,
-    ProgressMode,
     change_line,
     island_tables,
     progress_after,
+    progress_mode,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -553,7 +553,7 @@ class Workspace:
 
         ``record`` is one that :func:`readable` accepts.
         """
-        mode: ProgressMode = "to-questions" if await self.asks(record) else "to-report"
+        mode = progress_mode(await self.asks(record))
         frameworks = [selection.name for selection in record.whole_frameworks()]
 
         def line(events: Sequence[JobEvent]) -> dict[str, object]:

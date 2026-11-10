@@ -229,6 +229,12 @@ EMPTY_LIST_REASONS: Mapping[EmptyListReason, str] = MappingProxyType(
 ProgressMode = Literal["to-questions", "to-report"]
 
 
+def progress_mode(asks: bool) -> ProgressMode:
+    """The progress mode of a run that stops to ask a person, or of one that
+    does not."""
+    return "to-questions" if asks else "to-report"
+
+
 #: What the progress line says before the first step of a run completes. A
 #: page that starts a run from a description shows the ``to-questions`` words
 #: in each mode.

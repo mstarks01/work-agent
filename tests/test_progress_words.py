@@ -23,8 +23,8 @@ from tests import test_webapp
 from tests.factories import scripted_pipeline
 from tests.test_page_words import _copies
 from tests.test_webapp import (
-    PROJECT_ROOT,
     SAME_ORIGIN,
+    STATIC_SCRIPTS,
     _island,
     page_javascript,
     posted,
@@ -54,11 +54,6 @@ OTHER_MEANINGS = {
     "first_run.js": {'"analyze"', '"stated"'},
     "report_view.js": {'"critic"'},
 }
-
-#: Each script of ``webapp/static``.
-SCRIPTS = sorted(
-    path.name for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-)
 
 
 def built_node_names(selection: tuple[FrameworkName, ...]) -> list[set[str]]:
@@ -149,7 +144,7 @@ def test_the_line_keeps_the_highest_stage_and_the_words_of_the_last_node():
     }
 
 
-@pytest.mark.parametrize("script", SCRIPTS)
+@pytest.mark.parametrize("script", STATIC_SCRIPTS)
 def test_no_page_script_names_a_node_or_copies_the_words_of_a_step(script):
     """A script that reads a node name is a second reader of the graph."""
     code = page_javascript(script)
