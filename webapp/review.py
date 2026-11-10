@@ -62,6 +62,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Literal, get_args
 
 from fastapi import FastAPI, HTTPException, Request
@@ -409,6 +410,12 @@ def _require_token(request: Request, session: Session) -> None:
 ReasonKind = Literal["substance", "style"]
 
 
+#: The heading ``review_finding.js`` gives the group of each kind.
+REASON_KIND_HEADINGS: Mapping[ReasonKind, str] = MappingProxyType(
+    {"substance": "It is wrong", "style": "It is badly written"}
+)
+
+
 def _reason_kind(code: str) -> ReasonKind:
     return "substance" if code in SUBSTANCE_REASONS else "style"
 
@@ -424,7 +431,8 @@ def _reason_payload() -> list[dict[str, str]]:
         {
             "code": code,
             "gloss": REASON_GLOSS[code],
-            "kind": _reason_kind(code),
+            "kind": (kind := _reason_kind(code)),
+            "heading": REASON_KIND_HEADINGS[kind],
         }
         for code in sorted(SUBSTANCE_REASONS) + sorted(STYLE_REASONS)
     ]

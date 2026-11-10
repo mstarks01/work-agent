@@ -327,13 +327,14 @@ function notes(row) {
   ];
 }
 
-// One entry for each source that settings_view.ValueOrigin names.
+// One entry for each source that settings_view.ValueOrigin names. The words
+// of a source come with its row (settings_view.ORIGIN_WORDS).
 const sources = {
-  "process": (row) => [h("span", { class: "tag outside" }, "process environment"), hint(h("code", {}, row.variable))],
-  "page": () => h("span", { class: "tag" }, "this page"),
+  "process": (row) => [h("span", { class: "tag outside" }, row.source_text), hint(h("code", {}, row.variable))],
+  "page": (row) => h("span", { class: "tag" }, row.source_text),
   "file": (row) => h("code", {}, row.file),
-  "refused": (row) => [h("span", { class: "tag outside" }, "refused"), hint(h("code", {}, row.refusal))],
-  "default": () => h("span", { class: "tag" }, "default"),
+  "refused": (row) => [h("span", { class: "tag outside" }, row.source_text), hint(h("code", {}, row.refusal))],
+  "default": (row) => h("span", { class: "tag" }, row.source_text),
 };
 
 function source(row) {

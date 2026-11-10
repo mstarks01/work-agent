@@ -20,7 +20,7 @@ from analysis_service.frameworks import PreconditionResult
 from analysis_service.report_changes import Change, FindingChange
 from tests.factories import report_state, sample_report
 from tests.test_webapp import _island, page_javascript
-from webapp import page_words
+from webapp import page_words, review, settings_view
 from webapp.main import render_report
 
 FORM_TABLES = {
@@ -146,6 +146,29 @@ def test_the_form_scripts_copy_no_word_of_a_table():
 
     assert _copies(sentences, scripts) == []
     assert _copies([*FACET_ANSWERS], page_javascript("answer_editor.js")) == []
+
+
+@pytest.mark.parametrize(
+    ("table", "vocabulary", "script"),
+    [
+        (settings_view.ORIGIN_WORDS, settings_view.ValueOrigin, "settings.js"),
+        (review.REASON_KIND_HEADINGS, review.ReasonKind, "review_finding.js"),
+    ],
+)
+def test_a_table_that_an_answer_carries_names_its_set_and_has_no_copy(
+    table, vocabulary, script
+):
+    """The words of these tables reach the page in the rows of an answer.
+    ``refused`` and ``default`` spell their own keys, which ``settings.js``
+    reads, so the copy check reads the texts of several words."""
+    assert set(table) == set(get_args(vocabulary))
+    assert (
+        _copies(
+            [text for text in _texts(dict(table)) if " " in text],
+            page_javascript(script),
+        )
+        == []
+    )
 
 
 def test_each_template_holds_only_the_fields_its_script_fills():

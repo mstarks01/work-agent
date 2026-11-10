@@ -32,9 +32,9 @@ class Node {
 }
 const rows = [
   { key: "tiers.base.vendor", group: "Models", label: "Base vendor", value: "anthropic",
-    shipped: "anthropic", source: "page", mark: "changes", options: ["anthropic", "openai"] },
+    shipped: "anthropic", source: "page", source_text: "this page", mark: "changes", options: ["anthropic", "openai"] },
   { key: "credentials.anthropic.api_key", group: "Credentials", label: "Anthropic API key",
-    value: null, shipped: null, source: "page", mark: "changes", secret: true,
+    value: null, shipped: null, source: "page", source_text: "this page", mark: "changes", secret: true,
     key_saved: false, vendor: "anthropic", modes: ["api_key"] },
 ];
 const settings = { revision: "one", rows, modes: { anthropic: ["api_key"], openai: ["api_key"] },

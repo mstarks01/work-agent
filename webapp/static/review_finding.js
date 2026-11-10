@@ -52,7 +52,7 @@
       const group = document.createElement("div");
       group.className = "rgroup " + kind;
       const head = document.createElement("h3");
-      head.textContent = kind === "substance" ? "It is wrong" : "It is badly written";
+      head.textContent = rows[0].heading;
       group.appendChild(head);
       rows.forEach(reason => {
         const button = document.createElement("button");
