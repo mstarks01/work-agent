@@ -86,7 +86,7 @@ the source's placement, and on a flow out of a tenant zone only when the
 crossing is decided
 ([ADR 0128](adr/0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md)).
 An undecidable crossing is not in the evidence catalog either: each unplaced
-end offers an `unknown` entry for its `trust_zone` instead.
+end publishes an `unknown` entry for its `trust_zone` instead.
 
 **Flow direction is who initiates.** A data flow records the initiator, not a
 one-directional movement of bytes. A service reading a store and a service

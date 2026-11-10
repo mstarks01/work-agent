@@ -116,7 +116,8 @@ class TestEvidenceCatalog:
         ``decided=False``. The catalog is what an agent may cite and a critic
         lets stand, so an entry for it would say a boundary was crossed — the
         one thing rule 4 says an undecidable crossing does not establish. The
-        unplaced zone still reaches the agent as its own ``unknown`` entry.
+        unplaced endpoint still publishes an ``unknown`` entry for its
+        ``trust_zone``.
         """
         model = valid_model()
         model.data_stores[0].trust_zone = UNKNOWN
