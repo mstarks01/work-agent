@@ -26,7 +26,12 @@ from analysis_service.controls import (
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import STATE_CONTROL_LINES, STATE_FACT_ANSWERS
 from analysis_service.job_answers import JobAnswers
-from analysis_service.job_controls import NOT_COPIED, resolutions
+from analysis_service.job_controls import (
+    COVER_MEANINGS,
+    FACT_MEANINGS,
+    NOT_COPIED,
+    resolutions,
+)
 from analysis_service.jobs import (
     Admission,
     Checkpoint,
@@ -295,6 +300,10 @@ class TestTheOffer:
             "store:orders-db": ("zone-inferred", False),
             "store:audit-log": ("no-zone-stated", False),
         }
+        assert all(
+            cover["meaning"] == COVER_MEANINGS[cover["reason"]]
+            for cover in offer["Segmented"]["covers"]
+        )
         assert offer["Segmented"]["resolution"]["covers"] == [
             {"element": "process:web-app", "reason": "stated-zone", "ticked": True},
             {"element": "store:orders-db", "reason": "zone-inferred", "ticked": False},
@@ -525,7 +534,7 @@ class TestTheSubmission:
         after = owner.client.get(f"/workspace/runs/{run_id}").json()
         assert after == before
         assert after["controls_used"] == [
-            {"id": sso, "name": "SSO", "state": "applied"}
+            {"id": sso, "name": "SSO", "state": "applied", "state_text": "applied"}
         ]
         copies = asyncio.run(owner.store.controls(run_id, owner.owner_id()))
         assert [copy.document.name for copy in copies] == ["SSO"]
@@ -539,7 +548,14 @@ class TestTheSubmission:
         run_id = started.json()["run"]
         assert ran(owner.client, run_id) == "failed"
         used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
-        assert used == [{"id": sso, "name": "SSO", "state": "pending"}]
+        assert used == [
+            {
+                "id": sso,
+                "name": "SSO",
+                "state": "pending",
+                "state_text": "not matched yet",
+            }
+        ]
 
     def test_a_withheld_report_lists_each_control_pending(self, owner, monkeypatch):
         sso = owner.keep("SSO", {"type": "application"})
@@ -551,7 +567,14 @@ class TestTheSubmission:
         assert ran(owner.client, run_id) == "completed"
         monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
         used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
-        assert used == [{"id": sso, "name": "SSO", "state": "pending"}]
+        assert used == [
+            {
+                "id": sso,
+                "name": "SSO",
+                "state": "pending",
+                "state_text": "not matched yet",
+            }
+        ]
 
     def test_a_job_with_no_control_lists_none(self, owner):
         run_id = owner.paused()
@@ -839,6 +862,13 @@ class TestTheFacts:
         assert owner.answers_source(child) == [
             DB_LINE,
             DB_LINE.replace('"Encrypted"', '"Encrypted again"'),
+        ]
+
+    def test_the_pause_says_what_became_of_each_control_fact(self, owner):
+        run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
+        facts = owner.questions(run_id)["control_facts"]
+        assert [(fact["state"], fact["meaning"]) for fact in facts] == [
+            ("written", FACT_MEANINGS["written"])
         ]
 
     def test_an_untick_takes_the_control_fact_away(self, owner):

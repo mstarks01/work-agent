@@ -29,7 +29,6 @@ from analysis_service.claims import (
     Severity,
     Verdict,
 )
-from analysis_service.controls import scope_phrase
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import RULING_LISTS, SectionEntry, section_summary
 from analysis_service.open_facts import element_names
@@ -91,7 +90,7 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
     for entry in section:
         lines.append(f"### {_text(entry.name)}")
         lines.append("")
-        phrase = _text(scope_phrase(entry.scope))
+        phrase = _text(entry.scope_phrase)
         if entry.state == "applied":
             reached = ", ".join(_text(element.name) for element in entry.elements)
             lines.append(
@@ -99,7 +98,9 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
                 + (f", applied to {reached}." if reached else ".")
             )
         else:
-            lines.append(f"Protects {phrase}: left out, because {entry.meaning}.")
+            lines.append(
+                f"Protects {phrase}: {entry.state_text}, because {entry.meaning}."
+            )
         for fact in entry.facts:
             stated = (
                 f" (the description states “{_text(fact.stated)}”)"

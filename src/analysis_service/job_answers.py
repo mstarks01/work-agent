@@ -62,6 +62,7 @@ from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
 from analysis_service.job_controls import (
     CONTROL_GONE,
+    FACT_MEANINGS,
     ControlScopeEntry,
     CopiedControl,
     changes_nothing,
@@ -357,6 +358,7 @@ class Answerable:
                     "name": entry.name,
                     "label": fact_label(fact.answer.key, self.model),
                     "state": fact.state,
+                    "meaning": FACT_MEANINGS[fact.state],
                     "stated": fact.stated,
                     "answer": fact.answer.model_dump(mode="json"),
                 }
