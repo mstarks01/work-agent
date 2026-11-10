@@ -474,8 +474,8 @@ def test_kept_text_has_one_reader():
     assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
 
 
-#: Each site that splits a text on ``"\n"`` alone, with the reason. A line
-#: split of an uploaded text calls
+#: Each site that cuts a text at a separator in ``_NEWLINE_SEPARATORS``, with
+#: the reason. A line split of an uploaded text calls
 #: :func:`~analysis_service.owner_files.text_lines`.
 NEWLINE_SPLITS: dict[Site, str] = {
     (".github/scripts/five_class_read.py", "rendered"): (

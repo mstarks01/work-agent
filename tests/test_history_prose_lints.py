@@ -142,7 +142,8 @@ DIAGRAMS = without(
 #:   because a tier row is moved from one vendor to another;
 #: * a commit matches only after a capital "At" that opens a sentence;
 #: * "what changed" matches only before "is";
-#: * "before ... existed" matches only "this", a quoted name with or without
+#: * "until ... existed" matches only "this"; "before ... existed" matches
+#:   only "this", a quoted name with or without
 #:   a role, or a part of a record (a field, a key, a mark, an instrument, a
 #:   cause, a block or a table, one or many, after "the", "a", "an", "those",
 #:   "these" or "its"), because a guide says what holds before a new package
@@ -153,7 +154,7 @@ DIAGRAMS = without(
 #: because "the price map now disagrees" and "the part now has another name"
 #: describe run-time data.
 HISTORY = re.compile(
-    r"\b(used to|was written for|before this (\w+ )?(existed|one)|previously"
+    r"\b(used to|was written for|(before|until) this (\w+ )?(existed|one)|previously"
     r"|had been|until now|the old |now that|in the past|formerly|originally"
     r"|historically|once (had|took|wrote|sat|listed|lacked|missed|floored|ended)"
     r"|before this[,:.]|until #\d+|this replaced|(branch|if`?|list) it replaced"
@@ -375,6 +376,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "A sweep recorded before the instrument existed carries no block.",
         "A run wrote it before ``attacker_position`` existed.",
         "A report written before those fields existed reads as no schema.",
+        "A rule about writes read both as writes until this field existed.",
         "It cost 13.5 seconds of CPU before :class:`_Scan` existed.",
     )
     for text in history:

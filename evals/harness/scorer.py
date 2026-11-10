@@ -461,7 +461,7 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
 
     The one reader of which statuses answer a finding. The scorer's
     ``reviewed`` count, the published table's coverage, the gain gate's
-    unanswered count and the count in a sweep's review prompt all read it, so
+    unanswered count and the count that ``command_run`` prints all read it, so
     the four agree on one population.
     """
     answered = sum(counts.get(status, 0) for status in _ANSWERED)
