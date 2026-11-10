@@ -229,6 +229,7 @@ from analysis_service.job_controls import (
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
+    JobEvent,
     JobRecord,
     JobStore,
     PipelineRunner,
@@ -318,9 +319,12 @@ from webapp.page import (
 from webapp.page_words import (
     FORM_WORDS,
     REPORT_WORDS,
+    STAGE_COUNT,
     PageStatus,
     change_line,
     island_tables,
+    progress_after,
+    progress_mode,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -528,6 +532,41 @@ class Workspace:
         if isinstance(record, JobRecord) and self.continuing(record):
             return "running"
         return _page_status(record)
+
+    async def asks(self, record: Envelope) -> bool:
+        """Whether the run of ``record`` stops to ask a person: a job in
+        flight that will stop, or a job that waits for answers.
+
+        The envelope leaves the resumption out, and a Resumed Job never stops
+        to ask, so this reads the resumption of a job in flight by name. A job
+        in flight is a job of this process, so its resumption parses. The
+        resumption of a job that ended is never read.
+        """
+        if not (readable(record) and record.pauses_to_ask()):
+            return False
+        if ended(record):
+            return record.status == "awaiting-answers"
+        return await self.store.resumption(record.id, record.owner_id) is None
+
+    def progress_line(
+        self, record: JobRecord, asks: bool
+    ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
+        """The reader of the progress line of ``record`` after a list of its
+        node events (:func:`webapp.page_words.progress_after`), with the
+        ``seq`` of the last event, so the page keeps the latest line it got.
+
+        ``record`` is one that :func:`readable` accepts, and ``asks`` is the
+        answer of :meth:`asks` for it.
+        """
+        mode = progress_mode(asks)
+        frameworks = [selection.name for selection in record.whole_frameworks()]
+
+        def line(events: Sequence[JobEvent]) -> dict[str, object]:
+            nodes = [event.node for event in events if event.node is not None]
+            seq = events[-1].seq if events else 0
+            return progress_after(nodes, frameworks, mode) | {"seq": seq}
+
+        return line
 
     def continuing(self, record: JobRecord) -> bool:
         """Whether this process continues ``record`` at its pause: the job
@@ -742,7 +781,7 @@ class Workspace:
             "status": self.page_status(record),
             # Whether the run stops to ask a person, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": isinstance(record, JobRecord) and record.pauses_to_ask(),
+            "pauses": await self.asks(record),
             "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {
@@ -1737,6 +1776,7 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 facet_answers=script_json(list(FACET_ANSWERS)),
                 form_words=script_json(island_tables(FORM_WORDS)),
+                stage_count=str(STAGE_COUNT),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 theme=_THEME,
@@ -2240,9 +2280,13 @@ def create_app(
         if record is None:
             return no_such_run()
         payload = await workspace.snapshot(answers, record)
-        payload["completed_steps"] = [
-            event.node for event in record.events if event.kind == "node"
-        ]
+        if payload["status"] == "running":
+            # A job that runs is a job of this process, so each node of its
+            # events is a node of a graph of its selection.
+            line = workspace.progress_line(record, payload["pauses"] is True)
+            payload["progress"] = line(
+                [event for event in record.events if event.kind == "node"]
+            )
         payload["selection"] = [
             {"name": selection.name, "options": dict(selection.options)}
             for selection in record.whole_frameworks()
@@ -2502,17 +2546,28 @@ def create_app(
 
     @app.get("/events/{run_id}")
     async def events(run_id: str) -> Response:
-        """The job's status and node events, as the store records them, until
-        the job reaches a terminal status."""
+        """The job's status events, as the store records them, until the job
+        reaches a terminal status, with the progress line after each node
+        event of a job that has not ended."""
 
         def no_stream() -> Response:
             return PlainTextResponse("no such run", status_code=404)
 
         current = cell.read(no_stream)
-        if await workspace.envelope(current.answers, run_id) is None:
+        record = await workspace.envelope(current.answers, run_id)
+        if record is None:
             return no_stream()
         return StreamingResponse(
-            _stream(workspace, current.answers, run_id),
+            _stream(
+                workspace,
+                current.answers,
+                run_id,
+                # A job that ended before this request can be a record of an
+                # earlier build, with node names that no graph holds.
+                None
+                if ended(record)
+                else workspace.progress_line(record, await workspace.asks(record)),
+            ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
@@ -2740,18 +2795,31 @@ def _frame(event: EndFrame, data: dict[str, object]) -> str:
 
 
 async def _stream(
-    workspace: Workspace, answers: JobAnswers, run_id: str
+    workspace: Workspace,
+    answers: JobAnswers,
+    run_id: str,
+    progress: Callable[[Sequence[JobEvent]], dict[str, object]] | None,
 ) -> AsyncIterator[str]:
-    """Every event the store records for the job, as it records them, then
-    one frame for how it ended.
+    """Every status event the store records for the job, as it records them,
+    then one frame for how it ended. Where ``progress`` is given, each node
+    event gets a frame too: the progress line after that node, and no node
+    name.
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions
     a pause asks, where a report is, why a report is withheld, why a
     description was refused, or why a run failed.
     """
-    async for frame in event_frames(workspace.store, run_id):
-        yield frame
+
+    def frame(event: JobEvent) -> str | None:
+        if event.node is None:
+            return event.sse_frame()
+        if progress is None:
+            return None
+        return event.framed(json.dumps(progress([event])))
+
+    async for written in event_frames(workspace.store, run_id, frame=frame):
+        yield written
     try:
         record = await workspace.envelope(answers, run_id)
     except UnreadableSchema as refusal:

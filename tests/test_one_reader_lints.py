@@ -3086,3 +3086,13 @@ def test_a_subjects_table_has_one_reader():
         return any(not _calls(value, "subjects_of") for value in values)
 
     assert _sites(writes_a_table) == sorted(OWN_SUBJECT_TABLES)
+
+
+def test_the_workspace_has_one_reader_of_whether_a_run_stops_to_ask():
+    """An envelope holds no resumption, so ``pauses_to_ask`` on it is wrong for
+    a Resumed Job. ``Workspace.asks`` is the reader. ``Workspace.waiting``
+    reads only a job that waits for answers, which holds no resumption."""
+    assert _sites(lambda node: _calls(node, "pauses_to_ask")) == [
+        ("webapp/main.py", "asks"),
+        ("webapp/main.py", "waiting"),
+    ]

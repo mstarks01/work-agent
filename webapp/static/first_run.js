@@ -378,7 +378,7 @@
       }
       const run = (await jsonOf(started))?.run;
       if (!run) throw new Error("the answer names no run");
-      follow(run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
+      follow(run, FORM_WORDS.progress_start["to-questions"]);
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -1451,7 +1451,7 @@
       answerProblem.hidden = true;
       asked.hidden = true;
       pauseEnded = true;
-      follow(run, "Reading your description and identifying the parts of your system…", true);
+      follow(run, FORM_WORDS.progress_start["to-questions"]);
     })), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     if (data.asks) tail.append(fix);
@@ -1690,7 +1690,7 @@
       answerProblem.hidden = true;
       asked.hidden = true;
       pauseEnded = true;
-      follow(run, "Using your answers to continue the analysis…", false);
+      follow(run, "Using your answers to continue the analysis…");
     } finally {
       starting = false;
       startButton.disabled = false;
@@ -1746,12 +1746,12 @@
   asked.addEventListener("click", () => updateQuestionActions());
 
   // Follow one run's progress to its end: a report, questions, or a failure.
-  const follow = (runId, initialStage, pauses) => {
+  const follow = (runId, initialWords) => {
     running = true;
     gate();
     if (typeof workspace !== "undefined") workspace.track(runId);
-    working(initialStage);
-    if (typeof workspace !== "undefined") workspace.processing([], pauses, initialStage, runId);
+    working(initialWords);
+    if (typeof workspace !== "undefined") workspace.processing(null, initialWords, runId);
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
@@ -1766,11 +1766,11 @@
     stream.addEventListener("continuing", () => working("Continuing with your Controls…"));
     stream.addEventListener("continued", (event) => {
       stream.close();
-      follow(JSON.parse(event.data).run, "Continuing with your Controls…", false);
+      follow(JSON.parse(event.data).run, "Continuing with your Controls…");
     });
     stream.addEventListener("node", (event) => {
       if (typeof workspace !== "undefined") {
-        workspace.processing([JSON.parse(event.data).node], pauses, undefined, runId);
+        workspace.processing(JSON.parse(event.data), undefined, runId);
       }
     });
     stream.addEventListener("done", (event) => {
@@ -1807,5 +1807,5 @@
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
   if (followed) {
-    follow(followed, "Using your answers to continue the analysis…", false);
+    follow(followed, "Using your answers to continue the analysis…");
   }
