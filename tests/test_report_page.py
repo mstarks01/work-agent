@@ -358,20 +358,6 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     assert f"— {ANSWERS_LABEL}" not in text
 
 
-def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
-    """The page's WHY_OPEN table and FactStatus are one set."""
-    from typing import get_args
-
-    from analysis_service.report_conditions import FactStatus
-    from tests.test_webapp import viewer_javascript
-
-    table = re.search(
-        r"const WHY_OPEN = \{(.*?)\n  \};", viewer_javascript(), re.DOTALL
-    )
-    keys = set(re.findall(r"^\s*(\w+):", table.group(1), re.MULTILINE))
-    assert keys == set(get_args(FactStatus))
-
-
 @pytest.mark.parametrize(
     "step", [None, "evidence", "reasoning", "lane", "duplicate", "control"]
 )
@@ -383,6 +369,7 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
 
     from analysis_service.claims import RejectionStep, RuledClaim
     from tests.test_webapp import viewer_javascript
+    from webapp.page_words import UNIT_RULING_WORDS
 
     assert set(get_args(RejectionStep)) == {
         "evidence",
@@ -401,7 +388,8 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
     )
     verdict = {"status": "rejected", "rejected_because": step}
     program = (
-        f"const UNITS = {{asvs: ['1.1.1']}};\n{rule}\n"
+        f"const UNITS = {{asvs: ['1.1.1']}};\n"
+        f"const UNIT_RULING = {json.dumps(dict(UNIT_RULING_WORDS))};\n{rule}\n"
         f"console.log(JSON.stringify(rulesOnUnit("
         f"{{framework: 'asvs'}}, {{verdict: {json.dumps(verdict)}}})));"
     )
@@ -672,39 +660,14 @@ def _page_table_keys(name):
     return set(re.findall(r'(?:^|[,\n])\s*"?([\w-]+)"?\s*:', body))
 
 
-def _scope_states():
-    from analysis_service.claims import ScopeEntry
-
-    return ScopeEntry.model_fields["state"].annotation
-
-
-@pytest.mark.parametrize(
-    ("table", "vocabulary"),
-    [
-        ("GROUND_KIND", "analysis_service.claims:GroundKind"),
-        ("SEV", "analysis_service.claims:SeverityLevel"),
-        ("VERDICT_GLYPH", "analysis_service.claims:VerdictStatus"),
-        ("SCOPE_STATE", None),
-        ("CHANGE_LINE", "analysis_service.report_changes:Change"),
-        ("RECOMMENDATIONS", "analysis_service.claims:VerdictStatus"),
-        ("HISTORY", "analysis_service.report_conditions:FactStatus"),
-    ],
-)
-def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
-    """A page table keyed by a closed vocabulary holds every value of it.
-
-    A value the table lacks renders as a raw key or as nothing.
-    """
-    import importlib
+def test_the_glyph_table_answers_for_each_verdict_status():
+    """The page's glyph table holds every verdict status. A status the table
+    lacks renders as ``undefined`` beside its label."""
     from typing import get_args
 
-    if vocabulary is None:
-        values = get_args(_scope_states())
-    else:
-        module, name = vocabulary.split(":")
-        values = get_args(getattr(importlib.import_module(module), name))
+    from analysis_service.claims import VerdictStatus
 
-    assert _page_table_keys(table) == set(values)
+    assert _page_table_keys("VERDICT_GLYPH") == set(get_args(VerdictStatus))
 
 
 @pytest.mark.parametrize(
@@ -779,8 +742,7 @@ def test_the_page_reads_the_service_s_severity_order():
     """The page orders severity by ``SEVERITY_ORDER`` as the server sends it.
 
     The page holds no order of its own, so a level the service adds lands in
-    the summary and the finding rows. ``SEV`` labels each level, and the
-    table test holds its keys.
+    the summary and the finding rows. ``SEVERITY_LABELS`` labels each level.
     """
     from analysis_service.critic import SEVERITY_ORDER
     from tests.test_webapp import _island, viewer_javascript

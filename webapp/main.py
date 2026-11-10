@@ -313,6 +313,7 @@ from webapp.page import (
     response,
     script_json,
 )
+from webapp.page_words import REPORT_WORDS, change_line
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
@@ -1231,7 +1232,8 @@ def render_report(
         changes=script_json(
             {
                 "findings": [
-                    change.to_json() for change in report_changes(previous, report)
+                    change.to_json() | {"line": change_line(change)}
+                    for change in report_changes(previous, report)
                 ]
             }
             if previous is not None
@@ -1240,6 +1242,9 @@ def render_report(
         severity_order=script_json(list(SEVERITY_ORDER)),
         verdict_labels=script_json(dict(VERDICT_LABELS)),
         unit_verdict_words=script_json(dict(UNIT_VERDICT_WORDS)),
+        report_words=script_json(
+            {name: dict(table) for name, table in REPORT_WORDS.items()}
+        ),
         element_type_nouns=script_json(dict(ELEMENT_TYPE_NOUNS)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
         mermaid=script_json(styled_mermaid(report.system_model)),
