@@ -496,8 +496,8 @@ NEWLINE_SPLITS: dict[Site, str] = {
 }
 
 
-#: Each separator, or pattern for ``re.split``, that ends a line only at
-#: ``"\n"``.
+#: Each separator, or pattern for ``re.split``, that cuts a text at the end
+#: of a line and reads no other line ending that ``splitlines`` reads.
 _NEWLINE_SEPARATORS = frozenset({"\n", "\r\n", b"\n", b"\r\n", r"\n", r"\r?\n"})
 
 #: The calls that cut a text at a separator.
@@ -1837,7 +1837,10 @@ def _reads_an_answer_status(node: ast.AST) -> bool:
     if _loads(node, "_ANSWERED"):
         return True
     if isinstance(node, ast.BinOp):
-        return {getattr(node.left, "attr", ""), getattr(node.right, "attr", "")} == {
+        return isinstance(node.op, ast.Add) and {
+            getattr(node.left, "attr", ""),
+            getattr(node.right, "attr", ""),
+        } == {
             "unvoted_count",
             "stale_count",
         }
@@ -1848,6 +1851,25 @@ def _reads_an_answer_status(node: ast.AST) -> bool:
     else:
         return False
     return _is_constant(key, "unvoted") or _is_constant(key, "stale")
+
+
+@pytest.mark.parametrize(
+    ("expression", "refused"),
+    [
+        ("score.unvoted_count + score.stale_count", True),
+        ("score.stale_count + score.unvoted_count", True),
+        ('counts["unvoted"]', True),
+        ('counts.get("stale", 0)', True),
+        ("score.unvoted_count - score.stale_count", False),
+        ("score.unvoted_count + score.flagged_count", False),
+        ("score.stale_count", False),
+    ],
+)
+def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bool):
+    found = any(
+        _reads_an_answer_status(node) for node in ast.walk(ast.parse(expression))
+    )
+    assert found is refused
 
 
 def _reads_a_flow_label(node: ast.AST) -> bool:

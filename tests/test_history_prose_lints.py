@@ -142,9 +142,11 @@ DIAGRAMS = without(
 #:   because a tier row is moved from one vendor to another;
 #: * a commit matches only after a capital "At" that opens a sentence;
 #: * "what changed" matches only before "is";
-#: * "before ... existed" matches only "this", a quoted name, or a part of a
-#:   record ("the field", "a key", "the mark", "the instrument", "the
-#:   cause"), because a guide says what holds before a new package existed.
+#: * "before ... existed" matches only "this", a quoted name with or without
+#:   a role, or a part of a record (a field, a key, a mark, an instrument, a
+#:   cause, a block or a table, one or many, after "the", "a", "an", "those",
+#:   "these" or "its"), because a guide says what holds before a new package
+#:   existed.
 #:
 #: "legacy" is not matched, because a vendor's legacy name order and a legacy
 #: client are facts of the present. "now" before a verb is not matched,

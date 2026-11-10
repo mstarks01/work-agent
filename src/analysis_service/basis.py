@@ -31,7 +31,7 @@ decision with its own evidence (#470), and this module does not make it.
 here worth reading twice. A search costs the length of a source, and the number
 of searches is how many different words a model's controls name — so a
 150-element model of invented controls over a 100 KiB source costs 13.5 seconds
-of CPU with no :class:`_Scan`. Memoizing takes the repeated half of that
+of CPU when no search is memoized. Memoizing takes the repeated half of that
 away and :data:`MAX_SCAN_WORK` bounds the rest. Stopping is affordable for the
 same reason the whole module is safe: nothing downstream reads the result.
 
