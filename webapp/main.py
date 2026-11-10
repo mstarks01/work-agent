@@ -539,10 +539,10 @@ class Workspace:
         """Whether the run of ``record`` stops to ask a person: a job in
         flight that will stop, or a job that waits for answers.
 
-        The envelope leaves the resumption out, and a Resumed Job never stops
-        to ask, so this reads the resumption of a job in flight by name. A job
-        in flight is a job of this process, so its resumption parses. The
-        resumption of a job that ended is never read.
+        A Resumed Job never stops to ask, so this asks :meth:`starts_from`
+        what a job in flight does first. A job in flight is a job of this
+        process, so its resumption parses. The resumption of a job that ended
+        is never read.
         """
         if not (readable(record) and record.pauses_to_ask()):
             return False
