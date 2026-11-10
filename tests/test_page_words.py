@@ -33,7 +33,8 @@ FORM_TABLES = {
     "PAGE_STATUS_LABELS": page_words.PageStatus,
     "GATE_NOTES": PreconditionResult,
     "EMPTY_LIST_REASONS": EmptyListReason,
-    "INITIAL_PROGRESS_WORDS": page_words.ProgressMode,
+    "INITIAL_PROGRESS_WORDS": page_words.RunStart,
+    "PROGRESS_PANEL_WORDS": page_words.ProgressPanelLine,
 }
 
 REPORT_TABLES = {
@@ -221,7 +222,14 @@ def test_each_template_holds_only_the_fields_its_script_fills():
         "gate_notes": {"name"},
         "empty_list": {"held_back"},
         "progress_start": set(),
+        "progress_panel": {"clock", "complete", "count"},
     }
+    panel = page_javascript("workspace.js")
+    assert '["still-working"].replace("{clock}", clock)' in panel
+    assert (
+        '["stages-complete"].replace("{complete}", progress.value)'
+        '.replace("{count}", progress.max)'
+    ) in panel
     script = page_javascript("first_run.js")
     assert 'gate_notes[state].replace("{name}", name)' in script
     assert 'empty_list[data.early_stop].replace("{held_back}", heldBack)' in script

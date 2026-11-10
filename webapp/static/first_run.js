@@ -378,7 +378,7 @@
       }
       const run = (await jsonOf(started))?.run;
       if (!run) throw new Error("the answer names no run");
-      follow(run, FORM_WORDS.progress_start["to-questions"]);
+      follow(run, FORM_WORDS.progress_start.description);
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -1451,7 +1451,7 @@
       answerProblem.hidden = true;
       asked.hidden = true;
       pauseEnded = true;
-      follow(run, FORM_WORDS.progress_start["to-questions"]);
+      follow(run, FORM_WORDS.progress_start.description);
     })), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     if (data.asks) tail.append(fix);
@@ -1690,7 +1690,7 @@
       answerProblem.hidden = true;
       asked.hidden = true;
       pauseEnded = true;
-      follow(run, "Using your answers to continue the analysis…");
+      follow(run, FORM_WORDS.progress_panel["continues-with-answers"]);
     } finally {
       starting = false;
       startButton.disabled = false;
@@ -1763,10 +1763,10 @@
       showQuestions(JSON.parse(event.data));
     });
     // A job with Controls and no questions continues at its pause at once.
-    stream.addEventListener("continuing", () => working("Continuing with your Controls…"));
+    stream.addEventListener("continuing", () => working(FORM_WORDS.progress_panel["continues-with-controls"]));
     stream.addEventListener("continued", (event) => {
       stream.close();
-      follow(JSON.parse(event.data).run, "Continuing with your Controls…");
+      follow(JSON.parse(event.data).run, FORM_WORDS.progress_panel["continues-with-controls"]);
     });
     stream.addEventListener("node", (event) => {
       if (typeof workspace !== "undefined") {
@@ -1807,5 +1807,5 @@
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
   if (followed) {
-    follow(followed, "Using your answers to continue the analysis…");
+    follow(followed, FORM_WORDS.progress_panel["continues-with-answers"]);
   }

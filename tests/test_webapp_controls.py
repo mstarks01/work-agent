@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import threading
 from uuid import uuid4
 
 import pytest
@@ -24,7 +25,11 @@ from analysis_service.controls import (
     scope_phrase,
 )
 from analysis_service.fact_answers import FactAnswer
-from analysis_service.graph import STATE_CONTROL_LINES, STATE_FACT_ANSWERS
+from analysis_service.graph import (
+    PAUSE_NODE,
+    STATE_CONTROL_LINES,
+    STATE_FACT_ANSWERS,
+)
 from analysis_service.job_answers import JobAnswers
 from analysis_service.job_controls import (
     COVER_MEANINGS,
@@ -108,6 +113,9 @@ class ZonedRunner(PausingRunner):
 
     #: Whether each run raises, so its job fails.
     fails = False
+    #: Set by a test that reads the line of the pause: the run sends the
+    #: pause node and waits for the event.
+    held: threading.Event | None = None
     #: How many runs extracted a description and paused.
     heads = 0
 
@@ -116,6 +124,10 @@ class ZonedRunner(PausingRunner):
             raise RuntimeError("the run failed")
         if job.pauses():
             self.heads += 1
+            if self.held is not None:
+                await on_node(PAUSE_NODE)
+                while not self.held.is_set():
+                    await asyncio.sleep(0.01)
             checkpoint = Checkpoint(
                 system_model=zoned_model(), assertions=HELD.assertions
             )
@@ -974,6 +986,21 @@ class TestTheAutomaticContinue:
             ("Encrypted", DB_KEY, "AES-256", "written", "")
         ]
         assert owner.runner.heads == 1
+
+    @pytest.mark.parametrize(
+        ("questions", "words"),
+        [(False, "Preparing your Controls…"), (True, "Generating questions…")],
+    )
+    def test_the_line_before_the_pause_names_what_the_pause_is_for(
+        self, owner, questions, words
+    ):
+        owner.runner.held = threading.Event()
+        control = owner.keep("Encrypted", ORDERS_DB)
+        started = owner.submit(control, questions=questions)
+        threading.Timer(0.3, owner.runner.held.set).start()
+        stream = owner.client.get(f"/events/{started.json()['run']}").text
+        lines = re.findall(r"event: node\ndata: (.*)\n", stream)
+        assert [json.loads(line)["words"] for line in lines] == [words]
 
     def test_the_paused_job_reads_as_its_resumed_job(self, owner):
         """The parent waits with no task, and its Resumed Job locks it, so the

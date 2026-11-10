@@ -128,8 +128,8 @@ further framework adds its own lane nodes to that. The page shows a progress bar
 of four stages and one status line, for example
 `1 of 4 stages complete · Checking the system map for gaps or conflicting details…`.
 The bar counts completed stages, not elapsed time. A run that stops for your
-answers counts the extraction, the checks of the system model, the question
-catalog and the pause. A run toward a report counts the extraction, the
+answers counts the extraction and the checks of the system model, and its last
+step fills the bar. A run toward a report counts the extraction, the
 preparation, the review of the findings and the report assembly. The status line
 names the next stage in plain words, and the page shows no graph node name.
 
@@ -499,7 +499,8 @@ a Control of a part or a zone applies where its name or an alias matches, and
 a Control that covers no part is left out.
 Controls apply at the pause. With the questions off, a job with Controls also
 pauses, and the service continues it at once with no answers (ADR 0125). The
-page shows "Continuing with your Controls…" until the next run starts. Each
+last line of that job before its pause reads "Preparing your Controls…". The
+page then shows "Continuing with your Controls…" until the next run starts. Each
 Control takes its default match. A refusal, such as two Controls that write
 one fact with two values, leaves the job at the pause, and the page shows the
 refusal above the questions. Untick one of the Controls there, then continue.

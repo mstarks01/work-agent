@@ -321,10 +321,12 @@ from webapp.page_words import (
     REPORT_WORDS,
     STAGE_COUNT,
     PageStatus,
+    RunStart,
     change_line,
     island_tables,
     progress_after,
     progress_mode,
+    run_start,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -546,17 +548,24 @@ class Workspace:
             return False
         if ended(record):
             return record.status == "awaiting-answers"
-        return await self.store.resumption(record.id, record.owner_id) is None
+        return await self.run_start(record) == "description"
+
+    async def run_start(self, record: Envelope) -> RunStart:
+        """What the run of ``record``, a job in flight, does first. The
+        envelope leaves the resumption out, so this reads it by name."""
+        resumption = await self.store.resumption(record.id, record.owner_id)
+        return run_start(resumption is not None)
 
     def progress_line(
-        self, record: JobRecord, asks: bool
+        self, record: JobRecord, asks: bool, start: RunStart
     ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
         """The reader of the progress line of ``record`` after a list of its
         node events (:func:`webapp.page_words.progress_after`), with the
         ``seq`` of the last event, so the page keeps the latest line it got.
 
-        ``record`` is one that :func:`readable` accepts, and ``asks`` is the
-        answer of :meth:`asks` for it.
+        ``record`` is a job in flight that :func:`readable` accepts. ``asks``
+        is the answer of :meth:`asks` for it, and ``start`` the answer of
+        :meth:`run_start`.
         """
         mode = progress_mode(asks)
         frameworks = [selection.name for selection in record.whole_frameworks()]
@@ -564,7 +573,7 @@ class Workspace:
         def line(events: Sequence[JobEvent]) -> dict[str, object]:
             nodes = [event.node for event in events if event.node is not None]
             seq = events[-1].seq if events else 0
-            return progress_after(nodes, frameworks, mode) | {"seq": seq}
+            return progress_after(nodes, frameworks, mode, start) | {"seq": seq}
 
         return line
 
@@ -2283,7 +2292,9 @@ def create_app(
         if payload["status"] == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
-            line = workspace.progress_line(record, payload["pauses"] is True)
+            line = workspace.progress_line(
+                record, payload["pauses"] is True, await workspace.run_start(record)
+            )
             payload["progress"] = line(
                 [event for event in record.events if event.kind == "node"]
             )
@@ -2566,7 +2577,11 @@ def create_app(
                 # earlier build, with node names that no graph holds.
                 None
                 if ended(record)
-                else workspace.progress_line(record, await workspace.asks(record)),
+                else workspace.progress_line(
+                    record,
+                    await workspace.asks(record),
+                    await workspace.run_start(record),
+                ),
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
