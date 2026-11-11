@@ -672,21 +672,25 @@ class Workspace:
             grouped.setdefault(await self.workspace_id(record), []).append(record)
         snapshots = []
         for records in reversed(list(grouped.values())):
-            shown = records[-1]
-            for record in reversed(records):
-                if (await self.state(record)).waiting:
-                    shown = record
-                    break
-            snapshots.append(await self.snapshot(answers, shown, records))
+            states = {record.id: await self.state(record) for record in records}
+            shown = next(
+                (record for record in reversed(records) if states[record.id].waiting),
+                records[-1],
+            )
+            snapshots.append(
+                await self.snapshot(answers, shown, states[shown.id], records)
+            )
         return snapshots
 
     async def snapshot(
         self,
         answers: JobAnswers,
         record: Envelope,
+        state: JobState,
         related: list[Envelope] | None = None,
     ) -> dict[str, object]:
-        """Public workspace metadata; descriptions only on the detail route."""
+        """Public workspace metadata; descriptions only on the detail route.
+        ``state`` is the Job State of ``record``."""
         if related is None:
             group = await self.workspace_id(record)
             related = [
@@ -694,7 +698,6 @@ class Workspace:
                 for item in await self.jobs(answers)
                 if await self.workspace_id(item) == group
             ]
-        state = await self.state(record)
         return {
             "run": record.id,
             "name": _name_of(record),
@@ -2205,8 +2208,8 @@ def create_app(
         record = await workspace.parsable(answers, record.id)
         if record is None:
             return no_such_run()
-        payload = await workspace.snapshot(answers, record)
         state = await workspace.state(record)
+        payload = await workspace.snapshot(answers, record, state)
         if state.page_status == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
@@ -2758,15 +2761,13 @@ async def _stream(
         return
     if record is None:
         return
-    state = await workspace.state(record)
     if record.waits_to_continue():
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
-        if state.continuing:
+        if (await workspace.state(record)).continuing:
             yield _frame("continuing", {})
             await workspace.settled(run_id)
-            state = await workspace.state(record)
         child = await workspace.store.resumed_by(run_id, record.owner_id)
         if child is not None:
             yield _frame("continued", {"run": child})
@@ -2779,6 +2780,8 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
+        # Read after the continue ends, which stores a refusal or a Resumed Job.
+        state = await workspace.state(record)
         yield _frame("questions", {"run": run_id} | payload | _refusal_key(state))
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame

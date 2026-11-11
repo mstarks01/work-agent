@@ -64,7 +64,8 @@ class RunningJobState:
     #: Whether the run stops to ask a person. A Resumed Job never does.
     asks: bool
     start: RunStart
-    #: ``None`` and ``None`` for a job that resumes no job.
+    #: The resumption and the job it resumes: both ``None`` for a job that
+    #: resumes no job.
     resumption: Resumption | None
     parent: JobRecord | None
 
@@ -140,12 +141,12 @@ async def _running(store: JobStore, record: JobRecord) -> RunningJobState:
     resumption = await store.resumption(record.id, record.owner_id)
     parent = None
     if resumption is not None:
-        held = await store.owned(resumption.parent_id, record.owner_id)
-        if held is None:
+        stored = await store.owned(resumption.parent_id, record.owner_id)
+        if stored is None:
             raise LookupError(f"job {record.id} resumes a job the store lacks")
-        if not isinstance(held, JobRecord):
+        if not isinstance(stored, JobRecord):
             raise UnreadableSchema(f"job {record.id} resumes an unreadable job")
-        parent = held
+        parent = stored
     start = run_start_of(parent)
     return RunningJobState(
         asks=record.pauses_to_ask() and start == "description",
@@ -200,9 +201,9 @@ async def _refusal(
         return None
     # The task ends after it stores its refusal or admits the Resumed Job, so
     # the store holds either one now, though ``record`` was read before.
-    held = await store.owned(record.id, record.owner_id)
-    if isinstance(held, JobRecord) and held.continue_refusal is not None:
-        return StoredRefusal(held.continue_refusal)
+    current = await store.owned(record.id, record.owner_id)
+    if isinstance(current, JobRecord) and current.continue_refusal is not None:
+        return StoredRefusal(current.continue_refusal)
     if await store.resumed_by(record.id, record.owner_id) is None:
         return "not-continued"
     return None

@@ -30,6 +30,7 @@ from analysis_service.job_state import (
     PageStatus,
     RunningJobState,
     RunStart,
+    run_start_of,
 )
 from analysis_service.jobs import (
     JobEvent,
@@ -391,7 +392,7 @@ def progress_line(
     if isinstance(state, RunningJobState):
         start, resumption, parent = state.start, state.resumption, state.parent
     else:
-        start, resumption, parent = "description", None, None
+        start, resumption, parent = run_start_of(None), None, None
     lowest = lowest_stage(resumption, parent, frameworks, mode)
 
     def line(events: Sequence[JobEvent]) -> dict[str, object]:
