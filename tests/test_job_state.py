@@ -282,3 +282,39 @@ def test_a_job_continued_for_its_controls_alone_does_not_wait():
 
     assert isinstance(state, EndedJobState)
     assert (state.waiting, state.refusal) == (False, None)
+
+
+def test_a_paused_job_whose_resumed_job_was_deleted_waits_no_more():
+    """A store deletes only a job that ended, so a lock that is gone ended."""
+    store = InMemoryJobStore()
+    parent = _paused(store, ask_questions=True)
+    child = _resumed(store, parent)
+    child.transition("completed")
+    asyncio.run(store.save(child))
+    asyncio.run(store.delete(child.id, "alice"))
+
+    assert not _state(store, parent.id).waiting
+
+
+def test_a_refusal_on_the_record_is_read_without_the_store():
+    store = InMemoryJobStore()
+    job = _paused(store, continues_at_pause=True)
+    asyncio.run(store.set_continue_refusal(job.id, "alice", "No room."))
+
+    state = _state(store, job.id)
+
+    assert isinstance(state, EndedJobState)
+    assert state.refusal == StoredRefusal("No room.")
+
+
+def test_a_paused_job_of_another_schema_version_neither_asks_nor_reads_a_parent():
+    store = InMemoryJobStore()
+    job = _paused(store, ask_questions=True)
+    other = asyncio.run(store.owned(job.id, "alice")).model_copy(
+        update={"schema_version": "0.1"}
+    )
+
+    state = asyncio.run(job_state(store, other, held=False))
+
+    assert isinstance(state, EndedJobState)
+    assert (state.page_status, state.asks) == ("awaiting-answers", False)

@@ -227,10 +227,11 @@ from analysis_service.job_controls import (
     section_summary,
 )
 from analysis_service.job_state import (
-    EndedJobState,
     JobState,
     StoredRefusal,
+    continues,
     job_state,
+    waits,
 )
 from analysis_service.jobs import (
     DeleteRefusal,
@@ -533,7 +534,11 @@ class Workspace:
     async def state(self, record: Envelope) -> JobState:
         """The Job State of ``record``. A job of this process is held while
         its task runs, and that task continues it at its pause (ADR 0125)."""
-        return await job_state(self.store, record, held=record.id in self._runs)
+        return await job_state(self.store, record, held=self.held(record.id))
+
+    def held(self, job_id: str) -> bool:
+        """Whether this process runs the task of ``job_id``."""
+        return job_id in self._runs
 
     async def stop(self, job_ids: Iterable[str]) -> bool:
         """Stop each run of ``job_ids`` that this process runs, and wait up to
@@ -609,9 +614,7 @@ class Workspace:
         removable = [
             job
             for job in held
-            if ended(job)
-            and job.id != answering
-            and not (await self.state(job)).waiting
+            if ended(job) and job.id != answering and not await waits(self.store, job)
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):
@@ -672,14 +675,13 @@ class Workspace:
             grouped.setdefault(await self.workspace_id(record), []).append(record)
         snapshots = []
         for records in reversed(list(grouped.values())):
-            states = {record.id: await self.state(record) for record in records}
-            shown = next(
-                (record for record in reversed(records) if states[record.id].waiting),
-                records[-1],
-            )
-            snapshots.append(
-                await self.snapshot(answers, shown, states[shown.id], records)
-            )
+            shown = records[-1]
+            for record in reversed(records):
+                if await waits(self.store, record):
+                    shown = record
+                    break
+            state = await self.state(shown)
+            snapshots.append(await self.snapshot(answers, shown, state, records))
         return snapshots
 
     async def snapshot(
@@ -1498,8 +1500,7 @@ _NOT_CONTINUED = (
 def _refusal_key(state: JobState) -> dict[str, str]:
     """The ``refusal`` key of the questions of a job: why it waits at its
     pause. Empty for each job that does not wait there for a continue."""
-    refusal = state.refusal if isinstance(state, EndedJobState) else None
-    match refusal:
+    match state.refusal:
         case StoredRefusal(words=words):
             return {"refusal": words}
         case "not-continued":
@@ -2765,7 +2766,7 @@ async def _stream(
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
-        if (await workspace.state(record)).continuing:
+        if continues(record, held=workspace.held(run_id)):
             yield _frame("continuing", {})
             await workspace.settled(run_id)
         child = await workspace.store.resumed_by(run_id, record.owner_id)

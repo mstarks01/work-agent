@@ -60,6 +60,7 @@ class RunningJobState:
     page_status: ClassVar[PageStatus] = "running"
     waiting: ClassVar[bool] = False
     continuing: ClassVar[bool] = False
+    refusal: ClassVar[None] = None
 
     #: Whether the run stops to ask a person. A Resumed Job never does.
     asks: bool
@@ -76,7 +77,7 @@ class EndedJobState:
     :func:`~analysis_service.jobs.ended` counts as ended."""
 
     page_status: PageStatus
-    #: Whether the job waits for a person's answers.
+    #: Whether the job paused to ask a person.
     asks: bool
     waiting: bool
     #: Whether this process continues the job at its pause (ADR 0125).
@@ -92,6 +93,7 @@ class UnreadableJobState:
     page_status: ClassVar[PageStatus] = "unreadable"
     asks: ClassVar[bool] = False
     continuing: ClassVar[bool] = False
+    refusal: ClassVar[None] = None
 
     waiting: bool
 
@@ -107,10 +109,10 @@ async def job_state(store: JobStore, record: Envelope, *, held: bool) -> JobStat
     lacks, and :class:`UnreadableSchema` where it resumes an unreadable job.
     """
     if not isinstance(record, JobRecord):
-        return UnreadableJobState(waiting=await _waits(store, record))
+        return UnreadableJobState(waiting=await waits(store, record))
     if not ended(record):
         return await _running(store, record)
-    continuing = record.waits_to_continue() and held
+    continuing = continues(record, held=held)
     return EndedJobState(
         page_status="running" if continuing else _page_status(record),
         asks=(
@@ -118,10 +120,16 @@ async def job_state(store: JobStore, record: Envelope, *, held: bool) -> JobStat
             and record.pauses_to_ask()
             and record.status == "awaiting-answers"
         ),
-        waiting=await _waits(store, record),
+        waiting=await waits(store, record),
         continuing=continuing,
         refusal=await _refusal(store, record, continuing),
     )
+
+
+def continues(record: JobRecord, *, held: bool) -> bool:
+    """Whether this process continues ``record`` at its pause: the job waits
+    to continue, and this process holds its task (ADR 0125)."""
+    return record.waits_to_continue() and held
 
 
 def run_start_of(parent: JobRecord | None) -> RunStart:
@@ -165,8 +173,9 @@ def _page_status(record: JobRecord) -> PageStatus:
     return "failed" if status == "rejected" else status
 
 
-async def _waits(store: JobStore, record: Envelope) -> bool:
-    """True while the job waits for answers.
+async def waits(store: JobStore, record: Envelope) -> bool:
+    """True while the job waits for answers. A caller that needs no other
+    fact of the Job State reads this alone.
 
     A paused job that no job locks waits. A paused job whose locking job
     still runs also waits: that job can fail, and this one is then where its
