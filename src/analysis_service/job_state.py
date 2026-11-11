@@ -13,7 +13,7 @@ resumption.
 
 Three facts have their own reads, because only some pages need them and each
 costs store reads: :func:`run_origin` says what a run does first and which job
-it resumes, :func:`takes_answers` says whether a job still takes answers, and
+it resumes, :func:`waits_for_answers` says whether a job waits for answers, and
 :func:`why_not_continued` says why the continue at a job's pause did not
 happen.
 """
@@ -142,8 +142,10 @@ async def run_origin(store: JobStore, record: JobRecord) -> RunOrigin:
     envelope leaves the resumption out, so this reads it by name.
 
     Raises :class:`LookupError` where the job resumes a job the store lacks,
-    and :class:`UnreadableSchema`, with the parent's schema version, where it
-    resumes an unreadable job. A job
+    and :class:`UnreadableSchema` where it resumes a job that
+    :func:`~analysis_service.jobs.readable` refuses. The message of that
+    refusal names the parent's schema version, so it is about the parent, not
+    about ``record``. A job
     in flight locks its parent, so the store holds it.
     """
     resumption = await store.resumption(record.id, record.owner_id)
@@ -178,16 +180,17 @@ def _page_status(record: JobRecord) -> PageStatus:
     return "failed" if status == "rejected" else status
 
 
-async def takes_answers(store: JobStore, record: Envelope) -> bool:
-    """True while the job takes answers: its status is ``awaiting-answers``,
-    and no job that ended locks it.
+async def waits_for_answers(store: JobStore, record: Envelope) -> bool:
+    """True while the job waits for answers: it takes them now, or it takes
+    them again if the Resumed Job that locks it fails.
 
-    A paused job that no job locks takes answers. A paused job whose locking
-    job still runs also takes answers: that job can fail, and this one is
-    then where its answers resume. A paused job whose locking job has
-    :func:`~analysis_service.jobs.ended` takes no answers again. That job has
-    a report or pauses itself, and a paused job never fails. A locking job that the store no longer gives has ended
-    too, because a store deletes only a job that has ended.
+    A paused job that no job locks takes answers now. A paused job whose
+    locking job still runs takes none now, but that job can fail, and this
+    one is then where its answers resume. A paused job whose locking job has
+    :func:`~analysis_service.jobs.ended` waits no more: that job has a report
+    or pauses itself, and a paused job never fails. A locking job that the
+    store no longer gives has ended too, because a store deletes only a job
+    that has ended.
     """
     if record.status != "awaiting-answers":
         return False

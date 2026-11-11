@@ -233,7 +233,7 @@ from analysis_service.job_state import (
     continues,
     job_state,
     run_origin,
-    takes_answers,
+    waits_for_answers,
     why_not_continued,
 )
 from analysis_service.jobs import (
@@ -631,7 +631,7 @@ class Workspace:
             for job in held
             if ended(job)
             and job.id != answering
-            and not await takes_answers(self.store, job)
+            and not await waits_for_answers(self.store, job)
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):
@@ -694,7 +694,7 @@ class Workspace:
         for records in reversed(list(grouped.values())):
             shown = records[-1]
             for record in reversed(records):
-                if await takes_answers(self.store, record):
+                if await waits_for_answers(self.store, record):
                     shown = record
                     break
             state = await self.state(shown)

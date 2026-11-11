@@ -1,4 +1,4 @@
-"""The Job State of a job, its run origin, whether it takes answers, and why
+"""The Job State of a job, its run origin, whether it waits for answers, and why
 its continue did not happen.
 
 Each test reads the record as an envelope from an in-memory store, as a route
@@ -21,7 +21,7 @@ from analysis_service.job_state import (
     UnreadableJobState,
     job_state,
     run_origin,
-    takes_answers,
+    waits_for_answers,
     why_not_continued,
 )
 from analysis_service.jobs import (
@@ -137,8 +137,8 @@ def _state(store: InMemoryJobStore, job_id: str, *, runs_here: bool = False):
     return asyncio.run(job_state(store, _envelope(store, job_id), runs_here=runs_here))
 
 
-def _takes_answers(store: InMemoryJobStore, job_id: str) -> bool:
-    return asyncio.run(takes_answers(store, _envelope(store, job_id)))
+def _waits_for_answers(store: InMemoryJobStore, job_id: str) -> bool:
+    return asyncio.run(waits_for_answers(store, _envelope(store, job_id)))
 
 
 def _refusal(store: InMemoryJobStore, job_id: str, *, runs_here: bool = False):
@@ -300,25 +300,25 @@ def test_an_unreadable_record_carries_only_its_page_status():
     )
 
 
-# --- Whether a job takes answers -------------------------------------------
+# --- Whether a job waits for answers ---------------------------------------
 
 
-def test_a_paused_job_that_no_job_locks_takes_answers():
+def test_a_paused_job_that_no_job_locks_waits_for_answers():
     store = InMemoryJobStore()
 
-    assert _takes_answers(store, _paused(store, ask_questions=True).id)
+    assert _waits_for_answers(store, _paused(store, ask_questions=True).id)
 
 
-def test_a_paused_job_whose_resumed_job_runs_still_takes_answers():
+def test_a_paused_job_whose_resumed_job_runs_still_waits_for_answers():
     store = InMemoryJobStore()
     parent = _paused(store, ask_questions=True)
     _resumed(store, parent)
 
-    assert _takes_answers(store, parent.id)
+    assert _waits_for_answers(store, parent.id)
 
 
 @pytest.mark.parametrize("deleted", [False, True])
-def test_a_paused_job_whose_resumed_job_ended_takes_no_answers(deleted):
+def test_a_paused_job_whose_resumed_job_ended_waits_no_more(deleted):
     """A store deletes only a job that ended, so a lock that is gone ended."""
     store = InMemoryJobStore()
     parent = _paused(store, ask_questions=True)
@@ -328,29 +328,29 @@ def test_a_paused_job_whose_resumed_job_ended_takes_no_answers(deleted):
     if deleted:
         asyncio.run(store.delete(child.id, "alice"))
 
-    assert not _takes_answers(store, parent.id)
+    assert not _waits_for_answers(store, parent.id)
 
 
-def test_a_job_continued_for_its_controls_alone_takes_no_answers():
+def test_a_job_continued_for_its_controls_alone_does_not_wait():
     """The Resumed Job that continues it shows the analysis."""
     store = InMemoryJobStore()
     parent = _paused(store, continues_at_pause=True)
     _resumed(store, parent)
 
-    assert not _takes_answers(store, parent.id)
+    assert not _waits_for_answers(store, parent.id)
 
 
-def test_a_job_that_did_not_pause_takes_no_answers():
+def test_a_job_that_did_not_pause_does_not_wait():
     store = InMemoryJobStore()
     job = _job()
     job.transition("running")
     asyncio.run(admit(store, job))
 
-    assert not _takes_answers(store, job.id)
+    assert not _waits_for_answers(store, job.id)
 
 
 @pytest.mark.parametrize(
-    ("status", "locker_ended", "takes"),
+    ("status", "locker_ended", "waiting"),
     [
         ("awaiting-answers", None, True),
         ("awaiting-answers", False, True),
@@ -359,11 +359,11 @@ def test_a_job_that_did_not_pause_takes_no_answers():
         (None, None, False),
     ],
 )
-def test_an_unreadable_record_takes_answers_as_its_stored_status_and_lock_say(
-    status, locker_ended, takes
+def test_an_unreadable_record_waits_as_its_stored_status_and_its_lock_say(
+    status, locker_ended, waiting
 ):
     """An unreadable record cannot say what it paused for, so a running lock
-    keeps it taking answers."""
+    keeps it waiting."""
     locker = _job()
     locker.transition("running")
     if locker_ended:
@@ -373,7 +373,7 @@ def test_an_unreadable_record_takes_answers_as_its_stored_status_and_lock_say(
     if locker_ended is not None:
         asyncio.run(admit(store, locker))
 
-    assert asyncio.run(takes_answers(store, _unreadable(status))) is takes
+    assert asyncio.run(waits_for_answers(store, _unreadable(status))) is waiting
 
 
 # --- The continue refusal ---------------------------------------------------
