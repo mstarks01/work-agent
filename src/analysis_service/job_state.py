@@ -152,7 +152,7 @@ async def run_origin(store: JobStore, record: JobRecord) -> RunOrigin:
         stored = await store.owned(resumption.parent_id, record.owner_id)
         if stored is None:
             raise LookupError(f"job {record.id} resumes a job the store lacks")
-        if not isinstance(stored, JobRecord):
+        if not readable(stored):
             raise UnreadableSchema(stored.schema_version)
         parent = stored
     return RunOrigin(run_start_of(parent), resumption, parent)
@@ -171,7 +171,7 @@ def run_start_of(parent: JobRecord | None) -> RunStart:
 
 def _page_status(record: JobRecord) -> PageStatus:
     """A job's status as the pages read it: a queued job is running, and a
-    rejected one stopped."""
+    rejected one failed."""
     status = record.status
     if status == "queued":
         return "running"
@@ -182,12 +182,11 @@ async def takes_answers(store: JobStore, record: Envelope) -> bool:
     """True while the job takes answers: its status is ``awaiting-answers``,
     and no job that ended locks it.
 
-    A paused job that no job locks waits. A paused job whose locking job
-    still runs also waits: that job can fail, and this one is then where its
-    answers resume. A paused job whose locking job has
-    :func:`~analysis_service.jobs.ended` waits no more. That job has a report
-    or pauses itself, and a paused job never fails, so this one takes no
-    answers again. A locking job that the store no longer gives has ended
+    A paused job that no job locks takes answers. A paused job whose locking
+    job still runs also takes answers: that job can fail, and this one is
+    then where its answers resume. A paused job whose locking job has
+    :func:`~analysis_service.jobs.ended` takes no answers again. That job has
+    a report or pauses itself, and a paused job never fails. A locking job that the store no longer gives has ended
     too, because a store deletes only a job that has ended.
     """
     if record.status != "awaiting-answers":

@@ -1,4 +1,5 @@
-"""The Job State, the run origin, the wait and the continue refusal of a job.
+"""The Job State of a job, its run origin, whether it takes answers, and why
+its continue did not happen.
 
 Each test reads the record as an envelope from an in-memory store, as a route
 does, so a Resumed Job's resumption is read by name and not off the record.
@@ -299,16 +300,16 @@ def test_an_unreadable_record_carries_only_its_page_status():
     )
 
 
-# --- The wait ---------------------------------------------------------------
+# --- Whether a job takes answers -------------------------------------------
 
 
-def test_a_paused_job_that_no_job_locks_waits():
+def test_a_paused_job_that_no_job_locks_takes_answers():
     store = InMemoryJobStore()
 
     assert _takes_answers(store, _paused(store, ask_questions=True).id)
 
 
-def test_a_paused_job_whose_resumed_job_runs_still_waits():
+def test_a_paused_job_whose_resumed_job_runs_still_takes_answers():
     store = InMemoryJobStore()
     parent = _paused(store, ask_questions=True)
     _resumed(store, parent)
@@ -317,7 +318,7 @@ def test_a_paused_job_whose_resumed_job_runs_still_waits():
 
 
 @pytest.mark.parametrize("deleted", [False, True])
-def test_a_paused_job_whose_resumed_job_ended_waits_no_more(deleted):
+def test_a_paused_job_whose_resumed_job_ended_takes_no_answers(deleted):
     """A store deletes only a job that ended, so a lock that is gone ended."""
     store = InMemoryJobStore()
     parent = _paused(store, ask_questions=True)
@@ -330,7 +331,7 @@ def test_a_paused_job_whose_resumed_job_ended_waits_no_more(deleted):
     assert not _takes_answers(store, parent.id)
 
 
-def test_a_job_continued_for_its_controls_alone_does_not_wait():
+def test_a_job_continued_for_its_controls_alone_takes_no_answers():
     """The Resumed Job that continues it shows the analysis."""
     store = InMemoryJobStore()
     parent = _paused(store, continues_at_pause=True)
@@ -339,7 +340,7 @@ def test_a_job_continued_for_its_controls_alone_does_not_wait():
     assert not _takes_answers(store, parent.id)
 
 
-def test_a_job_that_did_not_pause_does_not_wait():
+def test_a_job_that_did_not_pause_takes_no_answers():
     store = InMemoryJobStore()
     job = _job()
     job.transition("running")
@@ -349,7 +350,7 @@ def test_a_job_that_did_not_pause_does_not_wait():
 
 
 @pytest.mark.parametrize(
-    ("status", "locker_ended", "waiting"),
+    ("status", "locker_ended", "takes"),
     [
         ("awaiting-answers", None, True),
         ("awaiting-answers", False, True),
@@ -358,11 +359,11 @@ def test_a_job_that_did_not_pause_does_not_wait():
         (None, None, False),
     ],
 )
-def test_an_unreadable_record_waits_as_its_stored_status_and_its_lock_say(
-    status, locker_ended, waiting
+def test_an_unreadable_record_takes_answers_as_its_stored_status_and_lock_say(
+    status, locker_ended, takes
 ):
     """An unreadable record cannot say what it paused for, so a running lock
-    keeps it waiting."""
+    keeps it taking answers."""
     locker = _job()
     locker.transition("running")
     if locker_ended:
@@ -372,7 +373,7 @@ def test_an_unreadable_record_waits_as_its_stored_status_and_its_lock_say(
     if locker_ended is not None:
         asyncio.run(admit(store, locker))
 
-    assert asyncio.run(takes_answers(store, _unreadable(status))) is waiting
+    assert asyncio.run(takes_answers(store, _unreadable(status))) is takes
 
 
 # --- The continue refusal ---------------------------------------------------
@@ -437,3 +438,31 @@ def test_a_job_the_store_no_longer_gives_as_a_record_was_not_continued(unreadabl
 
     refusal = asyncio.run(why_not_continued(store, record, runs_here=False))
     assert refusal == "not-continued"
+
+
+def test_a_queued_job_of_another_schema_version_runs_on_the_page():
+    """A record of another schema version counts as ended, so its status goes
+    through the page status table."""
+    store = InMemoryJobStore()
+    job = _job()
+    asyncio.run(admit(store, job))
+    other = _envelope(store, job.id).model_copy(update={"schema_version": "0.1"})
+
+    state = asyncio.run(job_state(store, other, runs_here=False))
+
+    assert state == EndedJobState(page_status="running", asks=False, continuing=False)
+
+
+def test_a_job_whose_parent_is_of_another_schema_version_raises():
+    parent = _job(ask_questions=True)
+    parent.transition("running")
+    parent.transition("awaiting-answers")
+    other = parent.model_copy(update={"schema_version": "0.1"})
+    store = _ParentAs(parent.id, other)
+    asyncio.run(admit(store, parent))
+    envelope = _envelope(store, _resumed(store, parent).id)
+    assert isinstance(envelope, JobRecord)
+    store.replace = True
+
+    with pytest.raises(UnreadableSchema, match="schema version 0.1;"):
+        asyncio.run(run_origin(store, envelope))

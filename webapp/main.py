@@ -539,6 +539,11 @@ class Workspace:
         continues it at its pause (ADR 0125)."""
         return await job_state(self.store, record, runs_here=self.runs_here(record.id))
 
+    def continues(self, record: JobRecord) -> bool:
+        """Whether this process continues ``record`` at its pause
+        (:func:`continues`)."""
+        return continues(record, runs_here=self.runs_here(record.id))
+
     async def why_not_continued(self, record: JobRecord) -> NotContinuedReason | None:
         """Why the continue at the pause of ``record`` did not happen
         (:func:`why_not_continued`)."""
@@ -2783,7 +2788,7 @@ async def _stream(
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
-        if continues(record, runs_here=workspace.runs_here(run_id)):
+        if workspace.continues(record):
             yield _frame("continuing", {})
             await workspace.settled(run_id)
         child = await workspace.store.resumed_by(run_id, record.owner_id)
