@@ -162,11 +162,17 @@ def test_a_fresh_run_asks_where_the_job_asks(asks):
 
 def test_a_resumed_job_never_asks():
     """The envelope leaves the resumption out, so it reads as a job that
-    pauses to ask, and the state reads the resumption by name."""
-    store = InMemoryJobStore()
-    child = _resumed(store, _paused(store, ask_questions=True), ask_questions=True)
+    pauses to ask, and the state reads the resumption by name. It reads no
+    parent: the stand-in store gives none."""
+    parent = _job(ask_questions=True)
+    store = _ParentAs(parent.id, None)
+    parent.transition("running")
+    parent.transition("awaiting-answers")
+    asyncio.run(admit(store, parent))
+    child = _resumed(store, parent, ask_questions=True)
     envelope = _envelope(store, child.id)
     assert isinstance(envelope, JobRecord) and envelope.pauses_to_ask()
+    store.replace = True
 
     assert _state(store, child.id) == InFlightJobState(asks=False)
 

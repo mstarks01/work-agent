@@ -2232,7 +2232,8 @@ def create_app(
         if state.page_status == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
-            line = progress_line(record, state, await run_origin(store, record))
+            origin = await run_origin(workspace.store, record)
+            line = progress_line(record, state, origin)
             payload["progress"] = line(
                 [event for event in record.events if event.kind == "node"]
             )
@@ -2803,7 +2804,6 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        # The continue stores its refusal before its task ends.
         refusal_key = _refusal_key(await workspace.why_not_continued(record))
         yield _frame("questions", {"run": run_id} | payload | refusal_key)
     elif status == "completed":

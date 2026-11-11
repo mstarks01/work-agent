@@ -74,8 +74,7 @@ class EndedJobState:
     :func:`~analysis_service.jobs.ended` counts as ended."""
 
     page_status: PageStatus
-    #: Whether the job waits at its pause for a person's answers, and this
-    #: service can read it.
+    #: Whether the job paused to ask a person, and this service can read it.
     asks: bool
     #: Whether this process continues the job at its pause (ADR 0125).
     continuing: bool
