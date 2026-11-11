@@ -37,6 +37,7 @@ from analysis_service.job_controls import (
     NOT_COPIED,
     resolutions,
 )
+from analysis_service.job_state import StoredRefusal, why_not_continued
 from analysis_service.jobs import (
     Admission,
     Checkpoint,
@@ -1126,9 +1127,8 @@ class TestTheAutomaticContinue:
         stale = asyncio.run(owner.store.get(run_id)).model_copy(
             update={"continue_refusal": None}
         )
-        assert asyncio.run(owner.workspace.refusal(stale)) == {
-            "refusal": frames["questions"]["refusal"]
-        }
+        refusal = asyncio.run(why_not_continued(owner.store, stale, runs_here=False))
+        assert refusal == StoredRefusal(frames["questions"]["refusal"])
 
     def test_a_refusal_outlives_a_restart(self, owner):
         aes = owner.keep("Encrypted", ORDERS_DB)

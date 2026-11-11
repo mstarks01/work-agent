@@ -23,6 +23,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fact_answers import FACET_ANSWERS, FactStatus
 from analysis_service.frameworks import PreconditionResult
+from analysis_service.job_state import PageStatus, RunStart
 from analysis_service.report_changes import Change, FindingChange
 from tests.factories import report_state, sample_report
 from tests.test_webapp import PROJECT_ROOT, _island, page_javascript
@@ -30,10 +31,10 @@ from webapp import page_words, review, settings_view
 from webapp.main import render_report
 
 FORM_TABLES = {
-    "PAGE_STATUS_LABELS": page_words.PageStatus,
+    "PAGE_STATUS_LABELS": PageStatus,
     "GATE_NOTES": PreconditionResult,
     "EMPTY_LIST_REASONS": EmptyListReason,
-    "INITIAL_PROGRESS_WORDS": page_words.RunStart,
+    "INITIAL_PROGRESS_WORDS": RunStart,
     "PROGRESS_PANEL_WORDS": page_words.ProgressPanelLine,
 }
 

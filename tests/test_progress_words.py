@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
+from analysis_service.job_state import RunStart, job_state, run_origin, run_start_of
 from analysis_service.jobs import (
     Checkpoint,
     InMemoryJobStore,
@@ -56,8 +57,7 @@ from webapp.page_words import (
     STAGE_COUNT,
     STEP_PROGRESS,
     ProgressMode,
-    RunStart,
-    run_start_of,
+    progress_line,
     stage_after,
     words_after,
 )
@@ -567,7 +567,9 @@ PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
 }
 
 
-def resumed_job(start: RunStart, mode: ProgressMode) -> tuple[Workspace, JobRecord]:
+def resumed_job(
+    start: RunStart, mode: ProgressMode
+) -> tuple[InMemoryJobStore, JobRecord]:
     """A Resumed Job in flight, with its parent in the store. A parent in the
     ``to-report`` mode that asked for answers is a finished report, and its
     Resumed Job is the follow-up."""
@@ -603,18 +605,19 @@ def resumed_job(start: RunStart, mode: ProgressMode) -> tuple[Workspace, JobReco
     )
     child.transition("running")
     asyncio.run(admit(store, child))
-    return Workspace(store=store), child
+    return store, child
 
 
 def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
-    workspace, child = resumed_job(start, mode)
+    store, child = resumed_job(start, mode)
     events = [
         JobEvent.model_construct(seq=seq, node=node)
         for seq, node in enumerate(nodes, 1)
     ]
 
     async def read():
-        return (await workspace.progress_line(child, False))(events)
+        state = await job_state(store, child, runs_here=False)
+        return progress_line(child, state, await run_origin(store, child))(events)
 
     return asyncio.run(read())
 
@@ -645,3 +648,50 @@ def test_the_page_reads_the_start_words_of_a_resumed_job_from_the_start_table():
     for start in set(STARTS) - {"description"}:
         assert f"FORM_WORDS.progress_start.{start}" in script
     assert "continues-with-" not in script
+
+
+def test_a_paused_job_this_process_continues_shows_the_line_of_a_fresh_run():
+    """A paused job resumes no job, so its line starts as a run that reads a
+    description, at no stage."""
+    store = InMemoryJobStore()
+    paused = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+        continues_at_pause=True,
+    )
+    paused.transition("running")
+    paused.transition("awaiting-answers")
+    asyncio.run(admit(store, paused))
+
+    async def read():
+        envelope = await store.owned(paused.id, "alice")
+        state = await job_state(store, envelope, runs_here=True)
+        return progress_line(envelope, state, await run_origin(store, envelope))
+
+    assert asyncio.run(read())([]) == {
+        "stage": 0,
+        "words": INITIAL_PROGRESS_WORDS["description"],
+        "seq": 0,
+    }
+
+
+def test_a_job_that_is_not_running_has_no_progress_line():
+    store = InMemoryJobStore()
+    paused = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+        ask_questions=True,
+    )
+    paused.transition("running")
+    paused.transition("awaiting-answers")
+    asyncio.run(admit(store, paused))
+
+    async def read():
+        envelope = await store.owned(paused.id, "alice")
+        state = await job_state(store, envelope, runs_here=False)
+        return progress_line(envelope, state, await run_origin(store, envelope))
+
+    with pytest.raises(ValueError, match="not running"):
+        asyncio.run(read())
