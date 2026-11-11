@@ -672,3 +672,23 @@ def test_a_paused_job_this_process_continues_shows_the_line_of_a_fresh_run():
         "words": INITIAL_PROGRESS_WORDS["description"],
         "seq": 0,
     }
+
+
+def test_a_job_that_is_not_running_has_no_progress_line():
+    store = InMemoryJobStore()
+    paused = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+        ask_questions=True,
+    )
+    paused.transition("running")
+    paused.transition("awaiting-answers")
+    asyncio.run(admit(store, paused))
+
+    async def read():
+        envelope = await store.owned(paused.id, "alice")
+        return progress_line(envelope, await job_state(store, envelope, held=False))
+
+    with pytest.raises(ValueError, match="not running"):
+        asyncio.run(read())

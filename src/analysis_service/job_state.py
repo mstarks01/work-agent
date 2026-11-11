@@ -1,17 +1,19 @@
 """The **Job State**: what a page reads about one job, from one read.
 
 A page asks of a job its status, whether its run stops to ask a person, what
-its run does first, whether it waits for answers and why it waits at its
-pause. Each answer reads the job store in its own way: an envelope leaves the
-resumption out, a Resumed Job reads its parent, and a job that waits reads the
-job that locks it. :func:`job_state` makes each of those reads, so a caller
-reads the facts and never the store.
+its run does first, and whether this process continues it at its pause. An
+envelope leaves the resumption out, so the state of a Resumed Job reads it and
+the parent by name. :func:`job_state` makes those reads, so a caller reads the
+facts and never the store.
 
 The state has three shapes. A job in flight is readable, and the store holds
 its parent, so its state carries what its run does first. A job that ended
 may have lost its parent to a delete, so its state reads no parent. A record
-whose envelope does not parse carries only what its stored columns give
-(ADR 0095).
+whose envelope does not parse carries only its page status (ADR 0095).
+
+Two facts have their own reads, because only some pages need them and each
+costs store reads: :func:`waits` says whether a job waits for answers, and
+:func:`pause_refusal` says why a job waits at its pause.
 """
 
 from __future__ import annotations
@@ -49,7 +51,7 @@ class StoredRefusal:
 
 #: Why a job waits at its pause: the stored refusal, or ``not-continued``
 #: where nothing continued the job and nothing refused it, as after a restart.
-Refusal = StoredRefusal | Literal["not-continued"]
+PauseRefusal = StoredRefusal | Literal["not-continued"]
 
 
 @dataclass(frozen=True)
@@ -58,9 +60,7 @@ class RunningJobState:
     the job locks it."""
 
     page_status: ClassVar[PageStatus] = "running"
-    waiting: ClassVar[bool] = False
     continuing: ClassVar[bool] = False
-    refusal: ClassVar[None] = None
 
     #: Whether the run stops to ask a person. A Resumed Job never does.
     asks: bool
@@ -79,11 +79,8 @@ class EndedJobState:
     page_status: PageStatus
     #: Whether the job paused to ask a person.
     asks: bool
-    waiting: bool
     #: Whether this process continues the job at its pause (ADR 0125).
     continuing: bool
-    #: ``None`` for each job that does not wait at its pause for a continue.
-    refusal: Refusal | None
 
 
 @dataclass(frozen=True)
@@ -93,9 +90,6 @@ class UnreadableJobState:
     page_status: ClassVar[PageStatus] = "unreadable"
     asks: ClassVar[bool] = False
     continuing: ClassVar[bool] = False
-    refusal: ClassVar[None] = None
-
-    waiting: bool
 
 
 JobState = RunningJobState | EndedJobState | UnreadableJobState
@@ -109,7 +103,7 @@ async def job_state(store: JobStore, record: Envelope, *, held: bool) -> JobStat
     lacks, and :class:`UnreadableSchema` where it resumes an unreadable job.
     """
     if not isinstance(record, JobRecord):
-        return UnreadableJobState(waiting=await waits(store, record))
+        return UnreadableJobState()
     if not ended(record):
         return await _running(store, record)
     continuing = continues(record, held=held)
@@ -120,9 +114,7 @@ async def job_state(store: JobStore, record: Envelope, *, held: bool) -> JobStat
             and record.pauses_to_ask()
             and record.status == "awaiting-answers"
         ),
-        waiting=await waits(store, record),
         continuing=continuing,
-        refusal=await _refusal(store, record, continuing),
     )
 
 
@@ -174,8 +166,7 @@ def _page_status(record: JobRecord) -> PageStatus:
 
 
 async def waits(store: JobStore, record: Envelope) -> bool:
-    """True while the job waits for answers. A caller that needs no other
-    fact of the Job State reads this alone.
+    """True while the job waits for answers.
 
     A paused job that no job locks waits. A paused job whose locking job
     still runs also waits: that job can fail, and this one is then where its
@@ -198,15 +189,17 @@ async def waits(store: JobStore, record: Envelope) -> bool:
     return child is not None and not ended(child)
 
 
-async def _refusal(
-    store: JobStore, record: JobRecord, continuing: bool
-) -> Refusal | None:
-    """Why ``record`` waits at its pause. A job that waits to continue, with
-    no task in this process, no stored refusal and no Resumed Job, did not
-    continue, and the owner continues it (ADR 0125)."""
+async def pause_refusal(
+    store: JobStore, record: JobRecord, *, held: bool
+) -> PauseRefusal | None:
+    """Why ``record`` waits at its pause, or ``None`` for a job that does not
+    wait there for a continue. ``held`` is as :func:`job_state` takes it. A
+    job that waits to continue, with no task in this process, no stored
+    refusal and no Resumed Job, did not continue, and the owner continues it
+    (ADR 0125)."""
     if record.continue_refusal is not None:
         return StoredRefusal(record.continue_refusal)
-    if not record.waits_to_continue() or continuing:
+    if not record.waits_to_continue() or continues(record, held=held):
         return None
     # The task ends after it stores its refusal or admits the Resumed Job, so
     # the store holds either one now, though ``record`` was read before.

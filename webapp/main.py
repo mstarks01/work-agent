@@ -228,9 +228,11 @@ from analysis_service.job_controls import (
 )
 from analysis_service.job_state import (
     JobState,
+    PauseRefusal,
     StoredRefusal,
     continues,
     job_state,
+    pause_refusal,
     waits,
 )
 from analysis_service.jobs import (
@@ -535,6 +537,10 @@ class Workspace:
         """The Job State of ``record``. A job of this process is held while
         its task runs, and that task continues it at its pause (ADR 0125)."""
         return await job_state(self.store, record, held=self.held(record.id))
+
+    async def pause_refusal(self, record: JobRecord) -> PauseRefusal | None:
+        """Why ``record`` waits at its pause (:func:`pause_refusal`)."""
+        return await pause_refusal(self.store, record, held=self.held(record.id))
 
     def held(self, job_id: str) -> bool:
         """Whether this process runs the task of ``job_id``."""
@@ -1497,10 +1503,10 @@ _NOT_CONTINUED = (
 )
 
 
-def _refusal_key(state: JobState) -> dict[str, str]:
+def _refusal_key(refusal: PauseRefusal | None) -> dict[str, str]:
     """The ``refusal`` key of the questions of a job: why it waits at its
     pause. Empty for each job that does not wait there for a continue."""
-    match state.refusal:
+    match refusal:
         case StoredRefusal(words=words):
             return {"refusal": words}
         case "not-continued":
@@ -2271,7 +2277,7 @@ def create_app(
             payload["questions"] = (
                 {"run": record.id}
                 | await answers.payload_of(asked)
-                | _refusal_key(state)
+                | _refusal_key(await workspace.pause_refusal(record))
             )
         return JSONResponse(payload)
 
@@ -2782,8 +2788,8 @@ async def _stream(
             yield _frame("failed", {"message": str(refusal)})
             return
         # Read after the continue ends, which stores a refusal or a Resumed Job.
-        state = await workspace.state(record)
-        yield _frame("questions", {"run": run_id} | payload | _refusal_key(state))
+        why = _refusal_key(await workspace.pause_refusal(record))
+        yield _frame("questions", {"run": run_id} | payload | why)
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.

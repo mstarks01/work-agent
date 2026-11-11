@@ -386,7 +386,10 @@ def progress_line(
     (:func:`lowest_stage`). ``record`` is a job whose ``state`` has the page
     status ``running``: a job in flight, or a paused job that this process
     continues. A paused job resumes no job (:meth:`JobRecord.pauses`).
+    Raises :class:`ValueError` for each other state.
     """
+    if state.page_status != "running":
+        raise ValueError(f"job {record.id} is not running, so it has no line")
     mode = progress_mode(state.asks)
     frameworks = [selection.name for selection in record.whole_frameworks()]
     if isinstance(state, RunningJobState):
