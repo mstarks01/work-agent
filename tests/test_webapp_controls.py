@@ -63,7 +63,7 @@ from tests.test_webapp_questions import (
     ran,
 )
 from webapp.main import _NOT_CONTINUED, OPERATOR, Workspace
-from webapp.progress import INITIAL_PROGRESS_WORDS
+from webapp.progress import INITIAL_PROGRESS_WORDS, run_stages
 
 tiers = test_webapp.tiers
 
@@ -1011,6 +1011,35 @@ class TestTheAutomaticContinue:
             INITIAL_PROGRESS_WORDS["description"],
             words,
         ]
+
+    def test_the_continuing_frame_carries_the_line_of_the_continue(self, owner):
+        """While this process continues the job, the stream sends the line of
+        the run that continues it: its start words and the stage count."""
+        release = threading.Event()
+        original = owner.workspace._continue
+
+        async def held(*args):
+            while not release.is_set():
+                await asyncio.sleep(0.01)
+            await original(*args)
+
+        owner.workspace._continue = held
+        timer = threading.Timer(0.3, release.set)
+        timer.start()
+        try:
+            run_id, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        finally:
+            timer.cancel()
+            release.set()
+        record = asyncio.run(owner.store.get(run_id))
+
+        assert frames["continuing"] == {
+            "stage": 0,
+            "count": len(run_stages("to-report", record.assertion_pass)),
+            "words": INITIAL_PROGRESS_WORDS["controls"],
+            "seq": 0,
+        }
+        assert list(frames)[-1] == "continued"
 
     def test_the_paused_job_reads_as_its_resumed_job(self, owner):
         """The parent waits with no task, and its Resumed Job locks it, so the

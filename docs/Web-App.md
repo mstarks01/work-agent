@@ -949,8 +949,9 @@ action. Skipped questions remain open facts, not negative answers.
 
 Reopening a running analysis shows its progress bar and status line from its
 session snapshot, without consuming its live progress stream. Before the first
-stage completes, the line reads `0 of` the stage count of the run, as
-[Progress, in stages](#what-it-shows-you) gives it, and names the current stage. A completed analysis opens its
+stage completes, the line reads `0 of N stages complete`, where N is the stage
+count that [Progress, in stages](#what-it-shows-you) gives, and names the
+current stage. A completed analysis opens its
 report directly. Report entries use the analysis name and generation timestamp;
 the report header labels its generation time in UTC.
 
