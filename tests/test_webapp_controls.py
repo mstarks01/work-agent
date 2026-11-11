@@ -1012,24 +1012,31 @@ class TestTheAutomaticContinue:
             words,
         ]
 
-    def test_the_continuing_frame_carries_the_line_of_the_continue(self, owner):
+    def test_the_continuing_frame_carries_the_line_of_the_continue(
+        self, owner, monkeypatch
+    ):
         """While this process continues the job, the stream sends the line of
-        the run that continues it: its start words and the stage count."""
+        the run that continues it: its start words and the stage count. The
+        continue waits until the stream has sent that frame and waits for the
+        continue to end."""
         release = threading.Event()
-        original = owner.workspace._continue
+        workspace = owner.workspace
+        continue_job, settled = workspace._continue, workspace.settled
 
-        async def held(*args):
+        async def held_continue(*args):
             while not release.is_set():
                 await asyncio.sleep(0.01)
-            await original(*args)
+            await continue_job(*args)
 
-        owner.workspace._continue = held
-        timer = threading.Timer(0.3, release.set)
-        timer.start()
+        async def releasing_settled(job_id):
+            release.set()
+            await settled(job_id)
+
+        monkeypatch.setattr(workspace, "_continue", held_continue)
+        monkeypatch.setattr(workspace, "settled", releasing_settled)
         try:
             run_id, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
         finally:
-            timer.cancel()
             release.set()
         record = asyncio.run(owner.store.get(run_id))
 
