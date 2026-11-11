@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Reads a Mermaid diagram's structure with Mermaid's own parsers (ADR 0121).",
   "dependencies": {
-    "@mermaid-js/parser": "0.6.3",
+    "@mermaid-js/parser": "2.0.1",
     "jsdom": "26.1.0",
     "mermaid": "12.2.0"
   }

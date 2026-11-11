@@ -34,15 +34,25 @@ function lineOf(...tokens) {
   return index < 0 ? null : index + 1;
 }
 
-// A label as plain text: Mermaid's placeholder for an entity code decoded, a
-// line break a space, and any other markup dropped.
+// A label as plain text: a line break a space, any other markup dropped, and
+// each entity decoded as Mermaid's own render decodes it. Mermaid writes
+// `#quot;` and `#34;` as placeholders, which become `&quot;` and `&#34;` again
+// before the DOM decodes them. Only the flowchart path has a DOM.
 function plain(label) {
-  return String(label ?? "")
-    .replace(/ﬂ°°(\d+)¶ß/g, (_, code) => String.fromCodePoint(Number(code)))
+  const text = String(label ?? "")
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]*>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/ﬂ°°/g, "&#")
+    .replace(/ﬂ°/g, "&")
+    .replace(/¶ß/g, ";");
+  return decoded(text).replace(/\s+/g, " ").trim();
+}
+
+function decoded(text) {
+  if (!globalThis.document) return text;
+  const area = document.createElement("textarea");
+  area.innerHTML = text;
+  return area.value;
 }
 
 function arrowOf(type) {
@@ -104,7 +114,7 @@ async function architecture() {
     junctions: ast.junctions.map((junction) => ({
       id: junction.id, group: junction.in ?? null, line: astLine(junction) })),
     edges: ast.edges.map((edge) => ({
-      source: end(edge.lhsId, edge.lhsGroup), target: end(edge.rhsId, edge.rhsGroup), label: "",
+      source: end(edge.lhsId, edge.lhsGroup), target: end(edge.rhsId, edge.rhsGroup), label: plain(edge.title),
       arrow: edge.lhsInto && edge.rhsInto ? "both" : edge.rhsInto ? "forward" : edge.lhsInto ? "backward" : "none",
       line: astLine(edge) })),
   };
