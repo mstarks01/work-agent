@@ -1127,7 +1127,7 @@ class TestTheAutomaticContinue:
         stale = asyncio.run(owner.store.get(run_id)).model_copy(
             update={"continue_refusal": None}
         )
-        refusal = asyncio.run(pause_refusal(owner.store, stale, held=False))
+        refusal = asyncio.run(pause_refusal(owner.store, stale, runs_here=False))
         assert refusal == StoredRefusal(frames["questions"]["refusal"])
 
     def test_a_refusal_outlives_a_restart(self, owner):

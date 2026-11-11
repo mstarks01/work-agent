@@ -230,10 +230,10 @@ from analysis_service.job_state import (
     JobState,
     PauseRefusal,
     StoredRefusal,
-    continues,
+    awaits_answers,
     job_state,
     pause_refusal,
-    waits,
+    run_origin,
 )
 from analysis_service.jobs import (
     DeleteRefusal,
@@ -534,15 +534,17 @@ class Workspace:
             await asyncio.wait([held[0]])
 
     async def state(self, record: Envelope) -> JobState:
-        """The Job State of ``record``. A job of this process is held while
-        its task runs, and that task continues it at its pause (ADR 0125)."""
-        return await job_state(self.store, record, held=self.held(record.id))
+        """The Job State of ``record``. The task of a job of this process
+        continues it at its pause (ADR 0125)."""
+        return await job_state(self.store, record, runs_here=self.runs_here(record.id))
 
     async def pause_refusal(self, record: JobRecord) -> PauseRefusal | None:
         """Why ``record`` waits at its pause (:func:`pause_refusal`)."""
-        return await pause_refusal(self.store, record, held=self.held(record.id))
+        return await pause_refusal(
+            self.store, record, runs_here=self.runs_here(record.id)
+        )
 
-    def held(self, job_id: str) -> bool:
+    def runs_here(self, job_id: str) -> bool:
         """Whether this process runs the task of ``job_id``."""
         return job_id in self._runs
 
@@ -620,7 +622,9 @@ class Workspace:
         removable = [
             job
             for job in held
-            if ended(job) and job.id != answering and not await waits(self.store, job)
+            if ended(job)
+            and job.id != answering
+            and not await awaits_answers(self.store, job)
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):
@@ -683,7 +687,7 @@ class Workspace:
         for records in reversed(list(grouped.values())):
             shown = records[-1]
             for record in reversed(records):
-                if await waits(self.store, record):
+                if await awaits_answers(self.store, record):
                     shown = record
                     break
             state = await self.state(shown)
@@ -2220,7 +2224,7 @@ def create_app(
         if state.page_status == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
-            line = progress_line(record, state)
+            line = progress_line(record, state, await run_origin(store, record))
             payload["progress"] = line(
                 [event for event in record.events if event.kind == "node"]
             )
@@ -2503,7 +2507,11 @@ def create_app(
                 # earlier build, with node names that no graph holds.
                 None
                 if ended(record)
-                else progress_line(record, await workspace.state(record)),
+                else progress_line(
+                    record,
+                    await workspace.state(record),
+                    await run_origin(workspace.store, record),
+                ),
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
@@ -2772,7 +2780,7 @@ async def _stream(
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
-        if continues(record, held=workspace.held(run_id)):
+        if workspace.runs_here(run_id):
             yield _frame("continuing", {})
             await workspace.settled(run_id)
         child = await workspace.store.resumed_by(run_id, record.owner_id)

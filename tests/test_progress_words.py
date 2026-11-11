@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
-from analysis_service.job_state import RunStart, job_state, run_start_of
+from analysis_service.job_state import RunStart, job_state, run_origin, run_start_of
 from analysis_service.jobs import (
     Checkpoint,
     InMemoryJobStore,
@@ -616,7 +616,8 @@ def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
     ]
 
     async def read():
-        return progress_line(child, await job_state(store, child, held=False))(events)
+        state = await job_state(store, child, runs_here=False)
+        return progress_line(child, state, await run_origin(store, child))(events)
 
     return asyncio.run(read())
 
@@ -665,7 +666,8 @@ def test_a_paused_job_this_process_continues_shows_the_line_of_a_fresh_run():
 
     async def read():
         envelope = await store.owned(paused.id, "alice")
-        return progress_line(envelope, await job_state(store, envelope, held=True))
+        state = await job_state(store, envelope, runs_here=True)
+        return progress_line(envelope, state, await run_origin(store, envelope))
 
     assert asyncio.run(read())([]) == {
         "stage": 0,
@@ -688,7 +690,8 @@ def test_a_job_that_is_not_running_has_no_progress_line():
 
     async def read():
         envelope = await store.owned(paused.id, "alice")
-        return progress_line(envelope, await job_state(store, envelope, held=False))
+        state = await job_state(store, envelope, runs_here=False)
+        return progress_line(envelope, state, await run_origin(store, envelope))
 
     with pytest.raises(ValueError, match="not running"):
         asyncio.run(read())

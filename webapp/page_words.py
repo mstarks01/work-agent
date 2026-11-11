@@ -28,9 +28,8 @@ from analysis_service.graph import NodeStep, step_by_graph_node
 from analysis_service.job_state import (
     JobState,
     PageStatus,
-    RunningJobState,
+    RunOrigin,
     RunStart,
-    run_start_of,
 )
 from analysis_service.jobs import (
     JobEvent,
@@ -376,7 +375,7 @@ def lowest_stage(
 
 
 def progress_line(
-    record: JobRecord, state: JobState
+    record: JobRecord, state: JobState, origin: RunOrigin
 ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
     """The reader of the progress line of ``record`` after a list of its
     node events (:func:`stage_after` and :func:`words_after`), with the
@@ -385,18 +384,16 @@ def progress_line(
     The bar of a Resumed Job never goes below its lowest stage
     (:func:`lowest_stage`). ``record`` is a job whose ``state`` has the page
     status ``running``: a job in flight, or a paused job that this process
-    continues. A paused job resumes no job (:meth:`JobRecord.pauses`).
-    Raises :class:`ValueError` for each other state.
+    continues. ``origin`` is its
+    :func:`~analysis_service.job_state.run_origin`. Raises
+    :class:`ValueError` for each other state.
     """
     if state.page_status != "running":
         raise ValueError(f"job {record.id} is not running, so it has no line")
     mode = progress_mode(state.asks)
     frameworks = [selection.name for selection in record.whole_frameworks()]
-    if isinstance(state, RunningJobState):
-        start, resumption, parent = state.start, state.resumption, state.parent
-    else:
-        start, resumption, parent = run_start_of(None), None, None
-    lowest = lowest_stage(resumption, parent, frameworks, mode)
+    start = origin.start
+    lowest = lowest_stage(origin.resumption, origin.parent, frameworks, mode)
 
     def line(events: Sequence[JobEvent]) -> dict[str, object]:
         nodes = completed_nodes(events)
