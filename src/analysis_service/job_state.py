@@ -74,7 +74,8 @@ class EndedJobState:
     :func:`~analysis_service.jobs.ended` counts as ended."""
 
     page_status: PageStatus
-    #: Whether the job paused to ask a person.
+    #: Whether the job waits at its pause for a person's answers, and this
+    #: service can read it.
     asks: bool
     #: Whether this process continues the job at its pause (ADR 0125).
     continuing: bool
@@ -143,10 +144,8 @@ async def run_origin(store: JobStore, record: JobRecord) -> RunOrigin:
 
     Raises :class:`LookupError` where the job resumes a job the store lacks,
     and :class:`UnreadableSchema` where it resumes a job that
-    :func:`~analysis_service.jobs.readable` refuses. The message of that
-    refusal names the parent's schema version, so it is about the parent, not
-    about ``record``. A job
-    in flight locks its parent, so the store holds it.
+    :func:`~analysis_service.jobs.readable` refuses. A job in flight locks its
+    parent, so the store holds it.
     """
     resumption = await store.resumption(record.id, record.owner_id)
     parent = None
@@ -190,7 +189,8 @@ async def waits_for_answers(store: JobStore, record: Envelope) -> bool:
     :func:`~analysis_service.jobs.ended` waits no more: that job has a report
     or pauses itself, and a paused job never fails. A locking job that the
     store no longer gives has ended too, because a store deletes only a job
-    that has ended.
+    that has ended. A job that paused for its Controls alone and that a job
+    locks waits no more: the job that continues it shows the analysis.
     """
     if record.status != "awaiting-answers":
         return False

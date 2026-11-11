@@ -2803,7 +2803,7 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        # Read after the continue ends, which stores a refusal or a Resumed Job.
+        # The continue stores its refusal before its task ends.
         refusal_key = _refusal_key(await workspace.why_not_continued(record))
         yield _frame("questions", {"run": run_id} | payload | refusal_key)
     elif status == "completed":
