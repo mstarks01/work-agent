@@ -58,7 +58,7 @@ NotContinuedReason = StoredRefusal | Literal["not-continued"]
 
 
 @dataclass(frozen=True)
-class RunningJobState:
+class InFlightJobState:
     """A job in flight."""
 
     page_status: ClassVar[PageStatus] = "running"
@@ -89,7 +89,7 @@ class UnreadableJobState:
     continuing: ClassVar[bool] = False
 
 
-JobState = RunningJobState | EndedJobState | UnreadableJobState
+JobState = InFlightJobState | EndedJobState | UnreadableJobState
 
 
 @dataclass(frozen=True)
@@ -113,10 +113,12 @@ async def job_state(store: JobStore, record: Envelope, *, runs_here: bool) -> Jo
     if not isinstance(record, JobRecord):
         return UnreadableJobState()
     if not ended(record):
-        asks = record.pauses_to_ask() and (
-            await store.resumption(record.id, record.owner_id) is None
-        )
-        return RunningJobState(asks=asks)
+        asks = False
+        if record.pauses_to_ask():
+            resumption = await store.resumption(record.id, record.owner_id)
+            whole = record.model_copy(update={"resumption": resumption})
+            asks = whole.pauses_to_ask()
+        return InFlightJobState(asks=asks)
     continuing = continues(record, runs_here=runs_here)
     return EndedJobState(
         page_status="running" if continuing else _page_status(record),
@@ -204,11 +206,15 @@ async def takes_answers(store: JobStore, record: Envelope) -> bool:
 async def why_not_continued(
     store: JobStore, record: JobRecord, *, runs_here: bool
 ) -> NotContinuedReason | None:
-    """Why the continue at the pause of ``record`` did not happen, or ``None``
-    for a job that does not wait there for a continue. ``runs_here`` is as
-    :func:`job_state` takes it. A job that waits to continue, with no task in
-    this process, no stored refusal and no Resumed Job, did not continue, and
-    the owner continues it (ADR 0125)."""
+    """Why the continue at the pause of ``record`` did not happen.
+    ``runs_here`` is as :func:`job_state` takes it.
+
+    A stored refusal comes first. A job that waits to continue, with no task
+    in this process, no stored refusal and no Resumed Job, did not continue,
+    and the owner continues it (ADR 0125). ``None`` for each other job: a job
+    that does not wait to continue, a job that this process continues now,
+    and a job that a Resumed Job continued.
+    """
     if record.continue_refusal is not None:
         return StoredRefusal(record.continue_refusal)
     if not record.waits_to_continue() or continues(record, runs_here=runs_here):

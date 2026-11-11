@@ -1510,8 +1510,9 @@ _NOT_CONTINUED = (
 
 
 def _refusal_key(refusal: NotContinuedReason | None) -> dict[str, str]:
-    """The ``refusal`` key of the questions of a job: why it waits at its
-    pause. Empty for each job that does not wait there for a continue."""
+    """The ``refusal`` key of the questions of a job: why the continue at its
+    pause did not happen. Empty where :func:`why_not_continued` gives
+    ``None``."""
     match refusal:
         case StoredRefusal(words=words):
             return {"refusal": words}
@@ -2798,8 +2799,8 @@ async def _stream(
             yield _frame("failed", {"message": str(refusal)})
             return
         # Read after the continue ends, which stores a refusal or a Resumed Job.
-        why = _refusal_key(await workspace.why_not_continued(record))
-        yield _frame("questions", {"run": run_id} | payload | why)
+        refusal_key = _refusal_key(await workspace.why_not_continued(record))
+        yield _frame("questions", {"run": run_id} | payload | refusal_key)
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.

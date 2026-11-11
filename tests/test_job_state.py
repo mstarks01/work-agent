@@ -14,7 +14,7 @@ import pytest
 
 from analysis_service.job_state import (
     EndedJobState,
-    RunningJobState,
+    InFlightJobState,
     RunOrigin,
     StoredRefusal,
     UnreadableJobState,
@@ -140,7 +140,9 @@ def _takes_answers(store: InMemoryJobStore, job_id: str) -> bool:
     return asyncio.run(takes_answers(store, _envelope(store, job_id)))
 
 
-def _refusal(store: InMemoryJobStore, record: JobRecord, *, runs_here: bool = False):
+def _refusal(store: InMemoryJobStore, job_id: str, *, runs_here: bool = False):
+    record = _envelope(store, job_id)
+    assert isinstance(record, JobRecord)
     return asyncio.run(why_not_continued(store, record, runs_here=runs_here))
 
 
@@ -154,7 +156,7 @@ def test_a_fresh_run_asks_where_the_job_asks(asks):
     job.transition("running")
     asyncio.run(admit(store, job))
 
-    assert _state(store, job.id) == RunningJobState(asks=asks)
+    assert _state(store, job.id) == InFlightJobState(asks=asks)
 
 
 def test_a_resumed_job_never_asks():
@@ -165,7 +167,7 @@ def test_a_resumed_job_never_asks():
     envelope = _envelope(store, child.id)
     assert isinstance(envelope, JobRecord) and envelope.pauses_to_ask()
 
-    assert _state(store, child.id) == RunningJobState(asks=False)
+    assert _state(store, child.id) == InFlightJobState(asks=False)
 
 
 # --- The run origin ---------------------------------------------------------
@@ -380,14 +382,14 @@ def test_a_job_that_waits_to_continue_with_nothing_stored_was_not_continued():
     store = InMemoryJobStore()
     job = _paused(store, continues_at_pause=True)
 
-    assert _refusal(store, job) == "not-continued"
+    assert _refusal(store, job.id) == "not-continued"
 
 
 def test_a_job_this_process_continues_has_no_refusal():
     store = InMemoryJobStore()
     job = _paused(store, continues_at_pause=True)
 
-    assert _refusal(store, job, runs_here=True) is None
+    assert _refusal(store, job.id, runs_here=True) is None
 
 
 @pytest.mark.parametrize("stale", [False, True])
@@ -401,7 +403,8 @@ def test_a_stored_refusal_wins_whether_the_record_holds_it_or_the_store_does(sta
     record = before if stale else _envelope(store, job.id)
     assert isinstance(record, JobRecord)
 
-    assert _refusal(store, record) == StoredRefusal("No room.")
+    refusal = asyncio.run(why_not_continued(store, record, runs_here=False))
+    assert refusal == StoredRefusal("No room.")
 
 
 def test_a_job_whose_resumed_job_continues_it_has_no_refusal():
@@ -409,13 +412,13 @@ def test_a_job_whose_resumed_job_continues_it_has_no_refusal():
     parent = _paused(store, continues_at_pause=True)
     _resumed(store, parent)
 
-    assert _refusal(store, parent) is None
+    assert _refusal(store, parent.id) is None
 
 
 def test_a_job_that_asks_has_no_refusal():
     store = InMemoryJobStore()
 
-    assert _refusal(store, _paused(store, ask_questions=True)) is None
+    assert _refusal(store, _paused(store, ask_questions=True).id) is None
 
 
 @pytest.mark.parametrize("unreadable", [False, True])
@@ -428,6 +431,9 @@ def test_a_job_the_store_no_longer_gives_as_a_record_was_not_continued(unreadabl
     job.transition("running")
     job.transition("awaiting-answers")
     asyncio.run(admit(store, job))
+    record = _envelope(store, job.id)
+    assert isinstance(record, JobRecord)
     store.replace = True
 
-    assert _refusal(store, job) == "not-continued"
+    refusal = asyncio.run(why_not_continued(store, record, runs_here=False))
+    assert refusal == "not-continued"
