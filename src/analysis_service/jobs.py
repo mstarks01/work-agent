@@ -210,6 +210,7 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "control_facts": "same-schema",
     "ask_questions": "always",
     "continues_at_pause": "always",
+    "assertion_pass": "always",
     "continue_refusal": "always",
     "checkpoint": "never",
     "status": "always",
@@ -472,6 +473,11 @@ class JobRecord(BaseModel):
     # own answers (ADR 0125): its submission named Controls and asked no
     # questions, and the pause is where the Controls write their facts.
     continues_at_pause: bool = False
+    # Whether the analysis that this job belongs to runs the assertion pass:
+    # the deployment's setting when a job that extracts its model is admitted.
+    # A Resumed Job copies it from the job it resumes, though its own graph
+    # holds no pass. The progress line counts the stages of the run by it (ADR 0129).
+    assertion_pass: bool
     # Why the service's continue of this job at its pause was refused, in the
     # page's words (ADR 0125), or ``None``. Only
     # :meth:`JobStore.set_continue_refusal` writes it, and the admission of a
@@ -531,6 +537,7 @@ class JobRecord(BaseModel):
         control_facts: Sequence[ControlFacts] | None = None,
         ask_questions: bool = False,
         continues_at_pause: bool = False,
+        assertion_pass: bool,
         reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -555,6 +562,7 @@ class JobRecord(BaseModel):
             control_facts=None if control_facts is None else list(control_facts),
             ask_questions=ask_questions,
             continues_at_pause=continues_at_pause,
+            assertion_pass=assertion_pass,
             created_at=now,
             updated_at=now,
             reserved_tokens=reserved_tokens,

@@ -65,6 +65,8 @@ def captured(case: Path):
         sources=sources_of(case),
         frameworks=sample_selection(("asvs",)),
         ask_questions=True,
+        # The scripted pipeline above builds no assertion pass.
+        assertion_pass=False,
     )
     record.transition("running")
 

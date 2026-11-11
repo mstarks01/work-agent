@@ -66,6 +66,7 @@ def upgrade() -> None:
         sa.Column("error", sa.Text()),
         sa.Column("ask_questions", sa.Boolean(), nullable=False),
         sa.Column("continues_at_pause", sa.Boolean(), nullable=False),
+        sa.Column("assertion_pass", sa.Boolean(), nullable=False),
         sa.Column("continue_refusal", sa.Text()),
         *(sa.Column(name, sa.Text(), nullable=False) for name in _JSON_COLUMNS),
         sa.Column("sources_sha256", sa.String(64), nullable=False),

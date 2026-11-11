@@ -524,6 +524,7 @@ def stand_in_engine(
         limits=limits,
         deadline_seconds=deadline_seconds,
         frameworks=frameworks,
+        assertion_pass=True,
     )
 
 

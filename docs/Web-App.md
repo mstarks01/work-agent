@@ -123,19 +123,21 @@ app has no authentication, so its save accepts only a request from the app's own
 page on loopback: the same `Host` and `Sec-Fetch-Site` checks as each other
 writing route.
 
-**Progress, in four stages.** A STRIDE run takes around 40 seconds, and each
+**Progress, in stages.** A STRIDE run takes around 40 seconds, and each
 further framework adds its own lane nodes to that. The page shows a progress bar
-of four stages and one status line, for example
-`1 of 4 stages complete · Checking the system map for gaps or conflicting details…`.
+and one status line, for example
+`1 of 5 stages complete · Checking the system map for gaps or conflicting details…`.
 The bar counts completed stages, not elapsed time. A run that stops for your
-answers counts the extraction, the checks of the system model and the choice of
-the checks for your system, and its last step fills the bar. Where a deployment
-turns `ANALYSIS_ASSERTIONS` off, the run makes no choice of checks, so its bar
-goes from the second stage to the last. A run toward a report counts the
-extraction, the preparation, the review of the findings and the report
-assembly. The status line names the next stage in plain words, and the page
-shows no graph node name. Until the service sends the first line of a run, the
-bar shows no count.
+answers has four stages: the system map, the details of the system model, the
+choice of the checks for your system, and the questions. Its last step fills the
+bar. A run toward a report has five stages: the system map, the details, the
+choice of the checks, the review of the findings and the report assembly. Where
+a deployment turns `ANALYSIS_ASSERTIONS` off, the run makes no choice of checks,
+so each run has one stage less. A job keeps the setting it started with, so a
+change on the Settings page does not change the bar of a run in flight. The
+status line names the next stage in plain words, and the page shows no graph
+node name. Until the service sends the first line of a run, the bar shows no
+count and the status line shows no words.
 A run that continues a paused job starts its bar at the stage where that job
 stopped, counted in the stages of a run toward a report, and the bar does not
 go below it. Its first line reads "Using your
@@ -947,8 +949,9 @@ action. Skipped questions remain open facts, not negative answers.
 
 Reopening a running analysis shows its progress bar and status line from its
 session snapshot, without consuming its live progress stream. Before the first
-stage completes, the line reads `0 of 4 stages complete` and names the current
-stage. A completed analysis opens its
+stage completes, the line reads `0 of N stages complete`, where N is the stage
+count that [Progress, in stages](#what-it-shows-you) gives, and names the
+current stage. A completed analysis opens its
 report directly. Report entries use the analysis name and generation timestamp;
 the report header labels its generation time in UTC.
 

@@ -160,6 +160,7 @@ V1_CASES = {
 def _finished(store) -> str:
     """A finished report that asks a free-text fact and a closed one, in ``store``."""
     record = JobRecord.create(
+        assertion_pass=True,
         ask_questions=True,
         owner_id="alice",
         sources=[DESCRIPTION],

@@ -684,6 +684,7 @@ class JobAnswers:
             controls=controls,
             ask_questions=submission.questions,
             continues_at_pause=bool(controls) and not submission.questions,
+            assertion_pass=self.carries_catalog,
             reserved_tokens=budgets.estimate(sources, selection),
         )
         return await self.admit(record, start=start, principal=submitter.new)
@@ -858,6 +859,7 @@ class JobAnswers:
             controls=parent.controls,
             control_scopes=scopes,
             control_facts=outcome.control_facts,
+            assertion_pass=parent.assertion_pass,
             reserved_tokens=budgets.estimate(
                 outcome.sources, parent.whole_frameworks()
             ),
@@ -917,6 +919,7 @@ class JobAnswers:
             parent_revision=parent.revision,
             carried=parent.held_answers(),
             controls=parent.controls,
+            assertion_pass=self.carries_catalog,
             reserved_tokens=budgets.estimate(
                 amended.sources, parent.whole_frameworks()
             ),

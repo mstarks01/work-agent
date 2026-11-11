@@ -12,7 +12,7 @@ from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
 from tests.test_webapp import BREAKOUT, LOOPBACK, SAME_ORIGIN, posted
 from webapp.main import DEFAULT_NAME
-from webapp.page_words import STEP_PROGRESS
+from webapp.progress import STEP_WORDS, run_stages
 
 tiers = web.tiers
 
@@ -108,7 +108,8 @@ def test_a_run_in_progress_answers_with_its_progress_line_on_each_read(tiers):
         line = detail["progress"]
         assert line == {
             "stage": 1,
-            "words": STEP_PROGRESS["extract"].words["to-questions"],
+            "count": len(run_stages("to-questions", assertion_pass=True)),
+            "words": STEP_WORDS["extract"]["to-questions"],
             "seq": line["seq"],
         }
         again = client.get(f"/workspace/runs/{run}").json()

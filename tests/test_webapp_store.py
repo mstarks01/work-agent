@@ -608,6 +608,7 @@ def queued_run(store) -> str:
         principal = await store.principal(OPERATOR)
         assert principal is not None
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id=principal.owner_id,
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),

@@ -317,9 +317,7 @@ const workspace = (() => {
       else if (data.status === "running" || data.continuing) {
         show("progress-panel");
         el("status").hidden = false;
-        processing(data.progress, undefined, data.run);
-        // The service continues a job with Controls and no questions at its pause.
-        if (data.continuing) el("status-text").textContent = FORM_WORDS.progress_start.controls;
+        processing(data.progress, data.run);
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (view === "description") {
         show("description-panel");
@@ -376,12 +374,13 @@ const workspace = (() => {
     el("status-elapsed").textContent = FORM_WORDS.progress_panel["still-working"].replace("{clock}", clock);
   };
   // Show the progress line of the run. `sent` is the line the service sends:
-  // its count of complete stages, its words (webapp.page_words) and the
-  // number of its last event. The stream and the status answer both send
-  // lines, so the page keeps the line of the latest event. Before the service
-  // sends a line, the page shows `initialWords` and the bar shows no count,
-  // because only the service knows the stage where a run starts.
-  const processing = (sent, initialWords, runId) => {
+  // its count of complete stages, its count of stages, its words
+  // (webapp.progress) and the number of its last event. The stream and the
+  // status answer both send lines, so the page keeps the line of the latest
+  // event. Before the service sends a line, the page shows no words and the
+  // bar shows no count, because only the service knows where a run starts and
+  // how many stages it has.
+  const processing = (sent, runId) => {
     const progress = el("analysis-progress");
     if (runId && progressRun !== runId) {
       progressRun = runId;
@@ -391,10 +390,11 @@ const workspace = (() => {
       progress.removeAttribute("aria-valuetext");
     }
     if (sent) {
+      progress.max = sent.count;
       progress.value = Math.max(progress.value, sent.stage);
       if (sent.seq > (sentLine?.seq ?? -1)) sentLine = sent;
     }
-    const status = sentLine?.words ?? initialWords;
+    const status = sentLine?.words ?? "";
     if (sentLine) {
       const complete = FORM_WORDS.progress_panel["stages-complete"].replace("{complete}", progress.value).replace("{count}", progress.max);
       progress.setAttribute("aria-valuetext", complete);

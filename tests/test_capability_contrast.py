@@ -84,6 +84,7 @@ def _run(path: Path, reading: dict[str, Any]) -> tuple[SystemModel, SchemaLlm]:
         capability_reader=True,
     )
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description(f"{DESCRIPTION_TEXT}\n\n{_source(path)}")],
         frameworks=sample_selection(("asvs",)),

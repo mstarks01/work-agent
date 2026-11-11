@@ -38,7 +38,7 @@ from analysis_service.system_model import (
     make_element_id,
 )
 from tests import test_webapp_questions as web
-from webapp.page_words import STEP_PROGRESS
+from webapp.progress import STEP_WORDS
 
 tiers = web.tiers
 
@@ -573,13 +573,15 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         )
         tab = opened.locator("#questions-nav")
         assert opened.is_visible("#progress-panel")
-        # The bar shows a count once the service sends the first line.
+        # The bar shows a count once the service sends the first line. The
+        # deployment runs no assertion pass, so a run that asks has three
+        # stages.
         opened.wait_for_function(
-            "() => document.querySelector('#status-text').textContent === '0 of 4 stages complete · Reading your description and identifying the parts of your system…'"
+            "() => document.querySelector('#status-text').textContent === '0 of 3 stages complete · Reading your description and identifying the parts of your system…'"
         )
         assert opened.locator("#analysis-progress").count() == 1
         assert opened.locator("#analysis-progress").get_attribute("value") == "0"
-        assert opened.locator("#analysis-progress").get_attribute("max") == "4"
+        assert opened.locator("#analysis-progress").get_attribute("max") == "3"
         elapsed = opened.locator("#status-elapsed")
         assert elapsed.inner_text().startswith("Still working on this step · 0:0")
         assert elapsed.get_attribute("role") is None
@@ -599,12 +601,12 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
 
         runner.step.set()
         opened.wait_for_function(
-            "() => document.querySelector('#status-text').textContent === '1 of 4 stages complete · Checking the system map for gaps or conflicting details…'"
+            "() => document.querySelector('#status-text').textContent === '1 of 3 stages complete · Checking the system map for gaps or conflicting details…'"
         )
         assert opened.locator("#analysis-progress").get_attribute("value") == "1"
         assert (
             opened.locator("#analysis-progress").get_attribute("aria-valuetext")
-            == "1 of 4 stages complete"
+            == "1 of 3 stages complete"
         )
         assert elapsed.inner_text().startswith("Still working on this step · 0:0")
         opened.click("#description-nav")
@@ -668,9 +670,7 @@ def test_a_run_to_the_report_shows_the_stage_and_the_words_the_service_sends(
             "1 of 4 stages complete · Checking the system map for gaps or conflicting details…"
         )
         runner.release.set()
-        examining = (
-            f"2 of 4 stages complete · {STEP_PROGRESS['prepare'].words['to-report']}"
-        )
+        examining = f"2 of 4 stages complete · {STEP_WORDS['prepare']['to-report']}"
         line(examining)
         assert bar.get_attribute("value") == "2"
         assert bar.get_attribute("max") == "4"

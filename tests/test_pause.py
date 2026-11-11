@@ -50,6 +50,7 @@ def asking_job(
     resumption: Resumption | None = None,
 ) -> JobRecord:
     return JobRecord.create(
+        assertion_pass=True,
         owner_id=owner_id,
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),

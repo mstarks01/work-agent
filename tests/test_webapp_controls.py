@@ -63,7 +63,7 @@ from tests.test_webapp_questions import (
     ran,
 )
 from webapp.main import _NOT_CONTINUED, OPERATOR, Workspace
-from webapp.page_words import INITIAL_PROGRESS_WORDS
+from webapp.progress import INITIAL_PROGRESS_WORDS, run_stages
 
 tiers = test_webapp.tiers
 
@@ -1012,6 +1012,42 @@ class TestTheAutomaticContinue:
             words,
         ]
 
+    def test_the_continuing_frame_carries_the_line_of_the_continue(
+        self, owner, monkeypatch
+    ):
+        """While this process continues the job, the stream sends the line of
+        the run that continues it: its start words and the stage count. The
+        continue waits until the stream has sent that frame and waits for the
+        continue to end."""
+        release = threading.Event()
+        workspace = owner.workspace
+        continue_job, settled = workspace._continue, workspace.settled
+
+        async def held_continue(*args):
+            while not release.is_set():
+                await asyncio.sleep(0.01)
+            await continue_job(*args)
+
+        async def releasing_settled(job_id):
+            release.set()
+            await settled(job_id)
+
+        monkeypatch.setattr(workspace, "_continue", held_continue)
+        monkeypatch.setattr(workspace, "settled", releasing_settled)
+        try:
+            run_id, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        finally:
+            release.set()
+        record = asyncio.run(owner.store.get(run_id))
+
+        assert frames["continuing"] == {
+            "stage": 0,
+            "count": len(run_stages("to-report", record.assertion_pass)),
+            "words": INITIAL_PROGRESS_WORDS["controls"],
+            "seq": 0,
+        }
+        assert list(frames)[-1] == "continued"
+
     def test_the_paused_job_reads_as_its_resumed_job(self, owner):
         """The parent waits with no task, and its Resumed Job locks it, so the
         status route serves the child and shows no reason for a pause."""
@@ -1203,7 +1239,8 @@ class TestTheAutomaticContinue:
     def test_the_page_follows_the_continue_to_the_resumed_job(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.continuing({ data: "{}" });
+streams[0].listeners.continuing({ data: JSON.stringify({ stage: 3, count: 5,
+  words: "Continuing with your Controls…", seq: 9 }) });
 calls.push({ status: ids["status-text"].textContent });
 streams[0].listeners.continued({ data: JSON.stringify({ run: "r2" }) });
 """

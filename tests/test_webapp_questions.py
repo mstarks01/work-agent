@@ -2078,10 +2078,14 @@ def test_typing_a_mechanism_chooses_it(send):
 
 
 def test_the_form_script_shows_what_the_service_is_doing():
-    """The current stage appears from Analyze until the pause, and again after."""
+    """The status shows from Analyze until the pause, and again after, with
+    no words until the service sends a line, and then the words it sends."""
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 calls.push({ building: !ids.status.hidden, text: ids["status-text"].textContent });
+streams[0].listeners.node({ data: JSON.stringify({ stage: 0, count: 4,
+  words: "Reading the description", seq: 0 }) });
+calls.push({ sent: ids["status-text"].textContent });
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [] }) });
 calls.push({ paused: ids.status.hidden });
@@ -2089,16 +2093,12 @@ await ids.continue.listeners.click(); await settle();
 calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent });
 """
     seen = _run_form_script(steps)["calls"]
-    building, paused, analysing = (c for c in seen if "url" not in c)
+    building, sent, paused, analysing = (c for c in seen if "url" not in c)
 
-    assert building["building"]
-    assert (
-        building["text"]
-        == "Reading your description and identifying the parts of your system…"
-    )
+    assert building == {"building": True, "text": ""}
+    assert sent == {"sent": "Reading the description"}
     assert paused == {"paused": True}
-    assert analysing["analysing"]
-    assert analysing["text"] == "Using your answers to continue the analysis…"
+    assert analysing == {"analysing": True, "text": ""}
 
 
 def _control_row(flow, form="control"):

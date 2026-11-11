@@ -140,6 +140,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
     """
     marker = f"MARK-{index:04x}"
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|shared-caller",
         sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
