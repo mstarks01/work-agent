@@ -227,12 +227,13 @@ from analysis_service.job_controls import (
     section_summary,
 )
 from analysis_service.job_state import (
+    ContinueRefusal,
     JobState,
-    PauseRefusal,
     StoredRefusal,
     awaits_answers,
+    continue_refusal,
+    continues,
     job_state,
-    pause_refusal,
     run_origin,
 )
 from analysis_service.jobs import (
@@ -538,9 +539,9 @@ class Workspace:
         continues it at its pause (ADR 0125)."""
         return await job_state(self.store, record, runs_here=self.runs_here(record.id))
 
-    async def pause_refusal(self, record: JobRecord) -> PauseRefusal | None:
-        """Why ``record`` waits at its pause (:func:`pause_refusal`)."""
-        return await pause_refusal(
+    async def continue_refusal(self, record: JobRecord) -> ContinueRefusal | None:
+        """Why ``record`` waits at its pause (:func:`continue_refusal`)."""
+        return await continue_refusal(
             self.store, record, runs_here=self.runs_here(record.id)
         )
 
@@ -1507,7 +1508,7 @@ _NOT_CONTINUED = (
 )
 
 
-def _refusal_key(refusal: PauseRefusal | None) -> dict[str, str]:
+def _refusal_key(refusal: ContinueRefusal | None) -> dict[str, str]:
     """The ``refusal`` key of the questions of a job: why it waits at its
     pause. Empty for each job that does not wait there for a continue."""
     match refusal:
@@ -2281,7 +2282,7 @@ def create_app(
             payload["questions"] = (
                 {"run": record.id}
                 | await answers.payload_of(asked)
-                | _refusal_key(await workspace.pause_refusal(record))
+                | _refusal_key(await workspace.continue_refusal(record))
             )
         return JSONResponse(payload)
 
@@ -2780,7 +2781,7 @@ async def _stream(
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
-        if workspace.runs_here(run_id):
+        if continues(record, runs_here=workspace.runs_here(run_id)):
             yield _frame("continuing", {})
             await workspace.settled(run_id)
         child = await workspace.store.resumed_by(run_id, record.owner_id)
@@ -2796,7 +2797,7 @@ async def _stream(
             yield _frame("failed", {"message": str(refusal)})
             return
         # Read after the continue ends, which stores a refusal or a Resumed Job.
-        why = _refusal_key(await workspace.pause_refusal(record))
+        why = _refusal_key(await workspace.continue_refusal(record))
         yield _frame("questions", {"run": run_id} | payload | why)
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame

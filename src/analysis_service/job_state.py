@@ -3,6 +3,8 @@
 A page asks of a job its status, whether its run stops to ask a person, and
 whether this process continues it at its pause. :func:`job_state` makes the
 store reads these facts need, so a caller reads the facts and never the store.
+A page that also shows a progress line reads :func:`run_origin`, which reads
+the resumption again.
 
 The state has three shapes. A job in flight is readable. A job that ended may
 have lost its parent to a delete, so its state reads no parent. A record whose
@@ -11,7 +13,8 @@ envelope does not parse carries only its page status (ADR 0095).
 Three facts have their own reads, because only some pages need them and each
 costs store reads: :func:`run_origin` says what a run does first and which job
 it resumes, :func:`awaits_answers` says whether a job waits for answers, and
-:func:`pause_refusal` says why a job waits at its pause.
+:func:`continue_refusal` says why the continue at a job's pause did not
+happen.
 """
 
 from __future__ import annotations
@@ -47,9 +50,10 @@ class StoredRefusal:
     words: str
 
 
-#: Why a job waits at its pause: the stored refusal, or ``not-continued``
-#: where nothing continued the job and nothing refused it, as after a restart.
-PauseRefusal = StoredRefusal | Literal["not-continued"]
+#: Why the continue at a job's pause did not happen: the stored refusal, or
+#: ``not-continued`` where nothing continued the job and nothing refused it,
+#: as after a restart.
+ContinueRefusal = StoredRefusal | Literal["not-continued"]
 
 
 @dataclass(frozen=True)
@@ -135,7 +139,8 @@ async def run_origin(store: JobStore, record: JobRecord) -> RunOrigin:
     envelope leaves the resumption out, so this reads it by name.
 
     Raises :class:`LookupError` where the job resumes a job the store lacks,
-    and :class:`UnreadableSchema` where it resumes an unreadable job. A job
+    and :class:`UnreadableSchema`, with the parent's schema version, where it
+    resumes an unreadable job. A job
     in flight locks its parent, so the store holds it.
     """
     resumption = await store.resumption(record.id, record.owner_id)
@@ -145,7 +150,7 @@ async def run_origin(store: JobStore, record: JobRecord) -> RunOrigin:
         if stored is None:
             raise LookupError(f"job {record.id} resumes a job the store lacks")
         if not isinstance(stored, JobRecord):
-            raise UnreadableSchema(f"job {record.id} resumes an unreadable job")
+            raise UnreadableSchema(stored.schema_version)
         parent = stored
     return RunOrigin(run_start_of(parent), resumption, parent)
 
@@ -194,11 +199,11 @@ async def awaits_answers(store: JobStore, record: Envelope) -> bool:
     return child is not None and not ended(child)
 
 
-async def pause_refusal(
+async def continue_refusal(
     store: JobStore, record: JobRecord, *, runs_here: bool
-) -> PauseRefusal | None:
-    """Why ``record`` waits at its pause, or ``None`` for a job that does not
-    wait there for a continue. ``runs_here`` is as :func:`job_state` takes
+) -> ContinueRefusal | None:
+    """Why the continue at the pause of ``record`` did not happen, or ``None``
+    for a job that does not wait there for a continue. ``runs_here`` is as :func:`job_state` takes
     it. A job that waits to continue, with no task in this process, no stored
     refusal and no Resumed Job, did not continue, and the owner continues it
     (ADR 0125)."""

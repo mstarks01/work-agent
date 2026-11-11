@@ -138,7 +138,7 @@ beside it.
 - [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
   reports and sources. The build is in the tree: `analysis_service.sql_store`,
   `analysis_service.objects` and `analysis_service.store_backends` hold it.
-  - PostgreSQL, or SQLite on one host, holds job state and principals. `boto3` over the S3 API,
+  - PostgreSQL, or SQLite on one host, holds the job records and principals. `boto3` over the S3 API,
     or the filesystem, holds the sources and the report. Native GCS and Azure backends are a
     separate effort.
   - A principal is one issuer and `sub`, and a random UUIDv4 owner ID stands for it (ADR 0064).

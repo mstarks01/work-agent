@@ -1,4 +1,4 @@
-"""The Job State, the wait and the pause refusal of a job, read from a store.
+"""The Job State, the run origin, the wait and the continue refusal of a job.
 
 Each test reads the record as an envelope from an in-memory store, as a route
 does, so a Resumed Job's resumption is read by name and not off the record.
@@ -19,8 +19,8 @@ from analysis_service.job_state import (
     StoredRefusal,
     UnreadableJobState,
     awaits_answers,
+    continue_refusal,
     job_state,
-    pause_refusal,
     run_origin,
 )
 from analysis_service.jobs import (
@@ -141,7 +141,7 @@ def _awaits_answers(store: InMemoryJobStore, job_id: str) -> bool:
 
 
 def _refusal(store: InMemoryJobStore, record: JobRecord, *, runs_here: bool = False):
-    return asyncio.run(pause_refusal(store, record, runs_here=runs_here))
+    return asyncio.run(continue_refusal(store, record, runs_here=runs_here))
 
 
 # --- The Job State ----------------------------------------------------------
@@ -158,9 +158,9 @@ def test_a_fresh_run_asks_where_the_job_asks(asks):
 
 
 def test_a_resumed_job_never_asks():
-    store = InMemoryJobStore()
     """The envelope leaves the resumption out, so it reads as a job that
     pauses to ask, and the state reads the resumption by name."""
+    store = InMemoryJobStore()
     child = _resumed(store, _paused(store, ask_questions=True), ask_questions=True)
     envelope = _envelope(store, child.id)
     assert isinstance(envelope, JobRecord) and envelope.pauses_to_ask()
@@ -213,8 +213,12 @@ def test_a_job_whose_parent_the_store_cannot_give_raises(unreadable):
     assert isinstance(envelope, JobRecord)
     store.replace = True
 
-    with pytest.raises(UnreadableSchema if unreadable else LookupError):
-        asyncio.run(run_origin(store, envelope))
+    if unreadable:
+        with pytest.raises(UnreadableSchema, match="schema version 0;"):
+            asyncio.run(run_origin(store, envelope))
+    else:
+        with pytest.raises(LookupError):
+            asyncio.run(run_origin(store, envelope))
 
 
 # --- The page status --------------------------------------------------------
@@ -369,7 +373,7 @@ def test_an_unreadable_record_waits_as_its_stored_status_and_its_lock_say(
     assert asyncio.run(awaits_answers(store, _unreadable(status))) is waiting
 
 
-# --- The pause refusal ------------------------------------------------------
+# --- The continue refusal ---------------------------------------------------
 
 
 def test_a_job_that_waits_to_continue_with_nothing_stored_was_not_continued():
