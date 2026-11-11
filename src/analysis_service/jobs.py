@@ -473,9 +473,10 @@ class JobRecord(BaseModel):
     # own answers (ADR 0125): its submission named Controls and asked no
     # questions, and the pause is where the Controls write their facts.
     continues_at_pause: bool = False
-    # Whether the run of this job holds the assertion pass: the deployment's
-    # setting at admission, which a Resumed Job copies from the job it
-    # resumes. The progress line counts the stages of the run by it (ADR 0129).
+    # Whether the analysis that this job belongs to runs the assertion pass:
+    # the deployment's setting when a job that extracts its model is admitted.
+    # A Resumed Job copies it from the job it resumes, though its own graph
+    # holds no pass. The progress line counts the stages of the run by it (ADR 0129).
     assertion_pass: bool
     # Why the service's continue of this job at its pause was refused, in the
     # page's words (ADR 0125), or ``None``. Only

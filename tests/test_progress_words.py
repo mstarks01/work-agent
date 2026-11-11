@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient
 
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES, reads_capabilities
 from analysis_service.job_state import (
     InFlightJobState,
     RunOrigin,
@@ -206,6 +206,31 @@ def test_the_steps_of_an_entry_are_the_steps_of_each_graph_it_builds(selection):
             assertions=built.assertions,
             capability_reader=built.capability_reader,
         ), built
+
+
+@pytest.mark.parametrize("selection", SELECTIONS, ids="+".join)
+def test_the_steps_of_an_entry_refuse_each_graph_the_builder_refuses(selection):
+    """A refusal of the builder that ``entry_steps`` does not share would let
+    it answer for a graph that no job runs. The capability reader of a
+    selection that reads no capability is the one refusal it cannot see."""
+    built = {
+        (each.entry, each.assertions, each.capability_reader)
+        for each in built_graphs(selection)
+    }
+    answered = set()
+    for entry, assertions, reader in itertools.product(
+        get_args(graph.Entry), (False, True), (False, True)
+    ):
+        try:
+            graph.entry_steps(entry, assertions=assertions, capability_reader=reader)
+        except ValueError:
+            continue
+        answered.add((entry, assertions, reader))
+
+    if reads_capabilities(selection):
+        assert built == answered
+    else:
+        assert built == {each for each in answered if not each[2]}
 
 
 #: The Progress Stages of a run, by its mode and whether it holds the
@@ -390,10 +415,23 @@ def test_a_run_that_pauses_for_its_controls_alone_names_the_controls(node):
     }
 
 
-def test_a_pause_completes_no_stage_of_a_run_to_the_report():
-    """A pause for the Controls alone is no stage that the owner sees."""
-    nodes = [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "pause"]
-    assert line_after(nodes)["stage"] == 3
+@pytest.mark.parametrize(
+    ("assertion_pass", "nodes", "stage"),
+    [
+        (
+            True,
+            [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "catalog"],
+            3,
+        ),
+        (False, [graph.EXTRACT_NODE, graph.VALIDATE_NODE, "pause"], 2),
+    ],
+)
+def test_a_pause_completes_no_stage_of_a_run_to_the_report(
+    assertion_pass, nodes, stage
+):
+    """A pause for the Controls alone is no stage that the owner sees: the
+    catalog where the pass runs, and the pause node where it does not."""
+    assert line_after(nodes, assertion_pass=assertion_pass)["stage"] == stage
 
 
 def test_the_line_keeps_the_highest_stage_and_the_words_of_the_last_node():
@@ -499,10 +537,7 @@ def progress_at_start(client, run: str) -> dict:
     return client.get(f"/workspace/runs/{run}").json()["progress"]
 
 
-@pytest.mark.parametrize(
-    ("mode", "assertion_pass"),
-    [("to-questions", True), ("to-report", True), ("to-report", False)],
-)
+@pytest.mark.parametrize(("mode", "assertion_pass"), STAGES)
 def test_a_reload_at_the_start_shows_the_line_of_the_service(
     tiers, mode, assertion_pass
 ):
@@ -629,22 +664,24 @@ PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
         0,
     ),
     ("controls", "to-report"): (
-        [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "pause"],
+        [graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.ASSERT_NODE, "catalog"],
         3,
     ),
 }
 
 
 def resumed_job(
-    start: RunStart, mode: ProgressMode
+    start: RunStart,
+    mode: ProgressMode,
+    nodes: list[str],
+    assertion_pass: bool = True,
 ) -> tuple[InMemoryJobStore, JobRecord]:
     """A Resumed Job in flight, with its parent in the store. A parent in the
     ``to-report`` mode that asked for answers is a finished report, and its
     Resumed Job is the follow-up."""
     store = InMemoryJobStore()
-    nodes, _ = PARENT_RUNS[start, mode]
     parent = JobRecord.create(
-        assertion_pass=True,
+        assertion_pass=assertion_pass,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
@@ -662,7 +699,7 @@ def resumed_job(
         parent.transition("awaiting-answers")
     asyncio.run(admit(store, parent))
     child = JobRecord.create(
-        assertion_pass=True,
+        assertion_pass=parent.assertion_pass,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
@@ -678,8 +715,17 @@ def resumed_job(
     return store, child
 
 
-def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
-    store, child = resumed_job(start, mode)
+def _line(
+    start: RunStart,
+    mode: ProgressMode,
+    nodes: list[str],
+    *,
+    parent_nodes: list[str] | None = None,
+    assertion_pass: bool = True,
+) -> dict:
+    if parent_nodes is None:
+        parent_nodes = PARENT_RUNS[start, mode][0]
+    store, child = resumed_job(start, mode, parent_nodes, assertion_pass)
     events = [
         JobEvent.model_construct(seq=seq, node=node)
         for seq, node in enumerate(nodes, 1)
@@ -711,6 +757,16 @@ def test_the_bar_of_a_resumed_job_never_goes_below_its_lowest_stage(start, mode)
         assert _line(start, mode, nodes)["stage"] == max(expected, lowest)
 
 
+def test_a_resumed_job_of_an_analysis_with_no_assertion_pass_counts_its_stages():
+    """The parent ran with no pass and ended at the pause, so its Resumed Job
+    counts four stages and starts at the second."""
+    nodes = [graph.EXTRACT_NODE, graph.VALIDATE_NODE, "pause"]
+    line = _line(
+        "answers", "to-questions", [], parent_nodes=nodes, assertion_pass=False
+    )
+    assert (line["stage"], line["count"]) == (2, len(STAGES["to-report", False]))
+
+
 def paused_job(store: InMemoryJobStore, *, asks: bool) -> JobRecord:
     """A job of ``store`` that ran to its pause: to ask a person, or for its
     Controls alone."""
@@ -723,7 +779,7 @@ def paused_job(store: InMemoryJobStore, *, asks: bool) -> JobRecord:
         continues_at_pause=not asks,
     )
     paused.transition("running")
-    for node in (graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.PAUSE_NODE):
+    for node in (graph.EXTRACT_NODE, graph.VALIDATE_NODE, graph.CATALOG_NODE):
         paused.record_node(node)
     paused.transition("awaiting-answers")
     asyncio.run(admit(store, paused))
@@ -745,7 +801,7 @@ def test_a_paused_job_this_process_continues_shows_the_line_of_its_continue():
         "stage": 2,
         "count": len(STAGES["to-report", True]),
         "words": INITIAL_PROGRESS_WORDS["controls"],
-        "seq": paused.events[-1].seq,
+        "seq": max(event.seq for event in paused.events if event.node is not None),
     }
 
 

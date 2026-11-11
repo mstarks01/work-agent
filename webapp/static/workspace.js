@@ -375,10 +375,11 @@ const workspace = (() => {
   };
   // Show the progress line of the run. `sent` is the line the service sends:
   // its count of complete stages, its count of stages, its words
-  // (webapp.progress) and the number of its last event. The stream and the status answer both send
-  // lines, so the page keeps the line of the latest event. Before the service
-  // sends a line, the page shows no words and the bar shows no count, because
-  // only the service knows where a run starts and how many stages it has.
+  // (webapp.progress) and the number of its last event. The stream and the
+  // status answer both send lines, so the page keeps the line of the latest
+  // event. Before the service sends a line, the page shows no words and the
+  // bar shows no count, because only the service knows where a run starts and
+  // how many stages it has.
   const processing = (sent, runId) => {
     const progress = el("analysis-progress");
     if (runId && progressRun !== runId) {

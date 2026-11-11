@@ -2231,10 +2231,7 @@ def create_app(
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
             origin = await run_origin(workspace.store, record)
-            line = progress_line(record, state, origin)
-            payload["progress"] = line(
-                [event for event in record.events if event.kind == "node"]
-            )
+            payload["progress"] = progress_line(record, state, origin)(record.events)
         payload["selection"] = [
             {"name": selection.name, "options": dict(selection.options)}
             for selection in record.whole_frameworks()

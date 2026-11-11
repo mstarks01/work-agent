@@ -37,10 +37,10 @@ stages of a run to the report, and its bar starts at the stage where its
 paused parent stopped. A pause for the Controls alone completes no stage of a
 run to the report, so the owner sees one analysis across the two jobs.
 
-**The job stores whether its run holds the assertion pass.** The deployment's
-setting at admission goes into the record, and a Resumed Job copies it from
-its parent. A change on the Settings page does not change the count of a job
-in flight.
+**The job stores whether its analysis runs the assertion pass.** A job that
+extracts its model takes the deployment's setting at admission. A Resumed Job
+copies it from its parent, though the graph of a Resumed Job holds no pass. A change on the Settings page does not change the
+count of a job in flight.
 
 **The service writes every line.** Each line carries the count of complete
 stages, the count of stages of the run and the words of the work that

@@ -155,8 +155,9 @@ def progress_line(
 ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
     """The reader of the progress line of ``record`` after a list of its node
     events: the count of complete stages, the count of stages of the run, the
-    words of the work that follows, and the ``seq`` of the last event, so the
-    page keeps the latest line it got.
+    words of the work that follows, and the ``seq`` of the last node event, so
+    the page keeps the latest line it got. ``events`` may hold status events
+    too, and the line reads none of them.
 
     ``record`` is a job whose ``state`` has the page status ``running``: a
     job in flight, or a paused job that this process continues, whose line
@@ -203,7 +204,9 @@ def progress_line(
             "stage": max(complete(nodes), lowest),
             "count": len(stages),
             "words": words,
-            "seq": events[-1].seq if events else 0,
+            "seq": max(
+                (event.seq for event in events if event.node is not None), default=0
+            ),
         }
 
     return line

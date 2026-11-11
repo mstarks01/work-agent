@@ -571,8 +571,15 @@ def entry_steps(
     entry: Entry, *, assertions: bool, capability_reader: bool
 ) -> frozenset[NodeStep]:
     """The step of each node that :func:`build_pipeline` builds for ``entry``
-    and the two pass switches, whichever selection, with no build.
-    ``tests/test_progress_words.py`` holds it to each built graph."""
+    and the two pass switches, whichever selection, with no build. Raises
+    :class:`ValueError` where the builder refuses the entry and the switches,
+    whichever selection; the builder also refuses a capability reader for a
+    selection that reads no capability. ``tests/test_progress_words.py``
+    holds it to each built graph and to each refusal."""
+    if assertions and entry not in CATALOGUING_ENTRIES:
+        raise ValueError(f"entry {entry!r} ends in no catalog")
+    if capability_reader and entry not in READING_ENTRIES:
+        raise ValueError(f"entry {entry!r} extracts no model to pass on")
     if entry == ENTRY_EXTRACT_ONLY:
         return frozenset({"extract"})
     if entry == ENTRY_ASSERT_ONLY:
