@@ -218,6 +218,7 @@ def racing(request, tmp_path_factory, monkeypatch):
 
 def new_record(subject: str = "alice", reserved: int = 0) -> JobRecord:
     return JobRecord.create(
+        assertion_pass=True,
         owner_id=subject,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -253,6 +254,7 @@ def enrol(store, owner: str = "alice") -> None:
 def completed(store, subject="alice", **create) -> str:
     """The ID of a completed job with a report, admitted to ``store``."""
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=subject,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -268,6 +270,7 @@ def completed(store, subject="alice", **create) -> str:
 def follow_up(parent: str) -> JobRecord:
     """A report's follow-up of ``parent``, still queued."""
     return JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -288,6 +291,7 @@ def final(store, parent: str) -> str:
 def amendment(parent: str, revision: int = 0) -> JobRecord:
     """A job an amendment of ``parent`` started, still queued."""
     return JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -507,6 +511,7 @@ class TestReserve:
                     record.transition(status)
                 await store.save(record)
             probe = JobRecord.create(
+                assertion_pass=True,
                 owner_id=subject,
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),
@@ -534,6 +539,7 @@ class TestReserve:
             seen = {}
             for owner in ("alice", "alice", "bob", "alice", "bob"):
                 record = JobRecord.create(
+                    assertion_pass=True,
                     owner_id=owner,
                     sources=[Source.description("an app")],
                     frameworks=sample_selection(),
@@ -586,6 +592,7 @@ class TestReserve:
             for _ in range(3):
                 await admit(store, new_record())
             bob = JobRecord.create(
+                assertion_pass=True,
                 owner_id="bob",
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),

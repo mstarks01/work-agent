@@ -51,6 +51,7 @@ def _submit(client, answers_from, *, questions=True, token="alice-token"):
 class TestWhatAJobHolds:
     def test_a_later_answer_lies_over_an_earlier_one(self):
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description(DESCRIPTION_TEXT)],
             frameworks=sample_selection(),
@@ -67,6 +68,7 @@ class TestWhatAJobHolds:
     def test_it_holds_the_link_answers_too(self):
         link = LinkAnswer(principal="shoppers", element="entity:shopper")
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description(DESCRIPTION_TEXT)],
             frameworks=sample_selection(),

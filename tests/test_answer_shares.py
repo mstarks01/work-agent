@@ -168,6 +168,7 @@ def test_the_questions_route_returns_the_held_shares():
     held = _save(AnswerSet(), SentAnswers(shares=(_share("mutual TLS", STORE, READ),)))
     client, store = make_client()
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[DESCRIPTION],
         frameworks=sample_selection(),
@@ -195,6 +196,7 @@ def test_a_draft_share_reaches_what_a_new_analysis_carries():
     """``held_answers`` writes a draft's shares out, so a job that carries
     this one's answers reads each covered element (ADR 0079)."""
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[DESCRIPTION],
         frameworks=sample_selection(),

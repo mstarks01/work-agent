@@ -429,6 +429,7 @@ class TestTheResumedRunWithoutACatalog:
             key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
         )
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="idp|user-1",
             sources=with_link_answers([DESCRIPTION], [], [answer]),
             frameworks=sample_selection(),
@@ -463,6 +464,7 @@ class TestTheRoutes:
 
         # An analysis that asks: only its report offers follow-up questions.
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[DESCRIPTION],
             frameworks=sample_selection(),
@@ -547,6 +549,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     """One resumed job on the real graph from ``prepare``, and its report."""
     sources, links, answered = resumed_sources(list(given), [], [], earlier, facts)
     job = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
@@ -663,6 +666,7 @@ def resume_links(checkpoint, links, earlier=()):
         [DESCRIPTION], earlier, links, parent_facts=(), facts=()
     )
     job = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),

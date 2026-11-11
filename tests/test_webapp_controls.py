@@ -63,7 +63,7 @@ from tests.test_webapp_questions import (
     ran,
 )
 from webapp.main import _NOT_CONTINUED, OPERATOR, Workspace
-from webapp.page_words import INITIAL_PROGRESS_WORDS
+from webapp.progress import INITIAL_PROGRESS_WORDS
 
 tiers = test_webapp.tiers
 
@@ -1203,7 +1203,8 @@ class TestTheAutomaticContinue:
     def test_the_page_follows_the_continue_to_the_resumed_job(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.continuing({ data: "{}" });
+streams[0].listeners.continuing({ data: JSON.stringify({ stage: 3, count: 5,
+  words: "Continuing with your Controls…", seq: 9 }) });
 calls.push({ status: ids["status-text"].textContent });
 streams[0].listeners.continued({ data: JSON.stringify({ run: "r2" }) });
 """

@@ -8,14 +8,13 @@ a raw key.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any, Literal, NamedTuple, TypeVar
+from typing import Any, Literal
 
 from analysis_service.answer_state import EmptyListReason
 from analysis_service.claims import (
     VERDICT_LABELS,
-    FrameworkName,
     GroundKind,
     ScopeState,
     SeverityLevel,
@@ -24,19 +23,8 @@ from analysis_service.claims import (
 )
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
-from analysis_service.graph import NodeStep, step_by_graph_node
 from analysis_service.job_state import (
-    JobState,
     PageStatus,
-    RunOrigin,
-    RunStart,
-)
-from analysis_service.jobs import (
-    JobEvent,
-    JobRecord,
-    Resumption,
-    completed_nodes,
-    is_follow_up,
 )
 from analysis_service.report_changes import Change, FindingChange
 
@@ -232,180 +220,6 @@ EMPTY_LIST_REASONS: Mapping[EmptyListReason, str] = MappingProxyType(
     }
 )
 
-#: Which progress line a run gets: ``to-questions`` where the run stops to ask
-#: a person, and ``to-report`` for each other run.
-ProgressMode = Literal["to-questions", "to-report"]
-
-
-def progress_mode(asks: bool) -> ProgressMode:
-    """The progress mode of a run that stops to ask a person, or of one that
-    does not."""
-    return "to-questions" if asks else "to-report"
-
-
-#: What the progress line says before the first step of a run completes. The
-#: page reads the same row when it starts or follows a run.
-INITIAL_PROGRESS_WORDS: Mapping[RunStart, str] = MappingProxyType(
-    {
-        "description": (
-            "Reading your description and identifying the parts of your system…"
-        ),
-        "answers": "Using your answers to continue the analysis…",
-        "controls": "Continuing with your Controls…",
-    }
-)
-
-
-_T = TypeVar("_T")
-
-
-def _by_mode(to_questions: _T, to_report: _T) -> Mapping[ProgressMode, _T]:
-    return MappingProxyType({"to-questions": to_questions, "to-report": to_report})
-
-
-class StepProgress(NamedTuple):
-    """What the progress line shows when one step completes, in each mode."""
-
-    #: The work that follows the step.
-    words: Mapping[ProgressMode, str]
-    #: The count of stages that are complete.
-    stages: Mapping[ProgressMode, int]
-
-
-def _step(words: str, to_questions: int, to_report: int) -> StepProgress:
-    """A step that names the same work in each mode."""
-    return StepProgress(_by_mode(words, words), _by_mode(to_questions, to_report))
-
-
-_CHECKING_MAP = "Checking the system map for gaps or conflicting details…"
-_NOTING_MEASURES = "Noting the security measures you’ve already described…"
-_IDENTIFYING_DETAILS = "Identifying details that would make the analysis more precise…"
-_EXAMINING = "Examining your system against the selected frameworks…"
-_CHECKING_FINDINGS = "Bringing the results together and checking the findings…"
-#: The work at the end of a run that pauses. A run to the report pauses only
-#: for its Controls, and asks no question (ADR 0125).
-_PAUSING = _by_mode("Generating questions…", "Preparing your Controls…")
-
-#: The progress of each step. The bar counts completed stages, not a share of
-#: elapsed time. A run that the ``reject`` step ends shows its refusal, and its
-#: row completes no stage. In a run that asks, ``assert`` completes the third
-#: stage. A run that asks ends at ``catalog`` or at ``pause``, never at both, so
-#: each of the two fills the bar. A deployment that turns the assertion pass
-#: off builds no ``assert`` step, and the bar of its run that asks goes from
-#: the second stage to the last.
-STEP_PROGRESS: Mapping[NodeStep, StepProgress] = MappingProxyType(
-    {
-        "extract": _step(_CHECKING_MAP, 1, 1),
-        "repair": _step(_CHECKING_MAP, 2, 2),
-        "validate": _step(_NOTING_MEASURES, 2, 2),
-        "revalidate": _step(_NOTING_MEASURES, 2, 2),
-        "reject": _step("Continuing the analysis…", 0, 0),
-        "capabilities": _step(_IDENTIFYING_DETAILS, 2, 2),
-        "stated": _step(_IDENTIFYING_DETAILS, 2, 2),
-        "read": _step(_IDENTIFYING_DETAILS, 2, 2),
-        "assert": _step("Choosing the relevant checks for your system…", 3, 2),
-        "catalog": StepProgress(_PAUSING, _by_mode(4, 0)),
-        "pause": StepProgress(_PAUSING, _by_mode(4, 0)),
-        "prepare": _step(_EXAMINING, 0, 2),
-        "analyze": _step(_EXAMINING, 0, 0),
-        "join": _step(_CHECKING_FINDINGS, 0, 3),
-        "merge": _step(_CHECKING_FINDINGS, 0, 3),
-        "critic": _step(_CHECKING_FINDINGS, 0, 3),
-        "router": _step(_CHECKING_FINDINGS, 0, 3),
-        "recritic": _step(_CHECKING_FINDINGS, 0, 3),
-        "rereview": _step(_CHECKING_FINDINGS, 0, 3),
-        "critic_failed": _step(_CHECKING_FINDINGS, 0, 3),
-        "assemble": _step("Putting your report together…", 0, 4),
-    }
-)
-
-#: The count of stages of a run, which is the length of the progress bar.
-STAGE_COUNT = max(
-    stage for progress in STEP_PROGRESS.values() for stage in progress.stages.values()
-)
-
-
-def stage_after(
-    nodes: Sequence[str], frameworks: Sequence[FrameworkName], mode: ProgressMode
-) -> int:
-    """The count of stages that are complete after ``nodes`` completed in a
-    run of ``frameworks``. Raises :class:`KeyError` on a name that is not a
-    node of a graph of ``frameworks``."""
-    steps = step_by_graph_node(frameworks)
-    return max((STEP_PROGRESS[steps[node]].stages[mode] for node in nodes), default=0)
-
-
-def words_after(
-    nodes: Sequence[str],
-    frameworks: Sequence[FrameworkName],
-    mode: ProgressMode,
-    start: RunStart,
-) -> str:
-    """The words of the work that follows ``nodes`` in a run of
-    ``frameworks`` that does ``start`` first. Raises :class:`KeyError` on a
-    name that is not a node of a graph of ``frameworks``."""
-    if not nodes:
-        return INITIAL_PROGRESS_WORDS[start]
-    return STEP_PROGRESS[step_by_graph_node(frameworks)[nodes[-1]]].words[mode]
-
-
-def lowest_stage(
-    resumption: Resumption | None,
-    parent: JobRecord | None,
-    frameworks: Sequence[FrameworkName],
-    mode: ProgressMode,
-) -> int:
-    """The stage below which the bar of a Resumed Job never goes: the stage
-    where its paused parent stopped, counted in ``mode``
-    (:func:`stage_after`). ``None`` and ``None`` stand for a job that
-    resumes no job, and give 0.
-
-    The bar of a follow-up of a finished report starts at 0. So does the bar
-    of a job whose parent holds a node that no graph of ``frameworks`` holds,
-    a record of an earlier build. The bar is a display value, so this reader
-    answers 0 for such a name. :func:`stage_after` and :func:`words_after`,
-    which map a node name to its step, raise :class:`KeyError` for it.
-    """
-    if parent is None or is_follow_up(resumption):
-        return 0
-    nodes = completed_nodes(parent.events)
-    if not set(nodes) <= step_by_graph_node(frameworks).keys():
-        return 0
-    return stage_after(nodes, frameworks, mode)
-
-
-def progress_line(
-    record: JobRecord, state: JobState, origin: RunOrigin
-) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
-    """The reader of the progress line of ``record`` after a list of its
-    node events (:func:`stage_after` and :func:`words_after`), with the
-    ``seq`` of the last event, so the page keeps the latest line it got.
-
-    The bar of a Resumed Job never goes below its lowest stage
-    (:func:`lowest_stage`). ``record`` is a job whose ``state`` has the page
-    status ``running``: a job in flight, or a paused job that this process
-    continues. ``origin`` is its
-    :func:`~analysis_service.job_state.run_origin`. Raises
-    :class:`ValueError` for each other state.
-    """
-    if state.page_status != "running":
-        raise ValueError(f"job {record.id} is not running, so it has no line")
-    mode = progress_mode(state.asks)
-    frameworks = [selection.name for selection in record.whole_frameworks()]
-    start = origin.start
-    lowest = lowest_stage(origin.resumption, origin.parent, frameworks, mode)
-
-    def line(events: Sequence[JobEvent]) -> dict[str, object]:
-        nodes = completed_nodes(events)
-        return {
-            "stage": max(stage_after(nodes, frameworks, mode), lowest),
-            "words": words_after(nodes, frameworks, mode, start),
-            "seq": events[-1].seq if events else 0,
-        }
-
-    return line
-
-
 #: A line of the progress panel that the page chooses: the count of complete
 #: stages, and the time on one step.
 ProgressPanelLine = Literal["stages-complete", "still-working"]
@@ -423,9 +237,7 @@ PROGRESS_PANEL_WORDS: Mapping[ProgressPanelLine, str] = MappingProxyType(
 )
 
 #: The keys of the ``form_words`` island, as the form scripts read them.
-FormTable = Literal[
-    "page_status", "gate_notes", "empty_list", "progress_start", "progress_panel"
-]
+FormTable = Literal["page_status", "gate_notes", "empty_list", "progress_panel"]
 
 #: Every table the form page reads, by its key in the ``form_words`` island.
 FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
@@ -433,7 +245,6 @@ FORM_WORDS: Mapping[FormTable, Mapping[Any, object]] = MappingProxyType(
         "page_status": PAGE_STATUS_LABELS,
         "gate_notes": GATE_NOTES,
         "empty_list": EMPTY_LIST_REASONS,
-        "progress_start": INITIAL_PROGRESS_WORDS,
         "progress_panel": PROGRESS_PANEL_WORDS,
     }
 )

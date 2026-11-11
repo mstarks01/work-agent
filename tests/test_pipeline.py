@@ -99,6 +99,7 @@ def proposal_json(threat_id: str, category: str, **overrides) -> str:
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=[Source.description(text)],
         system_name="Order Service",
@@ -955,6 +956,7 @@ class HeldLlm(ScriptedLlm):
 
 def pair_job(pair: Sequence[FrameworkName]) -> JobRecord:
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=[Source.description(DESCRIPTION_TEXT)],
         system_name="Order Service",

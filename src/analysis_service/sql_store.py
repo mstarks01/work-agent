@@ -258,6 +258,7 @@ jobs = Table(
     Column("error", Text),
     Column("ask_questions", Boolean, nullable=False),
     Column("continues_at_pause", Boolean, nullable=False),
+    Column("assertion_pass", Boolean, nullable=False),
     Column("continue_refusal", Text),
     Column("frameworks", _Json, nullable=False),
     Column("answers", _Json, nullable=False),

@@ -120,6 +120,7 @@ def start(env: dict[str, str]) -> None:
 
 def queued(store: JobStore) -> str:
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -516,6 +517,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     held = Checkpoint(system_model=valid_model(), assertions=None)
     answers = AnswerSet(links=(LINK,), facts=(FactAnswer(key=KEY, value="TLS 1.3"),))
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=owner_id,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -589,6 +591,7 @@ class TestTheJsonRoundTrip:
         store = build_store(env)
         record = every_field()
         parent = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
@@ -608,6 +611,7 @@ class TestTheJsonRoundTrip:
 
 def completed_job(store: JobStore) -> JobRecord:
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -726,6 +730,7 @@ class TestTheReport:
     def test_the_restart_scan_fails_a_job_of_another_schema_version(self, env):
         store = build_store(env)
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
@@ -799,6 +804,7 @@ def in_flight(
     """The ID of a job of ``owner`` in ``status``, last updated ``days_ago``
     days ago."""
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=owner,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -877,6 +883,7 @@ class TestAStoredValueThisServiceDoesNotList:
         job = in_flight(store, status)
         store_unlisted(database_of(env), job, case)
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),

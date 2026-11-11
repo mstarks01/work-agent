@@ -85,6 +85,7 @@ def _completed(store, report, resumption=None):
     from tests.factories import admit, sample_selection
 
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("A web app talks to a database.")],
         frameworks=sample_selection(),

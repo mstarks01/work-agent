@@ -43,6 +43,7 @@ from tests.test_webapp import COMPLETE_OPTIONS
 
 def make_record() -> JobRecord:
     return JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -95,6 +96,7 @@ class TestTheStubRunner:
     @pytest.mark.parametrize("name", sorted(PACKAGES))
     def test_its_report_survives_a_round_trip_for_each_framework(self, name):
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=[FrameworkSelection(name=name, options=COMPLETE_OPTIONS[name])],

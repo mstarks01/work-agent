@@ -99,6 +99,7 @@ def queued_job(store: JobStore) -> str:
     """The ID of a queued job of the operator, put in ``store``."""
     principal = Principal.new(OPERATOR)
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=principal.owner_id,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),

@@ -90,6 +90,7 @@ def near_duplicate():
 def system_a_job() -> JobRecord:
     label, text = source_block(exemplar_systems()["A"])
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=[Source.description(text, label=label)],
         system_name="Payments platform",

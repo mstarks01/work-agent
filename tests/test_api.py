@@ -795,6 +795,7 @@ class TestReport:
     def test_queued_job_report_is_409(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -821,6 +822,7 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
     job is already terminal by the time the next one is sent.
     """
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=subject,
         sources=[Source.description("an app")],
         frameworks=sample_selection(),
@@ -948,6 +950,7 @@ class TestTheJobIdCheck:
 
     def test_every_minted_id_has_the_shape_each_route_checks(self):
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -1159,6 +1162,7 @@ class TestConcurrencyCeiling:
         client, _ = make_client(store=store, max_active_jobs=1)
         client.post("/v1/jobs", json=submission(), headers=auth())
         probe = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -1468,6 +1472,7 @@ class TestConsumptionBudgets:
         client, store = make_client(budget=tiny)
         client.post("/v1/jobs", json=submission(), headers=auth())
         probe = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),

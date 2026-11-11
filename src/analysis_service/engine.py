@@ -116,6 +116,7 @@ class Engine:
         limits: SourceLimits,
         deadline_seconds: float,
         frameworks: Sequence[FrameworkSelection],
+        assertion_pass: bool,
     ) -> None:
         # The same rule the HTTP routes apply, read through the one reader all
         # three share, :func:`~analysis_service.selection.resolve_names`: the
@@ -136,6 +137,8 @@ class Engine:
         self._limits = limits
         self._principals = PrincipalTable()
         self._deadline_seconds = deadline_seconds
+        # Whether a job here runs the assertion pass, which its record keeps.
+        self._assertion_pass = assertion_pass
 
     @property
     def frameworks(self) -> tuple[FrameworkName, ...]:
@@ -187,6 +190,7 @@ class Engine:
             limits=deployment.resilience.source_limits(),
             deadline_seconds=deployment.job_deadline_seconds(),
             frameworks=selections,
+            assertion_pass=deployment.carries_catalog,
         )
         # Built now rather than at the first job, so the build-time gates of
         # :meth:`~analysis_service.deployment.Deployment.pipeline` refuse here.
@@ -365,6 +369,7 @@ class Engine:
             frameworks=self._frameworks,
             system_name=name,
             ask_questions=ask_questions,
+            assertion_pass=self._assertion_pass,
         )
 
     def _owner_id(self, caller: str) -> str:

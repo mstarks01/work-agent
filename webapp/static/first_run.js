@@ -378,7 +378,7 @@
       }
       const run = (await jsonOf(started))?.run;
       if (!run) throw new Error("the answer names no run");
-      follow(run, FORM_WORDS.progress_start.description);
+      follow(run);
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -1451,7 +1451,7 @@
       answerProblem.hidden = true;
       asked.hidden = true;
       pauseEnded = true;
-      follow(run, FORM_WORDS.progress_start.description);
+      follow(run);
     })), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     if (data.asks) tail.append(fix);
@@ -1690,7 +1690,7 @@
       answerProblem.hidden = true;
       asked.hidden = true;
       pauseEnded = true;
-      follow(run, FORM_WORDS.progress_start.answers);
+      follow(run);
     } finally {
       starting = false;
       startButton.disabled = false;
@@ -1746,12 +1746,19 @@
   asked.addEventListener("click", () => updateQuestionActions());
 
   // Follow one run's progress to its end: a report, questions, or a failure.
-  const follow = (runId, initialWords) => {
+  const follow = (runId) => {
     running = true;
     gate();
     if (typeof workspace !== "undefined") workspace.track(runId);
-    working(initialWords);
-    if (typeof workspace !== "undefined") workspace.processing(null, initialWords, runId);
+    working("");
+    if (typeof workspace !== "undefined") workspace.processing(null, runId);
+    // Show a progress line that the service sends: on the bar of the
+    // workspace, or as the status words alone on a page with no bar.
+    const shown = (event) => {
+      const line = JSON.parse(event.data);
+      if (typeof workspace !== "undefined") workspace.processing(line, runId);
+      else working(line.words);
+    };
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
@@ -1763,16 +1770,12 @@
       showQuestions(JSON.parse(event.data));
     });
     // A job with Controls and no questions continues at its pause at once.
-    stream.addEventListener("continuing", () => working(FORM_WORDS.progress_start.controls));
+    stream.addEventListener("continuing", shown);
     stream.addEventListener("continued", (event) => {
       stream.close();
-      follow(JSON.parse(event.data).run, FORM_WORDS.progress_start.controls);
+      follow(JSON.parse(event.data).run);
     });
-    stream.addEventListener("node", (event) => {
-      if (typeof workspace !== "undefined") {
-        workspace.processing(JSON.parse(event.data), undefined, runId);
-      }
-    });
+    stream.addEventListener("node", shown);
     stream.addEventListener("done", (event) => {
       stream.close();
       location.href = "/report/" + encodeURIComponent(runId);
@@ -1807,5 +1810,5 @@
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
   if (followed) {
-    follow(followed, FORM_WORDS.progress_start.answers);
+    follow(followed);
   }

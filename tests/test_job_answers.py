@@ -132,6 +132,7 @@ class TestReadingAJob:
     def test_a_running_job_has_no_report_to_ask_about(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id=OWNER,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
@@ -608,6 +609,7 @@ class TestTheOneAdmission:
             raise ConfigError("ANALYSIS_TIERS_FILE is unset")
 
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id=OWNER,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
@@ -625,12 +627,14 @@ class TestTheOneAdmission:
         answers = operations(store, ceiling=1)
         submitter = asyncio.run(answers.submitter(identity_of(OWNER)))
         first = JobRecord.create(
+            assertion_pass=True,
             owner_id=submitter.owner_id,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),
         )
         asyncio.run(answers.admit(first, start=Starts(), principal=submitter.new))
         second = JobRecord.create(
+            assertion_pass=True,
             owner_id=submitter.owner_id,
             sources=list(valid_model_sources()),
             frameworks=sample_selection(),

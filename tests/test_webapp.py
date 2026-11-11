@@ -784,6 +784,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
     ) as client:
         assert JOB_ID_PATTERN.fullmatch(run_to_completion(client))
         foreign = JobRecord.create(
+            assertion_pass=True,
             owner_id="another-owner",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -820,6 +821,7 @@ def test_answers_from_reads_a_malformed_id_as_a_missing_run_before_the_store(tie
     ) as client:
         run_to_completion(client)
         foreign = JobRecord.create(
+            assertion_pass=True,
             owner_id="another-owner",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -897,6 +899,7 @@ def test_the_injection_point_escapes_every_angle_bracket():
     from webapp.main import VIEWER
 
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="local",
         sources=[Source.description("A web app.")],
         frameworks=sample_selection(),

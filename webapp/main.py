@@ -329,11 +329,10 @@ from webapp.page import (
 from webapp.page_words import (
     FORM_WORDS,
     REPORT_WORDS,
-    STAGE_COUNT,
     change_line,
     island_tables,
-    progress_line,
 )
+from webapp.progress import progress_line
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
@@ -1724,7 +1723,6 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 facet_answers=script_json(list(FACET_ANSWERS)),
                 form_words=script_json(island_tables(FORM_WORDS)),
-                stage_count=str(STAGE_COUNT),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 theme=_THEME,
@@ -2758,8 +2756,8 @@ async def _stream(
     then one frame for how it ended. Where ``progress`` is given, each node
     event gets a frame too: the progress line after that node, and no node
     name. The first frame is then the progress line before any node, so the
-    bar of a Resumed Job starts at its lowest stage
-    (:func:`webapp.page_words.lowest_stage`).
+    bar of a Resumed Job starts at the stage where its parent stopped
+    (:func:`webapp.progress.progress_line`).
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions
@@ -2790,7 +2788,12 @@ async def _stream(
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
         if workspace.continues(record):
-            yield _frame("continuing", {})
+            line = progress_line(
+                record,
+                await workspace.state(record),
+                await run_origin(workspace.store, record),
+            )
+            yield _frame("continuing", line(record.events))
             await workspace.settled(run_id)
         child = await workspace.store.resumed_by(run_id, record.owner_id)
         if child is not None:

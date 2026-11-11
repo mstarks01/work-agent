@@ -40,6 +40,7 @@ from tests.factories import DESCRIPTION_TEXT, admit, sample_report, sample_selec
 
 def _job(**fields: Any) -> JobRecord:
     return JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),

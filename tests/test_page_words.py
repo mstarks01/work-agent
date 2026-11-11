@@ -23,7 +23,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fact_answers import FACET_ANSWERS, FactStatus
 from analysis_service.frameworks import PreconditionResult
-from analysis_service.job_state import PageStatus, RunStart
+from analysis_service.job_state import PageStatus
 from analysis_service.report_changes import Change, FindingChange
 from tests.factories import report_state, sample_report
 from tests.test_webapp import PROJECT_ROOT, _island, page_javascript
@@ -34,7 +34,6 @@ FORM_TABLES = {
     "PAGE_STATUS_LABELS": PageStatus,
     "GATE_NOTES": PreconditionResult,
     "EMPTY_LIST_REASONS": EmptyListReason,
-    "INITIAL_PROGRESS_WORDS": RunStart,
     "PROGRESS_PANEL_WORDS": page_words.ProgressPanelLine,
 }
 
@@ -224,7 +223,6 @@ def test_each_template_holds_only_the_fields_its_script_fills():
         "page_status": set(),
         "gate_notes": {"name"},
         "empty_list": {"held_back"},
-        "progress_start": set(),
         "progress_panel": {"clock", "complete", "count"},
     }
     panel = page_javascript("workspace.js")
