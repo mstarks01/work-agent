@@ -227,14 +227,14 @@ from analysis_service.job_controls import (
     section_summary,
 )
 from analysis_service.job_state import (
-    ContinueRefusal,
     JobState,
+    NotContinuedReason,
     StoredRefusal,
-    awaits_answers,
-    continue_refusal,
     continues,
     job_state,
     run_origin,
+    takes_answers,
+    why_not_continued,
 )
 from analysis_service.jobs import (
     DeleteRefusal,
@@ -539,9 +539,10 @@ class Workspace:
         continues it at its pause (ADR 0125)."""
         return await job_state(self.store, record, runs_here=self.runs_here(record.id))
 
-    async def continue_refusal(self, record: JobRecord) -> ContinueRefusal | None:
-        """Why ``record`` waits at its pause (:func:`continue_refusal`)."""
-        return await continue_refusal(
+    async def why_not_continued(self, record: JobRecord) -> NotContinuedReason | None:
+        """Why the continue at the pause of ``record`` did not happen
+        (:func:`why_not_continued`)."""
+        return await why_not_continued(
             self.store, record, runs_here=self.runs_here(record.id)
         )
 
@@ -625,7 +626,7 @@ class Workspace:
             for job in held
             if ended(job)
             and job.id != answering
-            and not await awaits_answers(self.store, job)
+            and not await takes_answers(self.store, job)
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):
@@ -688,7 +689,7 @@ class Workspace:
         for records in reversed(list(grouped.values())):
             shown = records[-1]
             for record in reversed(records):
-                if await awaits_answers(self.store, record):
+                if await takes_answers(self.store, record):
                     shown = record
                     break
             state = await self.state(shown)
@@ -1508,7 +1509,7 @@ _NOT_CONTINUED = (
 )
 
 
-def _refusal_key(refusal: ContinueRefusal | None) -> dict[str, str]:
+def _refusal_key(refusal: NotContinuedReason | None) -> dict[str, str]:
     """The ``refusal`` key of the questions of a job: why it waits at its
     pause. Empty for each job that does not wait there for a continue."""
     match refusal:
@@ -2282,7 +2283,7 @@ def create_app(
             payload["questions"] = (
                 {"run": record.id}
                 | await answers.payload_of(asked)
-                | _refusal_key(await workspace.continue_refusal(record))
+                | _refusal_key(await workspace.why_not_continued(record))
             )
         return JSONResponse(payload)
 
@@ -2797,7 +2798,7 @@ async def _stream(
             yield _frame("failed", {"message": str(refusal)})
             return
         # Read after the continue ends, which stores a refusal or a Resumed Job.
-        why = _refusal_key(await workspace.continue_refusal(record))
+        why = _refusal_key(await workspace.why_not_continued(record))
         yield _frame("questions", {"run": run_id} | payload | why)
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame

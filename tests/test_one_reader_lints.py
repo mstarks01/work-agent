@@ -3091,9 +3091,9 @@ def test_a_subjects_table_has_one_reader():
 def test_the_job_state_is_the_one_reader_of_whether_a_run_stops_to_ask():
     """An envelope holds no resumption, so ``pauses_to_ask`` on it is wrong for
     a Resumed Job. :func:`~analysis_service.job_state.job_state` is the
-    reader. ``awaits_answers`` reads only a job that waits for answers,
+    reader. ``takes_answers`` reads only a job that waits for answers,
     which holds no resumption."""
     assert _sites(lambda node: _calls(node, "pauses_to_ask")) == [
-        ("src/analysis_service/job_state.py", "awaits_answers"),
         ("src/analysis_service/job_state.py", "job_state"),
+        ("src/analysis_service/job_state.py", "takes_answers"),
     ]

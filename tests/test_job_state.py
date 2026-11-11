@@ -18,10 +18,10 @@ from analysis_service.job_state import (
     RunOrigin,
     StoredRefusal,
     UnreadableJobState,
-    awaits_answers,
-    continue_refusal,
     job_state,
     run_origin,
+    takes_answers,
+    why_not_continued,
 )
 from analysis_service.jobs import (
     Checkpoint,
@@ -136,12 +136,12 @@ def _state(store: InMemoryJobStore, job_id: str, *, runs_here: bool = False):
     return asyncio.run(job_state(store, _envelope(store, job_id), runs_here=runs_here))
 
 
-def _awaits_answers(store: InMemoryJobStore, job_id: str) -> bool:
-    return asyncio.run(awaits_answers(store, _envelope(store, job_id)))
+def _takes_answers(store: InMemoryJobStore, job_id: str) -> bool:
+    return asyncio.run(takes_answers(store, _envelope(store, job_id)))
 
 
 def _refusal(store: InMemoryJobStore, record: JobRecord, *, runs_here: bool = False):
-    return asyncio.run(continue_refusal(store, record, runs_here=runs_here))
+    return asyncio.run(why_not_continued(store, record, runs_here=runs_here))
 
 
 # --- The Job State ----------------------------------------------------------
@@ -303,7 +303,7 @@ def test_an_unreadable_record_carries_only_its_page_status():
 def test_a_paused_job_that_no_job_locks_waits():
     store = InMemoryJobStore()
 
-    assert _awaits_answers(store, _paused(store, ask_questions=True).id)
+    assert _takes_answers(store, _paused(store, ask_questions=True).id)
 
 
 def test_a_paused_job_whose_resumed_job_runs_still_waits():
@@ -311,7 +311,7 @@ def test_a_paused_job_whose_resumed_job_runs_still_waits():
     parent = _paused(store, ask_questions=True)
     _resumed(store, parent)
 
-    assert _awaits_answers(store, parent.id)
+    assert _takes_answers(store, parent.id)
 
 
 @pytest.mark.parametrize("deleted", [False, True])
@@ -325,7 +325,7 @@ def test_a_paused_job_whose_resumed_job_ended_waits_no_more(deleted):
     if deleted:
         asyncio.run(store.delete(child.id, "alice"))
 
-    assert not _awaits_answers(store, parent.id)
+    assert not _takes_answers(store, parent.id)
 
 
 def test_a_job_continued_for_its_controls_alone_does_not_wait():
@@ -334,7 +334,7 @@ def test_a_job_continued_for_its_controls_alone_does_not_wait():
     parent = _paused(store, continues_at_pause=True)
     _resumed(store, parent)
 
-    assert not _awaits_answers(store, parent.id)
+    assert not _takes_answers(store, parent.id)
 
 
 def test_a_job_that_did_not_pause_does_not_wait():
@@ -343,7 +343,7 @@ def test_a_job_that_did_not_pause_does_not_wait():
     job.transition("running")
     asyncio.run(admit(store, job))
 
-    assert not _awaits_answers(store, job.id)
+    assert not _takes_answers(store, job.id)
 
 
 @pytest.mark.parametrize(
@@ -370,7 +370,7 @@ def test_an_unreadable_record_waits_as_its_stored_status_and_its_lock_say(
     if locker_ended is not None:
         asyncio.run(admit(store, locker))
 
-    assert asyncio.run(awaits_answers(store, _unreadable(status))) is waiting
+    assert asyncio.run(takes_answers(store, _unreadable(status))) is waiting
 
 
 # --- The continue refusal ---------------------------------------------------

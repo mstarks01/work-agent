@@ -6,14 +6,15 @@ store reads these facts need, so a caller reads the facts and never the store.
 A page that also shows a progress line reads :func:`run_origin`, which reads
 the resumption again.
 
-The state has three shapes. A job in flight is readable. A job that ended may
-have lost its parent to a delete, so its state reads no parent. A record whose
-envelope does not parse carries only its page status (ADR 0095).
+The state has three shapes: a job in flight, a job that ended, and a record
+whose envelope does not parse, which carries only its page status (ADR 0095).
+The state reads no parent. A job in flight that pauses to ask reads only its
+resumption.
 
 Three facts have their own reads, because only some pages need them and each
 costs store reads: :func:`run_origin` says what a run does first and which job
-it resumes, :func:`awaits_answers` says whether a job waits for answers, and
-:func:`continue_refusal` says why the continue at a job's pause did not
+it resumes, :func:`takes_answers` says whether a job still takes answers, and
+:func:`why_not_continued` says why the continue at a job's pause did not
 happen.
 """
 
@@ -53,7 +54,7 @@ class StoredRefusal:
 #: Why the continue at a job's pause did not happen: the stored refusal, or
 #: ``not-continued`` where nothing continued the job and nothing refused it,
 #: as after a restart.
-ContinueRefusal = StoredRefusal | Literal["not-continued"]
+NotContinuedReason = StoredRefusal | Literal["not-continued"]
 
 
 @dataclass(frozen=True)
@@ -175,8 +176,9 @@ def _page_status(record: JobRecord) -> PageStatus:
     return "failed" if status == "rejected" else status
 
 
-async def awaits_answers(store: JobStore, record: Envelope) -> bool:
-    """True while the job is **Awaiting Answers**.
+async def takes_answers(store: JobStore, record: Envelope) -> bool:
+    """True while the job takes answers: its status is ``awaiting-answers``,
+    and no job that ended locks it.
 
     A paused job that no job locks waits. A paused job whose locking job
     still runs also waits: that job can fail, and this one is then where its
@@ -199,14 +201,14 @@ async def awaits_answers(store: JobStore, record: Envelope) -> bool:
     return child is not None and not ended(child)
 
 
-async def continue_refusal(
+async def why_not_continued(
     store: JobStore, record: JobRecord, *, runs_here: bool
-) -> ContinueRefusal | None:
+) -> NotContinuedReason | None:
     """Why the continue at the pause of ``record`` did not happen, or ``None``
-    for a job that does not wait there for a continue. ``runs_here`` is as :func:`job_state` takes
-    it. A job that waits to continue, with no task in this process, no stored
-    refusal and no Resumed Job, did not continue, and the owner continues it
-    (ADR 0125)."""
+    for a job that does not wait there for a continue. ``runs_here`` is as
+    :func:`job_state` takes it. A job that waits to continue, with no task in
+    this process, no stored refusal and no Resumed Job, did not continue, and
+    the owner continues it (ADR 0125)."""
     if record.continue_refusal is not None:
         return StoredRefusal(record.continue_refusal)
     if not record.waits_to_continue() or continues(record, runs_here=runs_here):
