@@ -226,6 +226,12 @@ from analysis_service.job_controls import (
     controls_used,
     section_summary,
 )
+from analysis_service.job_state import (
+    EndedJobState,
+    JobState,
+    StoredRefusal,
+    job_state,
+)
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
@@ -234,9 +240,7 @@ from analysis_service.jobs import (
     JobStore,
     PipelineRunner,
     RefusalOutcome,
-    Resumption,
     StopSignal,
-    completed_nodes,
     ended,
     event_frames,
     execute_job,
@@ -322,15 +326,9 @@ from webapp.page_words import (
     FORM_WORDS,
     REPORT_WORDS,
     STAGE_COUNT,
-    PageStatus,
-    RunStart,
     change_line,
     island_tables,
-    lowest_stage,
-    progress_mode,
-    run_start_of,
-    stage_after,
-    words_after,
+    progress_line,
 )
 from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
@@ -532,101 +530,10 @@ class Workspace:
         if (held := self._runs.get(job_id)) is not None:
             await asyncio.wait([held[0]])
 
-    def page_status(self, record: Envelope) -> PageStatus:
-        """A job's status as the pages read it. A job that this process
-        continues at its pause runs, because it asks nobody anything."""
-        if isinstance(record, JobRecord) and self.continuing(record):
-            return "running"
-        return _page_status(record)
-
-    async def asks(self, record: Envelope) -> bool:
-        """Whether the run of ``record`` stops to ask a person: a job in
-        flight that will stop, or a job that waits for answers.
-
-        A Resumed Job never stops to ask, so this asks :meth:`starts_from`
-        what a job in flight does first. A job in flight is a job of this
-        process, so its resumption parses. The resumption of a job that ended
-        is never read.
-        """
-        if not (readable(record) and record.pauses_to_ask()):
-            return False
-        if ended(record):
-            return record.status == "awaiting-answers"
-        return await self.starts_from(record) == "description"
-
-    async def _resumed(
-        self, record: Envelope
-    ) -> tuple[Resumption, JobRecord] | tuple[None, None]:
-        """The resumption of ``record``, a job in flight, and the job it
-        resumes, or ``None`` and ``None`` where it resumes no job. The envelope
-        leaves the resumption out, so this reads it by name. A Resumed Job
-        locks its parent, so the store holds the parent."""
-        resumption = await self.store.resumption(record.id, record.owner_id)
-        if resumption is None:
-            return None, None
-        parent = await self.store.owned(resumption.parent_id, record.owner_id)
-        if parent is None:
-            raise LookupError(f"job {record.id} resumes a job the store lacks")
-        if not isinstance(parent, JobRecord):
-            raise UnreadableSchema(f"job {record.id} resumes an unreadable job")
-        return resumption, parent
-
-    async def starts_from(self, record: Envelope) -> RunStart:
-        """What the run of ``record``, a job in flight, does first."""
-        _, parent = await self._resumed(record)
-        return run_start_of(parent)
-
-    async def progress_line(
-        self, record: JobRecord, asks: bool
-    ) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
-        """The reader of the progress line of ``record`` after a list of its
-        node events (:func:`webapp.page_words.stage_after` and
-        :func:`webapp.page_words.words_after`), with the
-        ``seq`` of the last event, so the page keeps the latest line it got.
-
-        The bar of a Resumed Job never goes below its lowest stage
-        (:func:`webapp.page_words.lowest_stage`).
-
-        ``record`` is a job in flight that :func:`readable` accepts, and
-        ``asks`` is the answer of :meth:`asks` for it.
-        """
-        mode = progress_mode(asks)
-        frameworks = [selection.name for selection in record.whole_frameworks()]
-        resumption, parent = await self._resumed(record)
-        start = run_start_of(parent)
-        lowest = lowest_stage(resumption, parent, frameworks, mode)
-
-        def line(events: Sequence[JobEvent]) -> dict[str, object]:
-            nodes = completed_nodes(events)
-            return {
-                "stage": max(stage_after(nodes, frameworks, mode), lowest),
-                "words": words_after(nodes, frameworks, mode, start),
-                "seq": events[-1].seq if events else 0,
-            }
-
-        return line
-
-    def continuing(self, record: JobRecord) -> bool:
-        """Whether this process continues ``record`` at its pause: the job
-        waits to continue, and this process runs its task (ADR 0125)."""
-        return record.waits_to_continue() and record.id in self._runs
-
-    async def refusal(self, record: JobRecord) -> dict[str, str]:
-        """The ``refusal`` key of the questions of ``record``: why the job
-        waits at its pause. A job that waits to continue, with no task in this
-        process, no stored refusal and no Resumed Job, did not continue, and
-        the owner continues it (ADR 0125). Empty for every other job."""
-        words = record.continue_refusal
-        if words is None and record.waits_to_continue() and not self.continuing(record):
-            # The task ends after it stores its refusal or admits the Resumed
-            # Job, so the store holds either one now, though ``record`` was
-            # read before.
-            held = await self.store.owned(record.id, record.owner_id)
-            if isinstance(held, JobRecord) and held.continue_refusal is not None:
-                words = held.continue_refusal
-            elif await self.store.resumed_by(record.id, record.owner_id) is None:
-                words = _NOT_CONTINUED
-        return {} if words is None else {"refusal": words}
+    async def state(self, record: Envelope) -> JobState:
+        """The Job State of ``record``. A job of this process is held while
+        its task runs, and that task continues it at its pause (ADR 0125)."""
+        return await job_state(self.store, record, held=record.id in self._runs)
 
     async def stop(self, job_ids: Iterable[str]) -> bool:
         """Stop each run of ``job_ids`` that this process runs, and wait up to
@@ -678,29 +585,6 @@ class Workspace:
             return []
         return await self.store.owned_jobs(owner_id)
 
-    async def waiting(self, record: Envelope) -> bool:
-        """True while the job waits for answers.
-
-        A paused job that no job locks waits. A paused job whose locking job
-        still runs also waits: that job can fail, and this one is then
-        where its answers resume. A paused job whose locking job has
-        :func:`~analysis_service.jobs.ended` waits no more. That job has a
-        report or pauses itself, and a paused job never fails, so this one
-        takes no answers again. A locking job that this owner no longer holds
-        has ended too, because a store deletes only a job that has ended.
-        """
-        if record.status != "awaiting-answers":
-            return False
-        locker = await self.store.resumed_by(record.id, record.owner_id)
-        if locker is None:
-            return True
-        if isinstance(record, JobRecord) and not record.pauses_to_ask():
-            # The job paused for its Controls alone, so the job that continues
-            # it shows the analysis.
-            return False
-        child = await self.store.owned(locker, record.owner_id)
-        return child is not None and not ended(child)
-
     @asynccontextmanager
     async def make_room(
         self, answers: JobAnswers, *, answering: str | None = None
@@ -725,7 +609,9 @@ class Workspace:
         removable = [
             job
             for job in held
-            if ended(job) and job.id != answering and not await self.waiting(job)
+            if ended(job)
+            and job.id != answering
+            and not (await self.state(job)).waiting
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):
@@ -788,7 +674,7 @@ class Workspace:
         for records in reversed(list(grouped.values())):
             shown = records[-1]
             for record in reversed(records):
-                if await self.waiting(record):
+                if (await self.state(record)).waiting:
                     shown = record
                     break
             snapshots.append(await self.snapshot(answers, shown, records))
@@ -808,6 +694,7 @@ class Workspace:
                 for item in await self.jobs(answers)
                 if await self.workspace_id(item) == group
             ]
+        state = await self.state(record)
         return {
             "run": record.id,
             "name": _name_of(record),
@@ -816,10 +703,10 @@ class Workspace:
             "created_at": min(
                 (item.created_at for item in related), default=record.created_at
             ).isoformat(),
-            "status": self.page_status(record),
+            "status": state.page_status,
             # Whether the run stops to ask a person, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": await self.asks(record),
+            "pauses": state.asks,
             "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {
@@ -1051,18 +938,6 @@ def _selection_of(record: Envelope) -> list[FrameworkSelection]:
     if isinstance(record, JobRecord) and record.frameworks is not None:
         return record.frameworks
     return []
-
-
-def _page_status(record: Envelope) -> PageStatus:
-    """A job's status as the pages read it: a queued job is running, and a
-    rejected one stopped. A job whose envelope does not parse is
-    ``unreadable`` (ADR 0095)."""
-    if not isinstance(record, JobRecord):
-        return "unreadable"
-    status = record.status
-    if status == "queued":
-        return "running"
-    return "failed" if status == "rejected" else status
 
 
 @dataclass(frozen=True)
@@ -1615,6 +1490,19 @@ _NOT_CONTINUED = (
     "The app did not continue this job, for example after a restart or a stop."
     " Continue it."
 )
+
+
+def _refusal_key(state: JobState) -> dict[str, str]:
+    """The ``refusal`` key of the questions of a job: why it waits at its
+    pause. Empty for each job that does not wait there for a continue."""
+    refusal = state.refusal if isinstance(state, EndedJobState) else None
+    match refusal:
+        case StoredRefusal(words=words):
+            return {"refusal": words}
+        case "not-continued":
+            return {"refusal": _NOT_CONTINUED}
+        case None:
+            return {}
 
 
 def _refusal_message(refusal: Exception) -> str | None:
@@ -2318,10 +2206,11 @@ def create_app(
         if record is None:
             return no_such_run()
         payload = await workspace.snapshot(answers, record)
-        if payload["status"] == "running":
+        state = await workspace.state(record)
+        if state.page_status == "running":
             # A job that runs is a job of this process, so each node of its
             # events is a node of a graph of its selection.
-            line = await workspace.progress_line(record, payload["pauses"] is True)
+            line = progress_line(record, state)
             payload["progress"] = line(
                 [event for event in record.events if event.kind == "node"]
             )
@@ -2366,7 +2255,7 @@ def create_app(
         )
         # While the service continues a job at its pause, the page shows the
         # continue rather than the questions (ADR 0125).
-        payload["continuing"] = workspace.continuing(record)
+        payload["continuing"] = state.continuing
         if payload["continuing"]:
             asked = None
         payload["error"] = record.error
@@ -2378,7 +2267,7 @@ def create_app(
             payload["questions"] = (
                 {"run": record.id}
                 | await answers.payload_of(asked)
-                | await workspace.refusal(record)
+                | _refusal_key(state)
             )
         return JSONResponse(payload)
 
@@ -2604,9 +2493,7 @@ def create_app(
                 # earlier build, with node names that no graph holds.
                 None
                 if ended(record)
-                else await workspace.progress_line(
-                    record, await workspace.asks(record)
-                ),
+                else progress_line(record, await workspace.state(record)),
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
@@ -2871,13 +2758,15 @@ async def _stream(
         return
     if record is None:
         return
+    state = await workspace.state(record)
     if record.waits_to_continue():
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
         # task of this process continues stays paused.
-        if workspace.continuing(record):
+        if state.continuing:
             yield _frame("continuing", {})
             await workspace.settled(run_id)
+            state = await workspace.state(record)
         child = await workspace.store.resumed_by(run_id, record.owner_id)
         if child is not None:
             yield _frame("continued", {"run": child})
@@ -2890,9 +2779,7 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        yield _frame(
-            "questions", {"run": run_id} | payload | await workspace.refusal(record)
-        )
+        yield _frame("questions", {"run": run_id} | payload | _refusal_key(state))
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.

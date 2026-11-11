@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from analysis_service import StubPipelineRunner, graph
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
+from analysis_service.job_state import RunStart, job_state, run_start_of
 from analysis_service.jobs import (
     Checkpoint,
     InMemoryJobStore,
@@ -56,8 +57,7 @@ from webapp.page_words import (
     STAGE_COUNT,
     STEP_PROGRESS,
     ProgressMode,
-    RunStart,
-    run_start_of,
+    progress_line,
     stage_after,
     words_after,
 )
@@ -567,7 +567,9 @@ PARENT_RUNS: dict[tuple[RunStart, ProgressMode], tuple[list[str], int]] = {
 }
 
 
-def resumed_job(start: RunStart, mode: ProgressMode) -> tuple[Workspace, JobRecord]:
+def resumed_job(
+    start: RunStart, mode: ProgressMode
+) -> tuple[InMemoryJobStore, JobRecord]:
     """A Resumed Job in flight, with its parent in the store. A parent in the
     ``to-report`` mode that asked for answers is a finished report, and its
     Resumed Job is the follow-up."""
@@ -603,18 +605,18 @@ def resumed_job(start: RunStart, mode: ProgressMode) -> tuple[Workspace, JobReco
     )
     child.transition("running")
     asyncio.run(admit(store, child))
-    return Workspace(store=store), child
+    return store, child
 
 
 def _line(start: RunStart, mode: ProgressMode, nodes: list[str]) -> dict:
-    workspace, child = resumed_job(start, mode)
+    store, child = resumed_job(start, mode)
     events = [
         JobEvent.model_construct(seq=seq, node=node)
         for seq, node in enumerate(nodes, 1)
     ]
 
     async def read():
-        return (await workspace.progress_line(child, False))(events)
+        return progress_line(child, await job_state(store, child, held=False))(events)
 
     return asyncio.run(read())
 

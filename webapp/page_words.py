@@ -8,7 +8,7 @@ a raw key.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Any, Literal, NamedTuple, TypeVar
 
@@ -25,7 +25,14 @@ from analysis_service.claims import (
 from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.graph import NodeStep, step_by_graph_node
+from analysis_service.job_state import (
+    JobState,
+    PageStatus,
+    RunningJobState,
+    RunStart,
+)
 from analysis_service.jobs import (
+    JobEvent,
     JobRecord,
     Resumption,
     completed_nodes,
@@ -182,11 +189,6 @@ REPORT_WORDS: Mapping[ReportTable, Mapping[Any, object]] = MappingProxyType(
     }
 )
 
-#: A job's status as the pages read it.
-PageStatus = Literal[
-    "running", "awaiting-answers", "completed", "failed", "stopped", "unreadable"
-]
-
 #: The label of each page status, in the order the status filter lists them.
 PAGE_STATUS_LABELS: Mapping[PageStatus, str] = MappingProxyType(
     {
@@ -239,22 +241,6 @@ def progress_mode(asks: bool) -> ProgressMode:
     """The progress mode of a run that stops to ask a person, or of one that
     does not."""
     return "to-questions" if asks else "to-report"
-
-
-#: What a run does first: it reads a description, or it is a **Resumed Job**
-#: and continues the job it resumes, with answers or with Controls alone.
-RunStart = Literal["description", "answers", "controls"]
-
-
-def run_start_of(parent: JobRecord | None) -> RunStart:
-    """What a run does first, from the job it resumes: ``None`` for a run
-    that resumes no job. A parent that waits to continue for its Controls
-    alone (``continues_at_pause``) gives ``controls``. Each other parent gave
-    answers. ``tests/test_progress_words.py`` holds the answer to
-    :func:`~analysis_service.pipeline.entry_of`."""
-    if parent is None:
-        return "description"
-    return "controls" if parent.continues_at_pause else "answers"
 
 
 #: What the progress line says before the first step of a run completes. The
@@ -386,6 +372,37 @@ def lowest_stage(
     if not set(nodes) <= step_by_graph_node(frameworks).keys():
         return 0
     return stage_after(nodes, frameworks, mode)
+
+
+def progress_line(
+    record: JobRecord, state: JobState
+) -> Callable[[Sequence[JobEvent]], dict[str, object]]:
+    """The reader of the progress line of ``record`` after a list of its
+    node events (:func:`stage_after` and :func:`words_after`), with the
+    ``seq`` of the last event, so the page keeps the latest line it got.
+
+    The bar of a Resumed Job never goes below its lowest stage
+    (:func:`lowest_stage`). ``record`` is a job whose ``state`` has the page
+    status ``running``: a job in flight, or a paused job that this process
+    continues. A paused job resumes no job (:meth:`JobRecord.pauses`).
+    """
+    mode = progress_mode(state.asks)
+    frameworks = [selection.name for selection in record.whole_frameworks()]
+    if isinstance(state, RunningJobState):
+        start, resumption, parent = state.start, state.resumption, state.parent
+    else:
+        start, resumption, parent = "description", None, None
+    lowest = lowest_stage(resumption, parent, frameworks, mode)
+
+    def line(events: Sequence[JobEvent]) -> dict[str, object]:
+        nodes = completed_nodes(events)
+        return {
+            "stage": max(stage_after(nodes, frameworks, mode), lowest),
+            "words": words_after(nodes, frameworks, mode, start),
+            "seq": events[-1].seq if events else 0,
+        }
+
+    return line
 
 
 #: A line of the progress panel that the page chooses: the count of complete
