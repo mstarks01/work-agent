@@ -35,11 +35,13 @@ function lineOf(...tokens) {
 }
 
 // A label as plain text: a line break a space, any other markup dropped, and
-// each entity decoded as Mermaid's own render decodes it. Mermaid encodes
-// `#quot;` and `#34;` in the source before it parses, so the flowchart parser
-// gives placeholders. The architecture parser reads the source as written, so
-// the codes are encoded here first. Each becomes `&quot;` or `&#34;` before the
-// DOM decodes it.
+// each entity code decoded to its character. A flowchart label then reads as
+// Mermaid draws it. An architecture label reads as its author meant it: Mermaid
+// draws that label as SVG text, which decodes only `&amp;`, `&lt;`, `&gt;` and
+// `&#39;`. Mermaid encodes `#quot;` and `#34;` in the source before it parses,
+// so the flowchart parser gives placeholders. The architecture parser reads the
+// source as written, so the codes are encoded here first. Each becomes `&quot;`
+// or `&#34;` before the DOM decodes it.
 function plain(label) {
   const text = String(label ?? "")
     .replace(/#(\d+);/g, "ﬂ°°$1¶ß")

@@ -168,7 +168,7 @@ class TestTheReader:
         assert isinstance(reading, DiagramStructure)
         assert [e.label for e in reading.edges] == ["writes orders"]
 
-    def test_an_architecture_label_decodes_each_entity_as_mermaid_draws_it(self):
+    def test_an_architecture_label_decodes_each_entity_code(self):
         reading = read_diagram(
             "architecture-beta\n"
             "    service a(server)[A #amp; B #60;b#62;]\n"
@@ -181,11 +181,14 @@ class TestTheReader:
 
     def test_the_docs_state_the_node_floor_of_the_lock(self):
         lock = json.loads(Path("diagram_reader/package-lock.json").read_text())
-        floor = max(
-            tuple(int(part) for part in re.findall(r"\d+", engines["node"]))
+        ranges = [
+            engines["node"]
             for package in lock["packages"].values()
             if (engines := package.get("engines")) and "node" in engines
-        )
+        ]
+        floors = [re.fullmatch(r">=\s*v?(\d+(?:\.\d+)*)", r) for r in ranges]
+        assert all(floors), "a Node range in the lock is not a plain >= floor"
+        floor = max(tuple(map(int, f.group(1).split("."))) for f in floors)
         stated = {
             version
             for doc in ("README.md", "docs/First-Run.md", "docs/HTTP-API.md")
