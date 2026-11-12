@@ -1,6 +1,6 @@
 # 117. Each question-kind facet is a predicate
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-11-12
 - **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029)
 - **Would supersede**: [#1347](https://github.com/mstarks01/work-agent/issues/1347),
