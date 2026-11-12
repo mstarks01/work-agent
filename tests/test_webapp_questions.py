@@ -13,7 +13,8 @@ import json
 import re
 import shutil
 import subprocess
-from dataclasses import replace
+import threading
+from dataclasses import asdict, replace
 from types import MappingProxyType
 
 import pytest
@@ -22,7 +23,7 @@ from fastapi.testclient import TestClient
 from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.answer_bodies import BodyRefused, read_answers
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
@@ -32,14 +33,22 @@ from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
     merged_facts,
+    needed_facets,
 )
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
+from analysis_service.jobs import (
+    Checkpoint,
+    InMemoryJobStore,
+    PipelineAwaiting,
+    PipelineCompleted,
+)
 from analysis_service.links import NONE_OF_THESE, LinkAnswer, fold_principal
 from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.selection import SelectionError, resolve_names
+from analysis_service.sources import FORMATS
+from analysis_service.system_model import ELEMENT_TYPE_NOUNS
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
     asking_threat,
@@ -52,10 +61,12 @@ from tests.test_webapp import (
     LOOPBACK,
     PROJECT_ROOT,
     SAME_ORIGIN,
+    WEBAPP_LIMITS,
     posted,
     startup_for,
 )
-from webapp.main import create_app
+from webapp.main import PAGE_SOURCE_LABELS, create_app, file_refusals
+from webapp.page_words import FORM_WORDS, island_tables
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -113,6 +124,26 @@ class PausingRunner(StubPipelineRunner):
         return PipelineCompleted(report=report)
 
 
+class HeldAfterExtract(PausingRunner):
+    """Holds each run after its first node until the test releases it, and
+    records each node that the run sends."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.release = threading.Event()
+        self.sent: list[str] = []
+
+    async def run(self, job, on_node):
+        async def recorded(node):
+            self.sent.append(node)
+            await on_node(node)
+
+        await recorded("extract")
+        while not self.release.is_set():
+            await asyncio.sleep(0.01)
+        return await super().run(job, recorded)
+
+
 @pytest.fixture
 def runner():
     return PausingRunner()
@@ -135,6 +166,20 @@ def start(client, questions: bool) -> str:
     )
     assert started.status_code == 200, started.text
     return started.json()["run"]
+
+
+def asking_report(client) -> str:
+    """The report of an analysis that asks: its pause, continued with no
+    answers. Only such a report offers its follow-up questions."""
+    paused = start(client, questions=True)
+    client.get(f"/events/{paused}")
+    continued = client.post(
+        f"/answer/{paused}", json={"revision": 0}, headers=SAME_ORIGIN
+    )
+    assert continued.status_code == 200, continued.text
+    child = continued.json()["run"]
+    assert ran(client, child) == "completed"
+    return child
 
 
 def statuses(stream: str) -> list[str]:
@@ -233,8 +278,8 @@ class TestTheSaves:
             assert not before & {tuple(q["key"]) for q in shown["early_questions"]}
         else:
             pytest.fail("the saves never ended")
-        # The stop says why truthfully: the limits held questions back, or a
-        # floor left questions out, exactly where it says so.
+        # The empty-list reason says why truthfully: the limits held questions
+        # back, or a floor left questions out, exactly where it says so.
         assert shown["early_stop"] == (
             "budget-exhausted"
             if shown["early_held_back"]
@@ -404,8 +449,7 @@ class TestTheWholeFlow:
 
     def test_a_finished_report_s_questions_run_it_again(self, tiers, runner):
         client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         resumed = answer(client, finished, LINK)
         assert resumed.status_code == 200
         assert ran(client, resumed.json()["run"]) == "completed"
@@ -413,8 +457,7 @@ class TestTheWholeFlow:
     def test_a_follow_up_s_page_compares_it_with_the_report_before(self, tiers, runner):
         """The follow-up keeps the report its answers came from (#561)."""
         client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         resumed = answer(client, finished, LINK).json()["run"]
         client.get(f"/events/{resumed}")
 
@@ -434,8 +477,7 @@ class TestTheWholeFlow:
         from analysis_service.job_answers import JobAnswers
 
         client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         resumed = answer(client, finished, LINK).json()["run"]
         client.get(f"/events/{resumed}")
         monkeypatch.setattr(
@@ -535,6 +577,8 @@ def test_the_report_page_may_reach_its_own_origin_and_nothing_else(tiers, runner
 # needed, so the flow a person walks is checked on every run of the suite.
 _FORM_HARNESS = r"""
 const calls = [], streams = [];
+// A node's text with its children's, as a browser gives textContent.
+const textOf = (n) => typeof n === "string" ? n : [n.textContent || "", ...(n.children || []).map(textOf)].join("");
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.parentNode = null;
     this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {};
@@ -564,17 +608,31 @@ const ids = {};
 for (const id of ["analyze","description","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
-                  "answer_limits","save-status","changes","upload","transcript-file",
-                  "transcript-note","transcript-name","transcript-remove","analysis-name",
-                  "description-remaining"])
+                  "answer_limits","facet_answers","form_words","save-status","changes","upload","upload-file",
+                  "transcript-note","transcript-name","transcript-remove","diagram-note",
+                  "diagram-name","diagram-remove","analysis-name",
+                  "description-remaining","source_formats","file_refusals","page_labels","element_type_nouns",
+                  "files-rows","chosen-files","files-dialog","files-cancel","files-select",
+                  "upload-menu","upload-computer","upload-files","controls-offer",
+                  "controls-rows","controls-summary","controls-apply","controls-used","controls-used-list",
+                  "controls-choose","controls-dialog","controls-find","controls-all","controls-none",
+                  "controls-count","controls-status","controls-recover","controls-retry","controls-skip","go-wait","controls-unfit","controls-unfit-summary","controls-unfit-rows",
+                  "controls-done","frameworks","frameworks-toggle","frameworks-panel",
+                  "frameworks-summary"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
-ids["transcript-file"].dataset.maxBytes = "64";
-ids["transcript-file"].files = [];
+ids["upload-file"].dataset.maxBytes = "64";
+ids["upload-file"].files = [];
 ids.description.dataset.maxBytes = "1000000";
 ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
+ids.facet_answers.textContent = FACET_LIST;
+ids.form_words.textContent = FORM_WORD_TABLES;
+ids.source_formats.textContent = FORMATS;
+ids.file_refusals.textContent = REFUSALS;
+ids.page_labels.textContent = PAGE_LABELS;
+ids.element_type_nouns.textContent = TYPE_NOUN_TABLE;
 const framework = new Node("input");
 framework.value = "stride";
 framework.checked = true;
@@ -582,11 +640,14 @@ globalThis.document = {
   getElementById: (id) => ids[id] || null,
   createElement: (tag) => new Node(tag),
   querySelectorAll: (selector) => selector === "input[name=framework]" ? [framework] : [],
+  addEventListener() {},
   activeElement: null,
 };
 globalThis.location = { href: "", search: SEARCH };
 globalThis.window = { scrollTo() {}, listeners: {}, addEventListener(name, fn) { this.listeners[name] = fn; } };
 globalThis.fetch = async (url, init) => {
+  // The form lists the operator's Controls as it loads; this page has none.
+  if (url === "/workspace/controls") return { ok: true, json: async () => [] };
   calls.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
   const next = url === "/analyze" ? "r1" : "r2";
   return { ok: true, json: async () => ({ run: next }) };
@@ -605,20 +666,39 @@ def _presented(rows: list[dict]) -> list[list[str]]:
     return [row["key"] for row in rows if row.get("parent") not in keys]
 
 
+#: The format table as the server renders it into the form page.
+_FORMAT_TABLE = {name: asdict(row) for name, row in FORMATS.items()}
+
+
 def _run_form_script(steps: str, search: str = "") -> dict:
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the form page's script")
     script = "\n".join(
         (PROJECT_ROOT / "webapp" / "static" / name).read_text()
-        for name in ("answer_editor.js", "question_list.js", "first_run.js")
+        for name in (
+            "answer_editor.js",
+            "question_list.js",
+            "text_file.js",
+            "service_answer.js",
+            "form_controls.js",
+            "first_run.js",
+        )
     )
     program = (
-        _FORM_HARNESS.replace("SEARCH", json.dumps(search)).replace(
-            "LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS)))
+        _FORM_HARNESS.replace("SEARCH", json.dumps(search))
+        .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
+        .replace("FACET_LIST", json.dumps(json.dumps(list(FACET_ANSWERS))))
+        .replace(
+            "FORM_WORD_TABLES",
+            json.dumps(json.dumps(island_tables(FORM_WORDS))),
         )
+        .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
+        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64, 3))))
+        .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
+        .replace("TYPE_NOUN_TABLE", json.dumps(json.dumps(dict(ELEMENT_TYPE_NOUNS))))
         + script
-        + "\n(async () => {\n"
+        + "\n(async () => {\nawait settle(); await settle();\n"
         + steps
         + "\nconsole.log(JSON.stringify({calls, streams: streams.map(s => s.url),"
         " href: location.href, asked: !ids.asked.hidden}));\n})();"
@@ -650,7 +730,7 @@ def test_the_conflict_line_words_a_link_answer_of_none_as_the_page_does():
     theirs = {"principal": "shopper accounts", "element": "none"}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: [{json.dumps(question)}], early_questions: [], revision: 0 }}) }});
 globalThis.fetch = async (url) => url.startsWith("/answer/")
   ? {{ ok: false, status: 409, json: async () => ({{ message: "stale" }}) }}
@@ -697,7 +777,8 @@ class Node {
 const text = (n) => typeof n === "string" ? n
   : [n.textContent, ...n.children.map(text)].join("");
 globalThis.document = {
-  getElementById: (id) => Object.assign(new Node("script"), { textContent: LIMITS }),
+  getElementById: (id) => Object.assign(new Node("script"),
+    { textContent: { answer_limits: LIMITS, facet_answers: FACET_LIST }[id] }),
   createElement: (tag) => new Node(tag),
 };
 const box = (heading, ...rows) => {
@@ -734,7 +815,9 @@ def test_the_index_hides_an_empty_box_and_counts_the_rows_of_each_other():
         for name in ("answer_editor.js", "question_list.js")
     )
     program = (
-        _INDEX_HARNESS.replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
+        _INDEX_HARNESS.replace(
+            "LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS)))
+        ).replace("FACET_LIST", json.dumps(json.dumps(list(FACET_ANSWERS))))
         + script
         + """
 const clicked = [];
@@ -770,7 +853,7 @@ console.log(JSON.stringify({
 def test_the_form_script_asks_answers_and_follows_to_the_report():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [
   { principal: "shopper accounts", rows: 2,
     options: [{ id: "entity:shopper", name: "Shopper" }] }], early_questions: [] }) });
 const select = ids.questions.querySelectorAll("select")[0];
@@ -853,15 +936,16 @@ if (!ids.problem.hidden) calls.push({{ url: "problem", body: ids.problem.childre
         assert [entry["name"] for entry in sent[0]] == names
 
 
-# Picks a stand-in file of ``bytes`` in the transcript input. A read of its
-# content records a "read" call, and each refusal records a "problem" call.
+# Picks a stand-in file of ``bytes``, named ``name``, in the upload input. A
+# read of its content records a "read" call, and each refusal records a
+# "problem" call.
 _PICK = """
-const pick = async (bytes) => {
-  ids["transcript-file"].files = [{ name: "call.txt", size: bytes.length,
+const pick = async (bytes, name = "call.txt") => {
+  ids["upload-file"].files = [{ name, size: bytes.length,
     arrayBuffer: async () => { calls.push({ url: "read" });
       return Uint8Array.from(bytes).buffer; } }];
   ids.problem.hidden = true;
-  await ids["transcript-file"].listeners.change(); await settle();
+  await ids["upload-file"].listeners.change(); await settle();
   if (!ids.problem.hidden) calls.push({ url: "problem", body: ids.problem.children.join("") });
 };
 const submit = async () => {
@@ -896,6 +980,30 @@ await submit();
     assert removed == [description | {"text": "A shop."}]
 
 
+DIAGRAM = {"kind": "diagram", "label": "Uploaded diagram", "text": "flowchart LR"}
+
+
+def test_a_mermaid_file_posts_as_a_diagram_source_beside_a_transcript():
+    """A ``.mmd`` or ``.mermaid`` file goes as a ``diagram`` source. The page
+    holds one transcript and one diagram, and Remove takes off only its own."""
+    steps = """
+await pick([...new TextEncoder().encode("flowchart LR")], "model.mmd");
+await submit();
+await pick([...new TextEncoder().encode("Ana: hi")]);
+await submit();
+await pick([...new TextEncoder().encode("flowchart LR")], "Model.MERMAID");
+await submit();
+await ids["diagram-remove"].listeners.click();
+await submit();
+"""
+    alone, both, replaced, removed = _posted_sources(steps)
+
+    assert alone == [DIAGRAM]
+    assert both == [TRANSCRIPT, DIAGRAM]
+    assert replaced == [TRANSCRIPT, DIAGRAM]
+    assert removed == [TRANSCRIPT]
+
+
 @pytest.mark.parametrize(
     ("data", "refusal", "read"),
     [
@@ -920,6 +1028,31 @@ def test_a_file_that_is_not_text_is_refused_before_it_is_kept(data, refusal, rea
     assert [source["kind"] for source in posted[0]] == ["description"]
 
 
+@pytest.mark.parametrize("name", ["notes.md", "call", "model.mmd.bak"])
+def test_a_file_with_no_format_row_is_refused_before_it_is_read(name):
+    """The format table decides what the direct upload reads (ADR 0120), and
+    the refusal names each supported extension."""
+    steps = f"await pick([0x41], {json.dumps(name)});\nawait submit();"
+    calls = _run_form_script(_PICK + steps)["calls"]
+    [problem] = [call["body"] for call in calls if call["url"] == "problem"]
+    posted = [call["body"]["sources"] for call in calls if call["url"] == "/analyze"]
+
+    for row in FORMATS.values():
+        assert row.label in problem
+        assert all(extension in problem for extension in row.extensions)
+    assert {"url": "read"} not in calls
+    assert [source["kind"] for source in posted[0]] == ["description"]
+
+
+@pytest.mark.parametrize(
+    ("name", "kind"), [("call.VTT", "transcript"), ("notes.srt", "transcript")]
+)
+def test_the_direct_upload_takes_the_default_kind_of_its_row(name, kind):
+    steps = f"await pick([0x41], {json.dumps(name)});\nawait submit();"
+    [sources] = _posted_sources(steps)
+    assert [source["kind"] for source in sources] == [kind]
+
+
 def test_a_refused_file_keeps_the_transcript_the_page_holds():
     steps = """
 await pick([...new TextEncoder().encode("Ana: hi")]);
@@ -932,7 +1065,7 @@ await submit();
 def test_an_unanswered_question_is_left_out_of_the_answers():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [
   { principal: "ml engineers", rows: 1, options: [] }], early_questions: [] }) });
 await ids.continue.listeners.click(); await settle();
 """
@@ -961,7 +1094,7 @@ def test_the_form_script_sends_an_early_answer_with_the_links():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [first] = ids.questions.querySelectorAll("input");
 first.value = "  TLS 1.3 ";
@@ -980,25 +1113,6 @@ await ids.continue.listeners.click(); await settle();
         "facts": [],
         "presented": [key, kind],
     }
-
-
-def test_every_key_part_a_page_reads_is_the_part_it_means():
-    """A page reads a fact key by position, and ``key_ref`` is the server's one
-    reader of which part is which, so each position a page reads is held to
-    the field it means."""
-    from analysis_service.claims import UNKNOWN_KEY_FIELDS
-
-    means = {0: "element_id", 1: "attribute", 4: "question"}
-    read = {
-        int(index)
-        for name in ("first_run.js", "question_list.js", "report_view.js")
-        for index in re.findall(r"\bkey\[(\d)\]", test_webapp.page_javascript(name))
-    }
-
-    assert read, "no page reads a key part to check"
-    assert read <= set(means), f"a page reads key parts {sorted(read - set(means))}"
-    for index in read:
-        assert UNKNOWN_KEY_FIELDS[index] == means[index]
 
 
 def test_the_key_field_list_names_each_part_of_a_key():
@@ -1040,8 +1154,7 @@ class TestFactAnswers:
     def test_a_fact_answer_reruns_a_report_that_built_no_catalog(self, tiers):
         runner = PausingRunner(catalog=False)
         client = client_for(tiers, runner, catalog=False)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         response = client.post(
             f"/answer/{finished}",
             json={"links": [], "facts": [dict(FACT)]},
@@ -1049,7 +1162,8 @@ class TestFactAnswers:
         )
         assert response.status_code == 200, response.text
         assert ran(client, response.json()["run"]) == "completed"
-        assert [fact.value for fact in runner.resumed_facts[0]] == ["TLS 1.3"]
+        # The first resume is the pause's continue; the follow-up is the last.
+        assert [fact.value for fact in runner.resumed_facts[-1]] == ["TLS 1.3"]
 
     def test_a_link_answer_is_refused_where_the_report_built_no_catalog(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
@@ -1113,7 +1227,9 @@ def _report_payloads(payloads: dict) -> dict:
 
     sample = sample_report()
     served = test_report_page.payloads_of(
-        render_report(sample, report_state(sample), previous=None, parent=None).html
+        render_report(
+            sample, report_state(sample), previous=None, parent=None, controls=()
+        ).html
     )
     merged = {name: json.loads(text) for name, text in served.items()}
     for name, value in payloads.items():
@@ -1139,7 +1255,23 @@ def _report_payloads(payloads: dict) -> dict:
         for block in report["analyses"]
     ]
     merged["report"] = report
+    merged["fact_questions"] = [_as_served(q) for q in merged["fact_questions"]]
     return {name: json.dumps(value) for name, value in merged.items()}
+
+
+def _as_served(question: dict) -> dict:
+    """A fact question fixture with ``needs`` as
+    :meth:`~analysis_service.questions.FactQuestion.to_json` sends it: each
+    waiting finding's facets, read by
+    :func:`~analysis_service.fact_answers.needed_facets`."""
+    key = tuple(question["key"])
+    named = question.get("needs", {})
+    return question | {
+        "needs": {
+            finding: list(needed_facets(key, named.get(finding, ())))
+            for finding in question["findings"]
+        }
+    }
 
 
 def _run_answer_block(payloads: dict, steps: str) -> dict:
@@ -1215,9 +1347,9 @@ def test_the_form_page_keeps_why_and_the_description_in_help():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(rows)}, 
-  answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).filter(n => n.className === "question-context").map(h => ({{
@@ -1360,9 +1492,9 @@ def test_the_served_draft_keys_each_link_by_its_fold():
 
     report = sample_report()
     link = LinkAnswer(principal="Customer Account", element="entity:customer")
-    state = replace(report_state(report), draft=AnswerSet(links=(link,)))
+    state = replace(report_state(report), draft=SentAnswers(links=(link,)))
     served = test_report_page.payloads_of(
-        render_report(report, state, previous=None, parent=None).html
+        render_report(report, state, previous=None, parent=None, controls=()).html
     )
 
     (drafted,) = json.loads(served["earlier"])["draft"]["links"]
@@ -1569,7 +1701,7 @@ def _bounded(tiers, runner, max_jobs: int) -> TestClient:
     """A client over a workspace that holds at most ``max_jobs`` jobs."""
     from webapp.main import Workspace
 
-    workspace = Workspace(max_jobs=max_jobs)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=max_jobs)
     return TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     )
@@ -1601,9 +1733,9 @@ def test_the_workspace_deletes_a_run_that_waits_for_answers_last(tiers):
 
 
 def test_a_full_workspace_of_waiting_runs_refuses_a_new_one(tiers):
-    """A third run evicted the oldest paused one while it still waited
-    (#1289, F4). Now it is refused, and an answer to a held run still starts,
-    one place over the bound."""
+    """A third run is refused while two paused runs wait, rather than
+    evicting the oldest one (#1289, F4), and an answer to a held run still
+    starts, one place over the bound."""
     with _bounded(tiers, PausingRunner(catalog=False), max_jobs=2) as client:
         held = [_paused(client) for _ in range(2)]
 
@@ -1714,7 +1846,7 @@ def test_the_run_an_answer_continues_is_never_deleted_for_it(tiers):
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)
-    workspace = Workspace(max_jobs=2)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=2)
     with TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -1824,7 +1956,7 @@ def test_the_form_script_sends_a_control_s_state():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [state] = ids.questions.querySelectorAll("select");
 state.value = "none";
@@ -1875,7 +2007,7 @@ def _early_control_calls(steps: str) -> list:
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [state] = ids.questions.querySelectorAll("select");
 const [input] = ids.questions.querySelectorAll("input");
@@ -1946,27 +2078,27 @@ def test_typing_a_mechanism_chooses_it(send):
 
 
 def test_the_form_script_shows_what_the_service_is_doing():
-    """The current stage appears from Analyze until the pause, and again after."""
+    """The status shows from Analyze until the pause, and again after, with
+    no words until the service sends a line, and then the words it sends."""
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 calls.push({ building: !ids.status.hidden, text: ids["status-text"].textContent });
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.node({ data: JSON.stringify({ stage: 0, count: 4,
+  words: "Reading the description", seq: 0 }) });
+calls.push({ sent: ids["status-text"].textContent });
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [] }) });
 calls.push({ paused: ids.status.hidden });
 await ids.continue.listeners.click(); await settle();
 calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent });
 """
     seen = _run_form_script(steps)["calls"]
-    building, paused, analysing = (c for c in seen if "url" not in c)
+    building, sent, paused, analysing = (c for c in seen if "url" not in c)
 
-    assert building["building"]
-    assert (
-        building["text"]
-        == "Reading your description and identifying the parts of your system…"
-    )
+    assert building == {"building": True, "text": ""}
+    assert sent == {"sent": "Reading the description"}
     assert paused == {"paused": True}
-    assert analysing["analysing"]
-    assert analysing["text"] == "Using your answers to continue the analysis…"
+    assert analysing == {"analysing": True, "text": ""}
 
 
 def _control_row(flow, form="control"):
@@ -1990,7 +2122,7 @@ def _control_row(flow, form="control"):
 
 _SHARED_STEPS = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: FACTS, answered_early: [], answered_links: [], revision: 0 }) });
 const group = ids.questions.querySelectorAll("details").find((d) => d.className === "question-group");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
@@ -2012,7 +2144,7 @@ calls.push({ shared: shared.length });
     ],
 )
 def test_a_shared_answer_is_asked_as_a_question_of_every_part(form, choices, names):
-    """The box's heading asks the shared question of every part it lists,
+    """The box's heading asks the shared question of every element it lists,
     and it names each shared control (#1842)."""
     first, second = valid_model().data_flows[:2]
     _, heading = group_of(
@@ -2037,9 +2169,9 @@ calls.push({ heading: title.children[0].textContent,
     assert seen[2] == {"heading": heading, "names": [heading + name for name in names]}
 
 
-def test_one_shared_answer_fills_only_the_parts_a_person_ticks():
-    """A box asks its question once, every part starts unticked, and the
-    answer reaches only the parts a person ticks (ADR 0081, ADR 0113)."""
+def test_one_shared_answer_fills_only_the_elements_a_person_ticks():
+    """A box asks its question once, every element starts unticked, and the
+    answer reaches only the elements a person ticks (ADR 0081, ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2048,7 +2180,7 @@ def test_one_shared_answer_fills_only_the_parts_a_person_ticks():
 const heading = group.children.find(c => c.tag === "summary");
 calls.push({ open: each.open,
   ticked: rowsOf().map(r => child(r, "input").checked),
-  applies: heading.children.find(c => c.className === "group-applies").textContent });
+  applies: textOf(heading.children.find(c => c.className === "group-applies")) });
 const tick = child(rowsOf()[0], "input");
 tick.checked = true; tick.listeners.change();
 const state = child(shared[0].children[0], "select");
@@ -2074,8 +2206,9 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_shared_box_saves_one_share_and_an_untick_shrinks_it():
-    """The page sends the box's answer once, as a share of the parts ticked,
-    and an untick sends the share again with one part fewer (ADR 0114)."""
+    """The page sends the box's answer once, as a share of the elements
+    ticked, and an untick sends the share again with one element fewer (ADR
+    0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2108,9 +2241,9 @@ await settle();
 
 
 def test_a_part_ticked_after_a_reload_joins_the_held_share():
-    """A part the held share covers is answered, so a reload lists it under
-    "Your answers", marked shared. A part ticked then joins the share, and the
-    share keeps the part it covered (ADR 0114)."""
+    """An element the held share covers is answered, so a reload lists it
+    under "Your answers", marked shared. An element ticked then joins the
+    share, and the share keeps the element it covered (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     third = first.model_copy(
         update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
@@ -2122,7 +2255,7 @@ def test_a_part_ticked_after_a_reload_joins_the_held_share():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps([_control_row(second), _control_row(third)])},
   answered_early: [{json.dumps(answered)}], answered_shares: [{json.dumps(held)}],
   answered_links: [], revision: 1 }}) }});
@@ -2146,14 +2279,14 @@ await settle();
 
 
 def test_the_box_says_which_parts_its_answer_covers():
-    """The line beside the shared answer names each ticked part, and follows
+    """The line beside the shared answer names each ticked element, and follows
     a tick and an untick (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
-const line = () => shared[0].children.find(c => c.className === "share-covers").textContent;
+const line = () => textOf(shared[0].children.find(c => c.className === "share-covers"));
 calls.push({ line: line() });
 const t = child(rowsOf()[1], "input"); t.checked = true; t.listeners.change();
 calls.push({ line: line() });
@@ -2169,8 +2302,70 @@ calls.push({ line: line() });
     ]
 
 
+def test_cover_every_part_ticks_each_element_with_no_answer_of_its_own():
+    """A chosen answer with no element ticked says how to cover elements.
+    "Cover every part" ticks each blank element and gives it the answer, and
+    leaves an element answered by hand unticked (ADR 0113)."""
+    first, second = valid_model().data_flows[:2]
+    third = first.model_copy(
+        update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
+    )
+    facts = [_control_row(first), _control_row(second), _control_row(third)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const own = (r) => walk(r).find(c => c.tag === "select");
+const line = () => textOf(shared[0].children.find(c => c.className === "share-covers"));
+const ticks = () => rowsOf().map(r => child(r, "input").checked);
+const [one] = rowsOf();
+own(one).value = "none"; own(one).listeners.change();
+const state = child(shared[0].children[0], "select");
+state.value = "none"; state.listeners.change();
+calls.push({ line: line(), ticks: ticks() });
+const all = shared[0].children.find(c => c.tag === "button" && c.textContent === "Cover every part");
+all.listeners.click();
+calls.push({ line: line(), ticks: ticks(), rows: rowsOf().map(r => own(r).value) });
+"""
+    )
+    seen = [c for c in _run_form_script(steps)["calls"] if "ticks" in c]
+    assert seen == [
+        {
+            "line": "This answer covers no part yet. Tick each part it covers,"
+            " or use Cover every part.",
+            "ticks": [False, False, False],
+        },
+        {
+            "line": f"This answer covers: {second.name}, {third.name}",
+            "ticks": [False, True, True],
+            "rows": ["none", "none", "none"],
+        },
+    ]
+
+
+def test_cover_every_part_waits_for_a_shared_answer():
+    """With an empty shared answer, "Cover every part" is disabled, so it
+    ticks no element and copies no empty value. A value enables it, and an
+    empty value disables it again (ADR 0113)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const all = shared[0].children.find(c => c.tag === "button" && c.textContent === "Cover every part");
+const state = child(shared[0].children[0], "select");
+calls.push({ disabled: all.disabled === true });
+state.value = "none"; state.listeners.change();
+calls.push({ disabled: all.disabled === true });
+state.value = ""; state.listeners.change();
+calls.push({ disabled: all.disabled === true });
+"""
+    )
+    seen = [c["disabled"] for c in _run_form_script(steps)["calls"] if "disabled" in c]
+    assert seen == [True, False, True]
+
+
 def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():
-    """Undo restores the answer before the last change, and each part it
+    """Undo restores the answer before the last change, and each element it
     wrote (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
@@ -2194,9 +2389,10 @@ calls.push({ shown: !undo.hidden, shared: state.value, rows: rowsOf().map(r => o
     ]
 
 
-def test_unticking_a_part_takes_back_only_the_shared_answer():
-    """A part unticked after the shared answer reached it loses that value,
-    and a part a person answered by hand after it keeps its own (ADR 0113)."""
+def test_unticking_an_element_takes_back_only_the_shared_answer():
+    """An element unticked after the shared answer reached it loses that
+    value, and an element a person answered by hand after it keeps its own
+    (ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2271,7 +2467,7 @@ def test_the_form_script_keeps_the_list_s_order_with_a_box_for_each_run():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const groups = ids.questions.querySelectorAll("details").filter(g => g.className === "question-group");
 const rowsOf = g => g.children.find(c => c.className === "each-one").children.filter(r => r.tag === "p");
@@ -2279,7 +2475,7 @@ const child = (r, tag) => {{ for (const c of r.children) {{ if (typeof c !== "ob
   if (c.tag === tag) return c; const nested = child(c, tag); if (nested) return nested; }} }};
 calls.push({{ groups: groups.map(g => ({{
   title: g.children[0].children.find(n => n.className === "group-heading").textContent,
-  rows: rowsOf(g).map(r => child(r, "b").textContent),
+  rows: rowsOf(g).map(r => textOf(child(r, "b"))),
   open: Boolean(g.open) }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";
 child(rowsOf(groups[2])[0], "select").value = "yes";
@@ -2338,7 +2534,7 @@ def test_the_pause_asks_facets_once_with_a_table_for_the_exceptions():
     facts = [facet_fact(store), facet_fact(flow)]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const [head, ...rows] = table.children;
@@ -2392,7 +2588,7 @@ def test_the_shared_question_appears_only_over_two_rows(rows, shared):
     facts = [facet_fact(element) for element in elements[:rows]]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const top = ids.questions.querySelectorAll("div").filter(d => d.className === "shared-controls");
@@ -2406,12 +2602,12 @@ calls.push({{ rows: table.children.length, shared: top.length }});
 
 @pytest.mark.parametrize("value", ["yes", "no", "not applicable", "unknown"])
 def test_every_facet_answer_the_page_offers_is_one_the_service_takes(value):
-    """The page's FACET_CHOICES and the service's FACET_ANSWERS are two readers."""
+    """Each answer the page offers for a facet is one that the service takes."""
     store = valid_model().data_stores[0]
     facts = [facet_fact(store)]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const select = table.children[1].children[1].children[0];
@@ -2496,7 +2692,7 @@ calls.push(document.getElementById("invite").textContent);
 def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", answered_early: [], answered_links: [] }) });
 await settle();
 """
@@ -2520,6 +2716,7 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     ready = {
         "run": "r1",
         "revision": 4,
+        "element_hues": {},
         "link_questions": [],
         "early_questions": [],
         "early_stop": "budget-exhausted" if withheld else "nothing-left",
@@ -2539,10 +2736,10 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [
   {{ principal: "shopper accounts", rows: 2,
     options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], early_questions: [],
-  answered_early: [], answered_links: [], revision: 3 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 3 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "entity:shopper";
 const answered = fetch;
 globalThis.fetch = async (url, init) => {{
@@ -2605,9 +2802,9 @@ def test_a_capability_says_it_decides_what_an_analysis_covers():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: [], early_questions: [{json.dumps(row)}],
-  answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 calls.push(walk(ids.questions).filter(n => n.className === "question-context-content")
@@ -2640,9 +2837,9 @@ def test_no_to_the_rest_answers_only_the_blank_capability_questions():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(rows)},
-  answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const yes = ids.questions.querySelectorAll("select")[0];
 yes.value = "yes"; yes.listeners.change({{ type: "change" }});
 const detail = ids.questions.querySelectorAll("input")[2];
@@ -2672,7 +2869,7 @@ def test_skip_the_rest_skips_only_the_blank_questions():
     rows = [_text_row(answered, "who?"), _text_row(blank, "when?")]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(rows)}, 
   answered_early: [], answered_links: [] }}) }});
 ids.questions.querySelectorAll("input")[0].value = "the admins";
@@ -2706,9 +2903,9 @@ def test_skip_the_rest_sets_aside_a_question_answered_in_part():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(row)}], 
-  answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const selects = ids.questions.querySelectorAll("select");
 selects[0].value = "yes";
 globalThis.fetch = async (url, init) => {{
@@ -2726,7 +2923,7 @@ def test_a_skipped_question_can_be_answered_from_its_list():
     kept, skipped = (["", "", "", name, "", ""] for name in ("who?", "when?"))
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(_text_row(kept, "who?"))}], 
   skipped_early: [{json.dumps(_text_row(skipped, "when?"))}],
   answered_early: [], answered_links: [] }}) }});
@@ -2764,7 +2961,7 @@ def _suggested(click: bool) -> list:
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: [{json.dumps(link)}], early_questions: [], answered_early: [],
   answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
@@ -2798,9 +2995,9 @@ def _skip_the_rest(links, facts) -> dict:
     """The body "Skip the rest" sends for a list of these, every row blank."""
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: {json.dumps(links)}, early_questions: {json.dumps(facts)},
-  answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 globalThis.fetch = async (url, init) => {{
   calls.push({{ url, body: JSON.parse(init.body) }});
   return {{ ok: false, json: async () => ({{ message: "stop here" }}) }};
@@ -2827,9 +3024,9 @@ def test_skip_the_rest_skips_the_blank_links_and_facts_together():
 def test_a_skipped_link_can_be_answered_from_its_list():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [], skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
-  answered_early: [], answered_links: [], revision: 1 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 1 }}) }});
 const [open] = ids.skipped.querySelectorAll("button");
 open.listeners.click();
 ids.skipped.querySelectorAll("select")[0].value = "entity:shopper";
@@ -2863,7 +3060,7 @@ def test_a_question_answered_in_part_and_skipped_has_one_editor():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [], skipped_early: [{json.dumps(question)}],
   answered_early: [{json.dumps(answered)}], answered_links: [], revision: 1 }}) }});
 calls.push({{ earlier: ids.earlier.querySelectorAll("button").length }});
@@ -2895,7 +3092,7 @@ def test_a_link_answered_and_skipped_has_one_editor():
     answered = _LINK | {"answer": {"element": "entity:shopper"}}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [], skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
   answered_early: [], answered_links: [{json.dumps(answered)}], revision: 1 }}) }});
 calls.push({{ earlier: ids.earlier.querySelectorAll("button").length,
@@ -2923,7 +3120,7 @@ def test_an_earlier_answer_can_be_changed():
     del pending["answer"]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(pending)}], 
   answered_early: [{json.dumps(answered)}], answered_links: [] }}) }});
 const walk = (n, tag, out = []) => {{ for (const c of n.children || [])
@@ -2948,7 +3145,7 @@ def test_a_table_that_comes_back_keeps_its_earlier_facets():
     earlier = {**fact, "answer": {"key": fact["key"], "facets": {"rate": "yes"}}}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(fact)}], answered_early: [{json.dumps(earlier)}] }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const size = table.children[1].children[2].children[0];
@@ -3018,8 +3215,7 @@ class TestCorrections:
     def runs(self, tiers):
         """A client, a finished run, and the final run its follow-up wrote."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         final = client.post(
             f"/answer/{finished}",
             json={"links": [], "facts": [dict(FACT)]},
@@ -3209,8 +3405,7 @@ def test_a_report_whose_follow_up_started_asks_nothing_and_says_where_it_went(ti
     """The first-run app offers no follow-up for a report whose answers
     started one, and says where that follow-up is (#1369)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-    finished = start(client, questions=False)
-    client.get(f"/events/{finished}")
+    finished = asking_report(client)
     page = client.get(f"/report/{finished}").text
     (question,) = json.loads(
         re.search(r'id="fact_questions"[^>]*>(.*?)</script>', page).group(1)
@@ -3248,6 +3443,7 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
         None,
         {"asvs": {"level": 2}},
         [],
+        asks=True,
         waiting=True,
         answered=AnswerSet(),
         final=False,
@@ -3255,15 +3451,15 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
     )
     capabilities = [list(q.key) for q in asked.early if q.kind == "capability"]
     if asked.gates["asvs"] != "satisfied":
-        # A framework that will not run as the model reads now asks no
+        # A framework that will not run as the model reads asks no
         # capability (ADR 0067), so the list holds none.
         assert not capabilities
         return
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(asked.to_json()["early_questions"])},
-  answered_early: [], answered_links: [], revision: 0 }}) }});
+  answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
 const asked = new Set({json.dumps(capabilities)}.map(k => JSON.stringify(k)));
@@ -3696,7 +3892,7 @@ def test_a_pause_whose_framework_will_not_run_explains_it_and_waits():
     says why instead of starting the analysis unseen (#1542 F1, ADR 0067)."""
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left",
   framework_gates: {asvs: "refuted"}, answered_early: [], answered_links: [], revision: 0 }) });
 await settle();
@@ -3722,7 +3918,7 @@ def test_a_question_that_decides_a_framework_says_so():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(row)}], 
   framework_gates: {{asvs: "undecidable"}}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const text = (n) => typeof n === "string" ? n
@@ -3736,8 +3932,9 @@ calls.push({{ said: text(ids.questions) }});
 
 
 def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
-    """No stop says every fact is settled (#1542 F2, ADR 0068): the page lists
-    what stays open, and a question no list asks can still be answered."""
+    """No empty-list reason says every fact is settled (#1542 F2, ADR 0068):
+    the page lists what stays open, and a question no list asks can still be
+    answered."""
     low = _text_row(["", "", "", "who signs?", "", ""], "who signs?")
     summary = {
         "introduced": 14,
@@ -3917,6 +4114,30 @@ calls.push({{
         assert not after["disabled"]
         assert seen["href"] == ""
 
+    def test_an_edit_during_a_save_stays_unsaved(self):
+        """A save marks as saved what it sent, never an edit made during it."""
+        steps = (
+            _FILL_AND_SERVE
+            + """
+const served = globalThis.fetch;
+let release;
+globalThis.fetch = (url, init) => new Promise((resolve) => {
+  release = () => resolve(served(url, init));
+});
+const first = button("Save draft").listeners.click();
+await new Promise((r) => setTimeout(r, 0));
+box.all("input").filter(i => i.type === "text")[0].value = "edited during the save";
+release();
+await first;
+globalThis.fetch = served;
+await button("Save draft").listeners.click();
+"""
+        )
+        calls = _run_answer_block(_draft_payloads(2), steps)["calls"]
+        assert [c["body"]["facts"] for c in calls][-1] == [
+            calls[0]["body"]["facts"][0] | {"value": "edited during the save"}
+        ]
+
     def test_a_refused_request_shows_the_service_s_reason(self):
         steps = (
             _FILL_AND_SERVE
@@ -3993,9 +4214,9 @@ class TestTheAmendment:
     def test_the_page_sends_the_correction_and_follows_the_new_run(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
-  answered_early: [], answered_links: [], revision: 2 }) });
+  answered_early: [], answered_links: [], asks: true, revision: 2 }) });
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "amend");
 box.querySelectorAll("textarea")[0].value = "  A loader writes nightly.  ";
 await box.querySelectorAll("button")[0].listeners.click(); await settle();
@@ -4008,10 +4229,10 @@ await box.querySelectorAll("button")[0].listeners.click(); await settle();
     def test_the_page_lists_a_carried_answer_that_does_not_fit(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
-  answered_early: [], answered_links: [], revision: 0,
-  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
+  answered_early: [], answered_links: [], asks: true, revision: 0,
+  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES", reason: "not-taken",
     key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
   carried_dropped_links: [{ principal: "batch loader", element: "none" }] }) });
 const text = (n) => typeof n === "string" ? n
@@ -4026,7 +4247,7 @@ calls.push({ said: text(ids.questions) });
 
 def test_the_page_reviews_what_it_kept_from_the_earlier_analysis():
     """A kept answer is marked under Your answers, and one line counts what
-    was kept, not kept, and waits for a part (#2029 package 7)."""
+    was kept, not kept, and waits for an element (#2029 package 7)."""
     flow = valid_model().data_flows[0]
     key = [flow.id, "encryption_in_transit", "", "", "", ""]
     answered = {
@@ -4077,9 +4298,90 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
     assert "TLS 1.3 (from the earlier analysis)" in seen["earlier"]
 
 
+def test_the_page_marks_each_fact_a_control_writes():
+    """A Control's fact is marked with the Control's name, an own answer over
+    one shows the Control's value as "was", a fact no question asks is
+    listed, and the change review counts what the Controls answered (ADR
+    0125, #2155)."""
+
+    def row(element: str, attribute: str, value: str, origin: dict) -> dict:
+        key = [element, attribute, "", "", "", ""]
+        return {
+            "key": key,
+            "kind": "attribute",
+            "label": f"{element}: {attribute}",
+            "reasons": [],
+            "choices": [],
+            "form": "control",
+            "suggestions": [],
+            "max_length": 200,
+            "group": attribute,
+            "group_heading": f"{attribute}?",
+            "element": element,
+            "answer": {"key": key, "value": value},
+            "origin": origin,
+        }
+
+    def written(element: str, attribute: str, value: str, state: str) -> dict:
+        key = [element, attribute, "", "", "", ""]
+        return {
+            "control": "control-" + "a" * 32,
+            "name": "Encrypted",
+            "label": f"{element}: {attribute}",
+            "state": state,
+            "stated": "",
+            "answer": {"key": key, "value": value},
+        }
+
+    control = {"rung": "control", "control": "control-" + "a" * 32, "name": "Encrypted"}
+    payload = {
+        "run": "r1",
+        "link_questions": [],
+        "early_questions": [],
+        "early_stop": "nothing-left",
+        "framework_gates": {"asvs": "refuted"},
+        "answered_early": [
+            row("store:db", "encryption_at_rest", "AES-256", control),
+            row("store:log", "encryption_at_rest", "KMS", {"rung": "answer"}),
+        ],
+        "answered_links": [],
+        "revision": 0,
+        "control_facts": [
+            written("store:db", "encryption_at_rest", "AES-256", "written"),
+            written("store:log", "encryption_at_rest", "AES-256", "changed"),
+            written("store:db", "technology", "Postgres 16", "written"),
+        ],
+        "carried_dropped": [
+            {
+                "label": "DB: encryption at rest",
+                "value": "AES",
+                "reason": "control-states",
+                "key": ["store:db", "encryption_at_rest", "", "", "", ""],
+            }
+        ],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
+"""
+    seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
+    assert (
+        "2 facts are answered by a Control and marked under Your answers."
+        in (seen["said"])
+    )
+    assert "because a Control states the fact" in seen["said"]
+    assert "DB: encryption at rest \u2014 AES" in seen["said"]
+    assert "AES-256 (from Control Encrypted)" in seen["earlier"]
+    assert "KMS (was \u201cAES-256\u201d from Control Encrypted)" in seen["earlier"]
+    assert "Postgres 16 (from Control Encrypted)" in seen["earlier"]
+
+
 def test_the_pause_lists_what_the_description_says():
-    """Each part with its stated facts and the words they came from, above
-    the amendment box (#2029 package 8)."""
+    """Each element with its stated facts and the words they came from, open
+    and above the question list (#2029 package 8, ruled 2026-11-01)."""
     payload = {
         "run": "r1",
         "link_questions": [],
@@ -4093,7 +4395,7 @@ def test_the_pause_lists_what_the_description_says():
             {
                 "element": "process:web-app",
                 "name": "Web App",
-                "type": "Process",
+                "type": "process",
                 "excerpt": "the web app runs on Cloud Run",
                 "source_label": "System description",
                 "facts": [
@@ -4113,9 +4415,18 @@ streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }}
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "detected");
-calls.push({{ said: text(box) }});
+const order = ids.questions.children.map(part => part.className);
+calls.push({{ said: text(box), open: box.open, order }});
 """
-    said = next(c["said"] for c in _run_form_script(steps)["calls"] if "said" in c)
+    seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
+    said = seen["said"]
+    assert seen["open"] is True
+    assert seen["order"][:4] == [
+        "detected-facts",
+        "control-offer",
+        "hint",
+        "list-intro",
+    ], "the facts and the Controls come before the list"
     assert "What your description says (1 part)" in said
     assert (
         "Web App (process) \u2014 technology: FastAPI; exposure: internet-facing"
@@ -4125,13 +4436,13 @@ calls.push({{ said: text(box) }});
 
 
 class TestTheRenameOfACarriedElement:
-    """The owner says which part a missing element is now (ADR 0116)."""
+    """The owner names the element that a missing element is now (ADR 0116)."""
 
     PAUSE = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
-  answered_early: [], answered_links: [], revision: 3,
+  answered_early: [], answered_links: [], asks: true, revision: 3,
   carried_dropped: [{ label: "store:old: encryption at rest", value: "AES",
     reason: "missing-element", key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
   carried_renames: [{ earlier: "store:gone", element: "store:kept", name: "Kept DB" }],
@@ -4458,6 +4769,21 @@ await box.all("button").find(b => b.textContent === "Save draft").listeners.clic
         calls = _run_answer_block(payloads, steps)["calls"]
         return [c["body"] for c in calls if "body" in c], store, flow
 
+    def test_a_row_shows_its_element_as_a_hued_tag(self):
+        payloads, store, _ = self.payloads(
+            {"draft": {"links": [], "facts": [], "shares": []}, "revision": 0}
+        )
+        steps = """
+calls.push({ tags: box.all("span").filter(s => (s.className || "").startsWith("ref"))
+  .map(s => [s.title, s.className, s.style["--h"] ?? null]) });
+"""
+        calls = _run_answer_block(payloads, steps)["calls"]
+        [tags] = [c["tags"] for c in calls if "tags" in c]
+        # The row's title and the box's "Parts:" line each show the tag.
+        hued = [(kind, hue) for title, kind, hue in tags if title == store.id]
+        assert len(hued) == 2
+        assert all(kind == "ref" and hue is not None for kind, hue in hued)
+
     def test_a_shared_box_saves_one_share(self):
         bodies, store, flow = self.sent(
             {"draft": {"links": [], "facts": [], "shares": []}, "revision": 0}, [0, 1]
@@ -4669,7 +4995,7 @@ await followUp().listeners.click();
         row = _text_row(["", "", "", "", "", "authentication"], "Sign-in?") | shape
         steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps([row])}, answered_early: [],
   answered_links: [], revision: 0 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "yes";
@@ -4696,7 +5022,7 @@ def test_a_withheld_pause_ends_its_stream_with_a_frame_the_page_reads(
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     with TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -4717,7 +5043,7 @@ def test_a_held_run_without_its_sources_reads_as_this_service_s_defect(
     sources are gone is a logged 500, never a 404 that reads as a deleted run."""
     from webapp.main import Workspace
 
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     with TestClient(
         app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -4732,3 +5058,18 @@ def test_a_held_run_without_its_sources_reads_as_this_service_s_defect(
 
     assert response.status_code == 500
     assert "holds no sources" in caplog.text
+
+
+def test_an_amendment_over_the_byte_budget_is_refused_with_a_message(tiers):
+    """The page shows the server's refusal of an amendment that takes the
+    sources over the deployment's byte budget, so it checks no size itself."""
+    client = client_for(tiers, PausingRunner())
+    paused = start(client, questions=True)
+    client.get(f"/events/{paused}")
+    refused = client.post(
+        f"/amend/{paused}",
+        json={"text": "a" * WEBAPP_LIMITS.max_total_bytes, "revision": 0},
+        headers=SAME_ORIGIN,
+    )
+    assert 400 <= refused.status_code < 500, refused.text
+    assert "bytes" in refused.json()["message"]

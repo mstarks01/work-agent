@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Landing-bucket extracts may be readable on the scheduler read path | ['flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'process:ingest-scheduler', 'store:landing-bucket']
+- Scheduler-to-metadata-database traffic may expose SFTP keys and connection strings | ['flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'process:ingest-scheduler', 'store:airflow-metadata-database']
+- Claim records may be readable while loaded into the warehouse | ['flow:process:spark-transform-job>store:claims-warehouse>load-records', 'process:spark-transform-job', 'store:claims-warehouse']
+- Analyst warehouse queries may be observable in transit | ['flow:entity:data-analyst>store:claims-warehouse>run-queries', 'entity:data-analyst', 'store:claims-warehouse']
+- A landing-bucket storage copy may disclose partner health extracts | ['store:landing-bucket']
+- An unencrypted metadata-database copy may reveal partner access keys | ['store:airflow-metadata-database']
+- A claims-warehouse storage copy may expose the health-record corpus | ['store:claims-warehouse']
+- Code in the scheduler can read every landed partner extract | ['process:ingest-scheduler', 'flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'store:landing-bucket']
+- Code in the scheduler can recover unrotated partner SFTP keys | ['process:ingest-scheduler', 'flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'store:airflow-metadata-database']
+- A dataset-wide analyst grant exposes member-identifying claim data | ['entity:data-analyst', 'flow:entity:data-analyst>store:claims-warehouse>run-queries', 'store:claims-warehouse']
+spent: $0.0627 reported
+must-finds matched: [8, 9]

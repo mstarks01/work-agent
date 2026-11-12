@@ -32,7 +32,7 @@ import tomllib
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 from pydantic import ValidationError
 
@@ -109,9 +109,7 @@ def settings_dir(env: Mapping[str, str]) -> Path:
     """
     if chosen := env.get(SETTINGS_DIR_VAR):
         return Path(chosen)
-    xdg = env.get("XDG_CONFIG_HOME", "")
-    base = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".config"
-    return base / "work-agent"
+    return xdg_dir(env, "config")
 
 
 def data_dir(env: Mapping[str, str]) -> Path:
@@ -121,9 +119,38 @@ def data_dir(env: Mapping[str, str]) -> Path:
     ``$XDG_DATA_HOME/work-agent``, else ``~/.local/share/work-agent`` where
     ``XDG_DATA_HOME`` is unset or not an absolute path.
     """
-    xdg = env.get("XDG_DATA_HOME", "")
-    base = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".local" / "share"
-    return base / "work-agent"
+    return xdg_dir(env, "data")
+
+
+#: Each XDG base directory that holds a ``work-agent`` directory.
+XdgBase = Literal["config", "data", "state"]
+
+
+class XdgPlace(NamedTuple):
+    """The variable that names an XDG base directory, and its default."""
+
+    var: str
+    #: The directory in the home directory where ``var`` is unset or not an
+    #: absolute path.
+    default: str
+
+
+#: The place of each :data:`XdgBase`, as the XDG Base Directory Specification
+#: names it.
+XDG_BASES: Mapping[XdgBase, XdgPlace] = {
+    "config": XdgPlace("XDG_CONFIG_HOME", ".config"),
+    "data": XdgPlace("XDG_DATA_HOME", ".local/share"),
+    "state": XdgPlace("XDG_STATE_HOME", ".local/state"),
+}
+
+
+def xdg_dir(env: Mapping[str, str], base: XdgBase) -> Path:
+    """The ``work-agent`` directory under the XDG base directory ``base``
+    (:data:`XDG_BASES`)."""
+    var, default = XDG_BASES[base]
+    xdg = env.get(var, "")
+    root = Path(xdg) if os.path.isabs(xdg) else Path.home() / default
+    return root / "work-agent"
 
 
 @contextmanager

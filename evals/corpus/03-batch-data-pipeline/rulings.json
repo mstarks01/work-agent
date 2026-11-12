@@ -65,5 +65,91 @@
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 3: 03-batch-data-pipeline I-05"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+          "entity:insurance-partner"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 16"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "process:ingest-scheduler",
+          "store:landing-bucket"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 17"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "store:claims-warehouse",
+          "flow:entity:data-analyst>store:claims-warehouse>run-queries"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 19"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "recover-credential",
+        "affected_element_ids": [
+          "store:airflow-metadata-database"
+        ]
+      },
+      "position": "storage-copy",
+      "ruling": "The ballot proposed storage-copy, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 20"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:ingest-scheduler"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 21"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:spark-transform-job"
+        ]
+      },
+      "ruling": "The finding requires a write to the landed records but specifies no route to that write.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 18"
+    }
   ]
 }

@@ -139,7 +139,7 @@ TOKEN_CAPS: dict[str, int] = {
     # 0016's reading that a cap here alarms rather than rations.
     "prompts/extract-compact": 750,
     # ``repair`` carries the `duplicate-id` step (#1040). The repair pass is
-    # the one reader that sees that code, and "change nothing the issues do not
+    # the pass that sees that code, and "change nothing the issues do not
     # cite" would otherwise forbid the flows a rename carries.
     #
     # It also states three contract points (#1082): `trust_zone` may be
@@ -173,8 +173,10 @@ TOKEN_CAPS: dict[str, int] = {
     # ``critic`` must not say the service "already matched every quote against
     # the source it names" (#1082): `_verify_quotes` marks a quote it could not
     # find and keeps the draft, so the sentence would be false of exactly the
-    # draft that needs the critic most.
-    f"package/{CRITIC_DOC}": 1400,
+    # draft that needs the critic most. Each package's ``critic`` says what a
+    # ``control`` rejection means in its terms, with two worked cases (ADR
+    # 0126); ASVS's measures 1722.
+    f"package/{CRITIC_DOC}": 1800,
     # ASVS's disclaimer says what a `gap` means (#1082). A claim can take any
     # of the three directions ADR 0028 gives a draft, including the one the
     # report calls a gap, so "does not settle" alone does not describe every
@@ -185,13 +187,17 @@ TOKEN_CAPS: dict[str, int] = {
     # sentence would prove the control, so such a question routes to a
     # request and not to `config`. "Rule on every requirement at or below the
     # level" yields to the scope line's own list of units code ruled out.
-    f"package/{OUTPUT_DOC}": 1400,
+    # STRIDE's output contract allows two drafts at one verb and place where
+    # each fails its own control (ADR 0060).
+    f"package/{OUTPUT_DOC}": 1600,
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
-    # Four spoofing exemplars (#1295). One presents a held credential and
+    # Five spoofing exemplars (#1295). One presents a held credential and
     # carries ``use-credential``, as ``output.md`` files it; one poses as a
-    # caller without a credential, so the lane demonstrates both verbs.
-    "package/lane_exemplars": 2000,
+    # caller without a credential, so the lane demonstrates both verbs. A
+    # fifth shares the fourth's verb and place and fails another control, and
+    # its section names a near-duplicate that stays one draft (ADR 0060).
+    "package/lane_exemplars": 2600,
     # One instruction a lane reads last, in its user turn rather than its
     # instruction, so COMPOSED_ANALYZE_CAP does not count it (ADR 0030).
     "package/lane_closing": 120,

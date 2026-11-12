@@ -40,7 +40,7 @@ def digests_for(tree: Path, case: str) -> dict[str, str]:
 
 
 def every_mark(tree: Path, case: str = CASE) -> dict[str, str]:
-    """A mark on every recorded finding, which a submission now needs."""
+    """A mark on every recorded finding, which a submission needs."""
     prepared = sittings.prepare(tree / "evals" / "corpus" / case)
     return {target.fingerprint: "agree" for target in prepared.mark_targets}
 
@@ -344,6 +344,85 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         assert code == 1
         assert recorded == [], "the tree was written before the identity check"
         assert "mallory" in capsys.readouterr().out
+
+    def test_a_refusal_prints_no_control_character_of_the_envelope(
+        self, tree, tmp_path, monkeypatch, capsys
+    ):
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        answers["marks"] = {"k\x1b]0;pwned\x07\x1b[2J": "no such mark"}
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        code, recorded = self._written(tree, path, monkeypatch)
+
+        printed = capsys.readouterr().out
+        assert (code, recorded) == (1, [])
+        assert "pwned" in printed
+        assert printed.replace("\n", "").isprintable()
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+        assert str(refusal.value).replace("\n", "").isprintable()
+
+    @pytest.mark.parametrize(
+        "key",
+        ["k\x1b]0;pwned\x07", "k\n::error::forged", "k\u202eforged", "k\u3000forged"],
+    )
+    @pytest.mark.parametrize("field", ["cases", "marks", "opened_digests"])
+    def test_a_key_of_an_envelope_cannot_forge_a_line(self, tree, tmp_path, field, key):
+        # The value under the key is valid, so only the key can refuse. A key
+        # that passed would reach each later refusal that quotes it.
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        if field == "cases":
+            document["cases"] = {key: answers}
+        else:
+            answers[field] = {key: "agree" if field == "marks" else "0" * 64}
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        with pytest.raises(reviews_module.ReviewSubmissionError) as refusal:
+            reviews_module._read(path)
+
+        lines = str(refusal.value).splitlines()
+        assert "forged" in lines[-1] or "pwned" in lines[-1]
+        assert all(line.isprintable() for line in lines)
+        assert not [line for line in lines if line.startswith("::")]
+
+    def test_a_refusal_at_the_top_of_an_envelope_says_so(self, tree, tmp_path):
+        # An extra field has no name in a refusal, so the line names the
+        # object that holds it.
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        answers = next(iter(document["cases"].values()))
+        path.write_text(
+            json.dumps(
+                document | {"extra": 1, "cases": {"a case": answers | {"x": 1}}}
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+
+        assert str(refusal.value).splitlines()[1:] == [
+            "'cases.a case': Extra inputs are not permitted",
+            "the top of the file: Extra inputs are not permitted",
+        ]
+
+    def test_the_line_that_counts_the_rest_names_no_place(self, tree, tmp_path):
+        path = self._file(tree, tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        extras = {f"extra {number}": 1 for number in range(25)}
+        path.write_text(json.dumps(document | extras), encoding="utf-8")
+
+        with pytest.raises(EnvelopeError) as refusal:
+            envelopes.read(path)
+
+        assert str(refusal.value).splitlines()[20:] == [
+            "the top of the file: Extra inputs are not permitted",
+            "and 5 more problems not shown",
+        ]
 
     def test_a_forged_proxy_read_writes_nothing(
         self, tree, tmp_path, monkeypatch, capsys

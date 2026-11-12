@@ -37,7 +37,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, TypeVar
+
+from analysis_service.parsing import member, table_entry
 
 __all__ = [
     "ALWAYS",
@@ -45,6 +47,7 @@ __all__ = [
     "Applicability",
     "Capability",
     "CapabilityFact",
+    "CapabilityKey",
     "CapabilityNeed",
     "Decision",
     "Expression",
@@ -54,6 +57,7 @@ __all__ = [
     "expression_keys",
     "lineage",
     "open_capability_needs",
+    "parse_capability_key",
     "resolve",
 ]
 
@@ -72,6 +76,177 @@ ALWAYS = "always"
 #: ``always``, one capability key, or ``{"all": [...]}`` / ``{"any": [...]}``
 #: over smaller expressions. JSON-shaped, because a framework's table is data.
 Expression: TypeAlias = "str | Mapping[str, Sequence[Expression]]"
+
+
+#: The key of each row of :data:`CAPABILITIES`.
+CapabilityKey = Literal[
+    "browser-frontend",
+    "browser-accessible-http",
+    "postmessage-receiver",
+    "external-browser-resources",
+    "native-client",
+    "cookies",
+    "cors",
+    "websocket",
+    "graphql",
+    "http-caching",
+    "sensitive-http-requests",
+    "javascript-code",
+    "memory-unsafe-code",
+    "overflow-capable-arithmetic",
+    "manually-managed-resources",
+    "database",
+    "os-command",
+    "ldap",
+    "xpath",
+    "latex",
+    "jndi",
+    "cache-service",
+    "memcache",
+    "mail-sending",
+    "untrusted-template-input",
+    "dynamic-regex",
+    "xml-parsing",
+    "rich-text-input",
+    "untrusted-html",
+    "untrusted-svg",
+    "untrusted-scriptable-content",
+    "spreadsheet-export",
+    "outbound-http",
+    "http-request-construction",
+    "untrusted-outbound-destination",
+    "multi-step-flow",
+    "human-paced-business-flow",
+    "limited-resource",
+    "high-value-flow",
+    "multi-system-request",
+    "file-upload",
+    "archive-files",
+    "image-files",
+    "server-side-file-processing",
+    "public-files-from-untrusted-input",
+    "untrusted-file-path-input",
+    "file-download",
+    "untrusted-file-download",
+    "authentication",
+    "multiple-authentication-pathways",
+    "initial-authentication-secrets",
+    "expiring-authentication-mechanisms",
+    "password-authentication",
+    "password-reset",
+    "administrator-password-reset",
+    "stored-password-verifiers",
+    "multi-factor-authentication",
+    "one-time-codes",
+    "lookup-secrets",
+    "stored-lookup-secrets",
+    "lookup-secret-generation",
+    "out-of-band-authentication",
+    "out-of-band-codes",
+    "out-of-band-code-generation",
+    "pstn-out-of-band-authentication",
+    "push-authentication",
+    "totp",
+    "totp-seed-generation",
+    "biometric-authentication",
+    "cryptographic-authenticators",
+    "authenticator-certificates",
+    "federated-identity",
+    "multiple-identity-providers",
+    "idp-assurance-policy",
+    "saml",
+    "mutual-tls",
+    "sessions",
+    "reference-session-tokens",
+    "self-contained-tokens",
+    "self-contained-token-consumer",
+    "self-contained-token-issuer",
+    "token-validity-period",
+    "shared-signing-key-audiences",
+    "oauth",
+    "oauth-client",
+    "user-agent-authorization-flow",
+    "multiple-authorization-servers",
+    "client-code-flow",
+    "oidc-relying-party",
+    "oauth-resource-server",
+    "user-identity-authorization",
+    "resource-server-assurance-policy",
+    "oauth-authorization-server",
+    "server-code-flow",
+    "oidc-provider",
+    "refresh-tokens",
+    "public-client-refresh-tokens",
+    "reference-access-tokens",
+    "confidential-client-backchannel",
+    "unauthenticated-dynamic-registration",
+    "user-delegated-authorization",
+    "oidc-backchannel-logout",
+    "rp-initiated-logout",
+    "restricted-access",
+    "multi-tenancy",
+    "administrative-interface",
+    "sensitive-data",
+    "encryption",
+    "separate-cipher-and-mac",
+    "internal-services",
+    "internal-http-connections",
+    "internal-tls-connections",
+    "backend-service-connections",
+    "service-accounts",
+    "backend-service-credentials",
+    "separate-service-connections",
+    "webrtc",
+    "turn-server",
+    "media-server",
+    "media-recording",
+    "signaling-server",
+    "dynamic-url-construction",
+    "dynamic-javascript-or-json-output",
+    "untrusted-data-in-dangerous-context",
+    "untrusted-format-strings",
+    "regex-processing",
+    "untrusted-data-deserialization",
+    "multiple-parsers-same-data",
+    "related-data-consistency",
+    "business-logic-limits-needed",
+    "atomic-business-operation-needed",
+    "http-response-bodies",
+    "intermediary-header-consumption",
+    "http-content-length-generation",
+    "http2-messages",
+    "http3-messages",
+    "http2-request-reception",
+    "http3-request-reception",
+    "external-facing-http-services",
+    "intermediary-client-ip-handling",
+    "data-object-responses",
+    "request-object-field-writes",
+    "web-tier-file-serving",
+    "cryptographic-keys",
+    "cryptographic-operations",
+    "cryptographic-hashing",
+    "authenticity-or-integrity-hashing",
+    "password-derived-secret-keys",
+    "unpredictable-values-needed",
+    "random-value-generation",
+    "non-tls-public-key-operations",
+    "non-tls-key-exchange",
+    "tls-use",
+    "tls-certificates",
+    "tls-client",
+    "external-resource-use",
+    "backend-secrets",
+    "secret-assets",
+    "third-party-components",
+    "resource-demanding-functionality",
+    "dangerous-functionality",
+    "risky-third-party-components",
+    "shared-multithreaded-state",
+    "check-dependent-resource-actions",
+    "concurrency-locks",
+    "contended-thread-resources",
+]
 
 
 @dataclass(frozen=True)
@@ -96,7 +271,7 @@ def _row(
     )
 
 
-CAPABILITIES: Mapping[str, Capability] = MappingProxyType(
+CAPABILITIES: Mapping[CapabilityKey, Capability] = MappingProxyType(
     {
         # --- Clients and interfaces ---
         "browser-frontend": _row(
@@ -1269,7 +1444,10 @@ class Decision:
     missing: tuple[str, ...] = ()
 
 
-def lineage_issues(table: Mapping[str, Capability]) -> list[str]:
+_Key = TypeVar("_Key", bound=str)
+
+
+def lineage_issues(table: Mapping[_Key, Capability]) -> list[str]:
     """Everything that makes the parent links of ``table`` illegal, as messages.
 
     A parent must be a capability of the table, and no key may be its own
@@ -1279,7 +1457,7 @@ def lineage_issues(table: Mapping[str, Capability]) -> list[str]:
     """
     issues = []
     for key, capability in table.items():
-        seen = {key}
+        seen: set[str] = {key}
         parent = capability.parent
         while parent:
             if parent not in table:
@@ -1291,8 +1469,19 @@ def lineage_issues(table: Mapping[str, Capability]) -> list[str]:
                 issues.append(f"{key!r} is its own ancestor through {parent!r}")
                 break
             seen.add(parent)
-            parent = table[parent].parent
+            parent = table_entry(table, parent).parent
     return issues
+
+
+def parse_capability_key(name: str) -> CapabilityKey | None:
+    """The key of :data:`CAPABILITIES` that ``name`` names, or ``None``.
+
+    A statement, a reader's row and an open fact hold the key as a ``str``,
+    so one that names no capability still loads. Each reader that calls this
+    decides what that one gets: a check refuses it, and a label shows the key
+    as it is written.
+    """
+    return member(name, CAPABILITIES)
 
 
 if _lineage_issues := lineage_issues(CAPABILITIES):
@@ -1302,10 +1491,10 @@ if _lineage_issues := lineage_issues(CAPABILITIES):
 def lineage(key: str) -> Iterator[str]:
     """The key's ancestors, nearest first. The links are checked at import
     (:func:`lineage_issues`), so the walk ends."""
-    parent = CAPABILITIES[key].parent
+    parent = table_entry(CAPABILITIES, key).parent
     while parent:
         yield parent
-        parent = CAPABILITIES[parent].parent
+        parent = table_entry(CAPABILITIES, parent).parent
 
 
 def resolve(known: Mapping[str, CapabilityFact]) -> Mapping[str, CapabilityFact]:
@@ -1440,7 +1629,7 @@ def expression_keys(expression: Expression) -> tuple[str, ...]:
 def expression_issues(expression: object) -> list[str]:
     """Everything that makes ``expression`` illegal, as messages."""
     if isinstance(expression, str):
-        if expression == ALWAYS or expression in CAPABILITIES:
+        if expression == ALWAYS or parse_capability_key(expression) is not None:
             return []
         return [f"{expression!r} is not a capability"]
     if not isinstance(expression, Mapping) or len(expression) != 1:

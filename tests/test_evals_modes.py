@@ -56,6 +56,7 @@ from analysis_service.graph import (
 from analysis_service.grounding import verify_quote
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
+from analysis_service.sources import Source
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     UNKNOWN,
@@ -67,6 +68,7 @@ from analysis_service.system_model import (
     normalize_element_ids,
 )
 from analysis_service.validation import validate
+from tests.eval_factories import ruled_position
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     EVAL_MODEL,
@@ -143,6 +145,9 @@ def scripted_proposal(case, category) -> dict:
         # Taken from the reference the scripted draft is standing in for, so a
         # mode test grades the pipeline rather than this file's verb-picking.
         "verb": reference.verb,
+        # The position the case ruled on that reference, for the same reason;
+        # a lane must state one, so an unruled reference takes ``outside``.
+        "attacker_position": ruled_position(case, reference) or "outside",
         "evidence_refs": reaching_refs(case, reference.affected_element_ids),
         "severity": Severity(
             likelihood=reference.severity.likelihood,
@@ -347,8 +352,8 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     purpose: every field an :class:`~analysis_service.graph.Analysis` and a
     :class:`~analysis_service.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
-    is exactly how ``coverage`` came to be computed at the fan-in for a sweep
-    that then read an empty list for it.
+    can be computed at the fan-in for a sweep that then reads an empty list
+    for it.
 
     The marks are pinned through
     :class:`~analysis_service.claims.AnalysisMarks`, which is the one field
@@ -1857,6 +1862,21 @@ def test_extraction_mode_checks_excerpts_against_the_sources(case):
 
     assert [issue.code for issue in result.issues] == ["unverifiable-excerpt"]
     assert result.issues[0].element_id == case.model.processes[0].id
+
+
+def test_extraction_mode_holds_the_model_to_each_diagram_s_structure(case):
+    """The diagram half of the gate runs here as it runs in a job (ADR 0121):
+    a node the extraction does not model is an issue on the score."""
+    diagram = Source(
+        kind="diagram",
+        label="Diagram",
+        text="flowchart LR\n  a[Payment Gateway] --> b[Ledger]\n",
+    )
+    drawn = replace(case, sources=(*case.sources, diagram))
+
+    result = _extraction_of(drawn, case.model)
+
+    assert [issue.code for issue in result.issues] == ["diagram-node-missing"] * 2
 
 
 def test_a_faithful_extraction_still_passes_the_citation_check(case):

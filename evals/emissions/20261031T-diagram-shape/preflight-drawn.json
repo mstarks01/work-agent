@@ -1,0 +1,1185 @@
+{
+  "artifact_version": 7,
+  "mode": "extraction",
+  "cases": [
+    "01-payments-checkout"
+  ],
+  "models": {
+    "tiers_config_version": 9,
+    "tiers": {
+      "base": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "strong": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-terra",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "review": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-terra",
+        "upstreams": [
+          "openai/flex"
+        ]
+      }
+    }
+  },
+  "gating": "tier-1-structural-only",
+  "certification": {
+    "certified": false,
+    "uncertified_nodes": [
+      {
+        "node": "extract",
+        "fingerprint": "b4ab0b053d8aa324a0f96d6a527a255e8526862864a32e4e4fb9624d625bb368"
+      }
+    ],
+    "unexercised_tiers": []
+  },
+  "provenance": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.104.0"
+    },
+    "sampling_config_version": 5,
+    "tiers_config_version": 9,
+    "sampling": {
+      "base": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 16384,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "strong": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "review": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      }
+    },
+    "node_runs": {
+      "extract": [
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "63ea5dc7d6db7662dcd54b221e9e31b2583303e650c81a42f1f75ae50098caee",
+          "generation_fingerprint": "b4ab0b053d8aa324a0f96d6a527a255e8526862864a32e4e4fb9624d625bb368",
+          "served_upstream": "OpenAI"
+        }
+      ]
+    },
+    "generation_identities": {
+      "base": {
+        "requested_models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "served_models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "instruction_digests": [
+          "63ea5dc7d6db7662dcd54b221e9e31b2583303e650c81a42f1f75ae50098caee"
+        ],
+        "fingerprints": [
+          "b4ab0b053d8aa324a0f96d6a527a255e8526862864a32e4e4fb9624d625bb368"
+        ],
+        "nodes": [
+          "extract"
+        ]
+      }
+    }
+  },
+  "node_usage": {
+    "extract": {
+      "prompt_tokens": 6878,
+      "cached_prompt_tokens": 2475,
+      "cache_write_tokens": 0,
+      "completion_tokens": 3881,
+      "reasoning_tokens": 2464,
+      "total_tokens": 10759
+    }
+  },
+  "node_charges": {
+    "extract": 0.00279365
+  },
+  "node_latency": {
+    "extract": {
+      "executions": 1,
+      "total_ms": 25737,
+      "slowest_ms": 25737,
+      "mean_ms": 25737
+    }
+  },
+  "structural_failures": [],
+  "mode_output": [
+    {
+      "case": "01-payments-checkout",
+      "recall": 0.429,
+      "precision": 0.429,
+      "endpoint_recall": 1.0,
+      "interaction_recall": 1.0,
+      "zone_recall": 0.0,
+      "sourced_zone_recall": 0.333,
+      "zone_partition_agreement": 1.0,
+      "same_zone_recall": 0.0,
+      "different_zone_agreement": 1.0,
+      "zone_pair_coverage": 0.067,
+      "endpoint_missing": [
+        "boundary:core-services",
+        "boundary:public-internet",
+        "boundary:storefront-dmz"
+      ],
+      "endpoint_extra": [
+        "boundary:cloud-run",
+        "boundary:core-network",
+        "flow:store:orders-db>process:order-service"
+      ],
+      "name_tokens_absent_from_source": [],
+      "sourced_recall": 1.0,
+      "aliased": [
+        {
+          "reference": "boundary:core-services",
+          "produced": "boundary:core-network",
+          "evidence": "alias",
+          "excerpt": "The order service is a Python worker in our core network"
+        }
+      ],
+      "alignment": {
+        "pairs": [
+          {
+            "reference": "entity:card-processor",
+            "produced": "entity:card-processor",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "entity:shopper",
+            "produced": "entity:shopper",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:order-service",
+            "produced": "process:order-service",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:storefront-api",
+            "produced": "process:storefront-api",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:orders-db",
+            "produced": "store:orders-db",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:receipt-archive",
+            "produced": "store:receipt-archive",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "boundary:core-services",
+            "produced": "boundary:core-network",
+            "evidence": "alias",
+            "excerpt": "The order service is a Python worker in our core network"
+          },
+          {
+            "reference": "boundary:storefront-dmz",
+            "produced": "boundary:cloud-run",
+            "evidence": "membership",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+            "produced": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook-post",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:shopper>process:storefront-api>place-order",
+            "produced": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+            "evidence": "sole",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:order-service>store:orders-db>read-write-orders",
+            "produced": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+            "evidence": "sole",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:order-service>store:receipt-archive>append-receipt",
+            "produced": "flow:process:order-service>store:receipt-archive>receipt-tls",
+            "evidence": "sole",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:storefront-api>process:order-service>submit-order",
+            "produced": "flow:process:storefront-api>process:order-service>order-grpc",
+            "evidence": "sole",
+            "excerpt": ""
+          }
+        ],
+        "unaligned_reference": [
+          "boundary:public-internet"
+        ],
+        "unaligned_produced": [
+          "flow:store:orders-db>process:order-service>orders-addresses-card-last-four"
+        ],
+        "ambiguous": []
+      },
+      "aligned_recall": 1.0,
+      "aligned_precision": 0.917,
+      "aligned_interaction_recall": 1.0,
+      "aligned_interaction_precision": 0.833,
+      "actor_recall": 1.0,
+      "same_type_unmatched_candidates": [],
+      "extra_status": {
+        "boundary:cloud-run": "equivalent",
+        "boundary:core-network": "equivalent",
+        "flow:entity:card-processor>process:storefront-api>payment-settled-webhook-post": "equivalent",
+        "flow:entity:shopper>process:storefront-api>browse-place-orders": "equivalent",
+        "flow:process:order-service>store:orders-db>orders-addresses-card-last-four": "equivalent",
+        "flow:process:order-service>store:receipt-archive>receipt-tls": "equivalent",
+        "flow:process:storefront-api>process:order-service>order-grpc": "equivalent",
+        "flow:store:orders-db>process:order-service>orders-addresses-card-last-four": "unreviewed"
+      },
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.333,
+      "crossings_precision": 1.0,
+      "crossings_derivable": true,
+      "crossings_undecidable": [
+        "flow:entity:card-processor>process:storefront-api",
+        "flow:entity:shopper>process:storefront-api",
+        "flow:process:order-service>store:orders-db",
+        "flow:process:order-service>store:receipt-archive",
+        "flow:store:orders-db>process:order-service"
+      ],
+      "crossings_missing": [
+        "flow:entity:card-processor>process:storefront-api",
+        "flow:entity:shopper>process:storefront-api"
+      ],
+      "missing": [
+        "boundary:core-services",
+        "boundary:public-internet",
+        "boundary:storefront-dmz",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "flow:process:order-service>store:receipt-archive>append-receipt",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "extra": [
+        "boundary:cloud-run",
+        "boundary:core-network",
+        "flow:entity:card-processor>process:storefront-api>payment-settled-webhook-post",
+        "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "flow:process:order-service>store:receipt-archive>receipt-tls",
+        "flow:process:storefront-api>process:order-service>order-grpc",
+        "flow:store:orders-db>process:order-service>orders-addresses-card-last-four"
+      ],
+      "scored_field_agreement": 0.467,
+      "state_agrees_unbased": 0,
+      "control_state_agreement": 0.632,
+      "attributes_compared": 45,
+      "attributes_comparable": 47,
+      "comparison_coverage": 0.957,
+      "attributes_differing": [
+        {
+          "element": "entity:shopper",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "process:storefront-api",
+          "attribute": "exposure",
+          "blessed": "internet-facing",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:storefront-api",
+          "attribute": "interface_kind",
+          "blessed": "web",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:storefront-api",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "business-critical-data, financial"
+        },
+        {
+          "element": "process:order-service",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:order-service",
+          "attribute": "interface_kind",
+          "blessed": "non-web",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:order-service",
+          "attribute": "assets",
+          "blessed": "financial",
+          "extracted": "business-critical-data, financial, pii"
+        },
+        {
+          "element": "store:orders-db",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "business-critical-data, financial, pii"
+        },
+        {
+          "element": "store:receipt-archive",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": "financial"
+        },
+        {
+          "element": "store:receipt-archive",
+          "attribute": "encryption_at_rest",
+          "blessed": "stated",
+          "extracted": "unverified"
+        },
+        {
+          "element": "store:receipt-archive",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "flow:entity:shopper>process:storefront-api>place-order",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": ""
+        },
+        {
+          "element": "flow:entity:shopper>process:storefront-api>place-order",
+          "attribute": "operations",
+          "blessed": "write",
+          "extracted": "unknown"
+        },
+        {
+          "element": "flow:entity:shopper>process:storefront-api>place-order",
+          "attribute": "authentication",
+          "blessed": "stated",
+          "extracted": "unverified"
+        },
+        {
+          "element": "flow:process:storefront-api>process:order-service>submit-order",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "business-critical-data"
+        },
+        {
+          "element": "flow:process:storefront-api>process:order-service>submit-order",
+          "attribute": "operations",
+          "blessed": "write",
+          "extracted": "unknown"
+        },
+        {
+          "element": "flow:process:storefront-api>process:order-service>submit-order",
+          "attribute": "authentication",
+          "blessed": "absent",
+          "extracted": "unverified"
+        },
+        {
+          "element": "flow:process:order-service>store:orders-db>read-write-orders",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "business-critical-data, financial, pii"
+        },
+        {
+          "element": "flow:process:order-service>store:orders-db>read-write-orders",
+          "attribute": "operations",
+          "blessed": "read-write",
+          "extracted": "unknown"
+        },
+        {
+          "element": "flow:process:order-service>store:orders-db>read-write-orders",
+          "attribute": "authentication",
+          "blessed": "stated",
+          "extracted": "unverified"
+        },
+        {
+          "element": "flow:process:order-service>store:receipt-archive>append-receipt",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": "financial"
+        },
+        {
+          "element": "flow:process:order-service>store:receipt-archive>append-receipt",
+          "attribute": "protocol",
+          "blessed": "silent",
+          "extracted": "stated"
+        },
+        {
+          "element": "flow:process:order-service>store:receipt-archive>append-receipt",
+          "attribute": "authentication",
+          "blessed": "stated",
+          "extracted": "unverified"
+        },
+        {
+          "element": "boundary:storefront-dmz",
+          "attribute": "kind",
+          "blessed": "network",
+          "extracted": "other"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 1,
+        "measured": 1,
+        "uncited": 0,
+        "tokenless": 0,
+        "exhausted": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    }
+  ],
+  "trusted": false,
+  "repo_commit": {
+    "commit": "47e995b4b76b7bbd2f79703b7fc2297c6a686deb",
+    "clean": false
+  },
+  "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97",
+  "flow_identity_version": 2,
+  "frameworks": [
+    "asvs",
+    "stride"
+  ],
+  "stopped": [],
+  "series": {},
+  "completion": {
+    "attempted": 1,
+    "scored": 0,
+    "failed": 0,
+    "stopped_before": 0
+  },
+  "attribute_aggregate": {
+    "compared": 45,
+    "agreed": 21,
+    "agreement": 0.467,
+    "by_attribute": {
+      "boundary.kind": {
+        "compared": 2,
+        "agreed": 1,
+        "agreement": 0.5
+      },
+      "entity.kind": {
+        "compared": 2,
+        "agreed": 2,
+        "agreement": 1.0
+      },
+      "process.exposure": {
+        "compared": 2,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "process.interface_kind": {
+        "compared": 2,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "boundary.assets": {
+        "compared": 2,
+        "agreed": 2,
+        "agreement": 1.0
+      },
+      "entity.assets": {
+        "compared": 2,
+        "agreed": 1,
+        "agreement": 0.5
+      },
+      "flow.assets": {
+        "compared": 5,
+        "agreed": 1,
+        "agreement": 0.2
+      },
+      "process.assets": {
+        "compared": 2,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "store.assets": {
+        "compared": 2,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "flow.operations": {
+        "compared": 5,
+        "agreed": 2,
+        "agreement": 0.4
+      },
+      "flow.protocol": {
+        "compared": 5,
+        "agreed": 4,
+        "agreement": 0.8
+      },
+      "flow.authentication": {
+        "compared": 5,
+        "agreed": 1,
+        "agreement": 0.2
+      },
+      "flow.encryption_in_transit": {
+        "compared": 5,
+        "agreed": 5,
+        "agreement": 1.0
+      },
+      "store.encryption_at_rest": {
+        "compared": 2,
+        "agreed": 1,
+        "agreement": 0.5
+      },
+      "store.data_classification": {
+        "compared": 2,
+        "agreed": 1,
+        "agreement": 0.5
+      }
+    }
+  },
+  "grounds": [],
+  "grounds_failures": [],
+  "grounds_aggregate": null,
+  "coverage": [
+    {
+      "framework": "asvs",
+      "lane": "encoding-and-sanitization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "validation-and-business-logic",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "web-frontend-security",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "api-and-web-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "file-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authentication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "session-management",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authorization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "self-contained-tokens",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "oauth-and-oidc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "cryptography",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-communication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "configuration",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "data-protection",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-coding-and-architecture",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "security-logging-and-error-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "webrtc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "spoofing",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "tampering",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "repudiation",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "information-disclosure",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "denial-of-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "elevation-of-privilege",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    }
+  ],
+  "coverage_totals": {
+    "cases": 0,
+    "drafts": 0,
+    "rules_fired": 0,
+    "rules": 0,
+    "candidates": 0,
+    "candidates_cited": 0,
+    "elements": 0,
+    "elements_cited": 0,
+    "boundary_crossings": 0,
+    "boundary_crossings_cited": 0,
+    "unknown_controls": 0,
+    "unknown_controls_cited": 0,
+    "cited_rates": {
+      "candidates_cited": 0.0,
+      "elements_cited": 0.0,
+      "boundary_crossings_cited": 0.0,
+      "unknown_controls_cited": 0.0
+    }
+  },
+  "filler": {},
+  "instruction": [
+    {
+      "framework": "(shared)",
+      "node": "extract",
+      "tokens": 4236,
+      "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7"
+    }
+  ],
+  "instruction_totals": {
+    "(shared)": {
+      "nodes": 1,
+      "tokens": 4236,
+      "largest": 4236
+    }
+  },
+  "applicability": [],
+  "applicability_aggregate": null,
+  "applicability_exemplar_delta": null,
+  "applicability_holdout_split": null,
+  "over_applied_for_promotion": [],
+  "disposition": [],
+  "disposition_aggregate": null,
+  "applicability_yield": [],
+  "applicability_yield_aggregate": null,
+  "attribution": [],
+  "attribution_aggregate": null,
+  "scores": [],
+  "exemplar_delta": null,
+  "holdout_split": null,
+  "unlisted_for_promotion": [],
+  "critic_yield": [],
+  "critic_yield_aggregate": null,
+  "losses": [],
+  "losses_aggregate": null,
+  "writing": [],
+  "writing_aggregate": {
+    "answered": 0,
+    "objections": 0,
+    "carried": 0,
+    "objection_rate": 0.0,
+    "by_framework": {},
+    "by_reason": {}
+  }
+}

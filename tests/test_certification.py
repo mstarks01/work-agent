@@ -1,4 +1,4 @@
-"""Certification: the pure check, now the service's rather than the harness's.
+"""Certification: the pure check, the service's own rather than the harness's.
 
 Zero provider calls — the whole point is a gate the credential-free suite
 exercises. Fingerprints are scripted; the live gate *run* stays out of scope.

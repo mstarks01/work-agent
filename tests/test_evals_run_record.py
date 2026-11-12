@@ -8,7 +8,7 @@ import pytest
 
 from evals.harness import run_record as module
 from evals.harness.provenance import ProvenanceError
-from evals.harness.run_record import run_record
+from evals.harness.run_record import run_record, run_record_for, sweep_inputs
 
 
 def test_the_record_names_the_tree_the_table_and_each_input(tmp_path, monkeypatch):
@@ -52,3 +52,40 @@ def test_a_tree_with_no_checkout_writes_no_record(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "checkout_state", no_checkout)
     with pytest.raises(ProvenanceError):
         run_record("early-rounds", {}, {})
+
+
+def test_a_run_that_writes_no_output_asks_no_checkout(monkeypatch):
+    """A replay with no output file runs where there is no checkout to ask."""
+
+    def no_checkout():
+        raise ProvenanceError("no checkout")
+
+    monkeypatch.setattr(module, "checkout_state", no_checkout)
+    assert run_record_for([None, None], "critic-replay", {}, {}) is None
+
+
+def test_a_run_that_writes_one_output_gets_the_record(tmp_path, monkeypatch):
+    monkeypatch.setattr(module, "checkout_state", lambda: ("f" * 40, True))
+
+    record = run_record_for([None, tmp_path / "raw.json"], "critic-replay", {}, {})
+
+    assert record == run_record("critic-replay", {}, {})
+
+
+def test_a_sweep_is_its_artifact_and_every_file_beside_it(tmp_path):
+    """The artifact holds no digest of its case files, so each is named."""
+    artifact = tmp_path / "sweep.json"
+    artifact.write_text("{}")
+    reports = tmp_path / "sweep.reports"
+    reports.mkdir()
+    for name in ("02.report.json", "01.drafts.json"):
+        (reports / name).write_text("[]")
+
+    assert list(sweep_inputs([artifact])) == [
+        artifact,
+        reports / "01.drafts.json",
+        reports / "02.report.json",
+    ]
+
+
+#: The eval writers whose file is not a measurement, each with the reason.

@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph machine["Player's machine"]
+        player[Player]
+        client[Game client]
+    end
+    subgraph prod[Production network]
+        lobby[Lobby]
+        gs[Game servers]
+    end
+    playerdb[(Player database)]
+    stats[(Stats database)]
+    subgraph corp[Corporate network]
+        support[Customer support staff]
+    end
+    mod[Moderation website]
+
+    player -->|plays| client
+    client -->|"matchmaking (TCP 1234)"| lobby
+    client -->|"match (TCP 1235)"| gs
+    lobby -->|read| playerdb
+    lobby -->|match handover| gs
+    gs <-->|stats| stats
+    gs -->|write| playerdb
+    support -->|view and act on accounts| mod
+    mod <-->|player accounts| playerdb

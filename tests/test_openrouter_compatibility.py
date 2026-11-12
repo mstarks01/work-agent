@@ -129,11 +129,11 @@ class TestAnErrorInsideATwoHundred:
         This is the half of the #174 comment's worry that turns out to be
         unfounded on the pinned library: a wrapped 429 does not read as a 500.
 
-        The 500, 502 and 529 rows are the ones #807 measured as *not* retried.
-        The ladder keyed on litellm's exception class then, and litellm calls
-        this vendor's 500 an ``APIError`` where it calls anthropic's an
-        ``InternalServerError``. It keys on the status code now, so the class
-        the mapper picked stops deciding anything;
+        The 500, 502 and 529 rows are the ones #807 measured as *not* retried
+        when the ladder keyed on litellm's exception class: litellm calls this
+        vendor's 500 an ``APIError`` where it calls anthropic's an
+        ``InternalServerError``. The ladder keys on the status code, so the
+        class the mapper picks decides nothing;
         ``tests/test_retry.py`` holds that across the whole registry.
         """
         raised = _transform_error(code)

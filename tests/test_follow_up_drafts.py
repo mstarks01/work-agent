@@ -1,10 +1,9 @@
 """A report's follow-up saves its answers in batches, then runs once (#1542 F3, ADR 0070).
 
-At 2fae7d3, 201 schema-valid conditional threats with distinct unknown
-subjects made the follow-up ask 201 questions, and the answer request admitted
-at most 200 facts. A follow-up could not save a batch without running, and its
-first run used the one follow-up. These tests build that report and answer
-it through the ``/v1`` routes.
+A report can ask more questions than one answer request admits. So a
+follow-up saves its answers as a draft in batches, which runs nothing, and its
+one run reads the draft. These tests build that report and
+answer it through the ``/v1`` routes.
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from analysis_service.answer_bodies import AnswersSubmission
-from analysis_service.answer_sets import AnswerSet, HeldAnswerSet
+from analysis_service.answer_sets import AnswerSet, HeldAnswerSet, SentAnswers
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.claims import UnknownRef, Verdict
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
@@ -49,6 +48,8 @@ def _finished(store, count=MAX_FACT_ANSWERS + 1, earlier=()):
         for n in range(count)
     ]
     record = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="alice",
         sources=[DESCRIPTION],
         frameworks=sample_selection(),
@@ -295,7 +296,7 @@ class TestASaveDuringARunIsNotLost:
 
         async def racing(record, **bounds):
             # A second tab's save lands after the run composed its answers.
-            assert await store.save_draft(job, "alice", AnswerSet(facts=(late,)), 0)
+            assert await store.save_draft(job, "alice", SentAnswers(facts=(late,)), 0)
             return await reserve(record, **bounds)
 
         store.reserve = racing

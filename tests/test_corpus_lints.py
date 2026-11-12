@@ -22,6 +22,7 @@ from analysis_service.system_model import ELEMENT_GROUPS
 from analysis_service.validation import parse_and_validate, validate
 from evals import build_review_docs, verify_corpus
 from tests.factories import valid_model
+from tests.source_tree import PYTHON, source_files
 
 pytestmark = pytest.mark.lint
 
@@ -503,7 +504,9 @@ def test_the_harness_table_names_every_module():
     to anything that only asks whether named things exist.
     """
     documented = set(HARNESS_ROW.findall(README.read_text(encoding="utf-8")))
-    actual = {path.name for path in HARNESS_DIR.glob("*.py")} - {"__init__.py"}
+    actual = {
+        path.name for path in source_files(*PYTHON) if path.parent == HARNESS_DIR
+    } - {"__init__.py"}
 
     assert documented == actual, (
         "evals/README.md's harness table and evals/harness/ disagree: undocumented"

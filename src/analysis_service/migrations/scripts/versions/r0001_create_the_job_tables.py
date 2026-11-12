@@ -1,4 +1,5 @@
-"""Create the tables of the sql job store: principals, jobs, job_events, usage_rows.
+"""Create the tables of the sql job store: principals, jobs, job_events,
+usage_rows, owner_files and controls.
 
 Revision ID: 0001
 Revises:
@@ -22,6 +23,8 @@ _JSON_COLUMNS = (
     "resumption",
     "carried",
     "carried_renames",
+    "control_scopes",
+    "control_facts",
     "checkpoint",
     "validation_issues",
     "certification",
@@ -62,9 +65,13 @@ def upgrade() -> None:
         sa.Column("amends", sa.String(64)),
         sa.Column("error", sa.Text()),
         sa.Column("ask_questions", sa.Boolean(), nullable=False),
+        sa.Column("continues_at_pause", sa.Boolean(), nullable=False),
+        sa.Column("assertion_pass", sa.Boolean(), nullable=False),
+        sa.Column("continue_refusal", sa.Text()),
         *(sa.Column(name, sa.Text(), nullable=False) for name in _JSON_COLUMNS),
         sa.Column("sources_sha256", sa.String(64), nullable=False),
         sa.Column("report_sha256", sa.String(64)),
+        sa.Column("controls_sha256", sa.String(64)),
     )
     op.create_table(
         "job_events",
@@ -88,8 +95,41 @@ def upgrade() -> None:
         sa.Column("status", sa.String(32), nullable=False),
         sa.Column("parent_id", sa.String(64), index=True),
     )
+    op.create_table(
+        "owner_files",
+        sa.Column("id", sa.String(64), primary_key=True),
+        sa.Column(
+            "owner_id",
+            sa.String(64),
+            sa.ForeignKey("principals.owner_id"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("kind", sa.String(32), nullable=False),
+        sa.Column("sha256", sa.String(64), nullable=False),
+        sa.Column("size_bytes", sa.BigInteger(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint("owner_id", "name"),
+    )
+    op.create_table(
+        "controls",
+        sa.Column("id", sa.String(64), primary_key=True),
+        sa.Column(
+            "owner_id",
+            sa.String(64),
+            sa.ForeignKey("principals.owner_id"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("document", sa.Text(), nullable=False),
+        sa.UniqueConstraint("owner_id", "name"),
+    )
 
 
 def downgrade() -> None:
-    for table in ("usage_rows", "job_events", "jobs", "principals"):
+    tables = ("controls", "owner_files", "usage_rows", "job_events", "jobs")
+    for table in (*tables, "principals"):
         op.drop_table(table)

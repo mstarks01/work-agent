@@ -35,10 +35,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.fan_in import fan_in
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
 from analysis_service.graph import (
     STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
@@ -49,7 +52,7 @@ from analysis_service.graph import (
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import finished_file, stride_threats
+from evals.harness.bundle import finished_file, read_report, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -97,12 +100,11 @@ def replay_case(
 ) -> Replayed:
     """The fan-in run again over ``proposals`` plus ``injected``, then scored."""
     block = next(block for block in report.analyses if block.framework == FRAMEWORK)
-    schema = schemas_for(FRAMEWORK).proposals
     batches = {}
     for lane in set(proposals) | set(injected):
         raw = dict(proposals.get(lane) or {"claims": []})
         raw["claims"] = [*raw.get("claims", []), *injected.get(lane, ())]
-        batches[lane] = schema.model_validate(raw)
+        batches[lane] = ArchivedThreatProposals.model_validate(raw)
     merged = fan_in(
         batches,
         PACKAGES[FRAMEWORK],
@@ -145,34 +147,43 @@ def replay_case(
     )
 
 
-def lane_must_finds(
-    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: Any
-) -> tuple[int, ...]:
-    """The must-find references one lane's proposals match, before any critic.
+def lane_drafts(
+    state: Mapping[str, Any], lane: str, batch: ProposalBatch
+) -> list[DraftThreat]:
+    """One lane's proposals as drafts, before any critic.
 
     ``state`` is what ``prepare`` wrote for the case, as ``lane-replay
     --prepare-today`` runs it. The fan-in runs as ``merge`` runs it, over this
-    lane alone and that state, so a proposal it would drop is not counted. The
-    critic does not run, so this is the most the lane's drafts could keep.
+    lane alone and that state, so a proposal it would drop is not a draft.
     """
     nodes = FrameworkNodes(FRAMEWORK)
-    model = SystemModel.model_validate(state[STATE_VALID_MODEL])
     session = GraphKeys.of([FRAMEWORK]).state(SimpleNamespace(state=state))
     merged = fan_in(
-        {lane: schemas_for(FRAMEWORK).proposals.model_validate(batch)},
+        {lane: batch},
         nodes.package,
-        model,
+        SystemModel.model_validate(state[STATE_VALID_MODEL]),
         state[STATE_SOURCE_TEXTS],
         state.get(nodes.key("ruled_out")) or {},
         held_assertions(session),
         state.get(nodes.key("ruled_in")) or {},
     )
-    drafts = [draft for draft in merged.drafts if isinstance(draft, DraftThreat)]
+    return [draft for draft in merged.drafts if isinstance(draft, DraftThreat)]
+
+
+def lane_must_finds(
+    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: ProposalBatch
+) -> tuple[int, ...]:
+    """The must-find references one lane's drafts match, before any critic.
+
+    The drafts are :func:`lane_drafts`. The critic does not run, so this is
+    the most the lane's drafts could keep.
+    """
+    model = SystemModel.model_validate(state[STATE_VALID_MODEL])
     references = case.stride_claims()
     return tuple(
         sorted(
             index
-            for index in _matched(case, drafts, model)
+            for index in _matched(case, lane_drafts(state, lane, batch), model)
             if references[index].must_find
         )
     )
@@ -204,7 +215,7 @@ def replay_artifact(
         proposals_path = finished_file(artifact, case.id, "proposals")
         # A finished case: finished_file returns the path or raises.
         assert proposals_path is not None
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        report = read_report(report_path)
         proposals = json.loads(proposals_path.read_text(encoding="utf-8"))
         rows.append(
             replay_case(

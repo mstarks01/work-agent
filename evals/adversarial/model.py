@@ -136,8 +136,8 @@ class AdversarialCase(BaseModel):
         return digest_of(self.source_text()) == self.source_sha256
 
 
-#: The one reader of "what is this text's content digest", shared with the
-#: support spans that pin a quote to the source it came from.
+#: The content digest of a text: :func:`~analysis_service.sources.text_digest`,
+#: which the support spans that pin a quote to its source also call.
 digest_of = text_digest
 
 

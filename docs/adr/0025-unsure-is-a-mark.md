@@ -51,7 +51,7 @@ other three do not fit, and a control lists it where they look for it.
 
 **It moves no number, exactly as a vote's `unsure` moves none.** Nothing scores
 a sitting mark today — a mark is evidence a person reads. The rule stands for
-whatever reads them first: an `unsure` is a spent answer that counts toward the
+whatever reads them first: an `unsure` is a final answer that counts toward the
 sitting being complete and toward nothing else.
 
 **It is not `needs-evidence`.** The **Ledger** keeps that word for a reviewer

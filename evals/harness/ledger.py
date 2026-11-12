@@ -1,7 +1,7 @@
 """The vote ledger: what a person decided about a finding, kept forever.
 
-This is the only place in the repository where a human judgement is the datum.
-Everything else under ``evals/`` is agent-authored, and ``evals/README.md`` says
+The ledger records a human judgement as the datum. Everything else under
+``evals/`` is agent-authored, and ``evals/README.md`` says
 so once for the whole directory. This is the directory that changes that, one
 line at a time.
 
@@ -46,10 +46,10 @@ and every reader takes the one its question needs.
 
 An empty digest is a legal value and reads live against anything. It records
 that nothing was captured, for a caller that holds a claim it cannot digest. It
-is **not** how a row written before the field reads: :meth:`Vote.from_json`
+is **not** how a row with no digest key reads: :meth:`Vote.from_json`
 requires both keys, so such a row raises :class:`LedgerError` rather than
 loading with the question silently open. No row in this repository carries an
-empty digest, and none predates the field.
+empty digest, and each row carries both keys.
 
 A vote carries one reason code, from a closed set, and it decides where the vote
 lands. A reviewer who dislikes a finding's writing and a reviewer who says it is
@@ -118,35 +118,35 @@ VoteChoice = Literal["up", "down", "unsure", "needs-evidence"]
 
 #: Reasons that speak to whether the finding is *right*. A ``down`` carrying one
 #: of these counts against the configuration that produced it.
-SUBSTANCE_REASONS: frozenset[str] = frozenset(
-    {
-        "not-a-threat",
-        "unsupported-by-the-model",
-        "duplicate",
-        "wrong-lane",
-        "out-of-scope",
-    }
-)
+SubstanceReason = Literal[
+    "not-a-threat",
+    "unsupported-by-the-model",
+    "duplicate",
+    "wrong-lane",
+    "out-of-scope",
+]
+SUBSTANCE_REASONS: frozenset[SubstanceReason] = frozenset(get_args(SubstanceReason))
 
 #: Reasons that speak to how the finding is *written*. A ``down`` carrying one
 #: of these leaves every analysis metric untouched and is counted by
 #: :mod:`evals.harness.writing` instead. This is what stops a reviewer's taste
 #: moving recall.
-STYLE_REASONS: frozenset[str] = frozenset(
-    {
-        "too-vague",
-        "poorly-written",
-        "wrong-severity",
-        "unhelpful-mitigation",
-    }
-)
+StyleReason = Literal[
+    "too-vague",
+    "poorly-written",
+    "wrong-severity",
+    "unhelpful-mitigation",
+]
+STYLE_REASONS: frozenset[StyleReason] = frozenset(get_args(StyleReason))
 
-REASONS: frozenset[str] = SUBSTANCE_REASONS | STYLE_REASONS
+#: Every reason a ``down`` vote may carry.
+Reason = Literal[SubstanceReason, StyleReason]
+REASONS: frozenset[Reason] = SUBSTANCE_REASONS | STYLE_REASONS
 
 #: One-line gloss per reason, shown as the button label. Required for every
 #: reason — ``test_evals_ledger.py`` checks the two sets match, because a reason
 #: with no gloss is a reason two reviewers will read two ways.
-REASON_GLOSS: dict[str, str] = {
+REASON_GLOSS: dict[Reason, str] = {
     "not-a-threat": "this is not a threat to this system",
     "unsupported-by-the-model": "it asserts something the description does not say",
     "duplicate": "another finding in this report already says it",

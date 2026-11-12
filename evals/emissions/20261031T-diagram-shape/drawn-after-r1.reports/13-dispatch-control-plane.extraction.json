@@ -1,0 +1,708 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:scheduling-partner",
+        "name": "Scheduling partner",
+        "description": "Scheduling partner",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "partner[\"Scheduling partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "kind is not stated.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:dispatch-console-single-page-js-app-browser",
+        "name": "Dispatch console (single-page JS app, browser)",
+        "description": "Dispatch console (single-page JS app, browser)",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "console[\"Dispatch console (single-page JS app, browser)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:corporate-web-host",
+        "name": "Corporate web host",
+        "description": "Corporate web host",
+        "assets": [],
+        "source_excerpt": "webhost[Corporate web host]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:schedule-importer",
+        "name": "Schedule importer",
+        "description": "Schedule importer",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "importer[Schedule importer]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:dispatch-api",
+        "name": "Dispatch API",
+        "description": "Dispatch API",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[Dispatch API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:production-control-plane"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:duty-engineer",
+        "name": "Duty engineer",
+        "description": "Duty engineer",
+        "assets": [],
+        "source_excerpt": "engineer(Duty engineer)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "name": "Dispatch database: job orders, crew names, crew mobile numbers",
+        "description": "Dispatch database: job orders, crew names, crew mobile numbers",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "dispatchdb[(\"Dispatch database: job orders, crew names, crew mobile numbers\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:schedule-archive-corporate-file-store",
+        "name": "Schedule archive (corporate file store)",
+        "description": "Schedule archive (corporate file store)",
+        "assets": [],
+        "source_excerpt": "archive[(\"Schedule archive (corporate file store)\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process-duty-engineerentity-dispatch-console-single-page-js-app-browseruse-console",
+        "name": "use console",
+        "description": "Duty engineer uses the dispatch console.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "engineer --> console",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:duty-engineer",
+        "destination": "entity:dispatch-console-single-page-js-app-browser",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity-corporate-web-hostentity-dispatch-console-single-page-js-app-browserserves-console-app",
+        "name": "serves console app",
+        "description": "Corporate web host serves the console app to the dispatch console.",
+        "assets": [],
+        "source_excerpt": "webhost -->|serves console app| console",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:corporate-web-host",
+        "destination": "entity:dispatch-console-single-page-js-app-browser",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "console app",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity-dispatch-console-single-page-js-app-browserentity-dispatch-apiapi-calls-cross-origin",
+        "name": "API calls (cross-origin)",
+        "description": "Dispatch console makes cross-origin API calls to the Dispatch API.",
+        "assets": [],
+        "source_excerpt": "console -->|\"API calls (cross-origin)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:dispatch-console-single-page-js-app-browser",
+        "destination": "entity:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "API calls",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity-dispatch-apientity-dispatch-console-single-page-js-app-browserlive-job-status-websocket",
+        "name": "live job status (WebSocket)",
+        "description": "Dispatch API sends live job status to the dispatch console.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|\"live job status (WebSocket)\"| console",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:dispatch-api",
+        "destination": "entity:dispatch-console-single-page-js-app-browser",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity-dispatch-apistore-dispatch-database-job-orders-crew-names-crew-mobile-numbersjob-orders-crews",
+        "name": "job orders, crews",
+        "description": "Dispatch API exchanges job orders and crews with the dispatch database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"job orders, crews\"| dispatchdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:dispatch-api",
+        "destination": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crews",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store-dispatch-database-job-orders-crew-names-crew-mobile-numbersentity-dispatch-apijob-orders-crews",
+        "name": "job orders, crews",
+        "description": "Dispatch database exchanges job orders and crews with the Dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"job orders, crews\"| dispatchdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "destination": "entity:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crews",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity-schedule-importerentity-scheduling-partnerhourly-pull-soap-over-https",
+        "name": "hourly pull (SOAP over HTTPS)",
+        "description": "Schedule importer pulls hourly from the scheduling partner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "importer -->|\"hourly pull (SOAP over HTTPS)\"| partner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "SOAP over HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity-scheduling-partnerentity-schedule-importerplanned-work-xml",
+        "name": "planned work (XML)",
+        "description": "Scheduling partner sends planned work in XML to the schedule importer.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "partner -->|\"planned work (XML)\"| importer",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:scheduling-partner",
+        "destination": "entity:schedule-importer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "planned work (XML)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity-schedule-importerstore-schedule-archive-corporate-file-storedownloaded-xml-documents",
+        "name": "downloaded XML documents",
+        "description": "Schedule importer sends downloaded XML documents to the schedule archive.",
+        "assets": [],
+        "source_excerpt": "importer -->|downloaded XML documents| archive",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:schedule-importer",
+        "destination": "store:schedule-archive-corporate-file-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "downloaded XML documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity-schedule-importerentity-dispatch-apiparsed-work-orders",
+        "name": "parsed work orders",
+        "description": "Schedule importer sends parsed work orders to the Dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "importer -->|parsed work orders| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:schedule-importer",
+        "destination": "entity:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "parsed work orders",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph corp[\"Corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "Production control plane",
+        "description": "Production control plane",
+        "assets": [],
+        "source_excerpt": "subgraph cp[\"Production control plane\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The dispatch database contents are confidential because they include crew names, crew mobile numbers, and job orders.",
+        "element_id": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "attribute": "data_classification",
+        "basis": "The diagram names the stored contents as job orders, crew names, and crew mobile numbers."
+      },
+      {
+        "assumption": "The Corporate network is a network trust boundary.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Corporate network."
+      },
+      {
+        "assumption": "The Production control plane is a privilege trust boundary.",
+        "element_id": "boundary:production-control-plane",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Production control plane."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:scheduling-partner",
+        "name": "Scheduling partner",
+        "description": "Scheduling partner",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "partner[\"Scheduling partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "kind is not stated.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:dispatch-console-single-page-js-app-browser",
+        "name": "Dispatch console (single-page JS app, browser)",
+        "description": "Dispatch console (single-page JS app, browser)",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "console[\"Dispatch console (single-page JS app, browser)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:corporate-web-host",
+        "name": "Corporate web host",
+        "description": "Corporate web host",
+        "assets": [],
+        "source_excerpt": "webhost[Corporate web host]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:schedule-importer",
+        "name": "Schedule importer",
+        "description": "Schedule importer",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "importer[Schedule importer]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:dispatch-api",
+        "name": "Dispatch API",
+        "description": "Dispatch API",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[Dispatch API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram shape identifies this node as an external entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:production-control-plane"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:duty-engineer",
+        "name": "Duty engineer",
+        "description": "Duty engineer",
+        "assets": [],
+        "source_excerpt": "engineer(Duty engineer)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "name": "Dispatch database: job orders, crew names, crew mobile numbers",
+        "description": "Dispatch database: job orders, crew names, crew mobile numbers",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "dispatchdb[(\"Dispatch database: job orders, crew names, crew mobile numbers\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:schedule-archive-corporate-file-store",
+        "name": "Schedule archive (corporate file store)",
+        "description": "Schedule archive (corporate file store)",
+        "assets": [],
+        "source_excerpt": "archive[(\"Schedule archive (corporate file store)\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:duty-engineer>entity:dispatch-console-single-page-js-app-browser>use-console",
+        "name": "use console",
+        "description": "Duty engineer uses the dispatch console.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "engineer --> console",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:duty-engineer",
+        "destination": "entity:dispatch-console-single-page-js-app-browser",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:corporate-web-host>entity:dispatch-console-single-page-js-app-browser>serves-console-app",
+        "name": "serves console app",
+        "description": "Corporate web host serves the console app to the dispatch console.",
+        "assets": [],
+        "source_excerpt": "webhost -->|serves console app| console",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:corporate-web-host",
+        "destination": "entity:dispatch-console-single-page-js-app-browser",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "console app",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:dispatch-console-single-page-js-app-browser>entity:dispatch-api>api-calls-cross-origin",
+        "name": "API calls (cross-origin)",
+        "description": "Dispatch console makes cross-origin API calls to the Dispatch API.",
+        "assets": [],
+        "source_excerpt": "console -->|\"API calls (cross-origin)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:dispatch-console-single-page-js-app-browser",
+        "destination": "entity:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "API calls",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:dispatch-api>entity:dispatch-console-single-page-js-app-browser>live-job-status-websocket",
+        "name": "live job status (WebSocket)",
+        "description": "Dispatch API sends live job status to the dispatch console.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|\"live job status (WebSocket)\"| console",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:dispatch-api",
+        "destination": "entity:dispatch-console-single-page-js-app-browser",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:dispatch-api>store:dispatch-database-job-orders-crew-names-crew-mobile-numbers>job-orders-crews",
+        "name": "job orders, crews",
+        "description": "Dispatch API exchanges job orders and crews with the dispatch database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"job orders, crews\"| dispatchdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:dispatch-api",
+        "destination": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crews",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:dispatch-database-job-orders-crew-names-crew-mobile-numbers>entity:dispatch-api>job-orders-crews",
+        "name": "job orders, crews",
+        "description": "Dispatch database exchanges job orders and crews with the Dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"job orders, crews\"| dispatchdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "destination": "entity:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crews",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:schedule-importer>entity:scheduling-partner>hourly-pull-soap-over-https",
+        "name": "hourly pull (SOAP over HTTPS)",
+        "description": "Schedule importer pulls hourly from the scheduling partner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "importer -->|\"hourly pull (SOAP over HTTPS)\"| partner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "SOAP over HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:scheduling-partner>entity:schedule-importer>planned-work-xml",
+        "name": "planned work (XML)",
+        "description": "Scheduling partner sends planned work in XML to the schedule importer.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "partner -->|\"planned work (XML)\"| importer",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:scheduling-partner",
+        "destination": "entity:schedule-importer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "planned work (XML)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:schedule-importer>store:schedule-archive-corporate-file-store>downloaded-xml-documents",
+        "name": "downloaded XML documents",
+        "description": "Schedule importer sends downloaded XML documents to the schedule archive.",
+        "assets": [],
+        "source_excerpt": "importer -->|downloaded XML documents| archive",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:schedule-importer",
+        "destination": "store:schedule-archive-corporate-file-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "downloaded XML documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:schedule-importer>entity:dispatch-api>parsed-work-orders",
+        "name": "parsed work orders",
+        "description": "Schedule importer sends parsed work orders to the Dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "importer -->|parsed work orders| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:schedule-importer",
+        "destination": "entity:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "parsed work orders",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph corp[\"Corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "Production control plane",
+        "description": "Production control plane",
+        "assets": [],
+        "source_excerpt": "subgraph cp[\"Production control plane\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The dispatch database contents are confidential because they include crew names, crew mobile numbers, and job orders.",
+        "element_id": "store:dispatch-database-job-orders-crew-names-crew-mobile-numbers",
+        "attribute": "data_classification",
+        "basis": "The diagram names the stored contents as job orders, crew names, and crew mobile numbers."
+      },
+      {
+        "assumption": "The Corporate network is a network trust boundary.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Corporate network."
+      },
+      {
+        "assumption": "The Production control plane is a privilege trust boundary.",
+        "element_id": "boundary:production-control-plane",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Production control plane."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

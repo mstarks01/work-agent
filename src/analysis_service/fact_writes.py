@@ -16,6 +16,7 @@ it, so it admits only what the writer then accepts.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Literal, get_args
 
 from pydantic import ValidationError
 
@@ -31,8 +32,9 @@ from analysis_service.assertions import (
     answered,
     assertion_id,
     projected_attribute,
+    subjects_of,
 )
-from analysis_service.capabilities import CAPABILITIES, lineage
+from analysis_service.capabilities import lineage, parse_capability_key
 from analysis_service.fact_answers import (
     FactAnswer,
     answer_facets,
@@ -44,8 +46,12 @@ from analysis_service.fact_answers import (
     key_ref,
     merged_facts,
 )
-from analysis_service.open_facts import open_attribute, prepared_model
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.open_facts import (
+    open_attribute,
+    prepared_model,
+    stated_capability,
+)
+from analysis_service.question_kinds import parse_question_kind
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
     CapabilityStatement,
@@ -65,7 +71,8 @@ __all__ = [
 
 #: The fields a flow's ID is built from. An answer cannot move one, because the
 #: flow would then carry an ID its endpoints no longer derive.
-_ENDPOINTS = frozenset({"source", "destination"})
+EndpointField = Literal["source", "destination"]
+_ENDPOINTS: frozenset[EndpointField] = frozenset(get_args(EndpointField))
 
 
 class LineageConflict(ValueError):
@@ -115,16 +122,15 @@ def check_fact_answers(
     prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
     settled_before = {answer.key: answer for answer in earlier if answer.known}
-    stated = prepared.capability_facts()
     for at, answer in enumerate(answers):
         ref = key_ref(answer.key)
         element_id, attribute, assertion = ref.element_id, ref.attribute, ref.assertion
         question, capability = ref.question, ref.capability
-        if len(ref.spellings) != 1:
+        if not ref.sound:
             raise ValueError(f"facts[{at}]: a key names one fact, in one spelling")
         kind = answer.kind
         if kind == "question":
-            if question not in QUESTION_KINDS or model.get(element_id) is None:
+            if parse_question_kind(question) is None or model.get(element_id) is None:
                 raise ValueError(
                     f"facts[{at}]: no question of that kind on that element"
                 )
@@ -148,13 +154,10 @@ def check_fact_answers(
         ):
             raise ValueError(f"facts[{at}]: no open assertion row by that ID")
         elif kind == "capability":
-            if capability not in CAPABILITIES:
+            if parse_capability_key(capability) is None:
                 raise ValueError(f"facts[{at}]: no capability by that name")
-            known = stated.get(capability)
-            if (
-                answer.key not in answered_before
-                and known is not None
-                and known.state != UNKNOWN
+            if answer.key not in answered_before and stated_capability(
+                prepared, capability
             ):
                 raise ValueError(
                     f"the sources state {capability!r}, so it takes no answer"
@@ -226,7 +229,7 @@ def _check_capability_lineage(
         return
     held = answered_model(prepared, merged_facts(earlier, answers)).capability_facts()
     for key, fact in held.items():
-        if fact.state != "present" or key not in CAPABILITIES:
+        if fact.state != "present" or parse_capability_key(key) is None:
             continue
         for ancestor in lineage(key):
             absent = ancestor in held and held[ancestor].state == "absent"
@@ -447,11 +450,17 @@ def fact_rows(
             }
         )
     entries = [
-        replaced.get(assertion_id(entry), entry)
-        for entry in catalog.entries
-        if assertion_id(entry) not in superseded
+        *(
+            replaced.get(assertion_id(entry), entry)
+            for entry in catalog.entries
+            if assertion_id(entry) not in superseded
+        ),
+        *written.values(),
     ]
+    labels = {subject.id: subject for subject in catalog.subjects}
     return (
-        catalog.model_copy(update={"entries": [*entries, *written.values()]}),
+        catalog.model_copy(
+            update={"subjects": subjects_of(entries, labels), "entries": entries}
+        ),
         issues,
     )

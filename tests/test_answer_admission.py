@@ -18,7 +18,7 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.answer_forms import answer_choices, answer_limit
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.capabilities import lineage
@@ -222,6 +222,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             checkpoint.assertions.catalog,
             {"stride": {}},
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(),
             final=False,
@@ -242,6 +243,8 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         client, store = catalog_client()
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        # Each element of the model takes a hue for its tag.
+        assert body["element_hues"]
         served = {
             tuple(question["key"])
             for question in (
@@ -311,6 +314,7 @@ def asked_of(catalog, *, waiting):
         catalog,
         {"stride": {}},
         [],
+        asks=True,
         waiting=waiting,
         answered=AnswerSet(),
         final=False,
@@ -326,7 +330,7 @@ def admit(questions, links=(), facts=(), save=False, skips=(), presented=None):
     return questions.admit(
         sources=[],
         earlier=NO_ANSWERS,
-        given=AnswerSet(links=tuple(links), facts=tuple(facts)),
+        given=SentAnswers(links=tuple(links), facts=tuple(facts)),
         save=save,
         skips=skips,
         presented=presented,
@@ -358,6 +362,7 @@ def _asked_after(answered, *, waiting=True, final=False, shown=(), skipped=()):
         checkpoint.assertions.catalog,
         {"stride": {}},
         [],
+        asks=True,
         waiting=waiting,
         answered=AnswerSet(facts=tuple(answered)),
         final=final,
@@ -623,13 +628,13 @@ class TestTheAdaptiveList:
 
     def test_a_stop_says_whether_the_limits_held_questions_back(self):
         asked = _asked_after([])
-        assert asked.stop is None
+        assert asked.empty_list_reason is None
         ended = replace(asked, early=(), links=(), held_back=(), below_floor=())
-        assert ended.stop == "nothing-left"
+        assert ended.empty_list_reason == "nothing-left"
         low = replace(ended, below_floor=asked.early[:2])
-        assert low.stop == "below-floor"
+        assert low.empty_list_reason == "below-floor"
         held_back = replace(low, held_back=asked.early[:3])
-        assert held_back.stop == "budget-exhausted"
+        assert held_back.empty_list_reason == "budget-exhausted"
         assert held_back.to_json()["early_stop"] == "budget-exhausted"
         assert len(held_back.to_json()["early_held_back"]) == 3
         assert {row["reason"] for row in held_back.to_json()["early_held_back"]} == {
@@ -654,7 +659,9 @@ class TestTheAdaptiveList:
             answered = merged_facts(answered, given)
         assert not asked.early
         assert asked.links, "a control: the link questions still stand"
-        assert asked.stop is None, "a job that still asks a link has not stopped"
+        assert asked.empty_list_reason is None, (
+            "a job that still asks a link has not stopped"
+        )
 
     def test_a_save_must_answer_something_and_a_final_report_saves_nothing(
         self,
@@ -702,7 +709,7 @@ class TestTheAdaptiveList:
         else:
             pytest.fail("the list never ended")
         # Every answer was "I don't know", so the questions under the floor
-        # are what is left, and the stop says so.
+        # are what is left, and the empty-list reason says so.
         assert body["early_stop"] == "below-floor"
         assert body["early_below_floor"] and not body["early_held_back"]
 
@@ -903,7 +910,7 @@ class TestTakingAnAnswerBack:
         admitted = _asked_after(earlier).admit(
             sources=[],
             earlier=AnswerSet(facts=tuple(earlier)),
-            given=AnswerSet(facts=(back,)),
+            given=SentAnswers(facts=(back,)),
             save=True,
         )
         assert admitted.answers.facts == (back,)
@@ -940,7 +947,9 @@ class TestTakingAnAnswerBack:
             finished.admit(
                 sources=[],
                 earlier=AnswerSet(facts=tuple(earlier)),
-                given=AnswerSet(facts=(FactAnswer(key=question.key, value="unknown"),)),
+                given=SentAnswers(
+                    facts=(FactAnswer(key=question.key, value="unknown"),)
+                ),
             )
 
 
@@ -1246,6 +1255,7 @@ def _listed(answers=()):
         None,
         LEVEL_2,
         [],
+        asks=True,
         waiting=True,
         answered=AnswerSet(facts=tuple(answers)),
         final=False,
@@ -1389,6 +1399,7 @@ class TestTheFrameworksTakeTurns:
             None,
             frameworks,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(),
             final=False,
@@ -1397,12 +1408,12 @@ class TestTheFrameworksTakeTurns:
 
     def test_the_first_choices_serve_every_selected_framework(self):
         shown = self.list_of(BOTH)
-        first, spent = [], 0
+        first, choices = [], 0
         for question in shown:
-            if spent >= 10:
+            if choices >= 10:
                 break
             first.append(question)
-            spent += question.decisions
+            choices += question.decisions
         assert {name for q in first for name in q.frameworks} == set(BOTH)
 
     def test_a_part_still_follows_its_parent(self):
@@ -1434,6 +1445,7 @@ class TestTheFrameworksTakeTurns:
             None,
             BOTH,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=(FactAnswer(key=first.key, value="yes"),)),
             final=False,

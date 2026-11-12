@@ -1,0 +1,548 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "browser",
+        "description": "A browser initiating a page request.",
+        "assets": [],
+        "source_excerpt": "n0[\"browser\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "The web application receiving page requests and enqueuing jobs.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1(\"web application\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "A background worker process consuming jobs and reading and writing database records.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"background worker process\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "Configuration for the web application.",
+        "assets": [],
+        "source_excerpt": "n5[(\"web application config\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "A queue holding jobs.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3[(\"message queue\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "A database holding records.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4[(\"database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "Configuration for the background worker process.",
+        "assets": [],
+        "source_excerpt": "n6[(\"worker config\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>page-request-http-s",
+        "name": "page request (HTTP/S)",
+        "description": "A page request from the browser to the web application.",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"page request (HTTP/S)\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "page request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>enqueue-job",
+        "name": "enqueue job",
+        "description": "The web application enqueues a job in the message queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1 -->|\"enqueue job\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:message-queue>consume-job",
+        "name": "consume job",
+        "description": "The background worker process consumes a job from the message queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"consume job\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>read-write-records",
+        "name": "read write records",
+        "description": "The background worker process reads and writes records in the database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"read write records\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "records",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-application>store:web-application-config>read-configuration",
+        "name": "read configuration",
+        "description": "The web application reads configuration from web application config.",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"read configuration\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "configuration",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:worker-config>read-configuration",
+        "name": "read configuration",
+        "description": "The background worker process reads configuration from worker config.",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"read configuration\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "configuration",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone: public internet.",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:web-tier",
+        "name": "web tier",
+        "description": "Trust zone: web tier.",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: web tier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "backend tier",
+        "description": "Trust zone: backend tier.",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: backend tier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The browser is an external system outside the system's control.",
+        "element_id": "entity:browser",
+        "attribute": "kind",
+        "basis": "The browser is shown as the initiating node in the public internet trust zone and is not part of the web, backend, or storage components."
+      },
+      {
+        "assumption": "The web application is internet-facing.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "A browser in the public internet trust zone sends a page request directly to the web application."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "browser",
+        "description": "A browser initiating a page request.",
+        "assets": [],
+        "source_excerpt": "n0[\"browser\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "The web application receiving page requests and enqueuing jobs.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1(\"web application\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "A background worker process consuming jobs and reading and writing database records.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"background worker process\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "Configuration for the web application.",
+        "assets": [],
+        "source_excerpt": "n5[(\"web application config\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "A queue holding jobs.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3[(\"message queue\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "A database holding records.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4[(\"database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "Configuration for the background worker process.",
+        "assets": [],
+        "source_excerpt": "n6[(\"worker config\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>page-request-http-s",
+        "name": "page request (HTTP/S)",
+        "description": "A page request from the browser to the web application.",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"page request (HTTP/S)\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "page request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>enqueue-job",
+        "name": "enqueue job",
+        "description": "The web application enqueues a job in the message queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1 -->|\"enqueue job\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:message-queue>consume-job",
+        "name": "consume job",
+        "description": "The background worker process consumes a job from the message queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"consume job\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>read-write-records",
+        "name": "read write records",
+        "description": "The background worker process reads and writes records in the database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"read write records\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "records",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-application>store:web-application-config>read-configuration",
+        "name": "read configuration",
+        "description": "The web application reads configuration from web application config.",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"read configuration\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "configuration",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:worker-config>read-configuration",
+        "name": "read configuration",
+        "description": "The background worker process reads configuration from worker config.",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"read configuration\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "configuration",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone: public internet.",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:web-tier",
+        "name": "web tier",
+        "description": "Trust zone: web tier.",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: web tier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "backend tier",
+        "description": "Trust zone: backend tier.",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: backend tier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The browser is an external system outside the system's control.",
+        "element_id": "entity:browser",
+        "attribute": "kind",
+        "basis": "The browser is shown as the initiating node in the public internet trust zone and is not part of the web, backend, or storage components."
+      },
+      {
+        "assumption": "The web application is internet-facing.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "A browser in the public internet trust zone sends a page request directly to the web application."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

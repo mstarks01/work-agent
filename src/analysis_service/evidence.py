@@ -104,6 +104,7 @@ from analysis_service.claims import (
     Claim,
     DroppedClaim,
     Ground,
+    GroundKind,
     InvalidProposal,
     Proposal,
     UnknownClaimIdentity,
@@ -233,16 +234,17 @@ def evidence_catalog(
     rule 4 says a crossing the model could not decide establishes nothing — not
     that a crossing occurred, not that a control is missing. It confers
     eligibility for analysis, which the crossing block and the candidate rules
-    already carry. The zones behind it are unstated on their own elements, so
-    each publishes its own ``unknown`` entry above and the fact a reader needs
-    is offered there, in the words that say it is a question.
+    already carry. Each unplaced endpoint publishes an ``unknown`` entry for
+    its ``trust_zone`` above, and the fact a reader needs is offered there, in
+    the words that say it is a question.
 
     A third enumeration follows where the job carried an assertion pass:
     every row :func:`~analysis_service.assertions.offered` returns — settled,
     and not already carried by the attribute its projection wrote — in the
-    catalog's own order. ``None`` is a job that ran no such pass, and it is the same catalog
-    as before the layer existed; an empty catalog is a pass that settled
-    nothing, which offers the same rows and says so on the report.
+    catalog's own order. ``None`` is a job that ran no such pass, and its
+    catalog holds only the first two enumerations; an empty catalog is a pass
+    that settled nothing, which offers the same rows and says so on the
+    report.
 
     Only the *type-specific* attributes are eligible
     (:func:`~analysis_service.system_model.attribute_names`). ``notes`` holding
@@ -287,8 +289,8 @@ def evidence_catalog(
         # it reaches no graph field: the one class of fact that no other offer
         # reaches, because the attribute enumeration above walks elements
         # and this row's subject may be a principal.
-        # A row in a conflict is a question too, and one with no graph field
-        # reaches a lane nowhere else: the model shows a disputed attribute as
+        # A row in a conflict is a question too, and this offer carries one
+        # with no graph field to a lane: the model shows a disputed attribute as
         # a qualified unknown, but a principal's second factor has no
         # attribute to qualify.
         open_rows = (
@@ -770,13 +772,13 @@ def _reviewed(row: Assertion) -> str:
 #: raises here, where a branch would let it fall through to the attribute
 #: sentence below and gloss a resolved row as an unstated attribute.
 #: ``tests/test_evidence.py`` compares the keys against the set.
-ASSERTION_GLOSSES: Mapping[str, Callable[[Assertion, Mapping[str, Subject]], str]] = (
-    MappingProxyType(
-        {
-            "assertion": _assertion_gloss,
-            "unknown-assertion": _open_question_gloss,
-        }
-    )
+ASSERTION_GLOSSES: Mapping[
+    GroundKind, Callable[[Assertion, Mapping[str, Subject]], str]
+] = MappingProxyType(
+    {
+        "assertion": _assertion_gloss,
+        "unknown-assertion": _open_question_gloss,
+    }
 )
 
 
@@ -809,10 +811,10 @@ def _grounds_of(
     Quotes first, then evidence, then absences, and the order is fixed rather
     than incidental: :class:`~analysis_service.claims.UnverifiedGround` marks a
     quote by its *index* into the finished list, so a reader following a mark
-    back to the quote it is about depends on this being the one place the order
-    is set. The fan-in's scope check later removes the grounds about none of a
-    claim's elements, keeping the order of the rest, and it runs before the
-    quote check takes any mark. Quotes lead because they are the submitter's
+    back to the quote it is about depends on the order this sets. The fan-in's
+    scope check later removes the grounds about none of a claim's elements,
+    keeping the order of the rest, and it runs before the quote check takes
+    any mark. Quotes lead because they are the submitter's
     own words, which is what a reader looks for first.
 
     A ref is stripped of surrounding whitespace before lookup — which spelling
@@ -895,10 +897,9 @@ def resolve_proposals(
     package could break. Three things are the service's here and none of them is
     a judgement: the grounds, the claim ID, and the lane.
 
-    The catalog is the sole source of truth for evidence: a resolved ground is
-    the entry itself, so it carries the branch and the fields that branch
-    requires, and the claim this returns cannot be mis-shaped whatever an agent
-    emitted.
+    A resolved ground is its catalog entry itself, so it carries the branch and
+    the fields that branch requires, and the claim this returns cannot be
+    mis-shaped whatever an agent emitted.
 
     ``lane`` is the lane being resolved, and it arrives as an argument because
     that is where the fact lives — the graph builds one node per

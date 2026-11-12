@@ -66,7 +66,7 @@ ActionVerb = Literal[
 ]
 
 #: The same set at runtime, derived from the type rather than spelled twice.
-ACTION_VERBS: frozenset[str] = frozenset(get_args(ActionVerb))
+ACTION_VERBS: frozenset[ActionVerb] = frozenset(get_args(ActionVerb))
 
 #: The grouping a reader and a prompt use, keyed by the question each family
 #: answers. Nothing dispatches on a family — a family is a description of the

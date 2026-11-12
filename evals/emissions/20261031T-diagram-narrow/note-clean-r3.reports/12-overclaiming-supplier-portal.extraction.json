@@ -1,0 +1,598 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "supplier",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0[\"supplier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "category manager",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1[\"category manager\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:portal-vendor",
+        "name": "portal vendor",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2[\"portal vendor\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-portal",
+        "name": "supplier portal",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3(\"supplier portal\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "supplier master service",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"supplier master service\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:document-store",
+        "name": "document store",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5[(\"document store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n6[(\"landing bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "supplier database",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"supplier database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "name": "upload documents",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"upload documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:supplier",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "name": "review documents",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"review documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-portal>store:document-store>store-documents",
+        "name": "store documents",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"store documents\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-portal",
+        "destination": "store:document-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "name": "push nightly extract",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"push nightly extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:portal-vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "name": "load extract",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4 -->|\"load extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "extract",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "name": "write supplier records",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"write supplier records\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone: public internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone: corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "name": "vendor platform",
+        "description": "Trust zone: vendor platform",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: vendor platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-account",
+        "name": "cloud account",
+        "description": "Trust zone: cloud account",
+        "assets": [],
+        "source_excerpt": "subgraph z3[\"Trust zone: cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "other"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The supplier portal presents a web interface because it is named as a portal.",
+        "element_id": "process:supplier-portal",
+        "attribute": "interface_kind",
+        "basis": "The process is named \"supplier portal\" in the system diagram."
+      },
+      {
+        "assumption": "The supplier master service and supplier database hold business-critical operating records.",
+        "element_id": "process:supplier-master-service",
+        "attribute": "assets",
+        "basis": "The diagram states that the service writes supplier records."
+      },
+      {
+        "assumption": "The supplier database holds business-critical operating records.",
+        "element_id": "store:supplier-database",
+        "attribute": "assets",
+        "basis": "The diagram states that supplier records are written into the database."
+      },
+      {
+        "assumption": "The flow from the supplier master service to the supplier database carries business-critical operating records.",
+        "element_id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"write supplier records\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "supplier",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0[\"supplier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "category manager",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1[\"category manager\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:portal-vendor",
+        "name": "portal vendor",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2[\"portal vendor\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-portal",
+        "name": "supplier portal",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3(\"supplier portal\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "supplier master service",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"supplier master service\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:document-store",
+        "name": "document store",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5[(\"document store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n6[(\"landing bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "supplier database",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"supplier database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "name": "upload documents",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"upload documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:supplier",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "name": "review documents",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"review documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-portal>store:document-store>store-documents",
+        "name": "store documents",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"store documents\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-portal",
+        "destination": "store:document-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "name": "push nightly extract",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"push nightly extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:portal-vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "name": "load extract",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4 -->|\"load extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "extract",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "name": "write supplier records",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"write supplier records\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone: public internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone: corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "name": "vendor platform",
+        "description": "Trust zone: vendor platform",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: vendor platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-account",
+        "name": "cloud account",
+        "description": "Trust zone: cloud account",
+        "assets": [],
+        "source_excerpt": "subgraph z3[\"Trust zone: cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "other"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The supplier portal presents a web interface because it is named as a portal.",
+        "element_id": "process:supplier-portal",
+        "attribute": "interface_kind",
+        "basis": "The process is named \"supplier portal\" in the system diagram."
+      },
+      {
+        "assumption": "The supplier master service and supplier database hold business-critical operating records.",
+        "element_id": "process:supplier-master-service",
+        "attribute": "assets",
+        "basis": "The diagram states that the service writes supplier records."
+      },
+      {
+        "assumption": "The supplier database holds business-critical operating records.",
+        "element_id": "store:supplier-database",
+        "attribute": "assets",
+        "basis": "The diagram states that supplier records are written into the database."
+      },
+      {
+        "assumption": "The flow from the supplier master service to the supplier database carries business-critical operating records.",
+        "element_id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"write supplier records\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

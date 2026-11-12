@@ -240,6 +240,21 @@ class TestASaveThatPasses:
         assert "extreme" not in refused.text
         assert "THINKING" not in settings_text(tmp_path)
 
+    def test_more_evidence_than_one_control_holds_is_refused(self, tmp_path):
+        client, _ = app_on(tmp_path, hand_written())
+
+        refused = save(
+            client,
+            {
+                "resilience.max_control_evidence": "100",
+                "resilience.max_source_bytes": "10485760",
+            },
+        )
+
+        assert refused.status_code == 422, refused.text
+        assert "16,777,216 bytes of evidence" in refused.text
+        assert "MAX_CONTROL_EVIDENCE" not in settings_text(tmp_path)
+
     def test_a_level_on_a_model_that_takes_none_is_refused_on_its_row(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
 
@@ -535,6 +550,29 @@ class TestAStoreChange:
 
         assert saved.status_code == 200, saved.text
         assert stat.S_IMODE(database.stat().st_mode) == 0o600
+
+    def test_a_library_that_does_not_load_is_refused_as_a_broken_install(
+        self, tmp_path, monkeypatch
+    ):
+        """Each store converts a missing extra into its own refusal, so an
+        ImportError that reaches the check is a broken install."""
+        client, _ = app_on(tmp_path, hand_written())
+        before = settings_text(tmp_path)
+
+        def broken(env):
+            raise ImportError("cannot import name 'connect' from 'aiosqlite'")
+
+        monkeypatch.setattr(settings_save, "build_app_store", broken)
+        refused = save(client, {"resilience.timeout_ms": "5000"})
+
+        assert refused.status_code == 422, refused.text
+        (error,) = refused.json()["errors"]
+        assert error["message"] == (
+            "the store cannot load a library (cannot import name 'connect' from"
+            " 'aiosqlite'): install analysis-service again with the extra that"
+            " the store needs"
+        )
+        assert settings_text(tmp_path) == before
 
     @pytest.mark.parametrize(
         ("credentials", "message"),

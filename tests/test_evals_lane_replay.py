@@ -11,13 +11,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
 from analysis_service.frameworks import LANE_CLOSING_DOC, PACKAGES
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
 from analysis_service.graph import FrameworkNodes
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
@@ -30,6 +34,7 @@ from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS
+from evals.harness.run_record import loaded
 from evals.harness.scorer import score_case
 from evals.reference_facts import load_facts
 from tests import test_evals_run_grounds as grounds
@@ -43,6 +48,11 @@ PROMPT_LOADER = MarkdownLoader(REPO_ROOT / "prompts")
 def finished(out, case_id):
     """The artifact of a sweep whose one case finished."""
     return write_emission_sweep(out, "analysis", [case_id])
+
+
+def load_material(artifact, case_id):
+    """One case's captured lane material, as the command reads it."""
+    return lane_replay.material_at(lane_replay.lanes_file(artifact, case_id))
 
 
 def record_requests(monkeypatch) -> list[tuple[str, list]]:
@@ -73,7 +83,7 @@ def recorded(monkeypatch, case, tmp_path):  # noqa: F811
 
 def test_every_lane_request_is_rebuilt_byte_for_byte(recorded, case):  # noqa: F811
     out, seen = recorded
-    material = lane_replay.load_material(finished(out, case.id), case.id)
+    material = load_material(finished(out, case.id), case.id)
     sent = {instruction: contents for instruction, contents in seen}
 
     for lane in FrameworkNodes("stride").lanes:
@@ -88,7 +98,7 @@ def test_every_lane_request_is_rebuilt_byte_for_byte(recorded, case):  # noqa: F
 
 def test_a_replay_parses_the_answer_under_the_package_schema(recorded, case):  # noqa: F811
     out, _ = recorded
-    material = lane_replay.load_material(finished(out, case.id), case.id)
+    material = load_material(finished(out, case.id), case.id)
     asked: list[str] = []
 
     async def call(instruction, turn):
@@ -113,7 +123,7 @@ def test_a_replay_parses_the_answer_under_the_package_schema(recorded, case):  #
 
 def test_an_appended_part_follows_the_captured_turn(recorded, case):  # noqa: F811
     out, _ = recorded
-    material = lane_replay.load_material(finished(out, case.id), case.id)
+    material = load_material(finished(out, case.id), case.id)
     _, captured = asyncio.run(
         lane_replay.compose(
             material, "stride", "spoofing", PACKAGE_LOADER, PROMPT_LOADER
@@ -143,7 +153,7 @@ def test_an_appended_part_follows_the_captured_turn(recorded, case):  # noqa: F8
 
 def test_an_answer_outside_the_schema_is_refused(recorded, case):  # noqa: F811
     out, _ = recorded
-    material = lane_replay.load_material(finished(out, case.id), case.id)
+    material = load_material(finished(out, case.id), case.id)
 
     async def call(instruction, turn):
         return json.dumps({"threats": []})
@@ -167,7 +177,7 @@ def test_a_finished_case_with_a_lost_lanes_file_is_refused(recorded, case):  # n
     case_file(out, case.id, "lanes").unlink()
 
     with pytest.raises(EvalRunError, match="holds no lanes file"):
-        lane_replay.load_material(finished(out, case.id), case.id)
+        load_material(finished(out, case.id), case.id)
 
 
 def test_a_failed_case_is_refused_and_its_stale_file_is_not_read(recorded, case):  # noqa: F811
@@ -176,17 +186,17 @@ def test_a_failed_case_is_refused_and_its_stale_file_is_not_read(recorded, case)
     failed = write_emission_sweep(out, "analysis", [case.id], failed=[case.id])
 
     with pytest.raises(EvalRunError, match="an earlier sweep wrote it"):
-        lane_replay.load_material(failed, case.id)
+        load_material(failed, case.id)
     case_file(out, case.id, "lanes").unlink()
     with pytest.raises(EvalRunError, match="wrote no lane material"):
-        lane_replay.load_material(failed, case.id)
+        load_material(failed, case.id)
 
 
 def test_a_case_the_artifact_does_not_list_is_refused(recorded, case):  # noqa: F811
     out, _ = recorded
 
     with pytest.raises(EvalRunError, match="does not list the case"):
-        lane_replay.load_material(finished(out, "02-other"), case.id)
+        load_material(finished(out, "02-other"), case.id)
 
 
 def test_the_command_refuses_a_failed_case_before_the_call(
@@ -218,6 +228,103 @@ def test_the_command_refuses_a_failed_case_before_the_call(
     assert "an earlier sweep wrote it" in capsys.readouterr().err
 
 
+def test_the_out_file_starts_with_the_record_of_the_lane_material(
+    recorded,
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
+    """A replay's proposals name the sweep files they were rebuilt from (#2029),
+    and each prompt and package file the lane's request was built from."""
+    out, _ = recorded
+    finished(out, case.id)
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return json.dumps({"claims": []})
+
+        return call
+
+    monkeypatch.setattr(lane_replay, "node_call", scripted)
+    monkeypatch.setattr(lane_replay.Deployment, "from_env", lambda: None)
+    written = tmp_path / "proposals.json"
+    args = argparse.Namespace(
+        artifact=out,
+        case=case.id,
+        lane="spoofing",
+        framework="stride",
+        accept_cost="unknown",
+        append=None,
+        fresh_leads=False,
+        prepare_today=None,
+        out=written,
+    )
+
+    assert lane_replay.command_lane_replay(args) == 0
+
+    held = json.loads(written.read_text(encoding="utf-8"))
+    assert next(iter(held)) == "record"
+    assert held["claims"] == []
+    assert held["record"]["table"]["lane"] == "spoofing"
+    digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
+    files = [
+        loader.root / f"{name}.md"
+        for loader in (PACKAGE_LOADER, PROMPT_LOADER)
+        for name in loader.names()
+    ]
+    assert digests.keys() == {
+        str(out),
+        str(case_file(out, case.id, "lanes")),
+        *map(str, files),
+    }
+    assert all(
+        digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in files
+    )
+
+
+def test_a_replay_of_todays_prepare_names_each_file_it_loaded(
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
+    """With no sweep, the record names each prompt, package and Domain Pack file
+    the lane's request was built from, with its digest."""
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return json.dumps({"claims": []})
+
+        return call
+
+    monkeypatch.setattr(lane_replay, "node_call", scripted)
+    monkeypatch.setattr(lane_replay.Deployment, "from_env", lambda: None)
+    written = tmp_path / "proposals.json"
+    args = argparse.Namespace(
+        artifact=None,
+        case=case.id,
+        lane="spoofing",
+        framework="stride",
+        accept_cost="unknown",
+        append=None,
+        fresh_leads=False,
+        prepare_today="none",
+        out=written,
+    )
+
+    assert lane_replay.command_lane_replay(args) == 0
+
+    held = json.loads(written.read_text(encoding="utf-8"))
+    digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
+    domains = MarkdownLoader(REPO_ROOT / "domains")
+    named = loaded((PACKAGE_LOADER, PROMPT_LOADER, domains))
+    assert digests.keys() == set(map(str, named))
+    assert all(
+        digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in named
+    )
+
+
 def test_material_without_the_user_turn_is_refused(tmp_path):
     out = tmp_path / "artifact.json"
     reports_dir(out).mkdir()
@@ -226,9 +333,7 @@ def test_material_without_the_user_turn_is_refused(tmp_path):
     )
 
     with pytest.raises(EvalRunError, match="no user turn"):
-        lane_replay.load_material(
-            finished(out, "01-payments-checkout"), "01-payments-checkout"
-        )
+        load_material(finished(out, "01-payments-checkout"), "01-payments-checkout")
 
 
 def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():
@@ -239,7 +344,7 @@ def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():
 def test_the_fidelity_check_fails_on_material_the_lane_never_had(recorded, case):  # noqa: F811
     """The control for the byte-for-byte test: a changed lead is a new request."""
     out, seen = recorded
-    material = lane_replay.load_material(finished(out, case.id), case.id)
+    material = load_material(finished(out, case.id), case.id)
     material["lanes"]["stride"]["spoofing"]["candidates"] = "a lead nobody wrote"
 
     instruction, _ = asyncio.run(
@@ -291,7 +396,7 @@ def test_the_closing_table_answers_for_every_package():
 def test_fresh_leads_on_todays_run_are_the_leads_it_captured(recorded, case):  # noqa: F811
     """One reader: rebuilt with today's code, every lane's inputs are the captured ones."""
     out, _ = recorded
-    material = lane_replay.load_material(finished(out, case.id), case.id)
+    material = load_material(finished(out, case.id), case.id)
 
     for lane in FrameworkNodes("stride").lanes:
         rebuilt = lane_replay.fresh_leads(
@@ -365,9 +470,7 @@ def test_todays_prepare_without_a_catalog_is_what_a_run_captured(recorded, case)
 
     prepared = lane_replay.prepare_today(case, "stride", "none")
 
-    assert prepared.material == lane_replay.load_material(
-        finished(out, case.id), case.id
-    )
+    assert prepared.material == load_material(finished(out, case.id), case.id)
 
 
 def test_the_signed_arm_changes_only_what_the_catalog_reaches(case):  # noqa: F811
@@ -400,7 +503,9 @@ def test_each_lane_scores_the_must_finds_the_run_drafts_match(recorded, case):  
     by_lane = {
         index
         for lane, batch in proposals["stride"].items()
-        for index in lane_must_finds(case, prepared.state, lane, batch)
+        for index in lane_must_finds(
+            case, prepared.state, lane, ArchivedThreatProposals.model_validate(batch)
+        )
     }
     whole = {
         pair.reference_index

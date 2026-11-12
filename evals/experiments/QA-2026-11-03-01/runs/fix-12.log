@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Supplier paperwork may be intercepted on the unverified public-to-vendor upload path | ['flow:entity:supplier>process:supplier-portal>upload-documents', 'entity:supplier', 'process:supplier-portal']
+- Category-manager document reviews may be exposed on an unverified cross-zone connection | ['flow:entity:category-manager>process:supplier-portal>review-documents', 'entity:category-manager', 'process:supplier-portal']
+- Uploaded documents may be visible on the unverified portal-to-document-store hop | ['flow:process:supplier-portal>store:document-store>store-documents', 'process:supplier-portal', 'store:document-store']
+- Nightly supplier extracts may be intercepted between the vendor platform and landing bucket | ['flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'entity:portal-vendor', 'store:landing-bucket']
+- Supplier-master retrieval from the landing bucket may expose the nightly extract in transit | ['flow:process:supplier-master-service>store:landing-bucket>load-extract', 'process:supplier-master-service', 'store:landing-bucket']
+- Supplier records may be exposed on the unverified service-to-database write path | ['flow:process:supplier-master-service>store:supplier-database>write-supplier-records', 'process:supplier-master-service', 'store:supplier-database']
+- A copied document-store artifact could disclose supplier documents if at-rest encryption is absent | ['store:document-store']
+- A copied landing-bucket artifact could disclose the nightly extract if at-rest encryption is absent | ['store:landing-bucket']
+- A copied supplier-database artifact could disclose supplier records if at-rest encryption is absent | ['store:supplier-database']
+- Code running in the supplier master service can read the entire landing extract through its existing access | ['process:supplier-master-service', 'flow:process:supplier-master-service>store:landing-bucket>load-extract', 'store:landing-bucket']
+spent: $0.0556 reported
+must-finds matched: []

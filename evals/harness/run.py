@@ -42,6 +42,7 @@ import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -91,6 +92,7 @@ from evals.harness import (
     promotion,
     question_prior,
     queue,
+    recritic_replay,
     replay,
     roster,
     rule_applicability,
@@ -108,6 +110,7 @@ from evals.harness.artifact import (
     ScoredAgainst,
     corpus_digest,
     load_artifact,
+    rendered_sources,
     repo_commit,
 )
 from evals.harness.artifact import build as build_artifact
@@ -137,6 +140,7 @@ from evals.harness.calibration import (
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
 from evals.harness.critic_yield import CriticYield, score_case_with_yield
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.grounds import (
     CAUGHT,
     CaseGrounds,
@@ -167,13 +171,13 @@ from evals.harness.reference import (
     CorpusError,
     GoldenCase,
     corpus_argument,
-    corpus_refusal,
     development_cases,
     diagnosable,
     flows_by_case,
     load_corpus,
 )
-from evals.harness.scorer import CaseScore
+from evals.harness.run_record import run_record, sweep_inputs
+from evals.harness.scorer import CaseScore, review_coverage
 from evals.harness.stability import (
     Band,
     CaseStability,
@@ -276,7 +280,7 @@ def _batches(items: Sequence[_T], size: int) -> list[list[_T]]:
 
 async def _run_mode(
     cases: Sequence[GoldenCase],
-    mode: str,
+    mode: modes.SweepMode,
     deployment: Deployment,
     only: Sequence[FrameworkName],
     accepted: float | None,
@@ -491,8 +495,8 @@ async def _run_mode(
             )
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             # A refused model and a provider fault arrive the same way here and
-            # are told apart by :data:`MEASURED` in the fold, which is the one
-            # reader of that question.
+            # are told apart by :data:`MEASURED` in the fold, which answers that
+            # question.
             return _CaseOutcome(case=case, error=error)
         return _CaseOutcome(
             case=case,
@@ -544,15 +548,16 @@ async def _run_mode(
         if outcome.extraction is not None:
             extractions.append(outcome.extraction)
             payloads.append(outcome.extraction.to_json())
-            # The citation half is scored, not failed. It fires when the model
-            # quotes a source wrongly, which production hands to ``repair`` and
-            # this mode stops before; ``score.uncited`` carries every one into
-            # the artifact. Everything else is still a malformed model.
+            # The citation and diagram rules are scored, not failed. They fire
+            # when the model quotes a source wrongly or leaves out a node or an
+            # edge of a diagram, which production hands to ``repair`` and this
+            # mode stops before; ``score.uncited`` carries every citation issue
+            # into the artifact. Everything else is still a malformed model.
             failures.extend(
                 f"{case.id}: extraction is not a valid system model:"
                 f" {issue.code}: {issue.message}"
                 for issue in outcome.issues
-                if not issue.is_citation
+                if not (issue.is_citation or issue.is_diagram)
             )
             return False
         run = outcome.run
@@ -743,7 +748,7 @@ def _scored_sweep(
     runs: dict[str, modes.AnalysisRun],
     votes: ledger.Ledger,
     table: roster.Roster,
-) -> dict[str, Sweep]:
+) -> dict[standings.Series, Sweep]:
     """Every reading that needs the vote ledger, folded onto ``sweep``.
 
     One spelling for the two commands that compute these numbers: ``run``,
@@ -786,7 +791,7 @@ def _scored_sweep(
     matcher = SubsetVerbIdentity(flow_maps)
     reports = {case: run.report for case, run in runs.items()}
 
-    by_series = {}
+    by_series: dict[standings.Series, Sweep] = {}
     for name, included in standings.SERIES.items():
         read = standings.narrow(votes, table, included)
         scores, yields, charged = _score_runs(cases, runs, matcher, read, flow_maps)
@@ -814,7 +819,7 @@ def _scored_keys(sweep: Sweep) -> dict[str, Any]:
     return keys
 
 
-def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
+def _series_record(by_series: dict[standings.Series, Sweep]) -> dict[str, Any]:
     """Which standings each series reads, and the non-primary series' numbers.
 
     The primary series' blocks are the artifact's top-level scored keys and
@@ -836,7 +841,7 @@ def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
     }
 
 
-def _print_series(by_series: dict[str, Sweep]) -> None:
+def _print_series(by_series: dict[standings.Series, Sweep]) -> None:
     """Say which standings the printed numbers read, and what the others say."""
     included = ", ".join(standings.SERIES[standings.PRIMARY])
     print(f"\nThe scored numbers above read {included} votes only.")
@@ -891,8 +896,7 @@ def _pin_record(tiers: ModelTierConfig, selection: TierSelection) -> dict[str, A
     direct vendor is its own upstream and has no choice to record; the key is
     absent there, exactly as the served upstream is. An aggregator tier the
     deployment left unpinned records ``[]``, which says the gateway chose —
-    a different fact from a sweep taken before this was recorded, which
-    carries no key at all.
+    a different fact from a sweep that carries no key at all.
     """
     if selection.vendor_entry.routes_to_one_provider:
         return {}
@@ -1096,7 +1100,8 @@ def command_run(args: argparse.Namespace) -> int:
     # Before anything is spent. Both answers are free and the sweep is not, so
     # a repository that cannot say what it is about to run stops here rather
     # than 90 minutes later holding an artifact that cannot name its prompts.
-    commit, corpus = repo_commit(), corpus_digest()
+    commit, corpus = repo_commit(), corpus_digest(Path(args.corpus))
+    rendered = rendered_sources(cases)
     # One deployment for the whole sweep: the graph it runs and the manifest it
     # is certified against are then one configuration rather than two reads
     # that could disagree.
@@ -1156,8 +1161,8 @@ def command_run(args: argparse.Namespace) -> int:
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
 
-    # First the run-level instruments, then the scores: the split predates
-    # scoring being free and is kept because the two halves read differently —
+    # First the run-level instruments, then the scores: the two stay
+    # apart because the two halves read differently —
     # one is about the graph's behaviour, the other about its output.
     sweep = Sweep(run=mode_run)
     render_all(sweep, scored=False)
@@ -1165,14 +1170,15 @@ def command_run(args: argparse.Namespace) -> int:
     # A mode that produced no run has nothing to score, and ``Sweep`` already
     # defaults every scored field to empty — which is a sweep that measured
     # nothing rather than one whose numbers were all zero.
-    by_series: dict[str, Sweep] = {}
+    by_series: dict[standings.Series, Sweep] = {}
     if mode_run.runs:
         by_series = _scored_sweep(sweep, ran, mode_run.runs, votes, table)
         sweep = by_series[standings.PRIMARY]
-        unvoted = sum(score.unvoted_count for score in sweep.scores)
-        if unvoted:
+        coverage = [review_coverage(score.status_counts) for score in sweep.scores]
+        unanswered = sum(eligible - answered for answered, eligible in coverage)
+        if unanswered:
             print(
-                f"{unvoted} unlisted finding(s) have no vote; run"
+                f"{unanswered} unlisted finding(s) have no live vote; run"
                 " `python -m evals.harness.run review <artifact> --voter <you>`"
                 " to see them"
             )
@@ -1190,6 +1196,7 @@ def command_run(args: argparse.Namespace) -> int:
         trusted=trusted,
         commit=commit,
         corpus=corpus,
+        rendered=rendered,
         sweep=sweep,
         series=_series_record(by_series) if by_series else None,
     )
@@ -1283,8 +1290,8 @@ def _print_certification(result: CertifyResult) -> None:
     ``certified`` is narrow by design (see
     :mod:`analysis_service.certification`): it means no *observed* fingerprint
     went unblessed, which is vacuously true of a sweep that observed none.
-    Printing it alone is how a run that certified nothing came to announce that
-    every fingerprint was blessed, so completeness is reported first and the
+    Printed alone, it would announce that every fingerprint was blessed for a
+    run that certified nothing, so completeness is reported first and the
     green line requires both halves.
     """
     if not result.complete:
@@ -1583,9 +1590,22 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     ]
     verb_pricing.render(shipped, priced)
     if args.out is not None:
+        record = run_record(
+            "price-verbs",
+            {
+                "equivalent": args.equivalent,
+                "together": args.together,
+                "corpus_digest": corpus_digest(Path(args.corpus)),
+            },
+            {
+                Path(args.pairs): {},
+                **sweep_inputs([] if args.artifact is None else [Path(args.artifact)]),
+            },
+        )
         Path(args.out).write_text(
             json.dumps(
                 {
+                    "record": record,
                     "shipped": shipped.to_json(),
                     "candidates": [p.to_json() for p in priced],
                 },
@@ -1671,7 +1691,19 @@ def command_stability(args: argparse.Namespace) -> int:
     _print_stability(runs, stability)
     _print_band(measured, bool(args.row))
     if args.out:
+        record = run_record(
+            "stability",
+            {"calibrate": args.calibrate, "rows": args.row},
+            {
+                Path(path): {}
+                for path in (
+                    *args.artifact,
+                    *(p for paths in args.calibrate for p in paths),
+                )
+            },
+        )
         report = {
+            "record": record,
             "runs": [
                 {"artifact": run.label, "mode": run.mode, "models": run.models}
                 for run in runs
@@ -1711,7 +1743,13 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
     warnings = extraction_losses.warnings_for(end_to_end, analysis)
     extraction_losses.render(rows, warnings)
     if args.out:
+        record = run_record(
+            "extraction-losses",
+            {"corpus_digest": corpus_digest(Path(args.corpus))},
+            {**sweep_inputs([Path(args.end_to_end)]), Path(args.analysis): {}},
+        )
         report = {
+            "record": record,
             "runs": {
                 "end_to_end": {
                     "artifact": end_to_end.label,
@@ -1738,25 +1776,60 @@ def command_replay(args: argparse.Namespace) -> int:
     corpus_dir = Path(args.corpus)
     try:
         cases = load_corpus(corpus_dir)
+        named = named_arms(args.arm, args.artifact)
         sweeps = [
-            replay_artifact(Path(path), cases, corpus_dir) for path in args.artifact
+            replay_artifact(Path(path), cases, corpus_dir, named[path])
+            for path in args.artifact
         ]
     except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
         print(f"cannot replay: {error}", file=sys.stderr)
         return 1
     replay.render(sweeps, args.targets)
     if args.out:
-        commit = repo_commit()
-        report = replay.artifact(
-            sweeps, commit.commit, commit.clean, corpus_digest(corpus_dir)
+        record = run_record(
+            "replay",
+            {"targets": args.targets, "corpus_digest": corpus_digest(corpus_dir)},
+            sweep_inputs(map(Path, args.artifact)),
         )
+        report = replay.artifact(sweeps, record)
         Path(args.out).write_text(archive_bytes("artifact", report), encoding="utf-8")
         print(f"\nreplay written to {args.out}")
     return 0
 
 
+def named_arms(
+    entries: Sequence[str] | None, paths: Sequence[str]
+) -> dict[str, str | None]:
+    """The arm each ``--arm LABEL=GLOB`` names for each artifact, by its file name.
+
+    ``None`` for an artifact that no entry matches. A file that two labels
+    match, or an entry with no label or no glob, is refused: the caller's
+    grouping is the only record of what such a sweep read.
+    """
+    parsed = []
+    for entry in entries or ():
+        label, _, pattern = entry.partition("=")
+        if not label or not pattern:
+            raise ValueError(f"--arm {entry!r} is not LABEL=GLOB")
+        parsed.append((label, pattern))
+    named: dict[str, str | None] = {}
+    for path in paths:
+        labels = {
+            label for label, pattern in parsed if fnmatch(Path(path).name, pattern)
+        }
+        if len(labels) > 1:
+            raise ValueError(
+                f"{path}: --arm names it {sorted(labels)}; name one arm for it"
+            )
+        named[path] = next(iter(labels), None)
+    return named
+
+
 def replay_artifact(
-    path: Path, cases: Sequence[GoldenCase], corpus_dir: Path
+    path: Path,
+    cases: Sequence[GoldenCase],
+    corpus_dir: Path,
+    named: str | None,
 ) -> replay.SweepReplay:
     """One archived sweep, read through the loader and re-scored by its mode.
 
@@ -1779,7 +1852,7 @@ def replay_artifact(
         for case in present
         if not diagnosable(case)
     }
-    arm = replay.arm_of(loaded)
+    arm = replay.arm_of(loaded, named)
 
     def sweep(**graded: Any) -> replay.SweepReplay:
         return replay.SweepReplay(
@@ -1838,16 +1911,22 @@ def command_bind(args: argparse.Namespace) -> int:
             (path.name, listed_extractions(path, cases))
             for path in map(Path, args.graphs)
         ]
-        sweeps = [bind_artifact(Path(path), cases, graphs) for path in args.proposals]
+        named = named_arms(args.arm, args.proposals)
+        sweeps = [
+            bind_artifact(Path(path), cases, graphs, named[path])
+            for path in args.proposals
+        ]
     except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
         print(f"cannot bind: {error}", file=sys.stderr)
         return 1
     replay.render_bindings(sweeps, args.targets)
     if args.out:
-        commit = repo_commit()
-        report = replay.binding_artifact(
-            sweeps, commit.commit, commit.clean, corpus_digest(corpus_dir)
+        record = run_record(
+            "bind",
+            {"targets": args.targets, "corpus_digest": corpus_digest(corpus_dir)},
+            sweep_inputs(map(Path, [*args.proposals, *args.graphs])),
         )
+        report = replay.binding_artifact(sweeps, record)
         Path(args.out).write_text(archive_bytes("artifact", report), encoding="utf-8")
         print(f"\nbindings written to {args.out}")
     return 0
@@ -1857,6 +1936,7 @@ def bind_artifact(
     path: Path,
     cases: Sequence[GoldenCase],
     graphs: Sequence[tuple[str, Mapping[str, modes.ExtractionResult]]],
+    named: str | None,
 ) -> replay.BindingSweep:
     """One archived assertion sweep against every archived graph of each case."""
     loaded = load_artifact(path)
@@ -1870,7 +1950,7 @@ def bind_artifact(
     proposed = assertions_from_reports(loaded, held)
     return replay.BindingSweep(
         artifact=path.name,
-        arm=replay.arm_of(loaded),
+        arm=replay.arm_of(loaded, named),
         bindings=tuple(
             replay.bind_assertions(case, proposed[case.id], extracted[case.id], name)
             for case in held
@@ -1940,8 +2020,13 @@ def _print_stability(
     )
 
     def held(kept: int | None, moved: int | None) -> str:
-        """``kept/compared``, or ``-`` where a run predates the record it needs."""
+        """``kept/compared``, or ``-`` where a run lacks the record it needs."""
         return "-" if kept is None or moved is None else f"{kept}/{kept + moved}"
+
+    def cause(entry: CaseStability) -> str:
+        """The cause cell: ``kept/compared``, then ``+unread`` where there is one."""
+        compared = held(entry.cause_stable, entry.cause_moving)
+        return f"{compared} +{entry.cause_unread}" if entry.cause_unread else compared
 
     for entry in stability:
         recalls = " ".join(f"{recall:.2f}" for recall in entry.recalls)
@@ -1949,7 +2034,7 @@ def _print_stability(
         print(
             f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
             f" {entry.recall_spread:8.2f} {always:>16} {entry.mean_jaccard:9.2f}"
-            f" {held(entry.cause_stable, entry.cause_moving):>10}"
+            f" {cause(entry):>10}"
             f" {held(entry.severity_held, entry.severity_moved):>10}"
             f" {held(entry.place_held, entry.place_moved):>10}"
         )
@@ -1963,9 +2048,10 @@ def _print_stability(
         " (instrument, non-gating)"
     )
     print(
-        "  the cause column is references every run missed that kept one cause;"
+        "  the cause column is references every run missed that kept one cause,"
+        " and +n is those a run charged unstated, which show no cause to compare;"
         " severity and place are references two or more runs matched that kept"
-        " one band and one resolved place; - means a run predates the record"
+        " one band and one resolved place; - means a run lacks the record"
     )
 
 
@@ -2106,7 +2192,17 @@ def command_calibrate(args: argparse.Namespace) -> int:
         f" {result.total} pairs (bar {AGREEMENT_BAR:.0%})"
     )
     if args.out:
-        payload = result.to_json() | {"corpus_merges": merges.to_json()}
+        record = run_record(
+            "calibrate",
+            {
+                "agreement_bar": AGREEMENT_BAR,
+                "corpus_digest": corpus_digest(Path(args.corpus)),
+            },
+            {DEFAULT_PAIRS_PATH: {}},
+        )
+        payload = (
+            {"record": record} | result.to_json() | {"corpus_merges": merges.to_json()}
+        )
         Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
     if result.meets_bar:
         return 0
@@ -2398,6 +2494,18 @@ def _bind_arguments(parser: argparse.ArgumentParser) -> None:
         "--targets", type=int, default=10, help="how many refused rows to list per arm"
     )
     parser.add_argument("--out", help="where to write the binding report")
+    _arm_argument(parser)
+
+
+def _arm_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--arm",
+        action="append",
+        metavar="LABEL=GLOB",
+        help="name the arm of each sweep whose file name GLOB matches, for a sweep"
+        " that records no rendered_sources block; such a sweep is otherwise its own"
+        " arm. Repeat for each arm. A sweep that records the block is placed by it",
+    )
 
 
 def _replay_arguments(parser: argparse.ArgumentParser) -> None:
@@ -2417,6 +2525,7 @@ def _replay_arguments(parser: argparse.ArgumentParser) -> None:
         "--targets", type=int, default=10, help="how many lost elements to list per arm"
     )
     parser.add_argument("--out", help="where to write the replay report")
+    _arm_argument(parser)
 
 
 def _stability_arguments(parser: argparse.ArgumentParser) -> None:
@@ -2658,8 +2767,8 @@ COMMANDS: dict[str, Command] = {
         arguments=early_answerers.arguments,
     ),
     "shared-answers": Command(
-        help="read how often one shared answer is wrong for a part its box"
-        " lists, against the corpus's blessed models (offline, no credentials)",
+        help="read how often one shared answer is wrong for an element its"
+        " box lists, against the corpus's blessed models (offline, no credentials)",
         run=shared_answers.command_shared_answers,
         arguments=shared_answers.arguments,
     ),
@@ -2687,6 +2796,12 @@ COMMANDS: dict[str, Command] = {
         " verdicts with the archived ones (#1091, one paid call)",
         run=critic_replay.command_critic_replay,
         arguments=critic_replay.arguments,
+    ),
+    "recritic-replay": Command(
+        help="send one critic re-ask over an archived first pass with one"
+        " injected fault, and check what it repaired (one paid call)",
+        run=recritic_replay.command_recritic_replay,
+        arguments=recritic_replay.arguments,
     ),
     "descendants": Command(
         help="run a sweep's fan-in again over its archived proposals, with"
@@ -2761,13 +2876,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             command.arguments(sub)
         sub.set_defaults(func=command.run)
     args = parser.parse_args(argv)
-    # Every command that reads the corpus refuses here, through the one
-    # sentence `webapp/sitting.py` and the offline page print: the error names
-    # the case and the field, and a traceback over it names neither.
+    # Each command refuses here in one line. A corpus that does not load and a
+    # configuration this process cannot run on go through `refuse_entry`, as
+    # in each other entry point: the error names the case and the field, or
+    # the file or the variable to fix, and a traceback over it names neither.
+    # A ProvenanceError is a sweep that a command cannot read. An
+    # EvalRunError names its own fault, such as a missing part of a sweep, an
+    # argument, a case or a pass that this deployment does not build.
     try:
         return args.func(args)
-    except CorpusError as exc:
-        print(corpus_refusal(exc), file=sys.stderr)
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
+    except ProvenanceError as exc:
+        print(f"cannot read the sweep: {exc}", file=sys.stderr)
+        return 1
+    except modes.EvalRunError as exc:
+        print(exc, file=sys.stderr)
         return 1
 
 

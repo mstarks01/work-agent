@@ -47,6 +47,7 @@ from analysis_service.critic import CriticOutputError
 from analysis_service.critic_round import CriticRound
 from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.frameworks import (
+    PACKAGES,
     PRECONDITION_RESULTS,
     PreconditionError,
     package_for,
@@ -99,7 +100,7 @@ from tests.test_compact import compact_fixture
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
 #: The selection every test here builds a graph for. A graph is built for one
-#: selection now, so a test asserting about "the nodes" has to say which.
+#: selection, so a test asserting about "the nodes" has to say which.
 FRAMEWORKS = DEFAULT_FRAMEWORKS
 NODES = graph.FrameworkNodes("stride")
 LANES = NODES.lanes
@@ -1399,7 +1400,7 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
 
 
 def test_revalidate_puts_every_uncited_element_back_and_records_it():
-    """#675 D01: the repair prompt asked for it; the gate now enforces it."""
+    """#675 D01: the repair prompt asks for it, and the gate enforces it."""
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
@@ -1547,11 +1548,11 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
 
     assert output["element_count"] == 7
     assert output["crossing_count"] == 1
-    # Four, not three, since a flow says what it does: the login flow's
-    # `operations` is `unknown`, and an unstated attribute is a fact an agent
-    # may ground a question on. Nothing about the catalog changed to allow that
-    # — `_attribute_entry` reads every type-specific field through
-    # `control_state`, so the new field is catalogued the day it lands.
+    # Four, because a flow says what it does: the login flow's `operations`
+    # is `unknown`, and an unstated attribute is a fact an agent may ground a
+    # question on. `_attribute_entry` reads every type-specific field through
+    # `control_state`, so the catalog holds each such field with no change of
+    # its own.
     assert output["evidence_count"] == 4
     assert (
         "flow:entity:customer>process:web-app>login"
@@ -1670,7 +1671,7 @@ def test_merge_joins_drafts_in_canonical_order():
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
     assert (
         event.output
-        == CriticRound.of("stride", valid_model(), drafts, marks, None).summary()
+        == CriticRound.of("stride", valid_model(), drafts, marks, None, ()).summary()
     )
     # Two drafts on quotes and derived facts are the critic's to rule.
     assert event.actions.route == graph.ROUTE_REVIEW
@@ -2095,7 +2096,12 @@ def test_the_re_ask_reads_one_view_of_a_draft_and_not_a_second():
     assert (
         dropped
         == critic._ruling_view(
-            [drafts[1]], repaired=(), unverified=(), assertions=None
+            [drafts[1]],
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )[0]
     )
 
@@ -2914,7 +2920,7 @@ def test_a_trigger_after_the_report_is_built_builds_it_no_second_time(domain_loa
 
     Two frameworks that finish before either of their triggers is scheduled both
     find every framework finished. The second one would compose the same blocks
-    from the same parked artifacts, so it spends the time and changes nothing;
+    from the same parked artifacts, so it takes the time and changes nothing;
     the written report is what says the pass already happened.
     """
     model = valid_model().model_dump(mode="json")
@@ -3029,6 +3035,8 @@ FRAMEWORK_KEY_WRITERS: tuple[tuple[str, dict[str, Any]], ...] = (
             # Unit -> why this job could not settle it. Empty for a package
             # that defers nothing, which is every package but ASVS.
             "deferred": {},
+            # Unit -> the kind a Control row kept it from ``deferred`` for.
+            "undeferred": {},
         },
     ),
     (
@@ -3531,6 +3539,42 @@ class TestTheFunctionNodesStayOffTheEventLoop:
         assert result == {"claims": 2}
         assert seen["state"] == {"a": 1}
 
+    def test_the_deadline_returns_the_token_while_the_thread_runs_on(self):
+        """The job deadline is an ``asyncio.timeout``. It ends the await at
+        once and returns the token; the body ends later, on its own."""
+        import asyncio
+        import threading
+
+        started = threading.Event()
+        release = threading.Event()
+        ended = threading.Event()
+
+        def body():
+            started.set()
+            release.wait(timeout=10)
+            ended.set()
+
+        node = graph._node(body, "some_node")
+
+        async def scenario():
+            try:
+                async with asyncio.timeout(10) as deadline:
+                    run = asyncio.ensure_future(node._func())
+                    await asyncio.to_thread(started.wait, 10)
+                    held_by_the_body = graph._NODE_THREADS.borrowed_tokens
+                    deadline.reschedule(0)
+                    await run
+            except TimeoutError:
+                pass
+            held_at_deadline = graph._NODE_THREADS.borrowed_tokens
+            ended_at_deadline = ended.is_set()
+            release.set()
+            await asyncio.to_thread(ended.wait, 10)
+            return held_by_the_body, held_at_deadline, ended_at_deadline
+
+        assert asyncio.run(scenario()) == (1, 0, False)
+        assert ended.is_set()
+
 
 class TestNoPromptWritesItsOwnFence:
     """A fence in a prompt file is only ever as long as itself.
@@ -3569,21 +3613,6 @@ class TestNoPromptWritesItsOwnFence:
 
         assert lines[0] == "````", "the body's backtick run sized the fence"
         assert lines[0] == lines[-1]
-
-    def test_no_prompt_file_writes_a_fence_around_a_placeholder(self):
-        """The lint. A fence written beside a ``{placeholder}`` is the shape
-        this class exists to keep out, whatever the value turns out to hold."""
-        import re
-
-        offenders = []
-        for path in sorted((PROJECT_ROOT / "prompts").glob("*.md")):
-            text = path.read_text(encoding="utf-8")
-            if re.search(r"`{3,}\s*\n\{[a-z_]+\}\s*\n`{3,}", text):
-                offenders.append(path.name)
-        assert not offenders, (
-            f"{offenders} fence a placeholder in the file. Interpolate the value"
-            " on its own line and let render_fenced size the fence over it."
-        )
 
 
 class TestTheReviseCount:
@@ -3797,3 +3826,57 @@ class TestThePerFrameworkRoles:
         """A role that named the same node as another would silently merge two."""
         named = [NODES.node(role) for role in graph.ROLES]
         assert len(set(named)) == len(graph.ROLES)
+
+
+def test_a_mark_on_a_returned_claim_leaves_the_block_with_it(domain_loader):
+    """A claim the critic kept against every Control row goes back to the
+    deferred set, and each mark on it goes with it (ADR 0126). A mark left on
+    the block would name a claim the block does not hold."""
+    from analysis_service.claims import UnverifiedGround
+    from tests.test_critic_controls import DB_CONTROL, _applied, _asvs_draft, _db, _row
+
+    asvs = graph.FrameworkNodes("asvs")
+    keys = graph.GraphKeys.of(("asvs",))
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**{graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 3}}})
+    graph.prepare_analysis(
+        model,
+        ctx,
+        keys,
+        ("asvs",),
+        domain_loader,
+        repo_package_loaders(("asvs",)),
+        assertions=False,
+    )
+    draft = _asvs_draft("V11.2.1", "store:orders-db")
+    refused = {"control": DB_CONTROL, "unit": "V11.2.1", "reason": "names no key"}
+    ctx.state[graph.STATE_APPLIED_CONTROLS] = [
+        control.model_dump(mode="json") for control in _applied(_db(_row("V11.2.1")))
+    ]
+    ctx.state[asvs.key("drafts")] = [draft.model_dump(mode="json")]
+    ctx.state[asvs.key("reviewed")] = {
+        "claims": [
+            {"id": draft.id, "verdict": {"reason": "", "refused_controls": [refused]}}
+        ]
+    }
+    ctx.state[asvs.key("marks")] = AnalysisMarks(
+        unverified_grounds=[UnverifiedGround(claim_id=draft.id, index=0, reason="x")]
+    ).model_dump(mode="json")
+    ctx.state[asvs.key("undeferred")] = {"V11.2.1": "config"}
+    ctx.state[asvs.key("accepted")] = True
+
+    graph.assemble_report(
+        model,
+        ctx,
+        keys,
+        ("asvs",),
+        {"asvs": BOTH_DISCLAIMERS["asvs"]},
+        domain_packs=None,
+    )
+
+    [block] = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS]).analyses
+    assert block.claims == []
+    assert [entry.claim_id for entry in block.returned_claims] == [draft.id]
+    assert block.unverified_grounds == []
+    [entry] = [entry for entry in block.scope if entry.unit == "V11.2.1"]
+    assert (entry.state, entry.needs) == ("needs-other-evidence", "config")

@@ -100,30 +100,77 @@ VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 # about the draft's *unit* (#659). ``evidence`` says the model's stated facts
 # settle that the draft's subject is not there — a framework that ruled a
 # requirement out of scope and one that rejected an attacker action on a stated
-# fact both answer it, and it rules on the unit. ``reasoning`` says the draft
-# asserts or infers what the model does not state, so the draft fails and the
-# unit stays open: a package answering in units lists it as ``not-raised``.
+# fact both answer it, and it rules on the unit. ``reasoning`` says the draft's
+# argument does not follow even if every open fact it depends on holds, so the
+# draft fails and the unit stays open: a package answering in units lists it
+# as ``not-raised``.
+# ``control`` is the third check: a row of an applied Control covers the
+# draft's unit, as the owner states it, and it rules on the unit (ADR 0126).
 # The vocabulary describes the check rather than what the check was about, so
 # it answers for a package nobody has written.
-RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate"]
+RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate", "control"]
+
+#: The steps whose rejection rules on the unit a draft names.
+#: :meth:`RuledClaim.rules_on_unit` reads them, and the report page words each.
+UnitRuling = Literal["evidence", "control"]
 
 # The steps a critic may fail a draft on. ``duplicate`` is not among them: the
 # critic rules every draft on its own, because every duplicate rejection on
 # record dropped a different finding (QA-2026-10-03-02-E3). It stays in
 # :data:`RejectionStep` because archived reports carry it and are re-scored.
-CriticStep = Literal["evidence", "reasoning", "lane"]
+CriticStep = Literal["evidence", "reasoning", "lane", "control"]
+
+#: How a person reads each verdict status: the label of a finding on the
+#: report page and in the Markdown export.
+VERDICT_LABELS: Mapping[VerdictStatus, str] = MappingProxyType(
+    {"confirmed": "Confirmed", "needs-info": "Needs info", "rejected": "Rejected"}
+)
+
+#: How the report page reads the verdict of a claim on a unit's row, for a
+#: framework that answers in units: a label and what it means. No verdict here
+#: reports a pass, so a confirmed claim on a unit reads as a gap. The other
+#: labels are the finding labels.
+UNIT_VERDICT_WORDS: Mapping[VerdictStatus, tuple[str, str]] = MappingProxyType(
+    {
+        "confirmed": ("Gap", "Applies, and the input does not show it satisfied."),
+        "needs-info": (
+            VERDICT_LABELS["needs-info"],
+            "Applies, and the input does not settle it.",
+        ),
+        "rejected": (
+            VERDICT_LABELS["rejected"],
+            "The critic ruled this draft out. The reason says which check ended it.",
+        ),
+    }
+)
+
+#: How a person reads each step that ended a rejected draft, in the Markdown
+#: export. The words describe the check, as :data:`RejectionStep` does.
+REJECTION_MEANINGS: Mapping[RejectionStep, str] = MappingProxyType(
+    {
+        "evidence": "the stated facts settle that its subject is not there",
+        "reasoning": (
+            "its argument does not follow, even if each open fact it rests on holds"
+        ),
+        "lane": "it was filed under a category or chapter it does not belong to",
+        "duplicate": "it repeats another finding",
+        "control": "the owner states that a Control covers its unit",
+    }
+)
+
+#: The ground kinds that cite an attribute of an element.
+AttributeGround = Literal["unknown-attribute", "absent-attribute"]
 
 # What a finding can cite in its own support. Spelled out rather than terse
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
 # read as "the kind is unknown" rather than "the ground is an unknown
 # attribute". ``absent-attribute`` follows that spelling for the same reason and
-# for one more: the two attribute branches carry identical fields, so the kind
-# is the only place their difference can live.
+# for one more: the two attribute branches carry identical fields, so only the
+# kind can tell them apart.
 GroundKind = Literal[
     "quote",
-    "unknown-attribute",
-    "absent-attribute",
+    AttributeGround,
     "derived-fact",
     "absent-element",
     "assertion",
@@ -143,7 +190,7 @@ GroundKind = Literal[
 #: A *stated absence* is not here, under either spelling. "The control is not
 #: there" is a fact in hand, and "put the control in" is a countermeasure an
 #: agent can always name.
-CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
+CONDITIONAL_GROUNDS: frozenset[GroundKind] = frozenset(
     {"unknown-attribute", "unknown-assertion"}
 )
 
@@ -155,14 +202,14 @@ CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
 #: **Here rather than in either reader.** ``fan_in`` snaps the field and
 #: ``coverage`` counts the pairs, and each listed the two kinds for itself, so
 #: a third attribute kind would have reached one of them.
-ATTRIBUTE_GROUNDS: frozenset[str] = frozenset({"unknown-attribute", "absent-attribute"})
+ATTRIBUTE_GROUNDS: frozenset[AttributeGround] = frozenset(get_args(AttributeGround))
 
 #: The two ground kinds whose reference is a row of the **Assertion** catalog.
 #: Both carry ``assertion`` and nothing else, and that value is a digest of the
 #: row's value and scope — so a reader holding the ground alone holds no fact.
 #: Here for the reason the pair above is here: every consumer that has to
 #: resolve one back to its row asks the same question of the same catalog.
-ASSERTION_GROUNDS: frozenset[str] = frozenset({"assertion", "unknown-assertion"})
+ASSERTION_GROUNDS: frozenset[GroundKind] = frozenset({"assertion", "unknown-assertion"})
 
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``
@@ -404,8 +451,9 @@ class UnknownRef(BaseModel):
         **The one reader of "how is this fact named".** The review seam sends
         back an entry that uses more than one,
         :func:`~analysis_service.critic.snap_rulings` drops one
-        whose sound twin sits beside it, and the fallback count reads the
-        question and subject spellings here. A model whose provider treats the
+        whose sound twin sits beside it, and the fallback count reads
+        :attr:`sound` and :attr:`kind`, which read the spellings here. A model
+        whose provider treats the
         schema as a hint writes an attribute reference and then repeats it with
         a ``subject`` and schema punctuation in ``assertion``
         (``QA-2026-09-26-03-E10``).
@@ -419,6 +467,18 @@ class UnknownRef(BaseModel):
             "capability": bool(self.capability),
         }
         return tuple(name for name, on in used.items() if on)
+
+    @property
+    def sound(self) -> bool:
+        """Whether this reference uses one spelling, as a key that names one
+        fact must."""
+        return len(self.spellings) == 1
+
+    @property
+    def mixed(self) -> bool:
+        """Whether this reference uses more than one spelling. A reference
+        that uses none is neither sound nor mixed."""
+        return len(self.spellings) > 1
 
     @property
     def kind(self) -> Spelling:
@@ -453,7 +513,8 @@ class UnknownRef(BaseModel):
 #: The fields of :class:`UnknownRef` in :attr:`UnknownRef.key` order, for a
 #: reader that holds a key and not its reference. A test holds the two equal.
 #: :func:`~analysis_service.fact_answers.key_ref` and two
-#: :class:`~analysis_service.fact_answers.FactAnswer` validators use it.
+#: :class:`~analysis_service.fact_answers.FactAnswer` validators use it, and a
+#: lint in ``tests/test_one_reader_lints.py`` refuses any other reader.
 UNKNOWN_KEY_FIELDS = (
     "element_id",
     "attribute",
@@ -583,7 +644,7 @@ class Ground(BaseModel):
       agent's argument and the critic's to rule on.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a
       thing, which no element's free text names. **The only branch whose
-      referent is the whole model rather than a part of it**, and the one a
+      referent is the whole model rather than an element of it**, and the one a
       framework needs to justify a claim about what a system does not have. A
       requirement about LDAP injection does not apply to a system that never
       mentions a directory service, and the fact that rules it out is the
@@ -674,7 +735,7 @@ class Ground(BaseModel):
         credential the graph has no node for, and which element it is about is
         the catalog's to answer, not this record's.
 
-        Read wherever a caller needs "which part of the model is this about",
+        Read wherever a caller needs "which element of the model is this about",
         so a sixth branch answers here once instead of in each caller's own
         ``or`` chain.
         """
@@ -738,6 +799,28 @@ def rests_on(refs: Sequence[UnknownRef]) -> str:
     return reason
 
 
+#: The bound on a Control ID and a unit ID that a ruling copies. The review
+#: seam checks each against the rows the draft was shown, so the bound is the
+#: only check here.
+CONTROL_REF_MAX_CHARS = 64
+
+
+class ControlRowRef(BaseModel):
+    """One row of an applied Control: the Control's ID and the row's unit."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    control: str = Field(max_length=CONTROL_REF_MAX_CHARS)
+    unit: str = Field(max_length=CONTROL_REF_MAX_CHARS)
+
+
+class RefusedControl(ControlRowRef):
+    """A row the critic was shown on a draft and that does not cover it, with
+    why. Prose, because the judgement is the critic's (ADR 0126)."""
+
+    reason: str = Field(min_length=1, max_length=REASON_MAX_CHARS)
+
+
 class VerdictFields(BaseModel):
     """What a critic writes about one draft, and what a report's verdict keeps.
 
@@ -762,6 +845,11 @@ class VerdictFields(BaseModel):
     #: grounds. A dismissal is a claim somebody can check (#894).
     immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
+    #: The row that covers the draft, exactly where ``rejected_because`` is
+    #: ``control``. The reason quotes the sentence that covers it.
+    control_row: ControlRowRef | None = None
+    #: Each row the draft was shown that does not cover it.
+    refused_controls: list[RefusedControl] = Field(default_factory=list)
 
     def dismissed_refs(self) -> frozenset[UnknownKey]:
         """``immaterial_unknowns`` as the keys it names, by :attr:`UnknownRef.key`.
@@ -879,6 +967,11 @@ class Verdict(VerdictFields):
                 f"rejected_because is only meaningful for rejected verdicts,"
                 f" not {self.status!r}"
             )
+        if (self.rejected_because == "control") != (self.control_row is not None):
+            raise ValueError(
+                "a control_row is required on a control rejection, and on no"
+                " other verdict"
+            )
         return self
 
 
@@ -969,7 +1062,11 @@ class Claim(BaseModel):
 
     @classmethod
     def partition_proposals(
-        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+        cls,
+        proposals: Sequence[Any],
+        lane: str,
+        carried: Collection[str],
+        covered: Collection[str],
     ) -> tuple[list[Any], dict[str, str]]:
         """Split a lane's proposals into the ones this job can settle, and the rest.
 
@@ -998,8 +1095,12 @@ class Claim(BaseModel):
         ``carried`` is what the job's input actually holds. It is an argument
         rather than a constant so that the answer changes when the service
         accepts a second kind of input, with no edit to any package.
+
+        ``covered`` is each unit a row of an applied Control covers. A proposal
+        on one is kept whatever kind it names, so the critic judges it against
+        the row (ADR 0126).
         """
-        del lane, carried
+        del lane, carried, covered
         return list(proposals), {}
 
     @classmethod
@@ -1236,8 +1337,8 @@ class Claim(BaseModel):
     def text_of_unit(cls, unit: str) -> str:
         """This framework's own statement of one unit, or ``""``.
 
-        **One reader of what a unit says**, asked by the critic view, through
-        :meth:`unit_text`, and by the report page, which lists a row per unit
+        The critic view asks **what a unit says**, through :meth:`unit_text`,
+        and so does the report page, which lists a row per unit
         and would otherwise show a reader an identifier and a verdict with no
         way to tell whether either is right. A package answers from its own
         catalog: ASVS's answer is
@@ -1307,23 +1408,24 @@ class RuledClaim(Claim):
     verdict: Verdict
 
     def waits_on(self) -> list[UnknownRef]:
-        """The open facts this claim waits on: its ``needs-info`` verdict's
-        ``related_unknowns``, or none for any other verdict.
+        """The open facts this claim waits on: its verdict's
+        ``related_unknowns``.
 
-        **The one reader of "what a finding waits on"** (ADR 0094). The card,
-        the open-facts grouping and the follow-up's counts and order call it.
-        A ground the critic dismissed in ``immaterial_unknowns`` is not one;
+        The card, the open-facts grouping and the follow-up's counts and order
+        read it (ADR 0094). The validator of :class:`Verdict` is the one rule
+        of which verdict waits: it refuses ``related_unknowns`` on any status
+        but ``needs-info``, and an empty list on ``needs-info``. So a site that
+        reads ``verdict.related_unknowns`` reads the same facts. A ground the
+        critic dismissed in ``immaterial_unknowns`` is not one;
         :func:`~analysis_service.critic.complete_rulings` adds every other
         unknown ground to ``related_unknowns``.
         """
-        if self.verdict.status != "needs-info":
-            return []
         return list(self.verdict.related_unknowns)
 
     def rules_on_unit(self) -> bool:
         """Whether this ruling says something about the unit the claim names.
 
-        A rejection has four causes and only one of them is a ruling. Rejected
+        A rejection has five causes and two of them are rulings. Rejected
         for ``evidence``, the critic says the unit does not apply to a system of
         this shape, which is an answer. Rejected for ``reasoning``, the critic
         says the *draft's argument* does not hold — it asserted or inferred what
@@ -1331,8 +1433,10 @@ class RuledClaim(Claim):
         open (#659). Rejected for ``lane`` or ``duplicate``, the critic says the
         draft was in the wrong place or was a second copy, and again says
         nothing about the unit. All three leave it unruled, exactly as if no
-        lane had drafted it. A rejection with no cause, from a report read
-        back, carries ``None`` and reads as a ruling.
+        lane had drafted it. Rejected for ``control``, the critic says a row of
+        an applied Control covers the unit, as the owner states it, which is a
+        ruling (ADR 0126). A rejection with no cause, from a report read back,
+        carries ``None`` and reads as a ruling.
 
         **One reader.** The scope builder that decides which units a block
         still has to list, the coverage check that audits it, and the eval
@@ -1342,7 +1446,7 @@ class RuledClaim(Claim):
         """
         if self.verdict.status != "rejected":
             return True
-        return self.verdict.rejected_because in (None, "evidence")
+        return self.verdict.rejected_because in (None, *get_args(UnitRuling))
 
 
 class QuoteCandidate(BaseModel):
@@ -1698,7 +1802,7 @@ class RepairedQuote(BaseModel):
 
     The ladder refused what the agent wrote, and
     :func:`~analysis_service.grounding.repair_prepared` found a window of the named
-    source near enough to hand back. The ground now carries that window — the
+    source near enough to hand back. The ground carries that window — the
     submitter's words — and this mark carries what the agent wrote, so the
     substitution is on the record rather than silent. ``similarity`` is the
     ratio that licensed it.
@@ -1723,7 +1827,7 @@ class RepairedQuote(BaseModel):
 
     ``scan_complete`` is whether the rung ranked every window before it
     answered. ``None`` is *not recorded*: the 18 repairs archived under
-    ``evals/runs/`` predate the field, and a default of ``True`` would claim a
+    ``evals/runs/`` carry no such field, and a default of ``True`` would claim a
     fact about a scan nobody measured.
     """
 
@@ -2035,6 +2139,11 @@ UNNAMED_CLAIM = "(unnamed)"
 #: * ``verdict-shape`` — a verdict's fields cannot make a coherent verdict;
 #: * ``unresolved-unknown`` — a ``needs-info`` names an element or attribute
 #:   the model does not hold, or names nothing at all;
+#: * ``control-row`` — a ruling names a Control row the draft was not shown,
+#:   names a ``control_row`` on a step other than ``control``, is rejected for
+#:   ``control`` and names no ``control_row``, is rejected for ``control`` with
+#:   a reason that quotes neither the Control's name nor a line of its
+#:   evidence, or leaves a shown row unanswered (ADR 0126);
 #: * ``unbriefed-change`` — the re-ask changed a ruling no problem named, and
 #:   the first pass's ruling was kept.
 #:
@@ -2051,6 +2160,7 @@ UnreconciledKind = Literal[
     "duplicate-on-unit",
     "verdict-shape",
     "unresolved-unknown",
+    "control-row",
     "unbriefed-change",
 ]
 
@@ -2411,6 +2521,23 @@ class ScopeEntry(BaseModel):
         return self
 
 
+class ReturnedClaim(BaseModel):
+    """A claim the critic kept against every Control row it was shown, whose
+    unit went back to the deferred set (ADR 0126).
+
+    The job carries no evidence of the kind the unit needs, so the claim
+    leaves the block and the unit is listed ``needs-other-evidence``. The
+    critic's refusals of the rows stay here, so each row keeps its rulings.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    unit: str = Field(min_length=1, max_length=300)
+    needs: str = Field(min_length=1, max_length=100)
+    refused_controls: list[RefusedControl] = Field(default_factory=list)
+
+
 class DecidingFact(BaseModel):
     """One capability that decided an applicability entry, with what states it."""
 
@@ -2628,6 +2755,9 @@ class FrameworkAnalysis(BaseModel):
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
     dropped_claims: list[DroppedClaim] = Field(default_factory=list)
+    #: Each claim the critic kept against every Control row, whose unit went
+    #: back to the deferred set with the row refusals of its ruling.
+    returned_claims: list[ReturnedClaim] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
     #: How many **Candidates** fire only because of the assertion catalog: the
@@ -2829,7 +2959,7 @@ class FrameworkAnalysis(BaseModel):
 
         Uniqueness stops at the block on purpose. #163 ruled that ``id`` has no
         shared grammar, so two packages composing ``1.2.5`` and ``1.2.5`` for
-        unrelated things is legal — and every mark that points at a claim now
+        unrelated things is legal — and every mark that points at a claim
         lives in the same block as the claim it points at, so nothing resolves
         an ID across a boundary.
 

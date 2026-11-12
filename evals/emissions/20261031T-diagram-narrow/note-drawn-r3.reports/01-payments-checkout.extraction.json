@@ -1,0 +1,574 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "Shopper",
+        "description": "A shopper interacting with the storefront.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "shopper[Shopper]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "Card processor",
+        "description": "An external card-processing system.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor[Card processor]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "Storefront API",
+        "description": "The storefront API.",
+        "assets": [
+          "business-critical-data",
+          "financial"
+        ],
+        "source_excerpt": "api[Storefront API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-run",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "Order service",
+        "description": "The order service.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "orders[Order service]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders-db",
+        "description": "Stores orders, addresses, and card-last-four values.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "db[(orders-db)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "Receipt archive",
+        "description": "An archive for receipts.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "receipts[(Receipt archive)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "name": "browse, place orders",
+        "description": "The shopper browses and places orders through the storefront API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "shopper -->|\"browse, place orders\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "browse, place orders",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>order",
+        "name": "order",
+        "description": "The storefront API sends orders to the order service.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|\"order (gRPC)\"| orders",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "unknown",
+        "data_description": "order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "name": "orders, addresses, card-last-four",
+        "description": "The order service exchanges orders, addresses, and card-last-four values with the orders database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "orders <-->|\"orders, addresses, card-last-four\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "orders, addresses, card-last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>receipt",
+        "name": "receipt",
+        "description": "The order service sends receipts to the receipt archive.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "orders -->|\"receipt (TLS)\"| receipts",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "TLS",
+        "authentication": "unknown",
+        "data_description": "receipt",
+        "encryption_in_transit": "TLS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook-post",
+        "name": "payment settled webhook (POST)",
+        "description": "The card processor sends a payment-settled webhook to the storefront API.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor -->|\"payment settled webhook (POST)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payment settled webhook",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:cloud-run",
+        "name": "Cloud Run",
+        "description": "The Cloud Run trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph cloudrun[Cloud Run]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-network",
+        "name": "Core network",
+        "description": "The core network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph core[Core network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Shopper is a human external entity.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The element is named 'Shopper'."
+      },
+      {
+        "assumption": "Card processor is an external system.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The element is named 'Card processor'."
+      },
+      {
+        "assumption": "The order service presents a non-web interface.",
+        "element_id": "process:order-service",
+        "attribute": "interface_kind",
+        "basis": "Its interaction with the storefront API is labelled gRPC."
+      },
+      {
+        "assumption": "The shopper-to-API interaction performs both reads and writes at the destination.",
+        "element_id": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "attribute": "operations",
+        "basis": "The label states both 'browse' and 'place orders'."
+      },
+      {
+        "assumption": "The order service and orders database exchange data in both directions, represented as read-write operations initiated by the order service.",
+        "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "attribute": "operations",
+        "basis": "The diagram uses a bidirectional arrow for 'orders, addresses, card-last-four'."
+      },
+      {
+        "assumption": "The orders database contains confidential data.",
+        "element_id": "store:orders-db",
+        "attribute": "data_classification",
+        "basis": "It stores orders, addresses, and card-last-four values."
+      },
+      {
+        "assumption": "The receipt archive contains confidential data.",
+        "element_id": "store:receipt-archive",
+        "attribute": "data_classification",
+        "basis": "It stores receipts, which are payment-related records."
+      },
+      {
+        "assumption": "The Cloud Run subgraph is a network trust boundary.",
+        "element_id": "boundary:cloud-run",
+        "attribute": "kind",
+        "basis": "The diagram explicitly defines a subgraph labelled 'Cloud Run' as a zone."
+      },
+      {
+        "assumption": "The Core network subgraph is a network trust boundary.",
+        "element_id": "boundary:core-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly defines a subgraph labelled 'Core network' as a zone."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "Shopper",
+        "description": "A shopper interacting with the storefront.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "shopper[Shopper]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "Card processor",
+        "description": "An external card-processing system.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor[Card processor]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "Storefront API",
+        "description": "The storefront API.",
+        "assets": [
+          "business-critical-data",
+          "financial"
+        ],
+        "source_excerpt": "api[Storefront API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-run",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "Order service",
+        "description": "The order service.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "orders[Order service]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders-db",
+        "description": "Stores orders, addresses, and card-last-four values.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "db[(orders-db)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "Receipt archive",
+        "description": "An archive for receipts.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "receipts[(Receipt archive)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "name": "browse, place orders",
+        "description": "The shopper browses and places orders through the storefront API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "shopper -->|\"browse, place orders\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "browse, place orders",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>order",
+        "name": "order",
+        "description": "The storefront API sends orders to the order service.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|\"order (gRPC)\"| orders",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "unknown",
+        "data_description": "order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "name": "orders, addresses, card-last-four",
+        "description": "The order service exchanges orders, addresses, and card-last-four values with the orders database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "orders <-->|\"orders, addresses, card-last-four\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "orders, addresses, card-last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>receipt",
+        "name": "receipt",
+        "description": "The order service sends receipts to the receipt archive.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "orders -->|\"receipt (TLS)\"| receipts",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "TLS",
+        "authentication": "unknown",
+        "data_description": "receipt",
+        "encryption_in_transit": "TLS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook-post",
+        "name": "payment settled webhook (POST)",
+        "description": "The card processor sends a payment-settled webhook to the storefront API.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor -->|\"payment settled webhook (POST)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payment settled webhook",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:cloud-run",
+        "name": "Cloud Run",
+        "description": "The Cloud Run trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph cloudrun[Cloud Run]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-network",
+        "name": "Core network",
+        "description": "The core network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph core[Core network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Shopper is a human external entity.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The element is named 'Shopper'."
+      },
+      {
+        "assumption": "Card processor is an external system.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The element is named 'Card processor'."
+      },
+      {
+        "assumption": "The order service presents a non-web interface.",
+        "element_id": "process:order-service",
+        "attribute": "interface_kind",
+        "basis": "Its interaction with the storefront API is labelled gRPC."
+      },
+      {
+        "assumption": "The shopper-to-API interaction performs both reads and writes at the destination.",
+        "element_id": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "attribute": "operations",
+        "basis": "The label states both 'browse' and 'place orders'."
+      },
+      {
+        "assumption": "The order service and orders database exchange data in both directions, represented as read-write operations initiated by the order service.",
+        "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "attribute": "operations",
+        "basis": "The diagram uses a bidirectional arrow for 'orders, addresses, card-last-four'."
+      },
+      {
+        "assumption": "The orders database contains confidential data.",
+        "element_id": "store:orders-db",
+        "attribute": "data_classification",
+        "basis": "It stores orders, addresses, and card-last-four values."
+      },
+      {
+        "assumption": "The receipt archive contains confidential data.",
+        "element_id": "store:receipt-archive",
+        "attribute": "data_classification",
+        "basis": "It stores receipts, which are payment-related records."
+      },
+      {
+        "assumption": "The Cloud Run subgraph is a network trust boundary.",
+        "element_id": "boundary:cloud-run",
+        "attribute": "kind",
+        "basis": "The diagram explicitly defines a subgraph labelled 'Cloud Run' as a zone."
+      },
+      {
+        "assumption": "The Core network subgraph is a network trust boundary.",
+        "element_id": "boundary:core-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly defines a subgraph labelled 'Core network' as a zone."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

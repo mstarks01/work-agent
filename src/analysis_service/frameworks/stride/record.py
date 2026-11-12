@@ -47,6 +47,9 @@ from analysis_service.system_model import is_zone
 __all__ = [
     "CATEGORY_LETTERS",
     "STRIDE_CATEGORIES",
+    "ArchivedThreatProposal",
+    "ArchivedThreatProposals",
+    "AttackerPosition",
     "DraftThreat",
     "RecommendationReading",
     "StrideAnalysis",
@@ -77,6 +80,27 @@ StrideCategory = Literal[
     "information-disclosure",
     "denial-of-service",
     "elevation-of-privilege",
+]
+
+#: Where the attacker of a STRIDE threat stands when it acts. A verb and a
+#: place do not decide a threat's mechanism: a storage copy of a config store
+#: and code that runs in the store's reader are two threats with one verb at one
+#: place, and encryption at rest stops only the first. The position tells them
+#: apart, so the scorer can hold a draft to the position a reference rests on.
+#:
+#: * ``outside`` reaches the target only through an interface the target
+#:   exposes, also with a credential it took from an element.
+#: * ``on-path`` observes or alters the traffic of a flow.
+#: * ``storage-copy`` holds a copy of a store's media, backup or snapshot.
+#: * ``in-component`` runs code in a modelled element, or controls its host, and
+#:   acts with that element's access.
+#: * ``authorized-principal`` is a legitimate account that acts beyond its purpose.
+AttackerPosition = Literal[
+    "outside",
+    "on-path",
+    "storage-copy",
+    "in-component",
+    "authorized-principal",
 ]
 
 # The six categories in canonical STRIDE order, derived from the type itself
@@ -133,7 +157,7 @@ def _threat_id(lane: StrideCategory, sequence: int) -> str:
 #: corpus files them so: forging a message is spoofing when the identity is the
 #: point and tampering when the content is, and deleting a record is tampering,
 #: repudiation or denial of service by what the record was for.
-LANES_OF_VERB: dict[str, tuple[StrideCategory, ...]] = {
+LANES_OF_VERB: dict[ActionVerb, tuple[StrideCategory, ...]] = {
     "read": ("information-disclosure",),
     "intercept": ("information-disclosure",),
     "elicit": ("information-disclosure",),
@@ -195,6 +219,10 @@ class DraftThreat(Claim):
     #: finding when they name one action against one place — and a threat that
     #: names no action leaves the first half of that unanswerable.
     verb: ActionVerb
+    #: The agent's choice, required on :class:`ThreatProposal`. ``None`` only on
+    #: a draft that a run's archive holds with no position, which states no
+    #: position and so matches no reference that a person ruled a position on.
+    attacker_position: AttackerPosition | None = None
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
@@ -440,6 +468,7 @@ class ThreatProposal(Proposal):
     # agent picks from the closed vocabulary; an unrecognised verb is refused by
     # the response schema before the node returns, not by a check afterwards.
     verb: ActionVerb
+    attacker_position: AttackerPosition
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
@@ -469,6 +498,24 @@ class ThreatProposals(ProposalBatch):
     # No length bound, for the reason `ProposalBatch` gives: `fan_in` carries
     # MAX_CLAIMS_PER_BATCH, so a narrowing cannot drop it.
     claims: list[ThreatProposal]  # type: ignore[assignment]
+
+
+class ArchivedThreatProposal(ThreatProposal):
+    """A :class:`ThreatProposal` read back from a run's archive.
+
+    A run's archive may hold a proposal with no ``attacker_position``: the run
+    stored no position, and the record says so with ``None``, as :class:`DraftThreat`
+    does. The agent's own schema stays :class:`ThreatProposal`, which requires
+    the field, so only a read of stored output takes this one.
+    """
+
+    attacker_position: AttackerPosition | None = None  # type: ignore[assignment]
+
+
+class ArchivedThreatProposals(ThreatProposals):
+    """A lane's stored batch, read with :class:`ArchivedThreatProposal`."""
+
+    claims: list[ArchivedThreatProposal]  # type: ignore[assignment]
 
 
 class ThreatRuling(Ruling):

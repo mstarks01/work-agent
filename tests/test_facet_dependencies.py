@@ -1,10 +1,10 @@
 """A finding can wait on some facets of a question, and an answer can carry a detail (#1542 F6, ADR 0073).
 
-At 2fae7d3 a finding referenced a whole question kind, so an answer covered
-it only once every facet was known: a finding that needed only who acted
-stayed uncovered while the log's protection was unknown. A yes or no answer
-also had no place for an exception. These tests drive the follow-up's
-coverage, a report's conditions, the critic's prompt and the answer's line.
+A finding names the facets it waits on, so an answer covers it once those
+facets are known: a finding that needs only who acted is covered while the
+log's protection is still unknown. A yes or no answer has a place for an
+exception. These tests drive the follow-up's coverage, a report's
+conditions, the critic's prompt and the answer's line.
 """
 
 from __future__ import annotations
@@ -46,16 +46,22 @@ def _analyses():
 
 class TestTheFacetsAFindingNeeds:
     def test_a_reference_names_some_facets_of_its_kind(self):
-        assert needed_facets(ACTOR) == ("records-actor",)
+        assert needed_facets(ACTOR.key, ACTOR.facets) == ("records-actor",)
 
     def test_a_reference_that_names_none_of_its_kind_s_facets_needs_them_all(self):
         stray = WHOLE.model_copy(update={"facets": ["rate"]})
-        assert needed_facets(stray) == ("records-actor", "record-protected")
-        assert needed_facets(WHOLE) == ("records-actor", "record-protected")
+        assert needed_facets(stray.key, stray.facets) == (
+            "records-actor",
+            "record-protected",
+        )
+        assert needed_facets(WHOLE.key, WHOLE.facets) == (
+            "records-actor",
+            "record-protected",
+        )
 
     def test_a_fact_answered_in_one_value_has_no_facets(self):
         attribute = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
-        assert needed_facets(attribute) == ()
+        assert needed_facets(attribute.key, attribute.facets) == ()
 
     def test_a_fact_named_twice_needs_the_facets_of_both(self):
         assert needs_of([ACTOR, WHOLE]) == {KEY: ("records-actor", "record-protected")}
@@ -96,7 +102,10 @@ class TestTheFollowUp:
         ]
         assert question.findings == ("stride/S-01", "stride/S-02")
         assert question.needs == {"stride/S-01": ("records-actor",)}
-        assert question.to_json()["needs"] == {"stride/S-01": ["records-actor"]}
+        assert question.to_json()["needs"] == {
+            "stride/S-01": ["records-actor"],
+            "stride/S-02": ["records-actor", "record-protected"],
+        }
 
     def test_a_report_reads_the_facets_each_finding_needs(self):
         answer = FactAnswer(
@@ -112,6 +121,7 @@ class TestTheFollowUp:
             None,
             {},
             _analyses(),
+            asks=True,
             waiting=False,
             answered=AnswerSet(),
             final=False,

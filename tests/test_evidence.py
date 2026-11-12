@@ -46,6 +46,7 @@ from analysis_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
+from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import (
     DraftThreat,
@@ -115,7 +116,8 @@ class TestEvidenceCatalog:
         ``decided=False``. The catalog is what an agent may cite and a critic
         lets stand, so an entry for it would say a boundary was crossed — the
         one thing rule 4 says an undecidable crossing does not establish. The
-        unplaced zone still reaches the agent as its own ``unknown`` entry.
+        unplaced endpoint still publishes an ``unknown`` entry for its
+        ``trust_zone``.
         """
         model = valid_model()
         model.data_stores[0].trust_zone = UNKNOWN
@@ -141,14 +143,14 @@ class TestEvidenceCatalog:
     def test_an_undecidable_crossing_offers_its_unplaced_endpoint_instead(
         self, unplaced
     ):
-        """The row ``prompts/analyze.md`` sends a lane agent to, tested here.
+        """The entry ``prompts/analyze.md`` sends a lane agent to, tested here.
 
         The prompt tells an agent that an undecidable crossing cannot be cited
         and that the unplaced endpoint's ``trust_zone`` can. That is a claim
         about this catalog, so the two readers are tested against each other
         rather than each against its own expectation: for every undecidable
         crossing, every endpoint the sources left unplaced publishes its own
-        ``unknown`` row.
+        ``unknown`` entry.
         """
         model = valid_model()
         by_id = {element.id: element for element in model.zoned_elements()}
@@ -664,7 +666,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         draft = sample_draft("S-01", grounds=[ground])
 
         (view,) = critic_view(
-            [draft], assertions=held, only=None, repaired=(), unverified=()
+            [draft],
+            assertions=held,
+            only=None,
+            repaired=(),
+            unverified=(),
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         (fact,) = view["assertion_facts"]
@@ -679,7 +687,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         draft = sample_draft("S-01", grounds=[ground])
 
         (view,) = critic_view(
-            [draft], assertions=held, only=None, repaired=(), unverified=()
+            [draft],
+            assertions=held,
+            only=None,
+            repaired=(),
+            unverified=(),
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert view["assertion_facts"][0]["says"] in render_catalog(
@@ -694,6 +708,8 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
             repaired=(),
             unverified=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert "assertion_facts" not in view

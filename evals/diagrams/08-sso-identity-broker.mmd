@@ -1,0 +1,28 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: corporate network"]
+        n3("identity broker")
+        n4("store admin console")
+        n5[("directory")]
+        n6[("key store")]
+        n7[("audit log")]
+    end
+    subgraph z1["Trust zone: outside corporate network"]
+        n0["colleague"]
+        n2["HR system"]
+    end
+    subgraph z2["Trust zone: franchise partner"]
+        n1["franchise identity provider"]
+    end
+    n0 -->|"sign in"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"vouch for colleague"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n0 -->|"change prices and void"| n4
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n4 -->|"fetch public key"| n3
+    n3 -->|"nightly group pull"| n2
+    linkStyle 4 stroke:#c0392b,stroke-width:2px
+    n3 -->|"read write directory"| n5
+    n3 -->|"read signing key"| n6
+    n3 -->|"write sign ins"| n7

@@ -1,7 +1,10 @@
-"""The object store: where the ``sql`` job store keeps sources and reports (ADR 0065).
+"""The object store: where the ``sql`` job store keeps sources, reports,
+Owner Files and the evidence of Controls (ADRs 0065, 0118 and 0127).
 
 A job's sources and its report are each one object, under the key that
-:func:`object_key` gives. The job store writes each object once, writes the
+:func:`object_key` gives. An Owner File's text is one object, under the key
+that :func:`file_key` gives, and so is one evidence file of a Control, under
+the key that :func:`evidence_key` gives. The job store writes each object once, writes the
 object before the row that names it, and keeps the SHA-256 of each object in
 that row. So this module stores bytes and checks nothing about them, and the
 job store checks the digest on each read.
@@ -24,7 +27,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
 
+from analysis_service.controls import CONTROL_ID_PATTERN, EVIDENCE_ID_PATTERN
 from analysis_service.jobs import JOB_ID_PATTERN
+from analysis_service.owner_files import OWNER_FILE_ID_PATTERN
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
@@ -32,9 +37,10 @@ from analysis_service.store_settings import (
 )
 from analysis_service.vendors import CredentialMode
 
-#: The two objects of a job. A job has one report, which the service writes
-#: once, so no name carries a revision.
-ObjectName = Literal["sources.json", "report.json"]
+#: The objects of a job: its sources, its report and its copy of the
+#: Controls it applies (ADR 0127). The service writes each one once, so no
+#: name carries a revision.
+ObjectName = Literal["sources.json", "report.json", "controls.json"]
 
 #: An owner ID is a UUIDv4 that the service generates (ADR 0064). This shape
 #: admits only lowercase letters, digits and hyphens, so no part of a key can
@@ -42,38 +48,101 @@ ObjectName = Literal["sources.json", "report.json"]
 _OWNER_ID = re.compile(r"[0-9a-z][0-9a-z-]{0,63}")
 
 
+def _owner_part(owner_id: str) -> str:
+    if not _OWNER_ID.fullmatch(owner_id):
+        raise ValueError("an owner ID is not a key part")
+    return owner_id
+
+
 def object_key(owner_id: str, job_id: str, name: ObjectName) -> str:
     """The key of one object of a job: ``<owner-id>/<job-id>/<name>``.
 
-    **The one rule for a key.** A key holds only the IDs that the service
+    **The one rule for a job key.** A key holds only the IDs that the service
     generates, never a name, an email or a ``sub``. A part outside its shape
     raises, so a key never reaches outside the owner's and the job's prefix.
     """
-    if not _OWNER_ID.fullmatch(owner_id):
-        raise ValueError("an owner ID is not a key part")
     if not JOB_ID_PATTERN.fullmatch(job_id):
         raise ValueError("a job ID is not a key part")
     if name not in get_args(ObjectName):
         raise ValueError(f"{name!r} is not an object name")
-    return f"{owner_id}/{job_id}/{name}"
+    return f"{_owner_part(owner_id)}/{job_id}/{name}"
 
 
-def key_parts(key: str) -> tuple[str, str, ObjectName] | None:
-    """The owner ID, the job ID and the object name of ``key``, or ``None``
-    where :func:`object_key` cannot give ``key``.
+def file_key(owner_id: str, file_id: str) -> str:
+    """The key of an Owner File's text: ``<owner-id>/<file-id>``.
 
-    :func:`object_key` checks each part, so this function holds no rule of
-    its own.
+    **The one rule for a file key** (ADR 0118). A job key has three parts and
+    a file key two, so no key has both shapes.
+    """
+    if not OWNER_FILE_ID_PATTERN.fullmatch(file_id):
+        raise ValueError("a file ID is not a key part")
+    return f"{_owner_part(owner_id)}/{file_id}"
+
+
+def evidence_key(owner_id: str, control_id: str, evidence_id: str) -> str:
+    """The key of one evidence file of a Control:
+    ``<owner-id>/<control-id>/<evidence-id>``.
+
+    **The one rule for an evidence key** (ADR 0127). It has three parts, as a
+    job key has, and the second part's prefix tells the two apart.
+    """
+    if not CONTROL_ID_PATTERN.fullmatch(control_id):
+        raise ValueError("a Control ID is not a key part")
+    if not EVIDENCE_ID_PATTERN.fullmatch(evidence_id):
+        raise ValueError("an evidence ID is not a key part")
+    return f"{_owner_part(owner_id)}/{control_id}/{evidence_id}"
+
+
+@dataclass(frozen=True)
+class JobKey:
+    """The parts of a key that :func:`object_key` gives."""
+
+    owner_id: str
+    job_id: str
+    name: ObjectName
+
+
+@dataclass(frozen=True)
+class FileKey:
+    """The parts of a key that :func:`file_key` gives."""
+
+    owner_id: str
+    file_id: str
+
+
+@dataclass(frozen=True)
+class ControlKey:
+    """The parts of a key that :func:`evidence_key` gives."""
+
+    owner_id: str
+    control_id: str
+    evidence_id: str
+
+
+def key_parts(key: str) -> JobKey | FileKey | ControlKey | None:
+    """The parts of ``key``, typed by its shape, or ``None`` where no builder
+    of :func:`object_key`, :func:`file_key` and :func:`evidence_key` can give
+    ``key``.
+
+    The builders check each part, so this function holds no rule of its own.
     """
     parts = key.split("/")
-    if len(parts) != 3:
-        return None
-    owner_id, job_id, name = parts
     try:
-        object_key(owner_id, job_id, cast(ObjectName, name))
+        if len(parts) == 3 and CONTROL_ID_PATTERN.fullmatch(parts[1]):
+            owner_id, control_id, evidence_id = parts
+            evidence_key(owner_id, control_id, evidence_id)
+            return ControlKey(owner_id, control_id, evidence_id)
+        if len(parts) == 3:
+            owner_id, job_id, name = parts
+            object_key(owner_id, job_id, cast(ObjectName, name))
+            return JobKey(owner_id, job_id, cast(ObjectName, name))
+        if len(parts) == 2:
+            owner_id, file_id = parts
+            file_key(owner_id, file_id)
+            return FileKey(owner_id, file_id)
     except ValueError:
         return None
-    return owner_id, job_id, cast(ObjectName, name)
+    return None
 
 
 def check_private(path: Path, label: str, *, directory: bool) -> None:
@@ -125,7 +194,9 @@ class ObjectStore(Protocol):
     def list(self) -> AsyncIterator[tuple[str, datetime]]:
         """Each key in the store, with the time of its last write in UTC.
 
-        The orphan sweep is the only reader. A key can have any shape, so the
+        The orphan sweep,
+        :meth:`~analysis_service.sql_store.SqlJobStore.sweep_orphans`, is the
+        only reader. A key can have any shape, so the
         sweep checks each one with :func:`key_parts`.
         """
         ...
@@ -156,10 +227,10 @@ class FilesystemObjectStore:
         )
         value = env.get(OBJECT_ROOT_VAR, "")
         if not value:
-            raise StoreConfigError("set ANALYSIS_OBJECT_ROOT for the filesystem store")
+            raise StoreConfigError(f"set {OBJECT_ROOT_VAR} for the filesystem store")
         root = Path(value)
         if not root.is_absolute():
-            raise StoreConfigError("ANALYSIS_OBJECT_ROOT must be an absolute path")
+            raise StoreConfigError(f"{OBJECT_ROOT_VAR} must be an absolute path")
         return cls(root)
 
     async def check(self) -> None:
@@ -167,7 +238,7 @@ class FilesystemObjectStore:
         or open to a group or to others."""
         check_private(
             self._root,
-            "the object root that ANALYSIS_OBJECT_ROOT names",
+            f"the object root that {OBJECT_ROOT_VAR} names",
             directory=True,
         )
 
@@ -262,7 +333,11 @@ def _delete(root: Path, parts: list[str]) -> bool:
             os.unlink(name, dir_fd=folder)
     except FileNotFoundError:
         return False
-    # The job's directory goes with its last object.
+    # A job's or a Control's directory goes with its last object. An owner's
+    # directory stays: every job, Owner File and Control of the owner writes
+    # under it, so a removal could race another write.
+    if len(folders) < 2:
+        return True
     with (
         contextlib.suppress(OSError),
         _folder(root, folders[:-1], create=False) as parent,
@@ -326,6 +401,24 @@ class ObjectStoreBackend:
     #: that mode. The Settings page shows them only for that mode.
     mode_reads: Mapping[CredentialMode, tuple[str, ...]]
 
+    def reads_in(self, mode: CredentialMode | None) -> tuple[str, ...]:
+        """The settings of :attr:`reads` that ``mode`` reads: each one but the
+        :attr:`mode_reads` of every other mode. ``None`` names no mode, so no
+        setting of :attr:`mode_reads` is in the list.
+
+        **The one reader of which settings a credential mode reads.** A store
+        refuses each other setting through
+        :func:`~analysis_service.store_settings.refuse_unread`, and the
+        Settings page shows only these.
+        """
+        unread = {
+            var
+            for other, mode_vars in self.mode_reads.items()
+            if other != mode
+            for var in mode_vars
+        }
+        return tuple(var for var in self.reads if var not in unread)
+
 
 ObjectStoreName = Literal["filesystem", "s3", "gcs"]
 
@@ -349,7 +442,7 @@ OBJECT_ROOT_VAR = "ANALYSIS_OBJECT_ROOT"
 OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
     "filesystem": ObjectStoreBackend(
         build=FilesystemObjectStore.from_env,
-        reads=(OBJECT_STORE_VAR, "ANALYSIS_OBJECT_ROOT"),
+        reads=(OBJECT_STORE_VAR, OBJECT_ROOT_VAR),
         mode_reads={},
     ),
     "s3": ObjectStoreBackend(
@@ -395,21 +488,37 @@ def object_reads(env: Mapping[str, str]) -> tuple[str, ...]:
     The Settings page shows only these. Where the credential mode names no
     mode, no setting of :attr:`ObjectStoreBackend.mode_reads` is in the list.
     """
-    backend = OBJECT_STORES[object_store_name(env)]
     mode: CredentialMode | None
     try:
-        mode = closed_setting(
-            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, _MODES
-        )
+        mode = _named_mode(env)
     except StoreConfigError:
         mode = None
-    unread = {
-        var
-        for other, mode_vars in backend.mode_reads.items()
-        if other != mode
-        for var in mode_vars
-    }
-    return tuple(var for var in backend.reads if var not in unread)
+    return OBJECT_STORES[object_store_name(env)].reads_in(mode)
+
+
+def _named_mode(env: Mapping[str, str]) -> CredentialMode:
+    """The credential mode that ``ANALYSIS_OBJECT_CREDENTIALS`` names; fail
+    closed. **The one reader of the object credential mode.**"""
+    return closed_setting(
+        env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, _MODES
+    )
+
+
+def credential_mode(env: Mapping[str, str], store: ObjectStoreName) -> CredentialMode:
+    """The credential mode of the ``store`` row, after the refusal of each
+    object setting that the mode does not read.
+
+    The s3 and gcs stores call it before they read any file. The refusal
+    names the mode, the store and each stray setting, and never a value.
+    """
+    mode = _named_mode(env)
+    refuse_unread(
+        env,
+        ("ANALYSIS_OBJECT_",),
+        OBJECT_STORES[store].reads_in(mode),
+        f"the {mode} mode of the {store} object store",
+    )
+    return mode
 
 
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:

@@ -30,10 +30,10 @@ from analysis_service.jobs import (
     Resumption,
 )
 from analysis_service.links import LinkAnswer, with_link_answers
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.sources import Source
 from tests.factories import (
     DESCRIPTION_TEXT,
+    adk_runner,
     sample_report,
     sample_selection,
     scripted_pipeline,
@@ -81,6 +81,8 @@ class TestTheResumedRun:
     def resumed_job(self) -> JobRecord:
         links = [LINK]
         record = JobRecord.create(
+            assertion_pass=True,
+            ask_questions=True,
             owner_id="idp|user-1",
             sources=with_link_answers([Source.description(DESCRIPTION_TEXT)], links),
             frameworks=sample_selection(),
@@ -105,7 +107,7 @@ class TestTheResumedRun:
             visited.append(node)
 
         async def scenario():
-            return await AdkPipelineRunner(pipeline).run(self.resumed_job(), on_node)
+            return await adk_runner(pipeline).run(self.resumed_job(), on_node)
 
         return asyncio.run(scenario()), visited
 
@@ -137,6 +139,8 @@ def test_the_builder_refuses_an_assertion_pass_on_a_resumed_graph():
 class TestTheAnswersRoute:
     def completed(self, store, subject="alice", assertions=True, links=()):
         record = JobRecord.create(
+            assertion_pass=True,
+            ask_questions=True,
             owner_id=subject,
             sources=with_link_answers(
                 [Source.description(DESCRIPTION_TEXT)], list(links)
@@ -231,8 +235,10 @@ class TestTheAnswersRoute:
 
 
 def test_a_resumption_is_absent_on_an_ordinary_job():
-    """The field is optional, so every record written before it still loads."""
+    """The field is optional, so a record with no such field loads."""
     record = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="a",
         sources=[Source.description("an app")],
         frameworks=sample_selection(),

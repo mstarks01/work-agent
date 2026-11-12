@@ -2,14 +2,17 @@
 
 import asyncio
 import logging
+import time
 
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service.jobs import InMemoryJobStore
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
 from tests.test_webapp import BREAKOUT, LOOPBACK, SAME_ORIGIN, posted
 from webapp.main import DEFAULT_NAME
+from webapp.progress import STEP_WORDS, run_stages
 
 tiers = web.tiers
 
@@ -91,18 +94,29 @@ def test_workspace_missing_run_and_cross_origin_write(tiers):
         assert client.get("/workspace/runs").json() == []
 
 
-def test_completed_processing_steps_survive_snapshot_reads(tiers):
-    from analysis_service import StubPipelineRunner
-    from tests.test_webapp import run_to_completion
-
-    with web.client_for(tiers, StubPipelineRunner()) as client:
-        run = run_to_completion(client)
-        detail = client.get(f"/workspace/runs/{run}").json()
-        assert detail["completed_steps"] == list(StubPipelineRunner.nodes)
+def test_a_run_in_progress_answers_with_its_progress_line_on_each_read(tiers):
+    runner = web.HeldAfterExtract()
+    with web.client_for(tiers, runner) as client:
+        body = posted("A web app talks to a database.") | {"questions": True}
+        run = client.post("/analyze", json=body, headers=SAME_ORIGIN).json()["run"]
+        deadline = time.monotonic() + 5
+        while not (detail := client.get(f"/workspace/runs/{run}").json())["progress"][
+            "seq"
+        ]:
+            assert time.monotonic() < deadline, detail
+            time.sleep(0.01)
+        line = detail["progress"]
+        assert line == {
+            "stage": 1,
+            "count": len(run_stages("to-questions", assertion_pass=True)),
+            "words": STEP_WORDS["extract"]["to-questions"],
+            "seq": line["seq"],
+        }
         again = client.get(f"/workspace/runs/{run}").json()
-        assert again["completed_steps"] == detail["completed_steps"], (
-            "Snapshot reads must not consume progress"
-        )
+        assert again["progress"] == line, "A read must not consume progress"
+        runner.release.set()
+        client.get(f"/events/{run}")
+        assert "progress" not in client.get(f"/workspace/runs/{run}").json()
 
 
 TITLE = "My orders board"
@@ -111,7 +125,7 @@ TITLE = "My orders board"
 def _workspace_client(tiers, runner=None):
     from webapp.main import Workspace
 
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     runner = web.PausingRunner() if runner is None else runner
     client = TestClient(
         web.app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
@@ -430,7 +444,6 @@ class AdmitsAChildOnDelete:
 def test_a_child_started_during_the_delete_keeps_the_analysis(tiers):
     """The store keeps a parent whose child is in flight (ADR 0107), so the
     route answers 409 and the analysis stays whole."""
-    from analysis_service.jobs import InMemoryJobStore
     from webapp.main import Workspace
 
     store = AdmitsAChildOnDelete(InMemoryJobStore())
@@ -470,7 +483,6 @@ class RefusesTheSecondDelete:
 
 def test_a_refusal_partway_names_the_jobs_the_route_deleted(tiers):
     """The jobs deleted before a refusal stay deleted, and the 409 names them."""
-    from analysis_service.jobs import InMemoryJobStore
     from webapp.main import Workspace
 
     store = RefusesTheSecondDelete(InMemoryJobStore())

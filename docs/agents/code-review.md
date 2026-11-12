@@ -42,7 +42,7 @@ Write the result in the pull request body, under the heading
 below. Give each class its own entry with text after the name. CI requires the
 section on each pull request that changes a code path:
 `src/*`, `webapp/*`, `evals/harness/*`, `evals/*.py`, `prompts/*`,
-`frameworks/*`, `domains/*`, `config/*`, `tests/*`, `.githooks/*`,
+`frameworks/*`, `domains/*`, `config/*`, `diagram_reader/*`, `tests/*`, `.githooks/*`,
 `.github/workflows/*`, `.github/scripts/*`, `pyproject.toml` or `uv.lock`. An
 asterisk also matches a slash, and a rename counts as a change to its old and
 its new path.
@@ -67,12 +67,96 @@ asks for a read of that package's own texts, and a new package needs no row.
 rows to `PACKAGES`, and holds every prompt to some row.
 `tests/test_one_reader_lints.py` refuses a pairing written in Python.
 
+A pull request that changes a file with a row in
+`.github/scripts/held_wording.toml` names each held phrase of that file in the
+same section. The entry says what the pull request did with the phrase: it
+changed it by a measured change, with the ledger row, or it kept it. The check
+reads the base branch's copy of this table too.
+
 The check has a limit. GitHub runs the copy of `five-class.yml` that the pull
 request carries. The workflow runs the base branch's copy of the script, but a
 pull request that edits the workflow can remove that step or the whole check.
 So the check does not guard a pull request that changes
 `.github/workflows/five-class.yml`. The reviewer of such a pull request reads
 the workflow diff.
+
+### The step before the code
+
+A defect that the standards read finds costs a new head and a new CI run. Stop
+the classes that come back before the code exists.
+
+Do this step before you add a function, a constant, a table, a type, a check
+or a comment claim. Read each row of the table "The classes that come back
+in fixes" in [the standards read](#the-standards-read-before-the-merge) as a
+question. For a second reader, search the tree for another reader of the
+same rule. Search by the name, by the literal values and by the data that the
+code reads.
+
+Record each answer in the pull request body, under the heading
+`## Before the code`, with one entry for each class by its name in that table.
+Each entry gives the class, the search you ran, and the result. Give one of
+these results: "existing reader: `path:symbol`", "none found" or "not touched
+by this change". CI requires the section on each pull request that changes a
+code path, and reads it the way it reads `## Five-class read`.
+`.github/scripts/five_class_read.py` holds the class names, and
+`tests/test_five_class_read.py` holds them to the table.
+
+Two rules keep a search small:
+
+- Count the matches first, with `grep -c` or `grep -l`. Narrow a wide search
+  before you read its lines.
+- Give a wide search to a read-only sub-task, so that only its conclusion
+  enters your context.
+
+### The standards read before the merge
+
+The author of a diff reads it against the five classes, but the author also
+believes the design is right, so the author misses the defects that come from
+that design. Before the merge of each pull request that changes a code path,
+a second reader reads the diff against the standards. That reader is a
+sub-task or a person who did not write the diff.
+
+Give the reader only these inputs:
+
+- the diff of the pull request head, and the files it touches;
+- `AGENTS.md`, `GLOSSARY.md` and each guide in `docs/agents/`;
+- the smell list and the classes that come back, below.
+
+Do not give the reader the author's reasons. Start the read when the head is
+pushed, so it runs while CI runs. The author fixes each finding, or answers it
+with evidence in the pull request body. A fix makes a new head, and a new head
+needs a new read.
+
+**The smell list.** Each smell is a judgement call, and a rule in these guides
+overrides it:
+
+| Smell | What the reader looks for |
+|---|---|
+| Mysterious Name | a name that does not say what the value holds or what the function does |
+| Duplicated Code | the same steps in two hunks or two files |
+| Feature Envy | a function that reads another object's fields more than its own |
+| Data Clumps | the same few parameters or fields that always go together |
+| Primitive Obsession | a bare string, number or bool that stands for a domain concept |
+| Repeated Switches | the same branch on the same value in more than one place |
+| Shotgun Surgery | one change that needs edits in many files |
+| Divergent Change | one module that changes for unrelated reasons |
+| Speculative Generality | a parameter, hook or layer that no caller needs |
+| Message Chains | a caller that walks a long chain of attributes |
+| Middle Man | a function or class that only passes a call on |
+| Refused Bequest | a subclass that does not fit what its base says |
+
+**The classes that come back in fixes.** The review of 2026-11-02 found these
+in the fix pull requests of the review before it. The author asks each
+question before the code, and the reader asks it again of the diff:
+
+| Class | The question |
+|---|---|
+| A second reader | each new helper or rule: is there one reader, and does a lint refuse a second? |
+| A claim with no guard | each claim that a rule has one reader (`CLAIM`): does it sit on a guard or name one in backticks? A guard is the reader of a `ONE_READERS` row or the one site of a one-site `==` assert. Only a ruling keeps a claim in `UNGUARDED_CLAIMS` |
+| A closed set with no `Literal` | each table or tuple of string keys that code reads as a set: does a `Literal` state the set? |
+| A default only a test omits | each new default: does a caller outside `tests/` omit it? |
+| A type that says the wrong thing | each new exception: does its base describe it? |
+| A name for the wrong thing | each new name or rename: does the name say what the value holds? |
 
 ## The five defect classes
 
@@ -103,7 +187,7 @@ pre-merge review cuts no tag.
 
 ### What the round reads after that
 
-The same range as before. Its question narrows, because each pull request in the
+The round reads the same range. Its question narrows, because each pull request in the
 range already had a reader: the round hunts across pull requests, over the whole
 tree, and on surfaces no diff touched. The tag message names which pull requests
 in the range got a pre-merge review, so the next round knows which half of the
@@ -124,9 +208,15 @@ in a ledger row.
 - Fix each instance that the sweep finds, in the same way as the finding.
 - When a mechanism comes back in a later round, add a lint that refuses it.
   Then it cannot come back again.
-- Count the findings in two groups: code older than the last `reviewed/*` tag,
-  and newer code. The count in older code must go down from round to round. A
-  count that does not go down shows a mechanism that needs a lint.
+- Count the findings in three groups:
+  - code newer than the last `reviewed/*` tag;
+  - older code, for a class whose definition did not change in this round;
+  - older code, for a class whose definition this round made wider, such as
+    new claim words or a wider scope.
+
+  The second count must go down from round to round. A count that does not go
+  down shows a mechanism that needs a lint. The third count shows old defects
+  that the narrower definition did not count, not new defects.
 
 ### Read the prompts against the code they describe
 
@@ -151,6 +241,15 @@ row names the `validation.IssueCode` values its sentence is the rule against,
 and the test holds the rows to that set. Where a prompt can take a sentence
 from a table that the code reads, render the sentence from the table instead,
 as `render_predicates` does.
+
+Wording in model text that breaks a wording rule, such as the SPEND lint, the
+MONEY lint, the GLOSSARY Element term or the GLOSSARY Boundary Crossing term,
+changes only with a measured prompt change. The
+maintainer rules such wording held until that change lands, and
+`.github/scripts/held_wording.toml` holds one row for each held phrase, with
+the rule and the reason. A round
+reads that table and does not report a held row as a finding. The SPEND and
+MONEY lints read model text and skip only the held rows of their rule.
 
 An exemplar teaches the model a draft shape, so it must pass every check that
 real lane output meets. `tests/test_exemplar_fan_in.py` sends each exemplar
@@ -204,7 +303,7 @@ and a third takes `c`.
 
 Tags `reviewed/2026-09-04` to `reviewed/2026-09-22` carry names that are not
 their dates. Each tag message carries the true date, and nothing reads the
-name. Today's plain name may already be spent, so take the letter.
+name. Today's plain name may already be taken, so take the letter.
 
 Sort by `creatordate`, never by name. `creatordate` is the order that answers
 "since when".
@@ -216,10 +315,12 @@ The message carries what a later reader cannot recover from the diff:
   knows which half of its own range nobody read before the merge
 - which axes ran, and what each read as its source of truth
 - how many findings each axis produced, and where each was fixed
-- how many findings were in code older than the last `reviewed/*` tag, and how
-  many were in newer code
+- how many findings were in each of the three count groups: newer code, older
+  code under an unchanged definition, and older code under a wider definition
 - **what was left open by decision**, with the reason — this is the part that
-  stops the next review re-reporting a settled question as a new finding
+  stops the next review re-reporting a settled question as a new finding.
+  Held wording in model text goes in `.github/scripts/held_wording.toml`, and
+  the message points to that table instead of listing the rows
 
 ## Why a tag
 
@@ -240,7 +341,7 @@ these are rules about the fix itself, not about testing harder. The tag
 messages from `reviewed/2026-09-03` to `reviewed/2026-09-09` record them.
 
 A fix is the riskiest code in the tree. It is new, it lands fast, and the
-attention that found the defect is spent by the time the repair is written.
+attention that found the defect is gone by the time the repair is written.
 
 ### Review your own fix the way you reviewed the defect
 

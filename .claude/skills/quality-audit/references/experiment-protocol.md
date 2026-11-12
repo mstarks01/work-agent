@@ -54,10 +54,10 @@ against the baseline. The command refuses a pair whose figures do not compare:
 a different scoring corpus, artifact version, identity version or mode.
 Re-score both artifacts on one corpus with `run.py score` first. A run can raise coverage by saying more, because an
 unlisted finding is not counted wrong. The `volume` gate catches that offline,
-and the `reviewed` and `rejected-rate` gates wait for votes on what the
+and the `reviewed` and `rejected-rate` gates wait for live votes on what the
 candidate added. A gate that reads `inconclusive` leaves the gain unconfirmed.
 
-Each rung-5 reading spends one of the holdout's `HOLDOUT_READS`, so confirm
+Each rung-5 reading uses one of the holdout's `HOLDOUT_READS`, so confirm
 only a gain that rung 4 already measured. Record each case the reading names in
 the row's `holdout_reads`. `run.py gain --held-out` reads the rung-4 gates on
 the held-out cases alone. It refuses a case that is exhausted: a case read
@@ -141,8 +141,8 @@ in this conversation.
   before it leaves the process, on every node, every retry and every
   single-node replay. It guards against an accident and is not consent.
 - **Classify a command by what it does.** `score` and `replay` re-read an
-  archive. `lane-replay` and `critic-replay` send a request again and cost a
-  call, whatever their names say.
+  archive. `lane-replay`, `critic-replay` and `recritic-replay` send a request
+  again and cost a call, whatever their names say.
 - **A cache hit is not free.** Meter paid requests.
 - **Do not substitute a cheaper model in a confirmation run.** That is a
   changed condition, and the comparison stops being a comparison. A cheaper

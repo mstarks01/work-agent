@@ -1,0 +1,18 @@
+flowchart LR
+    manager(Store manager)
+    colleague("Colleague (own phone)")
+    webapp[Scheduling web app]
+    payroll["Payroll system (other team)"]
+
+    subgraph internal["Internal network"]
+        sched[Scheduling service]
+        rotadb[("Rota database: rotas, names, contact details, availability")]
+        share[(File share)]
+    end
+
+    manager -->|build weekly rota| webapp
+    colleague -->|view shifts| webapp
+    webapp --> sched
+    sched <-->|rotas| rotadb
+    sched -->|weekly payroll export| share
+    payroll -->|collect export| share

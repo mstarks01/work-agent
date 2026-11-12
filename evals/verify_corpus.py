@@ -29,7 +29,6 @@ each case's ``source_sha256`` from its ``source.md``.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
@@ -93,7 +92,7 @@ from evals.reference_facts import (
     reference_catalog,
 )
 
-SOURCE_KINDS = frozenset(get_args(SourceKind))
+SOURCE_KINDS: frozenset[SourceKind] = frozenset(get_args(SourceKind))
 
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pairs.json"
@@ -171,15 +170,17 @@ UNASSIGNABLE: dict[tuple[str, str], str] = {
 
 #: The rating vocabulary, off the type that declares it rather than listed
 #: again -- the same rule the tier set below follows, for the same reason.
-RATINGS = frozenset(get_args(Rating))
+RATINGS: frozenset[Rating] = frozenset(get_args(Rating))
 #: The tier vocabulary, off the type that declares it rather than listed again.
 #: A second list is how the corpus lint comes to admit a tier the scorer cannot
 #: read, or refuse one it can.
-TIERS = frozenset(get_args(Tier))
+TIERS: frozenset[Tier] = frozenset(get_args(Tier))
 #: Which proximities a reference set may declare, off the type the reference
 #: record declares them with. A second list here is how the corpus lint comes
 #: to refuse a proximity the scorer reads.
-EXEMPLAR_PROXIMITY = frozenset(get_args(ExemplarProximity))
+EXEMPLAR_PROXIMITY: frozenset[ExemplarProximity] = frozenset(
+    get_args(ExemplarProximity)
+)
 CASE_FIELDS = frozenset(
     (
         "id",
@@ -322,7 +323,7 @@ LANES_REQUIRED_PER_CASE: Mapping[FrameworkName, bool] = {
 #: The expected dispositions a record may name, from the corpus vocabulary
 #: rather than a second list here — a lint spelling its own would pass a value
 #: the loader then refuses.
-ASVS_DISPOSITIONS: frozenset[str] = frozenset(get_args(AsvsDisposition))
+ASVS_DISPOSITIONS: frozenset[AsvsDisposition] = frozenset(get_args(AsvsDisposition))
 
 #: The extra fields each framework's reference record carries, and the checks
 #: over them. Harness data keyed off the closed ``FrameworkName``, beside
@@ -471,9 +472,9 @@ def _escalate_leads(
         pairs = "; ".join(
             f"{source} -> {destination}" for source, destination in joined
         )
-        # Every raise, declared or not. One reader of the condition: the caller
-        # that reports and the check that finds an obsolete declaration read the
-        # same keys, so a declaration cannot answer for a claim nothing raises.
+        # Every raise, declared or not. The caller that reports and the check
+        # that finds an obsolete declaration read the same keys, so a
+        # declaration cannot answer for a claim nothing raises.
         yield (
             (case_id, tuple(sorted(cited))),
             (
@@ -558,8 +559,9 @@ SOURCE_FIELDS = frozenset(("kind", "label", "file", "sha256"))
 
 
 def source_sha256(source_path: Path) -> str:
-    """One source's digest, over the exact submitted bytes."""
-    return hashlib.sha256(source_path.read_bytes()).hexdigest()
+    """One source's digest: :func:`~analysis_service.sources.text_digest` of the
+    text a run submits, read as the corpus loader reads it."""
+    return text_digest(source_path.read_text(encoding="utf-8"))
 
 
 def declared_sources(case_dir: Path, meta: dict) -> dict[str, str]:
@@ -718,13 +720,13 @@ def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
 def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
     """Every reviewed alias names a real element, keeps its type, and is sourced.
 
-    An alias credits an extraction that the strict reading marks wrong, so it
-    is the one place a name nobody wrote into the model can move a number.
+    An alias credits an extraction that the strict reading marks wrong, so
+    with it a name nobody wrote into the model can move a number.
     Each of these refuses a way it could do that dishonestly.
 
     The excerpt check is the load-bearing one: an alias is supported by the
-    case's own words or it is somebody's preference. :func:`verify_quote` is
-    the one reader of "does this source carry this quotation", so an excerpt
+    case's own words or it is somebody's preference. :func:`verify_quote` answers
+    "does this source carry this quotation", so an excerpt
     here is held to what a ``model.json`` excerpt and the evidence gate are
     held to. A raw substring test is a second reader, and it disagrees on a
     sentence the source wraps across two lines.

@@ -1,0 +1,20 @@
+flowchart LR
+    member(Member)
+    app["Library app (phone)"]
+
+    subgraph branch["Branch network"]
+        kiosk[Self-service kiosk]
+        desk(Desk staff)
+    end
+
+    subgraph dc["Council data centre"]
+        api["Lending API (REST)"]
+        db[("Loans database: members, loans, reservations")]
+    end
+
+    member -->|"borrow, renew, reserve"| app
+    app --> api
+    member -->|"library card, book scans"| kiosk
+    kiosk -->|"loans, returns"| api
+    desk -->|"extend loan, clear block, mark returned (circulation page)"| api
+    api <-->|"members, loans, reservations"| db

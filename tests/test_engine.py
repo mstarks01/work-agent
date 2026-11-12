@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from itertools import permutations
 from uuid import UUID
 
 import pytest
@@ -22,6 +23,9 @@ from analysis_service.engine import (
     EngineDeadlineError,
     EngineInputError,
 )
+from analysis_service.execution import GraphFailed
+from analysis_service.framework_config import CARRIED_VAR
+from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.jobs import (
     JobRecord,
@@ -32,12 +36,16 @@ from analysis_service.jobs import (
 )
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.principals import LOCAL_ISSUER
+from analysis_service.report import FrameworkSelection
 from analysis_service.resilience import load_resilience
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, SourceLimits
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
+    SCRIPTED_FRAMEWORKS,
+    adk_runner,
     sample_selection,
+    stand_in_engine,
 )
 from tests.test_pipeline import build, happy_replies
 
@@ -76,7 +84,7 @@ def engine_for(runner, frameworks=None) -> Engine:
     other path a job exists on, so a test about the deadline or the source
     ladder still states one.
     """
-    return Engine(
+    return stand_in_engine(
         runner,
         limits=TEST_LIMITS,
         deadline_seconds=TEST_DEADLINE,
@@ -178,6 +186,16 @@ def test_a_bare_string_is_refused_with_the_call_to_write_instead():
 
     with pytest.raises(EngineInputError, match="Source.description"):
         asyncio.run(engine.analyze("a web app storing orders"))
+
+
+def test_an_owner_file_copy_of_the_callers_own_is_refused():
+    """ADR 0119: only the service sets ``owner_file_id``, at every entry point."""
+    engine = engine_for(StubPipelineRunner())
+    forged = Source(
+        kind="transcript", label="Forged", text="x", owner_file_id="file-" + "a" * 32
+    )
+    with pytest.raises(EngineInputError, match="composed by this service"):
+        asyncio.run(engine.analyze([forged]))
 
 
 def test_a_repeated_framework_is_refused_at_the_engine_too():
@@ -294,30 +312,56 @@ def test_analyze_sync_refuses_a_running_loop():
         asyncio.run(inside_loop())
 
 
+#: A deployment whose adapters build offline. Nothing is selected by default,
+#: so the vendor is named here too. Vertex's credential mode is ADC, and the
+#: check is a build-time gate.
+DEPLOYMENT_ENV = {
+    "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
+    "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
+    "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
+    "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+    "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+    "ANALYSIS_VERTEX_PROJECT": "test-project",
+    "ANALYSIS_VERTEX_LOCATION": "us-central1",
+    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+}
+
+
 def test_from_config_builds_an_adk_runner():
-    # Nothing is selected by default, so the vendor is named here too. Vertex's
-    # credential mode is ADC, and the check is a build-time gate.
     engine = Engine.from_config(
         DEFAULT_FRAMEWORKS,
-        env={
-            "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
-            "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
-            "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
-            "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-            "ANALYSIS_VERTEX_PROJECT": "test-project",
-            "ANALYSIS_VERTEX_LOCATION": "us-central1",
-            "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
-        },
+        env=DEPLOYMENT_ENV,
     )
 
     assert isinstance(engine._runner_for(ENTRY_EXTRACT), AdkPipelineRunner)
 
 
+@pytest.mark.parametrize("carried", list(permutations(PACKAGES)))
+@pytest.mark.parametrize("asked", list(permutations(PACKAGES)))
+def test_an_engine_on_a_deployment_runs_in_the_carried_order(carried, asked):
+    """The job and its graph name the frameworks in the order the deployment
+    carries them, whatever order the caller asks in (ADR 0102).
+
+    The offline switch refuses the first model call, so a run that reaches it
+    is a job the graph accepted.
+    """
+    engine = Engine.from_config(
+        [
+            FrameworkSelection(name=name, options=SCRIPTED_FRAMEWORKS[name].options)
+            for name in asked
+        ],
+        env=DEPLOYMENT_ENV | {CARRIED_VAR: ",".join(carried)},
+    )
+
+    with pytest.raises(GraphFailed, match="offline mode"):
+        analyze(engine, DESCRIPTION_TEXT)
+    assert engine.frameworks == carried
+
+
 def test_engine_drives_the_real_graph_to_a_report():
     pipeline, _ = build(happy_replies())
-    engine = engine_for(AdkPipelineRunner(pipeline))
+    engine = engine_for(adk_runner(pipeline))
 
     outcome = analyze(engine, DESCRIPTION_TEXT)
 
@@ -337,7 +381,7 @@ def test_a_wedged_run_is_stopped_by_the_deployments_deadline():
     # The in-process path's own bound: ``execute_job`` wraps the job route in
     # ``asyncio.timeout``, and ``analyze`` carries the same deadline, so the
     # first-run app and every library embedder run bounded too.
-    engine = Engine(
+    engine = stand_in_engine(
         StallingRunner(),
         limits=TEST_LIMITS,
         deadline_seconds=0.05,
@@ -362,17 +406,7 @@ def test_a_timeout_from_inside_the_graph_keeps_its_own_identity():
 def test_the_deadline_comes_from_the_deployments_resilience_config():
     engine = Engine.from_config(
         DEFAULT_FRAMEWORKS,
-        env={
-            "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
-            "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
-            "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
-            "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-            "ANALYSIS_VERTEX_PROJECT": "test-project",
-            "ANALYSIS_VERTEX_LOCATION": "us-central1",
-            "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
-        },
+        env=DEPLOYMENT_ENV,
     )
 
     # The shipped number, not one this test picked: an engine that invented its

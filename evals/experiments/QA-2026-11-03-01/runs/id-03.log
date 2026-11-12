@@ -1,0 +1,14 @@
+material from today's prepare, catalog signed; prompt files from d51830a1fa4ffbdb5348b1713bae9fa0b2b2a2f2
+- Unverified encryption may expose landing-bucket extracts in transit | ['flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'process:ingest-scheduler', 'store:landing-bucket']
+- Unverified transport may expose Airflow connection strings and partner keys | ['flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'process:ingest-scheduler', 'store:airflow-metadata-database']
+- Unverified cross-zone transform trigger may reveal claim-processing details | ['flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform', 'process:ingest-scheduler', 'process:spark-transform-job']
+- Unverified warehouse-load transport may disclose normalized health records | ['flow:process:spark-transform-job>store:claims-warehouse>load-records', 'process:spark-transform-job', 'store:claims-warehouse']
+- Unverified analyst-query transport may expose warehouse records on the network | ['flow:entity:data-analyst>store:claims-warehouse>run-queries', 'entity:data-analyst', 'store:claims-warehouse']
+- A storage copy could expose all landing-bucket extracts if at-rest encryption is absent | ['store:landing-bucket']
+- A copy of the Airflow metadata database could reveal partner keys and connection strings | ['store:airflow-metadata-database']
+- A warehouse storage copy could disclose the normalized claims corpus | ['store:claims-warehouse']
+- Code in the scheduler can read every landing-bucket extract through its existing access | ['process:ingest-scheduler', 'flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'store:landing-bucket']
+- Code in the scheduler can recover Airflow-held partner keys and connection strings | ['process:ingest-scheduler', 'flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'store:airflow-metadata-database']
+- Dataset-wide analyst access discloses member-identifying claims beyond a need-to-know scope | ['entity:data-analyst', 'flow:entity:data-analyst>store:claims-warehouse>run-queries', 'store:claims-warehouse']
+spent: $0.0570 reported
+must-finds matched: [9]

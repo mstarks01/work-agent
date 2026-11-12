@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Colleague shift responses may be readable across the public-to-app boundary | ['flow:entity:colleague>process:scheduling-web-app>view-shifts', 'entity:colleague', 'process:scheduling-web-app']
+- Store rota submissions may be readable across the manager-to-app boundary | ['flow:entity:store-manager>process:scheduling-web-app>build-rota', 'entity:store-manager', 'process:scheduling-web-app']
+- Rota requests may expose colleague data on the web-app-to-service hop | ['flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-web-app', 'process:scheduling-service']
+- Rota database traffic may disclose the full rota and colleague-detail payload | ['flow:process:scheduling-service>store:rota-database>read-write-rotas', 'process:scheduling-service', 'store:rota-database']
+- Payroll export creation may disclose PII on the internal file-share hop | ['flow:process:scheduling-service>store:file-share>write-payroll-export', 'process:scheduling-service', 'store:file-share']
+- Payroll export collection may be readable across the payroll-team boundary | ['flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system', 'store:file-share']
+- A storage copy could expose rota records if database encryption at rest is absent | ['store:rota-database']
+- A storage copy could expose weekly payroll exports if file-share encryption is absent | ['store:file-share']
+- Code in the scheduling service can read rota records through the service access path | ['process:scheduling-service', 'flow:process:scheduling-service>store:rota-database>read-write-rotas', 'store:rota-database']
+- Unverified payroll-file-share authentication may expose payroll exports to unauthorized readers | ['store:file-share', 'flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system']
+spent: $0.0561 reported
+must-finds matched: [9]

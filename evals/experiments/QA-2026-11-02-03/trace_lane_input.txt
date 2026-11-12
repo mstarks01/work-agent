@@ -1,0 +1,11 @@
+LEAD "flow:process:web-application>store:web-application-config>read-configuration",
+LEAD "store:web-application-config"
+LEAD "flow:process:background-worker-process>store:worker-config>read-configuration",
+LEAD "store:worker-config"
+LEAD "store:web-application-config"
+LEAD "store:worker-config"
+LEAD "store:web-application-config",
+LEAD "store:worker-config",
+NOTES ['notes/identity-at-a-boundary', 'notes/callback-and-webhook-trust', 'cases/unknown-is-not-absent', 'notes/transport-protection', 'notes/write-path-integrity', 'cases/stated-control-outside-the-model', 'notes/attribution-and-audit', 'cases/shared-credential-attribution', 'notes/protection-at-rest', 'notes/compromise-inheritance', 'cases/two-threats-one-flow', 'notes/cost-of-an-unauthenticated-request', 'notes/failure-coupling', 'cases/chained-benign-facts', 'notes/compromise-inheritance', 'cases/chained-benign-facts']
+EVIDENCE | `assertion:credential-custody~credential:queue-credentials~any~v.9bc518f22bfa` | `credential-custody` stated `the web application config store` for credential:queue-credentials (credential) — unchecked |
+EVIDENCE | `assertion:credential-custody~credential:database-credentials~any~v.e060d9de7709` | `credential-custody` stated `the worker config store` for credential:database-credentials (credential) — unchecked |

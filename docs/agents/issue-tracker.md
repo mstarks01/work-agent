@@ -55,7 +55,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#1991](https://github.com/mstarks01/work-agent/issues/1991), is under
+**None.** The last map, [#2111](https://github.com/mstarks01/work-agent/issues/2111), is under
 Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
@@ -63,6 +63,41 @@ Completed maps. Chart a new one only against the bar at the end of this file.
 A completed map lives as a closed GitHub issue. Its tickets' resolution comments hold the reasoning,
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
+
+- [#2111](https://github.com/mstarks01/work-agent/issues/2111) — **Controls**: an owner's durable
+  record of a protection the system has, such as a firewall at the edge or a rate limit on an API.
+  The spec [#2148](https://github.com/mstarks01/work-agent/issues/2148) holds the build.
+  - A Control writes facts before the lanes, in the `FactAnswer` shape, and names framework units
+    in a table keyed by framework. The critic is the one judge of a row; the service holds no
+    "mitigated" state. Each package declares `units` and `control_unit_of` (ADR 0123).
+  - A scope is the application, a zone by name or an element by name, with aliases. A match is
+    element ID equality, a zone fans out ticked, and the owner confirms each match (ADR 0124).
+  - A Control fills only an open fact; own answers lie over it and it lies over carried answers.
+    `fact_origin` is the one reader of a fact's rung (ADR 0125).
+  - The critic judges each row in a `control` step, answers every shown row, and a row un-defers
+    its unit through `partition_proposals` (ADR 0126).
+  - A Control is a row in `controls` with evidence objects, a job copies it into
+    `<owner-id>/<job-id>/controls.json`, and `/v1` refuses it with 422 (ADR 0127).
+  - The page is variant A of the prototype on the branch `prototype/controls-2118`.
+  - A Control on a flow, a suggested Control, an authoring-time warning, who classifies a document,
+    and a corpus disposition for a settled row stay in the fog.
+
+- [#2057](https://github.com/mstarks01/work-agent/issues/2057) — a Files section in the web app,
+  where an owner keeps **Owner File**s, such as call transcripts and Mermaid diagrams. The spec
+  [#2073](https://github.com/mstarks01/work-agent/issues/2073) holds the build, as the tickets
+  #2074 to #2077.
+  - Files belongs to the owner and is in the web app only. `/v1` refuses a Source that carries
+    `owner_file_id`.
+  - An Owner File is an object under `<owner-id>/<file-id>` and a row in `owner_files`. The name
+    is unique for each owner, and `max_owner_files` bounds the count. A delete keeps nothing
+    (ADR 0118).
+  - A job copies each chosen Owner File as a Source with `owner_file_id`, so a delete changes no
+    job and no report. The report does not change (ADR 0119).
+  - One format table in `sources.py` serves both uploads. Each `diagram` Source starts with
+    `flowchart`, `graph` or `architecture-beta` (ADR 0120).
+  - The page is variant D of the prototype, the tag `archive/prototype/files-page-2062`.
+  - Image formats, a route for bytes, Files on `/v1`, an edit of a name or a kind, sharing and
+    retention are out of scope.
 
 - [#1991](https://github.com/mstarks01/work-agent/issues/1991) — Google Cloud Storage as an
   object store. The spec [#1998](https://github.com/mstarks01/work-agent/issues/1998) holds the
@@ -103,7 +138,7 @@ beside it.
 - [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
   reports and sources. The build is in the tree: `analysis_service.sql_store`,
   `analysis_service.objects` and `analysis_service.store_backends` hold it.
-  - PostgreSQL, or SQLite on one host, holds job state and principals. `boto3` over the S3 API,
+  - PostgreSQL, or SQLite on one host, holds the job records and principals. `boto3` over the S3 API,
     or the filesystem, holds the sources and the report. Native GCS and Azure backends are a
     separate effort.
   - A principal is one issuer and `sub`, and a random UUIDv4 owner ID stands for it (ADR 0064).

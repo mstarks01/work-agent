@@ -46,7 +46,7 @@ from analysis_service.certification import (
 )
 from analysis_service.identity import execution_fingerprint
 from analysis_service.model_tiers import TIER_NAMES, TierName
-from analysis_service.sampling import SamplingConfig, TierSampling
+from analysis_service.sampling import SamplingConfig, SamplingParam, TierSampling
 from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
 
 
@@ -74,13 +74,15 @@ class TierIdentityKey:
 # The file keys a sweep may re-pin in place, and how each serializes back to
 # TOML. ``top_k`` is absent from every set: it is not part of the sampling
 # config surface, because the build-time gate provably cannot cover it.
-_FLOAT_PARAMS = frozenset(
+_FLOAT_PARAMS: frozenset[SamplingParam] = frozenset(
     {"temperature", "top_p", "presence_penalty", "frequency_penalty"}
 )
-_INT_PARAMS = frozenset({"seed", "max_output_tokens", "candidate_count"})
+_INT_PARAMS: frozenset[SamplingParam] = frozenset(
+    {"seed", "max_output_tokens", "candidate_count"}
+)
 # ``thinking`` is a low/medium/high enum, not a resolved integer budget, so it
 # serializes as a quoted string like any other TOML literal.
-_STR_PARAMS = frozenset({"thinking"})
+_STR_PARAMS: frozenset[SamplingParam] = frozenset({"thinking"})
 
 # On the sampling surface but deliberately outside promotion. ``constrain_output``
 # is not a decoding value a sweep can tune towards — it records whether the
@@ -96,7 +98,9 @@ _STR_PARAMS = frozenset({"thinking"})
 # ``structured_output`` is outside promotion for the same reason: it records how
 # the provider serving this tier carries a schema, which is a property of the
 # deployment. An explicit ``native`` or ``tool`` enters the execution identity.
-_NOT_PROMOTABLE = frozenset({"constrain_output", "structured_output"})
+_NOT_PROMOTABLE: frozenset[SamplingParam] = frozenset(
+    {"constrain_output", "structured_output"}
+)
 
 
 def promote(

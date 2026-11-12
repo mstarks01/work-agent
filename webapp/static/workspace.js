@@ -4,8 +4,10 @@ const workspace = (() => {
   const panels = ["description-panel", "progress-panel", "asked", "reports-panel", "library-panel"];
   let current = null;
   let generation = 0;
+  // The runs whose stop is in flight: a redraw keeps their Stop button off.
+  const stopping = new Set();
   let progressRun = null;
-  let completedSteps = [];
+  let sentLine = null;
   let stepStatus = null;
   let stepStarted = 0;
   let elapsedTimer = null;
@@ -29,7 +31,10 @@ const workspace = (() => {
     if (className) item.className = className;
     return item;
   };
-  const labels = {"running": "In progress", "awaiting-answers": "Questions ready", "completed": "Report ready", "failed": "Failed", "stopped": "Stopped", "unreadable": "Cannot be read"};
+  // The words for each value of a closed service set, from the service
+  // (webapp.page_words.FORM_WORDS).
+  const FORM_WORDS = JSON.parse(document.getElementById("form_words").textContent);
+  const labels = FORM_WORDS.page_status;
   const message = (text) => { el("workspace-message").textContent = text; };
   const metadata = (data) => {
     el("description").readOnly = true;
@@ -39,14 +44,21 @@ const workspace = (() => {
     el("load").hidden = true;
     el("upload").hidden = true;
     el("transcript-note").hidden = true;
-    el("transcript-file").disabled = true;
+    el("diagram-note").hidden = true;
+    // A reopened analysis lists the copies its job holds, by the names they
+    // had when it ran, and offers no choice (ADR 0119).
+    el("chosen-files").hidden = true;
+    el("files-used-list").replaceChildren(...(data.owner_files || []).map((file) => node("li", `${file.label} (${file.kind})`)));
+    el("files-used").hidden = !(data.owner_files || []).length;
+    formControls.drawUsed(data.controls_used);
+    el("upload-file").disabled = true;
     el("ask").disabled = true;
     current = data;
     el("analysis-header").hidden = false;
     el("new-analysis-title").hidden = true;
     el("description-remaining").hidden = true;
     el("analysis-title").textContent = data.name;
-    el("analysis-state").textContent = labels[data.status] || data.status;
+    el("analysis-state").textContent = labels[data.status];
     el("analysis-frameworks").textContent = data.frameworks.join(" · ");
     el("questions-nav").disabled = !(data.status === "awaiting-answers" || (data.status === "running" && data.pauses));
     el("stop-run").hidden = data.status !== "running";
@@ -64,8 +76,10 @@ const workspace = (() => {
   };
   const fetchRun = async (id) => {
     const response = await fetch("/workspace/runs/" + encodeURIComponent(id));
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message);
+    const problem = "Could not load this analysis. Try again.";
+    if (!response.ok) throw new Error(await messageOf(response, problem));
+    const data = await jsonOf(response);
+    if (!data) throw new Error(problem);
     return data;
   };
   // Ask once with the native dialog; resolves true on Delete.
@@ -88,36 +102,50 @@ const workspace = (() => {
     const refused = [];
     for (const run of runs) {
       const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run), {method: "DELETE"});
-      if (!response.ok) refused.push(run.name + ": " + ((await response.json().catch(() => ({}))).message || "Could not delete it."));
+      if (!response.ok) refused.push(run.name + ": " + await messageOf(response, "Could not delete it."));
     }
     await library();
     message(refused.length ? "Not deleted. " + refused.join(" ") : "Deleted " + counted(runs.length, "analysis", "analyses") + ".");
   };
   // Stop the analysis's run. A 204 says the run ended, and a 202 that it
-  // still ends; resolves to whether it ended and the page's message for it.
+  // still ends; resolves to whether it ended and the page's message for it,
+  // a lost connection included. Both Stop buttons stop here, and the run
+  // stays in `stopping` until the answer comes.
   const stopRun = async (run) => {
-    const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    let response;
+    stopping.add(run.run);
+    try {
+      response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    } catch {
+      return {ended: false, text: "Not stopped. The connection to stop “" + run.name + "” was interrupted."};
+    } finally {
+      stopping.delete(run.run);
+    }
     if (response.status === 204) return {ended: true, text: "Stopped “" + run.name + "”."};
     if (response.status === 202) return {ended: false, text: "Stopping “" + run.name + "”. Its run ends after its current step."};
-    return {ended: false, text: "Not stopped. " + ((await response.json().catch(() => ({}))).message || "Could not stop it.")};
+    return {ended: false, text: "Not stopped. " + await messageOf(response, "Could not stop it.")};
   };
   const rename = (run, cell) => {
     const input = document.createElement("input");
     input.value = run.name;
     input.maxLength = el("analysis-name").maxLength;
     input.setAttribute("aria-label", "New name for " + run.name);
+    renaming = input;
     let settled = false;
     const save = async (keep) => {
       if (settled) return;
       settled = true;
+      let refusal = "";
       if (keep && input.value !== run.name) {
         const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/title", {
           method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: input.value}),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) { await library(); message(data.message || "Could not rename it."); return; }
+        }).catch(() => null);
+        if (!response) refusal = "Not renamed. The connection was interrupted.";
+        else if (!response.ok) refusal = await messageOf(response, "Could not rename it.");
       }
+      if (renaming === input) renaming = null;
       await library();
+      if (refusal) message(refusal);
     };
     input.onkeydown = (event) => {
       if (event.key === "Enter") save(true);
@@ -128,18 +156,29 @@ const workspace = (() => {
     input.focus();
     input.select();
   };
+  // The list keeps its sort, its ticked rows and an open rename input across
+  // each read, so the answer to a Stop, a Delete or a Rename changes only the
+  // rows.
+  let sortBy = "date";
+  let descending = true;
+  const selected = new Set();
+  let renaming = null;
   const library = async () => {
-    ++generation;
+    const ticket = ++generation;
     show("library-panel");
     el("analysis-header").hidden = true;
     history.replaceState(null, "", "/?view=analyses");
     try {
       const response = await fetch("/workspace/runs");
-      if (!response.ok) throw new Error("Could not load analyses. Try again.");
-      const data = await response.json();
-      let sortBy = "date";
-      let descending = true;
-      const selected = new Set();
+      const data = response.ok ? await jsonOf(response) : null;
+      if (!data) throw new Error("Could not load analyses. Try again.");
+      // A later load, or another view, owns the page now.
+      if (ticket !== generation) return;
+      // The owner types a new name. The read after the rename draws the rows.
+      if (renaming?.isConnected) return;
+      for (const run of [...selected]) {
+        if (!data.some((row) => row.run === run)) selected.delete(run);
+      }
       const fill = (select, values, label) => {
         const chosen = select.value;
         select.replaceChildren(select.options[0], ...values.map((value) => {
@@ -197,6 +236,7 @@ const workspace = (() => {
             const stopButton = node("button", "Stop", "danger");
             stopButton.type = "button";
             stopButton.setAttribute("aria-label", "Stop " + run.name);
+            stopButton.disabled = stopping.has(run.run);
             stopButton.onclick = async () => {
               stopButton.disabled = true;
               const {text} = await stopRun(run);
@@ -209,7 +249,7 @@ const workspace = (() => {
           selectCell.append(box);
           nameCell.append(link);
           dateCell.append(created);
-          statusCell.append(node("span", labels[run.status] || run.status, "badge"));
+          statusCell.append(node("span", labels[run.status], "badge"));
           actionCell.append(actions);
           row.append(selectCell, nameCell, dateCell, statusCell, actionCell);
           el("analysis-rows").append(row);
@@ -249,7 +289,7 @@ const workspace = (() => {
       el("analysis-status").onchange = render;
       el("analysis-framework").onchange = render;
       render();
-    } catch (error) { message(error.message); }
+    } catch (error) { if (ticket === generation) message(error.message); }
   };
   // Reopening polls snapshots, never competes with the original SSE consumer.
   const open = async (id) => {
@@ -264,20 +304,20 @@ const workspace = (() => {
       el("description").value = data.description;
       el("analysis-name").value = data.name;
       for (const checkbox of boxes) {
-        const selected = data.selection.find((item) => item.name === checkbox.value);
-        checkbox.checked = Boolean(selected);
-        if (selected) optionsOf(checkbox).forEach((control) => {
-          control.value = JSON.stringify(selected.options[control.dataset.option]);
+        const chosen = data.selection.find((item) => item.name === checkbox.value);
+        checkbox.checked = Boolean(chosen);
+        if (chosen) optionsOf(checkbox).forEach((control) => {
+          control.value = JSON.stringify(chosen.options[control.dataset.option]);
         });
         sync(checkbox);
       }
       // The snapshot lists only the reports the app serves.
       const served = data.reports.some((report) => report.run === data.run);
       if (data.questions) showQuestions(data.questions);
-      else if (data.status === "running") {
+      else if (data.status === "running" || data.continuing) {
         show("progress-panel");
         el("status").hidden = false;
-        processing(data.completed_steps, data.pauses, undefined, data.run);
+        processing(data.progress, data.run);
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (view === "description") {
         show("description-panel");
@@ -289,7 +329,7 @@ const workspace = (() => {
         if (data.status === "stopped") message("You stopped the analysis. Open an earlier paused run to retry, or start a new analysis.");
         if (data.status === "completed" && !served) message("The report of this analysis is withheld.");
       }
-    } catch (error) { message(error.message); }
+    } catch (error) { if (ticket === generation) message(error.message); }
   };
   // The link opens the list in place; library() writes the same URL.
   el("library-nav").addEventListener("click", (event) => {
@@ -300,6 +340,8 @@ const workspace = (() => {
     el("stop-run").disabled = true;
     const {ended, text} = await stopRun(current);
     el("stop-run").disabled = false;
+    // The list may show this run's Stop, held off while the stop ran.
+    if (!el("library-panel").hidden) await library();
     // An ended run shows its own status on the next read.
     if (!ended) message(text);
   });
@@ -317,43 +359,7 @@ const workspace = (() => {
     try {
       const data = await fetchRun(id);
       if (ticket === generation) metadata(data);
-    } catch (error) { message(error.message); }
-  };
-  // Each quarter marks a completed stage, not a share of elapsed time.
-  const completedStage = (step, pauses) => {
-    if (step === "extract") return 1;
-    if (["validate", "repair", "revalidate", "capabilities", "stated", "read", "assert"].includes(step)) return 2;
-    if (pauses && step === "catalog") return 3;
-    if (pauses && step === "pause") return 4;
-    if (!pauses && step === "prepare") return 2;
-    if (!pauses && (step.startsWith("join_") || step.startsWith("merge_")
-        || step.startsWith("critic_") || step.startsWith("critic_failed_")
-        || step.startsWith("router_") || step.startsWith("recritic_")
-        || step.startsWith("rereview_"))) return 3;
-    if (!pauses && step === "assemble") return 4;
-    return 0;
-  };
-  const stageAfter = (step, pauses) => {
-    if (!step) return pauses ? "Reading your description and identifying the parts of your system…"
-      : "Preparing the analysis…";
-    if (step === "extract" || step === "repair") return "Checking the system map for gaps or conflicting details…";
-    if (step === "validate" || step === "revalidate") return "Noting the security measures you’ve already described…";
-    if (step === "capabilities" || step === "stated" || step === "read") {
-      return "Identifying details that would make the analysis more precise…";
-    }
-    if (step === "assert") return "Choosing the relevant checks for your system…";
-    if (step === "catalog" || step === "pause") return "Generating questions…";
-    if (step === "prepare" || step.startsWith("analyze_")) {
-      return "Examining your system against the selected frameworks…";
-    }
-    if (step.startsWith("join_") || step.startsWith("merge_") || step.startsWith("critic_")
-        || step.startsWith("critic_failed_")
-        || step.startsWith("router_") || step.startsWith("recritic_")
-        || step.startsWith("rereview_")) {
-      return "Bringing the results together and checking the findings…";
-    }
-    if (step === "assemble") return "Putting your report together…";
-    return "Continuing the analysis…";
+    } catch (error) { if (ticket === generation) message(error.message); }
   };
   // A one-second count shows that a long step still runs. It sits outside
   // the status region, so a screen reader hears only a change of step.
@@ -365,26 +371,37 @@ const workspace = (() => {
     }
     const seconds = Math.floor((Date.now() - stepStarted) / 1000);
     const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-    el("status-elapsed").textContent = `Still working on this step · ${clock}. Some steps take a few minutes.`;
+    el("status-elapsed").textContent = FORM_WORDS.progress_panel["still-working"].replace("{clock}", clock);
   };
-  const processing = (steps, pauses, initialStage, runId) => {
+  // Show the progress line of the run. `sent` is the line the service sends:
+  // its count of complete stages, its count of stages, its words
+  // (webapp.progress) and the number of its last event. The stream and the
+  // status answer both send lines, so the page keeps the line of the latest
+  // event. Before the service sends a line, the page shows no words and the
+  // bar shows no count, because only the service knows where a run starts and
+  // how many stages it has.
+  const processing = (sent, runId) => {
+    const progress = el("analysis-progress");
     if (runId && progressRun !== runId) {
       progressRun = runId;
-      completedSteps = [];
+      sentLine = null;
       stepStatus = null;
-      el("analysis-progress").value = 0;
+      progress.removeAttribute("value");
+      progress.removeAttribute("aria-valuetext");
     }
-    if (steps?.length === 1 && !completedSteps.includes(steps[0])) {
-      completedSteps.push(steps[0]);
-    } else if (steps?.length > completedSteps.length) {
-      completedSteps = steps;
+    if (sent) {
+      progress.max = sent.count;
+      progress.value = Math.max(progress.value, sent.stage);
+      if (sent.seq > (sentLine?.seq ?? -1)) sentLine = sent;
     }
-    const latest = completedSteps.at(-1);
-    const progress = el("analysis-progress");
-    progress.value = Math.max(progress.value, ...completedSteps.map((step) => completedStage(step, pauses)));
-    progress.setAttribute("aria-valuetext", `${progress.value} of 4 stages complete`);
-    const status = latest ? stageAfter(latest, pauses) : initialStage || stageAfter(null, pauses);
-    el("status-text").textContent = `${progress.value} of 4 stages complete · ${status}`;
+    const status = sentLine?.words ?? "";
+    if (sentLine) {
+      const complete = FORM_WORDS.progress_panel["stages-complete"].replace("{complete}", progress.value).replace("{count}", progress.max);
+      progress.setAttribute("aria-valuetext", complete);
+      el("status-text").textContent = `${complete} · ${status}`;
+    } else {
+      el("status-text").textContent = status;
+    }
     if (status !== stepStatus) {
       stepStatus = status;
       stepStarted = Date.now();
@@ -409,7 +426,7 @@ const workspace = (() => {
   queueMicrotask(() => {
     if (params.get("run")) open(params.get("run"));
     else if (params.get("view") === "analyses") library();
-    fetch("/workspace/runs").then((response) => response.ok ? response.json() : []).then((runs) => {
+    fetch("/workspace/runs").then((response) => response.ok ? jsonOf(response) : []).then((runs) => {
       runs.slice(0, 5).forEach((run) => {
         const link = node("a", run.name);
         link.href = "/?run=" + encodeURIComponent(run.run);

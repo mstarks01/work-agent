@@ -68,7 +68,7 @@ client. The first attempt would therefore carry its own SDK-level retries
 underneath, and the worst case per node would be ``2 * attempts - 1``
 requests: five at the shipped three, and five times the fan-out in the seconds the lane agents
 go out together. Against a per-minute quota, that burst is what turns one 429
-into a run that spends its budget on retried 429s, which is OWASP LLM10. Passing
+into a run whose retries all go to repeated 429s, which is OWASP LLM10. Passing
 ``max_retries`` does not close it, because ``num_retries`` overwrites it on the
 way to the client. ``tests/test_model_gate.py`` probes exactly that.
 
@@ -79,7 +79,7 @@ one process-wide token bucket that successful requests credit, so the service
 caps them at a share of working traffic rather than at a count per node.
 Correlated failure is the only kind that storms, and it empties the bucket once
 for everyone, after which the service stops retrying. An isolated failure sees a
-full bucket and is retried as before. Turning ``attempts`` down during an
+full bucket and is retried. Turning ``attempts`` down during an
 incident still works and is still the blunt instrument. The budget is what makes
 that rarely necessary.
 
@@ -98,16 +98,26 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Self
+from typing import NamedTuple, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.config_files import read_toml, validation_problems
+from analysis_service.controls import (
+    MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROL_EVIDENCE_TOTAL_BYTES,
+    MAX_CONTROLS_CEILING,
+    ControlLimits,
+)
 from analysis_service.errors import ConfigError
 from analysis_service.parsing import is_version
 from analysis_service.retry import RetryBudget, RetryPolicy
-from analysis_service.sources import SourceLimits
+from analysis_service.sources import (
+    MAX_SOURCE_BYTES_CEILING,
+    MAX_SOURCES_CEILING,
+    SourceLimits,
+)
 from analysis_service.vendors import UPSTREAM_SLUG
 
 # The only schema version this loader accepts. The version check fires before
@@ -122,7 +132,7 @@ from analysis_service.vendors import UPSTREAM_SLUG
 # guide asks for a timeout above ten minutes, so the shipped row states thirty
 # minutes for both bounds. The table is required, and a deployment that wants
 # no per-upstream bound writes an empty one and means it.
-SUPPORTED_VERSION = 8
+SUPPORTED_VERSION = 10
 
 _ENV_PREFIX = "ANALYSIS_"
 
@@ -130,6 +140,9 @@ ATTEMPTS_VAR = f"{_ENV_PREFIX}RETRY_ATTEMPTS"
 TIMEOUT_MS_VAR = f"{_ENV_PREFIX}TIMEOUT_MS"
 MAX_SOURCE_BYTES_VAR = f"{_ENV_PREFIX}MAX_SOURCE_BYTES"
 MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
+MAX_OWNER_FILES_VAR = f"{_ENV_PREFIX}MAX_OWNER_FILES"
+MAX_CONTROLS_VAR = f"{_ENV_PREFIX}MAX_CONTROLS"
+MAX_CONTROL_EVIDENCE_VAR = f"{_ENV_PREFIX}MAX_CONTROL_EVIDENCE"
 JOB_DEADLINE_MS_VAR = f"{_ENV_PREFIX}JOB_DEADLINE_MS"
 RETRY_BUDGET_RATIO_VAR = f"{_ENV_PREFIX}RETRY_BUDGET_RATIO"
 MAX_ACTIVE_JOBS_VAR = f"{_ENV_PREFIX}MAX_ACTIVE_JOBS"
@@ -146,6 +159,9 @@ ENV_OVERRIDES: dict[str, tuple[str, Callable[[str], float]]] = {
     "timeout_ms": (TIMEOUT_MS_VAR, int),
     "max_source_bytes": (MAX_SOURCE_BYTES_VAR, int),
     "max_sources": (MAX_SOURCES_VAR, int),
+    "max_owner_files": (MAX_OWNER_FILES_VAR, int),
+    "max_controls": (MAX_CONTROLS_VAR, int),
+    "max_control_evidence": (MAX_CONTROL_EVIDENCE_VAR, int),
     "job_deadline_ms": (JOB_DEADLINE_MS_VAR, int),
     "retry_budget_ratio": (RETRY_BUDGET_RATIO_VAR, float),
     "max_active_jobs": (MAX_ACTIVE_JOBS_VAR, int),
@@ -165,6 +181,12 @@ class ResilienceConfigError(ConfigError):
     """The resilience configuration is invalid or unusable."""
 
 
+#: The longest request timeout and the longest job deadline, in milliseconds:
+#: one hour and one day. The base bounds and each upstream's row share them.
+TIMEOUT_MS_CEILING = 3_600_000
+JOB_DEADLINE_MS_CEILING = 86_400_000
+
+
 class UpstreamBounds(BaseModel):
     """The two durations a request pinned to one upstream reads instead of the base.
 
@@ -175,8 +197,8 @@ class UpstreamBounds(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    timeout_ms: int = Field(gt=0)
-    job_deadline_ms: int = Field(gt=0)
+    timeout_ms: int = Field(gt=0, le=TIMEOUT_MS_CEILING)
+    job_deadline_ms: int = Field(gt=0, le=JOB_DEADLINE_MS_CEILING)
 
 
 class ResilienceConfig(BaseModel):
@@ -197,8 +219,11 @@ class ResilienceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: int = Field(ge=1)
-    attempts: int = Field(ge=1)
-    timeout_ms: int = Field(gt=0)
+    #: Each bound has a ceiling as well as a floor, so a typing slip cannot
+    #: lift a bound out of reach. The Settings page reads both from here
+    #: (:func:`numeric_bounds`).
+    attempts: int = Field(ge=1, le=10)
+    timeout_ms: int = Field(gt=0, le=TIMEOUT_MS_CEILING)
     #: The bounds a request pinned to a named upstream reads, keyed by the
     #: gateway's slug for it. :meth:`request_timeout_seconds` and
     #: :meth:`deadline_seconds` read a row where a tier's ``[upstreams]`` pin
@@ -206,15 +231,36 @@ class ResilienceConfig(BaseModel):
     #: other request and job. Required and empty-able rather than defaulted, so
     #: a file states whether it has one.
     bounds_by_upstream: dict[str, UpstreamBounds]
-    max_source_bytes: int = Field(gt=0)
-    max_sources: int = Field(ge=1)
-    job_deadline_ms: int = Field(gt=0)
+    max_source_bytes: int = Field(gt=0, le=MAX_SOURCE_BYTES_CEILING)
+    max_sources: int = Field(ge=1, le=MAX_SOURCES_CEILING)
+    #: How many Owner Files one owner keeps (ADR 0118). Owner Files do not
+    #: expire, so this bound keeps one owner's store finite.
+    max_owner_files: int = Field(ge=1, le=10_000)
+    #: How many Controls one owner keeps, and how many evidence files one
+    #: Control holds (ADR 0127). Controls do not expire either.
+    max_controls: int = Field(ge=1, le=MAX_CONTROLS_CEILING)
+    max_control_evidence: int = Field(ge=1, le=MAX_CONTROL_EVIDENCE_CEILING)
+    job_deadline_ms: int = Field(gt=0, le=JOB_DEADLINE_MS_CEILING)
     retry_budget_ratio: float = Field(gt=0, le=1)
-    max_active_jobs: int = Field(ge=1)
-    budget_window_seconds: int = Field(gt=0)
-    max_jobs_per_window: int = Field(ge=1)
-    max_tokens_per_window: int = Field(ge=1)
-    global_max_tokens_per_window: int = Field(ge=1)
+    max_active_jobs: int = Field(ge=1, le=100)
+    budget_window_seconds: int = Field(gt=0, le=2_592_000)
+    max_jobs_per_window: int = Field(ge=1, le=100_000)
+    max_tokens_per_window: int = Field(ge=1, le=10**12)
+    global_max_tokens_per_window: int = Field(ge=1, le=10**12)
+
+    @model_validator(mode="after")
+    def _check_control_evidence_total(self) -> Self:
+        """Refuse more evidence text in one Control than
+        ``MAX_CONTROL_EVIDENCE_TOTAL_BYTES``, so the guard of a Control save's
+        body stays bounded."""
+        total = self.max_control_evidence * self.max_source_bytes
+        if total > MAX_CONTROL_EVIDENCE_TOTAL_BYTES:
+            raise ValueError(
+                f"max_control_evidence × max_source_bytes is {total:,} bytes."
+                f" One Control holds at most {MAX_CONTROL_EVIDENCE_TOTAL_BYTES:,}"
+                " bytes of evidence. Lower one of the two."
+            )
+        return self
 
     @model_validator(mode="after")
     def _check_upstream_keys(self) -> Self:
@@ -287,6 +333,15 @@ class ResilienceConfig(BaseModel):
             max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
         )
 
+    def control_limits(self) -> ControlLimits:
+        """The bounds on an owner's Controls. One evidence file is at most
+        what one job's sources may carry."""
+        return ControlLimits(
+            max_controls=self.max_controls,
+            max_evidence=self.max_control_evidence,
+            max_evidence_bytes=self.max_source_bytes,
+        )
+
     def request_timeout_seconds(self, upstreams: Iterable[str]) -> float:
         """The per-request timeout as LiteLLM wants it: seconds, not milliseconds.
 
@@ -317,6 +372,27 @@ class ResilienceConfig(BaseModel):
         second copy of itself.
         """
         return self._pinned("timeout_ms", upstreams, self.timeout_ms) / 1000
+
+
+class NumericBounds(NamedTuple):
+    """The range of one numeric setting. ``least`` is an inclusive floor and
+    ``above`` an exclusive floor; a setting has one of the two at most."""
+
+    least: float | None
+    above: float | None
+    most: float | None
+
+
+def numeric_bounds(field: str) -> NumericBounds:
+    """The range of ``field`` that :class:`ResilienceConfig` takes, from its
+    schema. ``None`` where a bound is absent. An exclusive floor of an integer
+    is the next integer, so only a decimal has an exclusive floor."""
+    schema = ResilienceConfig.model_json_schema()["properties"][field]
+    least = schema.get("minimum")
+    above = schema.get("exclusiveMinimum")
+    if above is not None and schema["type"] == "integer":
+        least, above = above + 1, None
+    return NumericBounds(least, above, schema.get("maximum"))
 
 
 def _override(

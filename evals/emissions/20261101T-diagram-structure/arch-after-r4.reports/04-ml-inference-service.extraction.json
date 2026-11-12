@@ -1,0 +1,540 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:calling-service",
+        "name": "calling service",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[calling service] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ml engineer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[ml engineer] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-model-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "inference gateway",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[inference gateway] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-serving-edge",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "model server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[model server] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:model-registry-bucket",
+        "name": "model registry bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(database)[model registry bucket] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[Redis feature store] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "Redis",
+        "trust_zone": "boundary:trust-zone-model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "inference log",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n6(database)[inference log] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-serving-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-service>process:inference-gateway>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:calling-service",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:model-server",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:redis-feature-store>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:model-server",
+        "destination": "store:redis-feature-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-public-internet",
+        "name": "Trust zone public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-serving-edge",
+        "name": "Trust zone serving edge",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone serving edge]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-model-network",
+        "name": "Trust zone model network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone model network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The calling service is an external system because it is identified as a service calling the inference gateway from the public internet zone.",
+        "element_id": "entity:calling-service",
+        "attribute": "kind",
+        "basis": "The diagram labels the node \"calling service\", places it in \"Trust zone public internet\", and directs its flow to the inference gateway."
+      },
+      {
+        "assumption": "The public internet, serving edge, and model network are network trust boundaries.",
+        "element_id": "boundary:trust-zone-public-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly labeled \"Trust zone public internet\", indicating a network location."
+      },
+      {
+        "assumption": "The serving edge is a network trust boundary.",
+        "element_id": "boundary:trust-zone-serving-edge",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly labeled \"Trust zone serving edge\", indicating a network location."
+      },
+      {
+        "assumption": "The model network is a network trust boundary.",
+        "element_id": "boundary:trust-zone-model-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly labeled \"Trust zone model network\", indicating a network location."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:calling-service",
+        "name": "calling service",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[calling service] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ml engineer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[ml engineer] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-model-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "inference gateway",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[inference gateway] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-serving-edge",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "model server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[model server] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:model-registry-bucket",
+        "name": "model registry bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(database)[model registry bucket] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[Redis feature store] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "Redis",
+        "trust_zone": "boundary:trust-zone-model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "inference log",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n6(database)[inference log] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-serving-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-service>process:inference-gateway>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:calling-service",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:model-server",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:redis-feature-store>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:model-server",
+        "destination": "store:redis-feature-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>data",
+        "name": "data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-public-internet",
+        "name": "Trust zone public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-serving-edge",
+        "name": "Trust zone serving edge",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone serving edge]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-model-network",
+        "name": "Trust zone model network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone model network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The calling service is an external system because it is identified as a service calling the inference gateway from the public internet zone.",
+        "element_id": "entity:calling-service",
+        "attribute": "kind",
+        "basis": "The diagram labels the node \"calling service\", places it in \"Trust zone public internet\", and directs its flow to the inference gateway."
+      },
+      {
+        "assumption": "The public internet, serving edge, and model network are network trust boundaries.",
+        "element_id": "boundary:trust-zone-public-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly labeled \"Trust zone public internet\", indicating a network location."
+      },
+      {
+        "assumption": "The serving edge is a network trust boundary.",
+        "element_id": "boundary:trust-zone-serving-edge",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly labeled \"Trust zone serving edge\", indicating a network location."
+      },
+      {
+        "assumption": "The model network is a network trust boundary.",
+        "element_id": "boundary:trust-zone-model-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly labeled \"Trust zone model network\", indicating a network location."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

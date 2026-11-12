@@ -46,6 +46,7 @@ def proposal_for(case, reference, title):  # noqa: F811
         "description": f"{reference.claim} Injected by the test.",
         "affected_element_ids": list(reference.affected_element_ids),
         "verb": reference.verb,
+        "attacker_position": "outside",
         "severity": {
             "likelihood": reference.severity.likelihood,
             "impact": reference.severity.impact,

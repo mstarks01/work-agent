@@ -32,13 +32,15 @@ withheld.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Literal, get_args
+from types import MappingProxyType
+from typing import Any, Literal, TypedDict, get_args
 
 from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import (
+    MAX_VALUE_CHARS,
     SETTINGS_FILE,
     SettingsFileError,
     SettingsLine,
@@ -68,6 +70,8 @@ from analysis_service.store_backends import (
     CLOSED_SETTINGS,
     JOB_STORE_VAR,
     JOB_STORES,
+    MAX_RETENTION_DAYS,
+    MIN_RETENTION_DAYS,
     RETENTION_DAYS_VAR,
     JobStore,
     build_store,
@@ -96,6 +100,21 @@ from webapp.settings_page import (
 #: Where a row's value comes from. ``refused`` is a file the loader refuses,
 #: which a row shows in place of a value. ``settings.js`` shows each one.
 ValueOrigin = Literal["process", "page", "file", "refused", "default"]
+
+#: The words ``settings.js`` shows for each source. A value from a file shows
+#: the path of the file in their place.
+ORIGIN_WORDS: Mapping[ValueOrigin, str | None] = MappingProxyType(
+    {
+        "process": "process environment",
+        "page": "this page",
+        "file": None,
+        "refused": "refused",
+        "default": "default",
+    }
+)
+
+#: The numbers a numeric row takes. ``settings.js`` checks each one.
+Numeric = Literal["integer", "decimal"]
 
 
 def store_defaults(env: Mapping[str, str]) -> dict[str, str]:
@@ -195,7 +214,8 @@ def settings_view(
             "mark": setting.mark,
             "reason": setting.reason,
             "note": setting.note,
-            "restart": var in stores,
+            # A store setting decides which store rows show, and it takes
+            # effect after a restart.
             "store": var in stores,
             "example": EXAMPLES.get(key),
             **_CONTROLS.get(key, {}),
@@ -215,6 +235,8 @@ def settings_view(
             if var not in page
         ],
         "rows": rows,
+        # The longest value the value rule and the secret rule take.
+        "value_chars": MAX_VALUE_CHARS,
         "store_shown": _store_keys(merged),
         "modes": {
             vendor: [mode.value for mode in VENDORS[vendor].credential_modes]
@@ -292,7 +314,26 @@ def _store_keys(merged: Mapping[str, str]) -> list[str]:
     return [key for key, setting in SETTINGS.items() if setting.variable in shown]
 
 
-def _controls() -> dict[str, dict[str, Any]]:
+def _numeric(parser: Callable[[str], float]) -> Numeric:
+    return "integer" if parser is int else "decimal"
+
+
+class NumericEntry(TypedDict):
+    """A numeric setting's control: its kind and the range the loader takes.
+    ``above`` is an exclusive floor."""
+
+    numeric: Numeric
+    min: float | None
+    above: float | None
+    max: float | None
+
+
+def _resilience_entry(field: str, parser: Callable[[str], float]) -> NumericEntry:
+    least, above, most = resilience.numeric_bounds(field)
+    return {"numeric": _numeric(parser), "min": least, "above": above, "max": most}
+
+
+def _controls() -> dict[str, Mapping[str, object]]:
     """The closed set of each Deployment Setting whose loader holds one, from
     that loader's table, so the page offers a choice in place of free text.
     ``multiple`` marks a list of names separated by commas. A tier's model row
@@ -321,11 +362,16 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in CLOSED_SETTINGS
         },
     }
-    numeric = {
-        f"resilience.{field}": {"numeric": "integer" if parser is int else "decimal"}
+    numeric: dict[str, NumericEntry] = {
+        f"resilience.{field}": _resilience_entry(field, parser)
         for field, (_, parser) in resilience.ENV_OVERRIDES.items()
     }
-    numeric["store.retention_days"] = {"numeric": "integer"}
+    numeric["store.retention_days"] = {
+        "numeric": "integer",
+        "min": MIN_RETENTION_DAYS,
+        "above": None,
+        "max": MAX_RETENTION_DAYS,
+    }
     return {
         **numeric,
         **{
@@ -429,7 +475,12 @@ def _sourced(
     source: ValueOrigin, value: str | None, **detail: str | None
 ) -> dict[str, Any]:
     """A row's value, where it comes from, and the detail that source shows."""
-    return {"value": value, "source": source, **detail}
+    return {
+        "value": value,
+        "source": source,
+        "source_text": ORIGIN_WORDS[source],
+        **detail,
+    }
 
 
 def _override_form(value: object) -> str:

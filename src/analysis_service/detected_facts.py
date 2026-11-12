@@ -36,8 +36,10 @@ def detected_facts(model: SystemModel) -> list[dict[str, object]]:
     """Each element with the facts the model states about it, in model order.
 
     A fact is an attribute whose value is neither ``unknown`` nor empty, and
-    the element's assets. ``inferred`` holds the basis where extraction
-    recorded the value as an assumption, and is empty where a source states it.
+    the element's assets. ``type`` is the element's
+    :data:`~analysis_service.system_model.ElementPrefix`. ``inferred`` holds
+    the basis where extraction recorded the value as an assumption, and is
+    empty where a source states it.
     """
     names = dict(element_names(model))
     basis = {(a.element_id, a.attribute): a.basis for a in model.assumptions}
@@ -67,7 +69,7 @@ def detected_facts(model: SystemModel) -> list[dict[str, object]]:
             {
                 "element": element.id,
                 "name": names.get(element.id, element.name),
-                "type": type(element).__name__,
+                "type": element.id_prefix,
                 "excerpt": element.source_excerpt,
                 "source_label": element.source_label,
                 "facts": facts,

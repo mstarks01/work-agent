@@ -54,14 +54,14 @@ from analysis_service.objects import (
     OBJECT_CREDENTIALS_VAR,
     OBJECT_ENDPOINT_VAR,
     OBJECT_REGION_VAR,
-    OBJECT_STORES,
+    OBJECT_STORE_VAR,
     S3_KEY_FILES,
     Addressing,
+    credential_mode,
 )
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
-    refuse_unread,
 )
 from analysis_service.vendors import REGION, CredentialMode
 
@@ -85,15 +85,9 @@ def _key_pair(env: Mapping[str, str]) -> boto3.Session:
 
 def _platform_identity(env: Mapping[str, str]) -> boto3.Session:
     """``iam``: a session on the identity of the platform, by
-    :func:`~analysis_service.aws_identity.platform_session`. A key file stops
-    the startup too, so a static key works only where the deployment declares
-    ``api_key``."""
-    for var in S3_KEY_FILES.values():
-        if env.get(var, "").strip():
-            raise StoreConfigError(
-                f"the iam mode of the s3 object store reads no static key;"
-                f" unset {var}, or set ANALYSIS_OBJECT_CREDENTIALS=api_key"
-            )
+    :func:`~analysis_service.aws_identity.platform_session`. The mode reads no
+    key file, so :func:`_credential_mode` refuses one, and a static key works
+    only where the deployment declares ``api_key``."""
     return platform_session("the iam mode of the s3 object store")
 
 
@@ -105,26 +99,20 @@ CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], boto3.Session]] 
 }
 
 
-def _refuse_stray_settings(env: Mapping[str, str]) -> None:
-    """Refuse a key in the environment by name, then any other unread setting."""
+def _credential_mode(env: Mapping[str, str]) -> CredentialMode:
+    """The credential mode that ``env`` selects. A key in the environment
+    stops the startup by its name, and so does each setting that the mode
+    does not read."""
     for var in S3_KEY_FILES.values():
         refuse_bare_secret(env, var, StoreConfigError)
-    refuse_unread(
-        env, ("ANALYSIS_OBJECT_",), OBJECT_STORES["s3"].reads, "the s3 object store"
-    )
-
-
-def _session(env: Mapping[str, str]) -> boto3.Session:
-    value = env.get(OBJECT_CREDENTIALS_VAR, "")
-    mode = closed_setting(value, OBJECT_CREDENTIALS_VAR, CREDENTIALS)
-    return CREDENTIALS[mode](env)
+    return credential_mode(env, "s3")
 
 
 #: Each endpoint host that accepts no ``If-None-Match`` on a write, by its
 #: suffix: the name of its store, then what to do instead (ADR 0103). Through
 #: such a host, a put replaces an object with no error.
 _NO_CREATE_ONLY: dict[str, tuple[str, str]] = {
-    "googleapis.com": ("Google Cloud Storage", "set ANALYSIS_OBJECT_STORE=gcs"),
+    "googleapis.com": ("Google Cloud Storage", f"set {OBJECT_STORE_VAR}=gcs"),
     "backblazeb2.com": ("Backblaze B2", "use a store that accepts it"),
 }
 
@@ -136,7 +124,7 @@ def _refuse_host(host: str) -> None:
     for suffix, (store, remedy) in _NO_CREATE_ONLY.items():
         if host == suffix or host.endswith(f".{suffix}"):
             raise StoreConfigError(
-                f"ANALYSIS_OBJECT_ENDPOINT names a {store} host, which accepts"
+                f"{OBJECT_ENDPOINT_VAR} names a {store} host, which accepts"
                 f" no If-None-Match on a write; {remedy}"
             )
 
@@ -155,9 +143,9 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
         # A port that is not a number raises here.
         host, _ = parts.hostname, parts.port
     except ValueError:
-        raise StoreConfigError("ANALYSIS_OBJECT_ENDPOINT is not a URL") from None
+        raise StoreConfigError(f"{OBJECT_ENDPOINT_VAR} is not a URL") from None
     if parts.scheme != "https":
-        raise StoreConfigError("ANALYSIS_OBJECT_ENDPOINT must be an https URL")
+        raise StoreConfigError(f"{OBJECT_ENDPOINT_VAR} must be an https URL")
     extra = (
         parts.username is not None
         or parts.password is not None
@@ -167,7 +155,7 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
     )
     if not host or extra:
         raise StoreConfigError(
-            "ANALYSIS_OBJECT_ENDPOINT must hold https://, a host and an optional"
+            f"{OBJECT_ENDPOINT_VAR} must hold https://, a host and an optional"
             " port, and nothing more"
         )
     # ``hostname`` is lower case and holds no port.
@@ -201,7 +189,7 @@ def _code(error: ClientError) -> str | None:
 _REFUSALS: dict[int, str] = {
     403: (
         "the object store refuses access to the bucket {bucket!r}: check"
-        " ANALYSIS_OBJECT_CREDENTIALS, the key files and the policy of the bucket"
+        f" {OBJECT_CREDENTIALS_VAR}, the key files and the policy of the bucket"
     ),
     404: "the bucket {bucket!r} does not exist",
 }
@@ -222,7 +210,7 @@ class S3ObjectStore:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> S3ObjectStore:
-        _refuse_stray_settings(env)
+        mode = _credential_mode(env)
         bucket = _required(env, OBJECT_BUCKET_VAR, _BUCKET)
         region = _required(env, OBJECT_REGION_VAR, REGION)
         addressing = closed_setting(
@@ -230,7 +218,7 @@ class S3ObjectStore:
             OBJECT_ADDRESSING_VAR,
             dict.fromkeys(get_args(Addressing)),
         )
-        client = _session(env).client(
+        client = CREDENTIALS[mode](env).client(
             "s3",
             region_name=region,
             endpoint_url=_endpoint(env),
@@ -264,7 +252,7 @@ class S3ObjectStore:
             reason = _REFUSALS.get(
                 status or 0,
                 "HeadBucket on the bucket {bucket!r} failed with HTTP {status}:"
-                " check ANALYSIS_OBJECT_REGION and ANALYSIS_OBJECT_ENDPOINT",
+                f" check {OBJECT_REGION_VAR} and {OBJECT_ENDPOINT_VAR}",
             )
             raise StoreConfigError(
                 reason.format(bucket=self._bucket, status=status)

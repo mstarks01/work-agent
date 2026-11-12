@@ -34,9 +34,11 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, NamedTuple, get_args
+
+from pydantic import ValidationError
 
 from analysis_service.claims import (
     AnalysisMarks,
@@ -46,11 +48,11 @@ from analysis_service.claims import (
     Ruling,
 )
 from analysis_service.critic_round import CriticRound, Failed
+from analysis_service.errors import error_place
 from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import finished_file
+from evals.harness.bundle import UnreadableReport, finished_file, read_report
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
@@ -61,10 +63,24 @@ def ruling_type(framework: FrameworkName) -> type[Ruling]:
     return get_args(batch.model_fields["claims"].annotation)[0]
 
 
+class ArchivedRulingError(ValueError):
+    """A ruled claim whose ruling today's ruling record refuses.
+
+    A report reads the shapes its archive holds, and a ruling record holds
+    only what a critic may write today: a claim rejected as ``duplicate``
+    (ADR 0059) rebuilds a ruling that :class:`~analysis_service.claims.ProposedVerdict`
+    refuses.
+    """
+
+
 def rulings_from_report(
     block: FrameworkAnalysis, drafts: Sequence[Claim]
 ) -> list[Ruling]:
-    """Every ruling the critic made on this block, rebuilt from its ruled claims."""
+    """Every ruling the critic made on this block, rebuilt from its ruled claims.
+
+    Raises :class:`ArchivedRulingError`, naming the claim and the field, where
+    a rebuilt ruling is one today's critic may not write.
+    """
     record = ruling_type(block.framework)
     verdict_fields = get_args(record.model_fields["verdict"].annotation) or (
         record.model_fields["verdict"].annotation,
@@ -85,7 +101,16 @@ def rulings_from_report(
             if draft is not None and getattr(draft, name, None) == value:
                 value = None
             values[name] = value
-        rulings.append(record.model_validate(values))
+        try:
+            rulings.append(record.model_validate(values))
+        except ValidationError as error:
+            problems = "; ".join(
+                f"{error_place(problem)} holds {problem['input']!r}: {problem['msg']}"
+                for problem in error.errors()
+            )
+            raise ArchivedRulingError(
+                f"{claim.id}: today's {record.__name__} refuses {problems}"
+            ) from error
     return rulings
 
 
@@ -99,9 +124,9 @@ class AssemblyReplay:
     replayed: tuple[str, ...]
     rejected_reported: tuple[str, ...]
     rejected_replayed: tuple[str, ...]
-    #: Why today's review check refused the archived rulings, where it did.
-    #: Assembly fails closed on a ruling the check refuses, so an older archive
-    #: can hold rulings today's code would never assemble.
+    #: Why today's ruling record or review check refused the archived rulings,
+    #: where one did. Assembly fails closed on a ruling either refuses, so an
+    #: older archive can hold rulings today's code would never assemble.
     refused: str = ""
 
     #: Drafts the critic ruled on that the report carries in neither array.
@@ -129,42 +154,51 @@ def replay_case(
     ruled = {claim.id for claim in block.all_claims()}
     omitted = tuple(sorted(draft.id for draft in drafts if draft.id not in ruled))
     accounted = [draft for draft in drafts if draft.id in ruled]
-    # The block carries no fan-in marks and no catalog a replay of assembly
-    # reads: the view is not built here, only the rulings are checked and merged.
-    critic_round = CriticRound.of(framework, model, accounted, AnalysisMarks(), None)
-    outcome = critic_round.outcome(
-        [
-            ruling.model_dump(mode="json")
-            for ruling in rulings_from_report(block, accounted)
-        ]
-    )
-    if isinstance(outcome, Failed):
-        return AssemblyReplay(
-            case=case.id,
-            framework=framework,
-            reported=tuple(claim.id for claim in block.claims),
-            replayed=(),
-            rejected_reported=tuple(claim.id for claim in block.rejected_claims),
-            rejected_replayed=(),
-            refused=str(outcome.error),
-            omitted=omitted,
-        )
-    return AssemblyReplay(
+    held = AssemblyReplay(
         case=case.id,
         framework=framework,
         reported=tuple(claim.id for claim in block.claims),
-        replayed=tuple(claim.id for claim in outcome.claims),
+        replayed=(),
         rejected_reported=tuple(claim.id for claim in block.rejected_claims),
-        rejected_replayed=tuple(claim.id for claim in outcome.rejected),
+        rejected_replayed=(),
         omitted=omitted,
     )
+    try:
+        rulings = rulings_from_report(block, accounted)
+    except ArchivedRulingError as error:
+        return replace(held, refused=str(error))
+    # The block carries no fan-in marks and no catalog a replay of assembly
+    # reads: the view is not built here, only the rulings are checked and merged.
+    critic_round = CriticRound.of(
+        framework, model, accounted, AnalysisMarks(), None, ()
+    )
+    outcome = critic_round.outcome(
+        [ruling.model_dump(mode="json") for ruling in rulings]
+    )
+    if isinstance(outcome, Failed):
+        return replace(held, refused=str(outcome.error))
+    return replace(
+        held,
+        replayed=tuple(claim.id for claim in outcome.claims),
+        rejected_replayed=tuple(claim.id for claim in outcome.rejected),
+    )
+
+
+class AssemblySweep(NamedTuple):
+    """Every block of a sweep, assembled again, and each report it refused."""
+
+    rows: list[AssemblyReplay]
+    #: One line for each finished case whose report today's
+    #: :class:`~analysis_service.report.Report` refuses. That case has no
+    #: block to replay, and the other cases replay.
+    unreadable: list[str]
 
 
 def replay_artifact(
     artifact: EvalArtifact, cases: Sequence[GoldenCase]
-) -> list[AssemblyReplay]:
+) -> AssemblySweep:
     """Every framework block of every finished case, assembled again."""
-    rows = []
+    sweep = AssemblySweep(rows=[], unreadable=[])
     for case in cases:
         report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
@@ -172,13 +206,17 @@ def replay_artifact(
         drafts_path = finished_file(artifact, case.id, "drafts")
         # A finished case: finished_file returns the path or raises.
         assert drafts_path is not None
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        try:
+            report = read_report(report_path)
+        except UnreadableReport as error:
+            sweep.unreadable.append(str(error))
+            continue
         held = json.loads(drafts_path.read_text(encoding="utf-8"))
         for block in report.analyses:
             record = PACKAGES[block.framework].record
             drafts = [record.model_validate(d) for d in held.get(block.framework, [])]
-            rows.append(replay_case(case, block, drafts, report.system_model))
-    return rows
+            sweep.rows.append(replay_case(case, block, drafts, report.system_model))
+    return sweep
 
 
 def arguments(parser: argparse.ArgumentParser) -> None:
@@ -196,17 +234,19 @@ def command_assembly(args: argparse.Namespace) -> int:
             for case in development_cases(load_corpus(args.corpus))
             if case.id in artifact.cases and (not args.case or case.id in args.case)
         ]
-        rows = replay_artifact(artifact, cases)
+        rows, unreadable = replay_artifact(artifact, cases)
     except (EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
+    for line in unreadable:
+        print(line)
     moved = 0
     for row in rows:
         for claim_id in row.omitted:
             print(f"  {row.case}: ruled on and omitted from the report: {claim_id}")
         moved += bool(row.omitted)
         if row.refused:
-            print(f"{row.case:34} {row.framework:6} refused by today's review check:")
+            print(f"{row.case:34} {row.framework:6} refused by today's check:")
             print(f"  {row.refused[:200]}")
             continue
         status = "same" if not (row.omitted or row.unexplained) else "DIFFERS"
@@ -218,5 +258,8 @@ def command_assembly(args: argparse.Namespace) -> int:
             print(f"  filed differently from its ruling: {claim_id}")
         moved += bool(row.unexplained)
     refused = sum(bool(row.refused) for row in rows)
-    print(f"{len(rows)} block(s), {moved} differ, {refused} refused by today's check")
+    print(
+        f"{len(rows)} block(s), {moved} differ, {refused} refused by today's check;"
+        f" {len(unreadable)} report(s) refused by today's Report"
+    )
     return 1 if moved else 0

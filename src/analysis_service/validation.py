@@ -30,7 +30,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
-from analysis_service.capabilities import CAPABILITIES
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
+from analysis_service.diagrams import DiagramReading, DiagramStructure, node_names
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
@@ -50,12 +51,14 @@ from analysis_service.system_model import (
     Assumption,
     CapabilityStatement,
     Element,
+    ElementSourceField,
     ExcerptRepair,
     SystemModel,
     assumable_attributes,
     derive_element_id,
     duplicate_ids,
     normalize_element_ids,
+    normalize_name,
 )
 
 #: Every way an extraction is refused. All but one are this gate's own rules;
@@ -77,6 +80,8 @@ IssueCode = Literal[
     "assumption-on-unknown",
     "blank-control",
     "ambiguous-control",
+    "diagram-node-missing",
+    "diagram-edge-missing",
 ]
 
 # Admission cap on model size. Deliberately loose: it is a
@@ -106,11 +111,10 @@ class ValidationIssue(BaseModel):
 
     @property
     def is_citation(self) -> bool:
-        """Did this issue come from the one gate rule that reads the sources?
+        """Did this issue come from the gate rule that reads the sources' text?
 
-        :func:`_citation_issues` is the only rule taking data from outside the
-        model, and it is the only rule that can name either of these fields. A
-        caller that supplies no sources can never see one.
+        :func:`_citation_issues` is the only rule that can name either of these
+        fields. A caller that supplies no sources can never see one.
 
         The property exists so a caller asking *which half of the gate failed*
         reads the answer here rather than re-deriving it from a code. The eval
@@ -120,19 +124,39 @@ class ValidationIssue(BaseModel):
         """
         return self.field in CITATION_FIELDS
 
+    @property
+    def is_diagram(self) -> bool:
+        """Did this issue come from the rule that reads a diagram's structure?
+
+        Like a citation issue, it names a gap the repair pass exists to fix
+        (ADR 0121), so the eval harness grades it rather than failing the case.
+        """
+        return self.code in DIAGRAM_CODES
+
+
+#: The codes only :func:`_diagram_issues` writes.
+DIAGRAM_CODES: frozenset[IssueCode] = frozenset(
+    {"diagram-node-missing", "diagram-edge-missing"}
+)
 
 #: The fields only :func:`_citation_issues` writes. Named beside the rule so the
 #: rule and :attr:`ValidationIssue.is_citation` cannot drift apart;
 #: ``tests/test_validation.py`` drives the gate both ways and holds them to it.
-CITATION_FIELDS: frozenset[str] = frozenset({"source_label", "source_excerpt"})
+CITATION_FIELDS: frozenset[ElementSourceField] = frozenset(
+    {"source_label", "source_excerpt"}
+)
 
 
 def validate(
     model: SystemModel,
     max_elements: int = MAX_ELEMENTS,
     sources: Mapping[str, str] = MappingProxyType({}),
+    diagrams: Mapping[str, DiagramReading] = MappingProxyType({}),
 ) -> list[ValidationIssue]:
     """Run every gate rule; an empty result means the model is ready for analysis.
+
+    ``diagrams`` maps each ``diagram`` Source's label to its reading, and
+    :func:`_diagram_issues` holds the model to each structure it holds.
 
     The size cap is checked first and returns alone: a model too large to
     analyze cannot be made acceptable by fixing its IDs, and reporting the
@@ -255,7 +279,7 @@ def validate(
         issues.extend(_assumption_issues(assumption, by_id))
 
     for statement in model.capabilities:
-        if statement.capability not in CAPABILITIES:
+        if parse_capability_key(statement.capability) is None:
             issues.append(
                 ValidationIssue(
                     code="invalid-reference",
@@ -266,6 +290,9 @@ def validate(
             )
 
     issues.extend(_citation_issues(elements, model.capabilities, sources))
+    for label, reading in diagrams.items():
+        if isinstance(reading, DiagramStructure):
+            issues.extend(_diagram_issues(model, label, reading))
     element_ids = {element.id for element in elements}
     issues += [
         ValidationIssue(
@@ -279,6 +306,74 @@ def validate(
         if repair.element_id not in element_ids
     ]
     return issues
+
+
+def _diagram_issues(
+    model: SystemModel, label: str, structure: DiagramStructure
+) -> list[ValidationIssue]:
+    """Each node of a diagram is an element, and each edge a flow (ADR 0121).
+
+    A node is an External Entity, a Process or a Data Store whose name is one
+    of the node's :func:`~analysis_service.diagrams.node_names`, compared as
+    :func:`~analysis_service.system_model.normalize_name` spells both. An edge is a Data Flow between the elements of its two nodes,
+    from source to target for a ``forward`` arrow, the other way for
+    ``backward``, and either way for ``both`` or ``none``. An edge with a group
+    or a junction at an end, and every group, is not checked: a group is a
+    trust zone only where its label says so, and which elements a junction
+    joins is extraction's judgement.
+    """
+    named: dict[str | None, set[str]] = {}
+    for element in model.zoned_elements():
+        named.setdefault(_slug_or_none(element.name), set()).add(element.id)
+    named.pop(None, None)
+    ends = {
+        node.id: set().union(
+            *(named.get(_slug_or_none(name), set()) for name in node_names(node.label))
+        )
+        for node in structure.nodes
+    }
+    issues = [
+        ValidationIssue(
+            code="diagram-node-missing",
+            message=f"node {node.label!r} on line {node.line} of {label!r} is not an"
+            f" element; model it as an External Entity, a Process or a Data Store"
+            f" named {' or '.join(map(repr, node_names(node.label)))}",
+        )
+        for node in structure.nodes
+        if not ends[node.id]
+    ]
+    pairs = {(flow.source, flow.destination) for flow in model.data_flows}
+    labels = {node.id: node.label for node in structure.nodes}
+    for edge in structure.edges:
+        sources, targets = ends.get(edge.source), ends.get(edge.target)
+        if not sources or not targets:
+            continue
+        ahead = any((a, b) in pairs for a in sources for b in targets)
+        behind = any((b, a) in pairs for a in sources for b in targets)
+        held = {"forward": ahead, "backward": behind}.get(edge.arrow, ahead or behind)
+        if not held:
+            start, end = labels[edge.source], labels[edge.target]
+            if edge.arrow == "backward":
+                start, end = end, start
+            either = " in either direction" if edge.arrow in ("both", "none") else ""
+            issues.append(
+                ValidationIssue(
+                    code="diagram-edge-missing",
+                    message=f"the edge on line {edge.line} of {label!r} has no data"
+                    f" flow from {start!r} to {end!r}{either}; model it as a flow"
+                    " between those elements",
+                )
+            )
+    return issues
+
+
+def _slug_or_none(name: str) -> str | None:
+    """``name`` as :func:`normalize_name` spells it, or ``None`` for a name
+    with no slug, which the ``empty-slug`` issue reports on its own."""
+    try:
+        return normalize_name(name)
+    except ValueError:
+        return None
 
 
 def _blank_control_issues(element: Element) -> list[ValidationIssue]:
@@ -380,6 +475,14 @@ UNCERTAIN_CONTROL_LEADS: frozenset[str] = frozenset(
 )
 
 
+def ambiguous_lead(value: str) -> str | None:
+    """The word a control value opens with where it is an ambiguous or an
+    uncertain lead, or ``None``. **The one reader of which leads a control
+    value may not open with**: the gate sends such a value to repair, and a
+    Control refuses it."""
+    return leading_word(value, AMBIGUOUS_CONTROL_LEADS | UNCERTAIN_CONTROL_LEADS)
+
+
 def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
     """Every control whose leading word is a negation other than ``none``, or a doubt.
 
@@ -399,10 +502,7 @@ def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
         # sentinels, so "where a word ends" has one answer: ``no-mfa`` and
         # ``no/unknown`` open with ``no`` here exactly as ``none;`` opens with
         # ``none`` there.
-        lead = leading_word(
-            str(getattr(element, attribute)),
-            AMBIGUOUS_CONTROL_LEADS | UNCERTAIN_CONTROL_LEADS,
-        )
+        lead = ambiguous_lead(str(getattr(element, attribute)))
         if lead is not None:
             issues.append(
                 ValidationIssue(
@@ -710,6 +810,7 @@ def parse_and_validate(
     max_elements: int = MAX_ELEMENTS,
     normalize_ids: bool = False,
     sources: Mapping[str, str] = MappingProxyType({}),
+    diagrams: Mapping[str, DiagramReading] = MappingProxyType({}),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
@@ -776,7 +877,7 @@ def parse_and_validate(
             for before, element in zip(emitted, model.elements(), strict=True)
             if before.id in shared
         ]
-    return model, issues + validate(model, max_elements, sources)
+    return model, issues + validate(model, max_elements, sources, diagrams)
 
 
 #: The issue codes whose repair changes an element's *name*, and therefore its
@@ -787,7 +888,7 @@ def parse_and_validate(
 #: settles it before this gate runs, so no extraction reaches the repair pass
 #: carrying one. A code absent from this set keeps its element's ID, which is
 #: the safe default: the flows stay pinned.
-RENAMING_CODES: frozenset[str] = frozenset({"duplicate-id", "empty-slug"})
+RENAMING_CODES: frozenset[IssueCode] = frozenset({"duplicate-id", "empty-slug"})
 
 
 def repair_scope(

@@ -88,5 +88,117 @@
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 10: 10-cookbook-generic-cms T-06"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:entity:admin>store:mysql-database>direct-administration",
+          "entity:admin"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 69"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:web-server>store:cdn-bucket>asset-publish",
+          "store:cdn-bucket"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 70"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:entity:reader>entity:cdn>asset-fetch"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 71"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:entity:admin>store:mysql-database>direct-administration"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 73"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "intercept",
+        "affected_element_ids": [
+          "flow:entity:admin>store:mysql-database>direct-administration"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 74"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "inject",
+        "affected_element_ids": [
+          "process:web-server",
+          "store:mysql-database",
+          "entity:reader"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The commenter supplies content through the site's comment interface. The claim does not require an authenticated account.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 76"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "entity:cdn"
+        ]
+      },
+      "ruling": "The attacker must replace a stored asset. The claim does not specify how they obtain write access.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 72"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "flow:entity:reader>entity:cdn>asset-fetch"
+        ]
+      },
+      "ruling": "The attacker must plant the asset, but the claim leaves open how the writer gains bucket access.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 75"
+    }
   ]
 }

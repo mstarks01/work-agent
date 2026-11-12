@@ -22,7 +22,6 @@ resolves inside one payload.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Annotated, Any, Literal, Self
@@ -198,7 +197,16 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # ``origin``, which names its writer: ``assertion-pass`` or ``answer``. Every
 # span of an ``answer`` row quotes the answers Source, and no span of another
 # row quotes it. A stored 3.1 job record gets 409 ``UnreadableSchema``.
-SCHEMA_VERSION = "3.2"
+#
+# Version 3.3: each STRIDE threat carries ``attacker_position``, from a closed
+# set of five, and ``None`` only on a threat a run wrote before the field. A
+# stored 3.2 job record gets 409 ``UnreadableSchema``.
+#
+# Version 3.4: ``rejected_because`` holds ``control``, a verdict carries
+# ``control_row`` and ``refused_controls``, and each block carries
+# ``returned_claims`` (ADR 0126). A stored 3.3 job record gets 409
+# ``UnreadableSchema``.
+SCHEMA_VERSION = "3.4"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
 # one framework. It does not say "threat model": that is false of a report
@@ -752,7 +760,7 @@ class InputRef(BaseModel):
         digests merely concatenate to the same string do not collide.
         """
         joined = "\n".join(f"{ref.kind}\x1f{ref.label}\x1f{ref.sha256}" for ref in refs)
-        return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+        return text_digest(joined)
 
     @classmethod
     def of(cls, *, system_name: str, sources: Sequence[Source]) -> Self:
@@ -831,7 +839,7 @@ class Report(BaseModel):
     elements_analyzed: int = Field(default=0, ge=0)
     # How the model was repaired, where it was. ``None`` where no repair pass
     # ran; a report whose ``nodes`` name the repair node and carry ``None``
-    # here predates the field. Envelope-level because it is about the shared
+    # here holds no record of the repair. Envelope-level because it is about the shared
     # model, like ``shared_element_names``.
     model_repair: ModelRepair | None = None
     # What the job's assertion pass produced, where the deployment ran one:

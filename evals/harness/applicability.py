@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from analysis_service.claims import (
     Claim,
@@ -43,13 +43,16 @@ from analysis_service.claims import (
     FrameworkName,
     RuledClaim,
     ScopeEntry,
+    VerdictStatus,
 )
 from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution, audit
+from evals.harness.attribution import ObservedKind
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
+    AsvsDisposition,
     CaseFramework,
     GoldenCase,
     ReferenceRequirement,
@@ -62,7 +65,7 @@ if TYPE_CHECKING:
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a
 #: missing one — so it is read, not ignored.
-APPLIES: frozenset[str] = frozenset({"confirmed", "needs-info"})
+APPLIES: frozenset[VerdictStatus] = frozenset({"confirmed", "needs-info"})
 
 #: This scorer's package, at the closed type the corpus is keyed by.
 FRAMEWORK: FrameworkName = "asvs"
@@ -268,11 +271,7 @@ def score_applicability(
     level = declared_level(case)
     universe = {requirement.id for requirement in requirements_for(level)}
 
-    references = [
-        reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    ]
+    references = case.requirement_records(FRAMEWORK)
     positives, negatives = split_references(references)
     expected = {reference.requirement for reference in positives}
     must_find = {
@@ -332,18 +331,38 @@ def score_applicability(
 def split_references(
     references: Iterable[ReferenceRequirement],
 ) -> tuple[list[ReferenceRequirement], list[ReferenceRequirement]]:
-    """A case's ASVS records as ``(positives, negatives)``.
+    """A case's ASVS records as ``(positives, negatives)``, by
+    :func:`applies`.
 
-    **The one reader of what an expected requirement is.** A record labelled
-    ``not-applicable`` says the requirement does *not* apply, so it belongs in
-    no expected set: a run that excludes it is right. Both scorers that build
-    an expected set read it here, so they cannot disagree about which records
-    count.
+    Both scorers that build an expected set read it here, so they cannot
+    disagree about which records count.
     """
     records = list(references)
-    positives = [ref for ref in records if ref.disposition != "not-applicable"]
-    negatives = [ref for ref in records if ref.disposition == "not-applicable"]
+    positives = [ref for ref in records if applies(ref.disposition)]
+    negatives = [ref for ref in records if not applies(ref.disposition)]
     return positives, negatives
+
+
+def applies(disposition: str | None) -> bool:
+    """Whether a record with ``disposition`` expects its requirement to apply.
+
+    **The one reader of an expected requirement.** A record labelled
+    ``not-applicable`` says the requirement does *not* apply, so it belongs in
+    no expected set: a run that excludes it is right. A record with no
+    disposition expects its requirement to apply. The split above and the
+    disposition tables read it.
+    """
+    return disposition != "not-applicable"
+
+
+def rules_out(observation: Observation) -> bool:
+    """Whether a run's answer says the requirement does not apply.
+
+    **The one reader of a ruled-out requirement**: a rejection or a
+    ``not-applicable`` scope entry. :func:`satisfies` and the count of false
+    exclusions read it.
+    """
+    return observation.kind in {"rejected", "not-applicable"}
 
 
 # ---------------------------------------------------------------------------
@@ -372,9 +391,7 @@ class Observation:
     of evidence that would settle the requirement.
     """
 
-    kind: Literal[
-        "confirmed", "needs-info", "rejected", "not-applicable", "deferred", "silent"
-    ]
+    kind: ObservedKind
     needs: str = ""
 
 
@@ -382,7 +399,7 @@ class Observation:
 #: so the two cannot drift. ``not-applicable`` and ``gap-from-prose`` are absent:
 #: neither asks for evidence, and :func:`satisfies` answers them before it looks
 #: here.
-EVIDENCE_FOR_DISPOSITION: Mapping[str, str] = MappingProxyType(
+EVIDENCE_FOR_DISPOSITION: Mapping[AsvsDisposition, str] = MappingProxyType(
     {disposition: kind for kind, disposition in DISPOSITION_FOR_EVIDENCE.items()}
 )
 
@@ -429,10 +446,10 @@ def observe(
 
 
 def satisfies(
-    disposition: str,
+    disposition: AsvsDisposition,
     observation: Observation,
     carried: Collection[str],
-    also_acceptable: Collection[str],
+    also_acceptable: Collection[AsvsDisposition],
 ) -> bool:
     """Whether one run's answer is one this case accepts.
 
@@ -440,8 +457,8 @@ def satisfies(
     may hold that a response header is settled by application code or by
     infrastructure configuration; either reading is right, and scoring the one
     the corpus did not write down as wrong punishes a defensible run (#659).
-    Every route is tried, and one hit is enough. A record naming none behaves
-    exactly as before.
+    Every route is tried, and one hit is enough. A record naming none is scored on
+    its one route.
 
     **``carried`` is read, never assumed**, and that is the whole reason this is
     a function rather than a lookup table. Which kinds of evidence become a
@@ -458,8 +475,8 @@ def satisfies(
     field that told them apart is stripped before the payload. With one carried
     kind, which is what ships, there is nothing to confuse.
     """
-    if disposition == "not-applicable":
-        return observation.kind in {"rejected", "not-applicable"}
+    if not applies(disposition):
+        return rules_out(observation)
     if disposition == "gap-from-prose":
         return observation.kind == "confirmed"
     return any(
@@ -469,7 +486,7 @@ def satisfies(
 
 
 def _routed(
-    disposition: str, observation: Observation, carried: Collection[str]
+    disposition: AsvsDisposition, observation: Observation, carried: Collection[str]
 ) -> bool:
     """Whether the run reached the evidence one route asks for."""
     wanted = EVIDENCE_FOR_DISPOSITION[disposition]
@@ -483,13 +500,13 @@ class Judged:
     """One requirement a case judged, the run answered, and the scorer compared."""
 
     requirement: str
-    expected: str
+    expected: AsvsDisposition
     observed: Observation
     ok: bool
     #: The other routes this record accepts. Carried into the artifact so a
     #: reader can tell an answer that scored right on an alternate from one
     #: that matched the case's first choice.
-    also_acceptable: tuple[str, ...] = ()
+    also_acceptable: tuple[AsvsDisposition, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         entry = {
@@ -611,8 +628,7 @@ class DispositionScore:
         return tuple(
             entry
             for entry in self.wrong
-            if entry.expected != "not-applicable"
-            and entry.observed.kind in {"rejected", "not-applicable"}
+            if applies(entry.expected) and rules_out(entry.observed)
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -650,11 +666,7 @@ def score_dispositions(
     catalog identifier — a verdict status, a scope state, an evidence kind. No
     claim prose is read, so a model's text cannot move a number (OWASP LLM01).
     """
-    references = [
-        reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    ]
+    references = case.requirement_records(FRAMEWORK)
     applied_by_id = {
         requirement_of(claim.id): claim
         for claim in block.claims
@@ -723,10 +735,7 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
     false_confirmed = sum(len(score.false_confirmed) for score in scores)
     wrong_kind = sum(len(score.wrong_kind) for score in scores)
     applicable = sum(
-        1
-        for score in scores
-        for entry in score.judged
-        if entry.expected != "not-applicable"
+        1 for score in scores for entry in score.judged if applies(entry.expected)
     )
     false_not_applicable = sum(len(score.false_not_applicable) for score in scores)
     return {
@@ -1065,11 +1074,7 @@ def score_yield(
     came back, and a draft the fan-in never delivered was never the critic's to
     rule on.
     """
-    positives, negatives = split_references(
-        reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    )
+    positives, negatives = split_references(case.requirement_records(FRAMEWORK))
     expected = {reference.requirement for reference in positives}
     negative = {reference.requirement for reference in negatives}
     # Read from the list a claim sits in, not from its verdict: the two lists

@@ -1,4 +1,4 @@
-"""What lost each STRIDE reference a run missed: the verb, the fan-in, the critic, the place, or no lead.
+"""What lost each STRIDE reference a run missed, charged to one of nine causes.
 
 The scorer says *which* references a run missed. This says *why*, from the
 same rulings, so a fix carries its ceiling before anybody pays for a run: an
@@ -9,7 +9,9 @@ below records one observation per miss rather than every contributor. Read the
 ceiling before a paid sweep. On the first Baseline, one exemplar edit had a
 ceiling of five must-finds of 129, inside the run-to-run band.
 
-Seven causes, decided in this order for one missed reference:
+Nine causes. For one missed reference, each stage below is asked in this
+order, and the first that finds the finding charges it; ``position`` and
+``unstated`` are the two causes a stage charges in place of its own:
 
 * ``verb``: a surviving claim in the reference's lane cites the same place —
   one endpoint-resolved element set contains the other, the identity rule's
@@ -20,6 +22,17 @@ Seven causes, decided in this order for one missed reference:
   whether one nests inside the other: containment is how a draft answering
   another question lands on this cause, and a ceiling is priced on the equal
   rows.
+* ``position``: claims cite the place with the reference's own action, and a
+  person ruled the reference an attacker position that none of them states.
+  The lane wrote the action against another attacker, which the scorer's
+  position gate refuses. Each later stage reads the same rule: a draft the
+  critic killed and a proposal the fan-in lost answer the reference only where
+  they state its ruled position, so a stage that finds the action at the place
+  and only other positions charges ``position``, not itself.
+* ``unstated``: as ``position``, except that none of those items states any
+  position. The archive holds them with no ``attacker_position``, so it
+  cannot read the position rule there, and the row is not a lane's
+  choice of attacker.
 * ``merged``: a surviving claim cites the place with the reference's own
   action, read through the equivalence table the identity rule reads, and the
   scorer assigned it to a sibling reference. Two references at
@@ -70,23 +83,37 @@ has no loss to charge, and an unlisted draft is the queue's to judge.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, get_args
+from typing import Any, Literal, TypeVar, get_args
 
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.parsing import strings
 from evals.harness.identity import CaseFlows, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import CaseScore, VoteStatus
+from evals.harness.scorer import CaseScore, VoteStatus, holds_position, position_fate
 from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
-#: The causes a miss is charged to, in the order they are decided.
-Cause = Literal["verb", "merged", "misfiled", "critic", "fan-in", "place", "unled"]
+#: The causes a miss is charged to, in the order of the stages that decide
+#: them. ``position`` and ``unstated`` can come from the surviving-claim,
+#: ``critic`` or ``fan-in`` stage.
+Cause = Literal[
+    "verb",
+    "position",
+    "unstated",
+    "merged",
+    "misfiled",
+    "critic",
+    "fan-in",
+    "place",
+    "unled",
+]
 CAUSES: tuple[Cause, ...] = (
     "verb",
+    "position",
+    "unstated",
     "merged",
     "misfiled",
     "critic",
@@ -304,6 +331,47 @@ def _at_place(
     ]
 
 
+_Item = TypeVar("_Item")
+
+
+def _draft_position(draft: DraftThreat) -> str | None:
+    return draft.attacker_position
+
+
+def _proposal_position(proposal: Mapping[str, Any]) -> object:
+    return proposal.get("attacker_position")
+
+
+def _holding(
+    position: str | None,
+    items: Sequence[_Item],
+    position_of: Callable[[_Item], object],
+) -> list[_Item]:
+    """The items that state the reference's ruled position, or all of them.
+
+    A reference with no ruled position takes any position, so every item holds.
+    Where a person ruled one, only an item that states it can answer the
+    reference, because the scorer's gate refuses every other: an empty result
+    is a ``position`` or ``unstated`` loss (see :func:`_refused`) at whichever
+    stage found the action at the place.
+    """
+    return [item for item in items if holds_position(position, position_of(item))]
+
+
+def _refused(
+    position: str | None,
+    items: Sequence[_Item],
+    position_of: Callable[[_Item], object],
+) -> Cause:
+    """The cause of a stage whose items all fail the reference's ruled position.
+
+    ``unstated`` where no item states any position, because then the archive
+    cannot read the rule; ``position`` where one states another.
+    """
+    fates = {position_fate(position, position_of(item)) for item in items}
+    return "unstated" if fates == {"unstated"} else "position"
+
+
 def _proposed_at(
     reference_ids: Sequence[str],
     lane_batch: object,
@@ -438,7 +506,7 @@ def attribute_case(
     by_id = {claim.id: claim for claim in produced}
     # The ledger's answer per unmatched claim, as the scorer recorded it. Read
     # rather than keyed again, for the reason ``misfiled`` above gives: the
-    # fingerprint rule has one reader, and a claim the scorer matched to a
+    # scorer applied the fingerprint rule, and a claim the scorer matched to a
     # reference of its own is absent here because nobody was asked about it.
     statuses = {threat.threat_id: threat.status for threat in score.unlisted}
     # Keyed by the title as the drop mark cut it, through the mark's own cut,
@@ -453,6 +521,7 @@ def attribute_case(
     for index in score.missed:
         reference = references[index]
         lane = reference.category
+        position = case.ruled_positions.get(index)
         verb = reference.verb
         if verb is None:
             # ``tests/test_verb_coverage.py`` holds every STRIDE reference to a
@@ -476,12 +545,24 @@ def attribute_case(
         if found is not None:
             read_verb, place, at_place = found
             claim = _charged_to(at_place, read_verb)
+            charged: Cause = "verb"
+            if same_action(claim.verb, read_verb):
+                with_action = [
+                    one for one in at_place if same_action(one.verb, read_verb)
+                ]
+                held = _holding(position, with_action, _draft_position)
+                charged = (
+                    "merged"
+                    if held
+                    else _refused(position, with_action, _draft_position)
+                )
+                claim = _charged_to(held or with_action, read_verb)
             losses.append(
                 Loss(
                     index,
                     lane,
                     index in must_find,
-                    "merged" if same_action(claim.verb, read_verb) else "verb",
+                    charged,
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,
@@ -534,13 +615,16 @@ def attribute_case(
             # ID is the whole of the choice — and it is still a choice, so the
             # same reader makes it.
             read_verb, place, killed_here = found
-            draft = _charged_to(killed_here, read_verb)
+            held = _holding(position, killed_here, _draft_position)
+            draft = _charged_to(held or killed_here, read_verb)
             losses.append(
                 Loss(
                     index,
                     lane,
                     index in must_find,
-                    "critic",
+                    "critic"
+                    if held
+                    else _refused(position, killed_here, _draft_position),
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
@@ -560,7 +644,11 @@ def attribute_case(
         )
         if offered is not None:
             read_verb, place, proposed_here = offered
-            proposal = min(proposed_here, key=lambda claim: str(claim.get("title", "")))
+            held_proposals = _holding(position, proposed_here, _proposal_position)
+            proposal = min(
+                held_proposals or proposed_here,
+                key=lambda claim: str(claim.get("title", "")),
+            )
             title = str(proposal.get("title", ""))
             # The draft the fan-in made of this proposal, if it kept one: the
             # fan-in keeps a proposal's title and action, and assigns the ID.
@@ -586,7 +674,9 @@ def attribute_case(
                     index,
                     lane,
                     index in must_find,
-                    "fan-in",
+                    "fan-in"
+                    if held_proposals
+                    else _refused(position, proposed_here, _proposal_position),
                     verb,
                     draft_id=kept[0].id if kept else None,
                     draft_verb=proposal["verb"],

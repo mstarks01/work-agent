@@ -436,7 +436,7 @@ class TestWhatTheRetryDriverReadsOffAnException:
         assert _retry_after_seconds(exc) is None
 
     def test_a_hint_past_the_ceiling_stops_the_node_rather_than_parking_it(self):
-        """#830's rule, on a header that now actually arrives. A provider
+        """#830's rule, on a header the provider sends. A provider
         asking for a day has answered the question a retry exists to ask."""
         provider = declining(429, {"retry-after": "86400"})
         raised_by("openai", provider)

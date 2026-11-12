@@ -22,7 +22,14 @@ from pathlib import Path
 import pytest
 
 from analysis_service.config_files import SECRET_FILE_SUFFIX
-from tests.source_tree import PYTHON, REPO_ROOT, WORKFLOWS, parse, source_files
+from tests.source_tree import (
+    PYTHON,
+    REPO_ROOT,
+    WORKFLOWS,
+    matching,
+    parse,
+    source_files,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -40,7 +47,8 @@ FILTERED_WORKFLOWS = (
 
 
 def _package_modules() -> set[str]:
-    return {path.stem for path in PACKAGE.glob("*.py")}
+    """The top-level modules of the package, which the filter's negations name."""
+    return {path.stem for path in source_files(*PYTHON) if path.parent == PACKAGE}
 
 
 def _module_file(dotted: str) -> Path | None:
@@ -52,14 +60,28 @@ def _module_file(dotted: str) -> Path | None:
     return None
 
 
+#: The spellings of the flag that is true only for a type checker.
+_TYPE_CHECKING = frozenset({"TYPE_CHECKING", "typing.TYPE_CHECKING"})
+
+
 def _imported(source: Path) -> set[str]:
     """Every ``analysis_service`` module ``source`` imports, dotted.
 
     A ``from`` import names a module or a name inside one, so each name is
     tried as a submodule and kept only where a file stands behind it.
+
+    An import under ``if TYPE_CHECKING:`` never runs, so a change to the module
+    it names cannot change an eval outcome. The walk skips that block and
+    reads its ``else`` branch.
     """
     found = set()
-    for node in ast.walk(parse(source)):
+    pending: list[ast.AST] = [parse(source)]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, ast.If) and ast.unparse(node.test) in _TYPE_CHECKING:
+            pending.extend(node.orelse)
+            continue
+        pending.extend(ast.iter_child_nodes(node))
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.startswith("analysis_service"):
@@ -143,6 +165,22 @@ def test_the_closure_is_not_vacuously_empty():
     assert {"graph", "report", "sampling", "grounding"} <= reachable
 
 
+def test_the_walk_skips_a_type_only_import(tmp_path):
+    """Positive control: an import under ``if TYPE_CHECKING:`` is not read, and
+    one in its ``else`` branch is."""
+    source = tmp_path / "typed.py"
+    source.write_text(
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    from analysis_service.store_settings import StoreConfigError\n"
+        "else:\n"
+        "    from analysis_service import report\n",
+        encoding="utf-8",
+    )
+
+    assert _imported(source) == {"analysis_service", "analysis_service.report"}
+
+
 def test_the_walk_follows_a_subpackage():
     """``capabilities`` is reached only through ``frameworks/asvs``."""
     assert "capabilities" in _reachable_from_evals()
@@ -168,7 +206,7 @@ def test_every_swept_path_still_exists(workflow):
     missing = [
         entry
         for entry in _filter_paths(workflow)
-        if not entry.startswith("!") and not any(REPO_ROOT.glob(entry))
+        if not entry.startswith("!") and not matching(entry)
     ]
 
     assert not missing, (
@@ -436,3 +474,114 @@ def test_every_key_file_export_uses_the_registry_suffix():
 
     assert exports, "no workflow exports a key file; the scan is vacuous"
     assert {suffix for _, suffix in exports} == {SECRET_FILE_SUFFIX}, exports
+
+
+#: The text of a step that reads a check script from the pull request's base
+#: commit.
+_BASE_READ = 'git show "$BASE_SHA:'
+
+#: The two shapes of a base read that fail the step where the base holds no
+#: script: a bare read, which ``bash -e`` stops on, and an ``if !`` read whose
+#: block prints a message and exits 1.
+_BARE_READ = re.compile(re.escape(_BASE_READ) + r'[^"]+" > "[^"]+"')
+_GUARDED_READ = re.compile(
+    rf"if ! {_BARE_READ.pattern}; then\n"
+    r'echo "[^"\n]*" >&2\n'
+    r"exit 1\n"
+    r"fi"
+)
+
+#: A line that may come before a base read in its ``run:`` block: a shell
+#: variable set to one word, or ``set -euo pipefail``. Any other line could
+#: open a block, a loop or a group that skips the read, or turn ``-e`` off.
+_PLAIN_LINE = re.compile(r'[A-Za-z_]+=("[^"]*"|\S+)|set -euo pipefail')
+
+
+def _base_reads() -> list[tuple[Path, int]]:
+    """Each workflow code line that reads a script from the base, by index."""
+    return [
+        (workflow, index)
+        for workflow in _workflows()
+        for index, line in enumerate(_code_lines(workflow))
+        if _BASE_READ in line
+    ]
+
+
+def _fails_closed(lines: list[str], index: int) -> bool:
+    """Whether the base read at ``index`` has one of the two shapes that fail
+    the step where the base holds no script, after only plain lines of its
+    ``run:`` block."""
+    stripped = [line.strip() for line in lines]
+    run = max(i for i, line in enumerate(stripped[:index]) if line == "run: |")
+    plain = all(_PLAIN_LINE.fullmatch(line) for line in stripped[run + 1 : index])
+    bare = _BARE_READ.fullmatch(stripped[index])
+    guarded = _GUARDED_READ.fullmatch("\n".join(stripped[index : index + 4]))
+    return plain and bool(bare or guarded)
+
+
+def test_a_base_read_fails_closed_where_the_base_holds_no_script():
+    """A step that runs the pull request's script where the base holds none
+    lets a pull request run its own copy of the check."""
+    reads = _base_reads()
+
+    assert reads, "no workflow reads a script from the base; the scan is vacuous"
+    open_reads = [
+        f"{workflow.name}: {_code_lines(workflow)[index].strip()}"
+        for workflow, index in reads
+        if not _fails_closed(_code_lines(workflow), index)
+    ]
+    assert not open_reads, open_reads
+
+
+_SAMPLE_READ = 'git show "$BASE_SHA:s" > "c"'
+_SAMPLE_GUARD = f'if ! {_SAMPLE_READ}; then\n  echo "no s" >&2\n  exit 1\nfi'
+
+
+def _fails_closed_in_step(step: str) -> bool:
+    lines = ["run: |", *step.splitlines()]
+    index = next(i for i, line in enumerate(lines) if _BASE_READ in line)
+    return _fails_closed(lines, index)
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        _SAMPLE_READ,
+        f'set -euo pipefail\ns=x\ncheck="$RUNNER_TEMP/c"\n{_SAMPLE_GUARD}',
+        f'{_SAMPLE_READ}\nchmod +x "c"',
+    ],
+)
+def test_a_read_that_fails_the_step_is_accepted(step):
+    assert _fails_closed_in_step(step)
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        f'{_SAMPLE_READ} || cp s "c"',
+        f'{_SAMPLE_READ} && chmod +x "c"',
+        f'if ! {_SAMPLE_READ}; then\n  cp s "c"\nfi',
+        f'if ! {_SAMPLE_READ}; then cp s "c"; fi',
+        f'{_SAMPLE_GUARD[:-2]}else\n  cp s "c"\nfi',
+        f'{_SAMPLE_GUARD[:-2]}elif x; then\n  cp s "c"\nfi',
+        (
+            f"if ! {_SAMPLE_READ}; then\n  if [ -n x ]; then\n    exit 1\n  fi\n"
+            'cp s "c"\nfi'
+        ),
+        (
+            f'if git cat-file -e "$BASE_SHA:s"; then\n  {_SAMPLE_READ}\nelse\n'
+            '  cp s "c"\nfi'
+        ),
+        f"if x; then\n  echo a\n  {_SAMPLE_READ}\nfi",
+        (
+            f'if git cat-file -e "$BASE_SHA:s"; then\n{_SAMPLE_GUARD}\nelse\n'
+            '  cp s "c"\nfi'
+        ),
+        f'if x\nthen\n  {_SAMPLE_READ}\nelse\n  cp s "c"\nfi',
+        f'{{\n  {_SAMPLE_READ}\n}} || cp s "c"',
+        f"while x; do\n  {_SAMPLE_READ}\ndone",
+        f"set +e\n{_SAMPLE_READ}",
+    ],
+)
+def test_a_fallback_to_the_pull_request_s_script_is_refused(step):
+    assert not _fails_closed_in_step(step)

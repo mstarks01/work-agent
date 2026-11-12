@@ -1,0 +1,20 @@
+architecture-beta
+    group z0(cloud)[Trust zone corporate network]
+    group z1(cloud)[Trust zone production control plane]
+    group z2(cloud)[Trust zone scheduling partner platform]
+    service n0(internet)[duty engineer] in z0
+    service n1(internet)[scheduling partner] in z2
+    service n2(server)[dispatch console] in z0
+    service n3(server)[dispatch API] in z1
+    service n4(server)[schedule importer] in z0
+    service n5(server)[corporate web host] in z0
+    service n6(database)[dispatch database] in z1
+    service n7(database)[schedule archive] in z0
+    n0:R --> L:n2
+    n2:R --> L:n3
+    n2:R --> L:n3
+    n4:R --> L:n1
+    n4:R --> L:n7
+    n4:R --> L:n3
+    n3:R --> L:n6
+    n0:R --> L:n5

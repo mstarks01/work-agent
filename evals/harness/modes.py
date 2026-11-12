@@ -40,6 +40,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from analysis_service.analysis import (
+    ControlAttribute,
     comparable_asset_tags,
     control_state,
 )
@@ -89,6 +90,7 @@ from analysis_service.graph import (
     EXTRACTING_ENTRIES,
     STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
+    STATE_DIAGRAM_READINGS,
     STATE_EXTRACTED_MODEL,
     STATE_FIRST_PASS,
     STATE_FRAMEWORK_OPTIONS,
@@ -100,6 +102,7 @@ from analysis_service.graph import (
     ModelResolver,
     Pipeline,
     Rejected,
+    diagram_readings,
     result_of,
     tier_node_by_graph_node,
 )
@@ -121,6 +124,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
     Element,
+    ElementPrefix,
     ExternalEntity,
     FlowIdError,
     ModelIndex,
@@ -326,7 +330,12 @@ class _Scored(NamedTuple):
     states: bool
 
 
-_SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
+#: An attribute the extraction scorer compares.
+ScoredAttribute = Literal[
+    "kind", "interface_kind", "assets", "operations", "protocol", ControlAttribute
+]
+
+_SCORED_ATTRIBUTES: Mapping[ScoredAttribute, _Scored] = {
     "kind": _Scored(str, states=False),
     "exposure": _Scored(str, states=False),
     "interface_kind": _Scored(str, states=False),
@@ -342,7 +351,7 @@ _SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
 #: The scored fields whose comparison reads a state rather than the fact. Taken
 #: off the table rather than listed beside it, so the two cannot disagree about
 #: which fields those are.
-STATE_REDUCED: frozenset[str] = frozenset(
+STATE_REDUCED: frozenset[ScoredAttribute] = frozenset(
     name for name, scored in _SCORED_ATTRIBUTES.items() if scored.states
 )
 
@@ -435,7 +444,7 @@ def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
 #: added tomorrow is in this population unless somebody rules it out — the
 #: direction that fails loudly. A hand-typed triple would have left it silently
 #: outside both readers.
-NAMED_TYPES: tuple[str, ...] = tuple(
+NAMED_TYPES: tuple[ElementPrefix, ...] = tuple(
     sorted(
         element.id_prefix
         for element in get_args(Element)
@@ -497,7 +506,7 @@ class ExtractionScore:
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
     #: Which produced element stands for which blessed one, and on what
-    #: evidence — :mod:`evals.harness.alignment` is the one reader of that
+    #: evidence — :mod:`evals.harness.alignment` answers that
     #: question, and every figure below that asks it reads this. ``matched``,
     #: ``missing`` and ``extra`` are the strict reading by exact ID, kept beside
     #: it so no archived number changes meaning.
@@ -1227,7 +1236,7 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     checks = [check for score in scores for check in score.attributes]
     compared = Counter(check.key for check in checks)
     agreed = Counter(check.key for check in checks if check.agrees)
-    order = list(_SCORED_ATTRIBUTES)
+    order: list[str] = list(_SCORED_ATTRIBUTES)
     keys = sorted(compared, key=lambda key: (order.index(key.split(".", 1)[1]), key))
     return {
         "compared": len(checks),
@@ -1440,6 +1449,7 @@ def _extraction_result(
         raw,
         pipeline.extraction_format or FULL_FORMAT,
         sources=state.get(STATE_SOURCE_TEXTS, {}),
+        diagrams=diagram_readings(state.get(STATE_DIAGRAM_READINGS)),
     )
     return ExtractionResult(
         case_id=case.id,
@@ -1651,8 +1661,9 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     state = graph_run.final_state
     if STATE_ASSERTION_PROPOSAL not in state:
         raise EvalRunError(f"{case.id}: assert produced no assertions")
-    # Resolved and gated through the one reader production's ``prepare`` node
-    # uses, so a sweep grades the catalog a job would have read.
+    # Resolved and gated through :meth:`AssertionRecord.of`, the call that
+    # production's ``prepare`` node makes, so a sweep grades the catalog a job
+    # would have read.
     record = AssertionRecord.of(
         CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL]),
         case.model,
@@ -1754,11 +1765,15 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
 #: Read off the projection's own reasons rather than listed again, so a reason
 #: added to :data:`~analysis_service.assertions.ProjectionReason` is counted the
 #: day it lands.
-_DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
+_DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) - {
     "stated",
     "absent",
     "unknown",
 }
+
+
+#: An attribute a projected value is compared on.
+ComparedAttribute = Literal[ScoredAttribute, "trust_zone"]
 
 
 #: How a projected value is compared with the blessed attribute, keyed by the
@@ -1774,7 +1789,7 @@ _DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
 #: into that has no entry here raises at the first projection, which
 #: ``tests/test_evals_modes.py`` holds against
 #: :func:`~analysis_service.assertions.projection_fields`.
-PROJECTION_COMPARED: Mapping[str, Callable[[Any], str]] = {
+PROJECTION_COMPARED: Mapping[ComparedAttribute, Callable[[Any], str]] = {
     **{name: scored.reduce for name, scored in _SCORED_ATTRIBUTES.items()},
     "trust_zone": str,
 }
@@ -2456,7 +2471,7 @@ def _report_of(
     """
     now = datetime.now(UTC)
     try:
-        # The terminal shape first, through the one reader of it. A refused
+        # The terminal shape first, through :func:`result_of`. A refused
         # model reached no fan-in, so reading the drafts first would name the
         # rejection as a framework the graph never reached.
         outcome = result_of(graph_run.final_state)
@@ -2503,7 +2518,19 @@ def _rejection(rejected: Rejected) -> str:
     return f"the graph rejected the model: {detail}"
 
 
-MODE_ENTRIES: dict[str, Entry] = {
+#: Each mode a sweep runs in.
+SweepMode = Literal[
+    "extraction",
+    "assertions",
+    "analysis",
+    "direct-facts",
+    "end-to-end",
+    "heads",
+    "answered",
+    "withheld",
+]
+
+MODE_ENTRIES: dict[SweepMode, Entry] = {
     "extraction": ENTRY_EXTRACT_ONLY,
     "assertions": ENTRY_ASSERT_ONLY,
     "analysis": ENTRY_PREPARE,
@@ -2530,7 +2557,7 @@ MODE_ENTRIES: dict[str, Entry] = {
 #: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
 #: an emission beside its artifact. Read off the entries rather than listed,
 #: so a mode added tomorrow answers by the entry it builds.
-EXTRACTING_MODES: frozenset[str] = frozenset(
+EXTRACTING_MODES: frozenset[SweepMode] = frozenset(
     mode for mode, entry in MODE_ENTRIES.items() if entry in EXTRACTING_ENTRIES
 )
 
@@ -2538,7 +2565,7 @@ EXTRACTING_MODES: frozenset[str] = frozenset(
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
-REPORTING_MODES: frozenset[str] = frozenset(
+REPORTING_MODES: frozenset[SweepMode] = frozenset(
     {"analysis", "answered", "direct-facts", "end-to-end", "withheld"}
 )
 

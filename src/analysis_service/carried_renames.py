@@ -29,8 +29,7 @@ from collections.abc import Sequence
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.answer_sets import AnswerSet
-from analysis_service.claims import UNKNOWN_KEY_FIELDS, UnknownKey
-from analysis_service.fact_answers import MAX_HELD_FACTS, key_ref
+from analysis_service.fact_answers import MAX_HELD_FACTS, key_ref, with_element
 from analysis_service.system_model import (
     ELEMENT_ID,
     ELEMENT_ID_MAX_CHARS,
@@ -89,16 +88,10 @@ def _renamed_id(element_id: str, renames: Sequence[ElementRename]) -> str:
     return make_flow_id(source, destination, parts.label, version)
 
 
-def _rekeyed(key: UnknownKey, element_id: str) -> UnknownKey:
-    parts = dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))
-    parts["element_id"] = element_id
-    return tuple(parts[name] for name in UNKNOWN_KEY_FIELDS)  # type: ignore[return-value]
-
-
 def renamed(carried: AnswerSet, renames: Sequence[ElementRename]) -> AnswerSet:
     """The carried answers with each element under ``renames``.
 
-    **The one reader of a rename.** A fact answer about an element takes the
+    **How a rename moves a carried answer.** A fact answer about an element takes the
     element's new ID; every other answer is kept as it was carried. Where a
     renamed answer would land on a fact another carried answer names, the
     other answer is kept and the renamed one is not.
@@ -113,7 +106,7 @@ def renamed(carried: AnswerSet, renames: Sequence[ElementRename]) -> AnswerSet:
         if to == element_id:
             facts.append(fact)
             continue
-        key = _rekeyed(fact.key, to)
+        key = with_element(fact.key, to)
         if key not in keys:
             facts.append(fact.model_copy(update={"key": key}))
     return carried.model_copy(update={"facts": tuple(facts)})

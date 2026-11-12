@@ -38,7 +38,16 @@ from evals.harness.archive import CaseKind, case_suffix
 from evals.harness.bundle import REPORTS_SUFFIX
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
-from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+from tests.source_tree import (
+    EXPERIMENTS_LEFT_OUT,
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    parse,
+    source_files,
+    without,
+)
+from tests.test_webapp import STATIC_SCRIPTS
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
 
@@ -65,7 +74,9 @@ PAGES: tuple[str, ...] = (
     (REPO_ROOT / "webapp" / "report_view.html").read_text(encoding="utf-8"),
 )
 SCRIPTS: tuple[str, ...] = tuple(
-    path.name for path in sorted((REPO_ROOT / "webapp" / "static").glob("*.js"))
+    path.name
+    for path in source_files(*PYTHON, suffixes=(".js",))
+    if path.parent == REPO_ROOT / "webapp" / "static"
 )
 
 #: Fields no code reads, kept on purpose, with the reason. Two readings live
@@ -191,6 +202,40 @@ def test_no_page_assertion_is_satisfied_by_a_comment():
 
 def test_the_spelling_scan_reads_a_real_population():
     assert len(_asserted_spellings()) > 20
+
+
+def test_every_client_script_belongs_to_a_page():
+    """A script file nothing serves is dead code nothing would notice.
+
+    The reverse of the template sweep in ``tests/test_webapp.py``, over the
+    same table: that one holds a page to its file, and this one holds a file to
+    its page.
+    """
+    on_disk = set(SCRIPTS)
+    named = set(STATIC_SCRIPTS)
+
+    assert on_disk == named, (
+        f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
+        f" the table names {sorted(named - on_disk)} that is not there."
+    )
+
+
+def test_no_page_words_a_count_with_a_bracketed_plural():
+    """A page words a count with ``counted``, never "finding(s)"."""
+    pages = [
+        *(REPO_ROOT / "webapp" / "static" / name for name in SCRIPTS),
+        *(
+            path
+            for path in source_files(*PYTHON, suffixes=(".html",))
+            if path.parent == REPO_ROOT / "webapp"
+        ),
+    ]
+    bracketed = {
+        page.name: found
+        for page in pages
+        if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
+    }
+    assert bracketed == {}
 
 
 # --- 3. A field no code reads -------------------------------------------------------
@@ -659,15 +704,7 @@ def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
 # moves, and its own test still passes.
 
 #: The production files, less the scripts an audit ran.
-_CASE_NAME_FILES = without(
-    source_files(*PYTHON),
-    {
-        "evals/experiments": (
-            "the scripts an audit ran on the day, as frozen evidence, so no"
-            " lint holds them to the live rule"
-        ),
-    },
-)
+_CASE_NAME_FILES = without(source_files(*PYTHON), EXPERIMENTS_LEFT_OUT)
 
 
 def _case_name_spellings() -> frozenset[str]:
@@ -738,3 +775,114 @@ def test_the_case_name_scan_finds_one_when_there_is_one(tmp_path):
     )
 
     assert found == [2, 3, 4, 5]
+
+
+# A closed set that a page reads is a Literal the page is tested against.
+
+#: The parts of :data:`~tests.source_tree.PYTHON` that the closed-set scan
+#: leaves out, with the reason.
+NOT_PAGE_DATA: dict[str, str] = {
+    root: (
+        "a page reads what the web app sends, and the choices between two words"
+        " here are mostly prose that no type can state"
+    )
+    for root in ("src", "evals", "examples", ".github/scripts")
+}
+
+#: Each function in the web app that chooses between two words that are not
+#: a closed set a page reads, with the reason.
+NOT_A_CLOSED_SET: dict[str, str] = {
+    "webapp/settings_view.py:_override_form": (
+        "the TOML spelling of a boolean override, a value that a row shows and"
+        " that no page compares"
+    ),
+}
+
+
+def _literal_aliases(tree: ast.Module) -> set[str]:
+    """Each module-level name bound to a ``Literal[...]``."""
+    return {
+        target.id
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Subscript)
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id == "Literal"
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+
+
+def _word_choices(tree: ast.Module) -> list[tuple[int, str]]:
+    """Each ``"a" if test else "b"`` that is not the value a function returns
+    under a ``Literal`` alias of its module, with its function's name."""
+    aliases = _literal_aliases(tree)
+    typed = {
+        id(node.value)
+        for function in ast.walk(tree)
+        if isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef)
+        and isinstance(function.returns, ast.Name)
+        and function.returns.id in aliases
+        for node in ast.walk(function)
+        if isinstance(node, ast.Return)
+    }
+
+    def walk(node: ast.AST, function: str) -> list[tuple[int, str]]:
+        found = []
+        for child in ast.iter_child_nodes(node):
+            inner = (
+                child.name
+                if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+                else function
+            )
+            if (
+                isinstance(child, ast.IfExp)
+                and id(child) not in typed
+                and all(
+                    isinstance(branch, ast.Constant) and isinstance(branch.value, str)
+                    for branch in (child.body, child.orelse)
+                )
+            ):
+                found.append((child.lineno, inner))
+            found.extend(walk(child, inner))
+        return found
+
+    return walk(tree, "<module>")
+
+
+def _untyped_word_choices() -> list[str]:
+    return [
+        f"{path.relative_to(REPO_ROOT).as_posix()}:{function}"
+        for path in without(source_files(*PYTHON), NOT_PAGE_DATA)
+        for _, function in _word_choices(parse(path))
+    ]
+
+
+def test_each_closed_set_a_page_reads_is_a_literal():
+    """A choice between two words that the web app sends to a page is a
+    ``Literal`` alias, which a test pins the page's script to. A ``str``
+    leaves the page's reader free to drift from it."""
+    found = set(_untyped_word_choices()) - NOT_A_CLOSED_SET.keys()
+
+    assert not found, (
+        f"these functions choose between two words typed str: {sorted(found)}."
+        " Return the choice from a function typed with a Literal alias, and pin"
+        " the page's reader to it."
+    )
+
+
+def test_each_declared_word_choice_is_still_one():
+    assert NOT_A_CLOSED_SET.keys() <= set(_untyped_word_choices())
+
+
+def test_the_word_choice_scan_finds_one_when_there_is_one():
+    """Positive control, in the shape of the review page's reason kind."""
+    probe = (
+        'Kind = Literal["substance", "style"]\n'
+        "def kind(code) -> Kind:\n"
+        '    return "substance" if code else "style"\n'
+        "def payload(code):\n"
+        '    return {"kind": "substance" if code else "style"}\n'
+    )
+
+    assert _word_choices(ast.parse(probe)) == [(5, "payload")]

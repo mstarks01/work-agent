@@ -1,10 +1,10 @@
-"""The one reader of each body a job's answer routes take.
+"""Each body a job's answer routes take, read through :func:`_read`.
 
 ``POST /v1/jobs/{id}/answers``, ``/amendments`` and ``/corrections``, and the
 first-run app's ``/answer``, ``/amend`` and ``/correct``, each take a JSON body.
 Both drivers hand the parsed body to one of :func:`read_answers`,
 :func:`read_amendment` and :func:`read_corrections`, and get back a typed
-value or a :class:`BodyRefused`. So one site applies the rules a body meets:
+value or a :class:`BodyRefused`. So this module applies the rules a body meets:
 the keys it may carry, the shape and bound of each field, and the strictness
 of ``save`` and ``revision``. Each driver only maps a refusal to its own
 transport: the ``/v1`` routes to a ``422`` problem that lists each place, the
@@ -35,7 +35,7 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import SentAnswers
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import MAX_SKIPS, Answers, Revision
 from analysis_service.carried_renames import MAX_RENAMES, ElementRename
@@ -48,6 +48,7 @@ from analysis_service.fact_answers import (
     SkipKey,
 )
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
+from analysis_service.sources import MAX_SOURCE_BYTES_CEILING
 
 __all__ = [
     "AmendmentSubmission",
@@ -75,8 +76,8 @@ class AnswersSubmission(BaseModel):
     the page showed: the job records them as shown, and a skip is taken only
     of one of them (ADR 0069). ``revision`` is the revision the answers
     were read against, which a waiting job and every save require. ``shares``
-    answers a question once for each part it covers (ADR 0114); each covered
-    part counts as one fact answer toward the bound. ``renames`` is every
+    answers a question once for each element it covers (ADR 0114); each
+    covered element counts as one fact answer toward the bound. ``renames`` is every
     rename a waiting job holds after a save: each maps an element a carried
     answer names to an element of this model (ADR 0116). Left out, the job
     keeps the renames it holds. One request carries at
@@ -116,7 +117,10 @@ class AmendmentSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    text: str
+    #: The deployment's byte budget refuses a longer text with its sentence.
+    #: This bound counts characters: a text of more characters than the
+    #: largest byte budget any deployment can set holds more bytes than it too.
+    text: str = Field(max_length=MAX_SOURCE_BYTES_CEILING)
     revision: Revision
 
 
@@ -193,7 +197,7 @@ def read_answers(raw: object) -> Answers:
     """The answers a body carries, or a :class:`BodyRefused`."""
     body = _read(AnswersSubmission, raw)
     return Answers(
-        given=AnswerSet(
+        given=SentAnswers(
             links=tuple(body.links), facts=tuple(body.facts), shares=tuple(body.shares)
         ),
         save=body.save,

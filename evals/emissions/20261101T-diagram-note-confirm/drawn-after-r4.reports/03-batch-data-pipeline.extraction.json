@@ -1,0 +1,619 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "Insurance partner",
+        "description": "An insurance partner providing a daily extract.",
+        "assets": [],
+        "source_excerpt": "partners[Insurance partners]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:analyst",
+        "name": "Analyst",
+        "description": "An analyst querying BigQuery.",
+        "assets": [],
+        "source_excerpt": "analysts[Analysts]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram uses the plural spelling 'Analysts'.",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:airflow-scheduler",
+        "name": "Airflow scheduler",
+        "description": "The Airflow scheduler.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow[Airflow scheduler]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform",
+        "name": "Spark transform",
+        "description": "The Spark transform.",
+        "assets": [],
+        "source_excerpt": "spark[Spark transform]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "A landing bucket receiving the daily extract.",
+        "assets": [],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-db",
+        "name": "Airflow metadata DB",
+        "description": "The Airflow metadata database.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "meta[(Airflow metadata DB)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:bigquery",
+        "name": "BigQuery",
+        "description": "The BigQuery data store.",
+        "assets": [],
+        "source_excerpt": "bq[(BigQuery)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>daily-extract-sftp",
+        "name": "daily extract (SFTP)",
+        "description": "A daily extract sent from the insurance partner to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "partners -->|\"daily extract (SFTP)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "unknown",
+        "data_description": "daily extract",
+        "encryption_in_transit": "SFTP",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:landing-bucket>process:airflow-scheduler>files",
+        "name": "files",
+        "description": "Files sent from the landing bucket to the Airflow scheduler.",
+        "assets": [],
+        "source_excerpt": "bucket -->|files| airflow",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:landing-bucket",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "files",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "Connection strings and partner keys sent from the Airflow scheduler to the Airflow metadata DB.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow -->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:airflow-metadata-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:airflow-metadata-db>process:airflow-scheduler>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "Connection strings and partner keys sent from the Airflow metadata DB to the Airflow scheduler.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:airflow-metadata-db",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>process:spark-transform>trigger-job",
+        "name": "trigger job",
+        "description": "The Airflow scheduler triggers a job on the Spark transform.",
+        "assets": [],
+        "source_excerpt": "airflow -->|trigger job| spark",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "process:spark-transform",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "trigger job",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform>store:bigquery>normalized-records",
+        "name": "normalized records",
+        "description": "Normalized records sent from the Spark transform to BigQuery.",
+        "assets": [],
+        "source_excerpt": "spark -->|normalized records| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "normalized records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:analyst>store:bigquery>queries",
+        "name": "queries",
+        "description": "Queries sent by analysts to BigQuery.",
+        "assets": [],
+        "source_excerpt": "analysts -->|queries| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:analyst",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "queries",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:landing-network",
+        "name": "Landing network",
+        "description": "The landing network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph landing[Landing network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "Warehouse network",
+        "description": "The warehouse network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph warehouse[Warehouse network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Insurance partners are modelled as external systems because they initiate the daily extract integration.",
+        "element_id": "entity:insurance-partner",
+        "attribute": "kind",
+        "basis": "The diagram names 'Insurance partners' as the source of a directed SFTP extract."
+      },
+      {
+        "assumption": "Analysts are modelled as human external entities because the diagram names people querying BigQuery.",
+        "element_id": "entity:analyst",
+        "attribute": "kind",
+        "basis": "The node is named 'Analysts' and initiates queries."
+      },
+      {
+        "assumption": "The Airflow metadata DB is confidential because it contains connection strings and partner keys.",
+        "element_id": "store:airflow-metadata-db",
+        "attribute": "data_classification",
+        "basis": "The diagram labels the exchanged contents as 'connection strings, partner keys'."
+      },
+      {
+        "assumption": "The Airflow scheduler carries credentials and secrets because it exchanges connection strings and partner keys.",
+        "element_id": "process:airflow-scheduler",
+        "attribute": "assets",
+        "basis": "The diagram shows the Airflow scheduler exchanging 'connection strings, partner keys'."
+      },
+      {
+        "assumption": "The Airflow metadata DB holds credentials and secrets because it contains connection strings and partner keys.",
+        "element_id": "store:airflow-metadata-db",
+        "attribute": "assets",
+        "basis": "The diagram labels the exchanged contents as 'connection strings, partner keys'."
+      },
+      {
+        "assumption": "The Airflow-to-metadata-DB flow carries credentials and secrets because it is labelled 'connection strings, partner keys'.",
+        "element_id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "attribute": "assets",
+        "basis": "The flow label explicitly names connection strings and partner keys."
+      },
+      {
+        "assumption": "The metadata-DB-to-Airflow flow carries credentials and secrets because it is labelled 'connection strings, partner keys'.",
+        "element_id": "flow:store:airflow-metadata-db>process:airflow-scheduler>connection-strings-partner-keys",
+        "attribute": "assets",
+        "basis": "The bidirectional flow label explicitly names connection strings and partner keys."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "Insurance partner",
+        "description": "An insurance partner providing a daily extract.",
+        "assets": [],
+        "source_excerpt": "partners[Insurance partners]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:analyst",
+        "name": "Analyst",
+        "description": "An analyst querying BigQuery.",
+        "assets": [],
+        "source_excerpt": "analysts[Analysts]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram uses the plural spelling 'Analysts'.",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:airflow-scheduler",
+        "name": "Airflow scheduler",
+        "description": "The Airflow scheduler.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow[Airflow scheduler]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform",
+        "name": "Spark transform",
+        "description": "The Spark transform.",
+        "assets": [],
+        "source_excerpt": "spark[Spark transform]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "A landing bucket receiving the daily extract.",
+        "assets": [],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-db",
+        "name": "Airflow metadata DB",
+        "description": "The Airflow metadata database.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "meta[(Airflow metadata DB)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:bigquery",
+        "name": "BigQuery",
+        "description": "The BigQuery data store.",
+        "assets": [],
+        "source_excerpt": "bq[(BigQuery)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>daily-extract-sftp",
+        "name": "daily extract (SFTP)",
+        "description": "A daily extract sent from the insurance partner to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "partners -->|\"daily extract (SFTP)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "unknown",
+        "data_description": "daily extract",
+        "encryption_in_transit": "SFTP",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:landing-bucket>process:airflow-scheduler>files",
+        "name": "files",
+        "description": "Files sent from the landing bucket to the Airflow scheduler.",
+        "assets": [],
+        "source_excerpt": "bucket -->|files| airflow",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:landing-bucket",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "files",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "Connection strings and partner keys sent from the Airflow scheduler to the Airflow metadata DB.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:airflow-metadata-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:airflow-metadata-db>process:airflow-scheduler>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "Connection strings and partner keys sent from the Airflow metadata DB to the Airflow scheduler.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:airflow-metadata-db",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>process:spark-transform>trigger-job",
+        "name": "trigger job",
+        "description": "The Airflow scheduler triggers a job on the Spark transform.",
+        "assets": [],
+        "source_excerpt": "airflow -->|trigger job| spark",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "process:spark-transform",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "trigger job",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform>store:bigquery>normalized-records",
+        "name": "normalized records",
+        "description": "Normalized records sent from the Spark transform to BigQuery.",
+        "assets": [],
+        "source_excerpt": "spark -->|normalized records| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "normalized records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:analyst>store:bigquery>queries",
+        "name": "queries",
+        "description": "Queries sent by analysts to BigQuery.",
+        "assets": [],
+        "source_excerpt": "analysts -->|queries| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:analyst",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "queries",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:landing-network",
+        "name": "Landing network",
+        "description": "The landing network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph landing[Landing network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "Warehouse network",
+        "description": "The warehouse network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph warehouse[Warehouse network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Insurance partners are modelled as external systems because they initiate the daily extract integration.",
+        "element_id": "entity:insurance-partner",
+        "attribute": "kind",
+        "basis": "The diagram names 'Insurance partners' as the source of a directed SFTP extract."
+      },
+      {
+        "assumption": "Analysts are modelled as human external entities because the diagram names people querying BigQuery.",
+        "element_id": "entity:analyst",
+        "attribute": "kind",
+        "basis": "The node is named 'Analysts' and initiates queries."
+      },
+      {
+        "assumption": "The Airflow metadata DB is confidential because it contains connection strings and partner keys.",
+        "element_id": "store:airflow-metadata-db",
+        "attribute": "data_classification",
+        "basis": "The diagram labels the exchanged contents as 'connection strings, partner keys'."
+      },
+      {
+        "assumption": "The Airflow scheduler carries credentials and secrets because it exchanges connection strings and partner keys.",
+        "element_id": "process:airflow-scheduler",
+        "attribute": "assets",
+        "basis": "The diagram shows the Airflow scheduler exchanging 'connection strings, partner keys'."
+      },
+      {
+        "assumption": "The Airflow metadata DB holds credentials and secrets because it contains connection strings and partner keys.",
+        "element_id": "store:airflow-metadata-db",
+        "attribute": "assets",
+        "basis": "The diagram labels the exchanged contents as 'connection strings, partner keys'."
+      },
+      {
+        "assumption": "The Airflow-to-metadata-DB flow carries credentials and secrets because it is labelled 'connection strings, partner keys'.",
+        "element_id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "attribute": "assets",
+        "basis": "The flow label explicitly names connection strings and partner keys."
+      },
+      {
+        "assumption": "The metadata-DB-to-Airflow flow carries credentials and secrets because it is labelled 'connection strings, partner keys'.",
+        "element_id": "flow:store:airflow-metadata-db>process:airflow-scheduler>connection-strings-partner-keys",
+        "attribute": "assets",
+        "basis": "The bidirectional flow label explicitly names connection strings and partner keys."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": [
+      {
+        "element_id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "written": "airflow -->|\"connection strings, partner keys\"| meta",
+        "similarity": 0.99,
+        "scan_complete": true
+      }
+    ]
+  },
+  "issues": [],
+  "repair": null
+}

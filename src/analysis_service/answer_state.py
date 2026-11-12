@@ -24,7 +24,7 @@ the band and the units a capability could settle, the prior per choice for a
 field question. What each answer would settle breaks a tie, and is published
 on the row (:mod:`analysis_service.answer_effects`). A question answered in part is
 listed before any new question, outside the limit, and where the limits hold
-questions back the job says so (:attr:`QuestionSet.stop`). A question that
+questions back the job says so (:attr:`QuestionSet.empty_list_reason`). A question that
 decides whether a selected framework runs at all comes first, outside the
 limits (ADR 0067), and the set says what each framework's precondition reads
 now (:attr:`QuestionSet.gates`). A part of a capability waits on its parent
@@ -58,7 +58,13 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar
 from pydantic import Field
 
 from analysis_service.answer_effects import Effect, capability_effects
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
+from analysis_service.answer_sets import (
+    NO_ANSWERS,
+    NO_SENT_ANSWERS,
+    AnswerSet,
+    SentAnswers,
+    within_held_limits,
+)
 from analysis_service.answer_shares import check_shares, merged_shares
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
@@ -92,6 +98,16 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.frameworks import PACKAGES, PreconditionResult
+from analysis_service.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+    control_answers,
+    control_facts,
+    control_lines,
+    refuse_disagreement,
+    with_own_answers,
+)
 from analysis_service.links import (
     MAX_HELD_LINKS,
     MAX_LINK_ANSWERS,
@@ -102,6 +118,7 @@ from analysis_service.links import (
     fold_principal,
     link_questions,
     resumed_sources,
+    with_link_answers,
 )
 from analysis_service.open_facts import (
     CAPABILITY_GROUP,
@@ -132,6 +149,7 @@ __all__ = [
     "BandApplicability",
     "Carried",
     "EarlyRule",
+    "EmptyListReason",
     "MissingRevision",
     "PauseSummary",
     "PolicyVersion",
@@ -143,7 +161,6 @@ __all__ = [
     "SavedDraft",
     "SourcesOverLimit",
     "StaleRevision",
-    "Stop",
     "by_turn",
     "passes_floor",
     "question_set",
@@ -170,6 +187,9 @@ class EarlyRule:
     limit: int | None
 
 
+#: The two kinds of question the early floor tells apart.
+EarlyKind = Literal["capability", "field"]
+
 #: The rule for each kind of early question: ``capability`` and ``field``,
 #: which is every other kind (``QA-2026-09-26-03-E20``). A field question's
 #: floor of 1 is where the ranking cuts: no measurement says how many findings
@@ -178,14 +198,31 @@ class EarlyRule:
 #: names, so the floor decides which field questions a pause asks. A
 #: capability question under 2 settles one unit, and at ASVS level 2 that
 #: leaves 28 of 51.
-EARLY_RULES: Mapping[str, EarlyRule] = {
+EARLY_RULES: Mapping[EarlyKind, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30),
     "field": EarlyRule(floor=1.0, limit=None),
 }
 
 
-#: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
-Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
+#: Why a waiting job asks nothing more (:attr:`QuestionSet.empty_list_reason`, ADR 0068).
+EmptyListReason = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
+
+#: Why a carried fact answer is not taken (:meth:`Carried.reason`, ADR 0116).
+CarriedReason = Literal["missing-element", "not-taken", "control-states"]
+
+#: Where an answer a job holds comes from, the highest rung first (ADR 0125).
+Rung = Literal["correction", "draft", "answer", "control", "carried"]
+
+
+@dataclass(frozen=True)
+class FactOrigin:
+    """The rung of one held answer. A Control's rung names the Control by its
+    ID and its name."""
+
+    rung: Rung
+    control: str = ""
+    name: str = ""
+
 
 #: Why a question is not in the recommended list (ADR 0078). A client maps
 #: each one to its own words. ``parent-undecided`` and ``gate-undecided``
@@ -231,7 +268,7 @@ ANSWER_LIMITS: Mapping[str, int] = MappingProxyType(
 )
 
 
-def _early_kind(question: EarlyQuestion) -> str:
+def _early_kind(question: EarlyQuestion) -> EarlyKind:
     return "capability" if question.kind == "capability" else "field"
 
 
@@ -308,9 +345,9 @@ class BandApplicability:
 class PauseSummary:
     """What a waiting job asked, and what it leaves open (#1542 F2, F5).
 
-    **No count here says a fact is settled that is not.** A stop of
-    :attr:`QuestionSet.stop` says why the list asks nothing more; this says
-    what remains. The counts are of different things, kept apart:
+    **No count here says a fact is settled that is not.**
+    :attr:`QuestionSet.empty_list_reason` says why the list asks nothing more;
+    this says what remains. The counts are of different things, kept apart:
 
     * ``recommended`` is the questions the list holds now, and
       ``recommended_choices`` the choices left to answer them: one a facet
@@ -429,10 +466,10 @@ class QuestionSet:
     effects: Mapping[UnknownKey, Effect] = field(default_factory=dict)
 
     @property
-    def stop(self) -> Stop | None:
+    def empty_list_reason(self) -> EmptyListReason | None:
         """Why a waiting job asks nothing more, or ``None`` while it asks.
 
-        **No stop says every fact is settled.** ``budget-exhausted`` where the
+        **No reason says every fact is settled.** ``budget-exhausted`` where the
         limits hold questions back, ``below-floor`` where only questions under
         a floor are left, ``skipped`` where every question left was skipped,
         and ``nothing-left`` where no open question is left to ask. In each
@@ -516,7 +553,7 @@ class QuestionSet:
             "final": self.final,
             "resumed_by": self.resumed_by,
             "policy_version": POLICY_VERSION,
-            "early_stop": self.stop,
+            "early_stop": self.empty_list_reason,
             "early_blocked": [listed(*blocked) for blocked in self.blocked],
             "early_unnecessary": [listed(*moot) for moot in self.unnecessary],
             "early_held_back": [
@@ -561,7 +598,7 @@ class QuestionSet:
         *,
         sources: Sequence[Source],
         earlier: AnswerSet,
-        given: AnswerSet,
+        given: SentAnswers,
         save: bool = False,
         skips: Sequence[SkipKey] = (),
         presented: Sequence[UnknownKey] = (),
@@ -581,9 +618,9 @@ class QuestionSet:
         (:func:`_adds_information`), so it does not go to a run that reads
         nothing new.
 
-        **Each share writes one answer for each part it covers** (ADR 0114),
-        and that answer is admitted as any other. A share that takes a part
-        back removes the answer it wrote (:func:`~analysis_service.answer_shares.merged_shares`).
+        **Each share writes one answer for each element it covers** (ADR
+        0114), and that answer is admitted as any other. A share that takes an
+        element back removes the answer it wrote (:func:`~analysis_service.answer_shares.merged_shares`).
         """
         if self.resumed_by is not None:
             raise AlreadyResumed(
@@ -763,6 +800,7 @@ def question_set(
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     analyses: Sequence[FrameworkAnalysis],
     *,
+    asks: bool,
     waiting: bool,
     answered: AnswerSet,
     final: bool,
@@ -775,7 +813,9 @@ def question_set(
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` holds
-    the saved answers, whose questions are not asked again. ``final`` marks a report the follow-up wrote, and ``shown``
+    the saved answers, whose questions are not asked again. ``asks`` is
+    whether the analysis asks a person. The pause and the report of an
+    analysis that asks nobody ask nothing. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -803,15 +843,15 @@ def question_set(
             skipped_links=(),
             resumed_by=resumed_by,
         )
-    if final:
+    if final or not asks:
         return QuestionSet(
             model=model,
             catalog=catalog,
-            waiting=False,
+            waiting=waiting and not final,
             early=(),
             facts=(),
             links=(),
-            final=True,
+            final=final,
             shown=tuple(shown),
             answered_early=(),
             answered_links=(),
@@ -898,10 +938,9 @@ def question_set(
         held += [
             (question, "gate-undecided")
             for question in would_ask
-            if not question.gates
-            and question.key not in listed_keys
-            and question.key not in done
+            if _open(question, done)
             and passes_floor(question, would_ask)
+            and question.key not in listed_keys
         ]
     effects = capability_effects(
         prepared,
@@ -919,9 +958,7 @@ def question_set(
     below_floor = tuple(
         question
         for question in listed
-        if not question.gates
-        and question.key not in aside | done
-        and not passes_floor(question, listed)
+        if _open(question, aside | done) and not passes_floor(question, listed)
     )
     linked = {fold_principal(link.principal): link for link in answered.links}
     open_links = link_questions(catalog, view)
@@ -1023,23 +1060,34 @@ def _settled(done: Iterable[SkipKey]) -> set[str]:
     }
 
 
+def _open(question: EarlyQuestion, done: Container[SkipKey]) -> bool:
+    """Whether a list may still ask ``question``: it is not a gate, and
+    ``done`` does not hold it.
+
+    **The one reader of the gate and done tests.** :func:`_rankable`, the
+    questions that an undecided gate would add, and the questions below the
+    floor read it.
+    """
+    return not question.gates and question.key not in done
+
+
 def _rankable(
     listed: Sequence[EarlyQuestion], done: frozenset[SkipKey]
 ) -> list[EarlyQuestion]:
-    """The listed questions a list may rank: not a gate, at or above its
-    kind's floor, not done, and not waiting on a parent.
+    """The listed questions a list may rank: open, at or above its kind's
+    floor, and not waiting on a parent.
 
-    **The one reader of which question a list may rank.** :func:`recommended`
-    takes from it, and the effects that break its ties are computed over its
-    capability questions, so no rankable question goes without its effect.
+    **The one reader of which listed question a list may rank.**
+    :func:`recommended` takes from it, and the effects that break its ties are
+    computed over its capability questions, so no rankable question goes
+    without its effect.
     """
     waiting = _waiting(listed, _settled(done))
     return [
         question
         for question in listed
-        if not question.gates
+        if _open(question, done)
         and passes_floor(question, listed)
-        and question.key not in done
         and question.key not in waiting
     ]
 
@@ -1213,10 +1261,10 @@ def recommended(
     place = {question.key: index for index, question in enumerate(listed)}
     # What the saved answers charged each framework: a question's choices,
     # to every framework it served. The turns start from here, not from zero.
-    spent: Counter[str] = Counter()
+    charged: Counter[str] = Counter()
     for key, served in answered_for.items():
         for name in served:
-            spent[name] += len(answer_facets(key)) or 1
+            charged[name] += len(answer_facets(key)) or 1
 
     def rank(question: EarlyQuestion) -> tuple[float, float, float, int, int]:
         # The list's own order first: a capability's standing, a field
@@ -1250,7 +1298,7 @@ def recommended(
             (question for question in eligible if question.key not in answered_for),
             key=rank,
         )
-        for question in by_turn(fresh, spent):
+        for question in by_turn(fresh, charged):
             slot = limit_place(question.key)
             if rule.limit is None or any(
                 slot in counted[name] or len(counted[name]) < rule.limit
@@ -1264,7 +1312,11 @@ def recommended(
         shown += [*started, *taken]
         for question in started:
             again.update(dict.fromkeys(question.frameworks, question.decisions))
-    return grouped((*gates, *by_turn(shown, spent - again))), blocked, tuple(held_back)
+    return (
+        grouped((*gates, *by_turn(shown, charged - again))),
+        blocked,
+        tuple(held_back),
+    )
 
 
 def limit_place(key: UnknownKey) -> UnknownKey | str:
@@ -1408,7 +1460,7 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
 
 
 #: The revision a request names: a whole number from zero, and never ``true``.
-#: **The one reader of a posted revision.** The HTTP models declare their
+#: **The type of a posted revision.** The HTTP models declare their
 #: ``revision`` fields with it, and the first-run app validates a posted value
 #: with it.
 Revision = Annotated[int, Field(ge=0, strict=True)]
@@ -1445,7 +1497,7 @@ class Answers:
     were read with, which a waiting job and every save require.
     """
 
-    given: AnswerSet = NO_ANSWERS
+    given: SentAnswers = NO_SENT_ANSWERS
     save: bool = False
     skips: Sequence[SkipKey] = ()
     presented: Sequence[UnknownKey] = ()
@@ -1453,6 +1505,9 @@ class Answers:
     #: Every rename the job holds after this save (ADR 0116), or ``None`` to
     #: keep the ones it holds. Only a waiting job's save sends renames.
     renames: Sequence[ElementRename] | None = None
+    #: Whether this save states the resolution of the job's Controls
+    #: (ADR 0124), which is a change of its own, as a rename is.
+    resolves_controls: bool = False
 
 
 @dataclass(frozen=True)
@@ -1468,6 +1523,8 @@ class SavedAnswers:
     shown: tuple[UnknownKey, ...]
     skipped: tuple[SkipKey, ...]
     revision: int
+    #: What each applied Control writes, with each fact's state (ADR 0125).
+    control_facts: tuple[ControlFacts, ...]
     renames: tuple[ElementRename, ...] = ()
 
 
@@ -1492,6 +1549,20 @@ class Carried:
     #: For each element a dropped answer names and the model does not have,
     #: the elements a rename can map it to.
     choices: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    #: Each fact the job's Controls write (ADR 0125).
+    controlled_keys: frozenset[UnknownKey] = frozenset()
+
+    def reason(self, fact: FactAnswer) -> CarriedReason:
+        """Why a dropped fact is not taken: ``control-states`` where a
+        Control writes it, ``missing-element`` where it names an element the
+        model does not have, and ``not-taken`` where the job's questions
+        refuse it, because the sources state the fact or no question asks
+        it."""
+        if fact.key in self.controlled_keys:
+            return "control-states"
+        if key_ref(fact.key).element_id in self.choices:
+            return "missing-element"
+        return "not-taken"
 
     def to_json(self, model: SystemModel) -> dict[str, list[Any]]:
         """The carried answers as every surface lists them for review: the key
@@ -1500,9 +1571,7 @@ class Carried:
         each link they do not take, the renames, and what each missing
         element can map to.
 
-        A fact is ``missing-element`` where it names an element the model
-        does not have, and ``not-taken`` where the job's questions refuse it:
-        the sources state the fact, or no question asks it.
+        Each dropped fact carries its :meth:`reason`.
         """
         names = element_names(model)
 
@@ -1517,11 +1586,7 @@ class Carried:
             "carried_dropped": [
                 {
                     "label": fact_label(fact.key, model),
-                    "reason": (
-                        "missing-element"
-                        if key_ref(fact.key).element_id in self.choices
-                        else "not-taken"
-                    ),
+                    "reason": self.reason(fact),
                 }
                 | fact.model_dump(mode="json")
                 for fact in self.dropped.facts
@@ -1562,7 +1627,7 @@ class SavedDraft:
     does a save's.
     """
 
-    draft: AnswerSet
+    draft: SentAnswers
     revision: int
 
 
@@ -1583,6 +1648,8 @@ class ResumedJob:
     skipped: tuple[SkipKey, ...]
     checkpoint: Checkpoint
     follow_up: bool
+    #: What each applied Control writes, with each fact's state (ADR 0125).
+    control_facts: tuple[ControlFacts, ...]
 
 
 @dataclass(frozen=True)
@@ -1610,6 +1677,9 @@ class AnswerState:
     checkpoint: Checkpoint
     frameworks: Mapping[FrameworkName, Mapping[str, Any]]
     analyses: Sequence[FrameworkAnalysis]
+    #: Whether the analysis asks a person. A job that pauses only so that its
+    #: Controls continue it at once does not, and neither does its report.
+    asks: bool
     waiting: bool
     final: bool
     sources: Sequence[Source]
@@ -1621,12 +1691,20 @@ class AnswerState:
     resumed_by: str | None
     #: A report's draft answers: what its follow-up saved in batches and has
     #: not yet run. Empty for a waiting job, whose saved answers are ``answers``.
-    draft: AnswerSet = NO_ANSWERS
+    draft: SentAnswers = NO_SENT_ANSWERS
     #: The answers a paused job held when its amendment started this job
     #: (ADR 0072). This job's questions take each one they still ask.
     carried_in: AnswerSet = NO_ANSWERS
     #: The owner's renames of the elements the carried answers name (ADR 0116).
     renames: tuple[ElementRename, ...] = ()
+    #: The job's copy of its Controls, and the resolution a save stated for
+    #: each, or ``None`` where each copy takes its default (ADR 0124).
+    controls: tuple[CopiedControl, ...] = ()
+    scopes: tuple[ControlResolution, ...] | None = None
+    #: What the job row holds of what each Control writes. A report reads
+    #: it, because its model holds each Control fact written already; a
+    #: waiting job reads its Controls against its model.
+    stored_facts: tuple[ControlFacts, ...] | None = None
 
     def _question_set(self, answers: AnswerSet) -> QuestionSet:
         assertions = self.checkpoint.assertions
@@ -1635,6 +1713,7 @@ class AnswerState:
             None if assertions is None else assertions.catalog,
             self.frameworks,
             self.analyses,
+            asks=self.asks,
             waiting=self.waiting,
             answered=answers,
             final=self.final,
@@ -1642,6 +1721,72 @@ class AnswerState:
             skipped=self.skipped,
             resumed_by=self.resumed_by,
         )
+
+    @cached_property
+    def _written_by_controls(self) -> tuple[ControlFacts, ...]:
+        """What each applied Control writes: a waiting job's Controls read
+        against its model, or what a report's job row holds."""
+        if self.waiting:
+            base = control_facts(
+                self.controls,
+                self.scopes,
+                self.checkpoint.system_model,
+                None
+                if self.checkpoint.assertions is None
+                else self.checkpoint.assertions.catalog,
+            )
+        else:
+            base = list(self.stored_facts or ())
+        return tuple(base)
+
+    @cached_property
+    def control_facts(self) -> tuple[ControlFacts, ...]:
+        """What each applied Control writes, with its state against the
+        job's own answers (ADR 0125)."""
+        return self._controls_of(self.own(self.answers))
+
+    @cached_property
+    def controlled(self) -> AnswerSet:
+        """The Control rung: every fact the Controls write."""
+        return control_answers(self._written_by_controls)
+
+    def own(self, answers: AnswerSet) -> AnswerSet:
+        """``answers`` without each fact as a Control wrote it (ADR 0125). A
+        waiting job saves only these, so a later save that unticks the
+        Control takes the fact away. A report's job holds the answers its run
+        wrote, Control facts included, and its own answers are these.
+
+        An answer that differs from the Control's stays, and
+        :func:`~analysis_service.job_controls.with_own_answers` marks it
+        ``changed`` by its key alone."""
+        written = {fact.key: fact for fact in self.controlled.facts}
+        own = tuple(fact for fact in answers.facts if written.get(fact.key) != fact)
+        return answers.model_copy(update={"facts": own})
+
+    def _controls_of(self, own: AnswerSet) -> tuple[ControlFacts, ...]:
+        return tuple(with_own_answers(self._written_by_controls, own.facts))
+
+    def fact_origin(self, key: UnknownKey) -> FactOrigin | None:
+        """The rung the held answer to ``key`` comes from, or ``None`` where
+        the job holds none.
+
+        **The one reader of a fact's rung** (ADR 0125): a correction, a
+        draft, an own answer, a Control with its ID, or a carried answer.
+        """
+        rungs: tuple[tuple[Rung, Sequence[FactAnswer]], ...] = (
+            ("correction", self.corrections),
+            ("draft", self.draft.written().facts),
+            ("answer", self.own(self.answers).facts),
+        )
+        for rung, facts in rungs:
+            if any(fact.key == key for fact in facts):
+                return FactOrigin(rung)
+        for entry in self.control_facts:
+            if any(fact.key == key for fact in entry.writes()):
+                return FactOrigin("control", entry.control, entry.name)
+        if any(fact.key == key for fact in self.carried.taken.facts):
+            return FactOrigin("carried")
+        return None
 
     @cached_property
     def carried(self) -> Carried:
@@ -1659,6 +1804,7 @@ class AnswerState:
         base = self._question_set(self.answers)
         saved = {answer.key for answer in self.answers.facts}
         placed = {fold_principal(link.principal) for link in self.answers.links}
+        controlled = frozenset(fact.key for fact in self.controlled.facts)
         facts = [a for a in carried.facts if a.key not in saved]
         links = [
             link
@@ -1666,10 +1812,12 @@ class AnswerState:
             if fold_principal(link.principal) not in placed
         ]
         taken_facts = tuple(
-            a for a in facts if self._admits(base, AnswerSet(facts=(a,)))
+            a
+            for a in facts
+            if a.key not in controlled and self._admits(base, SentAnswers(facts=(a,)))
         )
         taken_links = tuple(
-            link for link in links if self._admits(base, AnswerSet(links=(link,)))
+            link for link in links if self._admits(base, SentAnswers(links=(link,)))
         )
         return Carried(
             taken=AnswerSet(links=taken_links, facts=taken_facts),
@@ -1681,9 +1829,10 @@ class AnswerState:
             choices=rename_choices(
                 self.carried_in, self.checkpoint.system_model, self.renames
             ),
+            controlled_keys=controlled,
         )
 
-    def _admits(self, base: QuestionSet, given: AnswerSet) -> bool:
+    def _admits(self, base: QuestionSet, given: SentAnswers) -> bool:
         try:
             base.admit(
                 sources=self.sources, earlier=self.answers, given=given, save=True
@@ -1694,14 +1843,15 @@ class AnswerState:
 
     @property
     def held(self) -> AnswerSet:
-        """Every answer this job holds: the carried ones its questions take,
-        under the ones its own saves gave."""
-        return self.answers.over(self.carried.taken)
+        """Every answer this job holds: the ones its own saves gave, over each
+        fact its Controls write, over the carried ones its questions take."""
+        return self.answers.over(self.controlled.over(self.carried.taken))
 
     @cached_property
     def questions(self) -> QuestionSet:
-        """Every question this job asks."""
-        if self.carried.taken.empty:
+        """Every question this job asks. A fact a Control writes is answered,
+        so it is not asked."""
+        if self.carried.taken.empty and self.controlled.empty:
             return self._question_set(self.answers)
         return self._question_set(self.held)
 
@@ -1729,6 +1879,11 @@ class AnswerState:
         questions take each one they still ask (:attr:`carried`). The amendment
         names the revision it read, as a save does.
         """
+        if not self.asks:
+            # An amendment asks again, and this analysis asks nobody.
+            raise ValueError(
+                "this analysis asks no questions, so it takes no amendment"
+            )
         if self.resumed_by is not None:
             raise AlreadyResumed(
                 f"job {self.resumed_by} locks this job;"
@@ -1773,9 +1928,25 @@ class AnswerState:
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the
         submitter's own choices otherwise. ``limits`` is ``None`` only where
-        the job holds no sources to bound, as an eval replay of saves.
+        the job holds no sources to bound, as an eval replay of saves. An
+        analysis that asks no questions takes no answer and no skip: its pause
+        takes only a continue that unticks or resolves a Control (ADR 0125).
         """
+        own = (
+            not answers.given.empty
+            or bool(answers.skips)
+            or answers.renames is not None
+        )
+        if not self.asks and (own or not self.waiting):
+            raise ValueError("this analysis asks no questions, so it takes no answers")
         self._check_revision(answers.revision, required=self.waiting or answers.save)
+        if self.waiting:
+            assertions = self.checkpoint.assertions
+            refuse_disagreement(
+                self.control_facts,
+                self.checkpoint.system_model,
+                None if assertions is None else assertions.catalog,
+            )
         if answers.renames is not None:
             if not (self.waiting and answers.save):
                 raise ValueError("only a save to a waiting job sends renames")
@@ -1791,8 +1962,26 @@ class AnswerState:
                     skipped=tuple(self.skipped),
                     revision=self.revision,
                     renames=renaming.renames,
+                    control_facts=self.control_facts,
                 )
             return renaming.answer(replace(answers, renames=None), limits=limits)
+        if (
+            answers.resolves_controls
+            and self.waiting
+            and answers.save
+            and answers.given.empty
+            and not answers.skips
+        ):
+            # A Control's resolution alone is a change: the job keeps its own
+            # answers.
+            return SavedAnswers(
+                answers=self.answers,
+                shown=tuple(self.shown),
+                skipped=tuple(self.skipped),
+                revision=self.revision,
+                renames=self.renames,
+                control_facts=self.control_facts,
+            )
         given = answers.given
         if not self.waiting:
             if answers.save and given.empty:
@@ -1806,10 +1995,20 @@ class AnswerState:
             skips=answers.skips,
             presented=answers.presented,
         )
-        held = within_held_limits(admitted.answers)
+        held = within_held_limits(self.own(admitted.answers))
+        controls = self._controls_of(held)
+        # The answers Source holds each Control fact on a line that names the
+        # Control, as the run composes it again (ADR 0125).
+        written = within_held_limits(held.over(control_answers(controls)))
+        sources = with_link_answers(
+            [source for source in admitted.sources if source.kind != "answers"],
+            written.links,
+            written.facts,
+            control_lines(controls),
+        )
         # Checked for a save too: saved answers or a draft that no start could
         # run would hold the job until the submitter shortens an answer.
-        breach = None if limits is None else limits.breach(admitted.sources)
+        breach = None if limits is None else limits.breach(sources)
         if breach is not None:
             raise SourcesOverLimit(breach)
         if answers.save and not self.waiting:
@@ -1821,14 +2020,18 @@ class AnswerState:
                 skipped=admitted.skipped,
                 revision=self.revision,
                 renames=self.renames,
+                control_facts=controls,
             )
+        # The Resumed Job holds what its run writes, so each reader of a
+        # report's answers reads each Control fact too.
         return ResumedJob(
-            sources=admitted.sources,
-            answers=held,
+            sources=sources,
+            answers=written,
             shown=admitted.shown,
             skipped=admitted.skipped,
             checkpoint=self.checkpoint,
             follow_up=not self.waiting,
+            control_facts=controls,
         )
 
     def correct(

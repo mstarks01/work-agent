@@ -7,6 +7,7 @@ against the one the graph sent, instruction and user turn, byte for byte.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 
@@ -19,6 +20,7 @@ from evals.harness import critic_replay
 from evals.harness.bundle import case_file, reports_dir, write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.run_record import loaded
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
@@ -76,7 +78,7 @@ def test_changed_drafts_make_a_request_the_critic_never_saw(recorded, case):  # 
 def test_a_replayed_answer_is_compared_draft_by_draft(recorded, case):  # noqa: F811
     out, _ = recorded
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
-    block = archived.report.analyses[0]
+    block = archived.block
     first = block.all_claims()[0]
     flipped = {
         "claims": [
@@ -126,34 +128,65 @@ def test_an_answer_outside_the_contract_is_refused(recorded, case):  # noqa: F81
         asyncio.run(critic_replay.replay(archived, call, PACKAGE_LOADER, PROMPT_LOADER))
 
 
-def test_the_replayed_rulings_are_written_completed(recorded, case, tmp_path):  # noqa: F811
+def test_the_replayed_rulings_are_written_completed(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
     """The file carries what a status cannot: the reason and the open facts.
 
     A ruling that names nothing on a draft citing an unknown ground is written
-    with that ground in ``related_unknowns``, as the graph completes it.
+    with that ground in ``related_unknowns``, as the graph completes it. The
+    file starts with the record of the sweep files the replay read (#2029).
     """
     out, _ = recorded
-    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
-    bare = critic_replay.parse(
-        json.dumps(
-            {
-                "claims": [
-                    {
-                        "id": claim.id,
-                        "verdict": {},
-                        "confidence": getattr(claim, "confidence", "medium"),
-                    }
-                    for claim in archived.drafts
-                ]
-            }
-        ),
-        "stride",
+    artifact = finished(out, case.id)
+    archived = critic_replay.load(artifact, case.id, "stride")
+    bare = json.dumps(
+        {
+            "claims": [
+                {
+                    "id": claim.id,
+                    "verdict": {},
+                    "confidence": getattr(claim, "confidence", "medium"),
+                }
+                for claim in archived.drafts
+            ]
+        }
     )
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return bare
+
+        return call
+
+    monkeypatch.setattr(critic_replay, "node_call", scripted)
+    monkeypatch.setattr(critic_replay.Deployment, "from_env", lambda: None)
     written = tmp_path / "rulings.json"
+    args = argparse.Namespace(
+        artifact=artifact.path,
+        case=case.id,
+        framework="stride",
+        accept_cost="unknown",
+        out=written,
+        raw=None,
+    )
 
-    critic_replay.write_rulings(written, archived, bare)
+    assert critic_replay.command_critic_replay(args) == 0
 
-    claims = json.loads(written.read_text(encoding="utf-8"))["claims"]
+    held = json.loads(written.read_text(encoding="utf-8"))
+    assert held["record"]["command"] == "critic-replay"
+    assert [one["path"] for one in held["record"]["inputs"]] == sorted(
+        str(path)
+        for path in (
+            artifact.path,
+            *archived.files,
+            *loaded((PACKAGE_LOADER, PROMPT_LOADER)),
+        )
+    )
+    claims = held["claims"]
     assert [claim["id"] for claim in claims] == [d.id for d in archived.drafts]
     conditional = [d.id for d in archived.drafts if d.unknown_grounds()]
     assert conditional, "the recorded case carries a draft citing an unknown"
@@ -189,7 +222,7 @@ def test_a_failed_case_rebuilds_its_critic_request_from_the_dump(
         critic_replay.compose(archived, PACKAGE_LOADER, PROMPT_LOADER)
     )
 
-    assert archived.report is None
+    assert archived.block is None
     assert next(contents for text, contents in seen if text == instruction) == [turn]
 
 

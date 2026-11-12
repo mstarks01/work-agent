@@ -68,6 +68,7 @@ from typing import Any, NamedTuple, get_args, get_type_hints
 
 from analysis_service.model_tiers import TierName
 from analysis_service.parsing import non_negative, strings
+from analysis_service.sources import text_digest
 from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
@@ -120,8 +121,8 @@ class BaselineIdentity:
     endpoints — ``openai/flex`` and ``openai`` both report ``OpenAI`` while
     differing 2.1x in price and 46% in latency. Without the pin those two
     sweeps compute one identity and pool into one directory. Read from the
-    ``models`` block, which records the declaration per tier, so a sweep taken
-    before that was recorded carries no pin and keeps the identity it had.
+    ``models`` block, which records the declaration per tier, so a sweep with
+    no declaration there carries no pin and keeps its identity.
     """
 
     repo_commit: str
@@ -223,9 +224,7 @@ class BaselineIdentity:
 
     @property
     def hash(self) -> str:
-        return hashlib.sha256(
-            json.dumps(self.to_json(), sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        return text_digest(json.dumps(self.to_json(), sort_keys=True))
 
     @property
     def name(self) -> str:
@@ -264,9 +263,10 @@ def recorded_upstreams(
 ) -> dict[str, tuple[str, ...]]:
     """Every upstream the record names, per tier on an aggregator route.
 
-    The one reader of the question "which provider served this tier", for the
-    identity and for the rule that refuses a tier it cannot answer. Keyed only
-    by the tiers whose vendor does not route to one provider: a direct vendor
+    The reader of the question "which provider served this tier" for the
+    identity and for the rule that refuses a tier it cannot answer.
+    :meth:`~evals.harness.provenance.RunProvenance.tier_identities` folds the
+    same field for the artifact's tier summary. Keyed only by the tiers whose vendor does not route to one provider: a direct vendor
     is its own upstream, names none in its responses, and has nothing here to
     read. An aggregator tier whose executions name no upstream maps to an
     empty tuple rather than being absent, so the rule can tell "the record is
@@ -291,8 +291,8 @@ def declared_pins(
     The one reader of the recorded pin. Keyed like
     :func:`recorded_upstreams`, by the tiers whose vendor reaches more than one
     provider, because only those have an endpoint to choose. A tier whose
-    record carries no declaration is absent rather than empty: a sweep taken
-    before the pin was recorded does not know what it ran under, and reading
+    record carries no declaration is absent rather than empty: a sweep with
+    no declaration does not state what it ran under, and reading
     that as "the gateway chose" would give it an identity it cannot support.
     """
     recorded = _tiers_recorded(artifact)

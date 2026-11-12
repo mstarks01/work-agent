@@ -28,7 +28,6 @@ reviewer never saw.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -47,13 +46,18 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.reassess import ReviewerAssessment, reassess
-from analysis_service.report import Report
+from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
-from evals.harness.artifact import load_artifact
-from evals.harness.bundle import assertions_from_reports
+from evals.harness.artifact import corpus_digest, load_artifact
+from evals.harness.bundle import (
+    UnreadableReport,
+    assertions_from_reports,
+    read_report,
+)
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
+from evals.harness.run_record import run_record, sweep_inputs
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 
@@ -61,7 +65,7 @@ Route = Literal["projected", "offered", "open", "set-aside", "refused"]
 
 #: The routes that put a row in front of a lane. The population the support
 #: measurement is read over is these rows, frozen.
-REACHES: frozenset[str] = frozenset({"projected", "offered"})
+REACHES: frozenset[Route] = frozenset({"projected", "offered"})
 
 #: The format of a frozen population file. Bumped when a field changes
 #: meaning, so a population frozen under one rule is never read under another.
@@ -94,7 +98,7 @@ def catalog_digest(record: AssertionRecord) -> str:
     with another digest was written against rows this population never held.
     """
     body = json.dumps(record.catalog.model_dump(mode="json"), sort_keys=True)
-    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return text_digest(body)
 
 
 def population(
@@ -266,11 +270,17 @@ def command_freeze_population(args: argparse.Namespace) -> int:
         if not reports:
             raise PopulationError("name at least one report or assertion sweep")
         frozen = freeze(reports)
+        record = run_record(
+            "freeze-population",
+            {"corpus_digest": corpus_digest(args.corpus) if args.assertions else None},
+            {path: {} for path in args.reports} | sweep_inputs(args.assertions),
+        )
     except (OSError, ValueError, EvalRunError) as error:
         print(f"cannot freeze: {error}", file=sys.stderr)
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(frozen, indent=2) + "\n", encoding="utf-8")
+    written = {"record": record, **frozen}
+    args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
     print(
         f"froze {len(reached(frozen))} row(s) a lane read, across"
         f" {len(frozen['cases'])} case(s), to {args.out}"
@@ -316,7 +326,7 @@ def parsed_verdicts(held: object) -> dict[str, ReviewerAssessment]:
 def command_reassess(args: argparse.Namespace) -> int:
     """Recompute a report under a review. It runs no model and writes no report."""
     try:
-        report = Report.model_validate_json(args.report.read_text(encoding="utf-8"))
+        report = read_report(args.report)
         review = json.loads(args.verdicts.read_text(encoding="utf-8"))
         if report.assertions is None:
             raise PopulationError("the report ran no assertion pass")
@@ -329,16 +339,18 @@ def command_reassess(args: argparse.Namespace) -> int:
                 f" ({review.get('catalog_digest')!r}, this report's is {digest!r})"
             )
         result = reassess(report, parsed_verdicts(review.get("verdicts")))
-    except (OSError, ValueError) as error:
+        record = run_record("reassess", {}, {args.report: {}, args.verdicts: {}})
+    except (OSError, ValueError, UnreadableReport) as error:
         print(f"cannot reassess: {error}", file=sys.stderr)
         return 1
     written = {
+        "record": record,
         "catalog_digest": digest,
         "rejected": list(result.rejected),
         "withdrawn": [asdict(row) for row in result.withdrawn],
         "reopened": list(result.reopened),
         "projections": [asdict(row) for row in result.projections],
-        "record": result.record.model_dump(mode="json"),
+        "assertions": result.record.model_dump(mode="json"),
         "system_model": result.model.model_dump(mode="json"),
     }
     args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")

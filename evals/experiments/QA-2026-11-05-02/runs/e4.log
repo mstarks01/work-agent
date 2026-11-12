@@ -1,0 +1,16 @@
+e4-ctl-I-01-dropped-1 rc=0 spent=0.0241 total=0.0241
+e4-trt-I-01-dropped-1 rc=0 spent=0.0262 total=0.0503
+e4-ctl-I-01-invented-1 rc=0 spent=0.0210 total=0.0713
+e4-trt-I-01-invented-1 rc=0 spent=0.0213 total=0.0926
+e4-ctl-I-01-duplicate-id-1 rc=0 spent=0.0227 total=0.1153
+e4-trt-I-01-duplicate-id-1 rc=0 spent=0.0228 total=0.1381
+e4-ctl-I-01-verdict-shape-1 rc=0 spent=0.0237 total=0.1618
+e4-trt-I-01-verdict-shape-1 rc=0 spent=0.0237 total=0.1855
+e4-ctl-I-01-unresolved-unknown-1 rc=0 spent=0.0231 total=0.2086
+e4-trt-I-01-unresolved-unknown-1 rc=0 spent=0.0235 total=0.2321
+e4-ctl-I-02-control-row-missing-1 rc=0 spent=0.0241 total=0.2562
+e4-trt-I-02-control-row-missing-1 rc=0 spent=0.0223 total=0.2785
+e4-ctl-I-02-control-row-not-shown-1 rc=0 spent=0.0236 total=0.3021
+e4-trt-I-02-control-row-not-shown-1 rc=0 spent=0.0234 total=0.3255
+NO REPEAT 2: repeat 1 spent 0.3255, more than 0.20
+TOTAL 0.3255

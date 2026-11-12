@@ -35,7 +35,7 @@ runs" in [`AGENTS.md`](../AGENTS.md).
   a model to sweep with" below.
 - **Classify a command by what it does, not by its name.** `score`, `replay`,
   `stability` and the other re-reads of an archive are offline. `run`,
-  `lane-replay` and `critic-replay` send requests and are paid. Set
+  `lane-replay`, `critic-replay` and `recritic-replay` send requests and are paid. Set
   `ANALYSIS_OFFLINE=1` for offline work, and a paid path fails before it
   reaches a provider.
 
@@ -307,7 +307,7 @@ lands from now on sharpens it and costs nothing extra.
 
 Extraction is graded on element IDs, which are derived from names, so a model
 that identifies a component correctly and names it its own way scores as though
-it found nothing. Those are two different questions and the score now asks both:
+it found nothing. Those are two different questions and the score asks both:
 
 - **Naming-policy conformity** — `endpoint_recall`. Did the extraction keep the
   source's wording, which is what `extract.md` rule 3 asks for?
@@ -397,7 +397,7 @@ them the way you read critic yield — as a pair:
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
 | **`rejected_rate`** (per case) | falls, or holds | A style down-vote is not this number. `poorly-written` leaves the finding in the pool, so a config that writes worse cannot flatter this one. |
-| **`pooled`** against **`unvoted`** | `pooled` rises while `unvoted` falls | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` count means nobody has looked, not that the tool is right. |
+| **`pooled`** against **`unvoted`** and **`stale`** | `pooled` rises while `unvoted` and `stale` fall | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` or `stale` count means nobody has looked at this argument, not that the tool is right. |
 | **`writing_aggregate.objection_rate`** | falls, or holds | Where a style objection lands, and the only number it moves. It is a rate over the findings people answered, so read `answered` beside it. |
 
 The votes reach the numbers with no provider call: `score` re-reads the ledger
@@ -407,7 +407,7 @@ over a finished sweep's saved reports.
 python -m evals.harness.run score baseline-1.json
 ```
 
-A vote hangs on a finding's fingerprint, so tuning does not re-spend it: after
+A vote hangs on a finding's fingerprint, so tuning does not ask for it again: after
 the first sitting, a configuration change puts only its *new* findings in the
 queue. That is what makes this affordable per experiment rather than per
 session.
@@ -450,7 +450,10 @@ it as a number: must-finds of 129.
 
 **Read the archived misses.** Every scored sweep carries two blocks that charge
 each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
-place and wrote another action), `merged`, `misfiled` (the finding sits in
+place and wrote another action), `position` (the lane wrote the action against
+another attacker than the one a person ruled), `unstated` (as `position`, but
+the drafts state no position, because the archive holds them with no
+`attacker_position`), `merged`, `misfiled` (the finding sits in
 another lane), the critic, `fan-in` (the lane proposed it and the fan-in
 removed it, or narrowed its elements off the place), the place (a rule led
 there and nothing was drafted), or `unled`. A `place` or `unled` row also says
@@ -499,6 +502,10 @@ reference row on an assertion case takes a fate the same way.
 ```bash
 python -m evals.harness.run replay evals/emissions/*.json --out /tmp/replay.json
 ```
+
+The replay pools only the sweeps that record one input in `rendered_sources`.
+Name the arm of an older sweep with `--arm LABEL=GLOB` to pool it with others
+that read the same input.
 
 An `omitted` count is the ceiling of a prompt change that asks the model to
 read more. An `unresolved` count is not: it waits on a ruling, and a run

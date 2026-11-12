@@ -20,9 +20,9 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,13 +34,38 @@ from analysis_service import (
     SourceLimits,
     StubPipelineRunner,
 )
-from analysis_service.api import JOB_REFUSAL_STATUS
+from analysis_service.answer_shares import SharedAnswer
+from analysis_service.answer_state import ANSWER_LIMITS
+from analysis_service.api import (
+    JOB_REFUSAL_STATUS,
+    max_body_bytes,
+    max_control_body_bytes,
+)
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.compact import FULL_FORMAT
+from analysis_service.claims import UNKNOWN_KEY_FIELDS
+from analysis_service.controls import ControlLimits
 from analysis_service.deployment import Deployment
-from analysis_service.jobs import JOB_ID_PATTERN, AdmissionOutcome, JobRecord
-from analysis_service.principals import LOCAL_ISSUER
-from analysis_service.sources import ANSWERS_LABEL
+from analysis_service.fact_answers import FactAnswer, key_ref
+from analysis_service.job_answers import OWNER_FILE_GONE
+from analysis_service.jobs import (
+    JOB_ID_PATTERN,
+    InMemoryJobStore,
+    JobRecord,
+    RefusalOutcome,
+)
+from analysis_service.owner_files import (
+    CONTROL_CHARACTER,
+    NO_TEXT,
+    NOT_PLAIN_TEXT,
+    NOT_UTF_8,
+    OwnerFile,
+    name_in_use,
+    over_limit,
+    too_large,
+)
+from analysis_service.principals import LOCAL_ISSUER, Principal
+from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.sources import ANSWERS_LABEL, FORMATS
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
     A_FACT_ANSWER,
@@ -53,7 +78,19 @@ from tests.factories import (
     sample_selection,
     secret_env,
 )
-from webapp.main import Settings, Startup, Workspace, create_app, render_report
+from webapp.main import (
+    OPERATOR,
+    PAGE_SOURCE_LABELS,
+    FileRefusal,
+    FilesLimits,
+    Settings,
+    Startup,
+    Workspace,
+    create_app,
+    file_refusals,
+    render_report,
+)
+from webapp.settings_save import MAX_SAVE_BYTES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -105,13 +142,15 @@ def stub_settings(runner=None, catalog: bool = False) -> Settings:
         budget=WEBAPP_BUDGET,
         deadline_seconds=TEST_DEADLINE,
         carries_catalog=catalog,
+        max_owner_files=WEBAPP_MAX_OWNER_FILES,
+        control_limits=WEBAPP_CONTROL_LIMITS,
     )
 
 
 def startup_for(tiers, runner=None, catalog: bool = False) -> Startup:
     return Startup(
         settings=stub_settings(runner, catalog),
-        frameworks=CARRIED,
+        carried_frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -128,7 +167,7 @@ def broken_client(tiers):
     """The app as it comes up when the vendor's credentials are missing."""
     startup = Startup(
         settings=None,
-        frameworks=(),
+        carried_frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
             "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
@@ -140,6 +179,11 @@ def broken_client(tiers):
 # The demo app has one textarea, so it posts one description-kind source. Its
 # label is the app's, not the user's: the form asks for text, not a citation key.
 WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+WEBAPP_MAX_OWNER_FILES = 3
+#: The bounds on the operator's Controls in the webapp tests.
+WEBAPP_CONTROL_LIMITS = ControlLimits(
+    max_controls=50, max_evidence=10, max_evidence_bytes=10_000
+)
 
 # The local operator's own spend: no test here is about a window, and the
 # descriptions some tests send are a hundred kilobytes.
@@ -195,6 +239,63 @@ def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
     assert f'data-max-bytes="{limit}"' in client.get("/").text
 
 
+def _island(page: str, name: str) -> Any:
+    """The JSON value of the island ``name`` that a page carries."""
+    (sent,) = re.findall(
+        rf'<script type="application/json" id="{name}"[^>]*>(.*?)</script>',
+        page,
+        re.DOTALL,
+    )
+    return json.loads(sent)
+
+
+def test_the_form_page_reads_the_service_s_element_type_nouns(client):
+    """The form page names an element type with the words the server sends."""
+    from analysis_service.system_model import ELEMENT_TYPE_NOUNS
+
+    page = client.get("/").text
+    assert _island(page, "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
+    assert re.search(
+        r'const TYPE_NOUNS = JSON\.parse\(document\.getElementById\("element_type_nouns"\)',
+        page_javascript("first_run.js"),
+    )
+
+
+def test_the_form_page_reads_its_word_tables_from_the_service(client):
+    """The form page carries each table of ``FORM_WORDS`` and the facet
+    answers, and its scripts read them from the islands."""
+    from analysis_service.fact_answers import FACET_ANSWERS
+    from webapp.page_words import FORM_WORDS, island_tables
+
+    page = client.get("/").text
+    assert _island(page, "form_words") == island_tables(FORM_WORDS)
+    assert _island(page, "facet_answers") == list(FACET_ANSWERS)
+    scripts = page_javascript("workspace.js") + page_javascript("first_run.js")
+    assert not [name for name in FORM_WORDS if f".{name}" not in scripts]
+    assert 'getElementById("facet_answers")' in page_javascript("answer_editor.js")
+
+
+def test_the_page_reads_the_format_table_the_server_renders(client):
+    """The form page gets the format table and its ``accept`` value from
+    :data:`FORMATS`, and no page file holds a copy of an extension (ADR 0120)."""
+    page = client.get("/").text
+    rendered = re.search(r'id="source_formats"[^>]*>(.*?)</script>', page, re.DOTALL)
+    extensions = [ext for row in FORMATS.values() for ext in row.extensions]
+
+    assert json.loads(rendered.group(1)) == {
+        name: {
+            **asdict(row),
+            "extensions": list(row.extensions),
+            "kinds": list(row.kinds),
+        }
+        for name, row in FORMATS.items()
+    }
+    assert f'accept="{",".join(extensions)}"' in page
+    for name in ("workspace.html", "static/first_run.js"):
+        held = (PROJECT_ROOT / "webapp" / name).read_text()
+        assert not [ext for ext in extensions if ext in held], name
+
+
 def test_no_form_control_can_influence_which_model_runs(client, tiers):
     """The picker chooses what is analysed; nothing chooses what analyses it.
 
@@ -232,10 +333,9 @@ def test_the_only_controls_are_the_picker_and_the_description(client):
 def _reusing(tiers):
     """A client, and a finished run of its own that holds one answer."""
     from analysis_service.answer_sets import AnswerSet
-    from analysis_service.fact_answers import FactAnswer
 
     startup = startup_for(tiers)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     reusing = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
     earlier = run_to_completion(reusing)
     record = asyncio.run(workspace.store.get(earlier))
@@ -291,12 +391,17 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
     """Each POST, PUT and DELETE route asks the one gate before it reads the
     body, so a new write route without it fails here."""
     writes = [
-        (method, route.path.replace("{run_id}", "job-missing"))
+        (
+            method,
+            route.path.replace("{run_id}", "job-missing")
+            .replace("{file_id}", "file-" + "0" * 32)
+            .replace("{control_id}", "control-" + "0" * 32),
+        )
         for route in client.app.routes
         for method in sorted(getattr(route, "methods", None) or ())
         if method in {"POST", "PUT", "DELETE"}
     ]
-    assert len(writes) == 9, writes
+    assert len(writes) == 15, writes
     for method, path in writes:
         response = client.request(
             method, path, json={}, headers={"Sec-Fetch-Site": "cross-site"}
@@ -307,18 +412,86 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
         }
 
 
-def test_a_run_streams_one_tick_per_node_then_redirects(client):
+#: The write routes that take no body.
+NO_BODY = {("POST", "/workspace/runs/{run_id}/stop")}
+
+
+def _body_routes(client) -> list[tuple[str, str, int]]:
+    """Each POST and PUT route that reads a body, as a request path, with the
+    most bytes it reads."""
+    control = max_control_body_bytes(WEBAPP_CONTROL_LIMITS)
+    limits = {
+        "/settings": MAX_SAVE_BYTES,
+        "/settings/rows": MAX_SAVE_BYTES,
+        "/workspace/controls": control,
+        "/workspace/controls/{control_id}": control,
+    }
+    return [
+        (
+            method,
+            route.path.replace("{run_id}", "job-missing").replace(
+                "{control_id}", "control-" + "0" * 32
+            ),
+            limits.get(route.path, max_body_bytes(WEBAPP_LIMITS)),
+        )
+        for route in client.app.routes
+        for method in sorted(getattr(route, "methods", None) or ())
+        if method in {"POST", "PUT"} and (method, route.path) not in NO_BODY
+    ]
+
+
+def test_each_body_route_is_counted(client):
+    assert len(_body_routes(client)) == 11
+
+
+def test_each_write_route_refuses_a_body_that_is_not_json(client):
+    """The one body reader refuses another media type before it reads a byte."""
+    for method, path, _ in _body_routes(client):
+        response = client.request(
+            method,
+            path,
+            content=b"{}",
+            headers=SAME_ORIGIN | {"Content-Type": "text/plain"},
+        )
+        assert response.status_code == 415, (method, path)
+        assert response.json() == {"message": "This request takes a JSON body."}
+
+
+def test_each_write_route_reads_a_body_at_its_limit_and_refuses_one_over(client):
+    """A body of the route's limit is read and refused because it is not an
+    object; one byte more is refused for its size."""
+    for method, path, limit in _body_routes(client):
+        at_limit = b'["' + b"a" * (limit - len(b'[""]')) + b'"]'
+        for body, status in ((at_limit, 400), (at_limit + b" ", 413)):
+            response = client.request(
+                method,
+                path,
+                content=body,
+                headers=SAME_ORIGIN | {"Content-Type": "application/json"},
+            )
+            assert response.status_code == status, (method, path, response.text)
+        assert response.json() == {
+            "message": f"This request is at most {limit:,} bytes."
+        }
+
+
+def test_each_write_route_refuses_a_body_too_deep_to_parse(client):
+    """A nesting past the parser's recursion limit is a body that is not JSON."""
+    for method, path, _ in _body_routes(client):
+        response = client.request(
+            method,
+            path,
+            content=b"[" * 10_000,
+            headers=SAME_ORIGIN | {"Content-Type": "application/json"},
+        )
+        assert response.status_code == 400, (method, path, response.text)
+
+
+def test_the_stream_of_a_run_ends_on_its_terminal_status(client):
     started = client.post("/analyze", json=posted("A web app."), headers=SAME_ORIGIN)
     run_id = started.json()["run"]
     events = client.get(f"/events/{run_id}").text
 
-    ticked = [
-        json.loads(line.removeprefix("data: "))["node"]
-        for line in events.splitlines()
-        if line.startswith("data: ") and '"node"' in line
-    ]
-    # Verbatim as the graph emits them — no display-name mapping.
-    assert ticked == list(StubPipelineRunner.nodes)
     assert '"status":"completed"' in events, "the stream ends on the terminal status"
 
 
@@ -362,14 +535,7 @@ def test_the_run_gate_admits_one_at_a_time(tiers):
 
 def report_of(client, run_id: str) -> dict:
     """The report the viewer was handed, read back out of its JSON block."""
-    page = client.get(f"/report/{run_id}").text
-    block = re.search(
-        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
-        page,
-        re.DOTALL,
-    )
-    assert block is not None, "the report page carried no injected JSON block"
-    return json.loads(block.group(1))
+    return _island(client.get(f"/report/{run_id}").text, "report")
 
 
 def frameworks_of(client, body: dict) -> list[str]:
@@ -495,7 +661,7 @@ def test_a_framework_this_install_does_not_carry_is_refused(tiers):
         app=create_app(
             Startup(
                 settings=stub_settings(),
-                frameworks=(narrow,),
+                carried_frameworks=(narrow,),
                 tiers=tiers,
                 error=None,
             )
@@ -595,7 +761,7 @@ def test_an_option_that_is_not_a_closed_set_fails_loudly(client):
 
 def test_the_workspace_deletes_the_oldest_finished_job_and_stays_bounded(tiers):
     """Untrusted prose and its report never accumulate without bound."""
-    workspace = Workspace(max_jobs=3)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=3)
     with TestClient(
         create_app(startup_for(tiers), workspace), base_url=LOOPBACK
     ) as client:
@@ -618,6 +784,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
     ) as client:
         assert JOB_ID_PATTERN.fullmatch(run_to_completion(client))
         foreign = JobRecord.create(
+            assertion_pass=True,
             owner_id="another-owner",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -640,6 +807,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
                 ("PUT", "/workspace/runs/{run_id}/title"): {"title": "Orders"},
             },
             headers=SAME_ORIGIN,
+            others=("file_id", "control_id", "evidence_id"),
         )
 
 
@@ -653,6 +821,7 @@ def test_answers_from_reads_a_malformed_id_as_a_missing_run_before_the_store(tie
     ) as client:
         run_to_completion(client)
         foreign = JobRecord.create(
+            assertion_pass=True,
             owner_id="another-owner",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -675,9 +844,7 @@ def test_the_admission_messages_and_the_literal_agree():
     a page cannot cause."""
     from webapp.main import _ADMISSION_MESSAGES
 
-    answered = set(_ADMISSION_MESSAGES) | {"admitted", "duplicate"}
-
-    assert answered == set(get_args(AdmissionOutcome))
+    assert set(_ADMISSION_MESSAGES) == set(get_args(RefusalOutcome))
 
 
 def test_a_refused_submission_deletes_no_finished_job(tiers):
@@ -688,7 +855,8 @@ def test_a_refused_submission_deletes_no_finished_job(tiers):
     )
     startup = replace(startup_for(tiers), settings=settings)
     with TestClient(
-        create_app(startup, Workspace(max_jobs=2)), base_url=LOOPBACK
+        create_app(startup, Workspace(store=InMemoryJobStore(), max_jobs=2)),
+        base_url=LOOPBACK,
     ) as client:
         runs = [run_to_completion(client) for _ in range(2)]
         refused = client.post("/analyze", json=posted("C"), headers=SAME_ORIGIN)
@@ -731,6 +899,7 @@ def test_the_injection_point_escapes_every_angle_bracket():
     from webapp.main import VIEWER
 
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="local",
         sources=[Source.description("A web app.")],
         frameworks=sample_selection(),
@@ -743,7 +912,11 @@ def test_the_injection_point_escapes_every_angle_bracket():
     outcome = asyncio.run(StubPipelineRunner().run(record, ignore))
     assert isinstance(outcome, PipelineCompleted)
     page = render_report(
-        outcome.report, report_state(outcome.report), previous=None, parent=None
+        outcome.report,
+        report_state(outcome.report),
+        previous=None,
+        parent=None,
+        controls=(),
     ).html
 
     payload = re.search(
@@ -931,18 +1104,6 @@ def viewer_javascript() -> str:
     return page_javascript("report_view.js")
 
 
-def test_the_workspace_labels_each_page_status():
-    """``workspace.js`` labels every status that ``_page_status`` sends, and
-    no other. A status the table lacks renders as its raw key."""
-    from webapp.main import PageStatus
-
-    body = re.search(r"const labels = \{(.*?)\};", page_javascript("workspace.js"))
-    assert body is not None, "workspace.js holds no labels table"
-    assert set(re.findall(r'"([\w-]+)"\s*:', body.group(1))) == set(
-        get_args(PageStatus)
-    )
-
-
 def _table_keys(page: str, table: str) -> set[str]:
     """The quoted keys of the object literal ``const <table> = {...};`` in a
     page's script, one key at the start of each line."""
@@ -953,13 +1114,15 @@ def _table_keys(page: str, table: str) -> set[str]:
     return set(re.findall(r'^\s*"([\w-]+)"\s*:', body.group(1), re.MULTILINE))
 
 
-def test_the_first_run_page_words_each_stop():
-    """``first_run.js`` has a sentence for each
-    :data:`~analysis_service.answer_state.Stop` and no other. A stop the table
-    lacks renders as ``undefined``."""
-    from analysis_service.answer_state import Stop
+def test_the_first_run_page_reads_each_carried_reason():
+    """``first_run.js`` says for each
+    :data:`~analysis_service.answer_state.CarriedReason` whether a dropped
+    answer waits for an element, and for no other reason."""
+    from analysis_service.answer_state import CarriedReason
 
-    assert _table_keys("first_run.js", "stops") == set(get_args(Stop))
+    assert _table_keys("first_run.js", "waitsForElement") == set(
+        get_args(CarriedReason)
+    )
 
 
 def test_the_settings_page_shows_each_source():
@@ -970,82 +1133,54 @@ def test_the_settings_page_shows_each_source():
     assert _table_keys("settings.js", "sources") == set(get_args(ValueOrigin))
 
 
-def _graph_node_names() -> set[str]:
-    """Every node name of each graph a job runs: the extracting graph with
-    both passes, and the paused head with and without the catalog pass. A
-    resumed graph is a part of the extracting graph."""
-    from analysis_service import graph
-    from analysis_service.binding import NodeBinding
-    from analysis_service.frameworks import SCHEMAS
-    from analysis_service.markdown_loader import MarkdownLoader
-    from analysis_service.sampling import load_sampling
-    from tests.factories import repo_package_loaders, repo_tiers
+def _compared(page: str, field: str) -> set[str]:
+    """Each string that a page's script compares ``.<field>`` with."""
+    return set(re.findall(rf'\.{field} [!=]== "([\w-]+)"', page_javascript(page)))
 
-    frameworks = tuple(sorted(SCHEMAS))
-    tiers = repo_tiers()
-    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
-    binding = NodeBinding.from_configs(
-        tiers, sampling, lambda node: tiers.resolve_model(node).route
+
+def test_the_first_run_page_listens_for_each_end_of_a_stream():
+    """``first_run.js`` listens for each :data:`~webapp.main.EndFrame`, for
+    the node event, and for the connection's own ``error``. A frame it does
+    not listen for leaves the page waiting."""
+    from analysis_service.jobs import EventKind
+    from webapp.main import EndFrame
+
+    listened = set(
+        re.findall(
+            r'stream\.addEventListener\("(\w+)"', page_javascript("first_run.js")
+        )
     )
-    shapes: list[tuple[graph.Entry, bool, bool]] = [
-        (graph.ENTRY_EXTRACT, True, True),
-        (graph.ENTRY_HEAD_ONLY, True, False),
-        (graph.ENTRY_HEAD_ONLY, False, False),
-    ]
-    names: set[str] = set()
-    for entry, assertions, capability_reader in shapes:
-        built = graph.build_pipeline(
-            prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-            domain_loader=MarkdownLoader(PROJECT_ROOT / "domains"),
-            package_loaders=repo_package_loaders(frameworks),
-            binding=binding,
-            frameworks=frameworks,
-            entry=entry,
-            assertions=assertions,
-            capability_reader=capability_reader,
-            extraction_format=FULL_FORMAT,
-        ).workflow.graph
-        assert built is not None
-        names |= {node.name for node in built.nodes}
-    return names
+    assert "node" in get_args(EventKind)
+    assert listened == {*get_args(EndFrame), "node", "error"}
 
 
-#: The nodes each stage function leaves to its fallback, by decision.
-#: ``reject`` ends a run as ``rejected``, and the page shows a run's progress
-#: only while it is ``running``. A lane agent completes no stage alone: the
-#: third stage completes at its framework's join.
-_UNSTAGED = {"completedStage": ("reject", "analyze_"), "stageAfter": ("reject",)}
+def test_the_review_page_draws_each_reason_kind():
+    """``review_finding.js`` draws one group for each
+    :data:`~webapp.review.ReasonKind`. A reason of a kind it lacks shows no
+    button."""
+    from webapp.review import ReasonKind
 
-
-@pytest.mark.parametrize("function", sorted(_UNSTAGED))
-def test_the_workspace_maps_each_graph_node_to_a_stage(function):
-    """``workspace.js`` maps each node a job's graph runs to a stage, and names
-    no node that the graph lacks. A node the function lacks falls through to
-    no stage and a generic status line."""
-    from google.adk.workflow import START
-
-    body = re.search(
-        rf"const {function} = \(step, pauses\) => \{{(.*?)\n  \}};",
-        page_javascript("workspace.js"),
-        re.DOTALL,
+    drawn = re.search(
+        r"\[([^\]]*)\]\.forEach\(kind =>", page_javascript("review_finding.js")
     )
-    assert body is not None, f"workspace.js holds no {function} function"
-    names = set(re.findall(r'step === "(\w+)"', body[1]))
-    for listed in re.findall(r"\[([^\]]*)\]\.includes\(step\)", body[1]):
-        names |= set(re.findall(r'"(\w+)"', listed))
-    prefixes = tuple(re.findall(r'step\.startsWith\("(\w+)"\)', body[1]))
-    nodes = _graph_node_names() - {START.name}
+    assert drawn is not None, "review_finding.js draws no reason groups"
+    assert re.findall(r'"(\w+)"', drawn.group(1)) == list(get_args(ReasonKind))
+    assert _compared("review_finding.js", "kind") <= set(get_args(ReasonKind))
 
-    assert names, f"{function} names no node"
-    assert names <= nodes, f"{function} names no graph node {sorted(names - nodes)}"
-    for prefix in prefixes:
-        assert any(node.startswith(prefix) for node in nodes), prefix
-    unmapped = {
-        node
-        for node in nodes - names
-        if not node.startswith(prefixes) and not node.startswith(_UNSTAGED[function])
-    }
-    assert not unmapped, f"{function} maps no stage for {sorted(unmapped)}"
+
+def test_the_sitting_page_reads_only_a_contribution_mode():
+    from webapp.sitting import ContributionMode
+
+    assert _compared("sitting.js", "mode") == set(get_args(ContributionMode))
+
+
+def test_the_settings_page_reads_only_a_numeric_kind():
+    """``settings.js`` tests a row for ``integer`` and takes every other
+    numeric row as a decimal."""
+    from webapp.settings_view import Numeric
+
+    assert _compared("settings.js", "numeric") == {"integer"}
+    assert set(get_args(Numeric)) == {"integer", "decimal"}
 
 
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
@@ -1128,7 +1263,10 @@ class Node {
   }
 }
 globalThis.document = {
-  getElementById: () => Object.assign(new Node("script"), { children: ["{}"] }),
+  // Each data block is empty, but a report holds a model with its flows.
+  getElementById: (id) => Object.assign(new Node("script"), {
+    children: [id === "report" ? '{"system_model": {"data_flows": []}}' : "{}"],
+  }),
   createElement: (tag) => new Node(tag),
   createDocumentFragment: () => new Node("#fragment"),
   createTextNode: (t) => Object.assign(new Node("#text"), { children: [t] }),
@@ -1172,8 +1310,7 @@ def test_the_viewer_renders_a_backticked_identifier_as_code():
 
     The prompt hands identifiers to the lane agent in backticks and the agent
     writes them back the same way, so every description, rationale and
-    mitigation carries them. The page showed them as characters until `prose`
-    turned each span into a `code` element.
+    mitigation carries them. `prose` turns each span into a `code` element.
     """
     written = "The `encryption_in_transit` state of `flow:process:a>process:b>sync` is unknown."
     rendered = run_viewer_helpers(
@@ -1209,7 +1346,7 @@ def test_the_viewer_leaves_an_unpaired_backtick_alone():
 
 
 def test_the_viewer_renders_a_span_as_text_not_as_markup():
-    """`prose` is new text handling, so it gets #86's payload too.
+    """`prose` handles text, so it gets #86's payload too.
 
     A code span is still built as a `code` element with its content set as
     text. The payload must come back as the characters a reader sees, which is
@@ -1310,17 +1447,14 @@ def test_no_free_text_field_reaches_the_page_as_markup():
     lint above, since no offline test here can run the DOM.
     """
     report = report_with_markup_everywhere()
-    page = render_report(report, report_state(report), previous=None, parent=None).html
+    page = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
 
     assert MARKUP_PAYLOAD not in page
     assert "<img" not in page
 
-    payload = re.search(
-        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
-        page,
-        re.DOTALL,
-    )
-    decoded = json.loads(payload.group(1))
+    decoded = _island(page, "report")
     assert decoded["analyses"][0]["rejected_claims"][0]["title"] == MARKUP_PAYLOAD
     assert (
         decoded["analyses"][0]["rejected_claims"][0]["grounds"][0]["text"]
@@ -1394,7 +1528,9 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
     from tests.factories import sample_report, sample_threat
 
     report = sample_report(threats=[sample_threat(title="__CSP_NONCE__")])
-    rendered = render_report(report, report_state(report), previous=None, parent=None)
+    rendered = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    )
 
     nonce = re.search(r"script-src 'nonce-([^']+)'", rendered.csp).group(1)
     payload = re.search(
@@ -1415,15 +1551,12 @@ def test_the_page_carries_the_link_questions_its_catalog_raises():
     from tests.factories import sample_report
 
     report = sample_report()
-    rendered = render_report(report, report_state(report), previous=None, parent=None)
-    payload = re.search(
-        r'<script type="application/json" id="link_questions"[^>]*>(.*?)</script>',
-        rendered.html,
-        re.DOTALL,
+    rendered = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
     )
 
     catalog = report.assertions.catalog if report.assertions else None
-    assert json.loads(payload.group(1)) == [
+    assert _island(rendered.html, "link_questions") == [
         question.to_json() for question in link_questions(catalog, report.system_model)
     ]
 
@@ -1604,7 +1737,7 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
     page = diagnostic_page(
         Startup(
             settings=None,
-            frameworks=(),
+            carried_frameworks=(),
             tiers=tiers,
             error=ConfigError("__CSP_NONCE__"),
         ),
@@ -1657,19 +1790,77 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
 #: here rather than derived: a page added without an entry fails the sweep
 #: below, which is the point.
 PAGE_SCRIPTS = {
-    "webapp/sitting.py": "sitting.js",
-    "webapp/review.py": ("review_queue.js", "review_finding.js"),
+    "webapp/sitting.py": ("service_answer.js", "sitting.js"),
+    "webapp/review.py": ("service_answer.js", "review_queue.js", "review_finding.js"),
     "webapp/main.py": (
+        "theme.js",
         "sidebar.js",
+        "service_answer.js",
         "workspace.js",
         "answer_editor.js",
         "question_list.js",
+        "text_file.js",
+        "form_controls.js",
         "first_run.js",
         "settings.js",
+        "files.js",
+        "controls.js",
     ),
     "webapp/offline_sitting.py": "offline_sitting.js",
-    "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),
+    "webapp/report_view.html": (
+        "sidebar.js",
+        "service_answer.js",
+        "answer_editor.js",
+        "report_view.js",
+    ),
 }
+
+
+def test_each_workspace_script_reads_a_refusal_through_message_of():
+    """A plain error page is not JSON, so a refusal's message has a fallback.
+    The lint finds a read of the parsed answer's message in one expression,
+    with no fallback; ``messageOf`` of service_answer.js is the read with
+    one."""
+    unguarded = re.compile(
+        r"\.json\(\)\)\??\.message"
+        r"|\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\??\.message"
+    )
+    served = {*PAGE_SCRIPTS["webapp/main.py"], *PAGE_SCRIPTS["webapp/report_view.html"]}
+    found = {name: unguarded.findall(page_javascript(name)) for name in served}
+    assert {name: hits for name, hits in found.items() if hits} == {}
+
+
+#: Every client script the apps serve, as :data:`PAGE_SCRIPTS` names them.
+#: :func:`~tests.test_reader_lints.test_every_client_script_belongs_to_a_page`
+#: holds the set to the files in ``webapp/static``.
+STATIC_SCRIPTS = sorted(
+    {
+        name
+        for value in PAGE_SCRIPTS.values()
+        for name in ((value,) if isinstance(value, str) else value)
+    }
+)
+
+#: Each script that calls ``.json()``, with the count of its calls and the
+#: count of them that have no ``.catch(`` directly on them. ``jsonOf`` of
+#: service_answer.js is the one read, and each page loads that script.
+JSON_READS: dict[str, tuple[int, int]] = {"service_answer.js": (1, 0)}
+
+
+def test_each_script_reads_json_through_json_of():
+    """An answer of a proxy can be a plain page, and ``.json()`` of it throws.
+    The lint counts each ``.json()`` of each script, and each one with no
+    catch, against :data:`JSON_READS`. A script with no row holds none, and a
+    row holds no more than its script does."""
+    found = {}
+    for name in STATIC_SCRIPTS:
+        script = page_javascript(name)
+        reads = len(re.findall(r"\.json\(\)", script))
+        bare = len(re.findall(r"\.json\(\)(?!\s*\.catch\()", script))
+        if reads:
+            found[name] = (reads, bare)
+    assert found == JSON_READS
+
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
 #: holds values rather than code: a page's injected values keep their escape
@@ -1721,26 +1912,6 @@ def test_a_page_template_carries_no_script_body(source):
     )
 
 
-def test_every_client_script_belongs_to_a_page():
-    """A script file nothing serves is dead code nothing would notice.
-
-    The reverse of the sweep above, over the same table: that one holds a page
-    to its file, and this one holds a file to its page.
-    """
-    named = {
-        name
-        for value in PAGE_SCRIPTS.values()
-        for name in ((value,) if isinstance(value, str) else value)
-    }
-    from webapp.page import _STATIC
-
-    on_disk = {path.name for path in _STATIC.glob("*.js")}
-    assert on_disk == named, (
-        f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
-        f" the table names {sorted(named - on_disk)} that is not there."
-    )
-
-
 #: The pages that take an answer, and what builds an answer's input. Each
 #: marker is a piece of an answer input that only the shared builder spells.
 ANSWER_PAGES = ("report_view.js", "first_run.js", "question_list.js")
@@ -1753,6 +1924,15 @@ ANSWER_INPUT_MARKERS = (
     "datalist",
     "offersDontKnow",
 )
+
+
+def test_no_page_gives_a_finding_absent_from_needs_a_default():
+    """``FactQuestion.to_json`` sends each waiting finding's facets as
+    ``needed_facets`` reads them, so no page decides what a finding that
+    names no facet needs."""
+    for page in ANSWER_PAGES:
+        source = page_javascript(page)
+        assert not re.search(r"\.needs\s*\|\||!facets\.length", source), page
 
 
 @pytest.mark.parametrize("page", ANSWER_PAGES)
@@ -1773,31 +1953,135 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     )
 
 
-#: The rules the question list's pages share, as question_list.js spells each
-#: one's definition.
-SHARED_ROW_RULES = (
-    "const questionKey = ",
-    "const rowKey = ",
-    "const sameAnswer = ",
-    "const linkAnswerText = ",
-)
+#: The rules the question list's pages share, each with the pages that read
+#: it. question_list.js defines each one.
+SHARED_ROW_RULES: dict[str, tuple[str, ...]] = {
+    "questionKey": ("report_view.js", "first_run.js"),
+    "rowKey": ("report_view.js", "first_run.js"),
+    "sameAnswer": ("report_view.js", "first_run.js"),
+    "linkAnswerText": ("report_view.js", "first_run.js"),
+    "keyRef": ("question_list.js", "first_run.js"),
+    "shareKey": ("question_list.js", "report_view.js", "first_run.js"),
+    "sharesByKey": ("report_view.js", "first_run.js"),
+    "coveredCount": ("report_view.js", "first_run.js"),
+    "shareChanged": ("question_list.js", "first_run.js"),
+    "sameShare": ("question_list.js", "first_run.js"),
+    "shareable": ("question_list.js",),
+    "elementTag": ("question_list.js", "report_view.js"),
+}
 
 
 @pytest.mark.parametrize("rule", SHARED_ROW_RULES)
-def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
-    """A row's key and whether two answers are one answer have one definition.
+def test_a_row_rule_is_defined_once_and_read_by_its_pages(rule):
+    """A row's key, a share's key and whether two answers are one answer have
+    one definition.
 
-    question_list.js holds it, and the report page and the first-run page call
-    it, because two copies drift.
+    question_list.js holds it, and each page that needs it calls it, because
+    two copies drift.
     """
-    name = rule.removeprefix("const ").strip(" =")
-    definitions = [page for page in ANSWER_PAGES if rule in page_javascript(page)]
+    definitions = [
+        page for page in STATIC_SCRIPTS if f"const {rule} = " in page_javascript(page)
+    ]
 
     assert definitions == ["question_list.js"], (
-        f"{name} is defined in {definitions}; define it once, in question_list.js."
+        f"{rule} is defined in {definitions}; define it once, in question_list.js."
     )
-    for page in ("report_view.js", "first_run.js"):
-        assert f"{name}(" in page_javascript(page), f"{page} does not call {name}"
+    for page in SHARED_ROW_RULES[rule]:
+        assert f"{rule}(" in page_javascript(page), f"{page} does not call {rule}"
+
+
+#: A read of a question's key by position: an index into a key, or a key
+#: unpacked into names. A string key that a method splits is no question's key.
+_KEY_BY_POSITION = re.compile(r"\bkey\s*\[|\[[\w\s,]*\]\s*=\s*[\w.]*\bkey\b(?!\s*\.)")
+
+#: The definitions that read a key by position, both through ``KEY_FIELDS``:
+#: ``keyRef`` names each part, and ``withElement`` writes a key in that order.
+_KEY_LAYOUT = re.compile(
+    r"^const (?:keyRef|withElement) = .*?;$", re.DOTALL | re.MULTILINE
+)
+
+
+def test_a_key_is_read_by_position_only_through_key_fields():
+    """``keyRef`` is the one reader of which part of a key is which. A page
+    that reads ``key[1]`` itself is a second reader of ``UNKNOWN_KEY_FIELDS``,
+    and it reads the wrong part once the order moves."""
+    layout = _KEY_LAYOUT.findall(page_javascript("question_list.js"))
+    found = [
+        (name, match)
+        for name in STATIC_SCRIPTS
+        for match in _KEY_BY_POSITION.findall(
+            _KEY_LAYOUT.sub("", page_javascript(name))
+        )
+    ]
+
+    assert len(layout) == 2 and all(_KEY_BY_POSITION.search(rule) for rule in layout)
+    assert not found, (
+        f"{found} read a question's key by position. Read it by name with keyRef."
+    )
+
+
+def test_the_key_position_lint_sees_a_positional_read():
+    """A positive control on the lint above."""
+    reads = "const attribute = row.q.key[1];\nconst [element] = q.key;\n"
+
+    assert len(_KEY_BY_POSITION.findall(reads)) == 2
+
+
+def run_list_rules(program: str) -> object:
+    """The JSON ``program`` prints, run in node after the rules
+    question_list.js shares with both pages.
+
+    Skipped where ``node`` is absent.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the page's script")
+    javascript = page_javascript("question_list.js")
+    rules = javascript[javascript.index("const questionKey = ") :]
+    done = subprocess.run(
+        [node, "-"], input=rules + program, capture_output=True, text=True, check=True
+    )
+    return json.loads(done.stdout)
+
+
+def test_the_page_reads_a_key_and_a_share_as_the_service_does():
+    """``keyRef``, ``shapeOf`` and ``sharesByKey`` in question_list.js are
+    second readers of ``UNKNOWN_KEY_FIELDS`` and :class:`SharedAnswer`,
+    because the page reads a served key. Each is put to both."""
+    question = next(iter(QUESTION_KINDS))
+    shares = [
+        SharedAnswer(
+            answer=FactAnswer(key=("", "authentication", "", "", "", ""), value="mTLS"),
+            covers=("flow:a>b", "process:api"),
+        ),
+        SharedAnswer(
+            answer=FactAnswer(key=("", "", "", "", question, ""), value="yes"),
+            covers=("datastore:db",),
+        ),
+    ]
+    served = [share.model_dump(mode="json") for share in shares]
+    keys = [key for share in shares for key in sorted(share.keys())]
+    page = run_list_rules(
+        f"const shares = {json.dumps(served)};\n"
+        f"const keys = {json.dumps(keys)};\n"
+        "console.log(JSON.stringify({\n"
+        "  fields: KEY_FIELDS,\n"
+        "  refs: keys.map(keyRef),\n"
+        "  shapes: keys.map(shapeOf),\n"
+        "  covered: shares.map((share) => [...sharesByKey([share]).keys()]"
+        ".map((key) => JSON.parse(key)).sort()),\n"
+        "}));"
+    )
+
+    assert page == {
+        "fields": list(UNKNOWN_KEY_FIELDS),
+        "refs": [
+            {field: getattr(key_ref(key), field) for field in UNKNOWN_KEY_FIELDS}
+            for key in keys
+        ],
+        "shapes": [list(share.shape) for share in shares for _ in share.covers],
+        "covered": [sorted(map(list, share.keys())) for share in shares],
+    }
 
 
 #: Every script the two pages that take answers load.
@@ -1817,6 +2101,24 @@ def test_a_question_key_is_spelled_by_question_key_only(page):
     assert spellings == definition, f"{page} spells a question key as {spellings}"
 
 
+@pytest.mark.parametrize("page", STATIC_SCRIPTS)
+def test_a_key_and_a_share_are_read_by_the_shared_rules_only(page):
+    """``keyRef`` is the one reader of which part of a key is which, and
+    ``coveredCount`` the one count of a share's elements.
+
+    An index or a slice of a key beside ``keyRef`` reads the layout a second
+    time. The rules in question_list.js read a key part by name, so the lint
+    holds for that file too.
+    """
+    javascript = page_javascript(page)
+    positions = re.findall(r"\bkey\[[0-5]\]|\bkey\.slice\(", javascript)
+    counts = re.findall(r"\.covers\.length", javascript)
+
+    assert positions == [], f"{page} reads a key by position; read it with keyRef"
+    if page != "question_list.js":
+        assert counts == [], f"{page} counts a share's elements; call coveredCount"
+
+
 def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
     """``first_run.js`` and ``report_view.js`` call ``questionList`` as they
     load, so ``question_list.js`` and ``answer_editor.js`` come first on each
@@ -1827,7 +2129,7 @@ def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
     source = (PROJECT_ROOT / "webapp" / "main.py").read_text(encoding="utf-8")
     served = [
         re.findall(r'"(\w+\.js)"', block)
-        for block in re.findall(r"for name in \(([^)]*)\)", source)
+        for block in re.findall(r"client_scripts\(([^)]*)\)", source)
     ]
     lists = [names for names in served if "question_list.js" in names]
 
@@ -1842,9 +2144,9 @@ def test_the_link_group_heading_is_spelled_once():
     ``question_list.js``, and each page and the export read it there."""
     heading = "Match each user, team or account to a part of your system"
     spelled = {
-        path.name: page_javascript(path.name).count(heading)
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if heading in page_javascript(path.name)
+        name: page_javascript(name).count(heading)
+        for name in STATIC_SCRIPTS
+        if heading in page_javascript(name)
     }
 
     assert spelled == {"question_list.js": 1}
@@ -1880,14 +2182,12 @@ def test_the_question_index_is_built_once_for_both_pages():
     page and on the first-run page: it hides a box with no row that shows and
     counts the rows of each box that does. A page keeps only its click."""
     defined = [
-        path.name
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if "const indexGroups = " in page_javascript(path.name)
+        name
+        for name in STATIC_SCRIPTS
+        if "const indexGroups = " in page_javascript(name)
     ]
     spelled = [
-        path.name
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if "question-group-" in page_javascript(path.name)
+        name for name in STATIC_SCRIPTS if "question-group-" in page_javascript(name)
     ]
 
     assert defined == spelled == ["question_list.js"]
@@ -1951,7 +2251,7 @@ class TestTheReportPageGetsARowPerUnit:
 
         report = sample_report(threats=[sample_threat(title="</script>")])
         html = render_report(
-            report, report_state(report), previous=None, parent=None
+            report, report_state(report), previous=None, parent=None, controls=()
         ).html
 
         payload = re.search(
@@ -1984,13 +2284,13 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     from webapp.main import client_script
 
     script = client_script("report_view.js")
-    assert '(c.verdict.rejected_because ?? "evidence") === "evidence"' in script
+    assert "Object.hasOwn(UNIT_RULING, rulingStep(c))" in script
     assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
     assert (
-        "REVIEW_EXCLUDED"
+        "UNIT_RULING[rulingStep(claim)]"
         in script.split("function unitTable")[1].split("function renderBlock")[0]
-    ), "the requirement row reads the ruling as Excluded by review"
-    assert "block.rejected_claims.filter(c => !rulesOut(block, c))" in script, (
+    ), "the requirement row reads the words of the step that ruled"
+    assert "block.rejected_claims.filter(c => !rulesOnUnit(block, c))" in script, (
         "the dismissed list is the rest"
     )
     assert "ruled out by review" in script.split("function frameworkNotes")[1], (
@@ -2012,7 +2312,7 @@ def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
 
     startup = Startup(
         settings=replace(stub_settings(), runner_for=unconfigured),
-        frameworks=CARRIED,
+        carried_frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -2082,7 +2382,7 @@ def test_the_operator_is_a_local_principal_that_the_first_run_creates(tiers):
     from webapp.main import OPERATOR
 
     startup = startup_for(tiers)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     client = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
 
     assert client.get("/workspace/runs").json() == []
@@ -2109,13 +2409,232 @@ def test_every_workspace_page_takes_the_one_sidebar(name):
     assert 'id="sidebar-navigation"' not in template
 
 
-def test_no_page_words_a_count_with_a_bracketed_plural():
-    """A page words a count with ``counted``, never "finding(s)"."""
-    pages = [*(PROJECT_ROOT / "webapp" / "static").glob("*.js")]
-    pages += [*(PROJECT_ROOT / "webapp").glob("*.html")]
-    bracketed = {
-        page.name: found
-        for page in pages
-        if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
+class TestOwnerFilesInAnAnalysis:
+    """ADR 0119: ``/analyze`` copies each chosen Owner File into the job."""
+
+    TEXT = "Ana: the API uses mTLS."
+
+    def client_with_a_file(self, tiers) -> tuple[TestClient, OwnerFile]:
+        store = InMemoryJobStore()
+        principal = Principal.new(OPERATOR)
+        file = OwnerFile.create(
+            owner_id=principal.owner_id,
+            name="Kickoff call",
+            kind="transcript",
+            text=self.TEXT,
+        )
+        added = asyncio.run(
+            store.add_file(file, self.TEXT, limit=100, principal=principal)
+        )
+        assert added == "added"
+        app = create_app(startup_for(tiers), workspace=Workspace(store=store))
+        return TestClient(app, base_url=LOOPBACK), file
+
+    def test_a_reopened_analysis_lists_each_copy_and_keeps_its_text_out(self, tiers):
+        client, file = self.client_with_a_file(tiers)
+        body = posted("A web app.") | {"owner_files": [file.id]}
+        started = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+        assert started.status_code == 200, started.text
+        run = started.json()["run"]
+        client.get(f"/events/{run}")
+        page = client.get(f"/workspace/runs/{run}").json()
+        assert page["owner_files"] == [
+            {"id": file.id, "label": "Kickoff call", "kind": "transcript"}
+        ]
+        assert page["description"] == "A web app."
+
+    def test_a_file_that_is_gone_is_refused_with_one_sentence(self, tiers):
+        client, _ = self.client_with_a_file(tiers)
+        body = posted("A web app.") | {"owner_files": ["file-" + "0" * 32]}
+        refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+        assert refused.status_code == 400
+        assert refused.json()["message"] == OWNER_FILE_GONE
+
+    @pytest.mark.parametrize(
+        "owner_files", [["job-" + "0" * 32], ["file-" + "0" * 32 + "x"], "file-0"]
+    )
+    def test_a_malformed_id_is_refused_by_the_body(self, tiers, owner_files):
+        client, _ = self.client_with_a_file(tiers)
+        body = posted("A web app.") | {"owner_files": owner_files}
+        assert (
+            client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 400
+        )
+
+
+def uploaded(name: str = "Kickoff call.vtt", **changes) -> dict:
+    """The body the Files page sends for a plain text upload."""
+    return {
+        "name": name,
+        "kind": "transcript",
+        "format": "text/plain",
+        "text": "Ana: the API uses mTLS.",
+    } | changes
+
+
+class TestTheFilesRoutes:
+    """The Files section's routes (ADR 0118, #2062)."""
+
+    def test_the_page_is_served_under_a_strict_policy(self, client):
+        page = client.get("/files")
+        assert page.status_code == 200
+        policy = page.headers["content-security-policy"]
+        assert "connect-src 'self'" in policy and "unsafe-inline" not in policy
+        assert 'id="files_limits"' in page.text
+
+    def test_an_upload_lists_and_deletes(self, client):
+        assert client.get("/workspace/files").json() == []
+        added = client.post("/workspace/files", json=uploaded(), headers=SAME_ORIGIN)
+        assert added.status_code == 201, added.text
+        view = added.json()
+        assert set(view) == {"id", "name", "kind", "format", "size_bytes", "created_at"}
+        assert client.get("/workspace/files").json() == [view]
+        gone = client.delete(f"/workspace/files/{view['id']}", headers=SAME_ORIGIN)
+        assert gone.status_code == 204
+        assert client.get("/workspace/files").json() == []
+        again = client.delete(f"/workspace/files/{view['id']}", headers=SAME_ORIGIN)
+        assert again.status_code == 404
+
+    def test_the_first_upload_and_the_first_analysis_share_one_owner(self, client):
+        file = client.post(
+            "/workspace/files", json=uploaded(), headers=SAME_ORIGIN
+        ).json()
+        body = posted("A web app.") | {"owner_files": [file["id"]]}
+        assert (
+            client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 200
+        )
+
+    def test_a_name_in_use_and_the_count_limit_are_409(self, client):
+        client.post("/workspace/files", json=uploaded(), headers=SAME_ORIGIN)
+        repeated = client.post("/workspace/files", json=uploaded(), headers=SAME_ORIGIN)
+        assert repeated.status_code == 409
+        assert repeated.json()["message"] == name_in_use("Kickoff call.vtt")
+        for n in range(2, WEBAPP_MAX_OWNER_FILES + 1):
+            client.post(
+                "/workspace/files", json=uploaded(f"Call {n}"), headers=SAME_ORIGIN
+            )
+        over = client.post(
+            "/workspace/files", json=uploaded("One more"), headers=SAME_ORIGIN
+        )
+        assert over.status_code == 409
+        assert over.json()["message"] == over_limit(WEBAPP_MAX_OWNER_FILES)
+
+    @pytest.mark.parametrize(
+        ("changes", "phrase"),
+        [
+            ({"kind": "diagram"}, "cannot be a diagram"),
+            ({"format": "image/png"}, "format"),
+            ({"text": "x" * (WEBAPP_LIMITS.max_total_bytes + 1)}, "larger than"),
+            ({"text": "a\x00b"}, "control characters"),
+            ({"text": "  \n"}, "no text"),
+            ({"name": "Uploaded transcript"}, "for its own sources"),
+            ({"name": "Answers to link questions"}, "for its own sources"),
+            ({"name": "two\nlines"}, "on one line"),
+            ({"name": ""}, "on one line"),
+            (
+                {
+                    "format": "text/vnd.mermaid",
+                    "kind": "diagram",
+                    "text": "sequenceDiagram",
+                },
+                "architecture-beta",
+            ),
+            ({"owner_id": "someone"}, "only these fields"),
+        ],
+    )
+    def test_a_refused_upload_is_400_and_keeps_nothing(self, client, changes, phrase):
+        refused = client.post(
+            "/workspace/files", json=uploaded(**changes), headers=SAME_ORIGIN
+        )
+        assert refused.status_code == 400
+        assert phrase in refused.json()["message"]
+        assert client.get("/workspace/files").json() == []
+
+    @pytest.mark.parametrize(
+        "file_id", ["file-" + "0" * 31, "FILE-" + "0" * 32, "..", "job-" + "0" * 32]
+    )
+    def test_a_malformed_file_id_is_404_before_the_store(self, tiers, file_id):
+        store = LookupSpy()
+        with TestClient(
+            create_app(startup_for(tiers), Workspace(store=store)), base_url=LOOPBACK
+        ) as client:
+            gone = client.delete(f"/workspace/files/{file_id}", headers=SAME_ORIGIN)
+        assert gone.status_code == 404
+        assert file_id not in store.arguments
+
+
+def test_the_page_and_the_server_refuse_one_control_class():
+    """``text_file.js`` and ``owner_files.CONTROL_CHARACTER`` are two readers of
+    one rule, because the browser checks a file before the server does."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the page's script")
+    script = (PROJECT_ROOT / "webapp/static/text_file.js").read_text()
+    literal = re.search(r"const CONTROL = (/.*?/);", script).group(1)
+    program = (
+        f"const CONTROL = {literal};"
+        "console.log(JSON.stringify([...Array(0x2100).keys()]"
+        ".filter((c) => CONTROL.test(String.fromCharCode(c)))));"
+    )
+    done = subprocess.run(
+        [node, "-e", program], capture_output=True, text=True, check=True
+    )
+    assert json.loads(done.stdout) == [
+        point for point in range(0x2100) if CONTROL_CHARACTER.search(chr(point))
+    ]
+
+
+def test_no_page_script_words_a_refusal_the_server_words():
+    """The server renders each refusal that the page's own checks of a file
+    show (:func:`~webapp.main.file_refusals`), so the two cannot word one
+    refusal two ways. A script that spells one again fails here."""
+    sentences = [too_large(7), NOT_UTF_8, NOT_PLAIN_TEXT, NO_TEXT, over_limit(7)]
+    fragments = [
+        part for sentence in sentences for part in sentence.split("7") if len(part) > 12
+    ]
+    spelled = [
+        (script, fragment)
+        for script in STATIC_SCRIPTS
+        for fragment in fragments
+        if fragment
+        in (PROJECT_ROOT / "webapp" / "static" / script).read_text(encoding="utf-8")
+    ]
+    assert not spelled
+
+
+def test_the_file_scripts_read_only_a_file_refusal():
+    """``text_file.js`` and ``files.js`` read each
+    :data:`~webapp.main.FileRefusal` that :func:`~webapp.main.file_refusals`
+    sends, and no other key. A key the server does not send shows nothing."""
+    read = {
+        key
+        for script in STATIC_SCRIPTS
+        for key in re.findall(r"\brefusals\.(\w+)", page_javascript(script))
     }
-    assert bracketed == {}
+    assert set(file_refusals(7, 7)) == set(get_args(FileRefusal))
+    assert read == set(get_args(FileRefusal))
+
+
+def test_the_files_page_reads_only_a_files_limit():
+    """``files.js`` reads each :class:`~webapp.main.FilesLimits` key and no
+    other. A key the server does not send reads as ``undefined``."""
+    read = set(re.findall(r"\blimits\.(\w+)", page_javascript("files.js")))
+    assert read == FilesLimits.__required_keys__
+
+
+def test_each_page_reads_only_an_answer_limit():
+    """A script reads only a key of
+    :data:`~analysis_service.answer_state.ANSWER_LIMITS`. A key the server does
+    not send reads as ``undefined``, and a cap of ``undefined`` caps nothing."""
+    read = {
+        key
+        for script in STATIC_SCRIPTS
+        for key in re.findall(r"\bANSWER_LIMITS\.(\w+)", page_javascript(script))
+    }
+    assert read
+    assert read <= ANSWER_LIMITS.keys()
+
+
+def test_the_page_names_a_label_for_each_source_it_makes():
+    """The description and the default kind of each format row."""
+    kinds = {"description", *(row.default_kind for row in FORMATS.values())}
+    assert kinds <= PAGE_SOURCE_LABELS.keys()

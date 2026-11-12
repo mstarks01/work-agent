@@ -20,10 +20,13 @@ import re
 import shutil
 import subprocess
 import tempfile
+import types
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, cast, get_args
 
 import pytest
+from pydantic import ValidationError
 
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
@@ -31,10 +34,12 @@ from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION
 from evals.harness.reference import ANONYMOUS, CorpusError
+from tests.test_page_words import _copies
 from tests.test_sitting_app import CASE, build_tree
 from webapp.offline_sitting import build, payload
 from webapp.offline_sitting import main as offline_main
 from webapp.page import client_script
+from webapp.sitting import REVIEW_LABELS, _review_state
 
 
 @pytest.fixture
@@ -110,6 +115,26 @@ class TestThePageCarriesTheWholeMethod:
         assert body["submitted_by"] == "ada"
         assert body["submitted_for"] == ANONYMOUS
         assert body["envelope"] == VERSION
+
+
+class TestTheRailWordsComeFromTheServiceTable:
+    """The page has no server, so ``REVIEW_LABELS`` travels in the payload."""
+
+    def test_the_payload_carries_a_label_for_each_row_state(self, body):
+        assert body["review_labels"] == REVIEW_LABELS
+        assert set(body["review_labels"]) == set(get_args(sittings.RowState))
+
+    def test_the_script_names_row_states_and_reads_their_labels(self):
+        script = client_script("offline_sitting.js")
+        states = script.split("function state(id) {")[1].split("\n}\n")[0]
+        named = set(re.findall(r'"(\w+)"', states))
+        assert named == {"todo", "draft", "finished"}
+        assert named <= set(get_args(sittings.RowState))
+        assert "DATA.review_labels[state(" in script
+
+    def test_the_script_copies_no_label(self):
+        script = client_script("offline_sitting.js")
+        assert _copies([*REVIEW_LABELS.values()], script) == []
 
 
 class TestThePayloadCannotEndItsOwnBlock:
@@ -467,7 +492,9 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     from an older corpus can carry a mark for a target that is gone, and a
     count of marks then passes a case the merge refuses."""
 
-    def state_of(self, marks: dict) -> str:
+    def state_of(
+        self, marks: dict, notes: str = "", missing: Sequence[str] = ()
+    ) -> str:
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -479,9 +506,10 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
             "const DATA = {min_own_list: 1, cases: [{case: 'c', targets:"
             " [{fingerprint: 'a', claims: []}, {fingerprint: 'b', claims: []}]}]};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
-            f"const answers = {{c: {{own_list: [], marks: {json.dumps(marks)}}}}};\n"
+            f"const answers = {{c: {{own_list: ['one'], marks: {json.dumps(marks)},"
+            f" missing: {json.dumps([*missing])}, notes: {json.dumps(notes)}}}}};\n"
             f"{block}\n"
-            "process.stdout.write(state('c')[0]);\n"
+            "process.stdout.write(state('c'));\n"
         )
         with tempfile.TemporaryDirectory() as scratch:
             path = Path(scratch) / "state.cjs"
@@ -499,6 +527,15 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     def test_every_target_marked_is_finished(self):
         assert self.state_of({"a": "found", "b": "missed"}) == "finished"
 
+    def test_an_own_list_and_nothing_else_is_not_started(self):
+        """The rule of ``_review_state``: the review is what follows the list."""
+        assert self.state_of({}) == "todo"
+        assert self.state_of({}, notes=" \n") == "todo"
+
+    def test_a_note_or_a_missed_threat_starts_the_review(self):
+        assert self.state_of({}, notes="unsure") == "draft"
+        assert self.state_of({}, missing=["a threat"]) == "draft"
+
     def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
         assert self.state_of({"a": "found", "stale": "found"}) == "draft"
 
@@ -515,9 +552,13 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
         block = start + source.split(start, 1)[1].split(end, 1)[0]
         data = {
             "envelope": 1,
+            "marks": sorted(set(marks.values())),
             "cases": [{"case": "c", "digests": {}, "targets": list(targets)}],
         }
-        saved = {"envelope": 1, "cases": {"c": {"marks": marks}}}
+        saved = {
+            "envelope": 1,
+            "cases": {"c": {"own_list": ["one line"], "marks": marks}},
+        }
         harness = (
             f"const DATA = {json.dumps(data)};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
@@ -560,3 +601,234 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
         assert self.restored(marks, case["targets"]) == sittings.current_marks(
             prepared, marks
         )
+
+
+_ABSENT = object()
+
+#: Each shape a JSON value takes, as a saved file can hold it in a field. The
+#: record shapes use the key ``a``, which the one target of the harness holds.
+JSON_SHAPES: tuple[object, ...] = (
+    _ABSENT,
+    None,
+    True,
+    5,
+    "",
+    "text",
+    [],
+    ["line"],
+    [5],
+    [["line"]],
+    {},
+    {"a": sittings.MARKS[0]},
+    {"a": "0" * 64},
+    {"a": "no mark and no digest"},
+    {"a": 5},
+    {"a": None},
+)
+CASE_FIELDS = tuple(envelopes.CaseAnswers.model_fields)
+
+
+def _case_with(field: str, shape: object) -> dict:
+    case: dict = {"own_list": ["one line"]}
+    if shape is _ABSENT:
+        case.pop(field, None)
+    else:
+        case[field] = shape
+    return case
+
+
+#: Every field in every shape, a key outside the five, digests that are near
+#: the pattern, then a case that is no record at all.
+SAVED_CASES = (
+    *(_case_with(field, shape) for field in CASE_FIELDS for shape in JSON_SHAPES),
+    {"own_list": ["one line"], "a_sixth_field": 1},
+    {"own_list": ["one line"], "opened_digests": {"a": "A" * 64}},
+    {"own_list": ["one line"], "opened_digests": {"a": "a" * 63}},
+    {"own_list": ["one line"], "opened_digests": {"a": "a" * 64 + "\n"}},
+    None,
+    5,
+    "text",
+    ["line"],
+)
+
+
+class TestARestoredFileHoldsTheShapesTheMergeAccepts:
+    """Two readers of one shape rule, held against each other under ``node``.
+
+    ``restore`` is the one site of the page that reads a saved file, and
+    ``envelopes.CaseAnswers`` is the reader of the merge. The table gives each
+    of the five fields each JSON shape. The page keeps a case that the merge
+    accepts and refuses the file of any other, before it changes an answer.
+
+    The accepted limit: the merge also bounds each length and refuses a line
+    break in a line and a key that is not printable. The page checks shapes
+    only, so the table holds no such value.
+    """
+
+    def outcomes(self, files: list[str]) -> list[str]:
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the page's own block")
+        source = client_script("offline_sitting.js")
+        start, end = "function restore(text) {", "\nconst picker = "
+        assert start in source and end in source, "the block moved"
+        block = start + source.split(start, 1)[1].split(end, 1)[0]
+        data = {
+            "envelope": 1,
+            "marks": list(sittings.MARKS),
+            "cases": [
+                {
+                    "case": case,
+                    "digests": {},
+                    "targets": [{"fingerprint": "a", "aliases": [], "claims": []}],
+                }
+                for case in ("c", "other")
+            ],
+        }
+        harness = (
+            f"const DATA = {json.dumps(data)};\n"
+            "const BY_ID = Object.fromEntries(DATA.cases.map(c => [c.case, c]));\n"
+            "let answers = {};\nlet said = 0;\nlet drawn = 0;\n"
+            "const draw = () => { drawn += 1; };\n"
+            "const alert = () => { said += 1; };\n"
+            f"{block}\n"
+            "const outcomes = [];\n"
+            f"for (const text of {json.dumps(files)}) {{\n"
+            "  for (const id of Object.keys(answers)) delete answers[id];\n"
+            "  said = 0; drawn = 0;\n"
+            "  let outcome;\n"
+            "  try {\n"
+            "    restore(text);\n"
+            "    const kept = Object.keys(answers).length;\n"
+            "    outcome = kept === 2 && said === 0 && drawn === 1 ? 'kept'\n"
+            "      : kept === 0 && said === 1 && drawn === 0 ? 'refused'\n"
+            "      : 'part: ' + kept + ' kept, ' + said + ' said';\n"
+            "  } catch (e) { outcome = 'threw: ' + e.message; }\n"
+            "  outcomes.push(outcome);\n"
+            "}\n"
+            "process.stdout.write(JSON.stringify(outcomes));\n"
+        )
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "shapes.cjs"
+            path.write_text(harness, encoding="utf-8")
+            done = subprocess.run(
+                [node, str(path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        assert done.returncode == 0, done.stderr
+        return json.loads(done.stdout)
+
+    @staticmethod
+    def merge_reads(case: object) -> str:
+        try:
+            envelopes.CaseAnswers.model_validate(case)
+        except ValidationError:
+            return "refused"
+        return "kept"
+
+    def test_the_page_keeps_what_the_merge_accepts_and_refuses_the_rest(self):
+        # The good case comes first, so a refusal that follows a kept case
+        # shows a file that the page took in part.
+        files = [
+            json.dumps(
+                {"envelope": 1, "cases": {"other": {"own_list": ["one"]}, "c": case}}
+            )
+            for case in SAVED_CASES
+        ]
+        page = dict(
+            zip(map(json.dumps, SAVED_CASES), self.outcomes(files), strict=True)
+        )
+        merge = {json.dumps(case): self.merge_reads(case) for case in SAVED_CASES}
+
+        assert page == merge
+        assert {"kept", "refused"} == set(merge.values())
+
+    @pytest.mark.parametrize("name", ["constructor", "toString", "__proto__"])
+    def test_a_case_named_as_an_inherited_key_is_not_offered(self, name):
+        """The page offers a case that is an own key of ``BY_ID``. A plain
+        record also answers a lookup of each key that it inherits."""
+        good = {"own_list": ["one"]}
+        cases = {"other": good, "c": good, name: good}
+        text = json.dumps({"envelope": 1, "cases": cases})
+
+        assert self.outcomes([text]) == ["kept"]
+
+    @pytest.mark.parametrize("cases", [_ABSENT, None, 5, "text", [{"own_list": ["x"]}]])
+    def test_a_file_whose_cases_are_no_record_is_refused(self, cases):
+        """The merge requires a record of cases (``Envelope.cases``)."""
+        held = {"envelope": 1} if cases is _ABSENT else {"envelope": 1, "cases": cases}
+
+        assert self.outcomes([json.dumps(held)]) == ["refused"]
+
+
+#: The answers of a case that hold an own list: each field empty and not.
+STARTED_ANSWERS = tuple(
+    {"marks": marks, "missing": missing, "notes": notes}
+    for marks in ({}, {"a": sittings.MARKS[0]})
+    for missing in ([], ["a threat"], [""])
+    for notes in ("", " ", " \n\t", "unsure", " x ", "\u00a0", "\u2028", "\u200b")
+)
+
+#: Notes that the two readers read apart, which is an accepted limit. A note
+#: starts a review where it holds a character that is not white space, and
+#: JavaScript ``trim`` and Python ``strip`` hold two sets of white space. A
+#: byte order mark is white space to ``trim`` only. The others are white space
+#: to ``strip`` only.
+NOTES_READ_APART = ("\ufeff", "\u0085", "\x1c", "\x1d", "\x1e", "\x1f")
+
+
+class TestThePageAndTheAppStartAReviewOnTheSameAnswers:
+    """Two readers of one rule, held against each other under ``node``:
+    ``reviewStarted`` of the page and ``_review_state`` of the app."""
+
+    def page_reads(self, answers: Sequence[dict]) -> list[bool]:
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the page's own block")
+        source = client_script("offline_sitting.js")
+        start, end = "const reviewStarted = ", "\nfunction state(id)"
+        assert start in source and end in source, "the block moved"
+        block = start + source.split(start, 1)[1].split(end, 1)[0]
+        harness = (
+            f"{block}\n"
+            f"const read = {json.dumps(list(answers))}.map(reviewStarted);\n"
+            "process.stdout.write(JSON.stringify(read));\n"
+        )
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "started.cjs"
+            path.write_text(harness, encoding="utf-8")
+            done = subprocess.run(
+                [node, str(path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        assert done.returncode == 0, done.stderr
+        return json.loads(done.stdout)
+
+    @staticmethod
+    def app_reads(answers: dict) -> bool:
+        held = sittings.Draft(case=CASE, own_list=["one line"], **answers)
+        session = types.SimpleNamespace(draft=lambda case_id: held)
+        row = types.SimpleNamespace(case_id=CASE, state="draft")
+        reads = _review_state(cast("Any", session), cast("Any", row))
+        return reads.state == "draft"
+
+    def test_one_table_of_answers_reads_the_same_in_both(self):
+        app = [self.app_reads(answers) for answers in STARTED_ANSWERS]
+
+        assert self.page_reads(STARTED_ANSWERS) == app
+        assert {True, False} == set(app)
+
+    def test_a_note_of_white_space_that_one_reader_strips_reads_apart(self):
+        answers = [
+            {"marks": {}, "missing": [], "notes": notes} for notes in NOTES_READ_APART
+        ]
+        app = [self.app_reads(held) for held in answers]
+
+        assert app == [True, False, False, False, False, False]
+        assert self.page_reads(answers) == [not started for started in app]

@@ -1,0 +1,51 @@
+diff --git a/frameworks/stride/lanes/information-disclosure/exemplars.md b/frameworks/stride/lanes/information-disclosure/exemplars.md
+index 02ed505b..823154c6 100644
+--- a/frameworks/stride/lanes/information-disclosure/exemplars.md
++++ b/frameworks/stride/lanes/information-disclosure/exemplars.md
+@@ -121,3 +121,46 @@ Written against exemplar system B, and worth comparing with the canonical draft
+   ]
+ }
+ ```
++
++## Contrast, in system A: a compromised reader is not a storage copy
++
++`process:ledger-service` reads `store:accounts-db` through its own grant, and the store's `encryption_at_rest` is `unknown`. Two attackers reach the same rows. One obtains a copy of the storage: encryption at rest stops that attacker, and the draft is conditional on the unknown, as in the system B draft. The other runs code inside the ledger service and reads through the grant the service already holds: encryption at rest does nothing against that attacker, because the database decrypts each row for an authorized session. The two have different preconditions and different remedies, so they are two drafts. Where the sources say a component reads a store, write the compromised-reader draft. One draft does not stand in for the other.
++
++```json
++{
++  "sequence": 4,
++  "title": "Code running in the ledger service reads every account through the service's own grant",
++  "description": "`process:ledger-service` reads `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, and its account has full read/write on every table. An attacker who runs code in the ledger service, for example through the unauthenticated call from the internet-facing `process:web-api` on `flow:process:web-api>process:ledger-service>post-transfer`, inherits that grant and reads the balances and account-holder PII of every customer over the connection the service already uses. Encryption at rest does not stop this attacker, because the database decrypts every row for an authorized session; that is what separates this draft from a storage-copy draft on the same store. Second-order: the reads look like the service's own queries, so `store:audit-log`, which records transfers only, holds no trace of them.",
++  "affected_element_ids": [
++    "store:accounts-db",
++    "process:ledger-service",
++    "flow:process:ledger-service>store:accounts-db>read-write-balances"
++  ],
++  "verb": "read",
++  "evidence_refs": [
++    "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication",
++    "crossing:flow:process:web-api>process:ledger-service>post-transfer"
++  ],
++  "quotes": [
++    {
++      "text": "that account has full read/write on every table",
++      "source_label": "Payments platform notes"
++    }
++  ],
++  "severity": {
++    "likelihood": "medium",
++    "impact": "high",
++    "justification": "Likelihood is medium: the attacker must first run code in `process:ledger-service`, but the unauthenticated call from the internet-facing web API is a stated path to it. Impact is high: `store:accounts-db` is classified confidential and tagged `pii` and `financial`, and the grant covers every table."
++  },
++  "mitigations": [
++    {
++      "summary": "Scope the ledger service's grant to its operations",
++      "detail": "Replace the full read/write account with a role limited to the tables and columns that transfers need, so code in the service cannot read every account."
++    },
++    {
++      "summary": "Make bulk reads by the service visible",
++      "detail": "Log and alert on queries from the ledger service's account that read more rows than transfer traffic needs."
++    }
++  ]
++}
++```

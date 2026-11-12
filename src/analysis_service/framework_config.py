@@ -12,7 +12,7 @@ than whether the request is accepted.
 
 ``ANALYSIS_FRAMEWORKS_CARRIED`` replaces the ``carried`` list of the file. Its
 value is framework names separated by commas, with no spaces, such as
-``asvs,stride`` (ADR 0092). This loader is its one reader.
+``asvs,stride`` (ADR 0092). :func:`load_frameworks` is its one reader.
 """
 
 from __future__ import annotations

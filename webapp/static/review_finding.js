@@ -52,7 +52,7 @@
       const group = document.createElement("div");
       group.className = "rgroup " + kind;
       const head = document.createElement("h3");
-      head.textContent = kind === "substance" ? "It is wrong" : "It is badly written";
+      head.textContent = rows[0].heading;
       group.appendChild(head);
       rows.forEach(reason => {
         const button = document.createElement("button");
@@ -66,7 +66,10 @@
   }
 
   function load() {
-    fetch("/api/next").then(r => r.json()).then(fill);
+    fetch("/api/next").then(r => r.ok ? jsonOf(r) : null, () => null).then(item => {
+      if (item) fill(item);
+      else el("left").textContent = "The next finding did not load. Reload the page.";
+    });
   }
 
   function send(verdict, reason) {
@@ -85,7 +88,7 @@
     }).then(response => {
       if (!response.ok) { alert("That vote was refused."); return; }
       load();
-    });
+    }, () => alert("The connection was interrupted. Vote again."));
   }
 
   el("up").addEventListener("click", () => send("up", null));

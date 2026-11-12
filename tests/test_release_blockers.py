@@ -104,7 +104,7 @@ class Prepared:
 
 
 def prepared(
-    name: str, *, reviewed: bool
+    name: falsify.ProbeName, *, reviewed: bool
 ) -> tuple[falsify.Reading, Prepared, Prepared]:
     case = CASES[falsify.PROBES[name].case_id]
     reference = signed_reference(CORPUS, case)

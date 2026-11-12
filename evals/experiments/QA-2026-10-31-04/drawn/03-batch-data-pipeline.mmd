@@ -1,0 +1,19 @@
+flowchart LR
+    partners[Insurance partners]
+    bucket[(Landing bucket)]
+    subgraph landing[Landing network]
+        airflow[Airflow scheduler]
+    end
+    meta[(Airflow metadata DB)]
+    subgraph warehouse[Warehouse network]
+        spark[Spark transform]
+        bq[(BigQuery)]
+        analysts[Analysts]
+    end
+
+    partners -->|"daily extract (SFTP)"| bucket
+    bucket -->|files| airflow
+    airflow <-->|"connection strings, partner keys"| meta
+    airflow -->|trigger job| spark
+    spark -->|normalized records| bq
+    analysts -->|queries| bq

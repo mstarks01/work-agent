@@ -6,8 +6,9 @@ them. A transcript-only job is a one-element list with no special case, and so
 is a description-only job. There is no separate single-text path.
 
 ``kind`` is a closed vocabulary, and it is load-bearing: it selects the register
-:func:`render_sources` names around that source's text, so a new kind means a
-change to the extraction prompt and this enum together.
+:func:`render_sources` names around that source's text. A new kind needs a
+register, and a change to the extraction prompt where the register alone does
+not say how to read the text.
 
 ``label`` is the key a ``source_excerpt`` cites, which is what keeps the
 traceability chain intact across any number of sources — threat, then element,
@@ -26,9 +27,10 @@ is caller-controlled, so it must never sit on the marker line. What is left
 outside carries only this module's own bytes — an index, a count, and the
 register.
 
-The render is a pure function of the sources, called from the one place the
-graph is driven, so the service and the eval harness cannot show the same job to
-a model differently.
+The render is a pure function of the sources.
+:func:`~analysis_service.execution.seed_state` is its one reader for a graph
+run, so the service and the eval harness cannot show the same job to a model
+differently.
 """
 
 from __future__ import annotations
@@ -37,8 +39,9 @@ import hashlib
 import json
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -46,8 +49,86 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from analysis_service.grounding import normalize
 
 # Closed and load-bearing: each kind names the register rendered around its
-# text. Adding one means editing prompts/extract.md in the same change.
-SourceKind = Literal["description", "transcript", "answers"]
+# text. A new kind needs a register in _REGISTERS, and an edit to
+# prompts/extract.md where the register alone does not say how to read it.
+SourceKind = Literal["description", "transcript", "diagram", "answers"]
+
+#: The shape of an Owner File ID: it carries its type, as a job ID does.
+OWNER_FILE_ID = r"^file-[0-9a-f]{32}$"
+
+#: What an uploaded file is written in. Each value is a row of :data:`FORMATS`.
+SourceFormat = Literal["text/plain", "text/vnd.mermaid"]
+
+
+@dataclass(frozen=True)
+class FormatRow:
+    """One format that an upload reads: how a page names it, the file
+    extensions that select it, the Source kinds it allows, and the kind an
+    upload takes where the person chooses none."""
+
+    label: str
+    extensions: tuple[str, ...]
+    kinds: tuple[SourceKind, ...]
+    default_kind: SourceKind
+
+
+#: **The one format table** (ADR 0120). The direct upload and the Files upload
+#: both read it: the web app renders it into each page that uploads, so no
+#: page keeps a copy of the extensions. ``tests/test_doc_copy_lints.py`` holds
+#: each guide's copy to this table. A new format is a new row.
+FORMATS: dict[SourceFormat, FormatRow] = {
+    "text/plain": FormatRow(
+        label="Plain text",
+        extensions=(".txt", ".vtt", ".srt"),
+        kinds=("description", "transcript"),
+        default_kind="transcript",
+    ),
+    "text/vnd.mermaid": FormatRow(
+        label="Mermaid",
+        extensions=(".mmd", ".mermaid"),
+        kinds=("diagram",),
+        default_kind="diagram",
+    ),
+}
+
+#: The format of each kind that an upload allows: the one row of
+#: :data:`FORMATS` whose kinds hold it. ``tests/test_sources.py`` holds each
+#: kind to one row, so the kind gives the format.
+KIND_FORMATS: dict[SourceKind, SourceFormat] = {
+    kind: name for name, row in FORMATS.items() for kind in row.kinds
+}
+
+#: The Mermaid diagram types that the reader of ADR 0121 reads, as the first
+#: word of a diagram's first line. ``diagram_reader/read.mjs`` holds the same
+#: test in Node, and ``tests/test_sources.py`` runs both on one set of headers.
+DIAGRAM_TYPES = ("flowchart", "graph", "architecture-beta")
+
+# ASCII, as JavaScript's ``\b`` is, so the two header tests agree on a word.
+_DIAGRAM_TYPE = re.compile(
+    "(?:" + "|".join(map(re.escape, DIAGRAM_TYPES)) + r")\b", re.ASCII
+)
+
+
+def diagram_header(text: str) -> str:
+    """The first diagram line of Mermaid ``text``, stripped, or ``""``.
+
+    A blank line, a ``%%`` comment and a line between two ``---`` lines of
+    front matter are not diagram lines.
+    """
+    in_front_matter = False
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if line == "---":
+            in_front_matter = not in_front_matter
+        elif line and not in_front_matter and not line.startswith("%%"):
+            return line
+    return ""
+
+
+def is_read_diagram_type(text: str) -> bool:
+    """Whether Mermaid ``text`` is one of :data:`DIAGRAM_TYPES`."""
+    return _DIAGRAM_TYPE.match(diagram_header(text)) is not None
+
 
 # What a caller gets when they use the convenience constructors rather than
 # naming a source themselves. The wire never defaults a label — an unnamed
@@ -122,10 +203,25 @@ def _carries_formatting(value: str) -> bool:
 
 # All that ``kind`` still selects: one phrase telling the model what register
 # the text below is in. It sits outside the fence, so it is this module's bytes
-# and never the caller's.
-_REGISTERS: dict[str, str] = {
+# and never the caller's. The diagram phrase also says how to read a diagram,
+# so only a job with a diagram source is told how to read one.
+_REGISTERS: dict[SourceKind, str] = {
     "description": "a written description of the system",
     "transcript": "a transcribed conversation about the system",
+    "diagram": (
+        "a diagram of the system in Mermaid text. A node can be an element, and"
+        " an arrow can be a data flow in the direction of the arrow. A subgraph"
+        " or a group is a trust zone only where its label says so. A junction"
+        " is a point where edges meet, and never an element. Where a comment in the"
+        " diagram states its shape convention, a node's shape states its type"
+        " as the comment says. Otherwise the shape of a node states no"
+        " attribute. An excerpt quotes the line of the diagram as written."
+        " Where the block below the diagram gives the structure Mermaid's"
+        " parser read, model each of its nodes as an element named with the"
+        " node's label, or with the part of the label before its first colon"
+        " or bracket, and each of its edges as a data flow between those"
+        " elements in the direction of its arrow"
+    ),
     "answers": "the submitter's answers to questions this service asked",
 }
 
@@ -149,6 +245,11 @@ _BACKTICK_RUN = re.compile(r"`+")
 #: kind of evidence settles its claims rather than declaring what it cannot
 #: answer.
 CARRIED_EVIDENCE_KINDS: tuple[str, ...] = ("prose",)
+
+#: The kinds of evidence beside prose: the class an owner states for each
+#: evidence file of a Control (ADR 0127), and the kinds a package names where
+#: prose cannot settle a claim. No job carries one yet.
+EvidenceClass = Literal["code", "config", "people"]
 
 
 def check_answer_quotes(origin: str, labels: Sequence[str]) -> None:
@@ -186,6 +287,11 @@ class Source(BaseModel):
     kind: SourceKind
     label: str = Field(max_length=MAX_LABEL_CHARS)
     text: str
+    #: The Owner File that this Source copies, or ``None`` (ADR 0119). Only
+    #: the service sets it, from the store, and
+    #: :func:`~analysis_service.links.refuse_owner_file_sources` refuses a
+    #: caller's. The copy's digest is :meth:`digest`, so no field holds it.
+    owner_file_id: str | None = Field(default=None, pattern=OWNER_FILE_ID)
 
     @field_validator("label")
     @classmethod
@@ -219,6 +325,21 @@ class Source(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _read_diagram_type(self) -> Self:
+        """A ``diagram`` Source is a type that the reader reads (ADR 0120).
+
+        **The one rule of a diagram's type**, on every route. The message
+        names the types and never repeats the text.
+        """
+        if self.kind == "diagram" and not is_read_diagram_type(self.text):
+            types = ", ".join(f"'{name}'" for name in DIAGRAM_TYPES)
+            raise ValueError(
+                "a diagram source must be a Mermaid diagram whose first diagram"
+                f" line starts with one of {types}"
+            )
+        return self
+
     @classmethod
     def description(cls, text: str, *, label: str = DEFAULT_DESCRIPTION_LABEL) -> Self:
         """A written description, labelled for the caller who did not name one."""
@@ -240,6 +361,11 @@ class Source(BaseModel):
 
 def text_digest(text: str) -> str:
     """The sha256 hex digest of ``text``, over its UTF-8 bytes.
+
+    **The one digest rule of a text.** A source, a quote, a node's instruction,
+    an execution identity and each key the eval harness derives from a text all
+    read it here, so a change to it moves every digest the archive records.
+    Replay the archive before any change (``docs/agents/one-rule-one-reader.md``).
 
     **What a support span pins a quote to.** A span names offsets into the
     exact retained text, so a source that changes underneath it names different
@@ -263,6 +389,10 @@ def total_bytes(sources: Sequence[Source]) -> int:
     return sum(source.size_bytes() for source in sources)
 
 
+#: What a breach of the source limits is.
+LimitRung = Literal["empty", "duplicate-label", "count", "total"]
+
+
 @dataclass(frozen=True)
 class LimitBreach:
     """Why a submission was refused before any model ran.
@@ -272,8 +402,16 @@ class LimitBreach:
     reason. ``message`` is caller-facing and names no internal detail.
     """
 
-    rung: Literal["empty", "duplicate-label", "count", "total"]
+    rung: LimitRung
     message: str
+
+
+#: The largest byte budget and source count a deployment can set
+#: (``resilience.toml``). A body field that holds a source's text, or lists
+#: sources, takes these as its static bound; the deployment's own limit then
+#: refuses with its sentence.
+MAX_SOURCE_BYTES_CEILING = 10 * 1024 * 1024
+MAX_SOURCES_CEILING = 100
 
 
 @dataclass(frozen=True)
@@ -485,7 +623,21 @@ def render_fenced(value: Any) -> str:
     return fenced(render(value))
 
 
-def render_sources(sources: Sequence[Source]) -> str:
+#: The line above a diagram's reading, by whether the parser read it. This
+#: module's bytes: the reading itself is caller words, so it sits in a fence.
+_READING_LINES = {
+    True: "Mermaid's parser read this structure from the diagram above:",
+    False: (
+        "Mermaid's parser did not read the diagram above, so read it as text."
+        " The parser said:"
+    ),
+}
+
+
+def render_sources(
+    sources: Sequence[Source],
+    diagrams: Mapping[str, Mapping[str, Any]] = MappingProxyType({}),
+) -> str:
     """Render the job's sources as the untrusted-data section of a prompt.
 
     One block per source. The marker line carries only the position and the
@@ -493,9 +645,15 @@ def render_sources(sources: Sequence[Source]) -> str:
     sized to that block's own content, so nothing submitted can escape into
     instruction position (OWASP LLM01).
 
+    ``diagrams`` maps each ``diagram`` Source's label to its reading as JSON,
+    a :class:`~analysis_service.diagrams.DiagramReading` dumped (ADR 0121). The
+    reading follows the diagram in its own block, in a fence of its own.
+
     Raises :class:`ValueError` on an empty sequence: a job always has at least
     one source, and rendering nothing would hand a model a prompt whose input
-    section is silently absent.
+    section is silently absent. It raises too for a ``diagram`` Source with no
+    reading, because that diagram would reach a model without the block its
+    register names.
     """
     if not sources:
         raise ValueError("a job carries at least one source")
@@ -504,8 +662,13 @@ def render_sources(sources: Sequence[Source]) -> str:
     blocks = []
     for index, source in enumerate(sources, start=1):
         body = f"label: {source.label}\n{_HEADER_RULE}\n{source.text}"
-        blocks.append(
-            f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n"
-            f"{fenced(body)}"
-        )
+        block = f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n{fenced(body)}"
+        if source.kind == "diagram":
+            if source.label not in diagrams:
+                raise ValueError(f"the diagram {source.label!r} has no reading")
+            reading = diagrams[source.label]
+            read = "refused" not in reading
+            shown = reading if read else reading["refused"]
+            block += f"\n\n{_READING_LINES[read]}\n\n{render_fenced(shown)}"
+        blocks.append(block)
     return "\n\n".join(blocks)

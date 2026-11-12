@@ -22,7 +22,7 @@ without an answer to the part, which is what the effects count. Both are
 counts of dependency sets, never of findings an answer changes.
 
 **Effort is choices**: one for each facet of a question with facets, one for
-every other question, and one for a skip. Each save spends at least one
+every other question, and one for a skip. Each save takes at least one
 choice, so the largest budget bounds the walk, and each smaller budget reads a
 prefix of the same walk.
 
@@ -48,13 +48,14 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest import mock
 
 from analysis_service import answer_state
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_forms import YesNo
+from analysis_service.answer_sets import SentAnswers
 from analysis_service.answer_state import Answers, AnswerState, SavedAnswers
-from analysis_service.capabilities import lineage
+from analysis_service.capabilities import Presence, lineage
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import FactAnswer, SkipKey, key_ref
@@ -63,6 +64,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import prepared_model
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.bundle import read_report
 from evals.harness.early_policies import Needs, Selection, needs_of, paired
 from evals.harness.early_rounds import dont_know, paused_state
 from evals.harness.rule_applicability import TRUTH_ANSWERS, load_fixtures
@@ -100,7 +102,7 @@ def _skip(question: EarlyQuestion) -> None:
     del question
 
 
-def _truth(truth: Mapping[str, str]) -> Answerer:
+def _truth(truth: Mapping[str, Presence]) -> Answerer:
     """A signed fixture's truth for each capability it names, as
     ``rule-applicability`` answers it, and "I don't know" to the rest."""
 
@@ -153,7 +155,7 @@ def _save(
     """One save through the service's own admission, which runs no model."""
     saved = state.answer(
         Answers(
-            given=AnswerSet(facts=tuple(given)),
+            given=SentAnswers(facts=tuple(given)),
             save=True,
             skips=skips,
             presented=presented,
@@ -168,12 +170,13 @@ def _save(
 
 @dataclass(frozen=True)
 class Step:
-    """One listed question of a walk, its answer or ``None`` for a skip, and
-    the choices spent with it."""
+    """One listed question of a walk, and its answer, or ``None`` for a skip."""
 
     key: UnknownKey
     answer: FactAnswer | None
-    spent: int
+    #: The running total of choices: every choice of the walk until this step,
+    #: and the choices of this step.
+    choices_so_far: int
 
 
 @dataclass(frozen=True)
@@ -181,12 +184,12 @@ class Walk:
     """One list answered from the top, one question a save."""
 
     steps: tuple[Step, ...]
-    #: The list asked nothing more before the walk spent its budget.
+    #: The list asked nothing more before the walk reached its budget.
     ended: bool
 
     def within(self, budget: int) -> tuple[Step, ...]:
         """The steps taken within ``budget`` choices."""
-        return tuple(step for step in self.steps if step.spent <= budget)
+        return tuple(step for step in self.steps if step.choices_so_far <= budget)
 
 
 def walk(
@@ -198,14 +201,14 @@ def walk(
     budget: int = max(BUDGETS),
 ) -> Walk:
     """Answer or skip the first listed question and save, until ``budget``
-    choices are spent or the list ends. Each save reads the list again, as the
-    page does, and spends at least one choice, so ``budget`` bounds the saves."""
+    choices are taken or the list ends. Each save reads the list again, as the
+    page does, and takes at least one choice, so ``budget`` bounds the saves."""
     answered: list[FactAnswer] = []
     skipped: list[SkipKey] = []
     steps: list[Step] = []
-    spent = 0
+    choices = 0
     with policy(effects):
-        while spent < budget:
+        while choices < budget:
             state = paused_state(model, frameworks, answered, skipped)
             asked = state.questions
             if asked.done:
@@ -214,13 +217,13 @@ def walk(
             reply = answerer(question)
             if reply is None:
                 saved = _save(state, [], skips=[question.key], presented=[question.key])
-                spent += 1
+                choices += 1
             else:
                 saved = _save(state, [reply], presented=[question.key])
-                spent += question.decisions
+                choices += question.decisions
             answered = list(saved.answers.facts)
             skipped = list(saved.skipped)
-            steps.append(Step(key=question.key, answer=reply, spent=spent))
+            steps.append(Step(key=question.key, answer=reply, choices_so_far=choices))
     return Walk(steps=tuple(steps), ended=False)
 
 
@@ -235,7 +238,7 @@ class Reading:
     answerer: str
     selected: str
     budget: int
-    #: The choices spent, the questions answered and the questions skipped
+    #: The choices taken, the questions answered and the questions skipped
     #: within the budget.
     choices: int
     asked: int
@@ -284,7 +287,7 @@ def _decided(
 
 
 #: The other answer to a capability question.
-TURNED = {"yes": "no", "no": "yes"}
+TURNED: dict[YesNo, YesNo] = {"yes": "no", "no": "yes"}
 
 
 def _reversal(answers: Sequence[FactAnswer]) -> tuple[FactAnswer, ...]:
@@ -309,8 +312,9 @@ def _reversal(answers: Sequence[FactAnswer]) -> tuple[FactAnswer, ...]:
             and (name in lineage(other_name) or other_name in lineage(name))
         )
 
+    turned = TURNED[cast(YesNo, first.value)]
     return tuple(
-        FactAnswer(key=one.key, value=TURNED[one.value])
+        FactAnswer(key=one.key, value=turned)
         for one in (first, *filter(bound, answers))
     )
 
@@ -356,7 +360,7 @@ def _read(
     unnecessary = {question.key for question, _ in before.unnecessary}
     unnecessary_after = {question.key for question, _ in after.unnecessary}
     return {
-        "choices": steps[-1].spent if steps else 0,
+        "choices": steps[-1].choices_so_far if steps else 0,
         "asked": len(answers),
         "skipped": len(skips),
         "findings": len(needs.findings),
@@ -419,7 +423,7 @@ def readings(
 def _readings_of(job: tuple[str, str, Mapping[str, Selection]]) -> list[dict[str, Any]]:
     """One report's readings, for a worker process."""
     case, path, selections = job
-    report = Report.model_validate_json(Path(path).read_text(encoding="utf-8"))
+    report = read_report(Path(path))
     return [asdict(one) for one in readings(case, path, report, selections)]
 
 

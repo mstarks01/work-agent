@@ -1,0 +1,626 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "f453772fa9638aa38ecb88c970ce9c2660ddbc63",
+    "clean": false,
+    "table": {
+      "case": "04-ml-inference-service",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "fd6fcfceeb11bde3eadba6e34f34bd308ee63ffe873676caaf04412b0fd37548",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3c1d79e22c49192eaee2cafc6fa6b9712d67ed0e8f4c7030887733b05aae20ce",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "4bf1df365a7f5b0e17cfbd701fa44bb2c60ab0be22a5c01d0f22f3aec833529f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "cac087d11e037ed1b2903e3a83c36770f6f601d8b92781edb8fa5adadd8913ce",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "71b93c85034f3ec343287ab470166956ebc0e9fc4f29f68f8b206943a89d389f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "b60ef07e661fa30c8476befd883f194bf9942e8dcfc2b0f7821b8b4777fda2de",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/output.md",
+        "sha256": "6c37631a8b3fa3ba5494368d43fc0d426edc15a3628ed816dfa1951424e926bf",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Inference requests may be intercepted between calling services and the gateway",
+      "description": "`flow:entity:calling-service>process:inference-gateway>submit-inference-request` crosses from `boundary:public-internet` to `boundary:serving-edge` and carries end-user inference-request content, but its `encryption_in_transit` is unknown. If transport protection is absent or ineffective, an attacker able to observe the internet path can intercept requests sent by `entity:calling-service` before they reach `process:inference-gateway`, disclosing PII in the request. The disclosed text can enable targeted social engineering or identification of users and prompts handled by the gateway; this is conditional on resolving the transport-encryption gap.",
+      "affected_element_ids": [
+        "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+        "entity:calling-service",
+        "process:inference-gateway"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+        "unknown:flow:entity:calling-service>process:inference-gateway>submit-inference-request:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Other teams' backends call our inference gateway, a FastAPI service on GKE\nthat we expose on the internet because two of the calling services are in a\ndifferent cloud.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:entity:calling-service>process:inference-gateway>submit-inference-request` crosses a public-to-serving boundary, but an attacker still needs an on-path position and `encryption_in_transit` is unverified. Impact is medium because the flow is tagged `pii` and transports end-user inference content."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and require TLS for caller-to-gateway requests",
+          "detail": "Set `encryption_in_transit` on `flow:entity:calling-service>process:inference-gateway>submit-inference-request` to verified TLS 1.2+; consider mTLS for service-to-service callers."
+        }
+      ]
+    },
+    {
+      "title": "Gateway-to-model-server requests may expose customer prompts on the internal boundary",
+      "description": "`flow:process:inference-gateway>process:model-server>forward-request` crosses from `boundary:serving-edge` into `boundary:model-network`, carries the inference request payload, and has `encryption_in_transit: unknown`. If the internal hop is unencrypted, an attacker with access to that network path can intercept PII-bearing prompts between `process:inference-gateway` and `process:model-server`. Those prompts can reveal customer context that is subsequently combined with features read from `store:redis-feature-store`; this is conditional on the unverified transport posture.",
+      "affected_element_ids": [
+        "flow:process:inference-gateway>process:model-server>forward-request",
+        "process:inference-gateway",
+        "process:model-server"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:inference-gateway>process:model-server>forward-request",
+        "unknown:flow:process:inference-gateway>process:model-server>forward-request:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The gateway forwards the request to the model server, which runs the actual\nmodel on GPU nodes in our model network.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: the flow crosses from `boundary:serving-edge` to `boundary:model-network`, but interception requires a foothold on that internal path and transport encryption is unknown. Impact is medium because the flow is tagged `pii` and carries inference-request payloads."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and mutually authenticate the internal inference hop",
+          "detail": "Require TLS or mTLS on `flow:process:inference-gateway>process:model-server>forward-request`, with certificate validation at both endpoints."
+        }
+      ]
+    },
+    {
+      "title": "Model artifacts may be intercepted while the model server loads them",
+      "description": "`flow:process:model-server>store:model-registry-bucket>load-artifact` reads model artifacts from `store:model-registry-bucket`, but its `encryption_in_transit` is unknown. If that storage API path lacks effective encryption, an attacker positioned on the model-network path can intercept proprietary model artifacts as `process:model-server` loads them. The recovered artifact can reveal model behavior and intellectual property and can be used to refine later attacks against inference behavior; this is conditional on the unresolved transport control.",
+      "affected_element_ids": [
+        "flow:process:model-server>store:model-registry-bucket>load-artifact",
+        "process:model-server",
+        "store:model-registry-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:model-server>store:model-registry-bucket>load-artifact:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The model server loads model artifacts from a model registry bucket at startup.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because an attacker must first gain a position on the internal `boundary:model-network` path, and `encryption_in_transit` is unknown. Impact is medium because the flow carries a business-critical model artifact whose disclosure reveals proprietary inference behavior."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS for model-registry reads",
+          "detail": "Configure the object-storage client and endpoint used by `flow:process:model-server>store:model-registry-bucket>load-artifact` to require validated TLS and prevent plaintext fallback."
+        }
+      ]
+    },
+    {
+      "title": "Customer financial features may be intercepted on the model-server-to-Redis path",
+      "description": "`flow:process:model-server>store:redis-feature-store>read-features` reads account age and spend bands from `store:redis-feature-store`, which is confidential and tagged `pii` and `financial`; its `encryption_in_transit` is unknown. If this Redis connection is unencrypted, an attacker with a model-network foothold can intercept per-customer feature records while `process:model-server` reads them. The records can identify and financially profile customers and can improve targeting of subsequent attacks; this is conditional on the unverified encryption state.",
+      "affected_element_ids": [
+        "flow:process:model-server>store:redis-feature-store>read-features",
+        "process:model-server",
+        "store:redis-feature-store"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:model-server>store:redis-feature-store>read-features:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The features include account age and\nspend bands per customer.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because a model-network foothold is required but `encryption_in_transit` on `flow:process:model-server>store:redis-feature-store>read-features` is unverified. Impact is high because `store:redis-feature-store` is classified confidential and holds `pii` and `financial` data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the Redis read path",
+          "detail": "Enable Redis TLS and require certificate validation, preferably mTLS, for `flow:process:model-server>store:redis-feature-store>read-features`."
+        }
+      ]
+    },
+    {
+      "title": "Raw prompts and responses may be intercepted while being written to the inference log",
+      "description": "`flow:process:inference-gateway>store:inference-log>write-request-log` transfers raw prompts and model responses from `process:inference-gateway` to `store:inference-log`, but `encryption_in_transit` is unknown. If the logging connection is not protected, an attacker able to observe that path can intercept debugging records containing user-supplied text. Captured prompts may expose PII and provide material for targeted attacks against affected users or calling teams; this is conditional on verifying the logging transport.",
+      "affected_element_ids": [
+        "flow:process:inference-gateway>store:inference-log>write-request-log",
+        "process:inference-gateway",
+        "store:inference-log"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:inference-gateway>store:inference-log>write-request-log:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The gateway writes every request and response into an inference log in\nBigQuery, for debugging. That means raw prompts, which sometimes carry whatever\nthe calling team's users typed.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because this path is not a stated boundary crossing and interception requires internal-path access, while `encryption_in_transit` is unknown. Impact is medium because `store:inference-log` is tagged `pii` and receives raw user prompts and responses."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted BigQuery log ingestion",
+          "detail": "Verify and enforce TLS for `flow:process:inference-gateway>store:inference-log>write-request-log`, including certificate validation by the gateway."
+        },
+        {
+          "summary": "Minimize logged inference content",
+          "detail": "Redact or tokenize sensitive prompt fields at `process:inference-gateway` before records are sent to `store:inference-log`."
+        }
+      ]
+    },
+    {
+      "title": "Model artifacts may be intercepted during engineer publication",
+      "description": "`flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` carries model artifacts to `store:model-registry-bucket` with `encryption_in_transit: unknown`. If the publication connection is unencrypted, a network observer can intercept artifacts submitted by `entity:ml-engineer`, revealing proprietary model contents before they are loaded by `process:model-server`. This is conditional on the unresolved transport state.",
+      "affected_element_ids": [
+        "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact",
+        "entity:ml-engineer",
+        "store:model-registry-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "ML engineers publish new model artifacts to the registry bucket.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because interception requires access to the internal publication path and `encryption_in_transit` is unknown. Impact is medium because the artifacts are business-critical data and disclosure can reveal the deployed model's behavior."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS for artifact publication",
+          "detail": "Enforce validated TLS for `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`; use workload or user identity certificates where supported."
+        }
+      ]
+    },
+    {
+      "title": "Model-registry operational copies may reveal artifacts if at-rest encryption is absent",
+      "description": "`store:model-registry-bucket` holds business-critical model artifacts, but its `encryption_at_rest` and data classification are unknown. If the bucket or its operational copies are unencrypted at rest, an attacker who obtains storage-layer access to a copied object, snapshot, or decommissioned media can read the artifacts without using the `process:model-server` read path. Disclosure would reveal model behavior and intellectual property that can enable more informed attacks on the inference service. This draft is conditional on the unknown at-rest posture; it does not assert that encryption is absent.",
+      "affected_element_ids": [
+        "store:model-registry-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:model-registry-bucket:encryption_at_rest",
+        "unknown:store:model-registry-bucket:data_classification"
+      ],
+      "quotes": [
+        {
+          "text": "The model server loads model artifacts from a model registry bucket at startup.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because storage-layer copies can be exposed outside the application path, but `encryption_at_rest` is unknown. Impact is medium because the store holds business-critical model artifacts whose disclosure exposes proprietary model behavior."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce encryption for registry storage and copies",
+          "detail": "Verify `store:model-registry-bucket` encryption at rest, then require KMS-backed encryption for the bucket and any snapshots, replicas, backups, or exports, with restricted key use."
+        }
+      ]
+    },
+    {
+      "title": "A Redis storage copy may disclose confidential customer features if unencrypted at rest",
+      "description": "`store:redis-feature-store` is classified confidential and holds PII and financial customer features, while its `encryption_at_rest` is unknown. If that unknown resolves to no effective at-rest encryption, an attacker obtaining a Redis persistence file, storage volume, snapshot, or other operational copy can read account-age and spend-band records without authenticating through `process:model-server`. This exposes customer financial profiles at corpus scale and can enable targeted fraud or social engineering; the threat is conditional on the unverified at-rest control.",
+      "affected_element_ids": [
+        "store:redis-feature-store"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:redis-feature-store:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "The features include account age and\nspend bands per customer.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because access to a storage-layer copy is required, but encryption at rest is unverified. Impact is high because `store:redis-feature-store` is classified confidential and tagged `pii` and `financial`, and one copy can contain many customers' features."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt Redis persistence and all copies at rest",
+          "detail": "Verify the at-rest posture of `store:redis-feature-store`, enforce KMS-managed encryption for volumes, persistence files, backups, and snapshots, and restrict export access."
+        },
+        {
+          "summary": "Reduce feature sensitivity in Redis",
+          "detail": "Store only the minimum features needed for inference and tokenize or encrypt the highest-sensitivity feature values before caching them."
+        }
+      ]
+    },
+    {
+      "title": "Inference-log storage copies may expose raw end-user prompts if unencrypted at rest",
+      "description": "`store:inference-log` stores every request and response, including raw user prompts, and is tagged `pii`, but its `encryption_at_rest` and data classification are unknown. If at-rest encryption is absent or ineffective, anyone obtaining a storage-layer copy of the BigQuery data or an operational export can read prompt and response records outside the gateway's API-key path. The disclosed text can reveal personal or sensitive content entered by users and provide targeting material for attacks against calling teams; this is conditional on the unknown encryption state.",
+      "affected_element_ids": [
+        "store:inference-log"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:inference-log:encryption_at_rest",
+        "unknown:store:inference-log:data_classification"
+      ],
+      "quotes": [
+        {
+          "text": "The gateway writes every request and response into an inference log in\nBigQuery, for debugging. That means raw prompts, which sometimes carry whatever\nthe calling team's users typed.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because storage copies may be reachable outside the application path, while `encryption_at_rest` is unknown. Impact is high because the table retains every request and response and is tagged `pii`, so a single copy can expose many users' raw inputs."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and tightly control inference-log storage copies",
+          "detail": "Verify encryption at rest for `store:inference-log`, require KMS-backed protection for the table and exports, and restrict export and key-use permissions."
+        },
+        {
+          "summary": "Apply prompt redaction and retention limits",
+          "detail": "Redact sensitive fields before logging at `process:inference-gateway` and retain raw prompts only for a justified, short debugging period."
+        }
+      ]
+    },
+    {
+      "title": "An internal attacker may read all Redis customer features if no additional authentication protects Redis",
+      "description": "`process:model-server` reads `store:redis-feature-store` through `flow:process:model-server>store:redis-feature-store>read-features`; the flow's authentication is unknown, while the source explicitly states that Redis has no password and is reachable inside `boundary:model-network`. If no compensating Redis authentication or authorization mechanism exists, an attacker or over-privileged service with model-network access can query the store directly and read account age and spend bands for customers beyond the request currently being served. Those financial and PII records can then enable customer profiling and targeted abuse of systems that consume inference results. This is conditional because the absence of a Redis password does not establish the absence of every authentication mechanism.",
+      "affected_element_ids": [
+        "store:redis-feature-store",
+        "flow:process:model-server>store:redis-feature-store>read-features",
+        "process:model-server"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication",
+        "assertion:internet-exposure~store:redis-feature-store~any~internal"
+      ],
+      "quotes": [
+        {
+          "text": "Redis has no password on it; it is\nonly reachable inside the model network.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 10,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: an attacker needs a foothold in `boundary:model-network`, but Redis has no password and the remaining authentication state on `flow:process:model-server>store:redis-feature-store>read-features` is unknown. Impact is high because the confidential store contains `pii` and `financial` features for multiple customers."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated, least-privilege Redis reads",
+          "detail": "Configure Redis authentication and ACLs with a distinct credential for `process:model-server`, limiting it to only the required commands and key patterns."
+        },
+        {
+          "summary": "Constrain network access to Redis",
+          "detail": "Allow only the named model-server workload to reach `store:redis-feature-store`; do not treat model-network placement as an authorization control."
+        }
+      ]
+    },
+    {
+      "title": "Verbose failures at the internet-facing inference gateway may disclose internal details",
+      "description": "`process:inference-gateway` is an internet-exposed FastAPI service, and the sources do not state whether production error handling suppresses debug traces, framework details, request content, or backend connection errors. If error hardening is absent, an unauthenticated or API-key-holding attacker can send malformed requests to elicit verbose failure responses from `process:inference-gateway`. Disclosed stack paths, package versions, request details, or model-network topology can enable more precise attacks against the gateway and its downstream `process:model-server` and `store:redis-feature-store`. This is conditional on the unresolved error-handling posture.",
+      "affected_element_ids": [
+        "process:inference-gateway",
+        "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request"
+      ],
+      "quotes": [
+        {
+          "text": "Other teams' backends call our inference gateway, a FastAPI service on GKE\nthat we expose on the internet",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 11,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `process:inference-gateway` is internet-facing and reached across `flow:entity:calling-service>process:inference-gateway>submit-inference-request`, though error hardening is not stated. Impact is medium because verbose failures may disclose implementation and topology information that assists attacks on downstream model-network components."
+      },
+      "mitigations": [
+        {
+          "summary": "Harden production error responses",
+          "detail": "Configure `process:inference-gateway` to return generic errors and correlation IDs only; disable FastAPI and server debug modes in production and send detailed traces only to protected internal logs."
+        },
+        {
+          "summary": "Keep sensitive request data out of failure telemetry",
+          "detail": "Ensure exception handlers and logging middleware redact API keys, prompts, and backend connection details before recording errors."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

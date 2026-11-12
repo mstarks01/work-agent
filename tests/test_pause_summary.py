@@ -1,17 +1,17 @@
 """What a paused job says it leaves open (#1542 F2 and F5, ADR 0068).
 
-At 2fae7d3, a level 1 pause whose owner answered every capability "yes" ended
-with ``nothing-left``, no question withheld and 22 requirements still unknown;
-the page said "No question is left". A STRIDE pause skipped save by save
-showed 40 distinct field questions under a limit of 30. These tests drive the
-same paths through the production question set.
+A paused job says what it leaves open: the requirements still unknown, the
+questions under a floor, and each question a pause skipped save by save
+showed, counted apart from the limit. No empty-list reason says that every
+fact is settled. These tests drive the same paths through the production
+question set.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.system_model import SystemModel
@@ -24,6 +24,7 @@ def _paused(model, selection, answers=(), shown=(), skipped=()):
         None,
         selection,
         (),
+        asks=True,
         waiting=True,
         answered=AnswerSet(facts=tuple(answers)),
         final=False,
@@ -40,7 +41,7 @@ def _save(asked, earlier=(), facts=(), skips=(), presented=None):
     return asked.admit(
         sources=(),
         earlier=AnswerSet(facts=tuple(earlier)),
-        given=AnswerSet(facts=tuple(facts)),
+        given=SentAnswers(facts=tuple(facts)),
         save=True,
         skips=list(skips),
         presented=list(presented),
@@ -49,7 +50,7 @@ def _save(asked, earlier=(), facts=(), skips=(), presented=None):
 
 def _all_yes(level):
     """The issue's F2 run: every offered capability "yes", every other
-    question "I don't know", through production admission, to the stop."""
+    question "I don't know", through production admission, to the empty list."""
     model = valid_model()
     selection = {"asvs": {"level": level}}
     held, shown = [], ()
@@ -76,7 +77,9 @@ def _bands(asked):
 class TestTheStopSaysWhatIsLeft:
     def test_a_level_1_pause_discloses_the_requirements_it_leaves_unknown(self):
         asked = _all_yes(1)
-        assert asked.stop == "below-floor", "not nothing-left: questions remain"
+        assert asked.empty_list_reason == "below-floor", (
+            "not nothing-left: questions remain"
+        )
         assert len(asked.below_floor) == 24 and asked.held_back == ()
         assert _bands(asked) == {"level 1": ({"applicable": 48, "unknown": 22}, 0)}
         summary = asked.summary.to_json()
@@ -89,7 +92,7 @@ class TestTheStopSaysWhatIsLeft:
         the most parts, whose "yes" lists parts that take the thirty places
         (ADR 0078). The summary discloses them."""
         asked = _all_yes(2)
-        assert asked.stop == "budget-exhausted"
+        assert asked.empty_list_reason == "budget-exhausted"
         bands = _bands(asked)
         assert list(bands) == ["level 1", "level 2"], "the highest band first"
         assert bands["level 1"][0]["unknown"] == 18
@@ -175,7 +178,7 @@ def test_the_summary_counts_only_the_questions_the_page_presented():
 
 
 def test_a_pause_whose_questions_left_were_all_skipped_says_so():
-    """A skipped question stays open and takes an answer, so the stop is not
+    """A skipped question stays open and takes an answer, so the reason is not
     ``nothing-left`` (ADR 0068, checkpoint review c4)."""
     path = PROJECT_ROOT / "evals/corpus/07-cicd-store-deploy/model.json"
     model = SystemModel.model_validate_json(path.read_text())
@@ -191,4 +194,4 @@ def test_a_pause_whose_questions_left_were_all_skipped_says_so():
         pytest.fail("the saves never ended")
     assert (asked.held_back, asked.below_floor) == ((), ()), "a control"
     assert asked.summary.skipped > 0
-    assert asked.stop == "skipped"
+    assert asked.empty_list_reason == "skipped"

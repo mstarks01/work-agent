@@ -1,0 +1,418 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "Admin",
+        "assets": [],
+        "source_excerpt": "admin(Admin)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "CDN bucket",
+        "assets": [],
+        "source_excerpt": "cdn[\"CDN bucket\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:web-server-cms",
+        "name": "Web server (CMS)",
+        "description": "Web server (CMS)",
+        "assets": [],
+        "source_excerpt": "web[\"Web server (CMS)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:hosted-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:reader",
+        "name": "Reader",
+        "description": "Reader",
+        "assets": [],
+        "source_excerpt": "reader(Reader)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:admin",
+        "name": "Admin",
+        "description": "Admin",
+        "assets": [],
+        "source_excerpt": "admin(Admin)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database-pages-accounts-comments",
+        "name": "MySQL database: pages, accounts, comments",
+        "description": "MySQL database: pages, accounts, comments",
+        "assets": [],
+        "source_excerpt": "db[(\"MySQL database: pages, accounts, comments\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:reader>entity:web-server-cms>page-requests-https",
+        "name": "page requests (HTTPS)",
+        "description": "page requests (HTTPS)",
+        "assets": [],
+        "source_excerpt": "reader -->|\"page requests (HTTPS)\"| web",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:reader",
+        "destination": "entity:web-server-cms",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "page requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:web-server-cms>store:mysql-database-pages-accounts-comments>pages-accounts-comments",
+        "name": "pages, accounts, comments",
+        "description": "pages, accounts, comments",
+        "assets": [],
+        "source_excerpt": "web -->|\"pages, accounts, comments\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:web-server-cms",
+        "destination": "store:mysql-database-pages-accounts-comments",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "pages, accounts, comments",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:reader>entity:cdn-bucket>images-stylesheets-downloads-http",
+        "name": "images, stylesheets, downloads (HTTP)",
+        "description": "images, stylesheets, downloads (HTTP)",
+        "assets": [],
+        "source_excerpt": "reader -->|\"images, stylesheets, downloads (HTTP)\"| cdn",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:reader",
+        "destination": "entity:cdn-bucket",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "images, stylesheets, downloads",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:web-server-cms>entity:cdn-bucket>push-new-assets",
+        "name": "push new assets",
+        "description": "push new assets",
+        "assets": [],
+        "source_excerpt": "web -->|push new assets| cdn",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:web-server-cms",
+        "destination": "entity:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "new assets",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database-pages-accounts-comments>mysql-connection",
+        "name": "MySQL connection",
+        "description": "MySQL connection",
+        "assets": [],
+        "source_excerpt": "admin -->|\"MySQL connection\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database-pages-accounts-comments",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "Hosted network",
+        "assets": [],
+        "source_excerpt": "subgraph hosted[\"Hosted network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Reader is a human external entity.",
+        "element_id": "entity:admin",
+        "attribute": "kind",
+        "basis": "The node is named \"Admin\", which identifies a human actor."
+      },
+      {
+        "assumption": "The CDN bucket is an external system.",
+        "element_id": "entity:cdn-bucket",
+        "attribute": "kind",
+        "basis": "The node is named \"CDN bucket\", identifying a hosted storage system."
+      },
+      {
+        "assumption": "The Web server (CMS) is an external system.",
+        "element_id": "entity:web-server-cms",
+        "attribute": "kind",
+        "basis": "The node is named \"Web server (CMS)\", identifying a system component rather than a human."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "Admin",
+        "assets": [],
+        "source_excerpt": "admin(Admin)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "CDN bucket",
+        "assets": [],
+        "source_excerpt": "cdn[\"CDN bucket\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:web-server-cms",
+        "name": "Web server (CMS)",
+        "description": "Web server (CMS)",
+        "assets": [],
+        "source_excerpt": "web[\"Web server (CMS)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:hosted-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:reader",
+        "name": "Reader",
+        "description": "Reader",
+        "assets": [],
+        "source_excerpt": "reader(Reader)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:admin",
+        "name": "Admin",
+        "description": "Admin",
+        "assets": [],
+        "source_excerpt": "admin(Admin)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database-pages-accounts-comments",
+        "name": "MySQL database: pages, accounts, comments",
+        "description": "MySQL database: pages, accounts, comments",
+        "assets": [],
+        "source_excerpt": "db[(\"MySQL database: pages, accounts, comments\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:reader>entity:web-server-cms>page-requests-https",
+        "name": "page requests (HTTPS)",
+        "description": "page requests (HTTPS)",
+        "assets": [],
+        "source_excerpt": "reader -->|\"page requests (HTTPS)\"| web",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:reader",
+        "destination": "entity:web-server-cms",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "page requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:web-server-cms>store:mysql-database-pages-accounts-comments>pages-accounts-comments",
+        "name": "pages, accounts, comments",
+        "description": "pages, accounts, comments",
+        "assets": [],
+        "source_excerpt": "web -->|\"pages, accounts, comments\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:web-server-cms",
+        "destination": "store:mysql-database-pages-accounts-comments",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "pages, accounts, comments",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:reader>entity:cdn-bucket>images-stylesheets-downloads-http",
+        "name": "images, stylesheets, downloads (HTTP)",
+        "description": "images, stylesheets, downloads (HTTP)",
+        "assets": [],
+        "source_excerpt": "reader -->|\"images, stylesheets, downloads (HTTP)\"| cdn",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:reader",
+        "destination": "entity:cdn-bucket",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "images, stylesheets, downloads",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:web-server-cms>entity:cdn-bucket>push-new-assets",
+        "name": "push new assets",
+        "description": "push new assets",
+        "assets": [],
+        "source_excerpt": "web -->|push new assets| cdn",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:web-server-cms",
+        "destination": "entity:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "new assets",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database-pages-accounts-comments>mysql-connection",
+        "name": "MySQL connection",
+        "description": "MySQL connection",
+        "assets": [],
+        "source_excerpt": "admin -->|\"MySQL connection\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database-pages-accounts-comments",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "Hosted network",
+        "assets": [],
+        "source_excerpt": "subgraph hosted[\"Hosted network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Reader is a human external entity.",
+        "element_id": "entity:admin",
+        "attribute": "kind",
+        "basis": "The node is named \"Admin\", which identifies a human actor."
+      },
+      {
+        "assumption": "The CDN bucket is an external system.",
+        "element_id": "entity:cdn-bucket",
+        "attribute": "kind",
+        "basis": "The node is named \"CDN bucket\", identifying a hosted storage system."
+      },
+      {
+        "assumption": "The Web server (CMS) is an external system.",
+        "element_id": "entity:web-server-cms",
+        "attribute": "kind",
+        "basis": "The node is named \"Web server (CMS)\", identifying a system component rather than a human."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

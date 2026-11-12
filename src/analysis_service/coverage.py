@@ -29,9 +29,9 @@ Two of the four halves are counted at the grain their names promise, and the
 grain is a property of the drafts rather than of this module:
 
 - ``unknown_controls_cited`` counts an ``(element, attribute)`` pair only where
-  some draft carries an attribute **ground** on exactly that pair. A ground is
-  the one place a draft records which control it rests on, so a citation of the
-  store credits the store's controls one at a time, never all at once.
+  some draft carries an attribute **ground** on exactly that pair. A draft
+  records the control it rests on in a ground, so a citation of the store
+  credits the store's controls one at a time, never all at once.
 - ``candidates_cited`` counts a lead only where **one draft** cites every
   element the lead names. Two drafts that each cite half of a flow's endpoints
   have each looked at half, and a lead is one structural condition rather than
@@ -64,6 +64,7 @@ from analysis_service.claims import (
     LaneCoverage,
 )
 from analysis_service.frameworks import FrameworkPackage
+from analysis_service.parsing import table_entry
 from analysis_service.references import canonical
 from analysis_service.system_model import SystemModel, mentioned_ids
 
@@ -166,7 +167,7 @@ def _open(applicability: Sequence[ApplicabilityEntry], units: Sequence[str]) -> 
         for key in entry.missing:
             by_question.setdefault(key, []).append(entry.unit)
     settled_by = "; ".join(
-        f"{CAPABILITIES[key].question} ({', '.join(open_units)})"
+        f"{table_entry(CAPABILITIES, key).question} ({', '.join(open_units)})"
         for key, open_units in by_question.items()
     )
     return (

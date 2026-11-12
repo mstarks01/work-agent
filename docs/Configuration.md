@@ -296,8 +296,8 @@ there is nothing to pin.
 
 The sweep records the pin per tier, and the Baseline identity carries it. A
 tier you leave unpinned records an empty list, which says the gateway chose;
-that is a configuration of its own and not the same as a sweep taken before
-this was recorded.
+that is a configuration of its own and not the same as a sweep that carries
+no pin key.
 
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the
@@ -879,12 +879,14 @@ implies a provider was tried.
 ### Resilience
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
-`max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`,
+`max_sources = 10`, `max_owner_files = 100`, `max_controls = 50`,
+`max_control_evidence = 10`, `job_deadline_ms = 900000`,
+`retry_budget_ratio = 0.1`,
 `max_active_jobs = 3`, `budget_window_seconds = 3600`,
 `max_jobs_per_window = 30`, `max_tokens_per_window = 20000000`,
 `global_max_tokens_per_window = 100000000`, and a `[bounds_by_upstream]` table
 whose one row gives `openai/flex` a `timeout_ms` and a `job_deadline_ms` of
-`1800000` each (`version = 8`). On library
+`1800000` each (`version = 10`). On library
 defaults the LLM nodes never retry and never time out, so a single 429 kills a
 paid-for job; two more bound what one job may carry, the deadline bounds how
 long one may run, and the ceiling bounds how many one caller may run at once.
@@ -999,7 +1001,8 @@ single trace.
 
 **A request pinned to a slow upstream reads its own bounds.** The
 `[bounds_by_upstream]` table is keyed by the gateway's slug for an upstream, and
-each row states a `timeout_ms` and a `job_deadline_ms`. A row is read only where
+each row states a `timeout_ms` and a `job_deadline_ms`, each in the same range
+as the base value. A row is read only where
 a tier's `[upstreams]` pin in the tiers file names its key. The timeout applies
 to that tier's requests, and the deadline to every job of a deployment that
 pins the upstream on any bound tier, because a slow upstream is slow for the
@@ -1238,19 +1241,30 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
 ### Resilience overrides
 
-| Variable | Effect |
-| --- | --- |
-| `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. |
-| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. |
-| `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
-| `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. |
-| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. |
-| `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
-| `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. |
-| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. |
-| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. |
-| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. |
-| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
+| Variable | Effect | Range |
+| --- | --- | --- |
+| `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. | 1 to 10 |
+| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. | 1 to 3,600,000 |
+| `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. | 1 to 10,485,760 |
+| `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. | 1 to 100 |
+| `ANALYSIS_MAX_OWNER_FILES` | How many Owner Files one owner keeps in the web app's Files section. | 1 to 10,000 |
+| `ANALYSIS_MAX_CONTROLS` | How many Controls one owner keeps in the web app's Controls section. | 1 to 1,000 |
+| `ANALYSIS_MAX_CONTROL_EVIDENCE` | How many evidence files one Control holds. | 1 to 100 |
+| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. | 1 to 86,400,000 |
+| `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. | over 0, to 1 |
+| `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. | 1 to 2,592,000 |
+| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. | 1 to 100,000 |
+| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. | 1 to 10<sup>12</sup> |
+| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. | 1 to 10<sup>12</sup> |
+| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. | 1 to 100 |
+
+The loader refuses a value outside its range, and so does a save on the
+Settings page. The page shows each range and checks it before it saves.
+
+One more bound applies to two settings together. `max_control_evidence` ×
+`max_source_bytes` must be 16,777,216 bytes (16 MiB) or less, because one
+Control holds that many evidence files of that size. The loader and a Settings
+save refuse a larger product. The shipped values give 1,024,000 bytes.
 
 ### How strictly each override family is checked
 
@@ -1435,6 +1449,9 @@ Bounds enforced before or during analysis:
 | --- | --- | --- |
 | `max_source_bytes` | 100 KiB (UTF-8), total across all sources | Rejected at both entry points; deployment config. |
 | `max_sources` | 10 | Rejected at both entry points; deployment config. |
+| `max_owner_files` | 100 Owner Files per owner | Rejected at the upload to Files; deployment config. |
+| `max_controls` | 50 Controls per owner | Rejected at the save of a Control; deployment config. |
+| `max_control_evidence` | 10 evidence files per Control, each at most `max_source_bytes` | Rejected at the save of a Control; deployment config. |
 | `job_deadline_ms` | 900 s per job, wall clock | `failed` at the deadline; deployment config. |
 | `max_active_jobs` | 3 jobs in flight per owner | `429` at submission; deployment config. |
 | Source `label` | 200 characters, single-line, unique per job | Rejected as a malformed source. |

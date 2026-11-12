@@ -1,0 +1,19 @@
+flowchart LR
+    browser[Browser]
+    subgraph web[Web tier]
+        app[Web application]
+    end
+    subgraph backend[Backend tier]
+        queue[Message queue]
+        worker[Background worker]
+        db[(Database)]
+    end
+    webcfg[(Web application config)]
+    workercfg[(Worker config)]
+
+    browser -->|"HTTP/S"| app
+    app -->|jobs| queue
+    queue -->|jobs| worker
+    worker <-->|"data, log records"| db
+    webcfg -->|"settings, queue credentials"| app
+    workercfg -->|"settings, database credentials"| worker

@@ -1,0 +1,656 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:calling-team-backends",
+        "name": "Calling team backends",
+        "description": "Backends used by calling teams.",
+        "assets": [],
+        "source_excerpt": "callers[Calling team backends]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:ml-engineers",
+        "name": "ML engineers",
+        "description": "ML engineers who publish model artifacts.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "eng[ML engineers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "Inference gateway",
+        "description": "Gateway receiving inference requests and sending requests and responses to the inference log.",
+        "assets": [],
+        "source_excerpt": "gw[Inference gateway]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:gke",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "Model server",
+        "description": "Server receiving inference requests, model artifacts, and customer features.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "ms[Model server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "Feature store containing customer features.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "redis[(Redis feature store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Redis",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:model-registry-bucket",
+        "name": "Model registry bucket",
+        "description": "Bucket containing model artifacts.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "registry[(Model registry bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "Inference log",
+        "description": "Log containing requests and responses.",
+        "assets": [],
+        "source_excerpt": "log[(Inference log)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-team-backends>process:inference-gateway>inference-request",
+        "name": "inference request",
+        "description": "Inference request sent to the inference gateway.",
+        "assets": [],
+        "source_excerpt": "callers -->|inference request| gw",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:calling-team-backends",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "inference request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>request",
+        "name": "request",
+        "description": "Request sent to the model server.",
+        "assets": [],
+        "source_excerpt": "gw -->|request| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:model-registry-bucket>process:model-server>model-artifacts",
+        "name": "model artifacts",
+        "description": "Model artifacts sent to the model server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "registry -->|model artifacts| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:model-registry-bucket",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:redis-feature-store>process:model-server>customer-features",
+        "name": "customer features",
+        "description": "Customer features sent to the model server.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "redis -->|customer features| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:redis-feature-store",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "customer features",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>requests-responses",
+        "name": "requests + responses",
+        "description": "Requests and responses sent to the inference log.",
+        "assets": [],
+        "source_excerpt": "gw -->|\"requests + responses\"| log",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "requests + responses",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+        "name": "publish model artifacts",
+        "description": "ML engineers publish model artifacts to the model registry bucket.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "eng -->|publish model artifacts| registry",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:ml-engineers",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "Trust zone containing the inference gateway.",
+        "assets": [],
+        "source_excerpt": "subgraph gke[GKE]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "Model network",
+        "description": "Trust zone containing the model server and Redis feature store.",
+        "assets": [],
+        "source_excerpt": "subgraph modelnet[Model network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Calling team backends are an external system.",
+        "element_id": "entity:calling-team-backends",
+        "attribute": "kind",
+        "basis": "The name identifies backends belonging to calling teams rather than a component of this system."
+      },
+      {
+        "assumption": "ML engineers are human external entities.",
+        "element_id": "entity:ml-engineers",
+        "attribute": "kind",
+        "basis": "The name identifies people who publish model artifacts."
+      },
+      {
+        "assumption": "The GKE subgraph represents a network trust zone.",
+        "element_id": "boundary:gke",
+        "attribute": "kind",
+        "basis": "The diagram explicitly groups the inference gateway in a named GKE subgraph, which is treated as a network zone."
+      },
+      {
+        "assumption": "The Model network subgraph represents a network trust zone.",
+        "element_id": "boundary:model-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly names the subgraph 'Model network'."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "store:model-registry-bucket",
+        "attribute": "assets",
+        "basis": "The store contains model artifacts, which are operating assets of the ML system."
+      },
+      {
+        "assumption": "Customer features are personally identifiable information.",
+        "element_id": "store:redis-feature-store",
+        "attribute": "assets",
+        "basis": "The store is explicitly named as containing customer features, which describe customers."
+      },
+      {
+        "assumption": "Customer features are confidential.",
+        "element_id": "store:redis-feature-store",
+        "attribute": "data_classification",
+        "basis": "The store contains customer features, which describe customers and therefore disclosure could harm a person."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "process:model-server",
+        "attribute": "assets",
+        "basis": "The model server receives model artifacts."
+      },
+      {
+        "assumption": "Customer features are personally identifiable information.",
+        "element_id": "process:model-server",
+        "attribute": "assets",
+        "basis": "The model server receives customer features, which describe customers."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "flow:store:model-registry-bucket>process:model-server>model-artifacts",
+        "attribute": "assets",
+        "basis": "The flow carries model artifacts."
+      },
+      {
+        "assumption": "Customer features are personally identifiable information.",
+        "element_id": "flow:store:redis-feature-store>process:model-server>customer-features",
+        "attribute": "assets",
+        "basis": "The flow carries customer features, which describe customers."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+        "attribute": "assets",
+        "basis": "The flow carries published model artifacts."
+      },
+      {
+        "assumption": "ML engineers carry business-critical data when publishing model artifacts.",
+        "element_id": "entity:ml-engineers",
+        "attribute": "assets",
+        "basis": "The entity is shown publishing model artifacts."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:calling-team-backends",
+        "name": "Calling team backends",
+        "description": "Backends used by calling teams.",
+        "assets": [],
+        "source_excerpt": "callers[Calling team backends]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:ml-engineers",
+        "name": "ML engineers",
+        "description": "ML engineers who publish model artifacts.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "eng[ML engineers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "Inference gateway",
+        "description": "Gateway receiving inference requests and sending requests and responses to the inference log.",
+        "assets": [],
+        "source_excerpt": "gw[Inference gateway]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:gke",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "Model server",
+        "description": "Server receiving inference requests, model artifacts, and customer features.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "ms[Model server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "Feature store containing customer features.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "redis[(Redis feature store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Redis",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:model-registry-bucket",
+        "name": "Model registry bucket",
+        "description": "Bucket containing model artifacts.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "registry[(Model registry bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "Inference log",
+        "description": "Log containing requests and responses.",
+        "assets": [],
+        "source_excerpt": "log[(Inference log)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-team-backends>process:inference-gateway>inference-request",
+        "name": "inference request",
+        "description": "Inference request sent to the inference gateway.",
+        "assets": [],
+        "source_excerpt": "callers -->|inference request| gw",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:calling-team-backends",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "inference request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>request",
+        "name": "request",
+        "description": "Request sent to the model server.",
+        "assets": [],
+        "source_excerpt": "gw -->|request| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:model-registry-bucket>process:model-server>model-artifacts",
+        "name": "model artifacts",
+        "description": "Model artifacts sent to the model server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "registry -->|model artifacts| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:model-registry-bucket",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:redis-feature-store>process:model-server>customer-features",
+        "name": "customer features",
+        "description": "Customer features sent to the model server.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "redis -->|customer features| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:redis-feature-store",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "customer features",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>requests-responses",
+        "name": "requests + responses",
+        "description": "Requests and responses sent to the inference log.",
+        "assets": [],
+        "source_excerpt": "gw -->|\"requests + responses\"| log",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "requests + responses",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+        "name": "publish model artifacts",
+        "description": "ML engineers publish model artifacts to the model registry bucket.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "eng -->|publish model artifacts| registry",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:ml-engineers",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "Trust zone containing the inference gateway.",
+        "assets": [],
+        "source_excerpt": "subgraph gke[GKE]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "Model network",
+        "description": "Trust zone containing the model server and Redis feature store.",
+        "assets": [],
+        "source_excerpt": "subgraph modelnet[Model network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Calling team backends are an external system.",
+        "element_id": "entity:calling-team-backends",
+        "attribute": "kind",
+        "basis": "The name identifies backends belonging to calling teams rather than a component of this system."
+      },
+      {
+        "assumption": "ML engineers are human external entities.",
+        "element_id": "entity:ml-engineers",
+        "attribute": "kind",
+        "basis": "The name identifies people who publish model artifacts."
+      },
+      {
+        "assumption": "The GKE subgraph represents a network trust zone.",
+        "element_id": "boundary:gke",
+        "attribute": "kind",
+        "basis": "The diagram explicitly groups the inference gateway in a named GKE subgraph, which is treated as a network zone."
+      },
+      {
+        "assumption": "The Model network subgraph represents a network trust zone.",
+        "element_id": "boundary:model-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly names the subgraph 'Model network'."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "store:model-registry-bucket",
+        "attribute": "assets",
+        "basis": "The store contains model artifacts, which are operating assets of the ML system."
+      },
+      {
+        "assumption": "Customer features are personally identifiable information.",
+        "element_id": "store:redis-feature-store",
+        "attribute": "assets",
+        "basis": "The store is explicitly named as containing customer features, which describe customers."
+      },
+      {
+        "assumption": "Customer features are confidential.",
+        "element_id": "store:redis-feature-store",
+        "attribute": "data_classification",
+        "basis": "The store contains customer features, which describe customers and therefore disclosure could harm a person."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "process:model-server",
+        "attribute": "assets",
+        "basis": "The model server receives model artifacts."
+      },
+      {
+        "assumption": "Customer features are personally identifiable information.",
+        "element_id": "process:model-server",
+        "attribute": "assets",
+        "basis": "The model server receives customer features, which describe customers."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "flow:store:model-registry-bucket>process:model-server>model-artifacts",
+        "attribute": "assets",
+        "basis": "The flow carries model artifacts."
+      },
+      {
+        "assumption": "Customer features are personally identifiable information.",
+        "element_id": "flow:store:redis-feature-store>process:model-server>customer-features",
+        "attribute": "assets",
+        "basis": "The flow carries customer features, which describe customers."
+      },
+      {
+        "assumption": "Model artifacts are business-critical data.",
+        "element_id": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+        "attribute": "assets",
+        "basis": "The flow carries published model artifacts."
+      },
+      {
+        "assumption": "ML engineers carry business-critical data when publishing model artifacts.",
+        "element_id": "entity:ml-engineers",
+        "attribute": "assets",
+        "basis": "The entity is shown publishing model artifacts."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

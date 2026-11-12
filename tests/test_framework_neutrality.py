@@ -148,6 +148,72 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-11-02-05/capture_turn.py": (
+        "This code is that framework's. It runs a job that reaches the capability"
+        " reader, and the graph puts the reader only in a job whose selection"
+        " reads capabilities: a package whose units carry an applicability"
+        " expression."
+    ),
+    "evals/experiments/QA-2026-10-09-03/summarize.py": (
+        "This code is that framework's. It reads the stored answers of a lane"
+        " that drafts by a verb and a place, and scores them against the"
+        " must-finds of that package's references."
+    ),
+    "evals/experiments/QA-2026-11-02-05/position_rescore.py": (
+        "This code is that framework's. It counts the matches on the must-finds"
+        " that carry an attacker position, and only that package's drafts state one."
+    ),
+    "evals/experiments/QA-2026-11-06-02/lead_loss.py": (
+        "This code is that framework's. It measures candidate leads, and only"
+        " the package whose identity is an action at a place has a rule set"
+        " that leads a lane to the elements a reference names."
+    ),
+    "evals/experiments/QA-2026-11-06-02/zones.py": (
+        "This code is that framework's. It reads the zone kinds that the"
+        " privilege-crossing rule of the package with candidate leads reads."
+    ),
+    "evals/experiments/QA-2026-11-06-01/control_view_size.py": (
+        "This code is that framework's measurement case. It builds drafts of"
+        " one package whose units nest, so one Control row on a chapter reaches"
+        " several drafts. The view code it measures reads no package field."
+    ),
+    "evals/experiments/QA-2026-11-03-01/score_stage.py": (
+        "This code is that framework's. It reads the attacker position that"
+        " only that package's drafts state, against its ruled references."
+    ),
+    "evals/experiments/QA-2026-11-02-05/position_ballot.py": (
+        "This code is that framework's. It records the attacker position of a"
+        " reference claim, and only that package's drafts state a position."
+    ),
+    "evals/experiments/QA-2026-11-02-05/mechanism_proxy.py": (
+        "This code is that framework's. It reads the must-finds of a package"
+        " whose references a lane drafts by a verb and a place, and the drafts"
+        " that the claim scorer matches to them."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities.py": (
+        "This code is that framework's. It reads the decisions at the top band"
+        " of a package whose units carry an applicability expression, after the"
+        " capability reader. A package whose units carry none reads no"
+        " capability, so a stated capability settles nothing in it."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities_v2.py": (
+        "This code is that framework's: it reads the same decisions as"
+        " `read_capabilities.py`, through the same request."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities_v1.py": (
+        "This code is that framework's: it reads the same decisions as"
+        " `read_capabilities.py`, through an earlier form of the request."
+    ),
+    "evals/experiments/QA-2026-11-02-03/trace_baselines.py": (
+        "This code is that framework's. It traces two references through the"
+        " lane that a lead points at a place, and matches a draft by action and"
+        " place. A package whose claims carry a catalog identifier is led by"
+        " requirement, so it has no place-led lane to trace."
+    ),
+    "evals/experiments/QA-2026-11-02-03/trace_lane_input.py": (
+        "This code is that framework's: it prints the lane input that"
+        " `trace_baselines.py` reads, for the same lane."
+    ),
     "evals/experiments/QA-2026-10-31-02/build_answers.py": (
         "A recorded experiment's script. It reads the STRIDE prior because the"
         " experiment measures the STRIDE lanes; the ASVS prior holds no"
@@ -230,8 +296,8 @@ DECLARED: dict[str, str] = {
         "The scoring pass is that package's, because grading an open claim set"
         " is not a per-case fold; it names the block it grades so a sweep of"
         " another package skips it rather than fails in it. The"
-        " per-case mechanical dispatch that used to branch here is now"
-        " `PACKAGE_SCORERS`, a table keyed by framework."
+        " per-case mechanical dispatch is `PACKAGE_SCORERS`, a table keyed by"
+        " framework."
     ),
     "webapp/review.py": (
         "QUESTIONS is a table keyed by framework, checked against PACKAGES at"
@@ -549,6 +615,19 @@ def test_a_new_framework_literal_is_declared(literals):
     )
 
 
+def unexcused_names() -> dict[str, list[str]]:
+    """Each file's framework-named identifiers that no open decision excuses."""
+    found = {
+        name: sorted(
+            word
+            for word in words
+            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
+        )
+        for name, words in framework_named_identifiers().items()
+    }
+    return {name: words for name, words in found.items() if words}
+
+
 def test_a_framework_named_thing_is_declared_or_open(literals):
     """A class or a value may not carry a framework's name unexplained.
 
@@ -560,15 +639,8 @@ def test_a_framework_named_thing_is_declared_or_open(literals):
     in :data:`OPEN_BY_DECISION`, so somebody decided to keep it and said why.
     """
     unexplained = {
-        name: sorted(
-            word
-            for word in words
-            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
-        )
-        for name, words in framework_named_identifiers().items()
-        if name not in DECLARED
+        name: words for name, words in unexcused_names().items() if name not in DECLARED
     }
-    unexplained = {name: words for name, words in unexplained.items() if words}
 
     assert not unexplained, (
         f"these name a framework on a thing that serves every framework:"
@@ -603,15 +675,17 @@ def test_every_open_decision_gives_a_reason():
 def test_the_declaration_does_not_rot(literals):
     """A file that stops reaching one framework has to leave the list.
 
-    Either way of reaching one keeps it here. A module can name a package or
-    import its record, and a declaration is stale only when it does neither —
+    Each way of reaching one keeps it here. A module can name a package, import
+    its record, or give a thing a framework's name that no open decision
+    excuses, and a declaration is stale only when it does none of the three —
     otherwise removing a literal from a module that still imports the record
     would drop the reason and the entry together.
     """
-    reaching = set(literals) | set(package_importers())
+    reaching = set(literals) | set(package_importers()) | set(unexcused_names())
     stale = sorted(set(DECLARED) - reaching)
     assert not stale, (
-        f"these files no longer name or import a framework and are still"
+        f"these files no longer name a framework, import its record or give a"
+        f" thing a framework's name that no open decision excuses, and are still"
         f" declared: {stale}. Remove them."
     )
 
@@ -1086,6 +1160,7 @@ COUNT_WORDS = {
     8: "eight",
     9: "nine",
     10: "ten",
+    11: "eleven",
     17: "seventeen",
 }
 

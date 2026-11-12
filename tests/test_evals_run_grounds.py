@@ -107,6 +107,7 @@ def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dic
         "affected_element_ids": list(reference.affected_element_ids),
         # From the reference this stands in for; these tests grade grounds.
         "verb": reference.verb,
+        "attacker_position": "outside",
         "severity": {
             "likelihood": reference.severity.likelihood,
             "impact": reference.severity.impact,

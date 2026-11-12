@@ -16,9 +16,10 @@ const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const answerText = (answer) => (answer.facets
   ? Object.entries(answer.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
   : (answer.value === DONT_KNOW ? "I don't know" : answer.value));
-// The answers a facet takes, as the service lists them in FACET_ANSWERS.
+// The answers a facet takes, from the service (fact_answers.FACET_ANSWERS),
+// each under its own words, and then the answer that leaves the facet open.
 const FACET_CHOICES = [
-  ["yes", "yes"], ["no", "no"], ["not applicable", "not applicable"],
+  ...JSON.parse(document.getElementById("facet_answers").textContent).map((answer) => [answer, answer]),
   ["I don't know", DONT_KNOW],
 ];
 // Whether an input offers "I don't know" where it starts from `before`. With

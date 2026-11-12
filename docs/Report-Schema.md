@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.2"
+    schema_version: str  # "3.4"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -95,6 +95,7 @@ class FrameworkAnalysis:
     unresolved_evidence: list[UnresolvedEvidence]
     unknown_claim_identities: list[UnknownClaimIdentity]
     dropped_claims: list[DroppedClaim]
+    returned_claims: list[ReturnedClaim]  # kept against every Control row, unit deferred
     fired_rules: list[str]  # this package's deterministic rules that matched
     knowledge_docs: list[str]  # local-corpus documents those rules retrieved
     catalog_leads: int | None  # leads only the assertion catalog gave; null with no pass
@@ -158,13 +159,17 @@ require at least one.
 ```python
 class Threat(RuledClaim):
     category: StrideCategory  # spoofing | tampering | repudiation | ...
+    attacker_position: AttackerPosition | None  # outside | on-path | ...
     severity: Severity
     mitigations: list[Mitigation]  # {summary, detail}
     confidence: Rating | None  # low | medium | high (critic-calibrated)
     recommendation: RecommendationReading | None  # {sound, note}
 ```
 
-Five fields, and nothing else. `confidence` is `null` only on a threat that
+Six fields, and nothing else. `attacker_position` is where the attacker stands
+when it acts: `outside`, `on-path`, `storage-copy`, `in-component` or
+`authorized-principal`. It is `null` only on a stored threat that holds no
+position. `confidence` is `null` only on a threat that
 code rejected for its lane, because nobody rated it. `recommendation` is the
 critic's reading of the threat's `mitigations`. It is `null` where the critic
 made none, and on every rejected threat.
@@ -210,7 +215,7 @@ an empty list where STRIDE narrows it.
 
 **An ASVS claim never reports a pass.** `confirmed` means the requirement applies
 and the input does not show it satisfied; `needs-info` means the input does not
-settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
+settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; `control` means the owner states that a Control covers it, which the service did not verify; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
 source code, configuration and the people who built the system, and a job here
 carries prose. See
 [ADR 0013](adr/0013-asvs-rules-applicability-and-never-a-pass.md).
@@ -303,9 +308,9 @@ carries guarantees it was never written under. So an old report is readable by
 the version that wrote it and by nothing else, and a reader who needs both keeps
 both.
 
-That is also the whole answer for the assertion layer. It is part of 3.0, 3.0
-has never shipped, and so no report exists that predates it — `assertions:
-null` means a deployment that ran no pass, never a file older than the field.
+That is also the whole answer for the assertion layer. It is part of 3.0, so
+each 3.0 report carries the field — `assertions: null` means a deployment that
+ran no pass, never a file with no such field.
 
 [Schema versions](#schema-versions), at the end of this page, states what each
 version holds.
@@ -504,7 +509,7 @@ class RepairedQuote:
 
 The ladder refused what the agent wrote, and the repair rung
 (`analysis_service.grounding.repair_prepared`) found a window of the named source
-near enough to hand back. The ground now carries that window — the submitter's
+near enough to hand back. The ground carries that window — the submitter's
 words, whitespace collapsed — and this mark carries the agent's, so the
 substitution is on the record. A repaired quote verifies, so an entry here is
 never also in `unverified_grounds`.
@@ -520,6 +525,22 @@ the replaced span with `written` and `moved` beside it, and the viewer shows
 the difference to a reader. `scan_complete` is `False` where the work budget
 or a deadline stopped the scan before every window was ranked, so the span is
 the best found by then. See [ADR 0018](adr/0018-the-repair-rung.md).
+
+## `returned_claims` — claims a Control row kept that went back to the deferred set
+
+```python
+class ReturnedClaim:
+    claim_id: str  # the claim the critic kept against every Control row
+    unit: str  # the unit, now listed needs-other-evidence
+    needs: str  # the kind of evidence the unit needs
+    refused_controls: list[RefusedControl]  # the critic's refusal of each row
+```
+
+A Control row keeps a unit that the job cannot settle from the deferred set,
+so the critic can judge the row (ADR 0126). Where the critic keeps the draft
+against every row, the job still carries no evidence of the kind the unit
+needs. The claim leaves `claims`, the unit is listed `needs-other-evidence`
+with its kind, and this entry keeps the critic's refusals.
 
 ## `dropped_claims` — claims the service dropped for a fault in one entry
 
@@ -594,7 +615,7 @@ unfindable quote is: merge has no re-ask path, and a whole report is too much to
 trade for a mistyped ID in a sentence.
 
 The mark is worth more than typo-catching. The analyze prompt is built around a
-single worked exemplar system and spends a section telling the agent never to
+single worked exemplar system and uses a section to tell the agent never to
 cite that system's IDs. A description arguing about `process:web-api` in a job
 whose model has no such element is that contamination reaching the one field a
 reader reads as ordinary analysis.
@@ -648,7 +669,7 @@ every `ValidationIssue` is fatal, and an empty list *is* the definition of
 ready-for-analysis the graph routes on — and this does not deserve that,
 because it is not always wrong. A system can legitimately run a process and
 keep a store of the same name. Failing extraction on the pair would reject a
-valid model, and would spend `repair`'s single pass telling a transcriber to
+valid model, and would use `repair`'s single pass to tell a transcriber to
 rename something correct. So it is reported to the reader and to nobody else:
 it never reaches `repair`, which is told to change nothing the issues do not
 cite.
@@ -682,7 +703,7 @@ restored from the model the issues were computed against, with its ID in
 `restored`. When an issue named no element, a fault over the whole object,
 `scope` is `whole` and nothing is restored, because no narrower patch could
 answer it. A report whose `nodes` name the repair node and carry `None` here
-predates the field.
+holds no record of the repair.
 
 ## `coverage` — what each lane was offered
 
@@ -911,7 +932,9 @@ class Verdict:
     reason: str  # required unless confirmed
     related_unknowns: list[UnknownRef]  # required iff needs-info
     immaterial_unknowns: list[UnknownRef]  # unknown grounds the critic dismissed
-    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | None
+    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | "control" | None
+    control_row: ControlRowRef | None  # {control, unit}; exactly on a control rejection
+    refused_controls: list[RefusedControl]  # {control, unit, reason}; rows that do not cover it
 ```
 
 - `confirmed` — grounded in the model's facts.
@@ -1276,4 +1299,17 @@ version before it. Read it when you load an archived report.
   quotes the answers Source, and no span of another row quotes it. Additive
   for a consumer that reads only the 3.1 fields. A route that parses a stored
   3.1 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.3:** each STRIDE threat carries `attacker_position`, where the
+  attacker stands when it acts: `outside`, `on-path`, `storage-copy`,
+  `in-component` or `authorized-principal`. It is `null` only on a stored
+  threat that holds no position. Additive for a consumer that reads only
+  the 3.2 fields. A route that parses a stored 3.2 job record answers `409`
+  (see [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.4:** `rejected_because` holds `control`: a row of the owner's
+  Control covers the claim's unit, as the owner states it, and the service
+  verified nothing. A verdict carries `control_row` exactly on a `control`
+  rejection, and `refused_controls` for each row the critic refused. Each block
+  carries `returned_claims`. Additive for a consumer that reads only the 3.3
+  fields. A route that parses a stored 3.3 job record answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

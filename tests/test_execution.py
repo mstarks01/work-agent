@@ -12,14 +12,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from datetime import UTC, datetime
 
 import pytest
 from google.adk.sessions import InMemorySessionService
 
-from analysis_service import graph
+from analysis_service import execution, graph
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
-from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun, _NodeFinish
+from analysis_service.execution import (
+    GraphExecutor,
+    GraphFailed,
+    GraphRun,
+    _NodeFinish,
+    seed_state,
+)
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
 from analysis_service.report import InputRef, Job, Report
 from analysis_service.sampling import (
@@ -543,6 +550,122 @@ class TestSourceRendering:
 
         assert render_sources(sources) in models[graph.EXTRACT_NODE].seen[0]
 
+    def test_the_sources_are_read_off_the_event_loop(self, monkeypatch):
+        # A diagram read is a subprocess that blocks its thread, and on the
+        # loop's thread it stops each other request of the service.
+        pipeline, _ = scripted_pipeline(happy_replies())
+        threads = []
+
+        def seeding(*args):
+            threads.append(threading.get_ident())
+            return seed_state(*args)
+
+        monkeypatch.setattr(execution, "seed_state", seeding)
+
+        async def scenario():
+            await GraphExecutor(pipeline, app_name="stride-test").run(
+                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+            )
+            return threading.get_ident()
+
+        loop_thread = asyncio.run(scenario())
+
+        assert threads and loop_thread not in threads
+
+    @staticmethod
+    def held_reads(monkeypatch):
+        """A run whose read waits in its thread, the event that lets each read
+        end, a semaphore that counts each started read, and the started reads."""
+        pipeline, _ = scripted_pipeline(happy_replies())
+        release = threading.Event()
+        reading = threading.Semaphore(0)
+        in_flight: list[int] = []
+
+        def seeding(*args):
+            in_flight.append(threading.get_ident())
+            reading.release()
+            release.wait(10)
+            return seed_state(*args)
+
+        monkeypatch.setattr(execution, "seed_state", seeding)
+
+        async def run():
+            await GraphExecutor(pipeline, app_name="stride-test").run(
+                [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+            )
+
+        return run, release, reading, in_flight
+
+    def test_a_cancelled_run_holds_its_read_token_until_the_thread_ends(
+        self, monkeypatch
+    ):
+        # The deadline and the stop control cancel a run with a native cancel.
+        # The read thread and its Node process continue, so the token must too:
+        # a third read may start only when one of the two threads ends.
+        run, release, reading, in_flight = self.held_reads(monkeypatch)
+
+        async def scenario():
+            limiter = execution._DIAGRAM_READS
+            total = int(limiter.total_tokens)
+            cancelled = [asyncio.create_task(run()) for _ in range(total)]
+            for _ in cancelled:
+                await asyncio.to_thread(reading.acquire)
+            for task in cancelled:
+                task.cancel()
+            await asyncio.wait(cancelled)
+            held_after_cancel = limiter.borrowed_tokens
+            later = asyncio.create_task(run())
+            await asyncio.sleep(0.3)
+            threads_while_held = len(in_flight)
+            release.set()
+            await later
+            return held_after_cancel, threads_while_held, limiter.borrowed_tokens
+
+        held_after_cancel, threads_while_held, held_at_end = asyncio.run(scenario())
+
+        assert held_after_cancel == 2
+        assert threads_while_held == 2
+        assert held_at_end == 0
+
+    def test_a_run_cancelled_as_it_takes_a_free_token_returns_it(self, monkeypatch):
+        # The limiter grants a free token and then yields once. A cancel that
+        # arrives at that yield must leave no token held. The one started read
+        # shows that the run took its token before the cancel.
+        run, release, _, in_flight = self.held_reads(monkeypatch)
+        release.set()
+
+        async def scenario():
+            task = asyncio.create_task(run())
+            await asyncio.sleep(0)
+            task.cancel()
+            (ended,), _ = await asyncio.wait([task])
+            await asyncio.sleep(0.3)
+            return ended.cancelled(), execution._DIAGRAM_READS.borrowed_tokens
+
+        assert asyncio.run(scenario()) == (True, 0)
+        assert len(in_flight) == 1
+
+    def test_a_run_cancelled_in_the_queue_starts_no_read(self, monkeypatch):
+        run, release, reading, in_flight = self.held_reads(monkeypatch)
+
+        async def scenario():
+            limiter = execution._DIAGRAM_READS
+            first = [
+                asyncio.create_task(run()) for _ in range(int(limiter.total_tokens))
+            ]
+            for _ in first:
+                await asyncio.to_thread(reading.acquire)
+            queued = asyncio.create_task(run())
+            await asyncio.sleep(0.1)
+            queued.cancel()
+            await asyncio.wait([queued])
+            release.set()
+            await asyncio.gather(*first)
+            await asyncio.sleep(0.1)
+            return len(in_flight), limiter.borrowed_tokens
+
+        assert asyncio.run(scenario()) == (2, 0)
+
     def test_seeding_the_input_text_directly_is_refused(self):
         # Seeding raw text is what would let the service and the eval harness
         # show one job to a model differently, so it is inexpressible.
@@ -775,3 +898,46 @@ class TestTheRunCompletesItself:
         assert set(proposals) == set(STRIDE_CATEGORIES)
         assert [claim["sequence"] for claim in proposals["spoofing"]["claims"]] == [1]
         assert proposals["tampering"]["claims"] == []
+
+
+def test_a_deadline_in_a_node_body_returns_the_node_token(monkeypatch):
+    # The deadline cancels the job task, and ADK cancels the node task in its
+    # cleanup. The body holds one token while it runs. At the deadline the
+    # token is back and the body is not at its end.
+    started = threading.Event()
+    release = threading.Event()
+    ended = threading.Event()
+    after_gate = graph.after_gate
+
+    def held_body(model):
+        started.set()
+        release.wait(10)
+        ended.set()
+        return after_gate(model)
+
+    monkeypatch.setattr(graph, "after_gate", held_body)
+    pipeline, _ = scripted_pipeline(happy_replies())
+
+    async def scenario():
+        limiter = graph._NODE_THREADS
+        held_by_the_body = None
+        try:
+            async with asyncio.timeout(30) as deadline:
+                run = asyncio.ensure_future(
+                    GraphExecutor(pipeline, app_name="stride-test").run(
+                        [Source.description(DESCRIPTION_TEXT)], user_id="test-user"
+                    )
+                )
+                await asyncio.to_thread(started.wait, 20)
+                held_by_the_body = limiter.borrowed_tokens
+                deadline.reschedule(0)
+                await run
+        except TimeoutError:
+            pass
+        at_deadline = (held_by_the_body, limiter.borrowed_tokens, ended.is_set())
+        release.set()
+        await asyncio.to_thread(ended.wait, 10)
+        return at_deadline
+
+    assert asyncio.run(scenario()) == (1, 0, False)
+    assert ended.is_set()

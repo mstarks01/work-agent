@@ -1,0 +1,454 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "Reader",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[Reader] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[Admin] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:cdn",
+        "name": "CDN",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(internet)[CDN] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:web-server",
+        "name": "Web server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[Web server] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(database)[MySQL database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[CDN bucket] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader>process:web-server>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:reader>process:cdn>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:cdn",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-server>store:mysql-database>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-server>store:cdn-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "Public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone Public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone Hosted network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cdn",
+        "name": "CDN",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone CDN]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Reader is a human external entity.",
+        "element_id": "entity:reader",
+        "attribute": "kind",
+        "basis": "The node is named 'Reader', which denotes a person or user role."
+      },
+      {
+        "assumption": "Admin is a human external entity.",
+        "element_id": "entity:admin",
+        "attribute": "kind",
+        "basis": "The node is named 'Admin', which denotes a person or user role."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "Reader",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[Reader] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[Admin] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:cdn",
+        "name": "CDN",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(internet)[CDN] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:web-server",
+        "name": "Web server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[Web server] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(database)[MySQL database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[CDN bucket] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader>process:web-server>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:reader>process:cdn>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:cdn",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-server>store:mysql-database>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-server>store:cdn-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "Public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone Public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone Hosted network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cdn",
+        "name": "CDN",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone CDN]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Reader is a human external entity.",
+        "element_id": "entity:reader",
+        "attribute": "kind",
+        "basis": "The node is named 'Reader', which denotes a person or user role."
+      },
+      {
+        "assumption": "Admin is a human external entity.",
+        "element_id": "entity:admin",
+        "attribute": "kind",
+        "basis": "The node is named 'Admin', which denotes a person or user role."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

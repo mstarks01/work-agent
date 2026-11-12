@@ -20,8 +20,8 @@ worker pool, and wall-clock on one of eight threads measures the other seven.
 **What the numbers say, so nobody optimises this layer again without reading
 it.** The ``pipeline`` case measures a whole scripted job. The deterministic
 bodies cost 4 ms of CPU on a STRIDE-only run and 47 ms on one carrying ASVS,
-and serializing the analysis costs 0.2 ms. A real job spends seconds per node
-waiting for a provider, so this layer is a rounding error on job latency —
+and serializing the analysis costs 0.2 ms. A real job waits seconds per node
+for a provider, so this layer is a rounding error on job latency —
 *except* in one place. Fuzzy quote repair is the only part whose cost is set by
 submitted text rather than by the model, which is why it carries three separate
 bounds and why it is the one thing here worth tuning.
@@ -57,7 +57,7 @@ import sys
 import time
 from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, Literal, get_args
 
 from google.adk.workflow import FunctionNode
 
@@ -593,8 +593,8 @@ def as_compact(model: dict) -> dict:
 
     The measurement's own converter, and the fixture generator
     ``tests/test_compact.py`` drives the equivalence sweep with. Nothing in the
-    service converts this way round — the adapter only expands — so this is the
-    one place the inverse is written, and both readers of it share it.
+    service converts this way round — the adapter only expands — so the
+    measurement and the fixture generator share this inverse.
 
     **The ref is the element's own name slug behind its tag, because that is what
     a model writes.** A positional ref would be shorter and would make this
@@ -705,9 +705,21 @@ def case_transport() -> None:
     print(f"{'TOTAL':34}{total_full:9}{total_compact:9}{saved:7.1f}%")
 
 
+#: The name of each bench case.
+BenchCase = Literal[
+    "repair",
+    "spent-deadline",
+    "prepare",
+    "retention",
+    "index",
+    "catalog",
+    "pipeline",
+    "transport",
+]
+
 #: Every case, by the name the command line takes. A table rather than a
 #: dispatch chain, so a case added here is runnable without a second edit.
-CASES: dict[str, Callable[[], None]] = {
+CASES: dict[BenchCase, Callable[[], None]] = {
     "repair": case_repair,
     "spent-deadline": case_spent_deadline,
     "prepare": case_prepare,

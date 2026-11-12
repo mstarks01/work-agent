@@ -1,0 +1,490 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "shopper",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[shopper] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[card processor] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[storefront API] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:storefront-dmz",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[order service] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders db",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(database)[orders db] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[receipt archive] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:storefront-dmz",
+        "name": "storefront dmz",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone storefront dmz]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-services",
+        "name": "core services",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone core services]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The label 'shopper' identifies a human external entity.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The diagram names the external node 'shopper'."
+      },
+      {
+        "assumption": "The label 'card processor' identifies an external system.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The diagram names the external node 'card processor'."
+      },
+      {
+        "assumption": "The public internet zone is a network boundary.",
+        "element_id": "boundary:public-internet",
+        "attribute": "kind",
+        "basis": "The zone is named 'Trust zone public internet'."
+      },
+      {
+        "assumption": "The storefront DMZ is a network boundary.",
+        "element_id": "boundary:storefront-dmz",
+        "attribute": "kind",
+        "basis": "The zone is named 'Trust zone storefront dmz'."
+      },
+      {
+        "assumption": "The core services zone is a network boundary.",
+        "element_id": "boundary:core-services",
+        "attribute": "kind",
+        "basis": "The zone is named 'Trust zone core services'."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "shopper",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[shopper] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[card processor] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[storefront API] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:storefront-dmz",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[order service] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders db",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(database)[orders db] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[receipt archive] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>unknown-data",
+        "name": "unknown data",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:storefront-dmz",
+        "name": "storefront dmz",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone storefront dmz]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-services",
+        "name": "core services",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone core services]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The label 'shopper' identifies a human external entity.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The diagram names the external node 'shopper'."
+      },
+      {
+        "assumption": "The label 'card processor' identifies an external system.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The diagram names the external node 'card processor'."
+      },
+      {
+        "assumption": "The public internet zone is a network boundary.",
+        "element_id": "boundary:public-internet",
+        "attribute": "kind",
+        "basis": "The zone is named 'Trust zone public internet'."
+      },
+      {
+        "assumption": "The storefront DMZ is a network boundary.",
+        "element_id": "boundary:storefront-dmz",
+        "attribute": "kind",
+        "basis": "The zone is named 'Trust zone storefront dmz'."
+      },
+      {
+        "assumption": "The core services zone is a network boundary.",
+        "element_id": "boundary:core-services",
+        "attribute": "kind",
+        "basis": "The zone is named 'Trust zone core services'."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

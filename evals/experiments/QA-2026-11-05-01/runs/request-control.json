@@ -1,0 +1,54 @@
+{
+  "01-payments-checkout": {
+    "instruction": "a52ec372bbf6f52b13dd7eb4576d3c56f02bf4e960034a49b5411ba95375abe0",
+    "turn": "6f9db41a7f52d6549df8e0ae30aa6f1ea35f60b149895a19addee74590640ce6"
+  },
+  "02-iot-fleet-telemetry": {
+    "instruction": "f677906d34923f950329d71ca50cb5df5a97d10ff0a5cc7f4a38dcd63ee0590d",
+    "turn": "52b11abfffba9363cff38eb95c34bde2b1888a0cb715a2f364f1a8e2fd191a59"
+  },
+  "03-batch-data-pipeline": {
+    "instruction": "cd621f81fac97ee75adc667811772cae6f4e2042339f09e703831163bbcf798a",
+    "turn": "fe403ea271c46941e6e19742d1ba9f16af8696a0fb50aee0aab4cf36fde6b790"
+  },
+  "04-ml-inference-service": {
+    "instruction": "a4d6949a40ca071399df87db505cdf471b81029eb802f10ff2292e1d2a22374a",
+    "turn": "e975374573d912ca1cd8f865dc7dbc68798ccfb6a59116946e4d51c23c986438"
+  },
+  "05-cookbook-queue-webapp": {
+    "instruction": "694b5939673e738c9d6ca89b62376d759d26263442faaea6d7520deda5dae7c5",
+    "turn": "44a2cea11f7c21f2dd09be5e1f905ef1b5929d2e69e7546ebac2d275cf2929aa"
+  },
+  "06-cookbook-online-game": {
+    "instruction": "dd3ecb6649b224afc2fce1d493dd277e6c89c0fccabe5294c0fd0002318c1d88",
+    "turn": "d31888a1c0cb28170d824c18051d60b95313e2fb5a56c30d6bea8b377748362f"
+  },
+  "09-cookbook-sokify-retail": {
+    "instruction": "402ff05c6fa1e7beedb4fe645c394656343a12545c959f37c30caf0bb6094bbe",
+    "turn": "3c1d12a724e78032091e7ba376ed5f3a7b7ed543009bfac833230ecc96bb8948"
+  },
+  "10-cookbook-generic-cms": {
+    "instruction": "a7048ffba09300494a4b5fa500747d749a80500875a306636b71540ea608e5af",
+    "turn": "446d1714772be048d2283fe8c601407c5b24157a6ee957bd0af2a76890723770"
+  },
+  "11-sparse-shift-scheduling": {
+    "instruction": "39e2a71c543b90396ec10c32149d7265d23b58f6f1b54c1d3bb713edaa9a7961",
+    "turn": "4c8f2e3c07d97ab58973e659726330313643a915b44e5f5220c6d99c4032a4e6"
+  },
+  "12-overclaiming-supplier-portal": {
+    "instruction": "ecc05f6013b262bd5d09539c0d088abd1130b4f02d56b35c127931cecb684f8d",
+    "turn": "bda4b87db0d8adb087a658bfc5b32c24ed3e75eccc462543235b2a21a18793ba"
+  },
+  "13-dispatch-control-plane": {
+    "instruction": "7acd1ed3b40b970de5e377211c6baa4326c09a4688c709bc0a4fc59fa82d57c6",
+    "turn": "8c877f04b6315613a3ed55ebe4f493fb0f6509b1ed8a2879a44f3875567770f9"
+  },
+  "14-loyalty-oauth-platform": {
+    "instruction": "6ae4470af3aa1e8e2945bdc9a117ad5286d625d4c81f786a552d7f53fbfdf744",
+    "turn": "325d1c210267eba97e7e5584c470e0ded921ed4c4ee6e076ddf9d3c8a187d905"
+  },
+  "15-multitenant-invoicing": {
+    "instruction": "869ce2c14fc0b4d48c40f9c3dab31f5a4bffb8248498ec48834cbe1275ddab71",
+    "turn": "18f09fd9069d0dd13409afa2cee637b3420a6d93fcdfd743298c9469724460dc"
+  }
+}

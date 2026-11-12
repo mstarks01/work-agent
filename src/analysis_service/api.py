@@ -73,9 +73,18 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import UNKNOWN_KEY_FIELDS, FrameworkName
+from analysis_service.controls import (
+    CONTROL_ROW_FIELD_MAX_CHARS,
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_FACTS,
+    MAX_CONTROL_ROWS,
+    ControlLimits,
+    ControlRow,
+)
 from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.errors import ConfigError, shown_errors
+from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.job_answers import (
@@ -103,6 +112,7 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
+    RefusalOutcome,
     event_frames,
     execute_job,
     is_follow_up,
@@ -116,8 +126,15 @@ from analysis_service.parsing import ascii_int
 from analysis_service.principals import Identity
 from analysis_service.report_changes import report_changes
 from analysis_service.selection import SelectionError
-from analysis_service.sources import Source, SourceLimits, clean_system_name
+from analysis_service.sources import (
+    MAX_LABEL_CHARS,
+    LimitRung,
+    Source,
+    SourceLimits,
+    clean_system_name,
+)
 from analysis_service.store_backends import audited_delete, build_store, store_lifespan
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -129,6 +146,48 @@ logger = logging.getLogger(__name__)
 # :class:`BodyLimitMiddleware`, which counts what arrives rather than trusting
 # what was declared.
 _BODY_SLACK = 2
+
+
+def max_body_bytes(limits: SourceLimits) -> int:
+    """The raw-body guard of a deployment whose byte budget is ``limits``.
+
+    **The one reader of the guard.** :class:`BodyLimitMiddleware` enforces it
+    on ``/v1``, and the web app's ``_job_body`` enforces it on each job route.
+    ``tests/test_one_reader_lints.py`` refuses a second reader.
+    """
+    return limits.max_total_bytes * _BODY_SLACK
+
+
+#: The most bytes one character takes in UTF-8.
+_UTF8_MAX_BYTES = 4
+#: The room for the keys, quotes and commas around one item of a Control save:
+#: a name, an alias, a fact, a row or an evidence file.
+_ITEM_FRAMING_BYTES = 256
+
+
+def max_control_body_bytes(limits: ControlLimits) -> int:
+    """The raw-body guard of a Control save: the guard of a job whose sources
+    are a full Control's evidence and each other field at its bound, in
+    4-byte characters, with room for the framing of each item.
+
+    The web app's ``control_body`` enforces it, and
+    ``tests/test_one_reader_lints.py`` refuses another caller.
+    """
+    labels = 2 + MAX_CONTROL_ALIASES + limits.max_evidence
+    fact_chars = FACT_VALUE_MAX_CHARS + len(UNKNOWN_KEY_FIELDS) * ELEMENT_ID_MAX_CHARS
+    chars = (
+        labels * MAX_LABEL_CHARS
+        + MAX_CONTROL_FACTS * fact_chars
+        + MAX_CONTROL_ROWS * len(ControlRow.model_fields) * CONTROL_ROW_FIELD_MAX_CHARS
+    )
+    whole = SourceLimits(
+        max_total_bytes=limits.max_evidence * limits.max_evidence_bytes
+        + chars * _UTF8_MAX_BYTES,
+        max_sources=limits.max_evidence,
+    )
+    items = labels + MAX_CONTROL_FACTS + MAX_CONTROL_ROWS
+    return max_body_bytes(whole) + items * _ITEM_FRAMING_BYTES
+
 
 #: How many event streams one owner may hold open at once. Each stream polls
 #: the store until its job is terminal, and a job that waits on answers is not,
@@ -154,7 +213,12 @@ _CONTENT_LENGTH_DIGITS = 19
 # came near. A repeated label is the same kind of wrong — malformed at any size,
 # so 422 rather than a budget status. Per-source well-formedness never reaches
 # here: a bad source fails body validation, which FastAPI answers with 422 too.
-_STATUS_BY_RUNG = {"empty": 400, "duplicate-label": 422, "count": 413, "total": 413}
+_STATUS_BY_RUNG: dict[LimitRung, int] = {
+    "empty": 400,
+    "duplicate-label": 422,
+    "count": 413,
+    "total": 413,
+}
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -320,7 +384,7 @@ class JobSubmission(BaseModel):
     The order of the list decides nothing. The report's analysis blocks follow
     the order of ``config/frameworks.toml``, whatever order the submission
     listed (ADR 0102). :func:`~analysis_service.selection.resolve_selection`
-    is the one reader of that rule.
+    puts the selection in that order.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -352,8 +416,9 @@ class JobSubmission(BaseModel):
     #: ``represented-by`` rows; see :mod:`analysis_service.links`.
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     #: Stop after the assertion pass, publish the questions, and wait for a
-    #: person to answer them. Off by default, so an autonomous caller's job
-    #: never waits (#1252). Strict, as ``save`` is: ``"yes"`` asks nothing.
+    #: person to answer them; the report then offers its one follow-up. Off by
+    #: default, so an autonomous caller's job never waits and its report asks
+    #: nothing (#1252). Strict, as ``save`` is: ``"yes"`` asks nothing.
     questions: bool = Field(default=False, strict=True)
     #: An earlier job of the caller's whose answers this job carries, and
     #: whose questions take each one they still ask (ADR 0079). It needs
@@ -405,7 +470,7 @@ def _answers(request: Request) -> JobAnswers:
         limits=state.limits,
         ceiling=state.max_active_jobs,
         budget=state.budget,
-        frameworks=state.frameworks,
+        carried_frameworks=state.carried_frameworks,
         carries_catalog=state.carries_catalog,
         gate=state.certification,
     )
@@ -583,7 +648,7 @@ def _status_view(record: Envelope) -> JobStatusView:
 # status: a bound that clears with time is a 429, a job that already has its
 # resumed job is a 409, and a parent that a delete removed reads as a missing
 # job, with its 404.
-_REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
+_REFUSALS: dict[RefusalOutcome, tuple[int, Callable[[Admission, int], str]]] = {
     "at_ceiling": (
         429,
         lambda admission, ceiling: (
@@ -620,7 +685,7 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
             " answer returned; answer again only if that job fails"
         ),
     ),
-    "parent_moved": (
+    "parent_stale": (
         409,
         lambda admission, ceiling: (
             "the saved answers changed while this request read them; read the"
@@ -708,7 +773,7 @@ def create_app(
     job_deadline_seconds: float | None = None,
     max_active_jobs: int | None = None,
     budget: BudgetPolicy | None = None,
-    frameworks: Sequence[FrameworkName] | None = None,
+    carried_frameworks: Sequence[FrameworkName] | None = None,
     carries_catalog: bool | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
@@ -728,16 +793,12 @@ def create_app(
     because a stand-in that answers one is answering the seam rather than the
     graph.
 
-    ``carries_catalog`` says whether a job here builds an assertion catalog,
-    which is the only reader of a link answer. It is the deployment's wherever
-    there is one. Without a deployment it defaults to ``False``, so an app
-    that cannot know refuses link answers rather than accepting what nothing
-    reads.
-
     ``limits`` bounds what one job may carry, ``job_deadline_seconds`` bounds
     how long one may run, ``max_active_jobs`` bounds how many one caller may
-    have in flight, and ``frameworks`` is what a submission may select from. All
-    four come from the deployment wherever there is one; a caller who injects a
+    have in flight, ``carried_frameworks`` is what a submission may select
+    from, and ``carries_catalog`` says whether a job here builds an assertion
+    catalog, which a link answer places a principal in. All five come from the
+    deployment wherever there is one; a caller who injects a
     runner instead must state them, because reading a second configuration
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
@@ -765,12 +826,16 @@ def create_app(
         deployment = deployment if deployment is not None else Deployment.from_env()
         app.state.runner_for = deployment.runner
         app.state.certification = deployment.gate
-    frameworks = _setting(frameworks, deployment, "frameworks", lambda d: d.frameworks)
-    app.state.frameworks = tuple(frameworks)
-    app.state.carries_catalog = (
-        carries_catalog
-        if carries_catalog is not None
-        else deployment is not None and deployment.carries_catalog
+    app.state.carried_frameworks = tuple(
+        _setting(
+            carried_frameworks,
+            deployment,
+            "carried_frameworks",
+            lambda d: d.carried_frameworks,
+        )
+    )
+    app.state.carries_catalog = _setting(
+        carries_catalog, deployment, "carries_catalog", lambda d: d.carries_catalog
     )
     app.state.limits = limits = _setting(
         limits, deployment, "limits", lambda d: d.resilience.source_limits()
@@ -790,7 +855,6 @@ def create_app(
     app.state.budget = _setting(
         budget, deployment, "budget", lambda d: d.resilience.budget_policy()
     )
-    max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
     @app.exception_handler(StarletteHTTPException)
@@ -849,7 +913,7 @@ def create_app(
     async def _over_limit(request: Request, exc: SourcesOverLimit):
         return _problem_response(_STATUS_BY_RUNG[exc.breach.rung], str(exc))
 
-    app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes(limits))
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

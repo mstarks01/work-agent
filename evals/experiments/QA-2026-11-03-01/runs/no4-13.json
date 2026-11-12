@@ -1,0 +1,577 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "bee48c8e0e5a5d370156020b52e22496d5bff33f",
+    "clean": true,
+    "table": {
+      "case": "13-dispatch-control-plane",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "cf3fd3442d9a29ea5ca935978e4f32735bcad935281744cdaa5d6f8d567cb976"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "7605b8bc22968a87d5bf509b415d974629bec5bf49a41449471f804739c24da8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Engineer sign-in credentials may be intercepted before reaching the dispatch console",
+      "description": "`flow:entity:duty-engineer>process:dispatch-console>open-console` carries the duty engineer's sign-in to `process:dispatch-console`, but its protocol and `encryption_in_transit` are unknown. If the unresolved transport protection means the browser-to-console path is not confidential, an attacker able to observe traffic on `boundary:corporate-network` can intercept the engineer's credentials. The disclosed credentials may then enable access to `process:dispatch-console` and its subsequent dispatch-API interactions; this is conditional on the unknown transport state, not an assertion that encryption is absent.",
+      "affected_element_ids": [
+        "flow:entity:duty-engineer>process:dispatch-console>open-console",
+        "entity:duty-engineer",
+        "process:dispatch-console"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:duty-engineer>process:dispatch-console>open-console:protocol",
+        "unknown:flow:entity:duty-engineer>process:dispatch-console>open-console:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `flow:entity:duty-engineer>process:dispatch-console>open-console` has unknown protocol and transport encryption, while an attacker still needs an observation position on the corporate-network path. Impact is high because the flow carries credentials and a captured engineer sign-in can be used to access the dispatch console and actions reaching `process:dispatch-api`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce TLS for console sign-in",
+          "detail": "Set a verified HTTPS/TLS configuration for `flow:entity:duty-engineer>process:dispatch-console>open-console`, redirect cleartext requests, and record the negotiated transport posture."
+        },
+        {
+          "summary": "Use phishing-resistant sign-in protections",
+          "detail": "Require MFA or hardware-backed authentication for duty engineers so a captured sign-in exchange alone is less useful."
+        }
+      ]
+    },
+    {
+      "title": "Dispatch actions may be readable across the corporate-to-control-plane boundary",
+      "description": "`flow:process:dispatch-console>process:dispatch-api>dispatch-requests` crosses from `boundary:corporate-network` to `boundary:production-control-plane` and carries dispatch actions, while its protocol and `encryption_in_transit` are unknown. If transport confidentiality is not actually present, an attacker observing this boundary-crossing path can intercept crew-movement and depot-work requests, and potentially sensitive API responses associated with `process:dispatch-api`, which holds `pii`. The operational details enable targeted interference with live dispatch work; this is conditional on the unresolved encryption state.",
+      "affected_element_ids": [
+        "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "process:dispatch-console",
+        "process:dispatch-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>dispatch-requests:protocol",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>dispatch-requests:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: the flow crosses a trust boundary and has unknown protocol and encryption, but observation still requires a position on the corporate-to-control-plane path. Impact is medium because the flow exposes business-critical dispatch actions and reaches `process:dispatch-api`, which handles `pii` and live operational data."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS on the console-to-API route",
+          "detail": "Configure verified HTTPS/TLS for `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, including certificate validation at the browser and API endpoints."
+        },
+        {
+          "summary": "Minimize dispatch data in responses",
+          "detail": "Return only the fields needed by the console action so interception of a response cannot reveal unnecessary crew information."
+        }
+      ]
+    },
+    {
+      "title": "Live crew status may be intercepted on an unverified WebSocket channel",
+      "description": "`flow:process:dispatch-console>process:dispatch-api>live-job-status` crosses from the corporate network into the production control plane and carries live job status. Its `encryption_in_transit` and handshake authentication are unknown; if the WebSocket is not protected with TLS, an on-path attacker can intercept the live status shown for crews. The resulting view of current crews and work enables real-time targeting of operational activity and may expose information originating from `process:dispatch-api`, which holds `pii`; this draft is conditional on the unverified WebSocket transport.",
+      "affected_element_ids": [
+        "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "process:dispatch-console",
+        "process:dispatch-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>live-job-status:authentication",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>live-job-status:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because this boundary-crossing WebSocket has unknown encryption and authentication, although the attacker must obtain a network observation position. Impact is medium because the stream carries live job status for crews and originates at `process:dispatch-api`, a process tagged with `pii` and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Use authenticated WSS for live status",
+          "detail": "Require TLS-protected WebSockets with certificate validation on `flow:process:dispatch-console>process:dispatch-api>live-job-status` and reject non-WSS upgrades."
+        },
+        {
+          "summary": "Revalidate the session for the socket lifecycle",
+          "detail": "Authenticate the WebSocket handshake and enforce expiry or revalidation of the duty engineer's session after connection establishment."
+        }
+      ]
+    },
+    {
+      "title": "Archived partner schedules may be exposed while written to the corporate file store",
+      "description": "`flow:process:schedule-importer>store:schedule-archive>store-schedule-documents` writes downloaded partner XML schedule documents to `store:schedule-archive`, but its protocol and `encryption_in_transit` are unknown. If this internal write path is unencrypted, an attacker with a network observation position in the corporate environment can intercept the schedule documents while they are archived. The schedules reveal upcoming work and can be correlated with work orders later posted by `process:schedule-importer` to `process:dispatch-api`; this is conditional on the unknown transport protection.",
+      "affected_element_ids": [
+        "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
+        "process:schedule-importer",
+        "store:schedule-archive"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:schedule-importer>store:schedule-archive>store-schedule-documents:protocol",
+        "unknown:flow:process:schedule-importer>store:schedule-archive>store-schedule-documents:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the encryption state is unknown and exploitation requires an on-path position inside the corporate environment. Impact is medium because the flow carries business-critical partner schedules whose disclosure reveals future operational work."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the importer-to-archive write path",
+          "detail": "Use a verified authenticated transport protocol for `flow:process:schedule-importer>store:schedule-archive>store-schedule-documents` and document the protocol and encryption settings."
+        },
+        {
+          "summary": "Restrict archive-path observation",
+          "detail": "Segment file-store traffic and permit the archive write only from `process:schedule-importer` using a narrowly scoped service identity."
+        }
+      ]
+    },
+    {
+      "title": "A non-rotated importer API token and work orders may be intercepted en route to the dispatch API",
+      "description": "`flow:process:schedule-importer>process:dispatch-api>post-work-orders` crosses from `boundary:corporate-network` to `boundary:production-control-plane`, uses an API token, and has unknown protocol and `encryption_in_transit`. If that path lacks effective transport encryption, an attacker observing it can intercept the posted work orders and the token presented by `process:schedule-importer`. The token has not been rotated and can enable subsequent access to `process:dispatch-api`, whose control-plane functions include changing live crew and depot work; this is conditional on the unknown transport state.",
+      "affected_element_ids": [
+        "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "process:schedule-importer",
+        "process:dispatch-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "unknown:flow:process:schedule-importer>process:dispatch-api>post-work-orders:protocol",
+        "unknown:flow:process:schedule-importer>process:dispatch-api>post-work-orders:encryption_in_transit",
+        "assertion:credential-presented~principal:schedule-importer~any~credential:api-token",
+        "assertion:credential-rotation~credential:api-token~any~not-rotated"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the flow crosses a boundary with unknown protocol and encryption, while an attacker needs an observation position on that path. Impact is high because the intercepted API token is stated as not rotated and is presented to `process:dispatch-api`, which reaches the live production control plane."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect the importer-to-API channel with mTLS",
+          "detail": "Use TLS with certificate validation and service-to-service mTLS on `flow:process:schedule-importer>process:dispatch-api>post-work-orders`."
+        },
+        {
+          "summary": "Replace and rotate the static API token",
+          "detail": "Revoke the existing token, issue short-lived scoped credentials to `process:schedule-importer`, and enforce automated rotation."
+        }
+      ]
+    },
+    {
+      "title": "Crew PII may be readable on the unverified API-to-database connection",
+      "description": "`flow:process:dispatch-api>store:dispatch-database>read-write-job-orders` carries job orders, crew names, and crew mobile numbers between `process:dispatch-api` and `store:dispatch-database`, but its protocol and `encryption_in_transit` are unknown. If the database connection is not encrypted, an attacker able to observe this control-plane path can intercept crew PII and job-order data in transit. The captured records can be used to target named crews and disclose the operational corpus held by `store:dispatch-database`; this is conditional on the unverified transport setting.",
+      "affected_element_ids": [
+        "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "process:dispatch-api",
+        "store:dispatch-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:protocol",
+        "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "That database holds the job orders, the crew names and the crew mobile numbers.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the database-flow transport settings are unknown and interception requires a foothold on an internal control-plane path. Impact is high because `store:dispatch-database` holds the crew names and mobile numbers for job orders, giving an observer access to a potentially corpus-scale PII dataset."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted authenticated database transport",
+          "detail": "Configure TLS with server validation, and preferably mutually authenticated service identities, for `flow:process:dispatch-api>store:dispatch-database>read-write-job-orders`."
+        },
+        {
+          "summary": "Reduce sensitive fields traversing the connection",
+          "detail": "Limit queries and API processing to the crew fields needed for each operation and avoid moving mobile numbers when not required."
+        }
+      ]
+    },
+    {
+      "title": "A copied dispatch database may expose crew records if encryption at rest is absent",
+      "description": "`store:dispatch-database` contains job orders, crew names, and crew mobile numbers, and its `encryption_at_rest` is unknown. If that unknown resolves to storage without encryption, an attacker obtaining a database volume, backup, snapshot, or decommissioned copy can read the records directly without using `process:dispatch-api`. The disclosure is corpus-scale and enables targeting of crews and reconstruction of operational job assignments; this is explicitly conditional on verifying that at-rest encryption is absent or ineffective.",
+      "affected_element_ids": [
+        "store:dispatch-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:dispatch-database:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "How the database is protected at rest is not written down anywhere.",
+          "source_label": "System description"
+        },
+        {
+          "text": "That database holds the job orders, the crew names and the crew mobile numbers.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:store:dispatch-database:encryption_at_rest`: storage copies can bypass the normal application path, although an attacker must obtain one. Impact is high because `store:dispatch-database` holds crew PII and business-critical job-order data, and a raw copy can disclose the full dataset irreversibly."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption for the database and its copies",
+          "detail": "Establish the at-rest posture of `store:dispatch-database`, then require managed-key encryption for the primary database, backups, snapshots, replicas, and decommissioned media."
+        },
+        {
+          "summary": "Restrict export and key-use permissions",
+          "detail": "Separate database-export permissions from key-decryption permissions, log access to copies, and periodically test that backups cannot be read without authorized key use."
+        }
+      ]
+    },
+    {
+      "title": "A copied schedule archive may reveal all planned work if encryption at rest is absent",
+      "description": "`store:schedule-archive` retains every XML schedule document downloaded by `process:schedule-importer`, and its `encryption_at_rest` is unknown. If the corporate file-store folder is unencrypted at rest, an attacker holding a backup, snapshot, decommissioned media, or other storage-layer copy can read the accumulated partner schedules without accessing the importer. The archive exposes a historical and future-work view that can be correlated with work orders sent to `process:dispatch-api`; this is conditional on the unresolved at-rest encryption state.",
+      "affected_element_ids": [
+        "store:schedule-archive"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:schedule-archive:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:schedule-archive` has unknown at-rest encryption and an attacker must obtain a storage-layer copy. Impact is medium because the archive retains business-critical schedule documents for planned work, providing a broad operational view rather than a single record."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the archive and every operational copy",
+          "detail": "Verify and enforce encryption at rest for `store:schedule-archive`, including file-store backups, snapshots, replicas, and decommissioned storage."
+        },
+        {
+          "summary": "Limit archive retention and access",
+          "detail": "Apply a documented retention period for XML schedules and grant archive read access only to the importer and explicitly approved operational roles."
+        }
+      ]
+    },
+    {
+      "title": "A compromised dispatch API can read the complete dispatch database through its existing read path",
+      "description": "`process:dispatch-api` reads and writes `store:dispatch-database`, which contains job orders, crew names, and crew mobile numbers. An attacker running code in `process:dispatch-api` can use that process's existing database read path to read the full records available to the API. Authentication for `flow:process:dispatch-api>store:dispatch-database>read-write-job-orders` is unknown, so the model does not establish whether the API's database identity is restricted to only necessary rows and fields. The disclosed data enables targeting of crews and exposes the database corpus; this draft is conditional on the unresolved scope of the database access path, not a claim that authentication is absent.",
+      "affected_element_ids": [
+        "process:dispatch-api",
+        "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "store:dispatch-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The dispatch API reads and writes the dispatch database.",
+          "source_label": "System description"
+        },
+        {
+          "text": "That database holds the job orders, the crew names and the crew mobile numbers.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because exploitation requires the attacker to run code in the internal `process:dispatch-api`, and the database-flow authentication and scope are unresolved. Impact is high because the API's stated read path reaches `store:dispatch-database`, which holds job orders and crew PII including mobile numbers."
+      },
+      "mitigations": [
+        {
+          "summary": "Constrain the API database identity",
+          "detail": "Use a distinct least-privilege database principal for `process:dispatch-api`, limited to required tables, rows, and columns, and verify the authentication configuration on `flow:process:dispatch-api>store:dispatch-database>read-write-job-orders`."
+        },
+        {
+          "summary": "Detect abnormal database reads",
+          "detail": "Log and alert on bulk or unusual reads by the dispatch API identity, especially access to crew contact fields outside expected dispatch operations."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

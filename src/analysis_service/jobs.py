@@ -37,6 +37,7 @@ from collections.abc import (
     Callable,
     Iterable,
     Iterator,
+    Mapping,
     Sequence,
 )
 from dataclasses import dataclass, field
@@ -47,16 +48,40 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, HeldAnswerSet
+from analysis_service.answer_sets import (
+    NO_ANSWERS,
+    NO_SENT_ANSWERS,
+    AnswerSet,
+    HeldAnswerSet,
+    HeldSentAnswers,
+    SentAnswers,
+)
 from analysis_service.assertion_use import assertion_use
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.carried_renames import MAX_RENAMES, ElementRename, renamed
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
+from analysis_service.controls import (
+    Control,
+    ControlAdmission,
+    ControlLimits,
+    ControlReplacement,
+    EvidenceRefusal,
+    check_texts,
+    control_refusal,
+    names_another_scope,
+)
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
+from analysis_service.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+    control_answers,
+)
 from analysis_service.links import MAX_HELD_LINKS
+from analysis_service.owner_files import FileAdmission, OwnerFile
 from analysis_service.principals import Identity, Principal, PrincipalTable
 from analysis_service.report import (
     SCHEMA_VERSION,
@@ -180,7 +205,13 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "parent_revision": "always",
     "carried": "same-schema",
     "carried_renames": "same-schema",
+    "controls": "never",
+    "control_scopes": "same-schema",
+    "control_facts": "same-schema",
     "ask_questions": "always",
+    "continues_at_pause": "always",
+    "assertion_pass": "always",
+    "continue_refusal": "always",
     "checkpoint": "never",
     "status": "always",
     "created_at": "always",
@@ -277,7 +308,12 @@ class JobEvent(BaseModel):
     def sse_frame(self) -> str:
         """The event as one server-sent frame: ``seq`` as the id, the kind as
         the event name, and the rest as data. :func:`event_frames` writes it."""
-        data = self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        return self.framed(
+            self.model_dump_json(exclude={"seq", "kind"}, exclude_none=True)
+        )
+
+    def framed(self, data: str) -> str:
+        """One server-sent frame of the event with ``data`` as its data."""
         return f"id: {self.seq}\nevent: {self.kind}\ndata: {data}\n\n"
 
 
@@ -316,6 +352,11 @@ class Resumption(BaseModel):
     #: model and catalog the parent's run built, so its own verdict is combined
     #: with this one.
     certification: CertifyResult | None = None
+
+
+def completed_nodes(events: Sequence[JobEvent]) -> list[str]:
+    """The name of the node of each node event of ``events``, in order."""
+    return [event.node for event in events if event.node is not None]
 
 
 def is_follow_up(resumption: Resumption | None) -> TypeGuard[Resumption]:
@@ -364,7 +405,9 @@ class JobRecord(BaseModel):
     # answer's row quotes; these are what ``prepare`` writes the rows from. See
     # :mod:`analysis_service.links` and :mod:`analysis_service.questions`. One
     # request carries at most MAX_FACT_ANSWERS; a job holds every save's
-    # (ADR 0070).
+    # (ADR 0070). A waiting job holds only its own answers, so a save that
+    # unticks a Control takes the Control's facts away. A Resumed Job holds
+    # what its run writes: its own answers over each Control fact (ADR 0125).
     answers: HeldAnswerSet = NO_ANSWERS
     # Every early question the pause presented, answered or not. The report
     # reads it to say what became of a follow-up question before the analysis.
@@ -377,8 +420,9 @@ class JobRecord(BaseModel):
         default_factory=list, max_length=MAX_HELD_FACTS
     )
     # A finished report's draft answers: what its follow-up saved in batches
-    # and has not run. The run composes them with what it is sent (ADR 0070).
-    draft: HeldAnswerSet = NO_ANSWERS
+    # and has not run, with its shares as sent. The run composes them with
+    # what it is sent (ADR 0070).
+    draft: HeldSentAnswers = NO_SENT_ANSWERS
     # How many saves a waiting job, drafts a finished report, or corrections a
     # final report has made. A save, a continue or a correction names the
     # revision it read, so a page left open on an earlier revision cannot write
@@ -410,10 +454,38 @@ class JobRecord(BaseModel):
     carried_renames: list[ElementRename] = Field(
         default_factory=list, max_length=MAX_RENAMES
     )
+    # The job's copy of each Control its submission named (ADR 0127): the
+    # object ``<owner-id>/<job-id>/controls.json``, which the store writes
+    # once. A route reads it by name, with :meth:`JobStore.controls`.
+    controls: list[CopiedControl] = Field(default_factory=list)
+    # The resolution of each copy that a pause save stated (ADR 0124), or
+    # ``None`` where no save stated one and each copy takes its default.
+    control_scopes: list[ControlResolution] | None = None
+    # The facts each applied Control writes, with each fact's state (ADR
+    # 0125), as a pause save or the Resumed Job stated them, or ``None``
+    # where no save stated them yet.
+    control_facts: list[ControlFacts] | None = None
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
     ask_questions: bool = False
+    # Whether the service continues this job at its pause at once, with no
+    # own answers (ADR 0125): its submission named Controls and asked no
+    # questions, and the pause is where the Controls write their facts.
+    continues_at_pause: bool = False
+    # Whether the analysis that this job belongs to runs the assertion pass:
+    # the deployment's setting when a job that extracts its model is admitted.
+    # A Resumed Job copies it from the job it resumes, though its own graph
+    # holds no pass. The progress line counts the stages of the run by it (ADR 0129).
+    assertion_pass: bool
+    # Why the service's continue of this job at its pause was refused, in the
+    # page's words (ADR 0125), or ``None``. Only
+    # :meth:`JobStore.set_continue_refusal` writes it, and the admission of a
+    # job that names this one as its parent clears it.
+    # ``test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it``
+    # and ``test_a_child_s_admission_clears_the_parent_s_continue_refusal``
+    # check both.
+    continue_refusal: str | None = None
     # What a paused job holds while it waits: the answers resume from it.
     checkpoint: Checkpoint | None = None
     status: JobStatus = "queued"
@@ -460,7 +532,12 @@ class JobRecord(BaseModel):
         amends: str | None = None,
         parent_revision: int | None = None,
         carried: AnswerSet = NO_ANSWERS,
+        controls: Sequence[CopiedControl] = (),
+        control_scopes: Sequence[ControlResolution] | None = None,
+        control_facts: Sequence[ControlFacts] | None = None,
         ask_questions: bool = False,
+        continues_at_pause: bool = False,
+        assertion_pass: bool,
         reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -480,7 +557,12 @@ class JobRecord(BaseModel):
             amends=amends,
             parent_revision=parent_revision,
             carried=carried,
+            controls=list(controls),
+            control_scopes=None if control_scopes is None else list(control_scopes),
+            control_facts=None if control_facts is None else list(control_facts),
             ask_questions=ask_questions,
+            continues_at_pause=continues_at_pause,
+            assertion_pass=assertion_pass,
             created_at=now,
             updated_at=now,
             reserved_tokens=reserved_tokens,
@@ -504,11 +586,23 @@ class JobRecord(BaseModel):
         return self.sources
 
     def pauses(self) -> bool:
-        """Whether this job's run stops after the assertion pass to ask a person.
+        """Whether this job's run stops after the assertion pass, to ask a
+        person or to continue at once.
 
         A resumed job never pauses: it is the run that answers came back to.
         """
-        return self.ask_questions and self.resumption is None
+        stops = self.ask_questions or self.continues_at_pause
+        return stops and self.resumption is None
+
+    def pauses_to_ask(self) -> bool:
+        """Whether this job's run stops to ask a person: a job that pauses
+        only so that the service continues it at once asks nobody."""
+        return self.ask_questions and self.pauses()
+
+    def waits_to_continue(self) -> bool:
+        """Whether this job waits at its pause for the continue the service
+        makes at once (ADR 0125)."""
+        return self.continues_at_pause and self.status == "awaiting-answers"
 
     def final(self) -> bool:
         """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""
@@ -521,13 +615,22 @@ class JobRecord(BaseModel):
         submission names this job (ADR 0079) or an amendment starts from it
         (ADR 0072). A final report's corrections lie over a report's draft,
         the draft over the answers the job's run read or its pause saved, and
-        those over every answer the job carried under its renames, a dropped
-        one included. Nothing is checked here: the job that carries them
-        checks each one against its own questions.
+        those over each fact the job's Controls write, and those over every
+        answer the job carried under its renames, a dropped one included.
+        Nothing is checked here: the job that carries them checks each one
+        against its own questions.
         """
         corrected = AnswerSet(facts=tuple(self.corrections))
         carried = renamed(self.carried, self.carried_renames)
-        return corrected.over(self.draft.expanded().over(self.answers.over(carried)))
+        return corrected.over(
+            self.draft.written().over(self.written_answers().over(carried))
+        )
+
+    def written_answers(self) -> AnswerSet:
+        """The answers this job's run writes: its answers over each fact its
+        Controls write (ADR 0125). A Resumed Job's answers hold each Control
+        fact already, and the result is its answers."""
+        return self.answers.over(control_answers(self.control_facts or []))
 
     def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.
@@ -671,8 +774,8 @@ def ended(record: Envelope) -> bool:
 
 # What one admission attempt did.
 #
-# Four refusals rather than one, because they clear at different times and a
-# caller needs to know which: ``at_ceiling`` clears when one of their jobs
+# Four bound refusals rather than one, because they clear at different times
+# and a caller needs to know which: ``at_ceiling`` clears when one of their jobs
 # finishes, ``over_rate`` and ``over_owner_budget`` clear as the window rolls
 # past their older jobs, and ``over_global_budget`` is a deployment-wide bound
 # that no action of theirs will clear. ``duplicate`` says the store already
@@ -682,18 +785,24 @@ def ended(record: Envelope) -> bool:
 # the caller submits again under the owner ID that admission created.
 # ``parent_missing`` says the owner holds no job under the ID that the record's
 # parent names: a delete removed it after the caller read it.
-AdmissionOutcome = Literal[
-    "admitted",
+# ``resumed_already`` says another job already resumes or amends the parent
+# and locks it. ``parent_stale`` says a save changed the parent's revision
+# after the caller read it, so the caller reads the questions again.
+#
+# ``RefusalOutcome`` is every outcome that refuses a submission a caller can
+# make, so each one has an answer the caller reads. It leaves out ``admitted``,
+# which refuses nothing, and ``duplicate``, which no caller can cause.
+RefusalOutcome = Literal[
     "at_ceiling",
     "over_rate",
     "over_owner_budget",
     "over_global_budget",
-    "duplicate",
     "resumed_already",
-    "parent_moved",
+    "parent_stale",
     "parent_missing",
     "principal_exists",
 ]
+AdmissionOutcome = Literal["admitted", "duplicate", RefusalOutcome]
 
 
 @dataclass(frozen=True)
@@ -819,6 +928,11 @@ class JobStore(Protocol):
 
     async def sources(self, job_id: str, owner_id: str) -> list[Source] | None: ...
 
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        """The owned job's copy of its Controls, empty where it names none, or
+        ``None`` where the owner holds no such job."""
+        ...
+
     async def report_json(
         self, job_id: str, owner_id: str
     ) -> dict[str, Any] | None: ...
@@ -839,9 +953,10 @@ class JobStore(Protocol):
         """Write ``record`` over the job it names.
 
         A report is written once, and a save never clears or replaces it. A
-        save only appends events, and never writes an envelope.
-        :func:`check_save` raises :class:`ValueError` where a save breaks one
-        of these rules, and the store writes nothing.
+        save only appends events, and never writes an envelope. A save keeps
+        the stored title and the stored continue refusal. :func:`check_save`
+        raises :class:`ValueError` where a save breaks one of these rules, and
+        the store writes nothing.
         """
         ...
 
@@ -855,6 +970,8 @@ class JobStore(Protocol):
         revision: int,
         *,
         renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
     ) -> bool: ...
 
     async def save_corrections(
@@ -869,7 +986,7 @@ class JobStore(Protocol):
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool: ...
 
@@ -880,6 +997,14 @@ class JobStore(Protocol):
         changes. The revision and ``updated_at`` stay as they are, so a
         rename makes no saved answer stale.
         """
+        ...
+
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        """Keep why the service's continue of the owned job was refused
+        (ADR 0125). False where the job is missing or another owner's, and
+        nothing changes. The revision and ``updated_at`` stay as they are."""
         ...
 
     async def owned_jobs(self, owner_id: str) -> list[Envelope]:
@@ -924,6 +1049,122 @@ class JobStore(Protocol):
 
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job, oldest first, and return the IDs."""
+        ...
+
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Keep the Owner File ``file`` and its ``text`` (ADR 0118).
+
+        **Counting and adding is one step**, as admission is, so two uploads
+        cannot both pass ``limit``. The count comes first: an owner who holds
+        ``limit`` files gets ``over_limit``. A name that the owner already
+        uses gets ``name_in_use``. ``principal`` is a new principal whose
+        owner ID is the file's, which the store keeps only with the file, as
+        :meth:`reserve` keeps one with a job; without it, the owner must hold
+        one. ``file.sha256`` must be the digest of ``text``, or the call
+        raises and keeps nothing.
+        """
+        ...
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        """Every Owner File of the owner, the newest first."""
+        ...
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        """The owned Owner File and its text, or ``None``.
+
+        ``None`` too where the file is another owner's, so an ID tells
+        nothing about another owner. A text whose digest does not match its
+        row raises.
+        """
+        ...
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        """Delete the owned Owner File and its text, and keep nothing.
+
+        False where the owner holds no such file. A job that used the file
+        keeps its own copy, so a delete changes no job.
+        """
+        ...
+
+    async def add_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        principal: Principal | None,
+    ) -> ControlAdmission | EvidenceRefusal:
+        """Keep the Control ``control`` and the text of each evidence file it
+        lists, by evidence ID (ADR 0127).
+
+        The evidence passes :func:`~analysis_service.controls.control_refusal`
+        before the store writes anything. **Counting and adding is one step**,
+        as in :meth:`add_file`: an owner who holds ``limits.max_controls``
+        Controls gets ``over_limit``, a scope whose alias names another
+        Control's scope gets ``alias_in_use``
+        (:func:`~analysis_service.controls.names_another_scope`), and a name
+        that the owner already uses gets ``name_in_use``. ``principal`` is as
+        in :meth:`add_file`. A text that does not fit the evidence list raises
+        (:func:`~analysis_service.controls.check_texts`) and keeps nothing, and
+        so does a Control ID that the store holds, whoever its owner is.
+        """
+        ...
+
+    async def list_controls(self, owner_id: str) -> list[Control]:
+        """Every Control of the owner, the latest save first."""
+        ...
+
+    async def get_control(self, control_id: str, owner_id: str) -> Control | None:
+        """The owned Control, or ``None``, also where the Control is another
+        owner's, so an ID tells nothing about another owner."""
+        ...
+
+    async def replace_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        expected_updated_at: datetime,
+    ) -> ControlReplacement | EvidenceRefusal:
+        """Replace the owner's Control of ``control``'s ID in place, and keep no
+        earlier version.
+
+        ``texts`` holds the text of each evidence file that the store does not
+        hold yet. The checks are those of :meth:`add_control` but the count,
+        and a Control that the owner does not hold is ``absent``.
+        ``expected_updated_at`` is the ``updated_at`` of the Control the
+        caller read: where a save changed it since, the replace is ``stale``
+        and changes nothing, so of two edits that read one version only the
+        first lands. The store
+        removes each evidence file that the new document no longer lists.
+        """
+        ...
+
+    async def delete_control(self, control_id: str, owner_id: str) -> bool:
+        """Delete the owned Control and each evidence file, and keep nothing.
+
+        False where the owner holds no such Control. A job that applied the
+        Control keeps its own copy, so a delete changes no job.
+        """
+        ...
+
+    async def read_evidence(
+        self, control_id: str, evidence_id: str, owner_id: str
+    ) -> str | None:
+        """The text of one evidence file of the owned Control, or ``None``
+        where the owner holds no such Control or the Control lists no such
+        file. A text whose digest does not match the document raises.
+        """
         ...
 
 
@@ -1096,6 +1337,8 @@ class InMemoryJobStore:
         self._records: dict[str, JobRecord] = {}
         self._usage: dict[str, UsageRow] = {}
         self._principals = PrincipalTable()
+        self._files: dict[str, tuple[OwnerFile, str]] = {}
+        self._controls: dict[str, tuple[Control, dict[str, str]]] = {}
 
     def _rows(self) -> Iterator[JobRecord | UsageRow]:
         """Every job admission counts: the records held, and the usage rows left."""
@@ -1140,7 +1383,8 @@ class InMemoryJobStore:
         owner holds no principal where none is given is the caller's defect
         too, and it raises. Then the parent: the owner must hold it, no other
         child may lock it, and its revision must be the record's. Last,
-        :func:`check_bounds` checks the bounds.
+        :func:`check_bounds` checks the bounds. The admission of a child clears
+        its parent's ``continue_refusal`` in the same step (ADR 0125).
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -1159,19 +1403,23 @@ class InMemoryJobStore:
             if self._resumed_by(parent) is not None:
                 return Admission(outcome="resumed_already", active=0)
             if parent_record.revision != record.parent_revision:
-                return Admission(outcome="parent_moved", active=0)
+                return Admission(outcome="parent_stale", active=0)
 
         admission = check_bounds(record, self._rows(), ceiling=ceiling, budget=budget)
         if admission.outcome == "admitted":
             if principal is not None:
                 self._principals.add(principal)
+            if parent is not None:
+                self._records[parent].continue_refusal = None
             self._records[record.id] = record.model_copy(deep=True)
         return admission
 
     def _resumed_by(self, parent_id: str) -> str | None:
         """The resumed job of ``parent_id`` that locks it, if any.
 
-        **The one reader of "does this job still take answers".** A job takes
+        **The in-memory store's reader of "does this job still take
+        answers".** ``SqlJobStore._resumed_by`` is the SQL store's, and both ask
+        :func:`locks_its_parent`. A job takes
         one resumed job: a report's follow-up runs the analysis once (ADR
         0054), and a paused job's answers start one analysis. A job an
         amendment started locks its paused job the same way (ADR 0072). A
@@ -1240,6 +1488,12 @@ class InMemoryJobStore:
         if record is None or record.owner_id != owner_id or record.sources is None:
             return None
         return [source.model_copy(deep=True) for source in record.sources]
+
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        record = self._records.get(job_id)
+        if record is None or record.owner_id != owner_id:
+            return None
+        return list(record.controls)
 
     async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
         """The owned job's report, already JSON, or ``None`` if it has none.
@@ -1323,7 +1577,8 @@ class InMemoryJobStore:
         digest = None if held.report is None else report_digest(held.report)
         check_save(record, digest, held.events)
         self._records[record.id] = record.model_copy(
-            deep=True, update={"title": held.title}
+            deep=True,
+            update={"title": held.title, "continue_refusal": held.continue_refusal},
         )
 
     async def save_answers(
@@ -1336,12 +1591,16 @@ class InMemoryJobStore:
         revision: int,
         *,
         renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
     ) -> bool:
         """Keep the saved answers of a job that still waits for them.
 
         ``shown`` is every early question the pause has shown, ``skipped``
-        every one its submitter skipped for now, and ``renames`` every rename
-        of a carried answer's element (ADR 0116). ``revision`` is the
+        every one its submitter skipped for now, ``renames`` every rename
+        of a carried answer's element (ADR 0116), and ``control_scopes`` the
+        resolution of each copied Control (ADR 0124), and ``control_facts``
+        what each applied Control writes (ADR 0125). ``revision`` is the
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
@@ -1363,6 +1622,8 @@ class InMemoryJobStore:
         record.shown_early = list(shown)
         record.skipped_early = list(skipped)
         record.carried_renames = list(renames)
+        record.control_scopes = None if control_scopes is None else list(control_scopes)
+        record.control_facts = None if control_facts is None else list(control_facts)
         record.updated_at = datetime.now(UTC)
         return True
 
@@ -1370,7 +1631,7 @@ class InMemoryJobStore:
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, which run nothing (ADR 0070).
@@ -1432,6 +1693,15 @@ class InMemoryJobStore:
         record.title = title
         return True
 
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        record = self._records.get(job_id)
+        if record is None or record.owner_id != owner_id:
+            return False
+        record.continue_refusal = refusal
+        return True
+
     async def owned_jobs(self, owner_id: str) -> list[Envelope]:
         """Every job of the owner, as envelopes, oldest first.
 
@@ -1489,6 +1759,174 @@ class InMemoryJobStore:
         """Remove nothing: this store holds no objects."""
         return 0
 
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Count and add as one step: the body awaits nothing, as
+        :meth:`reserve` states."""
+        if principal is not None and principal.owner_id != file.owner_id:
+            raise ValueError(f"file {file.id} names another owner than its principal")
+        if file.sha256 != object_digest(text.encode("utf-8")):
+            raise ValueError(f"file {file.id} holds another digest than its text")
+        if principal is None:
+            if not self._principals.holds(file.owner_id):
+                raise ValueError(f"owner {file.owner_id} holds no principal")
+        elif self._principals.find(principal.identity) is not None:
+            return "principal_exists"
+        owned = [
+            held for held, _ in self._files.values() if held.owner_id == file.owner_id
+        ]
+        if len(owned) >= limit:
+            return "over_limit"
+        if any(held.name == file.name for held in owned):
+            return "name_in_use"
+        if principal is not None:
+            self._principals.add(principal)
+        self._files[file.id] = (file, text)
+        return "added"
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        owned = [held for held, _ in self._files.values() if held.owner_id == owner_id]
+        return sorted(owned, key=lambda held: (held.created_at, held.id), reverse=True)
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        held = self._files.get(file_id)
+        if held is None or held[0].owner_id != owner_id:
+            return None
+        return held
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        if await self.file_text(file_id, owner_id) is None:
+            return False
+        del self._files[file_id]
+        return True
+
+    def _owned_control(
+        self, control_id: str, owner_id: str
+    ) -> tuple[Control, dict[str, str]] | None:
+        held = self._controls.get(control_id)
+        return None if held is None or held[0].owner_id != owner_id else held
+
+    def _scope_refusal(
+        self, control: Control
+    ) -> Literal["alias_in_use", "name_in_use"] | None:
+        """``alias_in_use`` or ``name_in_use`` against the owner's other
+        Controls, in that order, as the ``sql`` store finds them."""
+        others = [
+            held.document
+            for held, _ in self._controls.values()
+            if held.owner_id == control.owner_id
+            and held.document.id != control.document.id
+        ]
+        scope = control.document.scope
+        if any(names_another_scope(scope, other.scope) for other in others):
+            return "alias_in_use"
+        if any(other.name == control.document.name for other in others):
+            return "name_in_use"
+        return None
+
+    async def add_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        principal: Principal | None,
+    ) -> ControlAdmission | EvidenceRefusal:
+        """Count and add as one step: the body awaits nothing, as
+        :meth:`reserve` states."""
+        if principal is not None and principal.owner_id != control.owner_id:
+            raise ValueError(
+                f"control {control.document.id} names another owner than its principal"
+            )
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        check_texts(control.document, texts)
+        if control.document.id in self._controls:
+            raise ValueError(f"the store already holds control {control.document.id}")
+        if principal is None:
+            if not self._principals.holds(control.owner_id):
+                raise ValueError(f"owner {control.owner_id} holds no principal")
+        elif self._principals.find(principal.identity) is not None:
+            return "principal_exists"
+        owned = [
+            held
+            for held, _ in self._controls.values()
+            if held.owner_id == control.owner_id
+        ]
+        if len(owned) >= limits.max_controls:
+            return "over_limit"
+        scope_refusal = self._scope_refusal(control)
+        if scope_refusal is not None:
+            return scope_refusal
+        if principal is not None:
+            self._principals.add(principal)
+        self._controls[control.document.id] = (control, dict(texts))
+        return "added"
+
+    async def list_controls(self, owner_id: str) -> list[Control]:
+        owned = [
+            held for held, _ in self._controls.values() if held.owner_id == owner_id
+        ]
+        return sorted(
+            owned, key=lambda held: (held.updated_at, held.document.id), reverse=True
+        )
+
+    async def get_control(self, control_id: str, owner_id: str) -> Control | None:
+        held = self._owned_control(control_id, owner_id)
+        return None if held is None else held[0]
+
+    async def replace_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        expected_updated_at: datetime,
+    ) -> ControlReplacement | EvidenceRefusal:
+        held = self._owned_control(control.document.id, control.owner_id)
+        if held is None:
+            return "absent"
+        if held[0].updated_at != expected_updated_at:
+            return "stale"
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        stored, stored_texts = held
+        check_texts(control.document, texts, stored.document.evidence)
+        scope_refusal = self._scope_refusal(control)
+        if scope_refusal is not None:
+            return scope_refusal
+        kept = {**stored_texts, **texts}
+        self._controls[control.document.id] = (
+            control,
+            {file.id: kept[file.id] for file in control.document.evidence},
+        )
+        return "replaced"
+
+    async def delete_control(self, control_id: str, owner_id: str) -> bool:
+        if self._owned_control(control_id, owner_id) is None:
+            return False
+        del self._controls[control_id]
+        return True
+
+    async def read_evidence(
+        self, control_id: str, evidence_id: str, owner_id: str
+    ) -> str | None:
+        # Each text here is one that check_texts matched to its digest at the
+        # save, and nothing outside the process can change it, so a read
+        # checks no digest.
+        held = self._owned_control(control_id, owner_id)
+        return None if held is None else held[1].get(evidence_id)
+
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
 
@@ -1518,9 +1956,11 @@ async def event_frames(
     seen: int = 0,
     *,
     gone: Callable[[], Awaitable[bool]] | None = None,
+    frame: Callable[[JobEvent], str | None] = JobEvent.sse_frame,
 ) -> AsyncIterator[str]:
     """The job's events past ``seen``, as server-sent frames, as the store
-    records them.
+    records them. ``frame`` writes the frame of one event, or gives ``None``
+    for an event that gets no frame.
 
     **The one reader of "when does a job's stream end".** It ends when the job
     reaches a terminal status, when the store holds no such job, when the
@@ -1539,7 +1979,8 @@ async def event_frames(
         status, events = progress
         for event in events:
             seen = event.seq
-            yield event.sse_frame()
+            if (written := frame(event)) is not None:
+                yield written
         if status in TERMINAL_STATUSES or (gone is not None and await gone()):
             return
         await asyncio.sleep(POLL_SECONDS)
@@ -1835,7 +2276,7 @@ async def execute_job(
                 stop.bind(None)
     except TimeoutError:
         elapsed = (datetime.now(UTC) - started).total_seconds()
-        completed = [event.node for event in record.events if event.kind == "node"]
+        completed = completed_nodes(record.events)
         if stop.requested:
             logger.info(
                 "job %s stopped by its owner after %.1fs; nodes completed: %s",

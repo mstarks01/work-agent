@@ -11,15 +11,17 @@ and turns an accepted set into claims.
 
 The round ends in one of three outcomes. :class:`Accepted` carries the claims
 and the rejected claims the block holds. :class:`Reask` carries what the
-re-ask reads: the problems, the roster, the drafts it must read and the first
-pass it is merged onto. :class:`Failed` carries the problems a second look
-still did not reconcile. The graph node parks what an outcome carries and
-takes the edge it names, and decides nothing else.
+re-ask reads: the problems, the roster, the drafts it must read, the first
+pass as the critic emitted it, and the first pass it is merged onto.
+:class:`Failed` carries the problems a second look still did not reconcile.
+The graph node parks what an outcome carries and takes the edge it names, and
+decides nothing else.
 
 The module also renders the request a critic node sends, instruction and
 user turn, as ADK renders it from session state. The two critic replays call
-:func:`critic_request`, so neither copies the prompt join, the placeholder
-substitution or the state templating.
+:func:`critic_request`, and the re-ask replay calls :func:`recritic_request`, so
+none copies the prompt join, the placeholder substitution or the state
+templating.
 
 The primitives this module calls, :func:`~analysis_service.critic.critic_view`,
 :func:`~analysis_service.critic.review_issues`,
@@ -33,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from google.genai import types
 
@@ -41,6 +43,7 @@ from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import (
     AnalysisMarks,
     Claim,
+    ControlRowRef,
     FrameworkName,
     RuledClaim,
     Ruling,
@@ -54,11 +57,14 @@ from analysis_service.critic import (
     merge_retry,
     problem_messages,
     review_issues,
+    shown_rows,
 )
 from analysis_service.frameworks import (
     FrameworkSchemas,
+    package_for,
     schemas_for,
 )
+from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.node_requests import node_instruction, node_request
 from analysis_service.prompts import compose_critic_prompt, compose_recritic_prompt
@@ -97,6 +103,13 @@ def rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
     for a ``confidence`` the neutral model forbids.
     """
     return list(schemas.rulings.model_validate({"claims": list(ruled)}).claims)
+
+
+#: The rendered artifacts the re-ask prompt reads, as ``REVIEW_ARTIFACTS``
+#: names them.
+ReaskArtifact = Literal[
+    "previous_review", "critic_issues", "draft_roster", "unreconciled_drafts"
+]
 
 
 @dataclass(frozen=True)
@@ -144,6 +157,11 @@ class Unreconciled:
         """Each problem's sentence, in the words the re-ask reads."""
         return problem_messages(self.problems)
 
+    @property
+    def revise_output(self) -> dict[str, int]:
+        """What the router outputs on the ``revise`` edge: the re-ask's user turn."""
+        return {"issue_count": len(self.problems)}
+
 
 @dataclass(frozen=True)
 class Reask(Unreconciled):
@@ -161,6 +179,19 @@ class Reask(Unreconciled):
     unreconciled: list[dict]
     #: The first pass, for the second look to merge the re-ask onto.
     first: FirstPass
+    #: The first pass as the critic emitted it. The re-ask reconciles with
+    #: the bytes the critic returned, not with a recomputed set.
+    emitted: list[Any]
+
+    @property
+    def rendered_artifacts(self) -> dict[ReaskArtifact, str]:
+        """Each rendered artifact the re-ask prompt reads, by artifact name."""
+        return {
+            "previous_review": render_fenced(self.emitted),
+            "critic_issues": render_fenced(self.messages),
+            "draft_roster": render_fenced(self.roster),
+            "unreconciled_drafts": render_fenced(self.unreconciled),
+        }
 
 
 @dataclass(frozen=True)
@@ -177,11 +208,12 @@ class Failed(Unreconciled):
 class CriticRound:
     """One framework's Critic round over what its Fan-In produced.
 
-    The three evidence fields travel together and none has a default. A view
-    built from fewer marks than the first pass read is a second reader of one
-    draft (#1082): a critic told once that a quote was invented must not read
-    the same quote clean on the second look, and a replay must send what the
-    graph sent.
+    The marks, the catalog and the Controls travel together and none has a
+    default. A view built from fewer marks than the first pass read is a
+    second reader of one draft (#1082): a critic told once that a quote was
+    invented must not read the same quote clean on the second look, and a
+    replay must send what the graph sent. ``controls`` is each Control that
+    applies to the job (ADR 0126).
     """
 
     framework: FrameworkName
@@ -190,6 +222,7 @@ class CriticRound:
     drafts: Sequence[Claim]
     marks: AnalysisMarks
     assertions: AssertionCatalog | None
+    controls: Sequence[AppliedControl]
 
     @classmethod
     def of(
@@ -199,9 +232,18 @@ class CriticRound:
         drafts: Sequence[Claim],
         marks: AnalysisMarks,
         assertions: AssertionCatalog | None,
+        controls: Sequence[AppliedControl],
     ) -> CriticRound:
         """The round for one framework, with that framework's own schemas."""
-        return cls(framework, schemas_for(framework), model, drafts, marks, assertions)
+        return cls(
+            framework,
+            schemas_for(framework),
+            model,
+            drafts,
+            marks,
+            assertions,
+            controls,
+        )
 
     def view(self, only: Collection[str] | None = None) -> list[dict]:
         """The drafts the Critic reads, every computed fact already on them.
@@ -215,15 +257,16 @@ class CriticRound:
             repaired=self.marks.repaired_quotes,
             unverified=self.marks.unverified_grounds,
             assertions=self.assertions,
+            package=package_for(self.framework),
+            controls=self.controls,
         )
 
     def summary(self) -> dict[str, Any]:
         """What the ``merge`` node outputs, and so the user turn its critic receives.
 
         ADK hands a node's output to the next node through ``to_user_content``,
-        so this dictionary is the critic's user turn. The one reader of that
-        shape: the node returns it, and :func:`critic_request` builds the turn
-        from it.
+        so this dictionary is the critic's user turn. The node returns it, and
+        :func:`critic_request` builds the turn from it.
         """
         return {
             "framework": self.framework,
@@ -259,6 +302,7 @@ class CriticRound:
                 rulings=[ruling.model_dump(mode="json") for ruling in rulings],
                 repairable=sorted(problems.repairable),
             ),
+            emitted=list(emitted),
         )
 
     def merge(
@@ -290,13 +334,18 @@ class CriticRound:
             return Failed(problems=list(problems.problems))
         return self._assembled(rulings)
 
+    def shown(self) -> dict[str, dict[ControlRowRef, AppliedControl]]:
+        """The Control rows each draft is shown, each with its Control, which
+        its ruling answers."""
+        return shown_rows(self.drafts, package_for(self.framework), self.controls)
+
     def _checked(self, emitted: Sequence[Any]) -> tuple[list[Ruling], ReviewProblems]:
         rulings = self.rulings(emitted)
-        return rulings, review_issues(self.drafts, rulings, self.model)
+        return rulings, review_issues(self.drafts, rulings, self.model, self.shown())
 
     def _assembled(self, rulings: Sequence[Ruling]) -> Accepted:
         claims, rejected = assemble_claims(
-            self.drafts, rulings, self.model, self.schemas
+            self.drafts, rulings, self.model, self.schemas, self.shown()
         )
         return Accepted(claims=claims, rejected=rejected)
 
@@ -369,3 +418,27 @@ async def critic_request(
     state = {**shared, nodes.key("draft_view"): render_fenced(critic_round.view())}
     template = critic_instruction(package_loader, prompt_loader, nodes)
     return await node_request(template, state, critic_round.summary(), None)
+
+
+async def recritic_request(
+    package_loader: MarkdownLoader,
+    prompt_loader: MarkdownLoader,
+    nodes: FrameworkNodes,
+    shared: Mapping[str, str],
+    reask: Reask,
+) -> tuple[str, types.Content]:
+    """The request this framework's recritic node sends over ``reask``.
+
+    ``shared`` holds the job-wide rendered keys, as for :func:`critic_request`.
+    The re-ask's own keys are rendered here from ``reask``, and the user turn
+    is the router's output on the ``revise`` edge.
+    """
+    state = {
+        **shared,
+        **{
+            nodes.key(artifact): text
+            for artifact, text in reask.rendered_artifacts.items()
+        },
+    }
+    template = recritic_instruction(package_loader, prompt_loader, nodes)
+    return await node_request(template, state, reask.revise_output, None)

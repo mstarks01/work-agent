@@ -369,7 +369,7 @@ def catalog_client():
         job_deadline_seconds=test_api.TEST_DEADLINE_SECONDS,
         max_active_jobs=test_api.TEST_MAX_ACTIVE_JOBS,
         budget=test_api.SEEDING_BUDGET,
-        frameworks=test_api.DEFAULT_FRAMEWORKS,
+        carried_frameworks=test_api.DEFAULT_FRAMEWORKS,
         carries_catalog=True,
     )
     return TestClient(app), store
@@ -447,6 +447,8 @@ class TestTheQuestionsRoute:
         from tests.test_api import admit
 
         record = JobRecord.create(
+            assertion_pass=True,
+            ask_questions=True,
             owner_id=subject,
             sources=[DESCRIPTION],
             frameworks=sample_selection(),

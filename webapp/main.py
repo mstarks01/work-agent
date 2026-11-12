@@ -50,10 +50,10 @@ The security posture is deliberate throughout:
   uses one. This is the primary control, and the CSP
   below is defence in depth behind it. The form page is included: a source label
   and a validator message both carry submitter bytes onto it over SSE, and both
-  land as text nodes. An uploaded transcript is a file only inside the
-  browser: the page checks its size, decodes it as strict UTF-8 and refuses a
-  control character before it keeps the text, and ``/analyze`` receives that
-  text as a ``transcript`` source in the JSON body. No route takes a file, so
+  land as text nodes. An uploaded transcript or diagram is a file only inside
+  the browser: the page checks its size, decodes it as strict UTF-8 and refuses
+  a control character before it keeps the text, and ``/analyze`` receives that
+  text as a ``transcript`` or ``diagram`` source in the JSON body. No route takes a file, so
   no file name, content type or multipart body reaches the server.
   Server-side, the two f-string pages escape through
   :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is
@@ -112,12 +112,13 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from contextlib import asynccontextmanager, nullcontext
-from dataclasses import dataclass
+from contextlib import asynccontextmanager, nullcontext, suppress
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, TypedDict, TypeVar, get_args
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -127,7 +128,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -162,20 +163,36 @@ from analysis_service.api import (
     JOB_REFUSAL_STATUS,
     FrameworkRequest,
     JobSubmission,
+    max_body_bytes,
+    max_control_body_bytes,
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
-from analysis_service.claims import UnknownKey
+from analysis_service.claims import UNIT_VERDICT_WORDS, VERDICT_LABELS, UnknownKey
 from analysis_service.config_files import (
     SETTINGS_FILE,
     SettingsFileError,
     settings_dir,
 )
+from analysis_service.controls import (
+    CONTROL_ID,
+    CONTROL_ID_PATTERN,
+    EVIDENCE_ID_PATTERN,
+    MAX_CONTROLS_CEILING,
+    Control,
+    ControlLimits,
+    ControlScope,
+    EvidenceRefusal,
+    evidence_too_large,
+)
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
+from analysis_service.diagrams import install_reader, reader_fault
+from analysis_service.element_hues import element_hues
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
+    FACET_ANSWERS,
     FactAnswer,
     SkipKey,
     answer_facets,
@@ -187,6 +204,7 @@ from analysis_service.fact_answers import (
 from analysis_service.fixes import fixes_by_framework
 from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.job_answers import (
+    Answerable,
     DraftSaved,
     JobAnswers,
     NoSuchJob,
@@ -200,13 +218,32 @@ from analysis_service.job_answers import (
     UnreadableSchema,
     Withheld,
 )
+from analysis_service.job_controls import (
+    RULING_LISTS,
+    ControlScopeEntry,
+    SectionEntry,
+    controls_section,
+    controls_used,
+    section_summary,
+)
+from analysis_service.job_state import (
+    JobState,
+    NotContinuedReason,
+    StoredRefusal,
+    continues,
+    job_state,
+    run_origin,
+    waits_for_answers,
+    why_not_continued,
+)
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
-    InMemoryJobStore,
+    JobEvent,
     JobRecord,
     JobStore,
     PipelineRunner,
+    RefusalOutcome,
     StopSignal,
     ended,
     event_frames,
@@ -219,12 +256,24 @@ from analysis_service.links import (
     components,
     fold_principal,
 )
+from analysis_service.mermaid import styled_mermaid
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
     gaps,
     reference_labels,
 )
-from analysis_service.principals import Identity
+from analysis_service.owner_files import (
+    NO_TEXT,
+    NOT_PLAIN_TEXT,
+    NOT_UTF_8,
+    OWNER_FILE_ID_PATTERN,
+    OwnerFile,
+    name_in_use,
+    over_limit,
+    too_large,
+    upload_refusal,
+)
+from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
@@ -232,7 +281,13 @@ from analysis_service.selection import SelectionError
 from analysis_service.settings_variables import deployment_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
+    FORMATS,
+    MAX_LABEL_CHARS,
+    MAX_SOURCES_CEILING,
     MAX_SYSTEM_NAME_CHARS,
+    OWNER_FILE_ID,
+    SourceFormat,
+    SourceKind,
     SourceLimits,
     clean_system_name,
 )
@@ -240,11 +295,22 @@ from analysis_service.store_backends import (
     audited_delete,
     store_lifespan,
 )
+from analysis_service.system_model import ELEMENT_TYPE_NOUNS
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
     missing_sdk,
     vendor_for,
+)
+from webapp.controls_page import (
+    ControlBody,
+    ControlEdit,
+    ControlSave,
+    control_view,
+    controls_full,
+    page_data,
+    save_refusal,
+    saved_control,
 )
 from webapp.page import (
     LOOPBACK_HOSTS,
@@ -253,12 +319,21 @@ from webapp.page import (
     RenderedPage,
     SecurityHeaders,
     client_script,
+    client_scripts,
     escape,
     is_same_origin,
     render,
     response,
     script_json,
 )
+from webapp.page_words import (
+    FORM_WORDS,
+    REPORT_WORDS,
+    change_line,
+    island_tables,
+)
+from webapp.progress import progress_line
+from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
@@ -318,6 +393,26 @@ _DIAGNOSTIC_GRANTS = Grants(style=True)
 #: save to ``/settings``.
 _SETTINGS_GRANTS = Grants(script=True, style=True, connect=True)
 
+#: The Files page calls ``/workspace/files`` to list, add and delete files.
+_FILES_GRANTS = Grants(script=True, style=True, connect=True)
+
+#: The Controls page calls ``/workspace/controls`` to list, add, replace and
+#: delete Controls.
+_CONTROLS_GRANTS = Grants(script=True, style=True, connect=True)
+
+#: The label of each Source that a job of this app gets beside its Owner
+#: Files, by kind: the three that the form page makes, which it reads from
+#: here, and the answers Source that the service composes. An upload to Files
+#: refuses each one as a name, because a job that held both would repeat a
+#: label (#2062).
+PAGE_SOURCE_LABELS: dict[SourceKind, str] = {
+    "description": "Pasted description",
+    "transcript": "Uploaded transcript",
+    "diagram": "Uploaded diagram",
+    "answers": ANSWERS_LABEL,
+}
+_RESERVED_NAMES = frozenset(PAGE_SOURCE_LABELS.values())
+
 #: The identity of this app's one local operator, who owns every job it holds.
 #: It is the caller the engine names for an in-process run, under the reserved
 #: local issuer, so no bearer token can name it.
@@ -339,6 +434,10 @@ class Settings:
     budget: BudgetPolicy
     deadline_seconds: float
     carries_catalog: bool
+    #: How many Owner Files the operator keeps in Files (ADR 0118).
+    max_owner_files: int
+    #: The bounds on the operator's Controls (ADR 0127).
+    control_limits: ControlLimits
     gate: CertificationGate | None = None
 
 
@@ -359,28 +458,20 @@ class Workspace:
     from the cell.
     """
 
-    def __init__(
-        self, *, store: JobStore | None = None, max_jobs: int = MAX_RUNS
-    ) -> None:
-        self.store: JobStore = InMemoryJobStore() if store is None else store
+    def __init__(self, *, store: JobStore, max_jobs: int = MAX_RUNS) -> None:
+        self.store = store
         self._max_jobs = max_jobs
         self._runs: dict[str, tuple[asyncio.Task[None], StopSignal]] = {}
 
-    def start(self, deadline_seconds: float) -> Start:
+    def start(self, deadline_seconds: float, answers: JobAnswers) -> Start:
         """What runs an admitted job on this process's event loop, under
-        ``deadline_seconds``. A job keeps the runner and the deadline that it
-        got at admission, whatever the cell holds later."""
+        ``deadline_seconds``. A job keeps the runner, the deadline and the job
+        operations that it got at admission, whatever the cell holds later."""
 
         def run(record: JobRecord, runner: PipelineRunner) -> None:
             stop = StopSignal()
             task = asyncio.create_task(
-                execute_job(
-                    self.store,
-                    runner,
-                    record.id,
-                    deadline_seconds=deadline_seconds,
-                    stop=stop,
-                )
+                self._run(answers, record, runner, deadline_seconds, stop)
             )
             # Held so the task is not garbage-collected mid-flight, and so
             # :meth:`stop` can reach it.
@@ -388,6 +479,80 @@ class Workspace:
             task.add_done_callback(lambda _: self._runs.pop(record.id, None))
 
         return run
+
+    async def _run(
+        self,
+        answers: JobAnswers,
+        record: JobRecord,
+        runner: PipelineRunner,
+        deadline_seconds: float,
+        stop: StopSignal,
+    ) -> None:
+        """Run the job, then continue it where it pauses for its Controls
+        alone (ADR 0125). The continue runs in the job's own task, so a read
+        of the job can wait for it with :meth:`settled`."""
+        await execute_job(
+            self.store, runner, record.id, deadline_seconds=deadline_seconds, stop=stop
+        )
+        if record.continues_at_pause and not stop.requested:
+            await self._continue(answers, record, deadline_seconds)
+
+    async def _continue(
+        self, answers: JobAnswers, record: JobRecord, deadline_seconds: float
+    ) -> None:
+        """Continue the paused job ``record`` with no own answers, and store
+        the page's words for a refusal, which leaves the job paused."""
+        try:
+            async with self.make_room(answers, answering=record.id):
+                await answers.continue_at_pause(
+                    record.id,
+                    record.owner_id,
+                    start=self.start(deadline_seconds, answers),
+                )
+        except Exception as refusal:
+            words = _refusal_message(refusal)
+            if words is None:
+                logger.exception("job %s did not continue at its pause", record.id)
+                words = _NOT_STARTED
+            try:
+                kept = await self.store.set_continue_refusal(
+                    record.id, record.owner_id, words
+                )
+            except Exception:
+                logger.exception("job %s did not store its refusal", record.id)
+            else:
+                if not kept:
+                    logger.warning(
+                        "job %s left the store before its refusal", record.id
+                    )
+
+    async def settled(self, job_id: str) -> None:
+        """Wait for the task of ``job_id`` to end, where this process runs
+        one. The task of a job that pauses for its Controls alone ends after
+        the continue."""
+        if (held := self._runs.get(job_id)) is not None:
+            await asyncio.wait([held[0]])
+
+    async def state(self, record: Envelope) -> JobState:
+        """The Job State of ``record``. The task of a job of this process
+        continues it at its pause (ADR 0125)."""
+        return await job_state(self.store, record, runs_here=self.runs_here(record.id))
+
+    def continues(self, record: JobRecord) -> bool:
+        """Whether this process continues ``record`` at its pause
+        (:func:`continues`)."""
+        return continues(record, runs_here=self.runs_here(record.id))
+
+    async def why_not_continued(self, record: JobRecord) -> NotContinuedReason | None:
+        """Why the continue at the pause of ``record`` did not happen
+        (:func:`why_not_continued`)."""
+        return await why_not_continued(
+            self.store, record, runs_here=self.runs_here(record.id)
+        )
+
+    def runs_here(self, job_id: str) -> bool:
+        """Whether this process runs the task of ``job_id``."""
+        return job_id in self._runs
 
     async def stop(self, job_ids: Iterable[str]) -> bool:
         """Stop each run of ``job_ids`` that this process runs, and wait up to
@@ -439,25 +604,6 @@ class Workspace:
             return []
         return await self.store.owned_jobs(owner_id)
 
-    async def waiting(self, record: Envelope) -> bool:
-        """True while the job waits for answers.
-
-        A paused job that no job locks waits. A paused job whose locking job
-        still runs also waits: that job can fail, and this one is then the
-        only place its answers resume. A paused job whose locking job has
-        :func:`~analysis_service.jobs.ended` waits no more. That job has a
-        report or pauses itself, and a paused job never fails, so this one
-        takes no answers again. A locking job that this owner no longer holds
-        has ended too, because a store deletes only a job that has ended.
-        """
-        if record.status != "awaiting-answers":
-            return False
-        locker = await self.store.resumed_by(record.id, record.owner_id)
-        if locker is None:
-            return True
-        child = await self.store.owned(locker, record.owner_id)
-        return child is not None and not ended(child)
-
     @asynccontextmanager
     async def make_room(
         self, answers: JobAnswers, *, answering: str | None = None
@@ -482,7 +628,9 @@ class Workspace:
         removable = [
             job
             for job in held
-            if ended(job) and job.id != answering and not await self.waiting(job)
+            if ended(job)
+            and job.id != answering
+            and not await waits_for_answers(self.store, job)
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):
@@ -545,19 +693,22 @@ class Workspace:
         for records in reversed(list(grouped.values())):
             shown = records[-1]
             for record in reversed(records):
-                if await self.waiting(record):
+                if await waits_for_answers(self.store, record):
                     shown = record
                     break
-            snapshots.append(await self.snapshot(answers, shown, records))
+            state = await self.state(shown)
+            snapshots.append(await self.snapshot(answers, shown, state, records))
         return snapshots
 
     async def snapshot(
         self,
         answers: JobAnswers,
         record: Envelope,
+        state: JobState,
         related: list[Envelope] | None = None,
     ) -> dict[str, object]:
-        """Public workspace metadata; descriptions only on the detail route."""
+        """Public workspace metadata; descriptions only on the detail route.
+        ``state`` is the Job State of ``record``."""
         if related is None:
             group = await self.workspace_id(record)
             related = [
@@ -573,10 +724,10 @@ class Workspace:
             "created_at": min(
                 (item.created_at for item in related), default=record.created_at
             ).isoformat(),
-            "status": _page_status(record),
-            # Whether the run stops for answers, so the page shows its
+            "status": state.page_status,
+            # Whether the run stops to ask a person, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": isinstance(record, JobRecord) and record.pauses(),
+            "pauses": state.asks,
             "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {
@@ -616,6 +767,8 @@ class Current:
 
     answers: JobAnswers
     deadline_seconds: float
+    max_owner_files: int
+    control_limits: ControlLimits
 
 
 class CellEmpty(Exception):
@@ -628,7 +781,7 @@ class CellEmpty(Exception):
 
 @dataclass
 class Cell:
-    """The one place that holds the :class:`Current` (ADR 0093).
+    """Holds the :class:`Current` (ADR 0093).
 
     ``current`` is ``None`` where the Deployment did not build, and the
     diagnostic page then serves. A swap replaces ``current`` in one
@@ -690,6 +843,86 @@ class _Submission(BaseModel):
     questions: bool = _as_v1("questions")
     answers_from: str | None = _as_v1("answers_from")
     name: str | None = None
+    #: The Owner Files whose text the new job copies (ADR 0119). Only this
+    #: route takes them: ``POST /v1/jobs`` has no Files.
+    #: :meth:`~analysis_service.job_answers.JobAnswers.owner_file_sources`
+    #: refuses more of them than the deployment's source limit.
+    owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
+        default_factory=list, max_length=MAX_SOURCES_CEILING
+    )
+    #: The Controls the new job copies (ADR 0127). Only this route takes
+    #: them: ``POST /v1/jobs`` has no Controls.
+    controls: list[Annotated[str, Field(pattern=CONTROL_ID)]] = Field(
+        default_factory=list, max_length=MAX_CONTROLS_CEILING
+    )
+
+
+class _AliasBody(BaseModel):
+    """The body of ``POST /workspace/controls/{id}/aliases``: the element
+    name that "keep this name" appends to the Control's scope (ADR 0124)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    alias: str
+
+
+#: The ``control_scopes`` key of an ``/answer`` body (ADR 0124). Only this
+#: route takes it: the ``/v1`` answer body refuses the key.
+_CONTROL_SCOPES: TypeAdapter[list[ControlScopeEntry]] = TypeAdapter(
+    list[ControlScopeEntry]
+)
+
+
+def _control_scopes(raw: object) -> list[ControlScopeEntry] | None:
+    """Take ``control_scopes`` out of an ``/answer`` body, so the rest of the
+    body is the one :func:`read_answers` reads. ``None`` where the body does
+    not carry the key. Raises :class:`ValidationError` for a value of the
+    wrong shape."""
+    if not isinstance(raw, dict) or "control_scopes" not in raw:
+        return None
+    return _CONTROL_SCOPES.validate_python(raw.pop("control_scopes"))
+
+
+class _FileUpload(BaseModel):
+    """The body of ``POST /workspace/files``: an upload to Files.
+
+    The browser reads the file and sends its text, so no route takes a file.
+    :func:`~analysis_service.owner_files.upload_refusal` checks the content.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    kind: SourceKind
+    format: SourceFormat
+    text: str
+
+
+def _file_view(file: OwnerFile) -> dict[str, object]:
+    """What the pages show of an Owner File: no owner ID and no text."""
+    return {
+        "id": file.id,
+        "name": file.name,
+        "kind": file.kind,
+        "format": file.format,
+        "size_bytes": file.size_bytes,
+        "created_at": file.created_at.isoformat(),
+    }
+
+
+#: The answer to a delete of a file the operator does not hold.
+_NO_SUCH_FILE = "This file is no longer in Files."
+_NO_SUCH_CONTROL = "This Control is no longer in Controls."
+_NO_SUCH_EVIDENCE = "This evidence file is no longer in the Control."
+
+_CONTROL_STALE = "This Control changed in another tab or window after you opened it."
+
+_CONTROL_ALIAS_IN_USE = (
+    "Another Control protects a scope with one of these names. Remove the alias,"
+    " or change the name."
+)
+
+_CONTROL_BODY = "Expected a JSON object with a name, a scope, facts, rows and evidence."
 
 
 class _UnknownKey(Exception):
@@ -728,24 +961,6 @@ def _selection_of(record: Envelope) -> list[FrameworkSelection]:
     return []
 
 
-#: A job's status as the pages read it. ``workspace.js`` labels each one.
-PageStatus = Literal[
-    "running", "awaiting-answers", "completed", "failed", "stopped", "unreadable"
-]
-
-
-def _page_status(record: Envelope) -> PageStatus:
-    """A job's status as the pages read it: a queued job is running, and a
-    rejected one stopped. A job whose envelope does not parse is
-    ``unreadable`` (ADR 0095)."""
-    if not isinstance(record, JobRecord):
-        return "unreadable"
-    status = record.status
-    if status == "queued":
-        return "running"
-    return "failed" if status == "rejected" else status
-
-
 @dataclass(frozen=True)
 class Startup:
     """What starting up produced: what the app can offer, or the failure.
@@ -754,14 +969,14 @@ class Startup:
     every route that would run a model is replaced by the diagnostic page, so
     no analysis can run on a model nobody chose — fail-closed, but explained.
 
-    ``frameworks`` is what this install carries, which is what the picker
+    ``carried_frameworks`` is what this install carries, which is what the picker
     offers and what the one submission allow-lists against. It is not itself a
     selection and it is never used as one: a submission names its own, and the
     form ships with every box unticked.
     """
 
     settings: Settings | None
-    frameworks: tuple[FrameworkName, ...]
+    carried_frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
 
@@ -778,11 +993,13 @@ class Startup:
                 limits=settings.limits,
                 ceiling=1,
                 budget=settings.budget,
-                frameworks=self.frameworks,
+                carried_frameworks=self.carried_frameworks,
                 carries_catalog=settings.carries_catalog,
                 gate=settings.gate,
             ),
             deadline_seconds=settings.deadline_seconds,
+            max_owner_files=settings.max_owner_files,
+            control_limits=settings.control_limits,
         )
 
 
@@ -813,21 +1030,23 @@ def build_startup(env: Mapping[str, str]) -> Startup:
     deployment = None
     try:
         deployment = Deployment.from_env(env)
-        deployment.runner(deployment.frameworks)
+        deployment.runner(deployment.carried_frameworks)
     except ConfigError as exc:
         logger.error("the Deployment did not build: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
-        return Startup(settings=None, frameworks=(), tiers=tiers, error=exc)
+        return Startup(settings=None, carried_frameworks=(), tiers=tiers, error=exc)
     return Startup(
         settings=Settings(
             runner_for=deployment.runner,
             limits=deployment.resilience.source_limits(),
             budget=deployment.resilience.budget_policy(),
+            max_owner_files=deployment.resilience.max_owner_files,
+            control_limits=deployment.resilience.control_limits(),
             deadline_seconds=deployment.job_deadline_seconds(),
             carries_catalog=deployment.carries_catalog,
             gate=deployment.gate,
         ),
-        frameworks=deployment.frameworks,
+        carried_frameworks=deployment.carried_frameworks,
         tiers=deployment.tiers,
         error=None,
     )
@@ -854,9 +1073,9 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
     """Per framework, the units its block answers for, with each one's own text.
 
     **The join is here because the knowledge is here.** Which claim rules on
-    which unit is a package's answer (``unit_of``) and what a unit says is a
-    package's answer (``text_of_unit``); the report page holds neither and must
-    not learn them. So the server pairs them and the page renders what it is
+    which unit is a package's answer (the record hook ``unit_of``) and what a
+    unit says is a package's answer (``text_of_unit``); the report page holds
+    neither and must not learn them. So the server pairs them and the page renders what it is
     handed.
 
     A framework whose claims are an open set contributes an empty list: no
@@ -895,6 +1114,7 @@ def render_report(
     state: AnswerState,
     previous: Report | None,
     parent: str | None,
+    controls: Sequence[SectionEntry],
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
@@ -929,19 +1149,22 @@ def render_report(
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
-        script="\n".join(
-            client_script(name)
-            for name in (
-                "sidebar.js",
-                "answer_editor.js",
-                "question_list.js",
-                "report_view.js",
-            )
+        script=client_scripts(
+            "sidebar.js",
+            "service_answer.js",
+            "answer_editor.js",
+            "question_list.js",
+            "report_view.js",
         ),
         workspace_style=WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
+        theme=_THEME,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
+        facet_answers=script_json(list(FACET_ANSWERS)),
         report=script_json(report.model_dump(mode="json")),
+        controls=script_json([entry.model_dump(mode="json") for entry in controls]),
+        controls_summary=script_json(section_summary(controls)),
+        ruling_lists=script_json(dict(RULING_LISTS)),
         units=script_json(unit_rows(report)),
         fixes=script_json(
             fixes_by_framework(
@@ -954,6 +1177,7 @@ def render_report(
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(asked["link_questions"]),
         final=script_json(asked["final"]),
+        asks=script_json(state.asks),
         resumed_by=script_json(asked["resumed_by"]),
         parent_run=script_json(parent),
         corrections=script_json(
@@ -981,14 +1205,21 @@ def render_report(
         changes=script_json(
             {
                 "findings": [
-                    change.to_json() for change in report_changes(previous, report)
+                    change.to_json() | {"line": change_line(change)}
+                    for change in report_changes(previous, report)
                 ]
             }
             if previous is not None
             else {}
         ),
         severity_order=script_json(list(SEVERITY_ORDER)),
+        verdict_labels=script_json(dict(VERDICT_LABELS)),
+        unit_verdict_words=script_json(dict(UNIT_VERDICT_WORDS)),
+        report_words=script_json(island_tables(REPORT_WORDS)),
+        element_type_nouns=script_json(dict(ELEMENT_TYPE_NOUNS)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
+        mermaid=script_json(styled_mermaid(report.system_model)),
+        element_hues=script_json(element_hues(report.system_model)),
         lanes=script_json(
             {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),
@@ -1071,7 +1302,7 @@ def _corrections_payload(
     ADR 0114).
 
     Each answer carries its current value with every correction in. A
-    corrected answer is its part's own, whatever share covered the part.
+    corrected answer is its element's own, whatever share covered the element.
     """
     corrected = {fact.key for fact in corrections}
     answers = merged_facts(answered, corrections)
@@ -1158,7 +1389,7 @@ _STALE_MESSAGE = (
 #: What the page is told for each admission refusal, keyed by outcome. An
 #: outcome missing here is this app's defect: ``duplicate`` cannot follow from
 #: a page, because ``JobRecord.create`` mints the ID.
-_ADMISSION_MESSAGES: dict[str, str] = {
+_ADMISSION_MESSAGES: dict[RefusalOutcome, str] = {
     "at_ceiling": "An analysis is already running. Wait for it to finish.",
     "over_rate": "This workspace started too many analyses in the current"
     " window. Wait for the window to roll past the earlier ones.",
@@ -1168,11 +1399,75 @@ _ADMISSION_MESSAGES: dict[str, str] = {
     " for the current window. Retry later, or submit less text.",
     "resumed_already": "These answers already started an analysis. Open its"
     " report, or answer again only if it fails.",
-    "parent_moved": _STALE_MESSAGE,
+    "parent_stale": _STALE_MESSAGE,
     "parent_missing": "This analysis was deleted.",
     "principal_exists": "Another analysis started at the same moment. Start"
     " this one again.",
 }
+
+
+#: The key of each refusal that ``text_file.js`` and ``files.js`` show for a
+#: file they check before the server does. ``at_limit`` is the refusal that a
+#: page shows where its list holds the most items it can keep.
+FileRefusal = Literal["too_large", "not_utf_8", "not_plain_text", "no_text", "at_limit"]
+
+
+#: The model of a Control save's body.
+_ControlBodyT = TypeVar("_ControlBodyT", bound=ControlBody)
+
+
+class FilesLimits(TypedDict):
+    """The limits that ``files.js`` reads."""
+
+    max_owner_files: int
+    max_bytes: int
+    name_chars: int
+
+
+def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
+    """Each :data:`FileRefusal` in the server's words (:func:`upload_refusal`)."""
+    return {
+        "too_large": too_large(max_bytes),
+        "not_utf_8": NOT_UTF_8,
+        "not_plain_text": NOT_PLAIN_TEXT,
+        "no_text": NO_TEXT,
+        "at_limit": over_limit(max_files),
+    }
+
+
+def evidence_refusals(limits: ControlLimits) -> dict[FileRefusal, str]:
+    """Each :data:`FileRefusal` of the Controls page. The file refusals are
+    those of an evidence file, in the words of
+    :func:`~analysis_service.controls.control_refusal`, and ``at_limit`` is
+    the refusal of a new Control where the owner holds the most Controls."""
+    return {
+        "too_large": evidence_too_large(limits.max_evidence_bytes),
+        "not_utf_8": NOT_UTF_8,
+        "not_plain_text": NOT_PLAIN_TEXT,
+        "no_text": NO_TEXT,
+        "at_limit": controls_full(limits),
+    }
+
+
+def _section_of(record: JobRecord, report: Report) -> list[SectionEntry]:
+    """The report's Controls section, from the job's copy and the report's
+    rulings (ADR 0127). ``record`` holds the copy that
+    :meth:`~analysis_service.job_answers.JobAnswers.answerable` read."""
+    return controls_section(
+        record.controls,
+        record.control_scopes,
+        record.control_facts,
+        report.system_model,
+        report.analyses,
+    )
+
+
+def _name_taken(name: str) -> str:
+    """The refusal of a Control save whose name the owner already uses."""
+    return (
+        f"You already have a Control named “{name}”. Give this Control a"
+        " different name."
+    )
 
 
 def _message(status: int, message: str) -> JSONResponse:
@@ -1189,35 +1484,81 @@ def _cross_origin(request: Request) -> JSONResponse | None:
     """
     if is_same_origin(request):
         return None
+    # repr of the path, never the path: it is the decoded text of a request
+    # that another site can send, so an escape sequence there would reach the
+    # operator's terminal.
     logger.warning(
-        "refused a %s %s that was not same-origin", request.method, request.url.path
+        "refused a %s %r that was not same-origin", request.method, request.url.path
     )
     return _message(403, "This request did not come from the app's own page.")
 
 
 async def _refused(status: int, request: Request, exc: Exception) -> JSONResponse:
     fields = exc.fields() if isinstance(exc, Refused) else {}
-    return JSONResponse({"message": str(exc), **fields}, status_code=status)
+    words = _refusal_message(exc) or _NOT_STARTED
+    return JSONResponse({"message": words, **fields}, status_code=status)
+
+
+#: What the page says where this app cannot start a job and the reason is in
+#: the server log only.
+_NOT_STARTED = "The analysis could not be started. Check the server log."
+
+#: What the page says for a job that waits to continue at its pause where no
+#: task of this process continues it, no refusal is stored and no Resumed Job
+#: exists (ADR 0125): the app restarted, a stop came after the pause, or the
+#: last continue ended without a report.
+_NOT_CONTINUED = (
+    "The app did not continue this job, for example after a restart or a stop."
+    " Continue it."
+)
+
+
+def _refusal_key(refusal: NotContinuedReason | None) -> dict[str, str]:
+    """The ``refusal`` key of the questions of a job: why the continue at its
+    pause did not happen. Empty where :func:`why_not_continued` gives
+    ``None``."""
+    match refusal:
+        case StoredRefusal(words=words):
+            return {"refusal": words}
+        case "not-continued":
+            return {"refusal": _NOT_CONTINUED}
+        case None:
+            return {}
+
+
+def _refusal_message(refusal: Exception) -> str | None:
+    """What the page says for a typed refusal of the job operations, or
+    ``None`` for any other exception. Each handler of these refusals and the
+    continue at a pause (ADR 0125) take the words from here."""
+    if isinstance(refusal, NotAdmitted):
+        # An outcome missing from the table gets no words: it is this app's
+        # defect, and the server log names it.
+        outcome = refusal.admission.outcome
+        if outcome not in _ADMISSION_MESSAGES:
+            return None
+        return _ADMISSION_MESSAGES[outcome]
+    if isinstance(refusal, AlreadyResumed):
+        return _ADMISSION_MESSAGES["resumed_already"]
+    if isinstance(refusal, StaleRevision):
+        return _STALE_MESSAGE
+    if isinstance(refusal, SourcesOverLimit):
+        return refusal.breach.message
+    if isinstance(refusal, tuple(_REFUSAL_STATUS)):
+        return str(refusal)
+    return None
 
 
 async def _not_admitted(request: Request, exc: NotAdmitted) -> JSONResponse:
-    outcome = exc.admission.outcome
-    if outcome in _ADMISSION_MESSAGES:
-        return _message(409, _ADMISSION_MESSAGES[outcome])
-    logger.error("job was not admitted: %s", outcome)
-    return _message(500, "The analysis could not be started. Check the server log.")
+    words = _refusal_message(exc)
+    if words is not None:
+        return _message(409, words)
+    logger.error("job was not admitted: %s", exc.admission.outcome)
+    return _message(500, _NOT_STARTED)
 
 
-async def _already_resumed(request: Request, exc: AlreadyResumed) -> JSONResponse:
-    return _message(409, _ADMISSION_MESSAGES["resumed_already"])
-
-
-async def _stale(request: Request, exc: StaleRevision) -> JSONResponse:
-    return _message(409, _STALE_MESSAGE)
-
-
-async def _over_limit(request: Request, exc: SourcesOverLimit) -> JSONResponse:
-    return _message(400, exc.breach.message)
+async def _worded(status: int, request: Request, exc: Exception) -> JSONResponse:
+    """The page's words for ``exc``, under ``status``."""
+    return _message(status, _refusal_message(exc) or _NOT_STARTED)
 
 
 async def _cell_empty(request: Request, exc: CellEmpty) -> Response:
@@ -1234,15 +1575,46 @@ def _refused_save(found: Sequence[Refusal]) -> JSONResponse:
     )
 
 
-async def _limited_body(request: Request, limit: int) -> bytes | None:
-    """The request body, or ``None`` where it is longer than ``limit`` bytes.
-    It stops the read at the first byte over the limit."""
+class _BodyUnread(Exception):
+    """A write route's body that :func:`_json_body` does not read."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+async def _body_unread(request: Request, exc: _BodyUnread) -> JSONResponse:
+    return _message(exc.status, str(exc))
+
+
+async def _json_body(request: Request, limit: int) -> object:
+    """The request's body as JSON, or ``None`` for a body that is not JSON.
+
+    **The one reader of a write route's body.** It refuses a media type other
+    than ``application/json`` with a 415 and a body longer than ``limit``
+    bytes with a 413, and it stops the read at the first byte over the limit.
+    Each refusal raises :class:`_BodyUnread`, which the app answers. ``None``
+    is a body that each route's own reader refuses as it refuses every other
+    body that is not an object, so a page gets one refusal wording.
+    """
+    media_type = request.headers.get("content-type", "").partition(";")[0]
+    if media_type.strip().lower() != "application/json":
+        raise _BodyUnread(415, "This request takes a JSON body.")
     data = bytearray()
     async for chunk in request.stream():
         data += chunk
         if len(data) > limit:
-            return None
-    return bytes(data)
+            raise _BodyUnread(413, f"This request is at most {limit:,} bytes.")
+    try:
+        return json.loads(data)
+    except (ValueError, RecursionError):
+        return None
+
+
+async def _job_body(request: Request, answers: JobAnswers) -> object:
+    """A job route's body, read by :func:`_json_body` under the deployment's
+    raw-body guard, :func:`~analysis_service.api.max_body_bytes`."""
+    return await _json_body(request, max_body_bytes(answers.limits))
 
 
 _RELOAD_MESSAGE = (
@@ -1295,7 +1667,7 @@ def create_app(
     except SettingsFileError as exc:
         logger.error("settings.env was refused at startup: %s", exc)
         env = process_env
-        startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
+        startup = Startup(settings=None, carried_frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_app_store(env)
         logger.info("job store: %s", type(store).__name__)
@@ -1316,10 +1688,11 @@ def create_app(
     for refusal, status in _REFUSAL_STATUS.items():
         app.add_exception_handler(refusal, partial(_refused, status))
     app.exception_handler(NotAdmitted)(_not_admitted)
-    app.exception_handler(AlreadyResumed)(_already_resumed)
-    app.exception_handler(StaleRevision)(_stale)
-    app.exception_handler(SourcesOverLimit)(_over_limit)
+    app.add_exception_handler(AlreadyResumed, partial(_worded, 409))
+    app.add_exception_handler(StaleRevision, partial(_worded, 409))
+    app.add_exception_handler(SourcesOverLimit, partial(_worded, 400))
     app.exception_handler(CellEmpty)(_cell_empty)
+    app.exception_handler(_BodyUnread)(_body_unread)
 
     def unavailable() -> JSONResponse:
         """The app came up without a runner: the diagnostic page says why."""
@@ -1337,23 +1710,36 @@ def create_app(
             render(
                 _FORM_PAGE,
                 _FORM_GRANTS,
-                script="\n".join(
-                    client_script(name)
-                    for name in (
-                        "sidebar.js",
-                        "workspace.js",
-                        "answer_editor.js",
-                        "question_list.js",
-                        "first_run.js",
-                    )
+                script=client_scripts(
+                    "sidebar.js",
+                    "service_answer.js",
+                    "workspace.js",
+                    "answer_editor.js",
+                    "question_list.js",
+                    "text_file.js",
+                    "form_controls.js",
+                    "first_run.js",
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
+                facet_answers=script_json(list(FACET_ANSWERS)),
+                form_words=script_json(island_tables(FORM_WORDS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
-                frameworks=_framework_fields(current.answers.frameworks),
+                theme=_THEME,
+                frameworks=_framework_fields(current.answers.carried_frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
+                source_formats=_SOURCE_FORMATS,
+                file_refusals=script_json(
+                    file_refusals(
+                        current.answers.limits.max_total_bytes,
+                        current.max_owner_files,
+                    )
+                ),
+                upload_accept=_UPLOAD_ACCEPT,
+                page_labels=script_json(PAGE_SOURCE_LABELS),
+                element_type_nouns=script_json(dict(ELEMENT_TYPE_NOUNS)),
                 store_note=""
                 if workspace.store.durable
                 else escape(_MEMORY_STORE_NOTE),
@@ -1369,12 +1755,11 @@ def create_app(
             render(
                 _SETTINGS_PAGE,
                 _SETTINGS_GRANTS,
-                script="\n".join(
-                    client_script(name) for name in ("sidebar.js", "settings.js")
-                ),
+                script=client_scripts("sidebar.js", "service_answer.js", "settings.js"),
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
             )
         )
 
@@ -1391,15 +1776,9 @@ def create_app(
         """
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
-        media_type = request.headers.get("content-type", "").partition(";")[0]
-        if media_type.strip().lower() != "application/json":
-            return _message(415, "A save is a JSON body.")
-        body = await _limited_body(request, MAX_SAVE_BYTES)
-        if body is None:
-            return _message(413, f"A save is at most {MAX_SAVE_BYTES:,} bytes.")
         try:
-            save = parse_save(json.loads(body))
-        except (ValueError, RecursionError):
+            save = parse_save(await _json_body(request, MAX_SAVE_BYTES))
+        except ValueError:
             return _message(
                 400,
                 "Expected a JSON object with a 'revision', a 'changes' object and"
@@ -1441,15 +1820,9 @@ def create_app(
         """
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
-        media_type = request.headers.get("content-type", "").partition(";")[0]
-        if media_type.strip().lower() != "application/json":
-            return _message(415, "The changes are a JSON body.")
-        body = await _limited_body(request, MAX_SAVE_BYTES)
-        if body is None:
-            return _message(413, f"The changes are at most {MAX_SAVE_BYTES:,} bytes.")
         try:
-            changes = parse_changes(json.loads(body))
-        except (ValueError, RecursionError):
+            changes = parse_changes(await _json_body(request, MAX_SAVE_BYTES))
+        except ValueError:
             return _message(400, "Expected a JSON object with a 'changes' object.")
         return JSONResponse({"shown": store_shown(process_env, changes)})
 
@@ -1457,6 +1830,376 @@ def create_app(
     async def example() -> Response:
         """The sample description, read from the file the examples also run."""
         return PlainTextResponse(SAMPLE.read_text(encoding="utf-8"))
+
+    @app.get("/files", response_class=HTMLResponse)
+    async def files_page() -> Response:
+        """The Files section: the operator's Owner Files (ADR 0118)."""
+        current = cell.read(
+            lambda: response(diagnostic_page(state, env), status_code=503)
+        )
+        limits: FilesLimits = {
+            "max_owner_files": current.max_owner_files,
+            "max_bytes": current.answers.limits.max_total_bytes,
+            "name_chars": MAX_LABEL_CHARS,
+        }
+        return response(
+            render(
+                _FILES_PAGE,
+                _FILES_GRANTS,
+                script=client_scripts(
+                    "sidebar.js", "text_file.js", "service_answer.js", "files.js"
+                ),
+                workspace_style=WORKSPACE_STYLE,
+                sidebar=_SIDEBAR,
+                theme=_THEME,
+                source_formats=_SOURCE_FORMATS,
+                file_refusals=script_json(
+                    file_refusals(limits["max_bytes"], limits["max_owner_files"])
+                ),
+                upload_accept=_UPLOAD_ACCEPT,
+                files_limits=script_json(limits),
+            )
+        )
+
+    @app.get("/workspace/files")
+    async def workspace_files() -> Response:
+        """The operator's Owner Files, the newest first, with no text."""
+        held = await workspace.store.principal(OPERATOR)
+        files = [] if held is None else await workspace.store.owned_files(held.owner_id)
+        return JSONResponse([_file_view(file) for file in files])
+
+    @app.post("/workspace/files")
+    async def upload_file(request: Request) -> Response:
+        """Keep an uploaded file in Files. The first upload of an operator
+        who holds no principal creates it, as a first job does (ADR 0064)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        raw = await _job_body(request, current.answers)
+        try:
+            body = _body_of(raw, _FileUpload)
+            upload = _FileUpload.model_validate(body)
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
+        except TypeError:
+            return _message(
+                400, "Expected a JSON object with a name, a kind, a format and a text."
+            )
+        except ValueError as exc:
+            return _message(400, refusal_text(exc))
+        refusal = upload_refusal(
+            upload.name,
+            upload.kind,
+            upload.format,
+            upload.text,
+            max_bytes=current.answers.limits.max_total_bytes,
+            page_labels=_RESERVED_NAMES,
+        )
+        if refusal is not None:
+            return _message(400, refusal)
+        held = await workspace.store.principal(OPERATOR)
+        principal = held or Principal.new(OPERATOR)
+        new = None if held is not None else principal
+        file = OwnerFile.create(
+            owner_id=principal.owner_id,
+            name=upload.name,
+            kind=upload.kind,
+            text=upload.text,
+        )
+        outcome = await workspace.store.add_file(
+            file, upload.text, limit=current.max_owner_files, principal=new
+        )
+        match outcome:
+            case "added":
+                if new is not None:
+                    log_created(new)
+                return JSONResponse(_file_view(file), status_code=201)
+            case "name_in_use":
+                return _message(409, name_in_use(upload.name))
+            case "over_limit":
+                return _message(409, over_limit(current.max_owner_files))
+            case "principal_exists":
+                return _message(
+                    409, "Another upload started at the same time. Try again."
+                )
+
+    @app.delete("/workspace/files/{file_id}")
+    async def delete_owner_file(file_id: str, request: Request) -> Response:
+        """Delete an Owner File and keep nothing. Each job that used it keeps
+        its own copy (ADR 0119)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        if not OWNER_FILE_ID_PATTERN.fullmatch(file_id):
+            return _message(404, _NO_SUCH_FILE)
+        held = await workspace.store.principal(OPERATOR)
+        if held is None or not await workspace.store.delete_file(
+            file_id, held.owner_id
+        ):
+            return _message(404, _NO_SUCH_FILE)
+        return Response(status_code=204)
+
+    @app.get("/controls", response_class=HTMLResponse)
+    async def controls_page() -> Response:
+        """The Controls page: the operator's Controls (ADR 0127)."""
+        current = cell.read(
+            lambda: response(diagnostic_page(state, env), status_code=503)
+        )
+        limits = current.control_limits
+        return response(
+            render(
+                _CONTROLS_PAGE,
+                _CONTROLS_GRANTS,
+                script=client_scripts(
+                    "sidebar.js", "text_file.js", "service_answer.js", "controls.js"
+                ),
+                workspace_style=WORKSPACE_STYLE,
+                sidebar=_SIDEBAR,
+                theme=_THEME,
+                source_formats=_SOURCE_FORMATS,
+                file_refusals=script_json(evidence_refusals(limits)),
+                controls_page=script_json(page_data(limits)),
+            )
+        )
+
+    @app.get("/workspace/controls")
+    async def workspace_controls() -> Response:
+        """The operator's Controls, the latest save first, with no evidence
+        text."""
+        held = await workspace.store.principal(OPERATOR)
+        controls = (
+            [] if held is None else await workspace.store.list_controls(held.owner_id)
+        )
+        return JSONResponse([control_view(control) for control in controls])
+
+    async def control_body(
+        request: Request, current: Current, model: type[_ControlBodyT]
+    ) -> _ControlBodyT | JSONResponse:
+        """The body of a Control save, or the ``400`` that refuses it."""
+        raw = await _json_body(request, max_control_body_bytes(current.control_limits))
+        try:
+            return model.model_validate(_body_of(raw, model))
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
+        except TypeError:
+            return _message(400, _CONTROL_BODY)
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+
+    @app.post("/workspace/controls")
+    async def add_control(request: Request) -> Response:
+        """Keep a new Control. The first save of an operator who holds no
+        principal creates it, as a first job does (ADR 0064)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        save = await control_body(request, current, ControlSave)
+        if isinstance(save, JSONResponse):
+            return save
+        held = await workspace.store.principal(OPERATOR)
+        principal = held or Principal.new(OPERATOR)
+        new = None if held is not None else principal
+        try:
+            control, texts = saved_control(save, owner_id=principal.owner_id)
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+        limits = current.control_limits
+        outcome = await workspace.store.add_control(
+            control, texts, limits=limits, principal=new
+        )
+        match outcome:
+            case "added":
+                if new is not None:
+                    log_created(new)
+                return JSONResponse(control_view(control), status_code=201)
+            case EvidenceRefusal(message=message):
+                return _message(400, message)
+            case "name_in_use":
+                return _message(409, _name_taken(save.name))
+            case "alias_in_use":
+                return _message(409, _CONTROL_ALIAS_IN_USE)
+            case "over_limit":
+                return _message(409, controls_full(limits))
+            case "principal_exists":
+                return _message(
+                    409, "Another save started at the same time. Try again."
+                )
+
+    def stale_control(latest: Control) -> JSONResponse:
+        """The ``409`` of an edit that read an older version. It carries the
+        version the store holds now, so the page can show what changed and
+        keep the owner's draft. The route checks the version before the
+        evidence list, because a stale draft can name a file that the newer
+        version removed; the store checks it again under its lock."""
+        return JSONResponse(
+            {"message": _CONTROL_STALE, "current": control_view(latest)},
+            status_code=409,
+        )
+
+    @app.put("/workspace/controls/{control_id}")
+    async def replace_control(control_id: str, request: Request) -> Response:
+        """Replace the operator's Control in place, and keep no earlier
+        version. The edit names the ``updated_at`` it read (ADR 0127)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        edit = await control_body(request, current, ControlEdit)
+        if isinstance(edit, JSONResponse):
+            return edit
+        if not CONTROL_ID_PATTERN.fullmatch(control_id):
+            return _message(404, _NO_SUCH_CONTROL)
+        held = await workspace.store.principal(OPERATOR)
+        stored = (
+            None
+            if held is None
+            else await workspace.store.get_control(control_id, held.owner_id)
+        )
+        if stored is None:
+            return _message(404, _NO_SUCH_CONTROL)
+        if stored.updated_at != edit.updated_at:
+            return stale_control(stored)
+        try:
+            control, texts = saved_control(
+                edit,
+                owner_id=stored.owner_id,
+                control_id=control_id,
+                held=stored.document.evidence,
+            )
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+        outcome = await workspace.store.replace_control(
+            control,
+            texts,
+            limits=current.control_limits,
+            expected_updated_at=edit.updated_at,
+        )
+        match outcome:
+            case "replaced":
+                return JSONResponse(control_view(control))
+            case EvidenceRefusal(message=message):
+                return _message(400, message)
+            case "absent":
+                return _message(404, _NO_SUCH_CONTROL)
+            case "stale":
+                latest = await workspace.store.get_control(control_id, stored.owner_id)
+                if latest is None:
+                    return _message(404, _NO_SUCH_CONTROL)
+                return stale_control(latest)
+            case "name_in_use":
+                return _message(409, _name_taken(edit.name))
+            case "alias_in_use":
+                return _message(409, _CONTROL_ALIAS_IN_USE)
+
+    @app.delete("/workspace/controls/{control_id}")
+    async def delete_control(control_id: str, request: Request) -> Response:
+        """Delete the operator's Control and its evidence, and keep nothing.
+        Each job that applied it keeps its own copy (ADR 0127)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        if not CONTROL_ID_PATTERN.fullmatch(control_id):
+            return _message(404, _NO_SUCH_CONTROL)
+        held = await workspace.store.principal(OPERATOR)
+        if held is None or not await workspace.store.delete_control(
+            control_id, held.owner_id
+        ):
+            return _message(404, _NO_SUCH_CONTROL)
+        return Response(status_code=204)
+
+    @app.get("/workspace/controls/{control_id}/evidence/{evidence_id}")
+    async def control_evidence(control_id: str, evidence_id: str) -> Response:
+        """The text of one evidence file of the operator's Control, as an
+        attachment under the file's own name: only a text that matches the
+        digest the Control lists."""
+        if not (
+            CONTROL_ID_PATTERN.fullmatch(control_id)
+            and EVIDENCE_ID_PATTERN.fullmatch(evidence_id)
+        ):
+            return _message(404, _NO_SUCH_EVIDENCE)
+        held = await workspace.store.principal(OPERATOR)
+        stored = (
+            None
+            if held is None
+            else await workspace.store.get_control(control_id, held.owner_id)
+        )
+        # read_evidence answers the text only, so the name comes from the
+        # document of the same Control.
+        file = None if stored is None else stored.document.file(evidence_id)
+        if held is None or file is None:
+            return _message(404, _NO_SUCH_EVIDENCE)
+        text = await workspace.store.read_evidence(
+            control_id, evidence_id, held.owner_id
+        )
+        if text is None:
+            return _message(404, _NO_SUCH_EVIDENCE)
+        # RFC 6266: the plain name is a fixed fallback, and filename* carries
+        # the owner's name percent-encoded, so only letters, digits and
+        # "_.-~" reach the header as themselves.
+        disposition = (
+            'attachment; filename="evidence.txt";'
+            f" filename*=UTF-8''{quote(file.name, safe='')}"
+        )
+        return PlainTextResponse(text, headers={"Content-Disposition": disposition})
+
+    @app.post("/workspace/controls/{control_id}/aliases")
+    async def keep_this_name(control_id: str, request: Request) -> Response:
+        """Append a name to the scope of the operator's Control as an alias:
+        "keep this name" (ADR 0124). Only the owner's click writes an alias;
+        the service never writes one of its own."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        raw = await _job_body(request, current.answers)
+        try:
+            alias = _AliasBody.model_validate(_body_of(raw, _AliasBody)).alias
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
+        except TypeError:
+            return _message(400, "Expected a JSON object with an alias.")
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+        if not CONTROL_ID_PATTERN.fullmatch(control_id):
+            return _message(404, _NO_SUCH_CONTROL)
+        held = await workspace.store.principal(OPERATOR)
+        control = (
+            None
+            if held is None
+            else await workspace.store.get_control(control_id, held.owner_id)
+        )
+        if control is None:
+            return _message(404, _NO_SUCH_CONTROL)
+        document = control.document
+        scope = document.scope
+        try:
+            widened = ControlScope.model_validate(
+                scope.model_dump() | {"aliases": [*scope.aliases, alias]}
+            )
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+        outcome = await workspace.store.replace_control(
+            Control.create(
+                owner_id=control.owner_id,
+                document=document.model_copy(update={"scope": widened}),
+            ),
+            {},
+            limits=current.control_limits,
+            expected_updated_at=control.updated_at,
+        )
+        match outcome:
+            case "replaced":
+                return JSONResponse({"aliases": widened.aliases})
+            case "absent":
+                return _message(404, _NO_SUCH_CONTROL)
+            case "stale":
+                return _message(
+                    409, "This Control changed at the same time. Try again."
+                )
+            case "alias_in_use":
+                return _message(
+                    409, f"Another Control's scope already holds “{alias}”."
+                )
+            case "name_in_use":
+                return _message(409, "Another Control took this name. Try again.")
+            case EvidenceRefusal(message=message):
+                return _message(409, message)
 
     @app.get("/workspace/runs")
     async def workspace_runs() -> Response:
@@ -1482,10 +2225,13 @@ def create_app(
         record = await workspace.parsable(answers, record.id)
         if record is None:
             return no_such_run()
-        payload = await workspace.snapshot(answers, record)
-        payload["completed_steps"] = [
-            event.node for event in record.events if event.kind == "node"
-        ]
+        state = await workspace.state(record)
+        payload = await workspace.snapshot(answers, record, state)
+        if state.page_status == "running":
+            # A job that runs is a job of this process, so each node of its
+            # events is a node of a graph of its selection.
+            origin = await run_origin(workspace.store, record)
+            payload["progress"] = progress_line(record, state, origin)(record.events)
         payload["selection"] = [
             {"name": selection.name, "options": dict(selection.options)}
             for selection in record.whole_frameworks()
@@ -1493,17 +2239,53 @@ def create_app(
         sources = await store.sources(record.id, owner_id)
         if sources is None:
             await answers.missing(record, "sources")
+        # The text of an Owner File's copy stays out of the description; the
+        # page lists each copy under "Files used" (ADR 0119).
         payload["description"] = "\n\n".join(
-            source.text for source in sources if source.kind != "answers"
+            source.text
+            for source in sources
+            if source.kind != "answers" and source.owner_file_id is None
         )
+        payload["owner_files"] = [
+            {"id": source.owner_file_id, "label": source.label, "kind": source.kind}
+            for source in sources
+            if source.owner_file_id is not None
+        ]
+        # Read from the job's copy, so a later edit or delete of a Control
+        # changes nothing here (ADR 0127).
+        copies = await store.controls(record.id, owner_id)
+        if copies is None:
+            await answers.missing(record, "controls")
+        # A waiting job's questions and its Controls' model come from one
+        # read. A job that serves no model leaves its Controls pending.
+        asked = None
+        if record.status == "awaiting-answers":
+            asked = await answers.answerable(
+                record.id, owner_id, sources=sources, controls=copies
+            )
+        elif copies:
+            with suppress(NotCompleted, Withheld):
+                asked = await answers.answerable(
+                    record.id, owner_id, sources=sources, controls=copies
+                )
+        payload["controls_used"] = controls_used(
+            copies, record.control_scopes, None if asked is None else asked.model
+        )
+        # While the service continues a job at its pause, the page shows the
+        # continue rather than the questions (ADR 0125).
+        payload["continuing"] = state.continuing
+        if payload["continuing"]:
+            asked = None
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}
             for issue in record.validation_issues
         ]
-        if record.status == "awaiting-answers":
-            payload["questions"] = {"run": record.id} | await answers.questions(
-                record.id, owner_id
+        if asked is not None and record.status == "awaiting-answers":
+            payload["questions"] = (
+                {"run": record.id}
+                | await answers.payload_of(asked)
+                | _refusal_key(await workspace.why_not_continued(record))
             )
         return JSONResponse(payload)
 
@@ -1562,7 +2344,7 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         answers = cell.read(unavailable).answers
-        body = await _json(request)
+        body = await _job_body(request, answers)
         sent = body.get("title") if isinstance(body, dict) else None
         if not isinstance(sent, str):
             return _message(400, _NAME_REFUSED)
@@ -1585,12 +2367,12 @@ def create_app(
             return forbidden
         current = cell.read(unavailable)
         answers = current.answers
-
+        raw = await _job_body(request, answers)
         try:
-            body = _body_of(await request.json(), _Submission)
+            body = _body_of(raw, _Submission)
         except _UnknownKey as exc:
             return _message(400, str(exc))
-        except (ValueError, TypeError):
+        except TypeError:
             return _message(
                 400,
                 "Expected a JSON body with a 'sources' list and a 'frameworks'"
@@ -1620,8 +2402,10 @@ def create_app(
                         system_name=name,
                         questions=submission.questions,
                         answers_from=submission.answers_from,
+                        owner_files=submission.owner_files,
+                        controls=submission.controls,
                     ),
-                    start=workspace.start(current.deadline_seconds),
+                    start=workspace.start(current.deadline_seconds, answers),
                 )
         except SelectionError as exc:
             # The framework or option the refusal names, never a value sent.
@@ -1636,14 +2420,20 @@ def create_app(
         at ``prepare`` from what that run reached, so nothing is extracted
         again. An empty answer list continues a paused run without answers; a
         finished run has nothing to continue. A save answers with the
-        new revision.
+        new revision. ``control_scopes`` states the resolution of each Control
+        a paused run copied (ADR 0124).
         """
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         current = cell.read(unavailable)
         answers = current.answers
+        raw = await _job_body(request, answers)
         try:
-            submitted = read_answers(await _json(request))
+            control_scopes = _control_scopes(raw)
+        except ValidationError as refused:
+            return _message(400, refusal_text(refused))
+        try:
+            submitted = read_answers(raw)
         except BodyRefused as refused:
             message = await _refusal_words(refused, workspace, answers, run_id)
             if refused.over_a_bound:
@@ -1661,7 +2451,8 @@ def create_app(
                 run_id,
                 owner_id,
                 submitted,
-                start=workspace.start(current.deadline_seconds),
+                start=workspace.start(current.deadline_seconds, answers),
+                control_scopes=control_scopes,
             )
         if isinstance(outcome, Started):
             return JSONResponse({"run": outcome.job_id})
@@ -1684,7 +2475,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            amendment = read_amendment(await _json(request))
+            amendment = read_amendment(await _job_body(request, answers))
         except BodyRefused as refused:
             return _message(400, str(refused))
         owner_id = await workspace.owner_id(answers, run_id)
@@ -1694,29 +2485,45 @@ def create_app(
                 owner_id,
                 amendment.text,
                 revision=amendment.revision,
-                start=workspace.start(current.deadline_seconds),
+                start=workspace.start(current.deadline_seconds, answers),
             )
         return JSONResponse({"run": started.job_id})
 
     @app.get("/events/{run_id}")
     async def events(run_id: str) -> Response:
-        """The job's status and node events, as the store records them, until
-        the job reaches a terminal status."""
+        """The job's status events, as the store records them, until the job
+        reaches a terminal status, with the progress line after each node
+        event of a job that has not ended."""
 
         def no_stream() -> Response:
             return PlainTextResponse("no such run", status_code=404)
 
         current = cell.read(no_stream)
-        if await workspace.envelope(current.answers, run_id) is None:
+        record = await workspace.envelope(current.answers, run_id)
+        if record is None:
             return no_stream()
         return StreamingResponse(
-            _stream(workspace, current.answers, run_id),
+            _stream(
+                workspace,
+                current.answers,
+                run_id,
+                # A job that ended before this request can be a record of an
+                # earlier build, with node names that no graph holds.
+                None
+                if ended(record)
+                else progress_line(
+                    record,
+                    await workspace.state(record),
+                    await run_origin(workspace.store, record),
+                ),
+            ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
 
-    @app.get("/report/{run_id}", response_class=HTMLResponse)
-    async def report_page(run_id: str) -> Response:
+    async def report_of(run_id: str) -> tuple[Answerable, Report] | None:
+        """The run's answerable state and its report, or ``None`` where the
+        app serves no report of it."""
         current = cell.read(
             lambda: PlainTextResponse("no such report", status_code=404)
         )
@@ -1725,10 +2532,19 @@ def create_app(
             owner_id = await workspace.owner_id(answers, run_id)
             answerable = await answers.answerable(run_id, owner_id)
         except (NoSuchJob, NotCompleted, Withheld):
+            return None
+        if answerable.report is None:
+            return None
+        return answerable, answerable.report
+
+    @app.get("/report/{run_id}", response_class=HTMLResponse)
+    async def report_page(run_id: str) -> Response:
+        served_report = await report_of(run_id)
+        if served_report is None:
             return PlainTextResponse("no such report", status_code=404)
-        report = answerable.report
-        if report is None:
-            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        answers = cell.read(unavailable).answers
+        owner_id = answerable.record.owner_id
         # The page compares with the report before it where the store holds
         # that report under this service's schema version and
         # :meth:`JobAnswers.servable` lets it be served, and else shows none,
@@ -1748,7 +2564,57 @@ def create_app(
                 answerable.state(),
                 previous,
                 None if resumption is None else resumption.parent_id,
+                _section_of(answerable.record, report),
             )
+        )
+
+    @app.get("/report/{run_id}/export.md")
+    async def report_markdown_export(run_id: str) -> Response:
+        """The report as one Markdown file, with its Controls section."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        text = report_markdown(
+            _name_of(answerable.record),
+            report,
+            _section_of(answerable.record, report),
+        )
+        return PlainTextResponse(
+            text,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="report.md"'},
+        )
+
+    @app.get("/report/{run_id}/export.json")
+    async def report_json_export(run_id: str) -> Response:
+        """The report and its Controls section as one JSON object."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        section = _section_of(answerable.record, report)
+        return JSONResponse(
+            {
+                "report": report.model_dump(mode="json"),
+                "controls": [entry.model_dump(mode="json") for entry in section],
+            },
+            headers={"Content-Disposition": 'attachment; filename="report.json"'},
+        )
+
+    @app.get("/report/{run_id}/export.csv")
+    async def report_csv_export(run_id: str) -> Response:
+        """The report's findings as one CSV file, a row for each."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        text = report_csv(report, _section_of(answerable.record, report))
+        # The byte order mark tells a spreadsheet that the file is UTF-8.
+        return Response(
+            "\ufeff" + text,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="report.csv"'},
         )
 
     @app.post("/correct/{run_id}")
@@ -1759,7 +2625,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            corrections = read_corrections(await _json(request))
+            corrections = read_corrections(await _job_body(request, answers))
         except BodyRefused as refused:
             return _message(
                 400, await _refusal_words(refused, workspace, answers, run_id)
@@ -1841,18 +2707,6 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
     )
 
 
-async def _json(request: Request) -> object:
-    """The request's body as JSON, or ``None`` for a body that is not JSON.
-
-    ``None`` is a body the reader refuses as it refuses every other body
-    that is not an object, so a page gets the one refusal wording.
-    """
-    try:
-        return await request.json()
-    except ValueError:
-        return None
-
-
 async def _refusal_words(
     refused: BodyRefused, workspace: Workspace, answers: JobAnswers, run_id: str
 ) -> str:
@@ -1878,23 +2732,47 @@ async def _refusal_words(
     return f'The answer to "{label}" was refused: {refused.reason}'
 
 
-def _frame(event: str, data: dict[str, object]) -> str:
+#: How a run's stream ends: the event of its last frame. ``first_run.js``
+#: listens for each one.
+EndFrame = Literal[
+    "failed", "questions", "done", "rejected", "stopped", "continuing", "continued"
+]
+
+
+def _frame(event: EndFrame, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 async def _stream(
-    workspace: Workspace, answers: JobAnswers, run_id: str
+    workspace: Workspace,
+    answers: JobAnswers,
+    run_id: str,
+    progress: Callable[[Sequence[JobEvent]], dict[str, object]] | None,
 ) -> AsyncIterator[str]:
-    """Every event the store records for the job, as it records them, then
-    one frame for how it ended.
+    """Every status event the store records for the job, as it records them,
+    then one frame for how it ended. Where ``progress`` is given, each node
+    event gets a frame too: the progress line after that node, and no node
+    name. The first frame is then the progress line before any node, so the
+    bar of a Resumed Job starts at the stage where its parent stopped
+    (:func:`webapp.progress.progress_line`).
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions
     a pause asks, where a report is, why a report is withheld, why a
     description was refused, or why a run failed.
     """
-    async for frame in event_frames(workspace.store, run_id):
-        yield frame
+
+    def frame(event: JobEvent) -> str | None:
+        if event.node is None:
+            return event.sse_frame()
+        if progress is None:
+            return None
+        return event.framed(json.dumps(progress([event])))
+
+    if progress is not None:
+        yield f"event: node\ndata: {json.dumps(progress([]))}\n\n"
+    async for written in event_frames(workspace.store, run_id, frame=frame):
+        yield written
     try:
         record = await workspace.envelope(answers, run_id)
     except UnreadableSchema as refusal:
@@ -1902,6 +2780,22 @@ async def _stream(
         return
     if record is None:
         return
+    if record.waits_to_continue():
+        # The service continues the job at once (ADR 0125). The page follows
+        # the Resumed Job, or shows the pause with the refusal. A job that no
+        # task of this process continues stays paused.
+        if workspace.continues(record):
+            line = progress_line(
+                record,
+                await workspace.state(record),
+                await run_origin(workspace.store, record),
+            )
+            yield _frame("continuing", line(record.events))
+            await workspace.settled(run_id)
+        child = await workspace.store.resumed_by(run_id, record.owner_id)
+        if child is not None:
+            yield _frame("continued", {"run": child})
+            return
     status = record.status
     if status == "awaiting-answers":
         try:
@@ -1910,7 +2804,8 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        yield _frame("questions", {"run": run_id} | payload)
+        refusal_key = _refusal_key(await workspace.why_not_continued(record))
+        yield _frame("questions", {"run": run_id} | payload | refusal_key)
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.
@@ -2025,6 +2920,22 @@ def _sdk_item(vendor: VendorName) -> str:
     )
 
 
+def prepare_diagram_reader() -> None:
+    """Install the diagram reader's packages where the reader cannot read a
+    valid flowchart, then read one again (ADR 0122).
+
+    Where the second reading also fails, it logs a warning that names the
+    fault, and it returns, so the app still starts: a job with no diagram
+    does not need the reader.
+    """
+    if reader_fault() is None:
+        return
+    logger.info("installing the diagram reader's packages")
+    install_reader()
+    if fault := reader_fault():
+        logger.warning("the diagram reader cannot read a diagram Source: %s", fault)
+
+
 def _env_var_item(var: str, is_set: bool) -> str:
     """One variable's row — presence only, never the value (OWASP A09)."""
     css_class, label = ("set", "set") if is_set else ("not", "NOT SET")
@@ -2037,9 +2948,9 @@ _STYLE = """
   :root { color-scheme: light dark; }
   body { font: 15px/1.55 system-ui, sans-serif; max-width: 46rem;
          margin: 3rem auto; padding: 0 1.25rem; }
-  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
-  h2 { font-size: 1.05rem; margin-top: 1.75rem; }
-  h3 { font-size: .9rem; font-family: ui-monospace, monospace; margin-bottom: .3rem; }
+  h1 { font-size: 20px; margin-bottom: .25rem; }
+  h2 { font-size: 17px; margin-top: 1.75rem; }
+  h3 { font-size: 15px; font-family: ui-monospace, monospace; margin-bottom: .3rem; }
   .sub { opacity: .7; margin-top: 0; }
   .problem { border-left: 3px solid #c00; padding: .5rem .75rem; margin: 1rem 0; }
   .not { color: #c00; font-weight: 600; }
@@ -2048,9 +2959,20 @@ _STYLE = """
 
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 _SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="utf-8")
+_FILES_PAGE = (Path(__file__).parent / "files.html").read_text(encoding="utf-8")
+_CONTROLS_PAGE = (Path(__file__).parent / "controls.html").read_text(encoding="utf-8")
+#: The format table as each page that uploads reads it, and the ``accept``
+#: attribute of its file field: both from :data:`FORMATS` (ADR 0120).
+_SOURCE_FORMATS = script_json({name: asdict(row) for name, row in FORMATS.items()})
+_UPLOAD_ACCEPT = escape(
+    ",".join(extension for row in FORMATS.values() for extension in row.extensions)
+)
 #: The sidebar of every workspace page: the form, Settings and the report.
 #: Static markup, so it takes no escape.
 _SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")
+#: The script each sidebar page runs in its head, to set the theme the reader
+#: chose before the page draws.
+_THEME = client_script("theme.js")
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
@@ -2085,6 +3007,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     print(f"First-run app on http://{HOST}:{PORT}")
+    prepare_diagram_reader()
     # Loopback is hard-bound: no flag, no env override. The no-auth posture is
     # only safe here.
     uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")

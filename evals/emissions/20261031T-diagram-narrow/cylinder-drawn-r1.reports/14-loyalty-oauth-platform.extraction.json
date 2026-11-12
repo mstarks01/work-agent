@@ -1,0 +1,1016 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member-s-browser",
+        "name": "Member's browser",
+        "description": "Member's browser",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "browser(\"Member's browser\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "Mobile app on the member's phone",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app[Mobile app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:member-s-phone",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:partner-app-e-g-meal-planning-service",
+        "name": "Partner app (e.g. meal-planning service)",
+        "description": "Partner application",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp[\"Partner app (e.g. meal-planning service)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:partner-server",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "Authorization server",
+        "description": "Authorization server",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz[Authorization server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "Rewards API",
+        "description": "Rewards API",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "rewards[Rewards API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "Support console",
+        "description": "Support console",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "support[Support console]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "name": "Identity database: accounts, emails, password hashes, codes, refresh tokens, consents",
+        "description": "Identity database containing accounts, emails, password hashes, codes, refresh tokens, and consents",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "iddb[(\"Identity database: accounts, emails, password hashes, codes, refresh tokens, consents\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger-balances-transactions",
+        "name": "Points ledger: balances, transactions",
+        "description": "Points ledger containing balances and transactions",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "ledger[(\"Points ledger: balances, transactions\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "API log store",
+        "description": "Store for API logs",
+        "assets": [],
+        "source_excerpt": "logs[(API log store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>sign-in-authorization-code-flow-https",
+        "name": "sign in, authorization code flow (HTTPS)",
+        "description": "Sign in and authorization code flow from the mobile app to the authorization server",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"sign in, authorization code flow (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign in, authorization code flow",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>process:mobile-app>access-token-refresh-token",
+        "name": "access token, refresh token",
+        "description": "Access token and refresh token from the authorization server to the mobile app",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|\"access token, refresh token\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access token, refresh token",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>requests-with-access-token-https",
+        "name": "requests with access token (HTTPS)",
+        "description": "Requests with an access token from the mobile app to the rewards API",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member-s-browser>process:authorization-server>sign-in-consent-https",
+        "name": "sign-in, consent (HTTPS)",
+        "description": "Sign-in and consent from the member's browser to the authorization server",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "browser -->|\"sign-in, consent (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member-s-browser",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign-in, consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member-s-browser>process:partner-app-e-g-meal-planning-service>redirect-with-authorization-code",
+        "name": "redirect with authorization code",
+        "description": "Redirect with an authorization code from the member's browser to the partner app",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser -->|\"redirect with authorization code\"| papp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member-s-browser",
+        "destination": "process:partner-app-e-g-meal-planning-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "redirect with authorization code",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app-e-g-meal-planning-service>process:authorization-server>token-requests-https",
+        "name": "token requests (HTTPS)",
+        "description": "Token requests from the partner app to the authorization server",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"token requests (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app-e-g-meal-planning-service",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app-e-g-meal-planning-service>process:rewards-api>requests-with-access-token-https",
+        "name": "requests with access token (HTTPS)",
+        "description": "Requests with an access token from the partner app to the rewards API",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app-e-g-meal-planning-service",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents>accounts-codes-tokens-consents",
+        "name": "accounts, codes, tokens, consents",
+        "description": "Accounts, codes, tokens, and consents from the authorization server to the identity database",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz <-->|\"accounts, codes, tokens, consents\"| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts, codes, tokens, consents",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents>process:authorization-server>accounts-codes-tokens-consents",
+        "name": "accounts, codes, tokens, consents",
+        "description": "Accounts, codes, tokens, and consents from the identity database to the authorization server",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz <-->|\"accounts, codes, tokens, consents\"| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts, codes, tokens, consents",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>process:authorization-server>public-key-download-at-start",
+        "name": "public key download at start",
+        "description": "Public key download at start from the authorization server to the rewards API",
+        "assets": [],
+        "source_excerpt": "rewards -->|public key download at start| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "public key download at start",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger-balances-transactions>points-gift-card-redemptions",
+        "name": "points, gift card redemptions",
+        "description": "Points and gift card redemptions from the rewards API to the points ledger",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "rewards <-->|\"points, gift card redemptions\"| ledger",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger-balances-transactions",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points, gift card redemptions",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:points-ledger-balances-transactions>process:rewards-api>points-gift-card-redemptions",
+        "name": "points, gift card redemptions",
+        "description": "Points and gift card redemptions from the points ledger to the rewards API",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "rewards <-->|\"points, gift card redemptions\"| ledger",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:points-ledger-balances-transactions",
+        "destination": "process:rewards-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points, gift card redemptions",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>every-request-with-headers",
+        "name": "every request, with headers",
+        "description": "Every request with headers from the rewards API to the API log store",
+        "assets": [],
+        "source_excerpt": "rewards -->|\"every request, with headers\"| logs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "every request, with headers",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:authorization-server>process:support-console>access-tokens",
+        "name": "access tokens",
+        "description": "Access tokens from the authorization server to the support console",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|access tokens| support",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:support-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access tokens",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents>close-account",
+        "name": "close account",
+        "description": "Close account action from the support console to the identity database",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support -->|close account| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "close account",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:member-s-phone",
+        "name": "Member's phone",
+        "description": "Member's phone trust zone",
+        "assets": [],
+        "source_excerpt": "subgraph phone[\"Member's phone\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-server",
+        "name": "Partner server",
+        "description": "Partner servers trust zone",
+        "assets": [],
+        "source_excerpt": "subgraph partner[\"Partner servers\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Our cloud account trust zone",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The identity database's contents are confidential.",
+        "element_id": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "attribute": "data_classification",
+        "basis": "It contains accounts, emails, password hashes, codes, refresh tokens, and consents."
+      },
+      {
+        "assumption": "The points ledger's contents are confidential.",
+        "element_id": "store:points-ledger-balances-transactions",
+        "attribute": "data_classification",
+        "basis": "It contains points balances and transactions."
+      },
+      {
+        "assumption": "The member's phone is controlled by a different party from the system.",
+        "element_id": "boundary:member-s-phone",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labelled \"Member's phone\", which is a customer's own device."
+      },
+      {
+        "assumption": "The partner server zone is controlled by a different party from the system.",
+        "element_id": "boundary:partner-server",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labelled \"Partner servers\"."
+      },
+      {
+        "assumption": "Our cloud account is a network trust zone within the system's control.",
+        "element_id": "boundary:our-cloud-account",
+        "attribute": "kind",
+        "basis": "The diagram groups the system components under the explicitly named zone \"Our cloud account\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:members-browser",
+        "name": "Member's browser",
+        "description": "Member's browser",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "browser(\"Member's browser\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "Mobile app on the member's phone",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app[Mobile app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:members-phone",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:partner-app-e-g-meal-planning-service",
+        "name": "Partner app (e.g. meal-planning service)",
+        "description": "Partner application",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp[\"Partner app (e.g. meal-planning service)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:partner-server",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "Authorization server",
+        "description": "Authorization server",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz[Authorization server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "Rewards API",
+        "description": "Rewards API",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "rewards[Rewards API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "Support console",
+        "description": "Support console",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "support[Support console]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "name": "Identity database: accounts, emails, password hashes, codes, refresh tokens, consents",
+        "description": "Identity database containing accounts, emails, password hashes, codes, refresh tokens, and consents",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "iddb[(\"Identity database: accounts, emails, password hashes, codes, refresh tokens, consents\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger-balances-transactions",
+        "name": "Points ledger: balances, transactions",
+        "description": "Points ledger containing balances and transactions",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "ledger[(\"Points ledger: balances, transactions\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "API log store",
+        "description": "Store for API logs",
+        "assets": [],
+        "source_excerpt": "logs[(API log store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>sign-in-authorization-code-flow-https",
+        "name": "sign in, authorization code flow (HTTPS)",
+        "description": "Sign in and authorization code flow from the mobile app to the authorization server",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"sign in, authorization code flow (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign in, authorization code flow",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>process:mobile-app>access-token-refresh-token",
+        "name": "access token, refresh token",
+        "description": "Access token and refresh token from the authorization server to the mobile app",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|\"access token, refresh token\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access token, refresh token",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>requests-with-access-token-https",
+        "name": "requests with access token (HTTPS)",
+        "description": "Requests with an access token from the mobile app to the rewards API",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:members-browser>process:authorization-server>sign-in-consent-https",
+        "name": "sign-in, consent (HTTPS)",
+        "description": "Sign-in and consent from the member's browser to the authorization server",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "browser -->|\"sign-in, consent (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:members-browser",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign-in, consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:members-browser>process:partner-app-e-g-meal-planning-service>redirect-with-authorization-code",
+        "name": "redirect with authorization code",
+        "description": "Redirect with an authorization code from the member's browser to the partner app",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser -->|\"redirect with authorization code\"| papp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:members-browser",
+        "destination": "process:partner-app-e-g-meal-planning-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "redirect with authorization code",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app-e-g-meal-planning-service>process:authorization-server>token-requests-https",
+        "name": "token requests (HTTPS)",
+        "description": "Token requests from the partner app to the authorization server",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"token requests (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app-e-g-meal-planning-service",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app-e-g-meal-planning-service>process:rewards-api>requests-with-access-token-https",
+        "name": "requests with access token (HTTPS)",
+        "description": "Requests with an access token from the partner app to the rewards API",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app-e-g-meal-planning-service",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents>accounts-codes-tokens-consents",
+        "name": "accounts, codes, tokens, consents",
+        "description": "Accounts, codes, tokens, and consents from the authorization server to the identity database",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz <-->|\"accounts, codes, tokens, consents\"| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts, codes, tokens, consents",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents>process:authorization-server>accounts-codes-tokens-consents",
+        "name": "accounts, codes, tokens, consents",
+        "description": "Accounts, codes, tokens, and consents from the identity database to the authorization server",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz <-->|\"accounts, codes, tokens, consents\"| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts, codes, tokens, consents",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>process:authorization-server>public-key-download-at-start",
+        "name": "public key download at start",
+        "description": "Public key download at start from the authorization server to the rewards API",
+        "assets": [],
+        "source_excerpt": "rewards -->|public key download at start| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "public key download at start",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger-balances-transactions>points-gift-card-redemptions",
+        "name": "points, gift card redemptions",
+        "description": "Points and gift card redemptions from the rewards API to the points ledger",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "rewards <-->|\"points, gift card redemptions\"| ledger",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger-balances-transactions",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points, gift card redemptions",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:points-ledger-balances-transactions>process:rewards-api>points-gift-card-redemptions",
+        "name": "points, gift card redemptions",
+        "description": "Points and gift card redemptions from the points ledger to the rewards API",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "rewards <-->|\"points, gift card redemptions\"| ledger",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:points-ledger-balances-transactions",
+        "destination": "process:rewards-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points, gift card redemptions",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>every-request-with-headers",
+        "name": "every request, with headers",
+        "description": "Every request with headers from the rewards API to the API log store",
+        "assets": [],
+        "source_excerpt": "rewards -->|\"every request, with headers\"| logs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "every request, with headers",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:authorization-server>process:support-console>access-tokens",
+        "name": "access tokens",
+        "description": "Access tokens from the authorization server to the support console",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|access tokens| support",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:support-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access tokens",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents>close-account",
+        "name": "close account",
+        "description": "Close account action from the support console to the identity database",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support -->|close account| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "close account",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:members-phone",
+        "name": "Member's phone",
+        "description": "Member's phone trust zone",
+        "assets": [],
+        "source_excerpt": "subgraph phone[\"Member's phone\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-server",
+        "name": "Partner server",
+        "description": "Partner servers trust zone",
+        "assets": [],
+        "source_excerpt": "subgraph partner[\"Partner servers\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Our cloud account trust zone",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The identity database's contents are confidential.",
+        "element_id": "store:identity-database-accounts-emails-password-hashes-codes-refresh-tokens-consents",
+        "attribute": "data_classification",
+        "basis": "It contains accounts, emails, password hashes, codes, refresh tokens, and consents."
+      },
+      {
+        "assumption": "The points ledger's contents are confidential.",
+        "element_id": "store:points-ledger-balances-transactions",
+        "attribute": "data_classification",
+        "basis": "It contains points balances and transactions."
+      },
+      {
+        "assumption": "The member's phone is controlled by a different party from the system.",
+        "element_id": "boundary:members-phone",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labelled \"Member's phone\", which is a customer's own device."
+      },
+      {
+        "assumption": "The partner server zone is controlled by a different party from the system.",
+        "element_id": "boundary:partner-server",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labelled \"Partner servers\"."
+      },
+      {
+        "assumption": "Our cloud account is a network trust zone within the system's control.",
+        "element_id": "boundary:our-cloud-account",
+        "attribute": "kind",
+        "basis": "The diagram groups the system components under the explicitly named zone \"Our cloud account\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

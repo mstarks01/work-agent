@@ -31,8 +31,8 @@ scale arrives with the measurement.
 ``tests/test_evals_promotion.py`` holds every name against a real artifact, so
 a gate cannot quietly read a key nothing writes.
 
-**An absent figure is never a zero.** An artifact written before a field
-existed, or a job that ran no assertion pass, leaves the gate over that figure
+**An absent figure is never a zero.** An artifact that holds no value
+for a field, or a job that ran no assertion pass, leaves the gate over that figure
 *unread* rather than failing it. A gate that read an absence as a measurement
 would refuse a promotion for a reason nobody measured.
 
@@ -64,7 +64,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from analysis_service.assertions import AssertionRecord
-from analysis_service.parsing import non_negative
+from analysis_service.parsing import member, non_negative, table_entry
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
@@ -77,12 +77,22 @@ from evals.harness.replay import (
     unsigned_reason,
 )
 
+#: A figure the baseline arm recorded, which a gate's limit is relative to.
+FigureName = Literal[
+    "charge_usd",
+    "node_seconds",
+    "must_find_coverage",
+    "reference_coverage",
+    "claims",
+    "required_fact_recall",
+]
+
 #: The baseline arm the budgets below were set from: one case, STRIDE only,
 #: ``analysis`` mode so the blessed model is fixed, `ANALYSIS_ASSERTIONS`
 #: unset. Recorded as values rather than as a path, because the artifacts are
 #: under the gitignored ``evals/runs/`` and a budget nobody can re-read is a
 #: number with no provenance.
-BASELINE: Mapping[str, float] = MappingProxyType(
+BASELINE: Mapping[FigureName, float] = MappingProxyType(
     {
         "charge_usd": 0.2791,
         "node_seconds": 165.4,
@@ -152,9 +162,31 @@ BASELINE_RUN = (
 Unit = Literal["ratio", "count", "sd"]
 GateResult = Literal["pass", "fail", "inconclusive"]
 
+#: A gate of :data:`GATES`.
+GateName = Literal[
+    "charge",
+    "latency",
+    "backs-claims",
+    "structural-refusals",
+    "critical-fixtures",
+    "must-find-coverage",
+    "required-fact-recall",
+    "reference-coverage",
+]
+
+#: A gate of :data:`PENDING`.
+PendingName = Literal["review-population", "support-shares", "case-diversity"]
+
+#: A gate of :data:`evals.harness.gain.GATES`. Stated here because
+#: :class:`Reading` carries it and the gain module imports this one.
+GainGateName = Literal["volume", "reviewed", "rejected-rate"]
+
+#: Every gate a :class:`Reading` can name.
+AnyGateName = Literal[GateName, PendingName, GainGateName]
+
 
 # Each reader returns ``None`` where the artifact does not carry the figure at
-# all — an artifact written before the field existed, or a job that ran no
+# all — an artifact that holds no value for the field, or a job that ran no
 # assertion pass. **That is not a zero.** A gate over a figure nobody recorded
 # is unread, and :func:`read_gate` reports it as such rather than letting an
 # absence read as a measurement.
@@ -361,13 +393,13 @@ class Gate:
     limit: float
     #: Which way passes: a figure at most the limit, or at least it.
     direction: Literal["at-most", "at-least"]
-    against: str = ""
+    against: FigureName | Literal[""] = ""
     why: str = ""
 
 
 #: Every gate the promotion is read against. Resource gates first, because they
 #: are the ones one pair can answer.
-GATES: Mapping[str, Gate] = MappingProxyType(
+GATES: Mapping[GateName, Gate] = MappingProxyType(
     {
         "charge": Gate(
             question="does a job cost more than the budget allows?",
@@ -503,7 +535,7 @@ class Pending:
 #: The measurement design #926 settled on 2026-09-23 (option (c) of the
 #: support-gate decision, with the owner's corrections), as gates nobody can
 #: read yet. A name here is never also in :data:`GATES`.
-PENDING: Mapping[str, Pending] = MappingProxyType(
+PENDING: Mapping[PendingName, Pending] = MappingProxyType(
     {
         "review-population": Pending(
             question="which rows is semantic support measured over?",
@@ -562,7 +594,7 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
 class Reading:
     """One gate, read against one pair of runs."""
 
-    gate: str
+    gate: AnyGateName
     verdict: GateResult
     #: What the treatment run measured, or ``None`` where the artifact carries
     #: no such figure.
@@ -654,8 +686,9 @@ def read_recall(repeats: Sequence[Sequence[Path]]) -> Reading:
     the baseline in units of :data:`RECALL_SPREAD`, which is how the baseline
     itself was measured.
     """
-    name = "required-fact-recall"
+    name: GateName = "required-fact-recall"
     gate = GATES[name]
+    assert gate.against, name
     baseline = BASELINE[gate.against]
 
     def unread(why: str) -> Reading:
@@ -688,7 +721,7 @@ def _assert_models(path: Path) -> frozenset[str]:
 
 
 def read_gate(
-    name: str,
+    name: GateName,
     artifact: Mapping[str, Any],
     report: Mapping[str, Any],
     *,
@@ -785,12 +818,12 @@ def render(readings: Sequence[Reading]) -> str:
         baseline = "—" if row.baseline is None else f"{row.baseline:.4g}"
         against = "—" if row.against_limit is None else f"{row.against_limit:.3f}"
         measured = "—" if row.measured is None else f"{row.measured:.4g}"
-        gate = GATES.get(row.gate)
-        limit = (
-            f"{gate.direction} {gate.limit} ({gate.unit})"
-            if gate is not None
-            else PENDING[row.gate].limit or "undeclared"
-        )
+        name = member(row.gate, GATES)
+        if name is not None:
+            gate = GATES[name]
+            limit = f"{gate.direction} {gate.limit} ({gate.unit})"
+        else:
+            limit = table_entry(PENDING, row.gate).limit or "undeclared"
         lines.append(
             f"| `{row.gate}` | {row.verdict} | {measured} | {baseline}"
             f" | {against} | {limit} |"
@@ -808,9 +841,8 @@ def render(readings: Sequence[Reading]) -> str:
     for row in unread:
         lines.append(f"- `{row.gate}` unread: {row.why}")
     for row in failed:
-        lines.append(
-            f"- `{row.gate}`: {GATES[row.gate].question} {GATES[row.gate].why}"
-        )
+        gate = table_entry(GATES, row.gate)
+        lines.append(f"- `{row.gate}`: {gate.question} {gate.why}")
     return "\n".join(lines) + "\n"
 
 

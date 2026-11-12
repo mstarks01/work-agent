@@ -284,8 +284,8 @@ class TestTheEndpointTheOperatorChose:
     def test_an_unpinned_gateway_is_not_a_sweep_that_recorded_no_pin(
         self, name, tmp_path
     ):
-        """``[]`` is a deployment that let the gateway choose. No key at all is
-        a sweep taken before the pin was recorded, which says nothing."""
+        """``[]`` is a deployment that let the gateway choose. A sweep with no
+        key at all says nothing."""
         unpinned = BaselineIdentity.from_artifact(self.sweep(tmp_path, name, (), "u"))
         unrecorded = BaselineIdentity.from_artifact(
             self.sweep(tmp_path, name, None, "n")
@@ -616,7 +616,7 @@ class TestAGatewayRouteCarriesNoUnitPrice:
         """The rule answers for a route, and declines to invent a vendor.
 
         A bare build identifier and a prefix no vendor claims both reach the
-        map as before. Refusing them here would un-price the fallback that
+        map. Refusing them here would un-price the fallback that
         :func:`prices._bare_name` exists to serve.
         """
         assert not prices._routes_to_many_providers("gemini-2.5-pro")

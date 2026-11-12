@@ -1,0 +1,518 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:calling-team-backend",
+        "name": "Calling team backend",
+        "description": "A calling team backend that sends inference requests.",
+        "assets": [],
+        "source_excerpt": "callers[Calling team backends]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ML engineer",
+        "description": "An ML engineer who publishes model artifacts.",
+        "assets": [],
+        "source_excerpt": "eng[ML engineers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "Inference gateway",
+        "description": "The gateway receiving inference requests and sending requests to the model server.",
+        "assets": [],
+        "source_excerpt": "gw[Inference gateway]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:gke",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "Model server",
+        "description": "The server receiving inference requests, model artifacts, and customer features.",
+        "assets": [],
+        "source_excerpt": "ms[Model server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "A Redis feature store containing customer features.",
+        "assets": [],
+        "source_excerpt": "redis[(Redis feature store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Redis",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:model-registry-bucket",
+        "name": "Model registry bucket",
+        "description": "A bucket containing model artifacts.",
+        "assets": [],
+        "source_excerpt": "registry[(Model registry bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "bucket",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "Inference log",
+        "description": "A store receiving inference requests and responses.",
+        "assets": [],
+        "source_excerpt": "log[(Inference log)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-team-backend>process:inference-gateway>inference-request",
+        "name": "inference request",
+        "description": "An inference request from a calling team backend to the inference gateway.",
+        "assets": [],
+        "source_excerpt": "callers -->|inference request| gw",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:calling-team-backend",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "inference request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>request",
+        "name": "request",
+        "description": "A request from the inference gateway to the model server.",
+        "assets": [],
+        "source_excerpt": "gw -->|request| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:model-registry-bucket>process:model-server>model-artifacts",
+        "name": "model artifacts",
+        "description": "Model artifacts sent from the model registry bucket to the model server.",
+        "assets": [],
+        "source_excerpt": "registry -->|model artifacts| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:model-registry-bucket",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:redis-feature-store>process:model-server>customer-features",
+        "name": "customer features",
+        "description": "Customer features sent from the Redis feature store to the model server.",
+        "assets": [],
+        "source_excerpt": "redis -->|customer features| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:redis-feature-store",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "customer features",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>requests-responses",
+        "name": "requests + responses",
+        "description": "Requests and responses sent from the inference gateway to the inference log.",
+        "assets": [],
+        "source_excerpt": "gw -->|\"requests + responses\"| log",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "requests + responses",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>publish-model-artifacts",
+        "name": "publish model artifacts",
+        "description": "An ML engineer publishes model artifacts to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "eng -->|publish model artifacts| registry",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "A named trust zone containing the inference gateway.",
+        "assets": [],
+        "source_excerpt": "subgraph gke[GKE]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "Model network",
+        "description": "A named trust zone containing the model server and Redis feature store.",
+        "assets": [],
+        "source_excerpt": "subgraph modelnet[Model network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The calling team backend is an external system.",
+        "element_id": "entity:calling-team-backend",
+        "attribute": "kind",
+        "basis": "The diagram names it as a backend calling the inference gateway."
+      },
+      {
+        "assumption": "The ML engineer is a human external entity.",
+        "element_id": "entity:ml-engineer",
+        "attribute": "kind",
+        "basis": "The diagram names the actor as an engineer."
+      },
+      {
+        "assumption": "GKE is a network trust boundary.",
+        "element_id": "boundary:gke",
+        "attribute": "kind",
+        "basis": "The diagram represents GKE as a named subgraph trust zone and gives no indication that it is a tenant or privilege boundary."
+      },
+      {
+        "assumption": "Model network is a network trust boundary.",
+        "element_id": "boundary:model-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly names the subgraph Model network, indicating a network trust zone."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:calling-team-backend",
+        "name": "Calling team backend",
+        "description": "A calling team backend that sends inference requests.",
+        "assets": [],
+        "source_excerpt": "callers[Calling team backends]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ML engineer",
+        "description": "An ML engineer who publishes model artifacts.",
+        "assets": [],
+        "source_excerpt": "eng[ML engineers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "Inference gateway",
+        "description": "The gateway receiving inference requests and sending requests to the model server.",
+        "assets": [],
+        "source_excerpt": "gw[Inference gateway]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:gke",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "Model server",
+        "description": "The server receiving inference requests, model artifacts, and customer features.",
+        "assets": [],
+        "source_excerpt": "ms[Model server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "A Redis feature store containing customer features.",
+        "assets": [],
+        "source_excerpt": "redis[(Redis feature store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Redis",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:model-registry-bucket",
+        "name": "Model registry bucket",
+        "description": "A bucket containing model artifacts.",
+        "assets": [],
+        "source_excerpt": "registry[(Model registry bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "bucket",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "Inference log",
+        "description": "A store receiving inference requests and responses.",
+        "assets": [],
+        "source_excerpt": "log[(Inference log)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-team-backend>process:inference-gateway>inference-request",
+        "name": "inference request",
+        "description": "An inference request from a calling team backend to the inference gateway.",
+        "assets": [],
+        "source_excerpt": "callers -->|inference request| gw",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:calling-team-backend",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "inference request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>request",
+        "name": "request",
+        "description": "A request from the inference gateway to the model server.",
+        "assets": [],
+        "source_excerpt": "gw -->|request| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:model-registry-bucket>process:model-server>model-artifacts",
+        "name": "model artifacts",
+        "description": "Model artifacts sent from the model registry bucket to the model server.",
+        "assets": [],
+        "source_excerpt": "registry -->|model artifacts| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:model-registry-bucket",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:redis-feature-store>process:model-server>customer-features",
+        "name": "customer features",
+        "description": "Customer features sent from the Redis feature store to the model server.",
+        "assets": [],
+        "source_excerpt": "redis -->|customer features| ms",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:redis-feature-store",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "customer features",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>requests-responses",
+        "name": "requests + responses",
+        "description": "Requests and responses sent from the inference gateway to the inference log.",
+        "assets": [],
+        "source_excerpt": "gw -->|\"requests + responses\"| log",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "requests + responses",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>publish-model-artifacts",
+        "name": "publish model artifacts",
+        "description": "An ML engineer publishes model artifacts to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "eng -->|publish model artifacts| registry",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "A named trust zone containing the inference gateway.",
+        "assets": [],
+        "source_excerpt": "subgraph gke[GKE]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "Model network",
+        "description": "A named trust zone containing the model server and Redis feature store.",
+        "assets": [],
+        "source_excerpt": "subgraph modelnet[Model network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The calling team backend is an external system.",
+        "element_id": "entity:calling-team-backend",
+        "attribute": "kind",
+        "basis": "The diagram names it as a backend calling the inference gateway."
+      },
+      {
+        "assumption": "The ML engineer is a human external entity.",
+        "element_id": "entity:ml-engineer",
+        "attribute": "kind",
+        "basis": "The diagram names the actor as an engineer."
+      },
+      {
+        "assumption": "GKE is a network trust boundary.",
+        "element_id": "boundary:gke",
+        "attribute": "kind",
+        "basis": "The diagram represents GKE as a named subgraph trust zone and gives no indication that it is a tenant or privilege boundary."
+      },
+      {
+        "assumption": "Model network is a network trust boundary.",
+        "element_id": "boundary:model-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly names the subgraph Model network, indicating a network trust zone."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -1,0 +1,834 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:customer-company-user-browser",
+        "name": "Customer company user (browser)",
+        "description": "Customer company user using a browser",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "user(\"Customer company user (browser)\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:payer",
+        "name": "Payer",
+        "description": "Payer receiving an invoice email and opening a payment page",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payer(Payer)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:support-agent",
+        "name": "Support agent",
+        "description": "Support agent using the admin console",
+        "assets": [],
+        "source_excerpt": "agent(Support agent)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:support-office-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:admin-console",
+        "name": "Admin console",
+        "description": "Administrative console used by a support agent to establish a session as a customer user",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "admin[Admin console]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:billing-app",
+        "name": "Billing app",
+        "description": "Application handling invoices, customers, bank details, payment pages, rendering jobs, and PDFs",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "billing[Billing app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:render-queue",
+        "name": "Render queue",
+        "description": "Queue receiving render jobs",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "queue[Render queue]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:pdf-renderer",
+        "name": "PDF renderer",
+        "description": "Component taking render jobs, reading invoices, and producing PDFs",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer[PDF renderer]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "name": "Tenant database (PostgreSQL): invoices, customers, payout bank details",
+        "description": "Tenant database containing invoices, customers, and payout bank details",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "db[(\"Tenant database (PostgreSQL): invoices, customers, payout bank details\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pdf-bucket",
+        "name": "PDF bucket",
+        "description": "Bucket containing generated PDFs",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "bucket[(PDF bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer-company-user-browser>process:billing-app>invoices",
+        "name": "invoices",
+        "description": "Invoices sent from the customer company user to the billing app",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "user -->|\"invoices (HTTPS)\"| billing",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer-company-user-browser",
+        "destination": "process:billing-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "invoices",
+        "encryption_in_transit": "HTTPS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:tenant-database-postgresql-invoices-customers-payout-bank-details>invoices-customers-bank-details",
+        "name": "invoices customers bank details",
+        "description": "Billing app interaction with the tenant database",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "billing <-->|\"invoices, customers, bank details\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "invoices, customers, bank details",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:tenant-database-postgresql-invoices-customers-payout-bank-details>process:billing-app>invoices-customers-bank-details",
+        "name": "invoices customers bank details",
+        "description": "Tenant database interaction with the billing app",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "billing <-->|\"invoices, customers, bank details\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "invoices, customers, bank details",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:billing-app>entity:payer>invoice-email-with-link",
+        "name": "invoice email with link",
+        "description": "Invoice email with a payment link sent to the payer",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "billing -->|invoice email with link| payer",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "entity:payer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "invoice email with link",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:payer>process:billing-app>open-payment-page",
+        "name": "open payment page",
+        "description": "Payer opens a payment page in the billing app",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payer -->|open payment page| billing",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:payer",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "open payment page",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:billing-app>process:render-queue>render-job",
+        "name": "render job",
+        "description": "Render job containing company ID and invoice number sent to the render queue",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "billing -->|\"render job: company ID, invoice number\"| queue",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "process:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "render job: company ID, invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:pdf-renderer>process:render-queue>take-job",
+        "name": "take job",
+        "description": "PDF renderer takes a job from the render queue",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer -->|take job| queue",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "process:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "take job",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:tenant-database-postgresql-invoices-customers-payout-bank-details>read-invoice",
+        "name": "read invoice",
+        "description": "PDF renderer reads an invoice from the tenant database",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer -->|read invoice| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "read invoice",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:pdf-bucket>pdf",
+        "name": "PDF",
+        "description": "PDF produced by the PDF renderer and sent to the PDF bucket",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer -->|PDF| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "PDF",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:pdf-bucket>fetch-pdfs",
+        "name": "fetch PDFs",
+        "description": "Billing app fetches PDFs from the PDF bucket",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "billing -->|fetch PDFs| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fetch PDFs",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:support-agent>process:admin-console>support-access",
+        "name": "support access",
+        "description": "Support agent accesses the admin console",
+        "assets": [],
+        "source_excerpt": "agent --> admin",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:support-agent",
+        "destination": "process:admin-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:admin-console>process:billing-app>session-as-customer-user",
+        "name": "session as customer user",
+        "description": "Admin console establishes a session as a customer user in the billing app",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "admin -->|session as customer user| billing",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:admin-console",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "session as customer user",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:support-office-network",
+        "name": "Support office network",
+        "description": "Support office network containing the support agent",
+        "assets": [],
+        "source_excerpt": "subgraph office[\"Support office network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cloud-platform",
+        "name": "Cloud platform",
+        "description": "Cloud platform containing the billing components and data stores",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Cloud platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The tenant database is confidential because it contains invoices, customer information, and payout bank details.",
+        "element_id": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "attribute": "data_classification",
+        "basis": "The diagram names invoices, customers, and payout bank details as database contents."
+      },
+      {
+        "assumption": "The PDF bucket is confidential because it stores PDFs generated from invoices.",
+        "element_id": "store:pdf-bucket",
+        "attribute": "data_classification",
+        "basis": "The renderer reads invoices and writes PDFs to the bucket, and the billing app fetches those PDFs."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:customer-company-user-browser",
+        "name": "Customer company user (browser)",
+        "description": "Customer company user using a browser",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "user(\"Customer company user (browser)\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:payer",
+        "name": "Payer",
+        "description": "Payer receiving an invoice email and opening a payment page",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payer(Payer)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:support-agent",
+        "name": "Support agent",
+        "description": "Support agent using the admin console",
+        "assets": [],
+        "source_excerpt": "agent(Support agent)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:support-office-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:admin-console",
+        "name": "Admin console",
+        "description": "Administrative console used by a support agent to establish a session as a customer user",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "admin[Admin console]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:billing-app",
+        "name": "Billing app",
+        "description": "Application handling invoices, customers, bank details, payment pages, rendering jobs, and PDFs",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "billing[Billing app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:render-queue",
+        "name": "Render queue",
+        "description": "Queue receiving render jobs",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "queue[Render queue]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:pdf-renderer",
+        "name": "PDF renderer",
+        "description": "Component taking render jobs, reading invoices, and producing PDFs",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer[PDF renderer]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "name": "Tenant database (PostgreSQL): invoices, customers, payout bank details",
+        "description": "Tenant database containing invoices, customers, and payout bank details",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "db[(\"Tenant database (PostgreSQL): invoices, customers, payout bank details\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pdf-bucket",
+        "name": "PDF bucket",
+        "description": "Bucket containing generated PDFs",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "bucket[(PDF bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer-company-user-browser>process:billing-app>invoices",
+        "name": "invoices",
+        "description": "Invoices sent from the customer company user to the billing app",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "user -->|\"invoices (HTTPS)\"| billing",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer-company-user-browser",
+        "destination": "process:billing-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "invoices",
+        "encryption_in_transit": "HTTPS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:tenant-database-postgresql-invoices-customers-payout-bank-details>invoices-customers-bank-details",
+        "name": "invoices customers bank details",
+        "description": "Billing app interaction with the tenant database",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "billing <-->|\"invoices, customers, bank details\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "invoices, customers, bank details",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:tenant-database-postgresql-invoices-customers-payout-bank-details>process:billing-app>invoices-customers-bank-details",
+        "name": "invoices customers bank details",
+        "description": "Tenant database interaction with the billing app",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "billing <-->|\"invoices, customers, bank details\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "invoices, customers, bank details",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:billing-app>entity:payer>invoice-email-with-link",
+        "name": "invoice email with link",
+        "description": "Invoice email with a payment link sent to the payer",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "billing -->|invoice email with link| payer",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "entity:payer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "invoice email with link",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:payer>process:billing-app>open-payment-page",
+        "name": "open payment page",
+        "description": "Payer opens a payment page in the billing app",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payer -->|open payment page| billing",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:payer",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "open payment page",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:billing-app>process:render-queue>render-job",
+        "name": "render job",
+        "description": "Render job containing company ID and invoice number sent to the render queue",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "billing -->|\"render job: company ID, invoice number\"| queue",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "process:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "render job: company ID, invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:pdf-renderer>process:render-queue>take-job",
+        "name": "take job",
+        "description": "PDF renderer takes a job from the render queue",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer -->|take job| queue",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "process:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "take job",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:tenant-database-postgresql-invoices-customers-payout-bank-details>read-invoice",
+        "name": "read invoice",
+        "description": "PDF renderer reads an invoice from the tenant database",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer -->|read invoice| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "read invoice",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:pdf-bucket>pdf",
+        "name": "PDF",
+        "description": "PDF produced by the PDF renderer and sent to the PDF bucket",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "renderer -->|PDF| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "PDF",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:pdf-bucket>fetch-pdfs",
+        "name": "fetch PDFs",
+        "description": "Billing app fetches PDFs from the PDF bucket",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "billing -->|fetch PDFs| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fetch PDFs",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:support-agent>process:admin-console>support-access",
+        "name": "support access",
+        "description": "Support agent accesses the admin console",
+        "assets": [],
+        "source_excerpt": "agent --> admin",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:support-agent",
+        "destination": "process:admin-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:admin-console>process:billing-app>session-as-customer-user",
+        "name": "session as customer user",
+        "description": "Admin console establishes a session as a customer user in the billing app",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "admin -->|session as customer user| billing",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:admin-console",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "session as customer user",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:support-office-network",
+        "name": "Support office network",
+        "description": "Support office network containing the support agent",
+        "assets": [],
+        "source_excerpt": "subgraph office[\"Support office network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cloud-platform",
+        "name": "Cloud platform",
+        "description": "Cloud platform containing the billing components and data stores",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Cloud platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The tenant database is confidential because it contains invoices, customer information, and payout bank details.",
+        "element_id": "store:tenant-database-postgresql-invoices-customers-payout-bank-details",
+        "attribute": "data_classification",
+        "basis": "The diagram names invoices, customers, and payout bank details as database contents."
+      },
+      {
+        "assumption": "The PDF bucket is confidential because it stores PDFs generated from invoices.",
+        "element_id": "store:pdf-bucket",
+        "attribute": "data_classification",
+        "basis": "The renderer reads invoices and writes PDFs to the bucket, and the billing app fetches those PDFs."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -29,19 +29,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from analysis_service.certification import CertifyResult
+from analysis_service.execution import seed_state
+from analysis_service.graph import STATE_INPUT_TEXT
 from analysis_service.identity import IDENTITY_VERSION
 from analysis_service.parsing import is_version
+from analysis_service.sources import text_digest
 from analysis_service.system_model import FLOW_ID_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
+from evals.harness.modes import SweepMode
 from evals.harness.provenance import (
     REPO_ROOT,
     ProvenanceError,
     RunProvenance,
     checkout_state,
 )
+from evals.harness.reference import GoldenCase
 
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
@@ -153,6 +158,21 @@ def corpus_digest(corpus_dir: Path = CORPUS_DIR) -> str:
     return digest.hexdigest()
 
 
+def rendered_sources(cases: Iterable[GoldenCase]) -> dict[str, str]:
+    """Each case's digest of its Sources as the graph renders them for a model.
+
+    The rendered text is what the model reads, so the digest moves when a
+    Source moves and when the render moves, such as a change to the diagram
+    reader. The corpus digest moves for neither of the two. Rendered through
+    :func:`~analysis_service.execution.seed_state`, the one writer of the
+    rendered text, before the sweep spends.
+    """
+    return {
+        case.id: text_digest(seed_state(case.sources)[STATE_INPUT_TEXT])
+        for case in cases
+    }
+
+
 @dataclass(frozen=True)
 class EvalArtifact:
     """A loaded sweep artifact: its provenance, plus the run that produced it.
@@ -174,7 +194,7 @@ class EvalArtifact:
     """
 
     path: Path
-    mode: str
+    mode: SweepMode
     cases: tuple[str, ...]
     trusted: bool
     structural_failures: tuple[str, ...]
@@ -214,8 +234,8 @@ class EvalArtifact:
         """
         if not self.carries(key):
             raise ProvenanceError(
-                f"{self.path}: carries no {key!r} block, so it predates the"
-                f" instrument that writes one; a sweep today writes it at"
+                f"{self.path}: carries no {key!r} block, so no instrument"
+                f" wrote one into it; a sweep writes that block at"
                 f" artifact_version {ARTIFACT_VERSION}"
             )
         return self.raw[key]
@@ -225,6 +245,9 @@ class EvalArtifact:
         return _failed_cases(self.block("mode_output"))
 
 
+_MODE: TypeAdapter[SweepMode] = TypeAdapter(SweepMode)
+
+
 def load_artifact(path: Path | str) -> EvalArtifact:
     """Read a sweep artifact's provenance, or refuse it.
 
@@ -232,8 +255,8 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     :func:`~analysis_service.certification.load_manifest` does: an artifact from
     another schema should be named as such, not reported as a heap of stray
     keys. There is no best-effort read of an unversioned artifact — those
-    predate served identities entirely, so anything recovered from one would be
-    a guess at what answered.
+    record no served identities, so anything recovered from one would be a
+    guess at what answered.
     """
     path = Path(path)
     try:
@@ -250,7 +273,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     if not is_version(version, ARTIFACT_VERSION):
         raise ProvenanceError(
             f"{path}: unsupported artifact_version {version!r}; expected"
-            f" {ARTIFACT_VERSION}. An artifact without one predates recorded"
+            f" {ARTIFACT_VERSION}. An artifact without one records no"
             " served identities and cannot be promoted — re-run the sweep"
         )
 
@@ -269,7 +292,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         # naming the wrong cause.
         raise ProvenanceError(
             f"{path}: the provenance block records no identity_version, so it"
-            " predates execution-identity versioning. Its fingerprints hash a"
+            " states no version of the execution identity. Its fingerprints hash a"
             f" payload this build cannot recompute (version {IDENTITY_VERSION});"
             " the run's recall, precision and spread still read"
         )
@@ -296,9 +319,15 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     trusted = raw.get("trusted", False)
     if not isinstance(trusted, bool):
         raise ProvenanceError(f"{path}: trusted is {trusted!r}, not true or false")
+    try:
+        mode = _MODE.validate_python(raw.get("mode"))
+    except ValidationError as exc:
+        raise ProvenanceError(
+            f"{path}: mode {raw.get('mode')!r} is not a sweep mode"
+        ) from exc
     return EvalArtifact(
         path=path,
-        mode=str(raw.get("mode", "")),
+        mode=mode,
         cases=tuple(str(case) for case in raw.get("cases", ())),
         trusted=trusted,
         structural_failures=tuple(
@@ -357,6 +386,13 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "stopped",
     "series",
     "completion",
+    # Declared without a version bump, on the ``flow_identity_version``
+    # precedent: ``carries`` says whether an artifact holds it. One digest per
+    # case the sweep selected, from :func:`rendered_sources`, so a sweep that
+    # the hold stopped short keeps the digests of its peers. ``replay`` places a
+    # sweep on an arm by it. It covers the corpus Sources only: the answered
+    # and withheld modes add an answers Source after it is taken.
+    "rendered_sources",
 )
 
 #: What a **re-score** writes and a sweep never does, which is why these are
@@ -450,7 +486,7 @@ def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
 
 def build(
     *,
-    mode: str,
+    mode: SweepMode,
     cases: Sequence[str],
     models: Mapping[str, Any],
     certification: CertifyResult,
@@ -458,6 +494,7 @@ def build(
     sweep: Sweep,
     commit: RepoCommit,
     corpus: str,
+    rendered: Mapping[str, str],
     series: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """The whole artifact: the sweep's envelope, plus every instrument's keys.
@@ -472,9 +509,10 @@ def build(
     ``trusted`` rides beside the aggregates so nothing downstream folds an
     uncertified run into a trusted number unaware.
 
-    ``commit`` and ``corpus`` are passed in rather than computed here, because
-    a sweep that cannot name its own repository state should stop before it
-    spends the money — ``command_run`` resolves both in its first second. By
+    ``commit``, ``corpus`` and ``rendered`` are passed in rather than computed
+    here, because a sweep that cannot name its own repository state or its input
+    should stop before it spends the money — ``command_run`` resolves all three
+    before the consent gate. By
     the time this runs, the answer has already been paid for.
 
     ``completion`` is what every aggregate below it is conditional on. Scoring
@@ -506,6 +544,7 @@ def build(
         "trusted": trusted,
         "repo_commit": commit.model_dump(),
         "corpus_digest": corpus,
+        "rendered_sources": dict(rendered),
         # Which rule spelled every flow ID in this artifact and its report
         # bundle (ADR 0037 rule 4). The version the writing code holds, because
         # every ID in the bundle came out of that code.

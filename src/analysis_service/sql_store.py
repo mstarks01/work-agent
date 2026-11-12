@@ -34,6 +34,7 @@ The rules this module keeps:
   :meth:`SqlJobStore.startup_check` refuses a schema that is not at the latest
   revision. The first-run app migrates a database whose row allows it, with
   :func:`migrate_first_run_database`, before it builds the store (ADR 0110).
+  :func:`migrator` names the process that migrates a database.
 """
 
 from __future__ import annotations
@@ -44,12 +45,19 @@ import json
 import logging
 import os
 import ssl
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
+from contextlib import asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from alembic.migration import MigrationContext
 from alembic.util import CommandError
@@ -76,26 +84,44 @@ from sqlalchemy import (
     event,
     func,
     insert,
+    inspect,
     or_,
     select,
     union_all,
     update,
 )
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.exc import ArgumentError, SQLAlchemyError
+from sqlalchemy.exc import ArgumentError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool, Pool
 from sqlalchemy.types import TypeDecorator
 from typing_extensions import override
 
 from analysis_service import migrations
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.carried_renames import ElementRename
 from analysis_service.claims import UnknownKey
 from analysis_service.config_files import read_secret, refuse_bare_secret
+from analysis_service.controls import (
+    Control,
+    ControlAdmission,
+    ControlDocument,
+    ControlLimits,
+    ControlReplacement,
+    EvidenceFile,
+    EvidenceRefusal,
+    check_texts,
+    control_refusal,
+    names_another_scope,
+)
 from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
+from analysis_service.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+)
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
     TERMINAL_STATUSES,
@@ -122,12 +148,18 @@ from analysis_service.jobs import (
     stored_report,
 )
 from analysis_service.objects import (
+    ControlKey,
+    FileKey,
+    JobKey,
     ObjectName,
     ObjectStore,
     check_private,
+    evidence_key,
+    file_key,
     key_parts,
     object_key,
 )
+from analysis_service.owner_files import FileAdmission, OwnerFile
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
@@ -225,6 +257,9 @@ jobs = Table(
     Column("amends", String(64)),
     Column("error", Text),
     Column("ask_questions", Boolean, nullable=False),
+    Column("continues_at_pause", Boolean, nullable=False),
+    Column("assertion_pass", Boolean, nullable=False),
+    Column("continue_refusal", Text),
     Column("frameworks", _Json, nullable=False),
     Column("answers", _Json, nullable=False),
     Column("shown_early", _Json, nullable=False),
@@ -234,12 +269,15 @@ jobs = Table(
     Column("resumption", _Json, nullable=False),
     Column("carried", _Json, nullable=False),
     Column("carried_renames", _Json, nullable=False),
+    Column("control_scopes", _Json, nullable=False),
+    Column("control_facts", _Json, nullable=False),
     Column("checkpoint", _Json, nullable=False),
     Column("validation_issues", _Json, nullable=False),
     Column("certification", _Json, nullable=False),
     Column("unreported_nodes", _Json, nullable=False),
     Column("sources_sha256", String(64), nullable=False),
     Column("report_sha256", String(64)),
+    Column("controls_sha256", String(64)),
 )
 
 #: The ``job_events`` table: one row for each event, keyed by the job and the
@@ -271,11 +309,57 @@ usage_rows = Table(
     Column("parent_id", String(64), index=True),
 )
 
+#: The ``owner_files`` table (ADR 0118): one row for each Owner File, which
+#: names the object of its text.
+owner_files = Table(
+    "owner_files",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    Column("name", Text, nullable=False),
+    Column("kind", String(32), nullable=False),
+    Column("sha256", String(64), nullable=False),
+    Column("size_bytes", BigInteger, nullable=False),
+    Column("created_at", _UtcTime, nullable=False),
+    # Refuses a second file of one name for one owner: two names are one where
+    # the strings are equal. The in-memory store compares names in `add_file`.
+    UniqueConstraint("owner_id", "name"),
+)
+
+#: The ``controls`` table (ADR 0127): one row for each Control, which holds
+#: the authored document as JSON. The document lists the evidence objects.
+controls = Table(
+    "controls",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    # The document's name, which the constraint below reads.
+    Column("name", Text, nullable=False),
+    Column("updated_at", _UtcTime, nullable=False),
+    Column("document", _Json, nullable=False),
+    # Refuses a second Control of one name for one owner, as on owner_files.
+    # The in-memory store compares names in `add_control`.
+    UniqueConstraint("owner_id", "name"),
+)
+
 #: The column of a job row that holds the digest of each object. The table
 #: answers for every name of :data:`~analysis_service.objects.ObjectName`.
 DIGEST_COLUMNS: dict[ObjectName, str] = {
     "sources.json": "sources_sha256",
     "report.json": "report_sha256",
+    "controls.json": "controls_sha256",
 }
 
 
@@ -309,7 +393,8 @@ def _object_keys(row: Row[Any], *, include_unnamed: bool = False) -> list[str]:
 
 
 #: The fields of a record that are objects or event rows, not job columns.
-_OUTSIDE_THE_ROW = frozenset({"sources", "report", "events"})
+RecordObjectField = Literal["sources", "report", "controls", "events"]
+_OUTSIDE_THE_ROW: frozenset[RecordObjectField] = frozenset(get_args(RecordObjectField))
 #: The fields a job row holds as JSON text.
 _JSON_FIELDS = frozenset(
     column.name for column in jobs.columns if isinstance(column.type, _Json)
@@ -320,6 +405,7 @@ _ADAPTERS: dict[str, TypeAdapter[Any]] = {
     for name in _JSON_FIELDS
 }
 _SOURCES: TypeAdapter[list[Source]] = TypeAdapter(list[Source])
+_CONTROLS: TypeAdapter[list[CopiedControl]] = TypeAdapter(list[CopiedControl])
 _STATUS: TypeAdapter[JobStatus] = TypeAdapter(JobStatus)
 _EVENTS: TypeAdapter[list[JobEvent]] = TypeAdapter(list[JobEvent])
 
@@ -376,10 +462,12 @@ def _record(
     sources: bytes | None,
     report: bytes | None,
     events: Sequence[str],
+    controls: bytes | None = None,
 ) -> JobRecord:
     """The record a row and its objects hold. An envelope, where ``sources``
     is ``None``, leaves out each part that :func:`envelope_parts` names, and
-    never parses one."""
+    never parses one. ``controls`` is ``None`` where the row names no
+    Controls object."""
     left_out = envelope_parts(row.schema_version) if sources is None else {}
     data: dict[str, Any] = {}
     for name in JobRecord.model_fields.keys() - _OUTSIDE_THE_ROW:
@@ -392,6 +480,7 @@ def _record(
             data[name] = value
     data["sources"] = None if sources is None else _loads(sources, "sources")
     data["report"] = None if report is None else _loads(report, "report")
+    data["controls"] = [] if controls is None else _loads(controls, "controls")
     data["events"] = [
         _loads(text, "events", index) for index, text in enumerate(events)
     ]
@@ -752,13 +841,33 @@ def _no_preparation(engine: AsyncEngine) -> None:
     """Set nothing on a new engine."""
 
 
-async def _held_by_begin_immediate(connection: AsyncConnection) -> None:
-    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database."""
+async def _held_by_begin_immediate(connection: AsyncConnection, *_: str) -> None:
+    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database.
+
+    It serves as the admission lock and as each owner's lock, so it takes the
+    owner ID of the second and reads nothing past the connection.
+    """
 
 
 #: The key of the advisory lock that admission takes on PostgreSQL. The value
 #: is arbitrary, and no other lock in the database uses it.
 _ADMISSION_LOCK_KEY = 1525
+
+#: The first key of the per-owner advisory lock of an Owner File upload and a
+#: Control save. The second key is a hash of the owner ID.
+_OWNER_LOCK_KEY = 2059
+
+
+async def _owner_advisory_lock(connection: AsyncConnection, owner_id: str) -> None:
+    """Take the owner's lock until the transaction ends (ADRs 0118 and 0127).
+
+    The count of an owner's files or Controls and the insert need one owner's
+    lock, so two owners' saves do not wait on each other. Two owner IDs with
+    one hash share a lock, which only makes their saves wait.
+    """
+    await connection.execute(
+        select(func.pg_advisory_xact_lock(_OWNER_LOCK_KEY, func.hashtext(owner_id)))
+    )
 
 
 async def _advisory_lock(connection: AsyncConnection) -> None:
@@ -789,6 +898,9 @@ class Database:
     #: Takes the global lock of admission, in the write transaction of
     #: admission.
     admission_lock: Callable[[AsyncConnection], Awaitable[None]]
+    #: Takes one owner's lock of an Owner File upload or a Control save, in its
+    #: write transaction.
+    owner_lock: Callable[[AsyncConnection, str], Awaitable[None]]
     #: Makes the database where there is none. Only a migration calls it,
     #: through :func:`create_database`; the service never makes one.
     create: Callable[[URL], None]
@@ -814,6 +926,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_prepare_sqlite,
         connect=_sqlite,
         admission_lock=_held_by_begin_immediate,
+        owner_lock=_held_by_begin_immediate,
         create=_create_sqlite,
         first_run_migrates=True,
         reads=(DATABASE_URL_VAR,),
@@ -826,6 +939,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_no_preparation,
         connect=_postgres,
         admission_lock=_advisory_lock,
+        owner_lock=_owner_advisory_lock,
         create=_no_creation,
         first_run_migrates=False,
         reads=(DATABASE_URL_VAR, DATABASE_CREDENTIALS_VAR, DATABASE_CA_FILE_VAR),
@@ -895,42 +1009,85 @@ def create_database(env: Mapping[str, str]) -> None:
     _database(url).create(url)
 
 
-def migrate_first_run_database(env: Mapping[str, str]) -> None:
-    """Migrate the database that the settings name to the latest revision,
-    where its row sets ``first_run_migrates`` (ADR 0110).
+#: The process that brings a database to the latest revision (ADR 0110).
+Migrator = Literal["the first-run app", "the migration step"]
 
-    The first-run app calls it through
-    :func:`~analysis_service.store_backends.build_store` at its startup and in
-    the check of a Settings save. It makes a missing database first,
-    as the migration step does. A database at the latest revision, or at a
-    revision that the tree does not hold, stays as it is, and the startup
-    check refuses the second. A migration writes one log line that names the
-    two revisions. A database that cannot be read or migrated stops the
-    startup with a :class:`StoreConfigError`, which names no path. It runs
+
+def migrator(env: Mapping[str, str], *, first_run: bool) -> Migrator:
+    """The process that migrates the database that the settings name.
+
+    **The one reader of which process migrates a database.** It is the
+    first-run app where that app builds the store and the row of the database
+    sets ``first_run_migrates``, and the migration step otherwise. The build
+    of the store reads it, and the build decides from it whether to migrate
+    and which remedy :meth:`SqlJobStore.startup_check` gives.
+    """
+    if first_run and _database(database_url(env)).first_run_migrates:
+        return "the first-run app"
+    return "the migration step"
+
+
+def migrate_database(env: Mapping[str, str]) -> None:
+    """Migrate the database that the settings name to the latest revision:
+    the migration step.
+
+    A database at a revision that the tree does not hold raises
+    :class:`RevisionNotHeld`, with the remedy of the migration step. An error
+    of the database ends in a traceback. It runs event loops of its own, so
+    call it where none runs.
+    """
+    _migrate(env, "the migration step")
+
+
+def migrate_first_run_database(env: Mapping[str, str]) -> None:
+    """Migrate the database that the settings name to the latest revision:
+    the first-run app, where :func:`migrator` names it (ADR 0110).
+
+    A database at a revision that the tree does not hold stays as it is, and
+    the startup check refuses it. A database whose revision cannot be read,
+    or that cannot be migrated, stops the startup with a
+    :class:`StoreConfigError` that says which, and names no path. It runs
     event loops of its own, so call it where none runs.
     """
-    url = database_url(env)
-    database = _database(url)
-    if not database.first_run_migrates:
-        return
+    with suppress(RevisionNotHeld):
+        _migrate(env, "the first-run app")
+
+
+def _migrate(env: Mapping[str, str], by: Migrator) -> None:
+    """The steps of each migration: make the database where it does not
+    exist, read its revision, refuse a revision that the tree does not hold,
+    and upgrade a database below the latest revision, with one log line that
+    names the two revisions."""
     create_database(env)
-    head = migrations.head()
-    try:
+    with _failed(by, "read"):
         current = asyncio.run(_current_revision(env))
-        if current == head or not migrations.holds(current):
-            return
+    if not migrations.holds(current):
+        raise _not_held(current, by)
+    head = migrations.head()
+    if current == head:
+        return
+    with _failed(by, "migrated"):
         migrations.upgrade(env)
+    logger.info(
+        "%s migrated the job database from revision %s to %s", by, current, head
+    )
+
+
+@contextmanager
+def _failed(by: Migrator, step: Literal["read", "migrated"]) -> Iterator[None]:
+    """Stop the first-run app with a :class:`StoreConfigError` where the
+    database cannot be ``step``. The refusal names no path, and the log says
+    why. The migration step keeps the error and its traceback."""
+    try:
+        yield
     except (SQLAlchemyError, CommandError):
-        logger.exception("the first-run app could not migrate the job database")
+        if by != "the first-run app":
+            raise
+        logger.exception("%s: the job database cannot be %s", by, step)
         raise StoreConfigError(
-            f"the database that {DATABASE_URL_VAR} names cannot be migrated;"
+            f"the database that {DATABASE_URL_VAR} names cannot be {step};"
             " the log says why"
         ) from None
-    logger.info(
-        "the first-run app migrated the job database from revision %s to %s",
-        current,
-        head,
-    )
 
 
 async def _current_revision(env: Mapping[str, str]) -> str | None:
@@ -958,6 +1115,63 @@ def engine_for(env: Mapping[str, str]) -> AsyncEngine:
 
 def _revision(connection: Connection) -> str | None:
     return MigrationContext.configure(connection).get_current_revision()
+
+
+#: The remedy for a database that no migration can bring to the latest
+#: revision, by the process that migrates it. Each remedy names no path, so
+#: the refusal that holds it names none.
+REMAKE: dict[Migrator, str] = {
+    "the first-run app": (
+        "delete the database file, then start the app again: the app makes"
+        " a new database and migrates it"
+    ),
+    "the migration step": (
+        "remove the database (for SQLite, delete its file; for PostgreSQL, drop"
+        " the database and create it again), then run"
+        " python -m analysis_service.migrations"
+    ),
+}
+
+
+class RevisionNotHeld(RuntimeError):
+    """A database at a revision that the tree does not hold, such as one that
+    a later build migrated. No migration of this build brings it to the
+    latest revision. The database is the fault, not a setting."""
+
+
+def _not_held(current: str | None, by: Migrator) -> RevisionNotHeld:
+    """**The one refusal of a revision that the tree does not hold**, with the
+    remedy of :data:`REMAKE`. The migrations and the startup check raise
+    it."""
+    return RevisionNotHeld(
+        f"the database schema is at revision {current}, which this build does"
+        f" not hold, so {REMAKE[by]}"
+    )
+
+
+def _schema_differences(connection: Connection) -> list[str]:
+    """Each table of :data:`METADATA` that the database lacks, and each column
+    that one of its tables lacks or holds beyond :data:`METADATA`.
+
+    An insert into a table that holds a column the service does not know
+    fails where that column takes no null.
+    """
+    inspector = inspect(connection)
+    held_tables = set(inspector.get_table_names())
+    differences = []
+    for name, table in sorted(METADATA.tables.items()):
+        if name not in held_tables:
+            differences.append(f"no {name} table")
+            continue
+        needed = set(table.columns.keys())
+        held = {column["name"] for column in inspector.get_columns(name)}
+        differences += [
+            f"no {name}.{column} column" for column in sorted(needed - held)
+        ]
+        differences += [
+            f"an unknown {name}.{column} column" for column in sorted(held - needed)
+        ]
+    return differences
 
 
 def _held(job_id: str) -> CompoundSelect:
@@ -1014,14 +1228,16 @@ class SqlJobStore:
     #: The database and the object store keep each job through a restart.
     durable = True
 
-    def __init__(self, engine: AsyncEngine, objects: ObjectStore) -> None:
+    def __init__(
+        self, engine: AsyncEngine, objects: ObjectStore, *, migrator: Migrator
+    ) -> None:
+        """``migrator`` is the process that migrates the database, which
+        decides the remedy that :meth:`startup_check` gives."""
         self._engine = engine
         self._objects = objects
+        self._migrator = migrator
         self._admission_lock = _database(engine.url).admission_lock
-
-    @classmethod
-    def from_env(cls, env: Mapping[str, str], objects: ObjectStore) -> SqlJobStore:
-        return cls(engine_for(env), objects)
+        self._owner_lock = _database(engine.url).owner_lock
 
     @asynccontextmanager
     async def _transaction(
@@ -1034,15 +1250,30 @@ class SqlJobStore:
                 yield connection
 
     async def startup_check(self) -> None:
-        """Refuse a schema that is not at the latest revision, then check the
-        object store. The service never migrates."""
+        """Refuse a schema that is not at the latest revision, or that differs
+        from :data:`METADATA` in a table or a column, then check the object
+        store. The service never migrates."""
         async with self._transaction() as connection:
             current = await connection.run_sync(_revision)
         head = migrations.head()
+        if not migrations.holds(current):
+            raise _not_held(current, self._migrator)
         if current != head:
             raise StoreConfigError(
                 f"the database schema is at revision {current}, and this service"
                 f" needs {head}: run python -m analysis_service.migrations first"
+            )
+        async with self._transaction() as connection:
+            differences = await connection.run_sync(_schema_differences)
+        if differences:
+            # A schema change edits revision 0001 in place, so a database with
+            # another schema can be at the head revision, and a migration changes
+            # nothing in it.
+            raise StoreConfigError(
+                f"the database schema differs from the one this service needs"
+                f" ({'; '.join(differences)}): the database holds another"
+                f" schema at the head revision, and a migration does not change it, so"
+                f" {REMAKE[self._migrator]}"
             )
         await self._objects.check()
 
@@ -1101,9 +1332,11 @@ class SqlJobStore:
     ) -> Admission:
         """Check every admission bound and insert, in one write transaction.
 
-        The objects go first, so the row never names a missing one, and they
-        go again at once where admission refuses the job or raises. A failed
-        object delete there changes neither the refusal nor the error.
+        The objects go first, so the row never names an object that does not
+        exist, and they go again at once where admission refuses the job or
+        raises. A failed object delete there changes neither the refusal nor
+        the error. The admission of a child clears its parent's
+        ``continue_refusal`` in the same transaction (ADR 0125).
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -1116,6 +1349,8 @@ class SqlJobStore:
         }
         if record.report is not None:
             objects["report.json"] = stored_report(record.report)
+        if record.controls:
+            objects["controls.json"] = _CONTROLS.dump_json(record.controls)
         keys = []
         try:
             for name, data in objects.items():
@@ -1174,13 +1409,7 @@ class SqlJobStore:
             await self._admission_lock(connection)
             if await connection.scalar(_held(record.id)) is not None:
                 return Admission(outcome="duplicate", active=0)
-            if principal is None:
-                owner = select(principals.c.owner_id).where(
-                    principals.c.owner_id == record.owner_id
-                )
-                if await connection.scalar(owner) is None:
-                    raise ValueError(f"owner {record.owner_id} holds no principal")
-            elif await self._principal(connection, principal.identity) is not None:
+            if not await self._principal_admits(connection, record.owner_id, principal):
                 return Admission(outcome="principal_exists", active=0)
             parent = parent_of(record)
             if parent is not None:
@@ -1195,7 +1424,7 @@ class SqlJobStore:
                 if await self._resumed_by(connection, parent) is not None:
                     return Admission(outcome="resumed_already", active=0)
                 if revision != record.parent_revision:
-                    return Admission(outcome="parent_moved", active=0)
+                    return Admission(outcome="parent_stale", active=0)
             counted = await connection.execute(_counted(budget.window_start()))
             held: list[Envelope | UsageRow] = []
             for row in counted.all():
@@ -1207,13 +1436,12 @@ class SqlJobStore:
             if admission.outcome != "admitted":
                 return admission
             if principal is not None:
+                await self._add_principal(connection, principal)
+            if parent is not None:
                 await connection.execute(
-                    insert(principals).values(
-                        owner_id=principal.owner_id,
-                        issuer=principal.issuer,
-                        sub=principal.sub,
-                        created_at=principal.created_at,
-                    )
+                    update(jobs)
+                    .where(jobs.c.id == parent)
+                    .values(continue_refusal=None)
                 )
             await connection.execute(
                 insert(jobs).values(
@@ -1221,6 +1449,7 @@ class SqlJobStore:
                         **_job_row(record),
                         "sources_sha256": digests["sources.json"],
                         "report_sha256": digests.get("report.json"),
+                        "controls_sha256": digests.get("controls.json"),
                     }
                 )
             )
@@ -1285,12 +1514,19 @@ class SqlJobStore:
         sources = await self._object(row, "sources.json")
         if sources is None:
             return None
-        report = None
-        if _names(row, "report.json"):
-            report = await self._object(row, "report.json")
-            if report is None:
-                return None
-        return _record(row, sources, report, texts)
+        named: dict[ObjectName, bytes | None] = {}
+        for name in ("report.json", "controls.json"):
+            if _names(row, name):
+                named[name] = await self._object(row, name)
+                if named[name] is None:
+                    return None
+        return _record(
+            row,
+            sources,
+            named.get("report.json"),
+            texts,
+            named.get("controls.json"),
+        )
 
     async def owned(self, job_id: str, owner_id: str) -> Envelope | None:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
@@ -1320,6 +1556,28 @@ class SqlJobStore:
         if data is None:
             return None
         return _part_of(row, lambda: _SOURCES.validate_json(data))
+
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        """The owned job's copy of its Controls. The owner is checked on the
+        row, before the object is read."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.controls_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            )
+            row = found.one_or_none()
+        if row is None:
+            return None
+        if not _names(row, "controls.json"):
+            return []
+        data = await self._object(row, "controls.json")
+        if data is None:
+            return None
+        return _part_of(row, lambda: _CONTROLS.validate_json(data, context=STORED))
 
     async def _report(
         self, job_id: str, owner_id: str
@@ -1441,8 +1699,13 @@ class SqlJobStore:
             raise ValueError(f"job {record.id!r} does not exist")
         check_save(record, row.report_sha256, _stored_events(row, events))
         values = _job_row(record)
-        # Only set_title writes the title after admission (ADR 0106).
+        # Only set_title writes the title after admission (ADR 0106), and
+        # only set_continue_refusal and a child's admission write the
+        # continue refusal (ADR 0125), as
+        # `test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it`
+        # checks.
         del values["title"]
+        del values["continue_refusal"]
         if record.report is not None and not _names(row, "report.json"):
             data = stored_report(record.report)
             key = object_key(row.owner_id, row.id, "report.json")
@@ -1485,6 +1748,8 @@ class SqlJobStore:
         revision: int,
         *,
         renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
     ) -> bool:
         """Keep a waiting job's saved answers, as one conditional ``UPDATE`` on
         the revision, under the lock on the job's row."""
@@ -1493,6 +1758,14 @@ class SqlJobStore:
             "shown_early": _json("shown_early", list(shown)),
             "skipped_early": _json("skipped_early", list(skipped)),
             "carried_renames": _json("carried_renames", list(renames)),
+            "control_scopes": _json(
+                "control_scopes",
+                None if control_scopes is None else list(control_scopes),
+            ),
+            "control_facts": _json(
+                "control_facts",
+                None if control_facts is None else list(control_facts),
+            ),
         }
         async with self._transaction(writes=True) as connection:
             await self._lock(connection, job_id)
@@ -1540,7 +1813,7 @@ class SqlJobStore:
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, as one conditional
@@ -1593,6 +1866,17 @@ class SqlJobStore:
                 update(jobs)
                 .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
                 .values(title=title)
+            )
+            return saved.rowcount == 1
+
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        async with self._transaction(writes=True) as connection:
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+                .values(continue_refusal=refusal)
             )
             return saved.rowcount == 1
 
@@ -1679,19 +1963,61 @@ class SqlJobStore:
         """Delete each object last written before ``before`` that no job row
         keeps, and return how many the store removed.
 
-        The sweep lists every key first. A key that :func:`object_key` cannot
-        give stays, because the service never writes one. Then one read
-        transaction finds the keys that the rows of the listed job IDs keep
-        (:meth:`_kept_keys`). A row keeps a key only under its own owner ID.
-        The sweep deletes each other listed key.
+        The sweep lists every key first. A key that no builder of
+        :func:`key_parts` can give stays, because the service never writes
+        one. Then it finds the keys that the rows of the listed job IDs keep
+        (:meth:`_kept_keys`), the keys that the rows of the listed Owner File
+        IDs keep (:meth:`_kept_file_keys`) and the keys that the rows of the
+        listed Control IDs keep (:meth:`_kept_evidence_keys`). A row keeps a
+        key only under its own owner ID. The sweep deletes each other listed
+        key.
         """
         listed = []
         async for key, modified in self._objects.list():
             parts = key_parts(key)
             if parts is not None and modified < before:
-                listed.append((key, parts[1]))
-        kept = await self._kept_keys(sorted({job_id for _, job_id in listed}))
+                listed.append((key, parts))
+        job_ids = {parts.job_id for _, parts in listed if isinstance(parts, JobKey)}
+        file_ids = {parts.file_id for _, parts in listed if isinstance(parts, FileKey)}
+        control_ids = {
+            parts.control_id for _, parts in listed if isinstance(parts, ControlKey)
+        }
+        kept = await self._kept_keys(sorted(job_ids))
+        kept |= await self._kept_file_keys(sorted(file_ids))
+        kept |= await self._kept_evidence_keys(sorted(control_ids))
         return await self._remove([key for key, _ in listed if key not in kept])
+
+    async def _kept_evidence_keys(self, control_ids: Sequence[str]) -> set[str]:
+        """The key of each evidence object that a row of ``control_ids`` lists,
+        under the row's own owner ID. One read transaction, with
+        :data:`_ID_BATCH` Control IDs in each query."""
+        query = select(controls.c.id, controls.c.owner_id, controls.c.document)
+        kept: set[str] = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(control_ids), _ID_BATCH):
+                batch = control_ids[start : start + _ID_BATCH]
+                rows = await connection.execute(query.where(controls.c.id.in_(batch)))
+                kept.update(
+                    evidence_key(row.owner_id, row.id, file.id)
+                    for row in rows
+                    for file in _document(row.document).evidence
+                )
+        return kept
+
+    async def _kept_file_keys(self, file_ids: Sequence[str]) -> set[str]:
+        """The key of each Owner File object that a row of ``file_ids`` names,
+        under the row's own owner ID. One read transaction, with
+        :data:`_ID_BATCH` file IDs in each query."""
+        query = select(owner_files.c.id, owner_files.c.owner_id)
+        kept: set[str] = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(file_ids), _ID_BATCH):
+                batch = file_ids[start : start + _ID_BATCH]
+                rows = await connection.execute(
+                    query.where(owner_files.c.id.in_(batch))
+                )
+                kept.update(file_key(row.owner_id, row.id) for row in rows)
+        return kept
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         async with self._transaction() as connection:
@@ -1739,3 +2065,434 @@ class SqlJobStore:
             )
             failed.append(job_id)
         return failed
+
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Put the text, then count and insert the row in one write
+        transaction (ADR 0118).
+
+        The object goes first, so a row never names an object that does not
+        exist, and it goes again at once where the insert is refused or raises.
+        """
+        if principal is not None and principal.owner_id != file.owner_id:
+            raise ValueError(f"file {file.id} names another owner than its principal")
+        data = text.encode("utf-8")
+        if file.sha256 != object_digest(data):
+            raise ValueError(f"file {file.id} holds another digest than its text")
+        key = file_key(file.owner_id, file.id)
+        await self._objects.put(key, data)
+        try:
+            outcome = await self._insert_file(file, limit=limit, principal=principal)
+        except BaseException:
+            await self._remove([key])
+            raise
+        if outcome != "added":
+            await self._remove([key])
+        return outcome
+
+    async def _principal_admits(
+        self,
+        connection: AsyncConnection,
+        owner_id: str,
+        principal: Principal | None,
+    ) -> bool:
+        """Whether a job, an upload or a save of ``owner_id`` may go on as to its
+        principal: ``principal`` is new and its identity holds none, or, without
+        ``principal``, the owner holds one. Without ``principal``, an owner who
+        holds none is a defect, and the call raises."""
+        if principal is not None:
+            return await self._principal(connection, principal.identity) is None
+        holder = select(principals.c.owner_id).where(principals.c.owner_id == owner_id)
+        if await connection.scalar(holder) is None:
+            raise ValueError(f"owner {owner_id} holds no principal")
+        return True
+
+    async def _add_principal(
+        self, connection: AsyncConnection, principal: Principal
+    ) -> None:
+        await connection.execute(
+            insert(principals).values(
+                owner_id=principal.owner_id,
+                issuer=principal.issuer,
+                sub=principal.sub,
+                created_at=principal.created_at,
+            )
+        )
+
+    async def _insert_file(
+        self, file: OwnerFile, *, limit: int, principal: Principal | None
+    ) -> FileAdmission:
+        """Count the owner's files and insert the row under the owner's lock.
+
+        ``UNIQUE (owner_id, name)`` refuses a duplicate name. Its refusal ends
+        the transaction, so the store reads the name again after the rollback,
+        and raises the error where no row holds it.
+        """
+        owned = owner_files.c.owner_id == file.owner_id
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_lock(connection, file.owner_id)
+                if not await self._principal_admits(
+                    connection, file.owner_id, principal
+                ):
+                    return "principal_exists"
+                count = select(func.count()).select_from(owner_files).where(owned)
+                if (await connection.scalar(count) or 0) >= limit:
+                    return "over_limit"
+                if principal is not None:
+                    await self._add_principal(connection, principal)
+                await connection.execute(insert(owner_files).values(file.model_dump()))
+        except IntegrityError:
+            named = select(owner_files.c.id).where(
+                owned, owner_files.c.name == file.name
+            )
+            async with self._transaction() as connection:
+                if await connection.scalar(named) is None:
+                    raise
+            return "name_in_use"
+        return "added"
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        async with self._transaction() as connection:
+            rows = await connection.execute(
+                select(owner_files)
+                .where(owner_files.c.owner_id == owner_id)
+                .order_by(owner_files.c.created_at.desc(), owner_files.c.id.desc())
+            )
+            return [OwnerFile(**row._mapping) for row in rows]
+
+    async def _file_row(self, file_id: str, owner_id: str) -> OwnerFile | None:
+        async with self._transaction() as connection:
+            row = (
+                await connection.execute(
+                    select(owner_files).where(
+                        owner_files.c.id == file_id, owner_files.c.owner_id == owner_id
+                    )
+                )
+            ).one_or_none()
+        return None if row is None else OwnerFile(**row._mapping)
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        """The row first, by the file ID and the owner ID, then the object
+        that the row names, checked against the row's digest."""
+        file = await self._file_row(file_id, owner_id)
+        if file is None:
+            return None
+        data = await self._objects.get(file_key(file.owner_id, file.id))
+        if data is None and await self._file_row(file_id, owner_id) is None:
+            # A delete removed the row after this read found it.
+            return None
+        if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
+            logger.error(
+                "Owner File %s of owner %s: its object is missing or fails its"
+                " digest check",
+                file.id,
+                file.owner_id,
+            )
+            raise CorruptObject(file.id)
+        return file, data.decode("utf-8")
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        """Delete the row, then the object. An object whose delete fails
+        stays for the orphan sweep."""
+        async with self._transaction(writes=True) as connection:
+            removed = await connection.execute(
+                delete(owner_files).where(
+                    owner_files.c.id == file_id, owner_files.c.owner_id == owner_id
+                )
+            )
+            held = removed.rowcount == 1
+        if not held:
+            return False
+        await self._remove([file_key(owner_id, file_id)])
+        return True
+
+    async def add_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        principal: Principal | None,
+    ) -> ControlAdmission | EvidenceRefusal:
+        """Put each evidence text, then count and insert the row in one write
+        transaction (ADR 0127).
+
+        The objects go first, so a row never lists an object that does not
+        exist, and they go again at once where the insert is refused or raises.
+        """
+        if principal is not None and principal.owner_id != control.owner_id:
+            raise ValueError(
+                f"control {control.document.id} names another owner than its principal"
+            )
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        check_texts(control.document, texts)
+        async with self._transaction() as connection:
+            held = select(controls.c.id).where(controls.c.id == control.document.id)
+            if await connection.scalar(held) is not None:
+                raise ValueError(
+                    f"the store already holds control {control.document.id}"
+                )
+        keys = await self._put_evidence(control, texts)
+        try:
+            outcome = await self._insert_control(
+                control, limit=limits.max_controls, principal=principal
+            )
+        except BaseException:
+            await self._remove(keys)
+            raise
+        if outcome != "added":
+            await self._remove(keys)
+        return outcome
+
+    async def _put_evidence(
+        self, control: Control, texts: Mapping[str, str]
+    ) -> list[str]:
+        """Put each text under its evidence key, and return the keys."""
+        keys = []
+        try:
+            for evidence_id, text in texts.items():
+                key = evidence_key(control.owner_id, control.document.id, evidence_id)
+                await self._objects.put(key, text.encode("utf-8"))
+                keys.append(key)
+        except BaseException:
+            await self._remove(keys)
+            raise
+        return keys
+
+    async def _scope_refusal(
+        self, connection: AsyncConnection, control: Control
+    ) -> Literal["alias_in_use"] | None:
+        """``alias_in_use`` where the scope's alias names the scope of another
+        Control of the owner. The caller holds the owner's lock."""
+        others = await connection.execute(
+            select(controls.c.document).where(
+                controls.c.owner_id == control.owner_id,
+                controls.c.id != control.document.id,
+            )
+        )
+        scope = control.document.scope
+        if any(
+            names_another_scope(scope, _document(row.document).scope) for row in others
+        ):
+            return "alias_in_use"
+        return None
+
+    async def _name_in_use(self, control: Control) -> bool:
+        """Whether another Control of the owner holds the name. The store reads
+        it after ``UNIQUE (owner_id, name)`` refused a write, because the
+        refusal ends the transaction."""
+        named = select(controls.c.id).where(
+            controls.c.owner_id == control.owner_id,
+            controls.c.name == control.document.name,
+            controls.c.id != control.document.id,
+        )
+        async with self._transaction() as connection:
+            return await connection.scalar(named) is not None
+
+    async def _insert_control(
+        self, control: Control, *, limit: int, principal: Principal | None
+    ) -> ControlAdmission:
+        """Count the owner's Controls and insert the row under the owner's lock,
+        as :meth:`_insert_file` does."""
+        owned = controls.c.owner_id == control.owner_id
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_lock(connection, control.owner_id)
+                if not await self._principal_admits(
+                    connection, control.owner_id, principal
+                ):
+                    return "principal_exists"
+                count = select(func.count()).select_from(controls).where(owned)
+                if (await connection.scalar(count) or 0) >= limit:
+                    return "over_limit"
+                refused = await self._scope_refusal(connection, control)
+                if refused is not None:
+                    return refused
+                if principal is not None:
+                    await self._add_principal(connection, principal)
+                await connection.execute(insert(controls).values(_control_row(control)))
+        except IntegrityError:
+            if not await self._name_in_use(control):
+                raise
+            return "name_in_use"
+        return "added"
+
+    async def list_controls(self, owner_id: str) -> list[Control]:
+        async with self._transaction() as connection:
+            rows = await connection.execute(
+                select(controls)
+                .where(controls.c.owner_id == owner_id)
+                .order_by(controls.c.updated_at.desc(), controls.c.id.desc())
+            )
+            return [_control(row) for row in rows]
+
+    async def get_control(self, control_id: str, owner_id: str) -> Control | None:
+        async with self._transaction() as connection:
+            row = (
+                await connection.execute(
+                    select(controls).where(
+                        controls.c.id == control_id, controls.c.owner_id == owner_id
+                    )
+                )
+            ).one_or_none()
+        return None if row is None else _control(row)
+
+    async def replace_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        expected_updated_at: datetime,
+    ) -> ControlReplacement | EvidenceRefusal:
+        """Put each new evidence text, then update the row under the owner's
+        lock, then remove each evidence object that the new document no
+        longer lists. A refused or failed update removes the new objects."""
+        held = await self.get_control(control.document.id, control.owner_id)
+        if held is None:
+            return "absent"
+        if held.updated_at != expected_updated_at:
+            return "stale"
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        check_texts(control.document, texts, held.document.evidence)
+        keys = await self._put_evidence(control, texts)
+        try:
+            outcome = await self._update_control(control, texts, expected_updated_at)
+        except BaseException:
+            await self._remove(keys)
+            raise
+        if isinstance(outcome, Control):
+            listed = {file.id for file in control.document.evidence}
+            await self._remove(
+                [
+                    evidence_key(control.owner_id, control.document.id, file.id)
+                    for file in outcome.document.evidence
+                    if file.id not in listed
+                ]
+            )
+            return "replaced"
+        await self._remove(keys)
+        return outcome
+
+    async def _update_control(
+        self, control: Control, texts: Mapping[str, str], expected_updated_at: datetime
+    ) -> Control | Literal["absent", "stale", "name_in_use", "alias_in_use"]:
+        """Write the row of ``control`` under the owner's lock, and return the
+        Control that it replaced. A row whose ``updated_at`` is not
+        ``expected_updated_at`` is ``stale``, so a save in between never
+        lands under this one."""
+        owned = (controls.c.id == control.document.id) & (
+            controls.c.owner_id == control.owner_id
+        )
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_lock(connection, control.owner_id)
+                row = (
+                    await connection.execute(select(controls).where(owned))
+                ).one_or_none()
+                if row is None:
+                    return "absent"
+                held = _control(row)
+                if held.updated_at != expected_updated_at:
+                    return "stale"
+                check_texts(control.document, texts, held.document.evidence)
+                refused = await self._scope_refusal(connection, control)
+                if refused is not None:
+                    return refused
+                await connection.execute(
+                    update(controls).where(owned).values(_control_row(control))
+                )
+        except IntegrityError:
+            if not await self._name_in_use(control):
+                raise
+            return "name_in_use"
+        return held
+
+    async def delete_control(self, control_id: str, owner_id: str) -> bool:
+        """Delete the row, then each evidence object. An object whose delete
+        fails stays for the orphan sweep."""
+        owned = (controls.c.id == control_id) & (controls.c.owner_id == owner_id)
+        async with self._transaction(writes=True) as connection:
+            row = (
+                await connection.execute(select(controls).where(owned))
+            ).one_or_none()
+            if row is None:
+                return False
+            await connection.execute(delete(controls).where(owned))
+        await self._remove(
+            [
+                evidence_key(owner_id, control_id, file.id)
+                for file in _document(row.document).evidence
+            ]
+        )
+        return True
+
+    async def read_evidence(
+        self, control_id: str, evidence_id: str, owner_id: str
+    ) -> str | None:
+        """The row first, by the Control ID and the owner ID, then the object
+        that the document lists, checked against the document's digest."""
+        file = _listed(await self.get_control(control_id, owner_id), evidence_id)
+        if file is None:
+            return None
+        data = await self._objects.get(evidence_key(owner_id, control_id, evidence_id))
+        if (
+            data is None
+            and _listed(await self.get_control(control_id, owner_id), evidence_id)
+            is None
+        ):
+            # A delete or a replace removed the file after this read found it.
+            return None
+        if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
+            logger.error(
+                "evidence %s of Control %s of owner %s: its object is missing or"
+                " fails its digest check",
+                evidence_id,
+                control_id,
+                owner_id,
+            )
+            raise CorruptObject(evidence_id)
+        return data.decode("utf-8")
+
+
+def _listed(held: Control | None, evidence_id: str) -> EvidenceFile | None:
+    """The evidence file ``evidence_id`` that ``held`` lists, or ``None``."""
+    return None if held is None else held.document.file(evidence_id)
+
+
+def _document(document: str) -> ControlDocument:
+    """A stored document, read back as the store wrote it."""
+    return ControlDocument.model_validate_json(document, context=STORED)
+
+
+def _control(row: Row[Any]) -> Control:
+    return Control(
+        owner_id=row.owner_id,
+        updated_at=row.updated_at,
+        document=_document(row.document),
+    )
+
+
+def _control_row(control: Control) -> dict[str, Any]:
+    """The columns of the row of ``control``. The name column copies the
+    document's name, which ``UNIQUE (owner_id, name)`` reads."""
+    return {
+        "id": control.document.id,
+        "owner_id": control.owner_id,
+        "name": control.document.name,
+        "updated_at": control.updated_at,
+        "document": control.document.model_dump_json(),
+    }

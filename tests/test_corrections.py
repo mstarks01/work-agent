@@ -35,6 +35,8 @@ def finished(store, *, final: bool = True) -> str:
 
     report = sample_report([asking_threat(ASKED)])
     parent = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
@@ -44,6 +46,8 @@ def finished(store, *, final: bool = True) -> str:
     parent.transition("completed")
     asyncio.run(admit(store, parent))
     record = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),

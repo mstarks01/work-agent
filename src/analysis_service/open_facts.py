@@ -19,19 +19,22 @@ from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from analysis_service.analysis import control_state
+from analysis_service.analysis import ControlAttribute, control_state
 from analysis_service.assertions import (
     REGISTRY,
     AssertionCatalog,
     assertion_id,
     identity_parts,
+    parse_predicate,
     read_assertion_id,
 )
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import UnknownRef
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
+from analysis_service.claims import AttributeGround, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.parsing import table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.system_model import (
+    UNKNOWN,
     ZONE_ATTRIBUTE,
     DataFlow,
     SystemModel,
@@ -78,7 +81,10 @@ def element_names(model: SystemModel) -> Mapping[str, str]:
 
 
 #: How a reader sees each attribute state the evidence catalog offers.
-_GROUND_STATE = {"unknown-attribute": "unstated", "absent-attribute": "stated absent"}
+_GROUND_STATE: dict[AttributeGround, str] = {
+    "unknown-attribute": "unstated",
+    "absent-attribute": "stated absent",
+}
 
 
 def reference_labels(
@@ -134,7 +140,7 @@ def _assertion_statement(
     """
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     row = next(entry for entry in catalog.entries if assertion_id(entry) == identity)
-    predicate = REGISTRY[row.predicate]
+    predicate = table_entry(REGISTRY, row.predicate)
     subject = subjects.get(row.subject) or names.get(row.subject, row.subject)
     value = row.value
     if predicate.value == "reference":
@@ -145,7 +151,7 @@ def _assertion_statement(
 #: The question an attribute asks where the plain form reads badly: of one
 #: element, and of each element its group lists. Each of these attributes
 #: belongs to one element type: a flow is in transit and a store is at rest.
-_ATTRIBUTE_QUESTIONS = {
+_ATTRIBUTE_QUESTIONS: dict[ControlAttribute, tuple[str, str]] = {
     "encryption_in_transit": (
         "Is the connection {element} encrypted?",
         "Is each connection encrypted? If so, how?",
@@ -159,10 +165,12 @@ _ATTRIBUTE_QUESTIONS = {
 
 def _attribute_questions(attribute: str) -> tuple[str, str]:
     """The question an attribute asks of one element, and of each one listed."""
+    if attribute in _ATTRIBUTE_QUESTIONS:
+        return _ATTRIBUTE_QUESTIONS[attribute]
     name = attribute_words(attribute)
-    return _ATTRIBUTE_QUESTIONS.get(
-        attribute,
-        (f"What is the {name} for {{element}}?", f"What is the {name} for each part?"),
+    return (
+        f"What is the {name} for {{element}}?",
+        f"What is the {name} for each part?",
     )
 
 
@@ -194,12 +202,13 @@ def assertion_label(
         return UNWORDED_ASSERTION
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     for entry in catalog.entries:
-        if entry.predicate not in REGISTRY:
+        name = parse_predicate(entry.predicate)
+        if name is None:
             continue
         if identity_parts(entry)[:3] != asked[:3]:
             continue
         subject = subjects.get(entry.subject) or names.get(entry.subject, entry.subject)
-        question = REGISTRY[entry.predicate].question.format(subject=subject)
+        question = REGISTRY[name].question.format(subject=subject)
         if not entry.scope:
             return question
         scope = "; ".join(f"{each.kind}: {each.value}" for each in entry.scope)
@@ -245,17 +254,25 @@ def label_of(
                     return f"What does {source} do when it connects to {destination}?"
     match ref.kind:
         case "capability":
-            capability = CAPABILITIES.get(ref.capability)
-            return capability.question if capability else ref.capability
+            key = parse_capability_key(ref.capability)
+            return ref.capability if key is None else CAPABILITIES[key].question
         case "question":
-            kind = QUESTION_KINDS.get(ref.question)
-            return kind.template.format(element=where) if kind else ref.question
+            name = parse_question_kind(ref.question)
+            if name is None:
+                return ref.question
+            return QUESTION_KINDS[name].template.format(element=where)
         case "assertion":
             return assertion_label(ref.assertion, names, catalog)
         case "attribute":
             return _attribute_questions(ref.attribute)[0].format(element=where)
         case "subject":
             return ref.subject
+
+
+def kind_words(template: str) -> str:
+    """A Question Kind's question about no one element: "it" for the
+    element."""
+    return template.replace("{element}'s", "its").replace("{element}", "it")
 
 
 def group_of(ref: UnknownRef) -> tuple[str, str]:
@@ -277,10 +294,8 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
             return "assertions", "What the description leaves open"
         case "subject":
             return "subjects", "Other questions"
-        case "question" if ref.question in QUESTION_KINDS:
-            template = QUESTION_KINDS[ref.question].template
-            heading = template.replace("{element}'s", "its").replace("{element}", "it")
-            return ref.question, heading
+        case "question" if (name := parse_question_kind(ref.question)) is not None:
+            return ref.question, kind_words(QUESTION_KINDS[name].template)
         case "attribute":
             return ref.attribute, _attribute_questions(ref.attribute)[1]
     label = label_of(ref, {})
@@ -343,6 +358,19 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
     return element is not None and (unverified or assumed)
+
+
+def stated_capability(model: SystemModel, capability: str) -> str | None:
+    """The state ``model`` gives the capability, or ``None`` where the
+    capability is open: no statement names it, or the statements disagree.
+
+    The answer check and a Control's fact both ask it, so a Control writes a
+    capability exactly where an answer may.
+    """
+    known = model.capability_facts().get(capability)
+    if known is None or known.state == UNKNOWN:
+        return None
+    return known.state
 
 
 def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> SystemModel:

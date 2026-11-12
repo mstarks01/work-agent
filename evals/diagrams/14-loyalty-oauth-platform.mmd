@@ -1,0 +1,33 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: rewards cloud"]
+        n3("authorization server")
+        n4("rewards api")
+        n5("support console")
+        n6[("identity database")]
+        n7[("points ledger")]
+        n8[("api log store")]
+    end
+    subgraph z1["Trust zone: member devices"]
+        n0["member"]
+        n2("mobile app")
+    end
+    subgraph z2["Trust zone: partner servers"]
+        n1["partner app"]
+    end
+    n0 -->|"sign in and consent (HTTPS)"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n0 -->|"return with authorization code (HTTPS)"| n1
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n2 -->|"token requests (HTTPS)"| n3
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n1 -->|"token requests (HTTPS)"| n3
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n2 -->|"call rewards api (HTTPS)"| n4
+    linkStyle 4 stroke:#c0392b,stroke-width:2px
+    n1 -->|"call rewards api (HTTPS)"| n4
+    linkStyle 5 stroke:#c0392b,stroke-width:2px
+    n3 -->|"read and write accounts and grants"| n6
+    n4 -->|"read and write points"| n7
+    n4 -->|"write request log"| n8
+    n5 -->|"close accounts"| n6

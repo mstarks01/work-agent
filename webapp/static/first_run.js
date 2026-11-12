@@ -34,6 +34,42 @@
     sync(checkbox);
   }
 
+  // The frameworks menu: its button names the ticked frameworks with their
+  // options, as "STRIDE, ASVS level 1", and opens the panel of rows. Escape,
+  // or a click or focus outside the menu, closes it. A click on a row's text
+  // moves focus to no element, so only a focus that lands outside closes it.
+  const picker = document.getElementById("frameworks");
+  const menuButton = document.getElementById("frameworks-toggle");
+  const menu = document.getElementById("frameworks-panel");
+  const optionText = (select) =>
+    `${select.closest("label").firstChild.textContent.trim()} ${select.selectedOptions[0].textContent}`;
+  const showFrameworks = () => {
+    const names = boxes
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => [checkbox.value.toUpperCase(), ...optionsOf(checkbox).map(optionText)].join(" "));
+    document.getElementById("frameworks-summary").textContent = names.join(", ") || "Choose frameworks";
+  };
+  const openMenu = (open) => {
+    menu.hidden = !open;
+    menuButton.setAttribute("aria-expanded", String(open));
+  };
+  menuButton.addEventListener("click", () => openMenu(menu.hidden));
+  picker.addEventListener("change", showFrameworks);
+  picker.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || menu.hidden) return;
+    openMenu(false);
+    menuButton.focus();
+  });
+  picker.addEventListener("focusout", (event) => {
+    if (event.relatedTarget && !picker.contains(event.relatedTarget)) openMenu(false);
+  });
+  document.addEventListener("click", (event) => {
+    if (!picker.contains(event.target)) openMenu(false);
+  });
+  // A reload can restore ticks after this script runs.
+  showFrameworks();
+  window.addEventListener("pageshow", showFrameworks);
+
   // What the server allow-lists. Each choice's value is the JSON of the choice
   // itself, so a level posts as the number its options model declares rather
   // than as the string a form control would otherwise send.
@@ -48,91 +84,219 @@
       }));
 
   document.getElementById("load").addEventListener("click", async () => {
+    // Text typed while the example loads stays: the example fills only the
+    // description the click left.
+    const before = box.value;
     try {
       const response = await fetch("/example");
       if (!response.ok) throw new Error();
-      box.value = await response.text();
+      const example = await response.text();
+      if (box.value !== before) return;
+      box.value = example;
       updateDescriptionRemaining();
     } catch {
       fail("Could not load the example. Try again.");
     }
   });
 
-  // A voice transcript, checked here so that only text leaves the page. The
-  // server never receives the file: the body carries the decoded text as a
-  // JSON string, as it does for a pasted description, so no file name, content
-  // type or multipart body reaches the server. The checks run before the text
-  // is kept, cheapest first: the size before a byte is read, then a strict
-  // UTF-8 decode, then no control character other than a tab or a line break.
-  // A refused file leaves the transcript the page holds as it was.
-  const transcriptFile = document.getElementById("transcript-file");
-  const transcriptNote = document.getElementById("transcript-note");
-  const maxTranscriptBytes = Number(transcriptFile.dataset.maxBytes);
+  // An uploaded transcript or diagram, checked by text_file.js so that only
+  // text leaves the page: the body carries the decoded text as a JSON string,
+  // as it does for a pasted description. A refused file leaves the uploads the
+  // page holds as they were. The upload takes the default kind of the file's
+  // row in the format table (ADR 0120). The page holds one file of each kind,
+  // under the label the server names for it.
+  const uploadFile = document.getElementById("upload-file");
+  const PAGE_LABELS = JSON.parse(document.getElementById("page_labels").textContent);
+  // The words for each value of a closed service set, from the service
+  // (webapp.page_words.FORM_WORDS).
+  const FORM_WORDS = JSON.parse(document.getElementById("form_words").textContent);
+  const maxUploadBytes = Number(uploadFile.dataset.maxBytes);
   const maxDescriptionBytes = Number(box.dataset.maxBytes);
   const remainingNote = document.getElementById("description-remaining");
-  const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
-  let transcript = null;
+  const UPLOADS = {
+    transcript: { label: PAGE_LABELS.transcript, text: null },
+    diagram: { label: PAGE_LABELS.diagram, text: null },
+  };
+  const held = () => Object.entries(UPLOADS).filter(([, upload]) => upload.text !== null);
+
+  // The Owner Files this analysis copies (ADR 0119). "Select from Files"
+  // lists the files in Files in a dialog, and the form lists the chosen ones.
+  // The submission sends only the chosen IDs: the server reads each text from
+  // the store. A chosen file that the list no longer holds stays on the form
+  // as "Missing" until it is removed.
+  const filesRows = document.getElementById("files-rows");
+  const chosenList = document.getElementById("chosen-files");
+  let ownerFiles = [];
+  const chosen = new Set();
+  const chosenFiles = () => ownerFiles.filter((file) => chosen.has(file.id));
   const updateDescriptionRemaining = () => {
-    const used = new TextEncoder().encode(box.value).length
-      + new TextEncoder().encode(transcript || "").length;
+    const used = [box.value, ...held().map(([, upload]) => upload.text)]
+      .reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0)
+      + chosenFiles().reduce((sum, file) => sum + file.size_bytes, 0);
     const remaining = maxDescriptionBytes - used;
     remainingNote.textContent = remaining < 0
-      ? "Description and transcript are too long. Shorten them to continue."
+      ? "The description and the files are too long. Remove a file or shorten the description."
       : `Up to ${remaining.toLocaleString()} bytes remaining`;
     remainingNote.classList.toggle("field-error", remaining < 0);
     return remaining;
   };
-  box.addEventListener("input", updateDescriptionRemaining);
-  updateDescriptionRemaining();
-  const holdTranscript = (text, name) => {
-    transcript = text;
-    document.getElementById("transcript-name").textContent = name;
-    transcriptNote.hidden = text === null;
-    box.required = text === null;
+  const needsDescription = () => !held().length && !chosen.size;
+  const removeButton = (id) => {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "quiet";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => { chosen.delete(id); drawChosen(); });
+    return remove;
+  };
+  const drawChosen = () => {
+    const present = new Set(ownerFiles.map((file) => file.id));
+    const lines = [...chosen].map((id) => {
+      const line = document.createElement("li");
+      line.className = "hint";
+      const file = ownerFiles.find((each) => each.id === id);
+      line.append(present.has(id)
+        ? `File: ${file.name} · ${textFile.kindLabel(file.kind)} · ${textFile.size(file.size_bytes)} `
+        : "Missing: a file you chose is no longer in Files. ", removeButton(id));
+      return line;
+    });
+    chosenList.replaceChildren(...lines);
+    chosenList.hidden = !lines.length;
+    box.required = needsDescription();
     updateDescriptionRemaining();
   };
-  document.getElementById("upload").addEventListener("click", () => transcriptFile.click());
-  document.getElementById("transcript-remove").addEventListener(
-    "click", () => holdTranscript(null, ""),
-  );
-  transcriptFile.addEventListener("change", async () => {
-    const [file] = transcriptFile.files;
-    transcriptFile.value = "";
-    if (!file) return;
-    if (file.size > maxTranscriptBytes) {
-      fail(`This file is larger than the ${maxTranscriptBytes} bytes that one analysis can carry.`);
-      return;
-    }
-    let text;
+  // A failed read keeps the last list, so a chosen file does not read as
+  // missing, and the dialog says the read failed.
+  let filesFailed = false;
+  const loadFiles = async () => {
+    let body = null;
     try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+      const listed = await fetch("/workspace/files");
+      if (listed.ok) body = await jsonOf(listed);
     } catch {
-      fail("The page could not read this file as UTF-8 text. Upload a plain text transcript.");
-      return;
+      // A failed read leaves `body` null.
     }
-    if (CONTROL.test(text)) {
-      fail("This file holds control characters, so it is not a plain text transcript.");
-      return;
+    filesFailed = !Array.isArray(body);
+    if (!filesFailed) ownerFiles = body;
+    drawChosen();
+  };
+  // The dialog ticks the chosen files. Select makes the ticked files the
+  // chosen ones, and Cancel changes nothing.
+  const filesDialog = document.getElementById("files-dialog");
+  const openFiles = async () => {
+    await loadFiles();
+    const rows = ownerFiles.map((file) => {
+      const row = document.createElement("label");
+      const tick = document.createElement("input");
+      tick.type = "checkbox";
+      tick.value = file.id;
+      tick.checked = chosen.has(file.id);
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = file.name;
+      const facts = document.createElement("span");
+      facts.className = "hint";
+      facts.textContent = `${textFile.kindLabel(file.kind)} · ${textFile.formatLabel(file.format)} · ${textFile.size(file.size_bytes)}`;
+      row.append(tick, name, facts);
+      return row;
+    });
+    if (filesFailed || !rows.length) {
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = filesFailed
+        ? "Your files did not load. Close this and open it again to retry."
+        : "Files is empty.";
+      rows.unshift(note);
     }
-    if (!text.trim()) {
-      fail("This file holds no text.");
+    filesRows.replaceChildren(...rows);
+    filesDialog.showModal();
+  };
+  document.getElementById("files-cancel").addEventListener("click", () => filesDialog.close());
+  document.getElementById("files-select").addEventListener("click", () => {
+    for (const tick of filesRows.querySelectorAll("input[type=checkbox]")) {
+      if (tick.checked) chosen.add(tick.value);
+      else chosen.delete(tick.value);
+    }
+    filesDialog.close();
+    drawChosen();
+  });
+
+  // The plus button opens a menu of the two ways to add a file. A click
+  // outside it or Escape closes it, and the focus returns to the button.
+  const uploadButton = document.getElementById("upload");
+  const uploadMenu = document.getElementById("upload-menu");
+  const menuItems = [...uploadMenu.querySelectorAll("[role=menuitem]")];
+  const showMenu = (open) => {
+    uploadMenu.hidden = !open;
+    uploadButton.setAttribute("aria-expanded", String(open));
+    if (open) menuItems[0].focus();
+  };
+  uploadButton.addEventListener("click", () => showMenu(uploadMenu.hidden));
+  uploadMenu.addEventListener("keydown", (event) => {
+    const at = menuItems.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      showMenu(false);
+      uploadButton.focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      menuItems[(at + step + menuItems.length) % menuItems.length].focus();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!uploadMenu.hidden && !uploadMenu.parentElement.contains(event.target)) showMenu(false);
+  });
+  document.getElementById("upload-computer").addEventListener("click", () => {
+    showMenu(false);
+    uploadFile.click();
+  });
+  document.getElementById("upload-files").addEventListener("click", () => {
+    showMenu(false);
+    openFiles();
+  });
+
+  box.addEventListener("input", updateDescriptionRemaining);
+  updateDescriptionRemaining();
+  const hold = (kind, text, name) => {
+    UPLOADS[kind].text = text;
+    document.getElementById(`${kind}-name`).textContent = name;
+    document.getElementById(`${kind}-note`).hidden = text === null;
+    box.required = needsDescription();
+    updateDescriptionRemaining();
+  };
+  Object.keys(UPLOADS).forEach(kind => document.getElementById(`${kind}-remove`)
+    .addEventListener("click", () => hold(kind, null, "")));
+  uploadFile.addEventListener("change", async () => {
+    const [file] = uploadFile.files;
+    uploadFile.value = "";
+    if (!file) return;
+    const read = await textFile.read(file, maxUploadBytes, "The page reads");
+    if (read.error) {
+      fail(read.error);
       return;
     }
     problem.hidden = true;
-    holdTranscript(text, file.name);
+    hold(read.row.default_kind, read.text, file.name);
   });
 
-  // The description goes with a transcript only where it holds text, and
-  // always where there is no transcript, so the service says what is missing.
+  // The description goes with an upload or a file only where it holds text,
+  // and always where there is neither, so the service says what is missing.
   const sources = () => [
-    ...(box.value.trim() || transcript === null
-      ? [{ kind: "description", label: "Pasted description", text: box.value }]
+    ...(box.value.trim() || needsDescription()
+      ? [{ kind: "description", label: PAGE_LABELS.description, text: box.value }]
       : []),
-    ...(transcript === null
-      ? []
-      : [{ kind: "transcript", label: "Uploaded transcript", text: transcript }]),
+    ...held().map(([kind, upload]) => ({ kind, label: upload.label, text: upload.text })),
   ];
 
+  // The start button is off while a submission or a run is under way, and
+  // while the Controls of a submission are unknown. The Controls of the form
+  // take no input while a submission or a run is under way.
+  let running = false;
+  const gate = () => {
+    go.disabled = running || !formControls.ready();
+    formControls.hold(running);
+  };
+  formControls.onChange(gate);
   // Nodes and strings, never markup. replaceChildren() inserts a string as a
   // text node, so a source label or a validator message that spells markup
   // shows the characters the submitter typed. Same rule as the report viewer,
@@ -142,10 +306,11 @@
     problem.replaceChildren(...content);
     problem.hidden = false;
     idle();
-    go.disabled = false;
+    running = false;
+    gate();
   };
 
-  // The question toggle is on the page only where the install can ask.
+  // The question toggle. Every install can pause, so the form always has it.
   const ask = document.getElementById("ask");
   const asked = document.getElementById("asked");
   const questions = document.getElementById("questions");
@@ -164,7 +329,8 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     problem.hidden = true;
-    go.disabled = true;
+    running = true;
+    gate();
 
     const name = document.getElementById("analysis-name").value.trim();
     if (!name) {
@@ -178,10 +344,17 @@
       return;
     }
     if (updateDescriptionRemaining() < 0) {
-      fail("Description and transcript are too long. Shorten them to continue.");
+      fail("The description and the files are too long. Remove a file or shorten the description.");
       return;
     }
 
+    // A job with Controls pauses even with the questions off: the service
+    // continues it at once (ADR 0125).
+    if (!formControls.ready()) {
+      fail("Your Controls are not known yet. Wait for them to load, retry, or continue without Controls.");
+      return;
+    }
+    const controls = formControls.chosen();
     try {
       const started = await fetch("/analyze", {
         method: "POST",
@@ -192,13 +365,20 @@
           frameworks,
           questions: Boolean(ask && ask.checked),
           answers_from: document.getElementById("answers-from")?.value || undefined,
+          owner_files: chosen.size ? [...chosen] : undefined,
+          controls,
         }),
       });
       if (!started.ok) {
-        fail((await started.json()).message);
+        fail(await messageOf(started, "The service could not start the analysis. Try again."));
+        // A chosen file or Control can be gone: the list shows it as missing.
+        if (chosen.size) loadFiles();
+        formControls.load();
         return;
       }
-      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
+      const run = (await jsonOf(started))?.run;
+      if (!run) throw new Error("the answer names no run");
+      follow(run);
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -213,6 +393,12 @@
   // Every label and option is untrusted and lands as text.
   // ------------------------------------------------------------------------
   let pausedRun = null;
+  // Whether a start or an amendment ended the pause of `pausedRun`.
+  let pauseEnded = false;
+  const startPause = (run) => {
+    pausedRun = run;
+    pauseEnded = false;
+  };
   // The revision this page last read. Every save and the start send it, so a
   // page left open on an earlier revision cannot write over a later one.
   let revision = 0;
@@ -248,19 +434,40 @@
     const active = document.activeElement;
     return Boolean(active && typeof node.contains === "function" && node.contains(active));
   };
-  // A part that holds its box's shared answer waits on the box's share.
+  // An element that holds its box's shared answer waits on the box's share.
   const dirty = (row) => edits.has(rowKey(row))
     || Boolean(row.inherited && edits.has(shareKey(row.q.key)));
   // A row the page must not rebuild: the submitter is editing it, or its edit is
   // not acknowledged yet.
   const busy = (row) => dirty(row) || focused(row.node);
 
-  // The intro, the list and the tail of the question area. The intro and the
-  // tail are redrawn from each payload; the list is reconciled by key.
+  // The parts of the question area. The intro is redrawn from each payload,
+  // what the description says and the tail once for each run, and the list
+  // is reconciled by key.
   const intro = document.createElement("div");
   intro.className = "list-intro";
   const tail = document.createElement("div");
   tail.className = "list-tail";
+  // What the description says, drawn once for each run (drawDetected).
+  const detectedBox = document.createElement("div");
+  detectedBox.className = "detected-facts";
+  // The copied Controls and their match, redrawn from each payload.
+  const controlsBox = document.createElement("div");
+  controlsBox.className = "control-offer";
+  controlsBox.id = "control-offer";
+  // An action that can end the pause runs here. The Controls of the pause
+  // take no input until it answers, so no change goes to a run that ended.
+  const holdControls = async (action) => {
+    controlsBox.inert = true;
+    try { await action(); }
+    finally { controlsBox.inert = false; }
+  };
+  // Says that the Control choices are saving, below the offer.
+  const scopeStatus = document.createElement("p");
+  scopeStatus.className = "hint";
+  scopeStatus.id = "scope-status";
+  scopeStatus.setAttribute("role", "status");
+  scopeStatus.hidden = true;
   // The answers this run carried from an earlier one and could not take,
   // redrawn from each payload (drawCarried).
   const carried = document.createElement("div");
@@ -268,7 +475,7 @@
   let framed = false;
   const frame = () => {
     if (framed) return;
-    questions.replaceChildren(intro, list, carried, tail);
+    questions.replaceChildren(detectedBox, controlsBox, scopeStatus, intro, list, carried, tail);
     framed = true;
   };
 
@@ -297,7 +504,7 @@
     return parts.length ? parts.join("; ") : null;
   };
   // The lines under a question's "?": why it is asked, what it serves, what
-  // each answer does, and the submitter's own words about the part.
+  // each answer does, and the submitter's own words about the element.
   const contextOf = (q) => {
     const parts = [];
     if ((q.reasons || []).length) parts.push(`Why: ${q.reasons[0]}`);
@@ -376,8 +583,7 @@
     const count = { facts: 0, links: 0, skips: 0 };
     for (const [key, edit] of sendable()) {
       const need = { facts: 0, links: 0, skips: edit.skip ? 1 : 0 };
-      // Each part a share covers counts as one fact answer (ADR 0114).
-      if (edit.kind === "share") need.facts = edit.answer.covers.length;
+      if (edit.kind === "share") need.facts = coveredCount([edit.answer]);
       else if (edit.answer) need[edit.kind === "link" ? "links" : "facts"] = 1;
       const over = Object.keys(need).some((kind) => count[kind] + need[kind] > ANSWER_LIMITS[kind]);
       if (over) continue;
@@ -400,13 +606,17 @@
     return inFlight;
   };
   const send = async () => {
+    saving = true;
+    // A Control save in flight returns the next revision: wait for it. With
+    // none, the request goes out at once, as leaving the page needs.
+    if (scopeInFlight) await scopeInFlight;
     const sent = batch();
     const body = bodyOf(sent);
     if (!body) {
+      saving = false;
       showState();
       return;
     }
-    saving = true;
     setStatus("saving");
     try {
       const response = await fetch("/answer/" + pausedRun, {
@@ -414,8 +624,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await response.json();
-      if (response.ok) {
+      // A refusal can carry a contradiction beside its message, so the page
+      // reads the body once here.
+      const data = await jsonOf(response);
+      const problem = data?.message ?? "The service did not save these answers. Retry.";
+      if (response.ok && data) {
         acknowledge(sent);
         // A batch that left edits behind is followed by the next one.
         if (sendable().size) again = true;
@@ -423,17 +636,19 @@
         // A save answers with the list again; a stand-in may answer less.
         if (data.early_questions) reconcile(data);
         showState();
-      } else if (response.status === 409) {
-        // Another tab saved first. Read the answers again, keep every edit
-        // that does not contradict them, and show the ones that do.
+      } else if (response.ok || response.status === 409) {
+        // Another tab saved first, or an ok answer came with no readable
+        // body and the save may have landed. Read the answers again, keep
+        // every edit that does not contradict them, and show the ones that
+        // do.
         await resync();
       } else {
         for (const [key, edit] of sent) {
           if (edits.get(key) === edit) edit.refused = true;
         }
-        refuse(data.message);
-        setStatus("failed", data.message);
-        if (data.contradiction) offerCorrection(data.contradiction);
+        refuse(problem);
+        setStatus("failed", problem);
+        if (data?.contradiction) offerCorrection(data.contradiction);
       }
     } catch {
       // The response was lost, and the save may have landed. Read the
@@ -473,8 +688,8 @@
     let payload;
     try {
       const response = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
-      payload = await response.json();
-      if (!response.ok) throw new Error();
+      payload = await jsonOf(response);
+      if (!response.ok || !payload) throw new Error();
     } catch {
       setStatus("failed", "Could not read the saved answers. Retry.");
       return;
@@ -578,7 +793,7 @@
     const key = shareKey(row.q.key);
     const base = answersOf(view || {}).get(key) || null;
     const share = shareOf(row.box, base);
-    if (!share || sameShare(share, base) || (!share.covers.length && !base)) {
+    if (!shareChanged(share, base)) {
       edits.delete(key);
       return false;
     }
@@ -590,7 +805,7 @@
   const registerEdit = (row) => {
     const shared = Boolean(row.kind === "fact" && row.box && row.box.shared);
     const boxChanged = shared && registerShare(row);
-    // A part that holds the shared answer sends no answer of its own: the
+    // An element that holds the shared answer sends no answer of its own: the
     // box's share carries it.
     if (row.inherited) {
       edits.delete(rowKey(row));
@@ -697,6 +912,8 @@
     reopen: true,
     contextOf,
     extras: (row) => [skipControl(row)],
+    // Each element's hue, from the payload the page drew last.
+    hueOf: (id) => (view && Object.hasOwn(view.element_hues, id) ? view.element_hues[id] : undefined),
   });
   const removeRow = (row) => {
     rows.delete(rowKey(row));
@@ -710,7 +927,7 @@
   // never moved: a new row is inserted where the service's order puts it.
   let pass = 0;
   let updateQuestionActions = () => {};
-  // True while a skip, a start or an amendment runs. The skip and start
+  // True while an answer action runs (`answerAction`). The skip and start
   // buttons stay disabled until it ends.
   let answerBusy = false;
   // How many new rows wait above a focused editor (`reconcile`).
@@ -793,6 +1010,8 @@
     openFirstBatch();
     drawIntro(data);
     drawCarried(data);
+    drawDetected(data);
+    drawOffer(data);
     drawTail(data);
     drawBoxes(data);
     announce(before, data);
@@ -837,28 +1056,19 @@
     for (const [name, state] of gates) {
       const note = document.createElement("p");
       note.className = "hint gate-note";
-      note.textContent = state === "refuted"
-        ? `The system model rules out the ${name} analysis, so it will not run and`
-          + " none of its questions are asked."
-        : `The ${name} analysis runs only once the system model shows that it applies.`
-          + " The questions that decide this come first; its other questions follow"
-          + " once an answer settles it.";
+      note.textContent = FORM_WORDS.gate_notes[state].replace("{name}", name);
       intro.append(note);
     }
     if (!left) {
       const ready = document.createElement("p");
       ready.className = "hint";
-      // The service's own stop reason decides the sentence (QuestionSet.stop).
-      // No stop says every fact is settled, so the page lists what stays open.
-      const stops = {
-        "budget-exhausted": `The question limit is reached, so ${counted((data.early_held_back || []).length,
-          "more question is", "more questions are")} not in the list. `,
-        "below-floor": "No recommended question is left. ",
-        "skipped": "You skipped every question that is left. ",
-        "nothing-left": "No question is left to ask. ",
-      };
-      ready.textContent = stops[data.early_stop]
-        + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
+      // The service's own reason decides the sentence (QuestionSet.empty_list_reason).
+      // No reason says every fact is settled, so the page lists what stays open.
+      const heldBack = counted((data.early_held_back || []).length, "more question is", "more questions are");
+      ready.textContent = data.asks === false
+        ? "This analysis asks no questions. Untick or resolve a Control, then choose Start the analysis."
+        : FORM_WORDS.empty_list[data.early_stop].replace("{held_back}", heldBack)
+          + " You can still change an answer below. Nothing runs until you choose Start the analysis.";
       intro.append(ready);
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".
@@ -914,7 +1124,7 @@
   // FIRST_BATCH choices, once, and leaves the rest closed with their counts.
   // A prototype (#2029 package 8): owner testing (#1286) decides the size. It
   // hides no row, so a skip, "no to the rest" and the questions recorded as
-  // shown read the same rows as before.
+  // shown read every row of the list.
   const FIRST_BATCH = 3;
   let batchOpened = false;
   const openFirstBatch = () => {
@@ -934,9 +1144,9 @@
 
   // ---- Carried answers ----------------------------------------------------
   // Answers this run carried from an earlier one and could not take
-  // (AnswerState.carried, ADRs 0072 and 0079). An answer about a part this
-  // model does not have can follow the part to its new name, where the
-  // submitter says which part it is now (ADR 0116). Nothing is matched by a
+  // (AnswerState.carried, ADRs 0072 and 0079). An answer about an element this
+  // model does not have can follow the element to its new name, where the
+  // submitter says which element it is now (ADR 0116). Nothing is matched by a
   // similar name.
   const plainList = (lines) => {
     const items = document.createElement("ul");
@@ -967,22 +1177,114 @@
         links: [], facts: [], save: true, skip: [], presented: presented(), revision, renames,
       }),
     });
-    const data = await response.json();
     if (!response.ok) {
-      refuse(data.detail || "The service did not keep this change.");
+      refuse(await messageOf(response, "The service did not keep this change."));
+      return;
+    }
+    const data = await jsonOf(response);
+    if (!data) {
+      refuse("The connection was interrupted. Reload this analysis to check whether the change was saved.");
       return;
     }
     answerProblem.hidden = true;
     if (data.early_questions) reconcile(data);
   });
+  // Save the resolution of each copied Control after a change at the pause
+  // (ADR 0124). The page keeps the newest choices in `wantedScopes` and
+  // sends them when the save before answers, with the revision it returned,
+  // so no change is dropped. While newer choices wait, an answer does not
+  // draw the offer again. A failed save draws the offer from the last
+  // answer and drops the choices that wait.
+  let wantedScopes = null;
+  let savingScopes = false;
+  // The Control save in flight, settled when its answer is drawn, so a
+  // question save sends the revision that answer returned. Null with none.
+  let scopeInFlight = null;
+  const unsaved = "Your last Control change was not saved. The list shows the choices the service kept. Make the change again.";
+  const sendScopes = async (scopes) => {
+    await flush();
+    if (edits.size) {
+      refuse("Some answers are not saved yet. Save them, then try again.");
+      return false;
+    }
+    let response, data, settle;
+    scopeInFlight = new Promise((resolve) => { settle = resolve; });
+    const answered = () => {
+      scopeInFlight = null;
+      settle();
+    };
+    try {
+      response = await fetch("/answer/" + pausedRun, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
+        }),
+      });
+      data = await jsonOf(response);
+    } catch {
+      answered();
+      refuse(unsaved);
+      return false;
+    }
+    try {
+      if (!response.ok || !data) {
+        refuse(data?.message ? `${unsaved} ${data.message}` : unsaved);
+        return false;
+      }
+      answerProblem.hidden = true;
+      formControls.accepted(scopes);
+      if (data.early_questions) reconcile(data);
+      return true;
+    } finally {
+      answered();
+    }
+  };
+  const saveScopes = (scopes) => {
+    wantedScopes = scopes;
+    if (savingScopes) return;
+    savingScopes = true;
+    (async () => {
+      scopeStatus.textContent = "Saving your Control choices…";
+      scopeStatus.hidden = false;
+      let saved = true;
+      try {
+        while (wantedScopes && saved) {
+          const next = wantedScopes;
+          wantedScopes = null;
+          saved = false;
+          // Another action may take the turn first: wait, then try again. A
+          // start or an amendment that ended the pause leaves no run to save
+          // the change to.
+          while (!pauseEnded && !await answerAction(async () => { saved = await sendScopes(next); })) await answerDone;
+        }
+      } finally {
+        wantedScopes = null;
+        savingScopes = false;
+        scopeStatus.hidden = true;
+        if (!saved) drawOffer(view);
+      }
+    })();
+  };
+  const drawOffer = (data) => {
+    if (wantedScopes) return;
+    formControls.drawOffer(controlsBox, data, { save: saveScopes, refuse });
+  };
+  // Whether a dropped answer waits for the submitter to choose an element, by its
+  // reason (CarriedReason).
+  const waitsForElement = {
+    "missing-element": true,
+    "not-taken": false,
+    "control-states": false,
+  };
   const drawCarried = (data) => {
     const dropped = data.carried_dropped || [];
     const renames = (data.carried_renames || []).map(({ earlier, element }) => ({ earlier, element }));
     carried.replaceChildren();
     // The change review: what this run kept from the earlier analysis, what
-    // it did not keep, and what waits for the submitter to choose a part.
+    // it did not keep, and what waits for the submitter to choose an element.
     const kept = (data.carried_kept || []).length + (data.carried_kept_links || []).length;
-    const waiting = dropped.filter((a) => a.reason === "missing-element").length;
+    const waiting = dropped.filter((a) => waitsForElement[a.reason]).length;
     const notKept = dropped.length - waiting + (data.carried_dropped_links || []).length;
     if (kept + waiting + notKept) {
       const parts = [`${counted(kept, "answer is", "answers are")} kept and marked under Your answers`];
@@ -991,6 +1293,17 @@
       const review = document.createElement("p");
       review.className = "carried-review";
       review.textContent = `From the earlier analysis: ${parts.join(", ")}.`;
+      carried.append(review);
+    }
+    // The change review counts what the Controls answered (ADR 0125).
+    const byControl = new Set((data.control_facts || [])
+      .filter((f) => f.state === "written")
+      .map((f) => questionKey(f.answer.key))).size;
+    if (byControl) {
+      const review = document.createElement("p");
+      review.className = "carried-review";
+      review.textContent = `${counted(byControl, "fact is", "facts are")} answered by a Control`
+        + " and marked under Your answers.";
       carried.append(review);
     }
     for (const [index, rename] of (data.carried_renames || []).entries()) {
@@ -1003,7 +1316,7 @@
       carried.append(line);
     }
     for (const { earlier, choices } of data.rename_choices || []) {
-      const about = dropped.filter((a) => a.key[0] === earlier);
+      const about = dropped.filter((a) => keyRef(a.key).element_id === earlier);
       if (!about.length) continue;
       const box = document.createElement("div");
       box.className = "rename";
@@ -1036,8 +1349,17 @@
       }
       carried.append(box);
     }
+    const controlled = dropped.filter((a) => a.reason === "control-states");
+    if (controlled.length) {
+      carried.append(
+        hint(`${counted(controlled.length, "earlier answer is", "earlier answers are")} not kept,`
+          + " because a Control states the fact:"),
+        plainList(controlled.map((a) => `${a.label} — ${answerText(a)}`)),
+      );
+    }
     const others = [
-      ...dropped.filter((a) => a.reason !== "missing-element").map((a) => `${a.label} — ${answerText(a)}`),
+      ...dropped.filter((a) => a.reason === "not-taken")
+        .map((a) => `${a.label} — ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
     ];
     if (others.length) {
@@ -1049,40 +1371,45 @@
     }
   };
 
-  // The tail: answers an amendment could not carry, and the amendment itself.
+  // What the extraction read from the description (detected_facts), open
+  // above the questions: each element with the facts stated about it and the
+  // words they came from, so a wrong fact is seen before any answer. Read
+  // only: the amendment after the questions corrects one.
+  let detectedDrawn = false;
+  const drawDetected = (data) => {
+    if (detectedDrawn) return;
+    detectedDrawn = true;
+    const detected = data.detected_facts || [];
+    if (!detected.length) return;
+    // The noun of each element type, by its ID prefix, in the service's words
+    // (ELEMENT_TYPE_NOUNS).
+    const TYPE_NOUNS = JSON.parse(document.getElementById("element_type_nouns").textContent);
+    const review = document.createElement("details");
+    review.className = "detected";
+    review.open = true;
+    const title = document.createElement("summary");
+    title.textContent = `What your description says (${counted(detected.length, "part", "parts")})`;
+    review.append(title, hint("These facts were read from your description. Where one is wrong, or"
+      + " a part is missing, say so in the box after the questions."));
+    for (const element of detected) {
+      const line = document.createElement("p");
+      const name = document.createElement("b");
+      name.textContent = element.name;
+      const facts = element.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
+        + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
+      line.append(name, ` (${TYPE_NOUNS[element.type]})`, facts.length ? ` — ${facts.join("; ")}` : "");
+      review.append(line);
+      if (element.excerpt) review.append(hint(`From ${element.source_label}: “${element.excerpt}”`));
+    }
+    detectedBox.append(review);
+  };
+
+  // The tail: the amendment.
   let tailDrawn = false;
   const drawTail = (data) => {
     if (tailDrawn) return;
     tailDrawn = true;
-    // What the extraction read from the description (detected_facts): each
-    // part with the facts stated about it and the words they came from, so a
-    // wrong fact is seen before the analysis. Read only: the amendment below
-    // corrects one.
-    const detected = data.detected_facts || [];
-    if (detected.length) {
-      const TYPES = {
-        Process: "process", DataStore: "data store", DataFlow: "data flow",
-        ExternalEntity: "external party", TrustBoundary: "trust zone",
-      };
-      const review = document.createElement("details");
-      review.className = "detected";
-      const title = document.createElement("summary");
-      title.textContent = `What your description says (${counted(detected.length, "part", "parts")})`;
-      review.append(title, hint("These facts were read from your description. Where one is wrong, or"
-        + " a part is missing, say so in the box below."));
-      for (const part of detected) {
-        const line = document.createElement("p");
-        const name = document.createElement("b");
-        name.textContent = part.name;
-        const facts = part.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
-          + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
-        line.append(name, ` (${TYPES[part.type] || part.type})`, facts.length ? ` — ${facts.join("; ")}` : "");
-        review.append(line);
-        if (part.excerpt) review.append(hint(`From ${part.source_label}: “${part.excerpt}”`));
-      }
-      tail.append(review);
-    }
-    // An amendment to the description itself: a part missing, or a fact read
+    // An amendment to the description itself: an element missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
     // and keeps every answer that still fits (ADR 0072).
     const fix = document.createElement("details");
@@ -1096,7 +1423,7 @@
       + " are kept.";
     const fixText = document.createElement("textarea");
     fixText.rows = 3;
-    const fixButton = button("Read the description again with this", () => answerAction(async () => {
+    const fixButton = button("Read the description again with this", () => answerAction(() => holdControls(async () => {
       const text = fixText.value.trim();
       if (!text) {
         refuse("Write the amendment first.");
@@ -1112,17 +1439,22 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, revision }),
       });
-      const body = await amended.json();
       if (!amended.ok) {
-        refuse(body.message);
+        refuse(await messageOf(amended, "The service could not read the corrected description. Try again."));
+        return;
+      }
+      const run = (await jsonOf(amended))?.run;
+      if (!run) {
+        refuse("The connection was interrupted. Reload this analysis to check whether the service reads the description again.");
         return;
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow(body.run, "Reading your description and identifying the parts of your system…", true);
-    }), "");
+      pauseEnded = true;
+      follow(run);
+    })), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
-    tail.append(fix);
+    if (data.asks) tail.append(fix);
   };
   // The boxes beside the list: every earlier answer, every skipped question,
   // and the questions the list leaves out. Each is redrawn from the payload
@@ -1130,12 +1462,16 @@
   // "Answer it" and "Change" build an editor only when pressed.
   const drawBoxes = (data) => {
     const held = answersOf(data);
-    const covered = sharedKeys(data.answered_shares || []);
+    const covered = sharesByKey(data.answered_shares || []);
     // The answers the earlier analysis gave, which this run kept (ADR 0079).
     const carriedKeys = new Set([
       ...(data.carried_kept || []).map(questionKey),
       ...(data.carried_kept_links || []).map(questionKey),
     ]);
+    // Each fact a Control writes, by its key, with its state (ADR 0125).
+    const controlFacts = new Map((data.control_facts || [])
+      .filter((f) => f.state !== "stated")
+      .map((f) => [questionKey(f.answer.key), f]));
     // A question the list holds, compact or open, is not drawn in a box too.
     const inList = (key) => {
       const row = rows.get(key);
@@ -1150,12 +1486,25 @@
       const kept = document.createElement("span");
       if (before) {
         kept.textContent = ` — ${kind === "link" ? linkAnswerText(before) : answerText(before)}`;
-        // Changing it here makes it this part's own answer (ADR 0114).
+        // Changing it here makes it this element's own answer (ADR 0114).
         if (covered.has(key)) kept.textContent += " (shared answer)";
         // Changing it here makes it this run's own answer.
         if (carriedKeys.has(key)) kept.textContent += " (from the earlier analysis)";
+        // The rung of the answer (fact_origin): a Control's value, or an own
+        // answer over it, which shows the Control's value as "was".
+        const control = controlFacts.get(key);
+        if (q.origin && q.origin.rung === "control") {
+          kept.textContent += ` (from Control ${q.origin.name})`;
+        } else if (control && control.state === "changed") {
+          kept.textContent += ` (was “${answerText(control.answer)}” from Control ${control.name})`;
+        }
       }
       row.append(kept);
+      // A fact no question asks is listed, and no editor can change it.
+      if (kind === "control") {
+        box.append(row);
+        return;
+      }
       const open = button(before ? "Change" : "Answer it", () => {
         open.hidden = true;
         kept.hidden = true;
@@ -1189,6 +1538,14 @@
       ...(data.answered_links || []).map((a) => ({ q: a, kind: "link", before: { principal: a.principal, element: a.answer.element } })),
       ...(data.answered_early || []).map((a) => ({ q: a, kind: "fact", before: a.answer })),
     ]).filter((entry) => !setAside.has(rowKey(entry)));
+    // A fact a Control writes that no question asks is still listed (ADR 0125).
+    const listed = new Set(answered.map(rowKey));
+    for (const f of controlFacts.values()) {
+      const q = { key: f.answer.key, label: f.label, origin: { rung: "control", name: f.name } };
+      if (f.state === "written" && !listed.has(questionKey(q.key)) && !inList(questionKey(q.key))) {
+        answered.push({ q, kind: "control", before: f.answer });
+      }
+    }
     redraw(earlierBox, (n) => `Your answers (${n})`, answered);
     const skipped = outside([
       ...(data.skipped_links || []).map((q) => ({ q, kind: "link", before: null })),
@@ -1212,7 +1569,7 @@
 
   // ---- Showing the list ---------------------------------------------------
   const showQuestions = (data) => {
-    // The service says whether the pause asks anything more (QuestionSet.stop).
+    // The service says whether the pause asks anything more (QuestionSet.empty_list_reason).
     const left = data.early_stop == null;
     const saved = (data.answered_early || []).length || (data.answered_links || []).length
       || (data.skipped_early || []).length || (data.skipped_links || []).length;
@@ -1221,11 +1578,12 @@
     const optional = (data.early_held_back || []).length + (data.early_below_floor || []).length;
     // A pause with nothing to ask, nothing answered or skipped, no optional
     // question and no analysis to explain starts the analysis, with no page
-    // between. After a save, only the start button starts it.
-    if (!left && !saved && !gates.length && !optional) {
-      pausedRun = data.run;
+    // between. After a save, or after a refused continue, only the start
+    // button starts it.
+    if (!left && !saved && !gates.length && !optional && !data.refusal) {
+      startPause(data.run);
       revision = data.revision;
-      startAnalysis();
+      holdControls(startAnalysis);
       return;
     }
     if (pausedRun !== data.run) {
@@ -1234,16 +1592,20 @@
       edits.clear();
       list.replaceChildren();
       tailDrawn = false;
+      detectedDrawn = false;
       batchOpened = false;
       tail.replaceChildren();
+      detectedBox.replaceChildren();
       view = null;
     }
-    pausedRun = data.run;
+    startPause(data.run);
     frame();
     skipButton.hidden = false;
     reconcile(data);
     setStatus(edits.size ? "unsaved" : "saved");
     asked.hidden = false;
+    // Why the service did not continue the job at its pause (ADR 0125).
+    if (data.refusal) refuse(data.refusal);
   };
   // The capability rows that "no" to the rest answers: listed, open, blank
   // and offering "no". A "no" rules out every unit that needs the capability,
@@ -1281,10 +1643,17 @@
       if (!row.compact && row.read) registerEdit(row);
     }
   };
+  // The job that a start of the paused run made, read from the snapshot of
+  // the run. Null where the snapshot names no such job or does not arrive.
+  const startedRun = async () => {
+    const snapshot = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun)).catch(() => null);
+    const run = snapshot?.ok ? (await jsonOf(snapshot))?.run : null;
+    return run && run !== pausedRun ? run : null;
+  };
   // Start the analysis once: every unsaved answer is saved first, at the
-  // revision the save returns, and the start names that revision. A lost
-  // response is read back from the run, so a second click cannot start a
-  // second run.
+  // revision the save returns, and the start names that revision. A response
+  // that is lost, or that is not JSON, is read back from the run, so a second
+  // click cannot start a second run.
   let starting = false;
   const startAnalysis = async () => {
     if (starting) return;
@@ -1302,42 +1671,40 @@
           return;
         }
       }
-      let resumed;
-      try {
-        resumed = await fetch("/answer/" + pausedRun, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ links: [], facts: [], presented: presented(), revision }),
-        });
-      } catch {
-        // The response was lost. Where the start landed, the run now names
-        // the job it started; follow it instead of starting again.
-        const snapshot = await fetch("/workspace/runs/" + encodeURIComponent(pausedRun));
-        const payload = await snapshot.json();
-        if (snapshot.ok && payload.run !== pausedRun) {
-          asked.hidden = true;
-          follow(payload.run, "Using your answers to continue the analysis…", false);
-          return;
-        }
-        refuse("The connection was interrupted. Reload this analysis to check whether it started.");
+      const resumed = await fetch("/answer/" + pausedRun, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ links: [], facts: [], presented: presented(), revision }),
+      }).catch(() => null);
+      if (resumed && !resumed.ok) {
+        refuse(await messageOf(resumed, "The service could not continue the analysis. Try again."));
         return;
       }
-      if (!resumed.ok) {
-        refuse((await resumed.json()).message);
+      // Where the start landed, the run names the job it started; follow it
+      // instead of starting again.
+      const run = (resumed && (await jsonOf(resumed))?.run) || await startedRun();
+      if (!run) {
+        refuse("The connection was interrupted. Reload this analysis to check whether it started.");
         return;
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow((await resumed.json()).run, "Using your answers to continue the analysis…", false);
+      pauseEnded = true;
+      follow(run);
     } finally {
       starting = false;
       startButton.disabled = false;
     }
   };
 
+  // Settles when the action under way ends, so a later save can wait for it.
+  let answerDone = Promise.resolve();
+  // Resolves to whether the action ran: an action under way turns it away.
   const answerAction = async (action) => {
-    if (answerBusy) return;
+    if (answerBusy) return false;
     answerBusy = true;
+    let done;
+    answerDone = new Promise((resolve) => { done = resolve; });
     const controls = [skipButton, startButton, noRestButton];
     controls.forEach((control) => { control.disabled = true; });
     try { await action(); }
@@ -1346,9 +1713,11 @@
       answerBusy = false;
       controls.forEach((control) => { control.disabled = false; });
       updateQuestionActions();
+      done();
     }
+    return true;
   };
-  startButton.addEventListener("click", () => answerAction(startAnalysis));
+  startButton.addEventListener("click", () => answerAction(() => holdControls(startAnalysis)));
 
   // Answer "no" to each of them, as each row's own answer, saved as any
   // answer is. Each one stays in its place and can be changed.
@@ -1377,11 +1746,19 @@
   asked.addEventListener("click", () => updateQuestionActions());
 
   // Follow one run's progress to its end: a report, questions, or a failure.
-  const follow = (runId, initialStage, pauses) => {
-    go.disabled = true;
+  const follow = (runId) => {
+    running = true;
+    gate();
     if (typeof workspace !== "undefined") workspace.track(runId);
-    working(initialStage);
-    if (typeof workspace !== "undefined") workspace.processing([], pauses, initialStage, runId);
+    working("");
+    if (typeof workspace !== "undefined") workspace.processing(null, runId);
+    // Show a progress line that the service sends: on the bar of the
+    // workspace, or as the status words alone on a page with no bar.
+    const shown = (event) => {
+      const line = JSON.parse(event.data);
+      if (typeof workspace !== "undefined") workspace.processing(line, runId);
+      else working(line.words);
+    };
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
@@ -1392,11 +1769,13 @@
       idle();
       showQuestions(JSON.parse(event.data));
     });
-    stream.addEventListener("node", (event) => {
-      if (typeof workspace !== "undefined") {
-        workspace.processing([JSON.parse(event.data).node], pauses, undefined, runId);
-      }
+    // A job with Controls and no questions continues at its pause at once.
+    stream.addEventListener("continuing", shown);
+    stream.addEventListener("continued", (event) => {
+      stream.close();
+      follow(JSON.parse(event.data).run);
     });
+    stream.addEventListener("node", shown);
     stream.addEventListener("done", (event) => {
       stream.close();
       location.href = "/report/" + encodeURIComponent(runId);
@@ -1425,9 +1804,11 @@
     });
   };
 
+  formControls.load();
+
   // A report page that started a resumed run sends the browser here to watch
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
   if (followed) {
-    follow(followed, "Using your answers to continue the analysis…", false);
+    follow(followed);
   }

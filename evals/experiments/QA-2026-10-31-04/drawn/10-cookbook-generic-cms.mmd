@@ -1,0 +1,15 @@
+flowchart LR
+    reader(Reader)
+    admin(Admin)
+    cdn["CDN bucket"]
+
+    subgraph hosted["Hosted network"]
+        web["Web server (CMS)"]
+        db[("MySQL database: pages, accounts, comments")]
+    end
+
+    reader -->|"page requests (HTTPS)"| web
+    web -->|"pages, accounts, comments"| db
+    reader -->|"images, stylesheets, downloads (HTTP)"| cdn
+    web -->|push new assets| cdn
+    admin -->|"MySQL connection"| db

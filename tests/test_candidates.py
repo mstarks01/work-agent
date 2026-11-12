@@ -5,6 +5,8 @@ fire on. The second is the boundary that makes this design safe at all: a
 candidate is a lead, and nothing downstream can turn one into a finding.
 """
 
+import json
+
 import pytest
 
 from analysis_service.assertions import (
@@ -32,7 +34,7 @@ from analysis_service.system_model import (
 )
 
 #: STRIDE's own rule table. The neutral engine takes the lanes and the rules as
-#: arguments now, so a test about *these* rules has to name the package they
+#: arguments, so a test about *these* rules has to name the package they
 #: belong to rather than reaching for a module-level constant.
 RULES = STRIDE.rules
 
@@ -405,14 +407,13 @@ class TestFiring:
         assert hits[0].facts["source_zone_kind"] == "tenant"
         assert hits[0].facts["destination_zone_kind"] == "tenant"
 
-    def test_an_undecidable_crossing_raises_a_lead_and_not_a_transition(self, model):
-        """ADR 0039 rules 3 and 4, in the one place they differ.
+    def test_an_unplaced_privilege_zone_raises_no_lead(self, model):
+        """ADR 0039 rules 3 and 4, where the zone the rule names has no kind.
 
         A rule whose premise is the crossing fires on an undecidable one and
         says so, because the flow is still eligible for analysis. The privilege
-        rule's premise is what the two zones *are*, and an unplaced endpoint has
-        no kind to read — firing there would assert the authority change an
-        undecidable crossing cannot establish.
+        rule reads the kind of the zone it names, and an unplaced destination
+        has none.
         """
         for element in model.zoned_elements():
             if element.id == "process:admin":
@@ -423,9 +424,37 @@ class TestFiring:
 
         undecided = [hit for hit in keyed if hit.facts["crossing_decided"] is False]
         assert undecided, "the flow stays eligible for analysis"
-        assert all(hit.facts["crossing_decided"] is True for hit in privilege), (
-            "no privilege transition rests on a zone nobody stated"
+        assert privilege == [], "no lead names a zone nobody placed"
+
+    def test_an_unplaced_source_entering_a_privilege_zone_raises_a_lead(self, model):
+        """ADR 0128: the destination's kind is stated, so the flow is a lead.
+
+        The crossing stays undecided in the facts, so the lead confers
+        eligibility for analysis and no transition (ADR 0039 rule 4).
+        """
+        for element in model.zoned_elements():
+            if element.id == "process:api":
+                element.trust_zone = UNKNOWN
+
+        (hit,) = fired(model, "elevation-of-privilege-privilege-zone-crossing")
+
+        assert hit.element_ids == (
+            "flow:process:api>process:admin>escalate",
+            "boundary:privileged",
         )
+        assert hit.facts["direction"] == "into"
+        assert hit.facts["destination_zone_kind"] == "privilege"
+        assert hit.facts["source_zone_kind"] == ""
+        assert hit.facts["crossing_decided"] is False
+
+    def test_leaving_a_tenant_zone_for_an_unplaced_destination_raises_no_lead(self):
+        """The destination may sit in the same tenant zone, so nothing is left."""
+        model = zoned_pair("tenant", "network")
+        for element in model.zoned_elements():
+            if element.id == "process:ours":
+                element.trust_zone = UNKNOWN
+
+        assert fired(model, "elevation-of-privilege-privilege-zone-crossing") == []
 
     def test_exposed_process_authority_needs_a_crossing(self, model):
         hits = fired(model, "elevation-of-privilege-inbound-from-exposed-process")
@@ -491,32 +520,6 @@ class TestCandidatesAreNotFindings:
             "lane",
             "element_ids",
             "facts",
-        }
-
-    def test_nothing_outside_the_prompt_seam_reads_a_candidate(self):
-        """Candidates reach the agents and stop there.
-
-        The importers of this module are the seam that renders the prompt
-        (``graph``), the fan-in that regenerates the same candidates for the
-        coverage account (``fan_in``), the accounting itself (``coverage``),
-        and the ranking of the questions a paused job asks
-        (``early_questions``), which orders questions and writes no finding.
-        Neither the critic nor the report can see one, so no code path exists
-        that turns a fired rule into a threat.
-        """
-        from pathlib import Path
-
-        package = Path(__file__).resolve().parents[1] / "src" / "analysis_service"
-        importers = {
-            path.name
-            for path in package.glob("*.py")
-            if "from analysis_service.candidates import" in path.read_text()
-        }
-        assert importers == {
-            "coverage.py",
-            "early_questions.py",
-            "fan_in.py",
-            "graph.py",
         }
 
 
@@ -748,3 +751,93 @@ class TestTheStoreReadersRule:
         ]
         fired = self._fired(model.model_copy(update={"data_flows": flows}))
         assert "store:worker-config" not in fired
+
+    #: Each caller's flows into the store, by the operations they state.
+    SHAPES = (
+        ("process:read", ("read",)),
+        ("process:read-write", ("read-write",)),
+        ("process:unknown", ("unknown",)),
+        ("process:write", ("write",)),
+        ("process:write-unknown", ("write", "unknown")),
+        ("process:read-unknown", ("read", "unknown")),
+    )
+
+    def _shapes_model(self):
+        callers = [caller for caller, _ in self.SHAPES]
+        return SystemModel(
+            processes=[
+                Process(
+                    id=caller,
+                    name=caller.removeprefix("process:"),
+                    technology="x",
+                    trust_zone="boundary:inside",
+                    exposure="internal",
+                    interface_kind="non-web",
+                )
+                for caller in callers
+            ],
+            data_stores=[
+                DataStore(
+                    id="store:vault",
+                    name="vault",
+                    technology="x",
+                    data_classification="confidential",
+                    encryption_at_rest="AES-256",
+                    trust_zone="boundary:inside",
+                    assets=["credentials"],
+                )
+            ],
+            trust_boundaries=[
+                TrustBoundary(id="boundary:inside", name="inside", kind="network")
+            ],
+            data_flows=[
+                flow(
+                    caller, "store:vault", f"{operation} {index}", operations=operation
+                )
+                for caller, operations in self.SHAPES
+                for index, operation in enumerate(operations)
+            ],
+        )
+
+    def test_each_caller_appears_once_at_its_strongest_status(self):
+        (candidate,) = self._fired(self._shapes_model()).values()
+
+        assert candidate.facts["readers"] == (
+            "process:read, process:read-unknown, process:read-write"
+        )
+        assert candidate.facts["callers_of_unknown_operation"] == (
+            "process:unknown, process:write-unknown"
+        )
+        assert "process:write" not in candidate.element_ids
+        assert len(candidate.element_ids) == len(set(candidate.element_ids)) == 6
+
+    def test_the_lane_reads_both_statuses_and_the_conditional_question(self):
+        from analysis_service.graph import FrameworkNodes, framework_lane_inputs
+        from tests.test_prompt_lints import PACKAGE_LOADERS
+
+        inputs = framework_lane_inputs(
+            FrameworkNodes("stride"),
+            self._shapes_model(),
+            {},
+            None,
+            PACKAGE_LOADERS["stride"],
+        )
+        rendered = inputs.artifacts["information-disclosure"]["candidates"]
+        rule = next(rule for rule in RULES if rule.rule_id == self.RULE)
+
+        assert json.dumps(rule.question) in rendered
+        assert "`callers_of_unknown_operation`" in rule.question
+        assert (
+            '"callers_of_unknown_operation": "process:unknown, process:write-unknown"'
+            in rendered
+        )
+
+    def test_a_store_with_only_unknown_callers_names_no_reader(self):
+        model = self._shapes_model()
+        flows = [f for f in model.data_flows if f.source == "process:unknown"]
+        fired = self._fired(model.model_copy(update={"data_flows": flows}))
+
+        assert "readers" not in fired["store:vault"].facts
+        assert fired["store:vault"].facts["callers_of_unknown_operation"] == (
+            "process:unknown"
+        )

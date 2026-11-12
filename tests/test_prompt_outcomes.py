@@ -30,6 +30,11 @@ from pydantic import ValidationError
 from analysis_service import graph
 from analysis_service.assertions import assertion_id
 from analysis_service.capabilities import resolve
+from analysis_service.claim_identity import (
+    distinct_mechanisms,
+    finding_key,
+    mechanism_of,
+)
 from analysis_service.claims import AnalysisMarks, ProposedVerdict, Severity
 from analysis_service.compact import COMPACT_FORMAT
 from analysis_service.critic_round import CriticRound, Reask, rulings_of
@@ -38,13 +43,15 @@ from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.graph import parse_extraction
-from analysis_service.system_model import normalize_name
+from analysis_service.system_model import ModelIndex, normalize_name
 from analysis_service.validation import IssueCode, parse_and_validate, validate
+from tests import test_critic_controls as controls
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_capabilities import _facts
 from tests.test_compact import compact_fixture
 from tests.test_evidence import assertions, row
+from tests.test_exemplar_fan_in import fixture_model
 from tests.test_five_class_read import TABLE
 from tests.test_graph import (  # noqa: F401  (four fixtures)
     KEYS,
@@ -57,6 +64,7 @@ from tests.test_graph import (  # noqa: F401  (four fixtures)
     prompt_loader,
     routed_targets,
 )
+from tests.test_two_mechanisms_one_place import merged, pair
 from tests.test_validation import TestCitationsResolve, codes
 
 pytestmark = pytest.mark.lint
@@ -71,7 +79,12 @@ CHECKS: dict[str, Callable[..., None]] = {}
 #: reason. A size ceiling admits or refuses on the count of elements, and no
 #: instruction keeps a large system small.
 UNWORDED_ISSUE_CODES: dict[str, str] = {
-    "too-many-elements": "an admission cap on model size, not a rule a model can follow"
+    "too-many-elements": "an admission cap on model size, not a rule a model can follow",
+    # The rule is worded in the diagram register, which renders only on a
+    # diagram Source's header; a prompt file holding it would change every
+    # job's prompt (ADR 0121). tests/test_sources.py pins the sentence.
+    "diagram-node-missing": "worded in the diagram register, not a prompt file",
+    "diagram-edge-missing": "worded in the diagram register, not a prompt file",
 }
 
 #: The one source every citing element of a test model quotes.
@@ -162,7 +175,7 @@ def a_ref_two_elements_claim_binds_to_neither():
     payload = compact_fixture()
     payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
-    _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
+    _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={}, diagrams={})
 
     assert "duplicate-ref" in codes(issues)
     assert "invalid-reference" in codes(issues)
@@ -318,6 +331,17 @@ def a_repeated_threat_id_keeps_the_first_draft_and_drops_the_rest():
 
 
 @decides
+def two_drafts_at_one_place_that_fail_two_controls_are_two_findings():
+    caller, server = merged(pair()).drafts
+    flows = ModelIndex.of(fixture_model("A")).flow_endpoints
+
+    assert finding_key(caller, flows) == finding_key(server, flows)
+    assert distinct_mechanisms(
+        mechanism_of(caller, flows, {}), mechanism_of(server, flows, {})
+    )
+
+
+@decides
 def a_threat_that_names_only_zones_is_dropped():
     record = PACKAGES["stride"].record
     data = {
@@ -430,7 +454,7 @@ def a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic(pipeline):  # noqa
     unreasoned = sample_ruling(verdict=ProposedVerdict(rejected_because="lane"))
 
     critic_round = CriticRound.of(
-        "stride", valid_model(), [sample_draft("S-01")], AnalysisMarks(), None
+        "stride", valid_model(), [sample_draft("S-01")], AnalysisMarks(), None, ()
     )
 
     outcome = critic_round.first([unreasoned.model_dump(mode="json")])
@@ -438,3 +462,36 @@ def a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic(pipeline):  # noqa
     assert isinstance(outcome, Reask)
     assert [problem.kind for problem in outcome.problems] == ["verdict-shape"]
     assert routed_targets(pipeline, ROUTER_NODE)[graph.ROUTE_REVISE] == RECRITIC_NODE
+
+
+@decides
+def a_control_rejection_that_quotes_neither_comes_back_to_the_critic():
+    verdict = {**controls.APPLIED, "reason": "rds.tf covers it."}
+
+    outcome = controls._round(controls._db(controls._row("V11"))).first(
+        [controls._ruling(**verdict)]
+    )
+
+    assert isinstance(outcome, Reask)
+    assert [problem.kind for problem in outcome.problems] == ["control-row"]
+
+
+@decides
+def an_evidence_entry_with_no_excerpt_names_an_earlier_entry():
+    drafts = [
+        controls._asvs_draft(unit, "store:orders-db") for unit in ("V11.2.1", "V11.2.2")
+    ]
+
+    view = controls._view(drafts, controls._applied(controls._db(controls._row("V11"))))
+
+    entries = [
+        entry
+        for draft in view
+        for control in draft["controls"]
+        for entry in control["evidence"]
+    ]
+    assert any("excerpt" not in entry for entry in entries)
+    excerpted: set[str] = set()
+    for entry in entries:
+        assert ("excerpt" in entry) == (entry["sha256"] not in excerpted)
+        excerpted.add(entry["sha256"])

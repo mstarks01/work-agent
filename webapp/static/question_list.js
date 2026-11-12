@@ -1,17 +1,18 @@
 // The question list as every page that asks open facts draws it: the early
 // list at a run's pause, and a report's Questions section. Each row sits in a
 // box for its group, in the service's order. A box whose rows ask one kind of
-// two or more elements asks it once, and a person ticks each part the answer
-// covers (ADR 0081, ADR 0113). A facets question is a table: a column per facet
-// and a row per element. A row asks only the facets in its question's `asks`
-// (ADR 0112), and "Additional details" shows the rest.
+// two or more elements asks it once, and a person ticks each element the
+// answer covers (ADR 0081, ADR 0113). A facets question is a table: a column
+// per facet and a row per element. A row asks only the facets in its
+// question's `asks` (ADR 0112), and "Additional details" shows the rest.
 //
 // The page keeps its own rule for what it sends and when. It hands in:
 // `list`, the node the boxes go in; `onEdit(row, event)`, run on each edit;
 // `inputFor(q, prefill, changed)`, the answerEditor for a row; `reopen`,
 // whether a facet offers "I don't know" over a known answer; `contextOf(q)`,
 // the lines under a question's "?"; `notes(row)`, nodes under a row's title;
-// and `extras(row)`, nodes after a row's input, such as a skip button.
+// `extras(row)`, nodes after a row's input, such as a skip button; and
+// `hueOf(id)`, an element's hue (analysis_service.element_hues) or undefined.
 //
 // A row is the page's own object: `{ q, kind, node }`, `kind` "fact" or
 // "link". Drawing sets `row.read`, the answer as the service takes it or
@@ -28,7 +29,13 @@ const questionList = ({
   contextOf = () => [],
   notes = () => [],
   extras = () => [],
+  hueOf = () => undefined,
 }) => {
+  // A row's element as its tag.
+  const partTag = (q) => {
+    const id = keyRef(q.key).element_id;
+    return elementTag(q.element, id, hueOf(id));
+  };
   const button = (text, onClick, className = "quiet") => {
     const control = document.createElement("button");
     control.type = "button";
@@ -61,7 +68,7 @@ const questionList = ({
     const title = document.createElement("div");
     title.className = "question-title";
     const label = document.createElement("b");
-    label.textContent = text;
+    label.append(text);
     title.append(label);
     const about = context(q);
     if (about) title.append(about);
@@ -81,24 +88,34 @@ const questionList = ({
     }
     onEdit(row, event);
   };
-  // The line beside a shared answer that says which parts it covers: each
-  // ticked part, and the parts the saved share covers that the box does not
-  // list (ADR 0114).
+  // The elements the `held` share covers that the box's fact rows `members`
+  // do not list, such as one answered before a reload (ADR 0114).
+  const heldElsewhere = (held, members) => {
+    const listed = new Set(members.map((row) => keyRef(row.q.key).element_id));
+    return held ? held.covers.filter((element) => !listed.has(element)) : [];
+  };
+  // The line beside a shared answer that says which elements it covers: each
+  // ticked element, and the elements the saved share covers that the box does
+  // not list (ADR 0114). "Cover every part" copies the shared answer, so it is
+  // disabled while the shared answer is empty (ADR 0113).
   const showCovers = (box) => {
     if (!box || !box.coverLine) return;
+    const answered = Boolean(box.sharedAnswer && box.sharedAnswer());
+    box.coverAllButton.disabled = !answered;
     const members = box.rows.filter((row) => row.kind === "fact");
-    const listed = new Set(members.map((row) => row.q.key[0]));
-    const before = box.held ? box.held.covers.filter((element) => !listed.has(element)).length : 0;
+    const before = heldElsewhere(box.held, members).length;
     const parts = [
-      ...members.filter((row) => row.inherited).map((row) => row.q.element),
+      ...members.filter((row) => row.inherited).map((row) => partTag(row.q)),
       ...(before ? [counted(before, "part answered before", "parts answered before")] : []),
     ];
-    box.coverLine.textContent = parts.length
-      ? `This answer covers: ${parts.join(", ")}`
-      : "This answer covers no part yet.";
+    box.coverLine.replaceChildren(...(parts.length
+      ? ["This answer covers: ", ...commaList(parts)]
+      : [answered
+        ? "This answer covers no part yet. Tick each part it covers, or use Cover every part."
+        : "This answer covers no part yet."]));
   };
   // Undo the last change of a shared answer: the answer before it, and each
-  // part it wrote as that part was. One step back.
+  // element it wrote as that element was. One step back.
   const undoShared = (box) => {
     const undo = box.undo;
     if (!undo) return;
@@ -118,8 +135,8 @@ const questionList = ({
     for (const { row } of undo.rows) onEdit(row);
     showCovers(box);
   };
-  // A part a person ticks takes the shared answer. Unticking it takes back
-  // only what the shared answer wrote, so the part's own answer stays
+  // An element a person ticks takes the shared answer. Unticking it takes back
+  // only what the shared answer wrote, so the element's own answer stays
   // (ADR 0113).
   const tickChanged = (row, event) => {
     const box = row.box;
@@ -139,6 +156,18 @@ const questionList = ({
     }
     showCovers(box);
     onEdit(row, event);
+  };
+
+  // "Cover every part": tick each element that has no answer of its own, so
+  // one click gives the shared answer to every blank element. An element with
+  // its own answer, by hand or from before, stays as it is (ADR 0113).
+  const coverAll = (box) => {
+    for (const row of box.rows) {
+      if (row.kind !== "fact" || row.compact || !row.tick || row.tick.checked) continue;
+      if (row.exception || row.read()) continue;
+      row.tick.checked = true;
+      tickChanged(row);
+    }
   };
 
   // ---- Rows ---------------------------------------------------------------
@@ -232,7 +261,10 @@ const questionList = ({
     const name = document.createElement("b");
     name.textContent = row.q.principal;
     const shown = document.createElement("span");
-    shown.textContent = ` — ${linkAnswerText(answer)}`;
+    const chosen = row.q.options.find((option) => option.id === answer.element);
+    shown.append(" — ", chosen && chosen.name
+      ? elementTag(chosen.name, chosen.id, hueOf(chosen.id))
+      : linkAnswerText(answer));
     row.compact = true;
     row.read = () => null;
     const fields = document.createElement("div");
@@ -304,7 +336,7 @@ const questionList = ({
     const q = row.q;
     const grid = row.grid;
     const name = document.createElement("td");
-    name.append(...(row.tick ? [row.tick] : []), questionTitle(q, q.element), ...notes(row));
+    name.append(...(row.tick ? [row.tick] : []), questionTitle(q, partTag(q)), ...notes(row));
     // A facet answered before offers no blank where the page cannot reopen
     // it: the service keeps the earlier answer to a facet left out.
     const selects = q.facets.map((facet) => {
@@ -338,12 +370,11 @@ const questionList = ({
         ? withDetail({ key: q.key, facets: given }, detail.value.trim())
         : null;
     };
-    // The critic names the kind, not a facet, so a finding waiting on it is
-    // covered only once every facet says more than "I don't know". A finding
-    // that needs only some facets is covered once those are known (ADR 0073);
-    // `facets` lists them, or is empty for every facet.
+    // A finding is covered once each facet it needs says more than "I don't
+    // know" (ADR 0073). `facets` lists them as the service sent them: every
+    // facet where the finding names none (needed_facets).
     row.knownFor = (facets) => inputs
-      .filter((select) => !facets.length || facets.includes(select.dataset.facet))
+      .filter((select) => facets.includes(select.dataset.facet))
       .every((select) => select.value && select.value !== DONT_KNOW);
     row.known = () => row.knownFor(q.asks);
     // Whether a facet it asks is still blank, which a skip sets aside.
@@ -366,7 +397,7 @@ const questionList = ({
   };
   const drawCompactFacets = (row, answer) => {
     const name = document.createElement("td");
-    name.append(questionTitle(row.q, row.q.element), ...notes(row));
+    name.append(questionTitle(row.q, partTag(row.q)), ...notes(row));
     const shown = document.createElement("td");
     shown.textContent = answerText(answer);
     const change = document.createElement("td");
@@ -435,7 +466,7 @@ const questionList = ({
     box.title.replaceChildren(heading, box.applies);
   };
   // A box whose rows ask one attribute or kind of two or more elements asks
-  // it once (ADR 0081): one answer for each part a person ticks, sent as that
+  // it once (ADR 0081): one answer for each element a person ticks, sent as that
   // element's own answer (ADR 0113). A row edited by hand is an exception the
   // shared answer leaves alone. A capability asks about the whole
   // application, so it never shares.
@@ -508,7 +539,7 @@ const questionList = ({
       return rest;
     };
     box.sharedSet = (answer) => shared.set(answer.value);
-    // The box's heading asks the question for every part it lists, so it
+    // The box's heading asks the question for every element it lists, so it
     // names each control; a second control adds what it takes.
     shared.controls.forEach((control, at) => control.setAttribute("aria-label",
       at ? `${q.group_heading}: ${control.placeholder}` : q.group_heading));
@@ -532,7 +563,7 @@ const questionList = ({
     }
     if (!box.shared) box.shared = sharedControl(box, members[0].q);
     box.each.open = true;
-    box.applies.textContent = "Parts: " + members.map((row) => row.q.element).join(", ");
+    box.applies.replaceChildren("Parts: ", ...commaList(members.map((row) => partTag(row.q))));
     const hint = document.createElement("p");
     hint.className = "hint";
     hint.textContent = "Tick each part this answer covers. A part left unticked keeps"
@@ -543,14 +574,16 @@ const questionList = ({
       box.coverLine.setAttribute("aria-live", "polite");
       box.undoButton = button("Undo", () => undoShared(box));
       box.undoButton.hidden = !box.undo;
+      box.coverAllButton = button("Cover every part", () => coverAll(box));
     }
     box.top.className = "shared-controls";
-    box.top.replaceChildren(box.shared, hint, box.coverLine, box.undoButton);
+    box.top.replaceChildren(box.shared, hint, box.coverLine, box.coverAllButton, box.undoButton);
     for (const row of members) addTick(row);
     showCovers(box);
   };
-  // A part starts unticked: the same question does not prove that one control
-  // covers every part (ADR 0113). A ticked part takes the shared answer.
+  // An element starts unticked: the same question does not prove that one
+  // control covers every element (ADR 0113). A ticked element takes the shared
+  // answer.
   const addTick = (row) => {
     if (row.tick) return;
     const tick = document.createElement("input");
@@ -637,22 +670,20 @@ const questionList = ({
   };
   // The share a box holds now, as the service takes it (ADR 0114): the shared
   // answer under the box's question with the element left empty, and each
-  // part that holds it. A part of the box holds it where it is ticked; a part
-  // the `held` share covers that the box does not list, such as one answered
-  // before a reload, keeps holding it. Null where the box shares nothing or
-  // has no answer.
+  // element that holds it. An element of the box holds it where it is ticked;
+  // an element the `held` share covers that the box does not list keeps
+  // holding it. Null where the box shares nothing or has no answer.
   const shareOf = (box, held = null) => {
     if (!box || !box.shared || !box.sharedAnswer) return null;
     const answer = box.sharedAnswer();
     const members = box.rows.filter((row) => row.kind === "fact");
     if (!answer || !members.length) return null;
-    const listed = new Set(members.map((row) => row.q.key[0]));
-    const kept = held ? held.covers.filter((element) => !listed.has(element)) : [];
-    const covers = [...kept, ...members.filter((row) => row.inherited).map((row) => row.q.key[0])];
-    return { answer: { ...answer, key: ["", ...members[0].q.key.slice(1)] }, covers };
+    const ticked = members.filter((row) => row.inherited).map((row) => keyRef(row.q.key).element_id);
+    const covers = [...heldElsewhere(held, members), ...ticked];
+    return { answer: { ...answer, key: shapeOf(members[0].q.key) }, covers };
   };
   // Show the shares the service holds: each box takes its share's answer, and
-  // each part it covers is ticked and holds it. A box whose share waits to be
+  // each element it covers is ticked and holds it. A box whose share waits to be
   // saved (`pending`) keeps what the person did.
   const restoreShares = (shares, pending) => {
     const held = new Map(shares.map((share) => [shareKey(share.answer.key), share]));
@@ -669,7 +700,7 @@ const questionList = ({
       box.sharedSet(share.answer);
       box.lastShared = share.answer;
       for (const row of members) {
-        const covered = share.covers.includes(row.q.key[0]);
+        const covered = share.covers.includes(keyRef(row.q.key).element_id);
         row.inherited = covered;
         if (covered) row.exception = false;
         if (row.tick) row.tick.checked = covered;
@@ -686,7 +717,7 @@ const questionList = ({
       if (!box.shared || !members.length) continue;
       const base = baseOf(shareKey(members[0].q.key));
       const share = shareOf(box, base);
-      if (share && !sameShare(share, base) && (share.covers.length || base)) changed.push(share);
+      if (shareChanged(share, base)) changed.push(share);
     }
     return changed;
   };
@@ -695,29 +726,66 @@ const questionList = ({
   };
 };
 
-// Two rules both pages read, so neither keeps its own copy.
+// The rules both pages read, so neither keeps its own copy.
 // A question's key as every page map holds it: the JSON of the key the
 // service serves, for a link row and a fact row alike. One reader, so a
 // finding's link and the question it reaches agree on every page.
 const questionKey = (key) => JSON.stringify(key);
 // A row's key is its question's key.
 const rowKey = (row) => questionKey(row.q.key);
-// The key a box's share is kept under: its question with the element left
-// empty, read from any part's key or from the share's own (ADR 0114).
-const shareKey = (key) => `share:${questionKey(["", ...key.slice(1)])}`;
-// The key of each part's question the held shares cover.
-const sharedKeys = (shares) => new Set(shares.flatMap((share) =>
-  share.covers.map((element) => questionKey([element, ...share.answer.key.slice(1)]))));
+// The parts of a question's key, in the order the service serves them
+// (UNKNOWN_KEY_FIELDS). A test holds the two equal.
+const KEY_FIELDS = ["element_id", "attribute", "assertion", "subject", "question", "capability"];
+// `keyRef` names each part of a key.
+// `withElement` writes a key in the same order. A test in tests/test_webapp.py
+// refuses a read of a key by position anywhere else.
+const keyRef = (key) => Object.fromEntries(KEY_FIELDS.map((field, at) => [field, key[at]]));
+// The key with its element replaced by `element`.
+const withElement = (key, element) =>
+  KEY_FIELDS.map((field, at) => (field === "element_id" ? element : key[at]));
+// The question a share answers: the key with the element left empty
+// (`SharedAnswer.shape`, ADR 0114). A test holds the two equal.
+const shapeOf = (key) => withElement(key, "");
+// The key a box's share is kept under, read from any element's key or from
+// the share's own.
+const shareKey = (key) => `share:${questionKey(shapeOf(key))}`;
+// The key of each element's question the held shares cover, to the share
+// that covers it (`SharedAnswer.key_of`).
+const sharesByKey = (shares) => new Map(shares.flatMap((share) => share.covers
+  .map((element) => [questionKey(withElement(share.answer.key, element)), share])));
+// How many elements the shares cover. Each counts as one fact answer in a
+// request (ADR 0114).
+const coveredCount = (shares) => shares.reduce((n, share) => n + share.covers.length, 0);
+// Whether a box's share is an edit against the saved `base`: it differs, and
+// it covers an element or takes back a saved share.
+const shareChanged = (share, base) =>
+  Boolean(share) && !sameShare(share, base) && Boolean(share.covers.length || base);
 // Whether a page asks two questions once (ADR 0081): one attribute or kind,
 // each of an element, with one form and one set of choices. The
 // `shared-answers` instrument reads the same rule, and a test holds the two to
 // each other.
-const shareable = (a, b) =>
-  Boolean(a.key[0] && b.key[0]) && a.key[1] === b.key[1] && a.key[4] === b.key[4]
-  && a.form === b.form
-  && JSON.stringify(a.choices) === JSON.stringify(b.choices);
+const shareable = (a, b) => {
+  const [one, other] = [keyRef(a.key), keyRef(b.key)];
+  return Boolean(one.element_id && other.element_id)
+    && one.attribute === other.attribute && one.question === other.question
+    && a.form === b.form
+    && JSON.stringify(a.choices) === JSON.stringify(b.choices);
+};
 // The heading of the box of link questions, on both pages and in the export.
 const LINK_GROUP_HEADING = "Match each user, team or account to a part of your system";
+// An element as a tag in its colour (`hue`, from
+// analysis_service.element_hues), its ID on hover; with no hue, a grey tag.
+// The report page and the question rows draw each element tag here.
+const elementTag = (name, id, hue) => {
+  const tag = document.createElement("span");
+  tag.className = hue === undefined ? "ref neutral" : "ref";
+  tag.textContent = name;
+  tag.title = id;
+  if (hue !== undefined) tag.style.setProperty("--h", String(hue));
+  return tag;
+};
+// Nodes or strings with ", " between them, so a list of tags reads as a list.
+const commaList = (items) => items.flatMap((item, at) => (at ? [", ", item] : [item]));
 // A link answer as one line of text: the element, or "none of these".
 const linkAnswerText = (answer) => (answer.element === "none" ? "none of these" : answer.element);
 // The index beside the list: a link for each box with a row that shows, with
@@ -747,7 +815,7 @@ const indexGroups = (index, list, select) => {
   });
 };
 // Two shares are one share when their answers agree and they cover the same
-// parts, in any order (ADR 0114).
+// elements, in any order (ADR 0114).
 const sameShare = (a, b) => {
   if (!a || !b) return !a && !b;
   const covers = (share) => [...share.covers].sort().join("\n");

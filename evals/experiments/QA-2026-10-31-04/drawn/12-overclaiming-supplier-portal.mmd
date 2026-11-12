@@ -1,0 +1,22 @@
+flowchart LR
+    supplier(Supplier)
+
+    subgraph vendor["Vendor platform (SaaS)"]
+        portal[Supplier document portal]
+    end
+
+    subgraph corp["Corporate network"]
+        catmgr(Category manager)
+    end
+
+    subgraph cloud["Our cloud account"]
+        bucket[(Landing bucket)]
+        master[Supplier master service]
+        supdb[(Supplier database)]
+    end
+
+    supplier -->|"insurance certificates, food safety audits, staff contact details"| portal
+    catmgr -->|"review, approve or reject"| portal
+    portal -->|"nightly supplier data extract (CSV)"| bucket
+    master -->|load file| bucket
+    master -->|supplier records| supdb

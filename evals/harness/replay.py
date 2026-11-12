@@ -81,6 +81,7 @@ and a run confirms.
 
 from __future__ import annotations
 
+import json
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -106,6 +107,8 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.grounding import normalize
+from analysis_service.parsing import table_entry
+from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     DataFlow,
@@ -127,6 +130,7 @@ from evals.harness.modes import (
     AssertionResult,
     AttributeCheck,
     ExtractionResult,
+    SweepMode,
     score_extraction,
 )
 from evals.harness.reference import GoldenCase
@@ -161,7 +165,7 @@ FATES: tuple[Fate, ...] = (
 #: reader ruled a producer need not draw, so nothing stood for it and nothing
 #: had to (:func:`~evals.harness.alignment.placeholder_zones`). A produced
 #: zone that pairs with one still reads ``found`` or ``renamed``.
-LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
+LOSSES: frozenset[Fate] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 
 #: The fates a produced row can answer a reference row with, which is every
 #: fate that is not an absence. Named apart from :data:`RowFate` because one
@@ -195,7 +199,7 @@ ROW_FATES: tuple[RowFate, ...] = (
 #: raised, and the prompt tells the model to write no such row, so nobody
 #: produced it and nobody should have. A produced value against one still
 #: reads ``wrong_value``, which is the defect that matters.
-ROW_LOSSES: frozenset[str] = frozenset(
+ROW_LOSSES: frozenset[RowFate] = frozenset(
     {"wrong_certainty", "wrong_value", "rescoped", "omitted"}
 )
 
@@ -725,7 +729,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
 def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     """The produced row in the reference's spellings, where a signed alias rules.
 
-    The one place an alias is applied, before any comparison: the subject, a
+    This applies an alias before any comparison: the subject, a
     value that points at another subject, and each scope qualifier are each
     rewritten to the reference's spelling where a signed ruling names the
     produced one. A value and a qualifier are rewritten only under the produced
@@ -738,7 +742,7 @@ def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     reference it points at. The alias is keyed by the whole **Element ID**, so a
     ruling about a zone reaches no value naming a process.
     """
-    predicate = REGISTRY[produced.predicate]
+    predicate = table_entry(REGISTRY, produced.predicate)
     own = reference.subject_aliases.get(produced.subject)
     subject = produced.subject if own is None else own.to
     value = produced.value
@@ -774,7 +778,7 @@ def _compares_exactly(predicate: str) -> bool:
     one of the layer's own subjects — a credential or a principal slugged
     from whatever the model wrote — are a reader's question.
     """
-    registered = REGISTRY[predicate]
+    registered = table_entry(REGISTRY, predicate)
     if registered.value == "term":
         return True
     return registered.value == "reference" and bool(registered.refers_to & GRAPH_BOUND)
@@ -967,7 +971,7 @@ BindFate = Literal[
 BIND_FATES: tuple[BindFate, ...] = get_args(BindFate)
 
 #: The binding losses, which the pooled table lists as targets.
-BIND_LOSSES: frozenset[str] = frozenset(
+BIND_LOSSES: frozenset[BindFate] = frozenset(
     {"renamed", "omitted", "referent_renamed", "referent_omitted"}
 )
 
@@ -1103,7 +1107,7 @@ def bind_assertions(
             # predicates that take no reference. A term predicate carrying a
             # term outside its vocabulary draws this same code, and reading
             # `refers_to` directly ended the replay with a bare StopIteration.
-            wanted = referent_type(REGISTRY[row.predicate])
+            wanted = referent_type(table_entry(REGISTRY, row.predicate))
             blessed_id = (
                 None if wanted is None else snap_subject(wanted, row.value, case.model)
             )
@@ -1122,9 +1126,17 @@ def bind_assertions(
     )
 
 
+#: What tells one sweep's input apart from another's on an :class:`Arm`.
+#: ``rendered_sources`` is the artifact's own record of each case's rendered
+#: Sources. ``named`` is the arm a caller named for a sweep that records none.
+#: ``sweep`` is a sweep that records none and that no caller named, so it is
+#: an arm of its own.
+TreatmentBy = Literal["rendered_sources", "named", "sweep"]
+
+
 @dataclass(frozen=True)
 class Arm:
-    """What one archived sweep was: the reading route, and the models that answered it.
+    """What one archived sweep was: the reading route, its input, and the models that answered it.
 
     ``models`` is what answered the archived route, read off the sweep's own
     execution record, never the tier table. Two sweeps with one tier table
@@ -1134,24 +1146,52 @@ class Arm:
     ``nodes`` and ``instructions`` are tuples because a reading route can be
     more than one call, and each call carries its own prompt. A single-call
     route holds one of each, which is every archived sweep.
+
+    ``treatment`` is what the route read, and ``treatment_by`` says where that
+    came from (:data:`TreatmentBy`). Two sweeps with one prompt and one model
+    read different input when a Source or its render moved, such as a change
+    to the diagram reader, and the instruction digest shows neither.
     """
 
     nodes: tuple[str, ...]
     instructions: tuple[str, ...]
     models: tuple[str, ...]
+    treatment: str
+    treatment_by: TreatmentBy
 
     @property
     def label(self) -> str:
         route = "+".join(self.nodes)
         digests = ",".join(digest[:12] for digest in self.instructions)
-        return f"{route}@{digests} on {', '.join(self.models)}"
+        read = TREATMENT_LABELS[self.treatment_by].format(self.treatment)
+        return f"{route}@{digests} on {', '.join(self.models)}, {read}"
 
     def to_json(self) -> dict[str, Any]:
         return {
             "nodes": list(self.nodes),
             "instructions": list(self.instructions),
             "models": list(self.models),
+            "treatment": self.treatment,
+            "treatment_by": self.treatment_by,
         }
+
+
+#: How each kind of treatment prints in an arm's label.
+TREATMENT_LABELS: Mapping[TreatmentBy, str] = {
+    "rendered_sources": "input {:.12}",
+    "named": "arm {!r}",
+    "sweep": "only {}",
+}
+
+
+def rendered_digest(rendered: Mapping[str, str]) -> str:
+    """One digest over a sweep's ``rendered_sources`` block, case by case.
+
+    Sweeps that read the same input for every case they selected share it,
+    so repeats pool and a case's own input never makes an arm of its own.
+    """
+    canonical = json.dumps(dict(rendered), sort_keys=True, separators=(",", ":"))
+    return text_digest(canonical)
 
 
 #: Which reading routes each mode admits, and so which nodes' instructions
@@ -1165,7 +1205,7 @@ class Arm:
 #:
 #: A table keyed by mode, listing routes: a second route added to a mode is one
 #: entry here, and a sweep that ran it is placed rather than refused.
-ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
+ROUTES_OF: Mapping[SweepMode, tuple[tuple[str, ...], ...]] = {
     "extraction": (("extract",),),
     "end-to-end": (("extract",),),
     "assertions": (("assert",),),
@@ -1178,7 +1218,7 @@ ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
 #: question — which nodes' instructions place the sweep on an arm. The head-only
 #: mode reads through ``extract`` and keeps a catalog, so the two tables answer
 #: apart.
-KEEPS: Mapping[str, str] = {
+KEEPS: Mapping[SweepMode, str] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
     "assertions": "catalog",
@@ -1186,12 +1226,13 @@ KEEPS: Mapping[str, str] = {
 }
 
 
-def arm_of(artifact: EvalArtifact) -> Arm:
-    """Which prompts and which models an archived sweep ran, off its own record.
+def arm_of(artifact: EvalArtifact, named: str | None) -> Arm:
+    """Which prompts, which input and which models an archived sweep ran, off its own record.
 
     One route of :data:`ROUTES_OF`, and one prompt per node of it. A sweep
     carrying the nodes of two routes is two arms and is refused, and so is one
-    that carries the nodes of none.
+    that carries the nodes of none. ``named`` is the arm a caller names for a
+    sweep that records no ``rendered_sources`` block.
     """
     rows = artifact.block("instruction")
     carried = {row["node"] for row in rows}
@@ -1220,7 +1261,59 @@ def arm_of(artifact: EvalArtifact) -> Arm:
                 f" {node}, so the sweep cannot be placed on an arm"
             )
         models.update(execution["requested_model"] for execution in executions)
-    return Arm(tuple(route), tuple(instructions), tuple(sorted(models)))
+    treatment, treatment_by = _treatment_of(artifact, named)
+    return Arm(
+        tuple(route),
+        tuple(instructions),
+        tuple(sorted(models)),
+        treatment,
+        treatment_by,
+    )
+
+
+def _treatment_of(artifact: EvalArtifact, named: str | None) -> tuple[str, TreatmentBy]:
+    """What a sweep read: its own record, else the caller's name, else itself.
+
+    The record wins over a name, because it is what the run rendered. A sweep
+    with neither is never pooled with another: the replay cannot tell whether
+    two such sweeps read one input, and it does not guess.
+    """
+    if artifact.carries("rendered_sources"):
+        rendered = artifact.block("rendered_sources")
+        if not isinstance(rendered, Mapping) or not all(
+            isinstance(digest, str) for digest in rendered.values()
+        ):
+            raise ValueError(
+                f"{artifact.path}: rendered_sources is not a digest per case, so"
+                " the sweep cannot be placed on an arm"
+            )
+        return rendered_digest(rendered), "rendered_sources"
+    if named is not None:
+        return named, "named"
+    return str(artifact.path), "sweep"
+
+
+def unpooled_note(arms: Iterable[Arm]) -> str | None:
+    """Why sweeps with one route, prompt and model print as separate arms.
+
+    ``None`` where no two such sweeps exist. Otherwise the message names the
+    sweeps and the option that pools them.
+    """
+    held: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+    for arm in dict.fromkeys(arms):
+        if arm.treatment_by == "sweep":
+            held[(arm.nodes, arm.instructions, arm.models)].append(arm.treatment)
+    apart = [paths for paths in held.values() if len(paths) > 1]
+    if not apart:
+        return None
+    names = "; ".join(", ".join(Path(path).name for path in paths) for paths in apart)
+    return (
+        f"NOT POOLED: {sum(map(len, apart))} sweep(s) share a route, a prompt and"
+        " a model but carry no rendered_sources block, so nothing records whether"
+        f" they read one input: {names}. Each is its own arm. To pool the sweeps"
+        " that read one input, name their arm with --arm LABEL=GLOB, where GLOB"
+        " matches the artifact file names."
+    )
 
 
 @dataclass(frozen=True)
@@ -1230,7 +1323,7 @@ class SweepReplay:
     artifact: str
     arm: Arm
     commit: str
-    #: ``None`` where the sweep predates the tree state being recorded.
+    #: ``None`` where the sweep records no tree state.
     clean: bool | None
     corpus_digest: str
     extractions: tuple[ExtractionReplay, ...] = ()
@@ -1472,6 +1565,9 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
         grouped[sweep.arm].append(sweep)
+    note = unpooled_note(grouped)
+    if note:
+        print(note)
     for arm, arm_sweeps in grouped.items():
         pool = pooled_bindings(arm_sweeps)
         print(f"\n== {arm.label}: {len(arm_sweeps)} proposal sweep(s)")
@@ -1500,17 +1596,14 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
 
 
 def binding_artifact(
-    sweeps: Sequence[BindingSweep], commit: str, clean: bool | None, corpus_digest: str
+    sweeps: Sequence[BindingSweep], record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The whole binding replay, with the coordinates it was scored under named first."""
+    """The whole binding replay, with the run record it was scored under first."""
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
         grouped[sweep.arm].append(sweep)
     return {
-        "coordinates": {
-            "repo_commit": {"commit": commit, "clean": clean},
-            "corpus_digest": corpus_digest,
-        },
+        "record": dict(record),
         "arms": [
             {"arm": arm.to_json(), "bindings": pooled_bindings(arm_sweeps)}
             for arm, arm_sweeps in grouped.items()
@@ -1536,7 +1629,11 @@ TREE_STATE: Mapping[bool | None, str] = {
 
 def render(sweeps: Sequence[SweepReplay], targets: int) -> None:
     """The pooled tables, one per arm, with the elements a change would aim at."""
-    for arm, arm_sweeps in by_arm(sweeps).items():
+    arms = by_arm(sweeps)
+    note = unpooled_note(arms)
+    if note:
+        print(note)
+    for arm, arm_sweeps in arms.items():
         print(f"\n== {arm.label}: {len(arm_sweeps)} sweep(s)")
         for sweep in arm_sweeps:
             state = TREE_STATE[sweep.clean]
@@ -1633,15 +1730,12 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
 
 
 def artifact(
-    sweeps: Sequence[SweepReplay], commit: str, clean: bool | None, corpus_digest: str
+    sweeps: Sequence[SweepReplay], record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The whole replay, with the coordinates it was scored under named first."""
+    """The whole replay, with the run record it was scored under first."""
     arms = by_arm(sweeps)
     return {
-        "coordinates": {
-            "repo_commit": {"commit": commit, "clean": clean},
-            "corpus_digest": corpus_digest,
-        },
+        "record": dict(record),
         "arms": [
             {
                 "arm": arm.to_json(),

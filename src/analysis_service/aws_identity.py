@@ -14,7 +14,7 @@ imports it on each call, so a missing ``boto3`` raises
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, get_args
 
 from analysis_service.store_settings import StoreConfigError
 
@@ -26,9 +26,8 @@ if TYPE_CHECKING:
 #: (``iam-role``), and the web identity token of a workload
 #: (``assume-role-with-web-identity``). Each one issues temporary credentials
 #: that ``botocore`` refreshes.
-PLATFORM_METHODS = frozenset(
-    {"container-role", "iam-role", "assume-role-with-web-identity"}
-)
+PlatformMethod = Literal["container-role", "iam-role", "assume-role-with-web-identity"]
+PLATFORM_METHODS: frozenset[PlatformMethod] = frozenset(get_args(PlatformMethod))
 
 
 def platform_session(setting: str) -> boto3.Session:

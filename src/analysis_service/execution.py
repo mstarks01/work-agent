@@ -21,12 +21,14 @@ seam, so a render one level up would be two renders that have to agree.
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import anyio.to_thread
 from google.adk import Runner
 from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
@@ -37,11 +39,13 @@ from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
+from analysis_service.diagrams import read_diagram
 from analysis_service.frameworks import package_for
 from analysis_service.graph import (
     LANE_ARTIFACTS,
     LANE_SHARED_KEYS,
     PREPARE_NODE,
+    STATE_DIAGRAM_READINGS,
     STATE_INPUT_TEXT,
     STATE_SOURCE_TEXTS,
     FrameworkNodes,
@@ -162,8 +166,51 @@ def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in state.items()
-        if key not in (STATE_INPUT_TEXT, STATE_SOURCE_TEXTS)
+        if key not in (STATE_INPUT_TEXT, STATE_SOURCE_TEXTS, STATE_DIAGRAM_READINGS)
     }
+
+
+#: How many runs read their diagrams at one time. A read is a Node process
+#: that blocks its thread for up to ``READ_TIMEOUT_SECONDS``, so it runs on a
+#: worker thread and never on the event loop. The limiter is its own, so a
+#: queue of reads takes no slot of the default limiter from the request path.
+#: Small because each Node process holds about 140 MB.
+_DIAGRAM_READS = anyio.CapacityLimiter(2)
+
+#: The reads that hold a token, so that no task of a cancelled caller is
+#: collected before its thread ends.
+_READS_IN_FLIGHT: set[asyncio.Task[dict[str, Any]]] = set()
+
+
+async def _seed_off_the_loop(
+    sources: Sequence[Source], extra_state: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """:func:`seed_state` on a worker thread, under :data:`_DIAGRAM_READS`.
+
+    The token stays held until the read task ends, and that task ends with the
+    thread unless the loop closes. A cancel of the caller cannot stop the
+    thread or its Node process, so the read runs in a task of its own that the
+    cancel does not reach, and the end of that task returns the token. A caller
+    cancelled while it waits for a token starts no read. A free token is taken
+    with no yield: the limiter yields after it grants one, and a cancel at that
+    yield leaves the token with a holder that nothing returns it for.
+    """
+    holder = object()
+    try:
+        _DIAGRAM_READS.acquire_on_behalf_of_nowait(holder)
+    except anyio.WouldBlock:
+        await _DIAGRAM_READS.acquire_on_behalf_of(holder)
+    # A limiter of one for this call: `_DIAGRAM_READS` already counts this
+    # read, and the default limiter belongs to the request path.
+    read = asyncio.ensure_future(
+        anyio.to_thread.run_sync(
+            seed_state, sources, extra_state, limiter=anyio.CapacityLimiter(1)
+        )
+    )
+    _READS_IN_FLIGHT.add(read)
+    read.add_done_callback(_READS_IN_FLIGHT.discard)
+    read.add_done_callback(lambda _: _DIAGRAM_READS.release_on_behalf_of(holder))
+    return await asyncio.shield(read)
 
 
 def seed_state(
@@ -182,7 +229,15 @@ def seed_state(
             f"{STATE_INPUT_TEXT} is rendered from the job's sources, "
             "not seeded by the caller"
         )
-    seed[STATE_INPUT_TEXT] = render_sources(sources)
+    # Each diagram is read once, here, and the reading travels both ways the
+    # sources do: rendered for the model, structured for the gate (ADR 0121).
+    readings = {
+        source.label: read_diagram(source.text).model_dump(mode="json")
+        for source in sources
+        if source.kind == "diagram"
+    }
+    seed[STATE_INPUT_TEXT] = render_sources(sources, readings)
+    seed[STATE_DIAGRAM_READINGS] = readings
     # The same bytes, structured: the validity gate checks each element's
     # citation against these labels, and the draft fan-in checks each
     # finding's quote against the text under the label it names. Both travel
@@ -368,7 +423,7 @@ class GraphExecutor:
         run means, and nothing here converts a failure into a run that looks
         short or into one that looks free.
         """
-        seed = seed_state(sources, extra_state)
+        seed = await _seed_off_the_loop(sources, extra_state)
         rendered = seed[STATE_INPUT_TEXT]
 
         session = await self._session_service.create_session(

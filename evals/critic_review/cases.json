@@ -545,5 +545,176 @@
     "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
+  },
+  {
+    "id": "control-covers-order-placement-audit",
+    "kind": "control-covers",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A shopper can deny placing an order",
+      "description": "`process:storefront-api` signs shoppers in and accepts their orders. Nothing states that it records which signed-in shopper placed each order, so a shopper who disputes an order leaves the service with no record that ties the order to their session.",
+      "affected_element_ids": [
+        "process:storefront-api"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Shoppers sign in with email and password and get a session cookie",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Record each accepted order with the shopper ID of the session that placed it",
+          "detail": "Have `process:storefront-api` log every order it accepts with the signed-in shopper, in a store it can add to and cannot rewrite."
+        }
+      ]
+    },
+    "controls": [
+      {
+        "name": "Order placement audit log",
+        "scope": {
+          "state": "applied",
+          "control": "control-11111111111111111111111111111111",
+          "outcome": "matched-by-name",
+          "element": "process:storefront-api",
+          "covers": []
+        },
+        "rows": [
+          {
+            "framework": "stride",
+            "unit": "repudiation",
+            "version": "1.0",
+            "ticked": true
+          }
+        ],
+        "evidence": [
+          {
+            "id": "evidence-11111111111111111111111111111111",
+            "name": "audit.yaml",
+            "class": "config",
+            "sha256": "c0806cea6d84023d067c5148a945b15e1a23ac1336a6c0fe6e5355ccbed70ce2",
+            "text": "# storefront-api audit settings\norder_placement:\n  event: one audit event for each order the storefront API accepts\n  identity: the shopper ID of the signed-in session\n  sink: logging bucket storefront-audit (append-only, retention lock 400 days)\n"
+          }
+        ]
+      }
+    ],
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "control",
+      "reason_must_name": [
+        "audit.yaml",
+        "audit event",
+        "append-only"
+      ],
+      "recommendation_sound": true
+    },
+    "rationale": "The argument follows: the source says shoppers sign in, and says nothing about a record of who placed an order. The Control on the storefront API states the record the draft calls missing, on the draft's element and for its lane, and `audit.yaml` says so in one line. The draft must die for `control`, and the reason must quote the evidence, so a critic that kills it for another reason does not pass.",
+    "reviewed_by": "mstarks01",
+    "framework": "stride",
+    "drafted_by": "agent-stand-in"
+  },
+  {
+    "id": "control-does-not-cover-shared-db-account",
+    "kind": "control-does-not-cover",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "R-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A change to orders-db cannot be tied to the person who made it",
+      "description": "`process:order-service` reads and writes `store:orders-db` with one application account whose password is an environment variable on the worker. Nothing states that a change to an order is recorded with the person who caused it, so anyone who uses that account can alter an order and deny it.",
+      "affected_element_ids": [
+        "process:order-service",
+        "store:orders-db"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "the order service reads and writes with a single application account that has full read/write",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "The password comes from an environment variable on the worker.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Record each change to orders-db with the identity that caused it",
+          "detail": "Give each person and each service its own database identity, or carry the caller's identity into an audit record that `process:order-service` writes for each change to `store:orders-db`."
+        }
+      ]
+    },
+    "controls": [
+      {
+        "name": "Order service gRPC TLS",
+        "scope": {
+          "state": "applied",
+          "control": "control-22222222222222222222222222222222",
+          "outcome": "matched-by-name",
+          "element": "process:order-service",
+          "covers": []
+        },
+        "rows": [
+          {
+            "framework": "stride",
+            "unit": "repudiation",
+            "version": "1.0",
+            "ticked": true
+          }
+        ],
+        "evidence": [
+          {
+            "id": "evidence-22222222222222222222222222222222",
+            "name": "grpc.yaml",
+            "class": "config",
+            "sha256": "39e8d19c6366e182d8564290b1565d95c260b0a3c04587e018074c09dda1bbcf",
+            "text": "# order-service gRPC server\ngrpc:\n  server_tls: required\n  min_version: TLS1.3\n"
+          }
+        ]
+      }
+    ],
+    "expect": {
+      "survives": true,
+      "recommendation_sound": true
+    },
+    "rationale": "The argument follows from two stated facts: one shared account, and a password any reader of the worker's environment holds. The Control on the order service sets TLS on its gRPC server. TLS protects a call in transit and records nothing about who changed an order, so the row must be refused and the draft must survive. A critic that applies every row it is shown fails here.",
+    "reviewed_by": "mstarks01",
+    "framework": "stride",
+    "drafted_by": "agent-stand-in"
   }
 ]

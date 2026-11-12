@@ -27,9 +27,16 @@ from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
 from analysis_service.objects import (
     OBJECT_STORES,
     S3_KEY_FILES,
+    ControlKey,
+    FileKey,
+    FilesystemObjectStore,
+    JobKey,
     ObjectStore,
     ObjectStoreName,
     build_object_store,
+    evidence_key,
+    file_key,
+    key_parts,
     object_key,
 )
 from analysis_service.store_backends import build_store
@@ -269,7 +276,7 @@ class TestTheSettings:
             ),
             (
                 {"ANALYSIS_OBJECT_CREDENTIALS": "iam"},
-                "reads no static key; unset ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
+                "the iam mode of the s3 object store takes no ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
             ),
             (
                 {"ANALYSIS_OBJECT_ROOT": "/srv/objects"},
@@ -393,7 +400,10 @@ class TestTheIamMode:
     def test_a_setting_of_the_api_key_mode_stops_the_startup(self, env, var):
         """The Settings page hides the rows of the ``api_key`` mode in the
         ``iam`` mode, so the ``iam`` mode refuses each of them."""
-        with pytest.raises(StoreConfigError, match=f"reads no static key; unset {var}"):
+        with pytest.raises(
+            StoreConfigError,
+            match=f"the iam mode of the s3 object store takes no {var}; unset it$",
+        ):
             build_store(iam(env) | {var: "/run/secrets/key"})
 
     def test_the_api_key_mode_reads_the_files(self, env):
@@ -512,3 +522,86 @@ def test_without_boto3_the_startup_names_the_aws_extra(tmp_path, monkeypatch):
 def test_s3_env_refuses_to_run_without_moto(tmp_path):
     with pytest.raises(AssertionError, match="moto_s3"):
         s3_env(tmp_path)
+
+
+class TestTheKeyRules:
+    """A job key and an evidence key have three parts and a file key two
+    (ADRs 0118 and 0127)."""
+
+    JOB = "job-" + "a" * 32
+    FILE = "file-" + "b" * 32
+    CONTROL = "control-" + "c" * 32
+    EVIDENCE = "evidence-" + "d" * 32
+
+    def test_each_shape_round_trips_with_its_type(self):
+        assert key_parts(object_key("alice", self.JOB, "sources.json")) == JobKey(
+            "alice", self.JOB, "sources.json"
+        )
+        assert key_parts(file_key("alice", self.FILE)) == FileKey("alice", self.FILE)
+        assert key_parts(
+            evidence_key("alice", self.CONTROL, self.EVIDENCE)
+        ) == ControlKey("alice", self.CONTROL, self.EVIDENCE)
+
+    @pytest.mark.parametrize(
+        ("owner_id", "control_id", "evidence_id"),
+        [
+            ("Alice", "control-" + "c" * 32, "evidence-" + "d" * 32),
+            ("../alice", "control-" + "c" * 32, "evidence-" + "d" * 32),
+            ("alice", "control-" + "C" * 32, "evidence-" + "d" * 32),
+            ("alice", "control-" + "c" * 31, "evidence-" + "d" * 32),
+            ("alice", "job-" + "c" * 32, "evidence-" + "d" * 32),
+            ("alice", "control-" + "c" * 32, "evidence-" + "d" * 33),
+            ("alice", "control-" + "c" * 32, "file-" + "d" * 32),
+            ("alice", "control-" + "c" * 32, "sources.json"),
+            ("alice", "control-" + "c" * 32, "evidence-" + "d" * 32 + "/x"),
+        ],
+    )
+    def test_an_evidence_key_refuses_each_part_outside_its_shape(
+        self, owner_id, control_id, evidence_id
+    ):
+        with pytest.raises(ValueError):
+            evidence_key(owner_id, control_id, evidence_id)
+
+    @pytest.mark.parametrize(
+        ("owner_id", "file_id"),
+        [
+            ("Alice", "file-" + "b" * 32),
+            ("../alice", "file-" + "b" * 32),
+            ("alice", "file-" + "B" * 32),
+            ("alice", "file-" + "b" * 31),
+            ("alice", "job-" + "b" * 32),
+            ("alice", "file-" + "b" * 32 + "/x"),
+        ],
+    )
+    def test_a_file_key_refuses_each_part_outside_its_shape(self, owner_id, file_id):
+        with pytest.raises(ValueError):
+            file_key(owner_id, file_id)
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "alice",
+            "alice/notes.txt",
+            "alice/" + "job-" + "a" * 32,
+            "alice/" + "file-" + "b" * 32 + "/sources.json",
+            "alice/" + "file-" + "b" * 32 + "/",
+            "tenant/alice/" + "file-" + "b" * 32,
+            "alice/" + "control-" + "c" * 32 + "/sources.json",
+            "alice/" + "control-" + "c" * 32 + "/" + "file-" + "b" * 32,
+            "alice/" + "job-" + "a" * 32 + "/" + "evidence-" + "d" * 32,
+            "alice/" + "control-" + "c" * 32,
+        ],
+    )
+    def test_a_key_no_builder_gives_has_no_parts(self, key):
+        assert key_parts(key) is None
+
+
+def test_a_file_delete_keeps_the_owner_directory(tmp_path):
+    """Another write of the owner can need the directory at the same time."""
+    root = tmp_path / "objects"
+    root.mkdir(mode=0o700)
+    store = FilesystemObjectStore(root)
+    key = file_key("alice", "file-" + "b" * 32)
+    asyncio.run(store.put(key, b"x"))
+    assert asyncio.run(store.delete(key)) is True
+    assert (root / "alice").is_dir()

@@ -5,13 +5,18 @@ mode: the local app calls the models you configure.
 
 ## 1. Install
 
-You need Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/) and Node 22.12 or newer.
 
 ```sh
 git clone https://github.com/mstarks01/work-agent.git
 cd work-agent
 uv sync
 ```
+
+The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 22.12
+or newer. At its first start, the app installs the parsers' locked packages,
+so that start needs a network connection. Where the install fails, the app
+logs a warning that names the command to run.
 
 ## 2. Select models and provide credentials
 
@@ -372,10 +377,43 @@ than one analysis can carry, is not UTF-8, or holds control characters. The
 service reads the transcript as a conversation, beside the description where
 you type one. **Remove** takes the transcript off the form.
 
+To add a diagram, click the same **+** button and choose a Mermaid file that
+ends in `.mmd` or `.mermaid`, such as a `flowchart`. The service reads it as a
+diagram of the system: a node can be a component and an arrow a data flow. A
+subgraph is a trust zone only where its label says so. A node's shape states
+its type only where a comment in the diagram states the shape convention, as
+the line `%% Shapes: ...` in a diagram from **Download as Mermaid** does. The
+page holds one transcript and one diagram, and **Remove** takes each one off
+the form.
+
+The service reads a `flowchart`, `graph` or `architecture-beta` diagram with
+Mermaid's own parsers. Extraction then models every node as an element and
+every edge as a flow, and the model decides what each one is. An element
+takes its node's label as its name, or the part of the label before a colon
+or a bracket, such as `Orders DB` for `Orders DB (PostgreSQL)`. A diagram that
+Mermaid cannot read, such as one with a syntax error, is read as text.
+
 Then replace the example with your own description. State security controls
 that are actually known. When the input does not state an attribute, extraction
 uses `unknown`; code turns a claim resting on such an attribute into
 `needs-info` rather than treating the control as missing.
+
+A protection that you state on each analysis, such as a WAF at the edge or
+SSO on an API, can be a **Control** instead. Open **Controls** in the
+sidebar, click **New Control**, and say what it protects, the protections it states,
+the framework units it covers and the evidence files that show it. The form
+names your ticked Controls under "Controls", and each one starts ticked.
+**Choose Controls** opens the list. A
+Control that states no fact and covers none of the frameworks you choose, at
+the framework version the service carries, changes nothing, so the list shows
+it unticked and says why. At
+the questions, the page shows what each Control matched in your description,
+and you confirm the match there. With the questions off, the service applies
+each Control's default match and continues at once. When it cannot apply them,
+the page shows the refusal at the questions. That pause asks no question: untick
+or resolve a Control there, then choose **Start the analysis**.
+The report lists each Control with the facts it wrote and what became of each
+row. See [The Controls page](Web-App.md#the-controls-page).
 
 ### Answer the questions the analysis asks
 
@@ -408,7 +446,10 @@ The app can ask you questions before the analysis, and after the report.
   back the shared answer from it. A line beside the answer names the parts
   it covers, and **Undo** puts back the answer and the parts as they were
   before your last change to it. A matching question does not prove that
-  one control covers every part, so the page ticks none for you. The service
+  one control covers every part, so the page ticks none for you. **Cover
+  every part** ticks each part that has no answer of its own, and leaves a
+  part with its own answer unticked. When you choose an answer and tick no
+  part, the line tells you to tick the parts it covers. The service
   keeps which parts the answer covers. After a reload, a covered part shows
   under **Your answers**, marked "(shared answer)"; change it there to give
   that part its own answer. The help
@@ -452,24 +493,27 @@ The app can ask you questions before the analysis, and after the report.
   so, and you can still change an answer. Only **Start the analysis** starts
   it. The analysis then starts from what was already read, so nothing is read
   again, and it reads your answers.
-- **After the report: one optional follow-up.** The report is complete
-  without it. Where the report asks something, a line under the findings
-  offers **Add information**, and the **Questions** tab shows how many
-  questions it asks. The questions use the same list as the questions before
-  the analysis: a group for each kind of question, an index of the groups on
-  the left, typed answers, and one shared answer for the parts you tick where a question
-  asks about several parts. Each question says what became of it before the analysis: new
-  from this analysis, left blank, skipped, answered in part, or answered "I
-  don't know". **Used by** names the findings that use it; click an ID to open
-  that finding. The help under **?** says what the answer informs and that a
-  finding can need other facts too. Where your install builds an assertion
-  catalog, the list also asks which part of your system each user, team or
-  account is, under **Match each user, team or account to a part of your
-  system**. Where a part of your system has the same name, the question lists
-  that part first, marked "(same name)", and shows an arrow button; nothing is
-  chosen until you click it. **Answers this report read** lists your earlier
-  answers; **Change** gives a new one. A known answer cannot change back to "I
-  don't know" there, and a known part of a question with parts cannot either.
+- **After the report: one optional follow-up.** Only an analysis with **Ask me
+  questions to make the report better.** ticked offers it. A report of an
+  analysis with the box unticked has no **Questions** tab. The report is
+  complete without the follow-up. Where the report asks something, a line
+  under the findings offers **Add information**, and the **Questions** tab
+  shows how many questions it asks. The questions use the same list as the
+  questions before the analysis: a group for each kind of question, an index
+  of the groups on the left, typed answers, and one shared answer for the
+  parts you tick where a question asks about several parts. Each question says
+  what became of it before the analysis: new from this analysis, left blank,
+  skipped, answered in part, or answered "I don't know". **Used by** names the
+  findings that use it; click an ID to open that finding. The help under **?**
+  says what the answer informs and that a finding can need other facts too.
+  Where your install builds an assertion catalog, the list also asks which
+  part of your system each user, team or account is, under **Match each user,
+  team or account to a part of your system**. Where a part of your system has
+  the same name, the question lists that part first, marked "(same name)", and
+  shows an arrow button; nothing is chosen until you click it. **Answers this
+  report read** lists your earlier answers; **Change** gives a new one. A
+  known answer cannot change back to "I don't know" there, and a known part of
+  a question with parts cannot either.
 
   For a control such as authentication or encryption, first choose "There is
   none", "I don't know" or "A mechanism". For a mechanism, the text box
@@ -486,12 +530,13 @@ The app can ask you questions before the analysis, and after the report.
   corrected answer. The analysis does not run again, and the verdicts do not
   change. This works on every install, with or without an assertion catalog.
 
-**Check what the app read.** Under the questions, **What your description
-says** lists each part of your system with the facts read about it and the
-words they came from. A value marked "inferred" is one your description did
-not state. Where a fact is wrong or a part is missing, write what is true
-under **Is a part of your system missing, or described wrongly?**, and the
-app reads your description again with it.
+**Check what the app read.** Above the questions, **What your description
+says** is open and lists each part of your system with the facts read about
+it and the words they came from. A value marked "inferred" is one your
+description did not state. Where a fact is wrong or a part is missing, write
+what is true under **Is a part of your system missing, or described
+wrongly?**, after the questions, and the app reads your description again
+with it.
 
 Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's job store, like every other

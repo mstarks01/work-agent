@@ -11,6 +11,7 @@ shipped graph with no provider call.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -530,42 +531,33 @@ class TestItWritesNothingInsideAMergedBaseline:
 class TestItRefusesRatherThanScoringHalf:
     @pytest.mark.parametrize("kind", ["drafts", "proposals"])
     def test_a_sweep_with_a_lost_case_file_is_refused(
-        self, swept, tmp_path, case, roster_path, kind
+        self, swept, tmp_path, case, roster_path, kind, capsys
     ):
         """Critic yield reads the drafts, and the fan-in cause the proposals."""
         (reports_dir(swept) / f"{case.id}.{kind}.json").unlink()
 
-        with pytest.raises(Exception, match=f"holds no {kind} file"):
-            main(
-                [
-                    "score",
-                    str(swept),
-                    "--ledger",
-                    str(tmp_path / "none"),
-                    "--roster",
-                    str(roster_path),
-                ]
-            )
+        assert _score(swept, tmp_path, roster_path) == 1
+        assert f"holds no {kind} file" in capsys.readouterr().err
 
     def test_a_finished_case_with_no_report_is_named(
-        self, swept, tmp_path, case, roster_path
+        self, swept, tmp_path, case, roster_path, capsys
     ):
         """The artifact records the case as finished, so its report was lost."""
         (reports_dir(swept) / f"{case.id}.report.json").unlink()
 
-        with pytest.raises(EvalRunError, match=f"{case.id}: .* no report"):
-            _score(swept, tmp_path, roster_path)
+        assert _score(swept, tmp_path, roster_path) == 1
+        assert re.search(f"{case.id}: .* no report", capsys.readouterr().err)
 
     def test_a_report_for_a_failed_case_is_refused(
-        self, swept, tmp_path, case, roster_path
+        self, swept, tmp_path, case, roster_path, capsys
     ):
         """This sweep wrote no report for a failed case, so another sweep did."""
         raw = json.loads(swept.read_text(encoding="utf-8"))
         raw["mode_output"] = [{"case": case.id, "run_failure": "a fault"}]
         swept.write_text(json.dumps(raw), encoding="utf-8")
 
-        with pytest.raises(EvalRunError, match=f"{case.id}: .* failed"):
-            _score(swept, tmp_path, roster_path)
+        assert _score(swept, tmp_path, roster_path) == 1
+        assert re.search(f"{case.id}: .* failed", capsys.readouterr().err)
 
     def test_drafts_under_a_framework_no_package_names_are_refused(self, swept, case):
         path = reports_dir(swept) / f"{case.id}.drafts.json"
@@ -576,23 +568,14 @@ class TestItRefusesRatherThanScoringHalf:
             runs_from_reports(load_artifact(swept), [case])
 
     def test_an_artifact_with_no_reports_directory_is_refused(
-        self, swept, tmp_path, roster_path
+        self, swept, tmp_path, roster_path, capsys
     ):
         for path in reports_dir(swept).iterdir():
             path.unlink()
         reports_dir(swept).rmdir()
 
-        with pytest.raises(Exception, match="does not exist"):
-            main(
-                [
-                    "score",
-                    str(swept),
-                    "--ledger",
-                    str(tmp_path / "none"),
-                    "--roster",
-                    str(roster_path),
-                ]
-            )
+        assert _score(swept, tmp_path, roster_path) == 1
+        assert "does not exist" in capsys.readouterr().err
 
 
 def _score(artifact: Path, tmp_path: Path, roster_path: Path) -> int:

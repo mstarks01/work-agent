@@ -1,10 +1,14 @@
 # The pre-merge review's record: a pull request that changes a code path holds
 # a "## Five-class read" section in its body, with one entry for each defect
-# class of docs/agents/code-review.md. A pull request that changes a module that
-# decides what a prompt says also holds a "## Prompt read" section.
+# class of docs/agents/code-review.md, and a "## Before the code" section, with
+# one entry for each class that comes back in fixes. A pull request that changes
+# a module that decides what a prompt says, or a file with a row in
+# held_wording.toml, also holds a "## Prompt read" section.
 # .github/scripts/five_class_read.py holds the rules and the class names, and
 # .github/scripts/prompt_outcomes.toml beside it holds the map from modules to
-# prompts; the script reads the base branch's copy of both.
+# prompts, and .github/scripts/held_wording.toml holds the held wording in model
+# text. The workflow runs the base branch's copy of the script, and the script
+# reads the base branch's copy of both tables.
 #
 # Its own workflow, so an edited pull request body is checked without running
 # the whole offline suite again.
@@ -32,20 +36,22 @@ jobs:
 
       # The base branch's copy of the script, so a pull request that edits
       # only the script does not pass its own check. A base that holds no copy
-      # runs the pull request's copy. LIMIT: GitHub runs the pull request's
-      # copy of this workflow file, so a pull request that edits this file can
-      # remove this step and pass. The check does not guard such a pull
-      # request; its reviewer reads the workflow diff. The body reaches the
-      # script through the environment, never through the command line,
-      # because a pull request author writes it.
+      # fails the step. LIMIT: GitHub runs the pull request's copy of this
+      # workflow file, so a pull request that edits this file can remove this
+      # step and pass. The check does not guard such a pull request; its
+      # reviewer reads the workflow diff. The body reaches the script through
+      # the environment, never through the command line, because a pull
+      # request author writes it.
       - name: Pull request body
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          script=.github/scripts/five_class_read.py
           check="$RUNNER_TEMP/five_class_read.py"
-          if ! git show "$BASE_SHA:.github/scripts/five_class_read.py" > "$check" 2>/dev/null; then
-            cp .github/scripts/five_class_read.py "$check"
+          if ! git show "$BASE_SHA:$script" > "$check"; then
+            echo "The base commit $BASE_SHA holds no $script, so the check cannot run it." >&2
+            exit 1
           fi
           python3 "$check" "$BASE_SHA" "$HEAD_SHA"

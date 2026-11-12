@@ -1,0 +1,490 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[member] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-internet"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "desk staff",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[desk staff] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:lending-api",
+        "name": "lending API",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[lending API] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:library-app",
+        "name": "library app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[library app] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internet",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "self-service kiosk",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[self-service kiosk] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "loans database",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[loans database] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-council-data-centre",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app>member-request",
+        "name": "member request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:member",
+        "destination": "process:library-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app>process:lending-api>app-request",
+        "name": "app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:library-app",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>kiosk-request",
+        "name": "kiosk request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>staff-request",
+        "name": "staff request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>loans-request",
+        "name": "loans request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-internet",
+        "name": "Trust zone internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-branch-network",
+        "name": "Trust zone branch network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone branch network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-council-data-centre",
+        "name": "Trust zone council data centre",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone council data centre]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The diagram labels the entity 'member'."
+      },
+      {
+        "assumption": "Desk staff are human external entities.",
+        "element_id": "entity:desk-staff",
+        "attribute": "kind",
+        "basis": "The diagram labels the entity 'desk staff'."
+      },
+      {
+        "assumption": "Trust zone internet is a network trust boundary.",
+        "element_id": "boundary:trust-zone-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone internet'."
+      },
+      {
+        "assumption": "Trust zone branch network is a network trust boundary.",
+        "element_id": "boundary:trust-zone-branch-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone branch network'."
+      },
+      {
+        "assumption": "Trust zone council data centre is a network trust boundary.",
+        "element_id": "boundary:trust-zone-council-data-centre",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone council data centre'."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[member] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-internet"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "desk staff",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[desk staff] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:lending-api",
+        "name": "lending API",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[lending API] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:library-app",
+        "name": "library app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[library app] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internet",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "self-service kiosk",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[self-service kiosk] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "loans database",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[loans database] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-council-data-centre",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app>member-request",
+        "name": "member request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:member",
+        "destination": "process:library-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app>process:lending-api>app-request",
+        "name": "app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:library-app",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>kiosk-request",
+        "name": "kiosk request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>staff-request",
+        "name": "staff request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>loans-request",
+        "name": "loans request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-internet",
+        "name": "Trust zone internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-branch-network",
+        "name": "Trust zone branch network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone branch network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-council-data-centre",
+        "name": "Trust zone council data centre",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone council data centre]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The diagram labels the entity 'member'."
+      },
+      {
+        "assumption": "Desk staff are human external entities.",
+        "element_id": "entity:desk-staff",
+        "attribute": "kind",
+        "basis": "The diagram labels the entity 'desk staff'."
+      },
+      {
+        "assumption": "Trust zone internet is a network trust boundary.",
+        "element_id": "boundary:trust-zone-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone internet'."
+      },
+      {
+        "assumption": "Trust zone branch network is a network trust boundary.",
+        "element_id": "boundary:trust-zone-branch-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone branch network'."
+      },
+      {
+        "assumption": "Trust zone council data centre is a network trust boundary.",
+        "element_id": "boundary:trust-zone-council-data-centre",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone council data centre'."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

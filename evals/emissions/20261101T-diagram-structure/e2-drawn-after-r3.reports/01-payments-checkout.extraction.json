@@ -1,0 +1,685 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "Shopper",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "shopper[Shopper]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "Card processor",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor[Card processor]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "Storefront API",
+        "description": "unknown",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[Storefront API]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-run",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "Order service",
+        "description": "unknown",
+        "assets": [
+          "financial",
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "orders[Order service]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders-db",
+        "description": "unknown",
+        "assets": [
+          "financial",
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "db[(orders-db)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "Receipt archive",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "receipts[(Receipt archive)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "name": "browse, place orders",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "shopper -->|\"browse, place orders\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "browse, place orders",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>order",
+        "name": "order",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|\"order (gRPC)\"| orders",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "unknown",
+        "data_description": "order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "name": "orders, addresses, card-last-four",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "orders <-->|\"orders, addresses, card-last-four\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "orders, addresses, card-last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>receipt",
+        "name": "receipt",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "orders -->|\"receipt (TLS)\"| receipts",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "TLS",
+        "authentication": "unknown",
+        "data_description": "receipt",
+        "encryption_in_transit": "TLS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+        "name": "payment settled webhook",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor -->|\"payment settled webhook (POST)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payment settled webhook",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:cloud-run",
+        "name": "Cloud Run",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph cloudrun[Cloud Run]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "other"
+      },
+      {
+        "id": "boundary:core-network",
+        "name": "Core network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph core[Core network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Shopper is a human external entity based on the node name.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The node is named \"Shopper\"."
+      },
+      {
+        "assumption": "The Card processor is an external system based on the node name and its webhook interaction.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The node is named \"Card processor\" and sends a payment settled webhook."
+      },
+      {
+        "assumption": "The Shopper carries personally identifying information because the entity represents a person.",
+        "element_id": "entity:shopper",
+        "attribute": "assets",
+        "basis": "The asset taxonomy defines information identifying or describing a person as pii."
+      },
+      {
+        "assumption": "The Card processor carries financial data because it sends a payment-settlement interaction.",
+        "element_id": "entity:card-processor",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"payment settled webhook (POST)\"."
+      },
+      {
+        "assumption": "The Storefront API handles financial and business-critical order data because it receives payment settlement notifications and handles orders.",
+        "element_id": "process:storefront-api",
+        "attribute": "assets",
+        "basis": "Its flows are labelled \"browse, place orders\", \"order (gRPC)\", and \"payment settled webhook (POST)\"."
+      },
+      {
+        "assumption": "The Order service handles financial, personally identifying, and business-critical data because it handles orders, addresses, and card-last-four values.",
+        "element_id": "process:order-service",
+        "attribute": "assets",
+        "basis": "The database interaction is labelled \"orders, addresses, card-last-four\"."
+      },
+      {
+        "assumption": "The orders-db contains financial, personally identifying, and business-critical data because the diagram names orders, addresses, and card-last-four as its contents.",
+        "element_id": "store:orders-db",
+        "attribute": "assets",
+        "basis": "The flow label is \"orders, addresses, card-last-four\"."
+      },
+      {
+        "assumption": "The orders-db data is confidential because it contains addresses and card-last-four values.",
+        "element_id": "store:orders-db",
+        "attribute": "data_classification",
+        "basis": "The stated contents include personal address data and payment-card information."
+      },
+      {
+        "assumption": "The Receipt archive contains financial data because it stores receipts.",
+        "element_id": "store:receipt-archive",
+        "attribute": "assets",
+        "basis": "The store is named \"Receipt archive\" and receives a flow labelled \"receipt (TLS)\"."
+      },
+      {
+        "assumption": "Receipt archive data is confidential because receipts are financial records.",
+        "element_id": "store:receipt-archive",
+        "attribute": "data_classification",
+        "basis": "The store is named \"Receipt archive\"."
+      },
+      {
+        "assumption": "The orders flow carries business-critical operating records because it is labelled \"order (gRPC)\".",
+        "element_id": "flow:process:storefront-api>process:order-service>order",
+        "attribute": "assets",
+        "basis": "An order is an operating record and the flow label is \"order (gRPC)\"."
+      },
+      {
+        "assumption": "The orders-db flow carries business-critical, personally identifying, and financial data because its label names orders, addresses, and card-last-four.",
+        "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "attribute": "assets",
+        "basis": "The flow label is \"orders, addresses, card-last-four\"."
+      },
+      {
+        "assumption": "The orders-db flow data is confidential because it carries addresses and card-last-four values.",
+        "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "attribute": "data_classification",
+        "basis": "The stated flow contents include personal address data and payment-card information."
+      },
+      {
+        "assumption": "The receipt flow carries financial data because it carries a receipt.",
+        "element_id": "flow:process:order-service>store:receipt-archive>receipt",
+        "attribute": "assets",
+        "basis": "The flow label is \"receipt (TLS)\"."
+      },
+      {
+        "assumption": "The receipt flow data is confidential because it carries a financial receipt.",
+        "element_id": "flow:process:order-service>store:receipt-archive>receipt",
+        "attribute": "data_classification",
+        "basis": "The flow label is \"receipt (TLS)\"."
+      },
+      {
+        "assumption": "The payment settled webhook carries financial data because it communicates payment settlement.",
+        "element_id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+        "attribute": "assets",
+        "basis": "The flow label is \"payment settled webhook (POST)\"."
+      },
+      {
+        "assumption": "The payment settled webhook data is confidential because it concerns payment settlement.",
+        "element_id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+        "attribute": "data_classification",
+        "basis": "The flow label is \"payment settled webhook (POST)\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "Shopper",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "shopper[Shopper]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "Card processor",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor[Card processor]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "Storefront API",
+        "description": "unknown",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[Storefront API]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-run",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "Order service",
+        "description": "unknown",
+        "assets": [
+          "financial",
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "orders[Order service]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders-db",
+        "description": "unknown",
+        "assets": [
+          "financial",
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "db[(orders-db)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "Receipt archive",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "receipts[(Receipt archive)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>browse-place-orders",
+        "name": "browse, place orders",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "shopper -->|\"browse, place orders\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "browse, place orders",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>order",
+        "name": "order",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|\"order (gRPC)\"| orders",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "unknown",
+        "data_description": "order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "name": "orders, addresses, card-last-four",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "orders <-->|\"orders, addresses, card-last-four\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "orders, addresses, card-last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>receipt",
+        "name": "receipt",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "orders -->|\"receipt (TLS)\"| receipts",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "TLS",
+        "authentication": "unknown",
+        "data_description": "receipt",
+        "encryption_in_transit": "TLS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+        "name": "payment settled webhook",
+        "description": "unknown",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "processor -->|\"payment settled webhook (POST)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payment settled webhook",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:cloud-run",
+        "name": "Cloud Run",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph cloudrun[Cloud Run]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "other"
+      },
+      {
+        "id": "boundary:core-network",
+        "name": "Core network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph core[Core network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Shopper is a human external entity based on the node name.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The node is named \"Shopper\"."
+      },
+      {
+        "assumption": "The Card processor is an external system based on the node name and its webhook interaction.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The node is named \"Card processor\" and sends a payment settled webhook."
+      },
+      {
+        "assumption": "The Shopper carries personally identifying information because the entity represents a person.",
+        "element_id": "entity:shopper",
+        "attribute": "assets",
+        "basis": "The asset taxonomy defines information identifying or describing a person as pii."
+      },
+      {
+        "assumption": "The Card processor carries financial data because it sends a payment-settlement interaction.",
+        "element_id": "entity:card-processor",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"payment settled webhook (POST)\"."
+      },
+      {
+        "assumption": "The Storefront API handles financial and business-critical order data because it receives payment settlement notifications and handles orders.",
+        "element_id": "process:storefront-api",
+        "attribute": "assets",
+        "basis": "Its flows are labelled \"browse, place orders\", \"order (gRPC)\", and \"payment settled webhook (POST)\"."
+      },
+      {
+        "assumption": "The Order service handles financial, personally identifying, and business-critical data because it handles orders, addresses, and card-last-four values.",
+        "element_id": "process:order-service",
+        "attribute": "assets",
+        "basis": "The database interaction is labelled \"orders, addresses, card-last-four\"."
+      },
+      {
+        "assumption": "The orders-db contains financial, personally identifying, and business-critical data because the diagram names orders, addresses, and card-last-four as its contents.",
+        "element_id": "store:orders-db",
+        "attribute": "assets",
+        "basis": "The flow label is \"orders, addresses, card-last-four\"."
+      },
+      {
+        "assumption": "The orders-db data is confidential because it contains addresses and card-last-four values.",
+        "element_id": "store:orders-db",
+        "attribute": "data_classification",
+        "basis": "The stated contents include personal address data and payment-card information."
+      },
+      {
+        "assumption": "The Receipt archive contains financial data because it stores receipts.",
+        "element_id": "store:receipt-archive",
+        "attribute": "assets",
+        "basis": "The store is named \"Receipt archive\" and receives a flow labelled \"receipt (TLS)\"."
+      },
+      {
+        "assumption": "Receipt archive data is confidential because receipts are financial records.",
+        "element_id": "store:receipt-archive",
+        "attribute": "data_classification",
+        "basis": "The store is named \"Receipt archive\"."
+      },
+      {
+        "assumption": "The orders flow carries business-critical operating records because it is labelled \"order (gRPC)\".",
+        "element_id": "flow:process:storefront-api>process:order-service>order",
+        "attribute": "assets",
+        "basis": "An order is an operating record and the flow label is \"order (gRPC)\"."
+      },
+      {
+        "assumption": "The orders-db flow carries business-critical, personally identifying, and financial data because its label names orders, addresses, and card-last-four.",
+        "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "attribute": "assets",
+        "basis": "The flow label is \"orders, addresses, card-last-four\"."
+      },
+      {
+        "assumption": "The orders-db flow data is confidential because it carries addresses and card-last-four values.",
+        "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+        "attribute": "data_classification",
+        "basis": "The stated flow contents include personal address data and payment-card information."
+      },
+      {
+        "assumption": "The receipt flow carries financial data because it carries a receipt.",
+        "element_id": "flow:process:order-service>store:receipt-archive>receipt",
+        "attribute": "assets",
+        "basis": "The flow label is \"receipt (TLS)\"."
+      },
+      {
+        "assumption": "The receipt flow data is confidential because it carries a financial receipt.",
+        "element_id": "flow:process:order-service>store:receipt-archive>receipt",
+        "attribute": "data_classification",
+        "basis": "The flow label is \"receipt (TLS)\"."
+      },
+      {
+        "assumption": "The payment settled webhook carries financial data because it communicates payment settlement.",
+        "element_id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+        "attribute": "assets",
+        "basis": "The flow label is \"payment settled webhook (POST)\"."
+      },
+      {
+        "assumption": "The payment settled webhook data is confidential because it concerns payment settlement.",
+        "element_id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+        "attribute": "data_classification",
+        "basis": "The flow label is \"payment settled webhook (POST)\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [
+    {
+      "code": "invalid-reference",
+      "message": "assumption names attribute 'data_classification', which 'flow:process:order-service>store:orders-db>orders-addresses-card-last-four' does not carry; it declares ['source', 'destination', 'protocol', 'authentication', 'data_description', 'encryption_in_transit', 'operations', 'assets']",
+      "element_id": "flow:process:order-service>store:orders-db>orders-addresses-card-last-four",
+      "field": "assumptions"
+    },
+    {
+      "code": "invalid-reference",
+      "message": "assumption names attribute 'data_classification', which 'flow:process:order-service>store:receipt-archive>receipt' does not carry; it declares ['source', 'destination', 'protocol', 'authentication', 'data_description', 'encryption_in_transit', 'operations', 'assets']",
+      "element_id": "flow:process:order-service>store:receipt-archive>receipt",
+      "field": "assumptions"
+    },
+    {
+      "code": "invalid-reference",
+      "message": "assumption names attribute 'data_classification', which 'flow:entity:card-processor>process:storefront-api>payment-settled-webhook' does not carry; it declares ['source', 'destination', 'protocol', 'authentication', 'data_description', 'encryption_in_transit', 'operations', 'assets']",
+      "element_id": "flow:entity:card-processor>process:storefront-api>payment-settled-webhook",
+      "field": "assumptions"
+    }
+  ],
+  "repair": null
+}

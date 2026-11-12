@@ -1,0 +1,88 @@
+{
+  "case": "05-cookbook-queue-webapp",
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:entity:browser>process:web-application>page-request",
+          "entity:browser"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 29"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:web-application>store:message-queue>enqueue-job",
+          "store:message-queue"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 30"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "recover-credential",
+        "affected_element_ids": [
+          "store:worker-config"
+        ]
+      },
+      "position": "in-component",
+      "ruling": "The ballot proposed in-component, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 32"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "recover-credential",
+        "affected_element_ids": [
+          "store:web-application-config"
+        ]
+      },
+      "position": "in-component",
+      "ruling": "The ballot proposed in-component, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 33"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "store:message-queue",
+          "process:background-worker-process"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 34"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:web-application-config",
+          "process:web-application"
+        ]
+      },
+      "ruling": "Changing the config is the prerequisite. The claim does not distinguish a config interface from local access.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 31"
+    }
+  ]
+}

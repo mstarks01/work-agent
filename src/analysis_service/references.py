@@ -17,7 +17,7 @@ schema's own checks: draft and ruling references in
 It is not a resolver. It never finds the element a reference meant. It only
 recognizes the one it already names, under a spelling the job's own construction
 rules make equivalent. A reference that names nothing comes back empty, and the
-caller's check reports it exactly as before.
+caller's check reports it as a reference that names nothing.
 
 The fold is two rungs, case and whitespace. Each rung of the quote ladder is a
 concession that loses some measured precision. These two almost never lose any,

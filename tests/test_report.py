@@ -643,7 +643,7 @@ class TestReportInvariants:
     def test_a_crossing_that_drops_its_assumed_endpoints_is_rejected(self):
         """The archive's own failure, kept as the guard (#468).
 
-        A report written before the mark existed carries a crossing with no
+        An archived report may carry a crossing with no
         ``assumed_endpoints``, and the envelope refuses it rather than reading
         a zone the service placed as one the input stated.
         """
@@ -932,39 +932,6 @@ class TestDroppedClaim:
         )
 
         assert mark.title == UNTITLED
-
-    def test_nothing_builds_one_any_other_way(self):
-        """``DroppedClaim(...)`` past the constructor is the second reader.
-
-        Read with ``ast`` rather than by substring, so the prose in these
-        modules — which names the type while explaining what it is for — is not
-        mistaken for a call.
-        """
-        import ast
-        from pathlib import Path
-
-        from analysis_service import report as report_module
-
-        source_root = Path(report_module.__file__).parent
-        direct: list[str] = []
-        for path in sorted(source_root.rglob("*.py")):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                is_call = isinstance(node, ast.Call)
-                names_the_type = (
-                    is_call
-                    and isinstance(node.func, ast.Name)
-                    and node.func.id == "DroppedClaim"
-                )
-                if names_the_type:
-                    direct.append(f"{path.name}:{node.lineno}")
-
-        assert not direct, (
-            f"{direct} builds a DroppedClaim directly. Call DroppedClaim.of,"
-            " which cuts every agent-written value to the bound its field"
-            " declares — a producer that raises here costs the job the report"
-            " the mark exists to preserve."
-        )
 
 
 class TestCoverageRatios:

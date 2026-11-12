@@ -1,0 +1,59 @@
+
+== extract@187807a13cfc on openrouter/openai/gpt-5.6-luna, arm 'after': 5 sweep(s)
+   after-r1.json @ 7cc94c194
+   after-r2.json @ 7cc94c194
+   after-r3.json @ 7cc94c194
+   after-r4.json @ 7cc94c194
+   after-r5.json @ 7cc94c194
+  80 emission(s), 0 refused by today's gate, 174 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  777     155.4       125      132      142      194      184
+  renamed                526     105.2        63       43      380       19       21
+  mistyped                 4       0.8         0        3        0        1        0
+  misattached              7       1.4         0        0        7        0        0
+  endpoint_unaligned      14       2.8         0        0       14        0        0
+  omitted                 23       4.6         0        0       23        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               7       1.4         0        2        4        1        0
+  placeholder             67      13.4        67        0        0        0        0
+  renamed by: alias 96, discriminated 222, label 19, membership 40, respelled 17, sole 132
+  spread: sd of the per-sweep count over the 5 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                           4.04      0.71     2.30     1.95     1.79     0.84
+  renamed                         3.56      1.52     1.82     3.08     1.30     0.84
+  mistyped                        0.45      0.00     0.55     0.00     0.45     0.00
+  misattached                     0.55      0.00     0.00     0.55     0.00     0.00
+  endpoint_unaligned              1.79      0.00     0.00     1.79     0.00     0.00
+  omitted                         0.55      0.00     0.00     0.55     0.00     0.00
+  ambiguous                       0.00      0.00     0.00     0.00     0.00     0.00
+  unresolved                      1.14      0.00     0.55     0.84     0.45     0.00
+  placeholder                     1.14      1.14     0.00     0.00     0.00     0.00
+  wrong facts on paired elements: boundary.assets 8, boundary.kind 18, entity.assets 95, entity.kind 1, flow.assets 222, flow.authentication 31, flow.encryption_in_transit 14, flow.operations 119, flow.protocol 77, process.assets 137, process.exposure 29, process.interface_kind 49, store.assets 87, store.data_classification 97, store.encryption_at_rest 4
+  targets (top 40 of 26):
+      5  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (misattached 5)
+      5  14-loyalty-oauth-platform/flow:entity:member>entity:partner-app>return-with-authorization-code  (endpoint_unaligned 3, omitted 2)
+      5  14-loyalty-oauth-platform/flow:entity:member>process:authorization-server>sign-in-and-consent  (misattached 2, omitted 3)
+      4  13-dispatch-control-plane/flow:entity:duty-engineer>process:dispatch-console>open-console  (omitted 4)
+      4  14-loyalty-oauth-platform/flow:entity:partner-app>process:authorization-server>token-requests  (endpoint_unaligned 3, omitted 1)
+      4  14-loyalty-oauth-platform/flow:entity:partner-app>process:rewards-api>call-rewards-api  (endpoint_unaligned 3, omitted 1)
+      3  14-loyalty-oauth-platform/entity:partner-app  (mistyped 3)
+      2  02-iot-fleet-telemetry/entity:field-technician  (unresolved 2)
+      2  02-iot-fleet-telemetry/flow:entity:field-technician>entity:sensor-node>local-service-session  (endpoint_unaligned 2)
+      2  10-cookbook-generic-cms/flow:process:web-server>store:mysql-database>cms-data  (omitted 2)
+      2  12-overclaiming-supplier-portal/flow:process:supplier-portal>store:document-store>store-documents  (omitted 2)
+      2  13-dispatch-control-plane/flow:process:dispatch-console>process:dispatch-api>live-job-status  (unresolved 2)
+      2  15-multitenant-invoicing/flow:process:pdf-renderer>store:render-queue>take-render-jobs  (omitted 2)
+      1  01-payments-checkout/flow:entity:shopper>process:storefront-api>place-order  (unresolved 1)
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  03-batch-data-pipeline/flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections  (omitted 1)
+      1  07-cicd-store-deploy/flow:entity:developer>process:build-runner>manual-rebuild  (omitted 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (omitted 1)
+      1  09-cookbook-sokify-retail/flow:process:fax-gateway>entity:customer>confirmation-fax  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/flow:process:sims>process:fax-gateway>dispatch-note  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/process:fax-gateway  (mistyped 1)
+      1  12-overclaiming-supplier-portal/flow:process:supplier-master-service>store:landing-bucket>load-extract  (omitted 1)
+      1  13-dispatch-control-plane/flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed  (omitted 1)
+      1  15-multitenant-invoicing/flow:process:billing-app>store:tenant-database>read-and-write-tenant-data  (unresolved 1)
+      1  16-library-lending-interview/flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns  (endpoint_unaligned 1)
+      1  16-library-lending-interview/process:self-service-kiosk  (unresolved 1)
+
+replay written to /tmp/claude-1000/-home-me-work-agent/37d623de-836a-47f2-ae96-2f5c8806ea49/scratchpad/qa2/replay-1813.json

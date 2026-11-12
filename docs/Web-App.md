@@ -62,7 +62,16 @@ LD_LIBRARY_PATH=~/.local/lib/chromium-deps/usr/lib/x86_64-linux-gnu uv run --gro
 
 ## What you select
 
-**The frameworks to run**, one checkbox per framework this install carries. The
+The form shows the name and the description on the left. A settings column on
+the right holds the frameworks, the "Ask me questions" box, the Controls,
+"Reuse answers from" and **Prepare analysis**. On a narrow screen, the column
+goes under the description. The "?" beside "What are you building?" shows
+what to describe.
+
+**The frameworks to run**, in the "Frameworks" menu: one checkbox per framework
+this install carries, with the options of each framework on its row. The menu
+button names the ticked frameworks with their options, such as "STRIDE, ASVS
+level 1". Escape, or a click outside the menu, closes it. The
 carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
 Every box starts unticked, so tick each framework you want **Prepare analysis**
 to run.
@@ -114,15 +123,29 @@ app has no authentication, so its save accepts only a request from the app's own
 page on loopback: the same `Host` and `Sec-Fetch-Site` checks as each other
 writing route.
 
-**Progress, in four stages.** A STRIDE run takes around 40 seconds, and each
+**Progress, in stages.** A STRIDE run takes around 40 seconds, and each
 further framework adds its own lane nodes to that. The page shows a progress bar
-of four stages and one status line, for example
-`1 of 4 stages complete · Checking the system map for gaps or conflicting details…`.
+and one status line, for example
+`1 of 5 stages complete · Checking the system map for gaps or conflicting details…`.
 The bar counts completed stages, not elapsed time. A run that stops for your
-answers counts the extraction, the checks of the system model, the question
-catalog and the pause. A run toward a report counts the extraction, the
-preparation, the review of the findings and the report assembly. The status line
-names the next stage in plain words, and the page shows no graph node name.
+answers has four stages: the system map, the details of the system model, the
+choice of the checks for your system, and the questions. Its last step fills the
+bar. A run toward a report has five stages: the system map, the details, the
+choice of the checks, the review of the findings and the report assembly. Where
+a deployment turns `ANALYSIS_ASSERTIONS` off, the run makes no choice of checks,
+so each run has one stage less. A job keeps the setting it started with, so a
+change on the Settings page does not change the bar of a run in flight. The
+status line names the next stage in plain words, and the page shows no graph
+node name. Until the service sends the first line of a run, the bar shows no
+count and the status line shows no words.
+A run that continues a paused job starts its bar at the stage where that job
+stopped, counted in the stages of a run toward a report, and the bar does not
+go below it. Its first line reads "Using your
+answers to continue the analysis…" after your answers, or "Continuing with
+your Controls…" after a pause for your Controls alone. A reload shows the same
+line. The bar of a follow-up starts at 0. So does the bar of a run that
+continues a job of an earlier version of the app, where that job holds a step
+that this version does not have.
 
 **The report** has three sections under its title: **Report**, **Questions**
 and **About the analysis**. The page opens on **Report**, and `?view=questions`
@@ -147,18 +170,23 @@ a quote the service could not find in its source marked as such. The confirmed
 findings show open; the conditional and the dismissed findings each sit in a
 closed section. A name that an agent writes, such as an element ID, an
 attribute or an asset tag, shows as words. The name itself shows when you hover
-over the words.
+over the words. An element shows as a tag in its own colour, with an outline
+in a darker shade of it; each element of the model has a colour of its own,
+the same in every view. A trust zone shows as a grey tag, and a flow as its
+two endpoint tags with an arrow between them. A question about an element and
+the Controls section show the element as the same tag.
 
-**Questions** asks the facts that the conditional findings need, in the same
-list as the questions before the analysis: a group for each kind of question,
-an index of the groups, typed answers, and one shared answer for the parts you tick where a
-question asks about several parts. The service keeps which parts that
-answer covers. Each question says what became of it before, names
-the findings that use it, and explains under its **?** what the answer informs.
-A link from a finding opens its question, and a link from a question opens its
-finding. **Save draft** keeps the answers and runs nothing. **Update report**
-starts the report's one follow-up. A final report shows its answers here to
-correct instead, and a correction runs nothing.
+**Questions** shows only for an analysis with **Ask me questions to make the
+report better.** ticked. It asks the facts that the conditional findings need,
+in the same list as the questions before the analysis: a group for each kind
+of question, an index of the groups, typed answers, and one shared answer for
+the parts you tick where a question asks about several parts. The service
+keeps which parts that answer covers. Each question says what became of it
+before, names the findings that use it, and explains under its **?** what the
+answer informs. A link from a finding opens its question, and a link from a
+question opens its finding. **Save draft** keeps the answers and runs nothing.
+**Update report** starts the report's one follow-up. A final report shows its
+answers here to correct instead, and a correction runs nothing.
 
 **About the analysis** starts with the extracted system model: its diagram,
 its boundary crossings and assumptions, its gaps, and a table for each element
@@ -176,10 +204,18 @@ zones runs across. A coloured arrow crosses a trust boundary. A dotted arrow
 may cross one, because a zone is not stated. Each flow's name sits on its
 arrow. An element whose zone the model does not state is drawn outside every
 zone, in a column named **Zone not stated**, and an element whose zone the
-service inferred says "zone assumed". Hover over an element or a flow to see
-its whole name. Under the diagram, a table for each element kind (external
-entities, processes, data stores and data flows) lists the same elements in
-words, with a column for each attribute. Hover over a name to see its ID.
+service inferred says "zone assumed". Each element's box takes the colour of
+its tag. Hover over an element or a flow to see
+its whole name. **Download as Mermaid**, in the caption, saves the same model
+as a Mermaid flowchart (`system-model.mmd`) to paste into a document that
+renders Mermaid. A comment on its first line states which shape names which
+element type. Each trust zone is a subgraph labelled "Trust zone", each arrow
+names its flow and the protocol where the model states one, and a flow that
+crosses a boundary, or may cross one, takes a link style. A `style` line gives
+each element the light colours of its tag. The file reads back as a `diagram`
+source. Under the diagram, a table for each element kind (external entities, processes, data stores and data flows)
+lists the same elements in words, with a column for each attribute. Hover over
+a name to see its ID.
 
 **Gaps in the system model**, in About the analysis, is a table of each
 attribute that the description leaves unstated, with the count and the
@@ -187,14 +223,69 @@ elements it is unstated on. The
 attribute on the most elements comes first. Where the report asks about an
 element, an **Answer** link opens that question.
 
-**The complete export** — **Preview complete export**, above the findings,
-shows the whole report as one document: every finding open, each question with
+**The complete export** — the eye icon at the end of the tab row
+(**Preview complete export**) shows the whole report as one document: every finding open, each question with
 its history and the findings it informs, and About the analysis as an appendix.
 The export has no editor; it gives the report's address to answer the questions
 online. **Print or save as PDF** prints it, and **Close preview** returns the
 page to the section and the open rows you had. A print from the browser prints
 the same export. A print leaves out the sidebar, the tabs and the buttons, and
 it always uses the light colours.
+
+**Controls**, under the findings of a job that copied a Control, starts with
+three count lines, one for each stage: the match, the facts and the rows, such
+as "Rows: 2 applied, 1 refused." The Rows line counts every row of the section,
+the rows of a Control that was left out too. Such a row shows `no-finding`, or
+`left-out` where it names another version. The Markdown export shows the same
+lines. Then one table holds each Control: what it matched, the facts it wrote,
+each with the meaning of its state (`written`, `changed` or `stated`), and its
+rows of the frameworks the job ran, each with the outcome `applied`,
+`partly-applied`, `refused`, `not-reached`, `no-finding` or `left-out`. A row
+is `partly-applied` when the critic applied it to some findings and refused it
+for others. A row is `not-reached` when no finding on its unit reached the
+critic with the row, and a finding on its unit names no part that the Control's
+scope holds. A row is `left-out` when it names another version of its framework
+than the version the analysis ran, so the job never showed it to the critic;
+its sentence names both versions. The summary of a row counts its rulings, such
+as "Ruled out: 1 · Refused: 1". A row opens to two lists: "Ruled out" holds
+each finding that the row ruled out, and "Refused" holds each finding for which
+the critic refused the row. A refusal says nothing more of the finding: another
+Control's row can rule it out. Each entry gives the claim ID and the critic's
+reason. The Markdown export labels each ruling with the same list names. Each
+row line of the export also gives the row's version, the same counts and the
+same sentence as the page. The row also shows each line of the evidence that
+the quotation of an applied ruling quotes, by file, class and line, and one
+sentence that says what the outcome means. The match, or the reason that the
+job left a Control out, shows as a sentence from the service. The section reads
+the job's copy and the report's rulings, so a later edit of a Control changes
+nothing here.
+
+The download icon at the end of the tab row opens a menu of **Download as
+Markdown**, **Download as JSON** and **Download as CSV**. They send
+`GET /report/{run}/export.md`, `GET /report/{run}/export.json` and
+`GET /report/{run}/export.csv`. The
+Markdown file holds the findings, the findings ruled out and the Controls
+section. It labels each verdict in the words the report page shows, and it
+says in words which check of the critic ruled a finding out. It escapes each
+value, so a value forms no Markdown markup, no HTML, no Markdown link and no
+GFM autolink. A viewer that links any bare domain name
+can still link one. The JSON file holds the report and
+the Controls section as `report` and `controls`. The CSV file holds one row
+for each finding of each framework, and the findings ruled out too. Its columns
+are `framework`, `id`, `title`, `status`, `severity`, `category`, `affected
+elements`, `description`, `mitigation` and `controls`. The category is the
+claim's lane, the field that each framework's ID rule names. For example, a
+STRIDE finding's category is its STRIDE category. The severity and the
+mitigation cells come from the record's own fields, through `JUDGEMENT_CELLS`
+in `webapp/report_export.py`. A record that declares no such field leaves that
+cell empty. The `controls` cell names each Control row that ruled on the finding,
+as `Control name (unit, version X): ruling`, with ` | ` between two rows. A
+`=`, `+`, `-` or `@`, or its full-width form, at the start of
+a cell, or after a `;`, a tab or a line break, also behind quote marks, gets an
+apostrophe first, and so does a cell that starts with a tab or a line break. So
+a line of a cell that starts with a hyphen shows an apostrophe. A spreadsheet
+then shows the cell as text and does not run it as a formula, also when it
+splits the file on `;` or on a tab. A `/v1` report carries no Controls section.
 
 ## When the configuration is wrong
 
@@ -245,6 +336,240 @@ serves also when the engine does not build.
 builds at once and the form shows, with no restart. The app does not watch its
 files or its environment: after a hand edit of a config file or of
 `settings.env`, or a change to the process environment, restart the app.
+
+## The Files page
+
+**Files**, between **Analyses** and **Controls**, keeps **Owner File**s: call
+transcripts and Mermaid diagrams that you add to any of your analyses
+(ADR 0118). Each file stays until you delete it. Retention does not remove it.
+
+- **The list.** A table gives the name, the kind, the format, the size and the
+  date of each file, the newest first. A line above it gives the count against
+  `max_owner_files`.
+- **Search and filters.** As on the Analyses page, a search box filters the
+  list by name, and two selects filter it by kind and by format. The selects
+  list the values of the format table.
+- **Upload a file.** The page reads the file in the browser with the checks of
+  the direct upload, then a dialog asks for the name and the kind. The name
+  starts as the file name. A plain text file is a "Transcript" or a
+  "Description", and a Mermaid file is always a "Diagram". `POST
+  /workspace/files` receives the text in JSON, with the name, the kind and the
+  format, and checks it again: the kind that the format's row allows, the byte
+  limit of one job, the control characters, the name rule of a Source label,
+  and the diagram type. It refuses a name that the page gives its own
+  Sources, such as "Uploaded transcript", a name you already use, and an
+  upload over the count limit.
+- **Delete.** A dialog says that each analysis that used the file keeps its
+  own copy. `DELETE /workspace/files/{file_id}` removes the row and the text,
+  and keeps nothing.
+
+The plus button in the description box opens a menu with two items. "Upload
+from computer" reads a file from your computer. "Select
+from Files" opens a dialog with a checklist of your files and a "Manage
+files" link. The box shows each chosen file as a chip with a Remove button. The
+submission sends the chosen IDs in `owner_files`, and the server copies each
+file's text into the job as a Source with the file's name as its label
+(ADR 0119). A later delete or a new upload changes no job and no report. When
+a chosen file is gone, the submission is refused and the form shows the file
+as "Missing". An analysis that you open again lists "Files used" from its own
+copies.
+
+## The Controls page
+
+**Controls**, between **Files** and **Settings**, keeps your **Control**s
+(ADR 0127). Each Control stays until you delete it. Retention does not remove
+it.
+
+- **The list.** The page has the Analyses page's shape: a "Find a Control"
+  search box, a "Protects" filter and a "Framework" filter, a select column
+  with "Delete selected", and a table of the name, what it protects, what it
+  covers, the evidence and the last update. The Name and Updated columns
+  sort. The facts a Control states show on a line under its name. A line
+  above the table gives the count against `max_controls`, such as "4 of 50
+  Controls", and "New Control" is disabled at the limit. On a screen 640 px
+  wide or less, each row keeps its select box, its name and facts, what it
+  protects, the last update, "Edit" and "Delete". A "Details" line under the
+  name opens what it covers and the evidence, and stays open when the table
+  redraws.
+- **The editor.** "New Control", "Edit" or a click on a name opens the editor
+  above the table: the name, then four cards in this order: "What it protects",
+  "What it does", "What it covers" and "Evidence". Each card shows its place,
+  such as "1 of 4", says when it is optional or required, and keeps its
+  description behind a "?" beside its title. A new Control starts with nothing
+  chosen in "What it protects", and "What it does" asks for that choice first.
+  A Control needs at least one fact or one row, so "What it covers" is required
+  while a kind is chosen and no protection is ticked. A Control of the whole
+  application states no fact, so it always needs a row. "What it covers" takes
+  a row by framework and unit, and the row keeps the package version. The units
+  of the chosen framework show as a tree, each under the unit it sits inside,
+  as an ASVS chapter holds its sections, with each unit's full label from its
+  package's catalog. "Find a unit" shows each unit whose ID or label holds
+  every word, under its chapter and section. Each unit has an "Add" button, and
+  a unit that is a row already shows "Added", so no row goes in twice. A note
+  shows under the rows when the Control does not cover the whole application
+  and a row names a framework whose findings can name no part, because such a
+  finding never reaches the Control. The note also says to choose the whole
+  application only when the protection covers every part, because that choice
+  removes the name and the facts. "What it protects" takes the kind, the name
+  and the aliases. A change of the kind removes the name, the aliases and each
+  fact that the new kind does not take. A notice lists what the change removed
+  and has an "Undo" button. The Undo stays until the next edit of what the
+  Control protects or does. "What it does" is a checklist of protections,
+  grouped by topic, such as "Encrypts its backups and snapshots." or "The
+  internet cannot reach it.". Each tick writes the answer that makes its fact a
+  protection: a Question Kind or one of its facets, the exposure `internal`, or
+  the encryption at rest. "Encrypts its data at rest." also takes how the part
+  does it. The service refuses every other fact and every answer that states a
+  weakness or nothing, because a Control states only a protection. "Evidence"
+  takes a plain text file and its class: Configuration, Code or People. The
+  page reads the file with the checks of an Owner File and sends only its text.
+  The analysis shows the file only beside the rows, so with no row a file has
+  no effect. The service refuses a file that looks like it holds a credential,
+  and names the line. The check is a list of shapes and does not find every
+  form, so a note on the card asks you to remove each password, key and token
+  first. In a settings file, a name that ends in `.env`, `.ini`, `.properties`,
+  `.cfg` or `.conf` or that starts with `.env.`, a credential name at the start
+  of a line counts with any plain value. An empty value, a reference such as
+  `${DB_PASSWORD}`, a mask and a comment do not count there, and a quoted value
+  counts as it does in any file. In every other file, a credential name set to
+  a value with no quotes counts where the value holds a digit or a symbol and
+  ends its line or its statement: at the end of the line, before a `#` or a
+  `;`, or, after `=`, before a `,`. The check has a limit there. A keyword
+  argument such as `connect(password=pw1, host=h)` counts, although `pw1` is a
+  variable, and so does a statement such as `self.token = token1;`. Each line
+  has a list of its class and the buttons "View", "Replace" and "Remove", and
+  a file that the Control holds also has "Download". A line that the page
+  still reads has no "View".
+  "View" shows the file's text under the line, as plain text. "Download"
+  saves a file that the Control holds. "Replace" reads a new file into the
+  line and keeps its class. "Remove" takes the file out. A change of the
+  class or the file takes effect at the save. "Save Control" sends the
+  Control, and an edit replaces it and keeps no earlier version. When another
+  tab or window saved the Control after you opened it, the save keeps your
+  changes and lists each field that differs from the version your changes
+  started from, as the saved version holds it. "Keep my changes" makes your
+  next save replace that version. It leaves out each file that the saved
+  version no longer holds, and it adds each file that the other save added,
+  because a save deletes each file that it does not list. "Open the saved
+  version" discards your changes. When the editor has changes
+  that you did not save, another Control or "New Control" opens a dialog with
+  "Stay", "Discard changes" and "Save and open". The browser also asks before
+  you leave the page with such changes, or during a save.
+- **The counts.** A Control holds at most 20 aliases, 50 rows and
+  `max_control_evidence` evidence files. The page checks each count before it
+  adds an item, and it shows the sentence that the server uses for the same
+  refusal. A fact of a Control takes no detail: the service refuses a fact
+  with a detail, from the page and from `/v1`.
+- **The routes.** `GET /workspace/controls` lists your Controls with no
+  evidence text. `POST /workspace/controls` adds one and answers `201`.
+  `PUT /workspace/controls/{control_id}` replaces one, and the body names the
+  `updated_at` the page read: a Control that changed since is refused with
+  `409`, and the refusal carries the saved version as `current`. The route
+  checks the version before the evidence list. Each save refuses a document
+  that breaks a rule with `400` and the rule's sentence, such as "Give the
+  Control a name.", and refuses a name you
+  already use, an alias that another scope holds and a save over the count
+  limit with `409`. A file that the Control holds is sent as its ID and its
+  class, and keeps its text. An evidence file over the byte limit, with a control
+  character, with no text or with a credential shape is refused with `400`.
+  The credential refusal names the line and the shape, and the service
+  redacts nothing.
+  `GET /workspace/controls/{control_id}/evidence/{evidence_id}` answers the
+  text of one file as `text/plain` and as an attachment under the file's name.
+  The service answers only a text that matches the digest that the
+  Control lists. A
+  file of another owner, or a file that the Control does not list, answers
+  `404`.
+- **Delete.** A dialog says that each analysis that applied the Control keeps
+  its own copy. `DELETE /workspace/controls/{control_id}` removes the row and
+  each evidence file, and keeps nothing. "Delete selected" asks once for the
+  count it shows. Another owner's Control answers as a Control that does not
+  exist.
+
+## Controls in an analysis
+
+A **Control** records a protection that your systems already have, and it
+names what it protects: the whole application, one zone or one element (ADR
+0124). "Controls", in the settings column, names the ticked Controls in one line:
+up to three names, then a count. **Choose Controls** opens a dialog that lists
+each of your Controls with what it protects and its rows, each ticked. The
+dialog finds a Control by its name, and **Tick all** and **Untick all** act on
+the Controls it shows. It folds the Controls that are not for this analysis
+under a count. The submission sends
+the IDs of the Controls you tick in `controls`, and the job copies each one,
+with the text of each evidence file (ADR 0127). A later edit or delete changes
+no job. When a ticked Control is gone, the submission is refused, the line
+counts it as missing, and the dialog shows it as "Missing". A Control that states no fact and has no row
+of a selected framework at the version the service carries changes nothing in
+the analysis, so the dialog shows it unticked and disabled, with the note "Not
+for this analysis". The note says when its rows are not at the framework
+version the service carries. The service refuses a submission that names one.
+A Control with facts and rows only of other frameworks stays ticked, with the
+note "Only its facts apply here". Under the line, when a Control is ticked,
+one sentence says how the Controls apply: with the questions on, you confirm
+what each one protects when the questions open; with the questions off, they
+apply with no check by you. A Control of the whole application always applies,
+a Control of a part or a zone applies where its name or an alias matches, and
+a Control that covers no part is left out.
+Controls apply at the pause. With the questions off, a job with Controls also
+pauses, and the service continues it at once with no answers (ADR 0125). The
+last line of that job before its pause reads "Preparing your Controls…". The
+page then shows "Continuing with your Controls…" until the next run starts. Each
+Control takes its default match. A refusal, such as two Controls that write
+one fact with two values, leaves the job at the pause, and the page shows the
+refusal above the questions. Untick one of the Controls there, then continue.
+The job keeps its own copy of each Control, so an edit in Controls changes
+only a later analysis.
+The refusal is stored on the job, so it stays after a restart. A restart does
+not continue a waiting job. If the app stops before it continues the job, or
+a continue ends without a report, the page says that the app did not continue
+it, and you continue it.
+
+The model exists only after the extraction, so the pause shows the match. The
+questions of a paused analysis list each copied Control in `controls`: what
+it matched, and why where it matched nothing.
+
+- **A match is an equal element ID**, from the name, then from each alias. A
+  similar name proposes nothing. The whole application always matches.
+- **A zone lists its elements.** An element that the description places in
+  the zone is ticked. An element that the service placed there by an
+  inference (`zone-inferred`), and an element that no source placed
+  (`no-zone-stated`), are listed unticked.
+- **No match has a reason.** `missing-element` lists the elements of the
+  scope's type to choose from, and a zone to choose lists its elements. The
+  choice applies to this analysis only. `empty-zone` is a zone that holds no
+  element.
+- **A row of another package version is unticked.** A unit can change its
+  meaning between two versions of a catalog.
+
+This table is the current behaviour. ADRs 0123 to 0127 hold the decisions, and
+ADR 0123 notes where a later ADR changed it.
+
+| Case | Questions on | Questions off |
+| --- | --- | --- |
+| A name or an alias matches a part | The pause shows the match. You keep it, or untick the Control. | The Control applies to that part. |
+| Nothing matches | The pause lists the parts of the scope's type to choose from. "Keep this name" adds the name as an alias. | The Control is left out, with its reason in the report. |
+| A zone | Each part that a source places in the zone is ticked. A part that the service placed there, or that no source placed, is unticked, and you can tick it. | The Control covers only the parts that a source places in the zone. |
+| Two Controls give one fact two values | The save is refused. The refusal names both Controls and their values. Untick one of them. | The job stays at the pause with the same refusal. Untick one of them, then continue. |
+| A row of another package version | The row is unticked at submission, and the report shows it as `left-out`. A Control with no row at the carried version and no fact cannot be ticked. | The same. |
+| The service restarts while a job waits | The job stays paused for your answers. | The job stays paused. The page says that the app did not continue it, and you continue it. |
+
+A save sends `control_scopes` to `/answer/{run}`: one entry for each Control
+that applies, with its element and, for a zone, the ticked elements. A zone
+Control that is off keeps its entry, with its zone and no ticked element. The
+service leaves that Control out, and the page keeps a zone that you chose
+until you load the page again. A Control with no entry is left out. A later
+save can tick it again. "Keep this
+name" sends `POST /workspace/controls/{control_id}/aliases`, which appends the
+name to the Control's aliases. Each line names the facts the Control
+answers, and says where the description already states one. A save that
+leaves two Controls writing one fact with two values is refused. With no
+save, the job takes the default resolution: each match as the pause first
+shows it. An analysis that you
+open again lists `controls_used` from its own copy, with the state
+`applied` or `left-out`, or `pending` where the job serves no model: it is
+not complete yet, it ended with no report (failed, stopped or rejected), or
+the certification gate withholds its report.
 
 ## The Settings page
 
@@ -458,13 +783,30 @@ label and a validator message both travel back to it over SSE, and neither is
 escaped for markup on the way. There is no escape helper on any page, which is
 what makes forgetting one impossible rather than merely unlikely.
 
-**An uploaded transcript reaches the server as text, never as a file.** The form
-page reads the file in the browser. It refuses a file larger than the
-deployment's `max_source_bytes` before it reads a byte, then refuses bytes that
-are not strict UTF-8, then refuses any control character other than a tab or a
-line break. `POST /analyze` receives the text as a `transcript` source in its
-JSON body, the same shape as a pasted description, so no route parses a file,
-a file name or a content type.
+**An uploaded transcript or diagram reaches the server as text, never as a
+file.** The form page reads the file in the browser. It refuses a file larger
+than the deployment's `max_source_bytes` before it reads a byte, then refuses
+bytes that are not strict UTF-8, then refuses any control character other than
+a tab or a line break. The file's extension finds its row in the format
+table, `analysis_service.sources.FORMATS`, which the server renders into the
+page with the `accept` value of the file field. A file with no row is refused,
+and the upload takes the row's default kind: a `.txt`, `.vtt` or `.srt` file is
+a `transcript`, and a `.mmd` or `.mermaid` file is a `diagram` (ADR 0120).
+`POST /analyze` receives the text as a source in its JSON body, the same shape
+as a pasted description, so no route parses a file, a file name or a content
+type. The server renders the words of each refusal that it also makes into the
+page, so the page and the server word a refusal in one way.
+
+**Each write route reads its body through one reader,** `_json_body` in
+`webapp/main.py`. It refuses a media type other than `application/json` with
+`415`. It refuses a body over the route's limit with `413`, and it stops the
+read at the first byte over the limit. The limit is `MAX_SAVE_BYTES` for the
+two Settings routes. The two Control save routes use `max_control_body_bytes`.
+It takes the most evidence files, each at its largest, and each other field at
+its bound in 4-byte characters, and it doubles that, as the job guard does. So
+the routes accept each Control that the rules accept. Each other route is a job route, and it reads its
+body through `_job_body`. There the limit is twice the deployment's
+`max_source_bytes`, the guard that `/v1` also applies.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
 per-response nonce on each inline block and no `'unsafe-inline'` anywhere. A
@@ -475,9 +817,11 @@ Each policy grants only what its own page does:
 | Page | Grants beyond `default-src 'none'` |
 | --- | --- |
 | Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
-| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}` and `/workspace/runs`. |
+| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}`, `/workspace/runs`, `/workspace/files` and `/workspace/controls`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
 | Settings | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/settings` and `/settings/rows`. It draws its table from the data in the page. |
+| Files | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/workspace/files`. |
+| Controls | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/workspace/controls`. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through
 fetch, so a navigation away from it would be something going wrong. A page and
@@ -501,6 +845,12 @@ or its link in the group index, to open it. The group index jumps to a group wit
 changing its answers or the engine's question order. Shared answers, row
 exceptions, earlier answers, skipped questions and follow-up rules use the
 existing answer service.
+
+**Settings** and the theme switch are at the foot of the sidebar on each page.
+The switch has two buttons, "Light theme" and "Dark theme", and the button of
+the theme the page shows is pressed. The browser keeps the choice, and each
+page sets it before it draws. With no choice, each page follows the system
+setting. The sidebar stays in view as the page scrolls.
 
 **Description**, **Questions** and **Reports** belong to the same analysis.
 Use **Analyses** to reopen a paused analysis or review its retained reports.
@@ -599,8 +949,9 @@ action. Skipped questions remain open facts, not negative answers.
 
 Reopening a running analysis shows its progress bar and status line from its
 session snapshot, without consuming its live progress stream. Before the first
-stage completes, the line reads `0 of 4 stages complete` and names the current
-stage. A completed analysis opens its
+stage completes, the line reads `0 of N stages complete`, where N is the stage
+count that [Progress, in stages](#what-it-shows-you) gives, and names the
+current stage. A completed analysis opens its
 report directly. Report entries use the analysis name and generation timestamp;
 the report header labels its generation time in UTC.
 

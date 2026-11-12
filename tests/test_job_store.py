@@ -11,18 +11,38 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import get_args
+from uuid import uuid4
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
+from pydantic import ValidationError
 from sqlalchemy.pool import NullPool
 
 from analysis_service import jobs, sql_store, store_backends
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import (
+    NO_ANSWERS,
+    NO_SENT_ANSWERS,
+    AnswerSet,
+    SentAnswers,
+)
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.controls import (
+    Control,
+    ControlDocument,
+    ControlLimits,
+    EvidenceRefusal,
+)
 from analysis_service.fact_answers import FactAnswer
+from analysis_service.job_controls import (
+    ControlFact,
+    ControlFacts,
+    CopiedControl,
+    LeftOutScope,
+)
 from analysis_service.jobs import (
     NON_LOCKING_STATUSES,
     RECORD_FIELDS,
@@ -41,10 +61,17 @@ from analysis_service.jobs import (
     readable,
     same_schema,
 )
-from analysis_service.objects import ObjectStore, build_object_store, object_key
+from analysis_service.objects import (
+    ObjectStore,
+    build_object_store,
+    evidence_key,
+    file_key,
+    object_key,
+)
+from analysis_service.owner_files import OwnerFile
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
-from analysis_service.sources import Source
+from analysis_service.sources import Source, text_digest
 from analysis_service.sql_store import DATABASES
 from analysis_service.store_backends import JOB_STORES, build_store
 from analysis_service.store_settings import StoreConfigError
@@ -64,6 +91,7 @@ from tests.sql_stores import (
     server_marks,
     sql_env,
 )
+from tests.test_controls import CONTROL_ID, copied_control
 from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
@@ -190,6 +218,7 @@ def racing(request, tmp_path_factory, monkeypatch):
 
 def new_record(subject: str = "alice", reserved: int = 0) -> JobRecord:
     return JobRecord.create(
+        assertion_pass=True,
         owner_id=subject,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -225,6 +254,7 @@ def enrol(store, owner: str = "alice") -> None:
 def completed(store, subject="alice", **create) -> str:
     """The ID of a completed job with a report, admitted to ``store``."""
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=subject,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -240,6 +270,7 @@ def completed(store, subject="alice", **create) -> str:
 def follow_up(parent: str) -> JobRecord:
     """A report's follow-up of ``parent``, still queued."""
     return JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -260,6 +291,7 @@ def final(store, parent: str) -> str:
 def amendment(parent: str, revision: int = 0) -> JobRecord:
     """A job an amendment of ``parent`` started, still queued."""
     return JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -479,6 +511,7 @@ class TestReserve:
                     record.transition(status)
                 await store.save(record)
             probe = JobRecord.create(
+                assertion_pass=True,
                 owner_id=subject,
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),
@@ -506,6 +539,7 @@ class TestReserve:
             seen = {}
             for owner in ("alice", "alice", "bob", "alice", "bob"):
                 record = JobRecord.create(
+                    assertion_pass=True,
                     owner_id=owner,
                     sources=[Source.description("an app")],
                     frameworks=sample_selection(),
@@ -558,6 +592,7 @@ class TestReserve:
             for _ in range(3):
                 await admit(store, new_record())
             bob = JobRecord.create(
+                assertion_pass=True,
                 owner_id="bob",
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),
@@ -812,10 +847,20 @@ class TestTheParentLock:
     def test_a_child_read_off_an_older_revision_is_refused(self, store):
         parent = waiting(store)
         assert asyncio.run(
-            store.save_answers(parent, "alice", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                parent,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
+            )
         )
-        moved = reserve(store, amendment(parent, revision=0))
-        assert moved == Admission(outcome="parent_moved", active=0)
+        stale = reserve(store, amendment(parent, revision=0))
+        assert stale == Admission(outcome="parent_stale", active=0)
         asyncio.run(admit(store, amendment(parent, revision=1)))
 
     @pytest.mark.parametrize("child", [follow_up, amendment])
@@ -861,7 +906,17 @@ class TestTheParentLock:
 
         async def race():
             return await asyncio.gather(
-                store.save_answers(parent, "alice", NO_ANSWERS, [], [], 0, renames=()),
+                store.save_answers(
+                    parent,
+                    "alice",
+                    NO_ANSWERS,
+                    [],
+                    [],
+                    0,
+                    renames=(),
+                    control_scopes=None,
+                    control_facts=None,
+                ),
                 reserving(store, amendment(parent, revision=0)),
             )
 
@@ -877,7 +932,15 @@ class TestTheSaves:
         def save(revision):
             return asyncio.run(
                 store.save_answers(
-                    job, record.owner_id, NO_ANSWERS, [], [], revision, renames=()
+                    job,
+                    record.owner_id,
+                    NO_ANSWERS,
+                    [],
+                    [],
+                    revision,
+                    renames=(),
+                    control_scopes=None,
+                    control_facts=None,
                 )
             )
 
@@ -889,7 +952,17 @@ class TestTheSaves:
         job = waiting(store)
         given = AnswerSet(facts=(FactAnswer(key=KEY, value="unknown"),))
         assert asyncio.run(
-            store.save_answers(job, "alice", given, [KEY], [], 0, renames=())
+            store.save_answers(
+                job,
+                "alice",
+                given,
+                [KEY],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
+            )
         )
         saved = asyncio.run(store.get(job))
         assert saved.revision == 1
@@ -900,33 +973,63 @@ class TestTheSaves:
     def test_a_save_is_refused_on_a_foreign_finished_or_locked_job(self, store):
         job = waiting(store)
         assert not asyncio.run(
-            store.save_answers(job, "mallory", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                job,
+                "mallory",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
+            )
         )
         done = completed(store)
         assert not asyncio.run(
-            store.save_answers(done, "alice", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                done,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
+            )
         )
         asyncio.run(admit(store, amendment(job)))
         assert not asyncio.run(
-            store.save_answers(job, "alice", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                job,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
+            )
         )
         assert asyncio.run(store.get(job)).revision == 0
 
     def test_a_draft_lands_once_for_each_revision(self, store):
         job = completed(store)
-        draft = AnswerSet(facts=(FactAnswer(key=KEY, value="TLS 1.3"),))
+        draft = SentAnswers(facts=(FactAnswer(key=KEY, value="TLS 1.3"),))
         assert asyncio.run(store.save_draft(job, "alice", draft, 0))
-        assert not asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(job, "alice", NO_SENT_ANSWERS, 0))
         saved = asyncio.run(store.get(job))
         assert saved.revision == 1
         assert saved.draft == draft
 
     def test_a_draft_is_refused_on_a_foreign_final_or_locked_report(self, store):
         job = completed(store)
-        assert not asyncio.run(store.save_draft(job, "mallory", NO_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(job, "mallory", NO_SENT_ANSWERS, 0))
         final_job = final(store, job)
-        assert not asyncio.run(store.save_draft(final_job, "alice", NO_ANSWERS, 0))
-        assert not asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(final_job, "alice", NO_SENT_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(job, "alice", NO_SENT_ANSWERS, 0))
 
     def test_a_correction_lands_only_on_a_final_report(self, store):
         corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
@@ -976,6 +1079,122 @@ class TestTheSaves:
         assert asyncio.run(store.set_title(job, "alice", "Orders"))
         asyncio.run(store.save(held))
         assert asyncio.run(store.get(job)).title == "Orders"
+
+    def test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it(
+        self, store
+    ):
+        """ADR 0125: a runner saves the record it read, so a save never
+        writes the continue refusal, and a revision does not move."""
+        job = completed(store)
+        held = asyncio.run(store.get(job))
+        assert not asyncio.run(store.set_continue_refusal(job, "mallory", "No."))
+        assert not asyncio.run(
+            store.set_continue_refusal("job-missing", "alice", "No.")
+        )
+        assert asyncio.run(store.set_continue_refusal(job, "alice", "Untick one."))
+        asyncio.run(store.save(held))
+        saved = asyncio.run(store.get(job))
+        assert (saved.continue_refusal, saved.revision, saved.updated_at) == (
+            "Untick one.",
+            held.revision,
+            held.updated_at,
+        )
+        assert asyncio.run(store.owned(job, "alice")).continue_refusal == "Untick one."
+
+    def test_a_child_s_admission_clears_the_parent_s_continue_refusal(self, store):
+        job = completed(store)
+        assert asyncio.run(store.set_continue_refusal(job, "alice", "Untick one."))
+        final(store, job)
+        assert asyncio.run(store.get(job)).continue_refusal is None
+
+
+class TestTheControlsCopy:
+    """A job keeps its own copy of its Controls (ADR 0127), and a pause save
+    keeps their resolution on the row (ADR 0124)."""
+
+    def copied(self, store) -> tuple[str, CopiedControl]:
+        copy = copied_control()
+        record = new_record()
+        record.controls = [copy]
+        asyncio.run(admit(store, record))
+        return record.id, copy
+
+    def test_the_copy_reads_back_for_its_owner_only(self, store):
+        job, copy = self.copied(store)
+        assert asyncio.run(store.controls(job, "alice")) == [copy]
+        assert asyncio.run(store.get(job)).controls == [copy]
+        assert asyncio.run(store.controls(job, "mallory")) is None
+        assert asyncio.run(store.owned(job, "alice")).controls == []
+
+    def test_a_job_with_no_control_holds_no_copy(self, store):
+        record = new_record()
+        asyncio.run(admit(store, record))
+        assert asyncio.run(store.controls(record.id, "alice")) == []
+
+    def test_a_job_with_no_control_writes_no_object(self, held):
+        store, objects = held
+        record = new_record()
+        asyncio.run(admit(store, record))
+        key = object_key("alice", record.id, "controls.json")
+        assert asyncio.run(objects.get(key)) is None
+
+    def test_a_copy_that_fails_its_digest_raises(self, held):
+        store, objects = held
+        job, _ = self.copied(store)
+        key = object_key("alice", job, "controls.json")
+        asyncio.run(objects.delete(key))
+        asyncio.run(objects.put(key, b"[]"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.controls(job, "alice"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.get(job))
+
+    def test_a_delete_removes_the_copy(self, held):
+        store, objects = held
+        record = new_record()
+        record.controls = [copied_control()]
+        record.transition("running")
+        record.transition("failed")
+        asyncio.run(admit(store, record))
+        assert isinstance(asyncio.run(store.delete(record.id, "alice")), int)
+        key = object_key("alice", record.id, "controls.json")
+        assert asyncio.run(objects.get(key)) is None
+
+    def test_a_save_keeps_the_resolution_and_the_fact_states(self, store):
+        job = waiting(store)
+        stated = [LeftOutScope(control=CONTROL_ID, reason="unticked")]
+        facts = [
+            ControlFacts(
+                control=CONTROL_ID,
+                name="Encrypted",
+                facts=[
+                    ControlFact(
+                        answer=FactAnswer(
+                            key=("store:db", "encryption_at_rest", "", "", "", ""),
+                            value="AES-256",
+                        ),
+                        state="stated",
+                        stated="KMS",
+                    )
+                ],
+            )
+        ]
+        assert asyncio.run(
+            store.save_answers(
+                job,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=stated,
+                control_facts=facts,
+            )
+        )
+        for read in (store.get(job), store.owned(job, "alice")):
+            record = asyncio.run(read)
+            assert (record.control_scopes, record.control_facts) == (stated, facts)
 
 
 class TestTheSaveContract:
@@ -1138,7 +1357,7 @@ class ChangedAfterListing:
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         listed = await self._store.expired(before)
         for job_id, owner_id in listed:
-            assert await self._store.save_draft(job_id, owner_id, NO_ANSWERS, 0)
+            assert await self._store.save_draft(job_id, owner_id, NO_SENT_ANSWERS, 0)
         return listed
 
 
@@ -1154,7 +1373,7 @@ class TestTheRetentionSweep:
     def test_a_delete_with_a_cutoff_keeps_a_job_updated_since(self, store):
         job = last_updated(store, "completed", days_ago=2)
         cutoff = datetime.now(UTC) - timedelta(days=1)
-        assert asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert asyncio.run(store.save_draft(job, "alice", NO_SENT_ANSWERS, 0))
         refused = asyncio.run(store.delete(job, "alice", updated_before=cutoff))
         assert refused == DeleteRefusal("changed")
         assert asyncio.run(store.get(job)) is not None
@@ -1167,7 +1386,7 @@ class TestTheRetentionSweep:
         async def race():
             return await asyncio.gather(
                 store.delete(job, "alice", updated_before=cutoff),
-                store.save_draft(job, "alice", NO_ANSWERS, 0),
+                store.save_draft(job, "alice", NO_SENT_ANSWERS, 0),
             )
 
         removed, saved = asyncio.run(race())
@@ -1790,7 +2009,17 @@ class TestTheSchemaVersion:
         record.schema_version = version
         asyncio.run(store.save(record))
         assert asyncio.run(
-            store.save_answers(job, "alice", NO_ANSWERS, (), (), 0, renames=())
+            store.save_answers(
+                job,
+                "alice",
+                NO_ANSWERS,
+                (),
+                (),
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
+            )
         )
         reads = [
             asyncio.run(store.get(job)),
@@ -1997,3 +2226,862 @@ class TestPrincipals:
                 store.reserve(record, ceiling=100, budget=POLICY, principal=principal)
             )
         assert asyncio.run(store.principal(self.identity())) is None
+
+
+def owner_file(
+    owner: str = "alice", name: str = "Call notes", text: str = "Ana: hi"
+) -> tuple[OwnerFile, str]:
+    """A new Owner File row of ``owner`` and its text."""
+    file = OwnerFile.create(owner_id=owner, name=name, kind="transcript", text=text)
+    return file, text
+
+
+def add(
+    store, owner: str = "alice", *, limit: int = 100, **made
+) -> tuple[OwnerFile, str]:
+    """Add a new Owner File of ``owner``, with a principal where it holds none."""
+    file, text = owner_file(owner, **made)
+    outcome = asyncio.run(
+        store.add_file(
+            file, text, limit=limit, principal=asyncio.run(new_principal(store, owner))
+        )
+    )
+    assert outcome == "added"
+    return file, text
+
+
+class TestOwnerFiles:
+    """ADR 0118: an Owner File is a row and its text, under one owner."""
+
+    @pytest.mark.parametrize(
+        ("kind", "file_format"),
+        [
+            ("description", "text/plain"),
+            ("transcript", "text/plain"),
+            ("diagram", "text/vnd.mermaid"),
+        ],
+    )
+    def test_the_kind_gives_the_format(self, kind, file_format):
+        file = OwnerFile.create(owner_id="alice", name="A file", kind=kind, text="x")
+        assert file.format == file_format
+        assert "format" not in file.model_dump()
+
+    def test_a_kind_that_no_format_allows_is_refused(self):
+        with pytest.raises(ValidationError, match="no upload format allows"):
+            OwnerFile.create(owner_id="alice", name="A file", kind="answers", text="x")
+
+    def test_an_added_file_reads_back_with_its_text(self, store):
+        file, text = add(store)
+        assert asyncio.run(store.file_text(file.id, "alice")) == (file, text)
+        assert asyncio.run(store.owned_files("alice")) == [file]
+
+    def test_the_list_is_the_newest_first_and_only_the_owners(self, store):
+        older, _ = add(store, name="Older")
+        newer, text = owner_file(name="Newer")
+        newer = newer.model_copy(
+            update={"created_at": older.created_at + timedelta(hours=1)}
+        )
+        assert (
+            asyncio.run(store.add_file(newer, text, limit=100, principal=None))
+            == "added"
+        )
+        add(store, "bob")
+        assert [held.name for held in asyncio.run(store.owned_files("alice"))] == [
+            "Newer",
+            "Older",
+        ]
+
+    def test_another_owners_file_reads_as_missing_and_stays(self, store):
+        file, text = add(store)
+        add(store, "bob", name="Other")
+        assert asyncio.run(store.file_text(file.id, "bob")) is None
+        assert asyncio.run(store.delete_file(file.id, "bob")) is False
+        assert asyncio.run(store.file_text(file.id, "alice")) == (file, text)
+
+    def test_a_delete_keeps_nothing(self, store):
+        file, _ = add(store)
+        assert asyncio.run(store.delete_file(file.id, "alice")) is True
+        assert asyncio.run(store.file_text(file.id, "alice")) is None
+        assert asyncio.run(store.owned_files("alice")) == []
+        assert asyncio.run(store.delete_file(file.id, "alice")) is False
+
+    def test_a_name_the_owner_uses_is_refused(self, store):
+        first, _ = add(store)
+        again, _ = owner_file(name=first.name, text="other text")
+        outcome = asyncio.run(
+            store.add_file(again, "other text", limit=100, principal=None)
+        )
+        assert outcome == "name_in_use"
+        assert asyncio.run(store.owned_files("alice")) == [first]
+        assert asyncio.run(store.file_text(again.id, "alice")) is None
+
+    @pytest.mark.parametrize("other", ["call notes", "Call notes ", "Call notes"])
+    def test_names_are_one_only_where_the_strings_are_equal(self, store, other):
+        add(store)
+        add(store, name=other)
+        assert len(asyncio.run(store.owned_files("alice"))) == 2
+
+    def test_another_owner_may_use_the_name(self, store):
+        add(store)
+        add(store, "bob")
+
+    def test_the_count_limit_refuses_one_more_file(self, store):
+        add(store, name="One", limit=2)
+        add(store, name="Two", limit=2)
+        file, text = owner_file(name="Three")
+        outcome = asyncio.run(store.add_file(file, text, limit=2, principal=None))
+        assert outcome == "over_limit"
+        assert len(asyncio.run(store.owned_files("alice"))) == 2
+
+    def test_the_count_comes_before_the_name(self, store):
+        first, _ = add(store, limit=1)
+        again, text = owner_file(name=first.name)
+        assert (
+            asyncio.run(store.add_file(again, text, limit=1, principal=None))
+            == "over_limit"
+        )
+
+    def test_a_first_upload_creates_the_principal(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        file, text = owner_file(principal.owner_id)
+        assert (
+            asyncio.run(store.add_file(file, text, limit=100, principal=principal))
+            == "added"
+        )
+        assert asyncio.run(store.principal(principal.identity)) == principal
+        late = Principal.new(principal.identity)
+        second, text = owner_file(late.owner_id, name="Second")
+        assert (
+            asyncio.run(store.add_file(second, text, limit=100, principal=late))
+            == "principal_exists"
+        )
+        assert asyncio.run(store.owned_files(late.owner_id)) == []
+
+    def test_a_refused_upload_keeps_no_new_principal(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        file, text = owner_file(principal.owner_id)
+        assert (
+            asyncio.run(store.add_file(file, text, limit=0, principal=principal))
+            == "over_limit"
+        )
+        assert asyncio.run(store.principal(principal.identity)) is None
+
+    def test_a_file_whose_owner_holds_no_principal_is_a_defect(self, store):
+        file, text = owner_file("nobody")
+        with pytest.raises(ValueError, match="holds no principal"):
+            asyncio.run(store.add_file(file, text, limit=100, principal=None))
+
+    def test_a_file_of_another_owner_than_its_principal_is_a_defect(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        file, text = owner_file("nobody")
+        with pytest.raises(ValueError, match="another owner"):
+            asyncio.run(store.add_file(file, text, limit=100, principal=principal))
+
+    def test_a_text_with_another_digest_is_a_defect(self, store):
+        add(store, name="Seed")
+        file, _ = owner_file()
+        with pytest.raises(ValueError, match="another digest"):
+            asyncio.run(store.add_file(file, "changed", limit=100, principal=None))
+        assert asyncio.run(store.file_text(file.id, "alice")) is None
+
+    def test_simultaneous_uploads_never_exceed_the_limit(self, store):
+        add(store, name="Seed", limit=3)
+
+        async def scenario():
+            start = asyncio.Event()
+
+            async def contend(at: int):
+                await start.wait()
+                file, text = owner_file(name=f"Racer {at}")
+                return await store.add_file(file, text, limit=3, principal=None)
+
+            racers = [asyncio.create_task(contend(at)) for at in range(12)]
+            start.set()
+            return await asyncio.gather(*racers)
+
+        outcomes = asyncio.run(scenario())
+        assert outcomes.count("added") == 2
+        assert len(asyncio.run(store.owned_files("alice"))) == 3
+
+
+class TestOwnerFileObjects:
+    """The text is an object that one row names (ADR 0118)."""
+
+    def keys(self, objects) -> set[str]:
+        async def listed():
+            return {key async for key, _ in objects.list()}
+
+        return asyncio.run(listed())
+
+    def test_the_text_is_an_object_under_the_file_key(self, held):
+        store, objects = held
+        file, text = add(store)
+        assert asyncio.run(objects.get(file_key("alice", file.id))) == text.encode()
+
+    def test_a_refused_upload_leaves_no_object(self, held):
+        store, objects = held
+        add(store)
+        before = self.keys(objects)
+        again, text = owner_file(text="other")
+        assert (
+            asyncio.run(store.add_file(again, text, limit=100, principal=None))
+            == "name_in_use"
+        )
+        over, text = owner_file(name="Over")
+        assert (
+            asyncio.run(store.add_file(over, text, limit=1, principal=None))
+            == "over_limit"
+        )
+        assert self.keys(objects) == before
+
+    def test_a_delete_removes_the_object(self, held):
+        store, objects = held
+        file, _ = add(store)
+        asyncio.run(store.delete_file(file.id, "alice"))
+        assert asyncio.run(objects.get(file_key("alice", file.id))) is None
+
+    def test_a_text_that_fails_its_digest_raises(self, held):
+        store, objects = held
+        file, _ = add(store)
+        key = file_key("alice", file.id)
+        asyncio.run(objects.delete(key))
+        asyncio.run(objects.put(key, b"changed"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.file_text(file.id, "alice"))
+
+    def test_the_sweep_deletes_a_file_object_that_no_row_names(self, held):
+        store, objects = held
+        named, _ = add(store)
+        orphan = file_key("alice", owner_file()[0].id)
+        foreign = file_key("bob", named.id)
+        asyncio.run(objects.put(orphan, b"x"))
+        asyncio.run(objects.put(foreign, b"x"))
+        assert asyncio.run(store.sweep_orphans(later())) == 2
+        assert asyncio.run(objects.get(orphan)) is None
+        assert asyncio.run(store.file_text(named.id, "alice")) is not None
+
+    def test_the_sweep_keeps_a_young_file_object(self, held):
+        store, objects = held
+        orphan = file_key("alice", owner_file()[0].id)
+        asyncio.run(objects.put(orphan, b"x"))
+        assert asyncio.run(store.sweep_orphans(earlier())) == 0
+
+
+#: The bounds of a Control save in the tests: a byte limit far over each text.
+CONTROL_LIMITS = ControlLimits(
+    max_controls=100, max_evidence=3, max_evidence_bytes=1000
+)
+
+
+def control(
+    owner: str = "alice",
+    name: str = "Orders DB encrypted",
+    *,
+    scope: tuple[str, str, list[str]] = ("store", "Orders DB", ["orders database"]),
+    files: Sequence[tuple[str, str]] = (("rds.tf", "storage_encrypted = true\n"),),
+    control_id: str | None = None,
+) -> tuple[Control, dict[str, str]]:
+    """A new Control of ``owner`` with one evidence file for each pair of a name
+    and a text, and the texts by evidence ID."""
+    texts = {f"evidence-{uuid4().hex}": text for _, text in files}
+    scope_type, scope_name, aliases = scope
+    document = ControlDocument.model_validate(
+        {
+            "id": control_id or f"control-{uuid4().hex}",
+            "name": name,
+            "scope": {"type": scope_type, "name": scope_name, "aliases": aliases},
+            "facts": [
+                {"key": ["", "encryption_at_rest", "", "", "", ""], "value": "AES"}
+            ],
+            "rows": [],
+            "evidence": [
+                {
+                    "id": evidence_id,
+                    "name": file_name,
+                    "class": "code",
+                    "sha256": text_digest(text),
+                    "size_bytes": len(text.encode("utf-8")),
+                }
+                for evidence_id, (file_name, text) in zip(texts, files, strict=True)
+            ],
+        }
+    )
+    return Control.create(owner_id=owner, document=document), texts
+
+
+def save(
+    store, owner: str = "alice", *, limits: ControlLimits = CONTROL_LIMITS, **made
+) -> tuple[Control, dict[str, str]]:
+    """Add a new Control of ``owner``, with a principal where it holds none."""
+    held, texts = control(owner, **made)
+    outcome = asyncio.run(
+        store.add_control(
+            held,
+            texts,
+            limits=limits,
+            principal=asyncio.run(new_principal(store, owner)),
+        )
+    )
+    assert outcome == "added"
+    return held, texts
+
+
+def edited(held: Control, **changed) -> Control:
+    """``held`` with its document changed, saved now."""
+    document = held.document.model_copy(update=changed)
+    return Control.create(owner_id=held.owner_id, document=document)
+
+
+def evidence_of(held: Control) -> list[str]:
+    return [file.id for file in held.document.evidence]
+
+
+class TestControls:
+    """ADR 0127: a Control is a row and its evidence, under one owner."""
+
+    def test_an_added_control_reads_back(self, store):
+        held, texts = save(store)
+        assert asyncio.run(store.get_control(held.document.id, "alice")) == held
+        assert asyncio.run(store.list_controls("alice")) == [held]
+        [evidence_id] = texts
+        assert (
+            asyncio.run(store.read_evidence(held.document.id, evidence_id, "alice"))
+            == texts[evidence_id]
+        )
+
+    def test_the_list_is_the_latest_save_first_and_only_the_owners(self, store):
+        older, _ = save(store, name="Older")
+        newer, texts = control(name="Newer")
+        newer = newer.model_copy(
+            update={"updated_at": older.updated_at + timedelta(hours=1)}
+        )
+        assert (
+            asyncio.run(
+                store.add_control(newer, texts, limits=CONTROL_LIMITS, principal=None)
+            )
+            == "added"
+        )
+        save(store, "bob")
+        assert [
+            held.document.name for held in asyncio.run(store.list_controls("alice"))
+        ] == ["Newer", "Older"]
+
+    def test_another_owners_control_reads_as_missing_and_stays(self, store):
+        held, texts = save(store)
+        save(store, "bob", name="Other")
+        control_id = held.document.id
+        [evidence_id] = texts
+        foreign = Control.create(owner_id="bob", document=held.document)
+        assert asyncio.run(store.get_control(control_id, "bob")) is None
+        assert asyncio.run(store.read_evidence(control_id, evidence_id, "bob")) is None
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    foreign,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "absent"
+        )
+        assert asyncio.run(store.delete_control(control_id, "bob")) is False
+        assert asyncio.run(store.get_control(control_id, "alice")) == held
+
+    def test_an_unlisted_evidence_id_reads_as_missing(self, store):
+        held, _ = save(store)
+        other = f"evidence-{uuid4().hex}"
+        assert (
+            asyncio.run(store.read_evidence(held.document.id, other, "alice")) is None
+        )
+
+    def test_a_delete_keeps_nothing(self, store):
+        held, texts = save(store)
+        control_id = held.document.id
+        [evidence_id] = texts
+        assert asyncio.run(store.delete_control(control_id, "alice")) is True
+        assert asyncio.run(store.get_control(control_id, "alice")) is None
+        assert asyncio.run(store.list_controls("alice")) == []
+        assert (
+            asyncio.run(store.read_evidence(control_id, evidence_id, "alice")) is None
+        )
+        assert asyncio.run(store.delete_control(control_id, "alice")) is False
+
+    def test_a_name_the_owner_uses_is_refused(self, store):
+        first, _ = save(store)
+        again, texts = control(name=first.document.name, scope=("process", "API", []))
+        outcome = asyncio.run(
+            store.add_control(again, texts, limits=CONTROL_LIMITS, principal=None)
+        )
+        assert outcome == "name_in_use"
+        assert asyncio.run(store.list_controls("alice")) == [first]
+
+    def test_another_owner_may_use_the_name(self, store):
+        save(store)
+        save(store, "bob")
+
+    def test_the_count_limit_refuses_one_more_control(self, store):
+        limits = replace(CONTROL_LIMITS, max_controls=2)
+        save(store, name="One", limits=limits)
+        save(store, name="Two", limits=limits)
+        third, texts = control(name="Three")
+        outcome = asyncio.run(
+            store.add_control(third, texts, limits=limits, principal=None)
+        )
+        assert outcome == "over_limit"
+        assert len(asyncio.run(store.list_controls("alice"))) == 2
+
+    def test_the_evidence_limit_refuses_one_more_file(self, store):
+        files = [(f"{at}.txt", f"line {at}\n") for at in range(4)]
+        held, texts = control(files=files)
+        outcome = asyncio.run(
+            store.add_control(
+                held,
+                texts,
+                limits=CONTROL_LIMITS,
+                principal=asyncio.run(new_principal(store, "alice")),
+            )
+        )
+        assert outcome == EvidenceRefusal(
+            None,
+            "A Control holds at most 3 evidence files. Remove a file before you add"
+            " another.",
+        )
+        assert asyncio.run(store.list_controls("alice")) == []
+
+    def test_a_credential_is_refused_by_line_and_nothing_is_kept(self, store):
+        text = "region: eu-west-1\nkey: AKIAIOSFODNN7EXAMPLE\n"
+        held, texts = control(files=[("aws.yaml", text)])
+        outcome = asyncio.run(
+            store.add_control(
+                held,
+                texts,
+                limits=CONTROL_LIMITS,
+                principal=asyncio.run(new_principal(store, "alice")),
+            )
+        )
+        assert outcome == EvidenceRefusal(
+            next(iter(texts)),
+            "Line 2 of “aws.yaml” looks like it holds a cloud access key ID. The"
+            " service did not save the file. Remove the value, then add the file"
+            " again.",
+        )
+        assert asyncio.run(store.list_controls("alice")) == []
+
+    @pytest.mark.parametrize(
+        ("theirs", "mine"),
+        [
+            (("store", "Orders DB", ["edge"]), ("store", "Ledger", ["edge"])),
+            (("store", "Orders DB", []), ("store", "Ledger", ["orders-db"])),
+            (("store", "Orders DB", ["Ledger"]), ("store", "Ledger", [])),
+        ],
+    )
+    def test_an_alias_that_names_another_scope_of_the_type_is_refused(
+        self, store, theirs, mine
+    ):
+        first, _ = save(store, scope=theirs)
+        again, texts = control(name="Second", scope=mine)
+        outcome = asyncio.run(
+            store.add_control(again, texts, limits=CONTROL_LIMITS, principal=None)
+        )
+        assert outcome == "alias_in_use"
+        assert asyncio.run(store.list_controls("alice")) == [first]
+
+    @pytest.mark.parametrize(
+        ("owner", "mine"),
+        [
+            ("alice", ("store", "orders db", ["orders database", "edge"])),
+            ("alice", ("process", "Ledger", ["Orders DB"])),
+            ("bob", ("store", "Ledger", ["orders database"])),
+        ],
+    )
+    def test_a_scope_may_share_its_name_its_type_or_its_owner(self, store, owner, mine):
+        save(store)
+        save(store, owner, name="Second", scope=mine)
+
+    def test_a_replace_changes_the_document_in_place(self, store):
+        held, _ = save(store)
+        renamed = edited(held, name="Renamed")
+        outcome = asyncio.run(
+            store.replace_control(
+                renamed, {}, limits=CONTROL_LIMITS, expected_updated_at=held.updated_at
+            )
+        )
+        assert outcome == "replaced"
+        assert asyncio.run(store.list_controls("alice")) == [renamed]
+        assert renamed.updated_at > held.updated_at
+
+    def test_a_replace_of_a_stale_control_changes_nothing(self, store):
+        """Of two edits that read one version, only the first lands."""
+        held, _ = save(store)
+        first = edited(held, name="First")
+        second = edited(held, name="Second")
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    first,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "replaced"
+        )
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    second,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "stale"
+        )
+        assert asyncio.run(store.get_control(held.document.id, "alice")) == first
+
+    def test_a_replace_adds_and_removes_evidence(self, store):
+        held, texts = save(store)
+        [old] = texts
+        added, new_texts = control(files=[("new.tf", "kms = true\n")])
+        changed = edited(held, evidence=added.document.evidence)
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    changed,
+                    new_texts,
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "replaced"
+        )
+        control_id = held.document.id
+        [new] = new_texts
+        assert asyncio.run(store.read_evidence(control_id, old, "alice")) is None
+        assert (
+            asyncio.run(store.read_evidence(control_id, new, "alice")) == "kms = true\n"
+        )
+
+    def test_a_replace_may_rename_a_kept_file(self, store):
+        held, texts = save(store)
+        [kept] = held.document.evidence
+        changed = edited(held, evidence=[kept.model_copy(update={"name": "main.tf"})])
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    changed,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "replaced"
+        )
+        assert asyncio.run(
+            store.read_evidence(held.document.id, kept.id, "alice")
+        ) == next(iter(texts.values()))
+
+    def test_a_replace_is_refused_on_a_name_or_an_alias_in_use(self, store):
+        save(store, name="Taken", scope=("process", "API", ["gateway"]))
+        held, _ = save(store)
+        named = edited(held, name="Taken")
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    named,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "name_in_use"
+        )
+        scope = held.document.scope.model_copy(
+            update={"type": "process", "name": "Admin", "aliases": ["gateway"]}
+        )
+        aliased = edited(held, scope=scope)
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    aliased,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+            == "alias_in_use"
+        )
+        assert asyncio.run(store.get_control(held.document.id, "alice")) == held
+
+    def test_a_replace_checks_the_new_evidence(self, store):
+        held, _ = save(store)
+        added, texts = control(files=[("pem.txt", "-----BEGIN PRIVATE KEY-----\n")])
+        changed = edited(held, evidence=added.document.evidence)
+        refused = asyncio.run(
+            store.replace_control(
+                changed,
+                texts,
+                limits=CONTROL_LIMITS,
+                expected_updated_at=held.updated_at,
+            )
+        )
+        assert isinstance(refused, EvidenceRefusal)
+        assert refused.message.startswith(
+            "Line 1 of “pem.txt” looks like it holds a private key"
+        )
+        assert asyncio.run(store.get_control(held.document.id, "alice")) == held
+
+    def test_a_kept_file_with_another_digest_is_a_defect(self, store):
+        held, _ = save(store)
+        [kept] = held.document.evidence
+        changed = edited(held, evidence=[kept.model_copy(update={"sha256": "0" * 64})])
+        with pytest.raises(ValueError, match="another digest"):
+            asyncio.run(
+                store.replace_control(
+                    changed,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+
+    def test_a_new_file_with_no_text_is_a_defect(self, store):
+        held, _ = save(store)
+        added, _ = control(files=[("new.tf", "kms = true\n")])
+        changed = edited(held, evidence=added.document.evidence)
+        with pytest.raises(ValueError, match="no text"):
+            asyncio.run(
+                store.replace_control(
+                    changed,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
+                )
+            )
+
+    def test_a_text_with_another_digest_is_a_defect(self, store):
+        save(store, name="Seed")
+        held, texts = control()
+        changed = {evidence_id: "changed" for evidence_id in texts}
+        with pytest.raises(ValueError, match="another digest"):
+            asyncio.run(
+                store.add_control(held, changed, limits=CONTROL_LIMITS, principal=None)
+            )
+        assert asyncio.run(store.get_control(held.document.id, "alice")) is None
+
+    def test_a_first_save_creates_the_principal(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        held, texts = control(principal.owner_id)
+        assert (
+            asyncio.run(
+                store.add_control(
+                    held, texts, limits=CONTROL_LIMITS, principal=principal
+                )
+            )
+            == "added"
+        )
+        assert asyncio.run(store.principal(principal.identity)) == principal
+        late = Principal.new(principal.identity)
+        second, texts = control(late.owner_id, name="Second")
+        assert (
+            asyncio.run(
+                store.add_control(second, texts, limits=CONTROL_LIMITS, principal=late)
+            )
+            == "principal_exists"
+        )
+
+    @pytest.mark.parametrize("owner", ["alice", "bob"])
+    def test_a_held_control_id_is_a_defect_and_changes_nothing(self, store, owner):
+        held, texts = save(store)
+        save(store, "bob", name="Other")
+        again, new_texts = control(owner, "Again", control_id=held.document.id)
+        with pytest.raises(ValueError, match="already holds"):
+            asyncio.run(
+                store.add_control(
+                    again, new_texts, limits=CONTROL_LIMITS, principal=None
+                )
+            )
+        assert asyncio.run(store.get_control(held.document.id, "alice")) == held
+        [(evidence_id, text)] = texts.items()
+        assert (
+            asyncio.run(store.read_evidence(held.document.id, evidence_id, "alice"))
+            == text
+        )
+
+    def test_a_control_whose_owner_holds_no_principal_is_a_defect(self, store):
+        held, texts = control("nobody")
+        with pytest.raises(ValueError, match="holds no principal"):
+            asyncio.run(
+                store.add_control(held, texts, limits=CONTROL_LIMITS, principal=None)
+            )
+
+    def test_two_saves_at_one_below_the_limit_admit_one(self, store):
+        limits = replace(CONTROL_LIMITS, max_controls=2)
+        save(store, name="Seed", limits=limits)
+
+        async def scenario():
+            start = asyncio.Event()
+
+            async def contend(at: int):
+                await start.wait()
+                held, texts = control(name=f"Racer {at}")
+                return await store.add_control(
+                    held, texts, limits=limits, principal=None
+                )
+
+            racers = [asyncio.create_task(contend(at)) for at in range(2)]
+            start.set()
+            return await asyncio.gather(*racers)
+
+        outcomes = asyncio.run(scenario())
+        assert sorted(outcomes) == ["added", "over_limit"]
+        assert len(asyncio.run(store.list_controls("alice"))) == 2
+
+
+class TestControlEvidenceObjects:
+    """Each evidence file is an object that one row lists (ADR 0127)."""
+
+    def keys(self, objects) -> set[str]:
+        async def listed():
+            return {key async for key, _ in objects.list()}
+
+        return asyncio.run(listed())
+
+    def test_the_text_is_an_object_under_the_evidence_key(self, held):
+        store, objects = held
+        control_row, texts = save(store)
+        [(evidence_id, text)] = texts.items()
+        key = evidence_key("alice", control_row.document.id, evidence_id)
+        assert asyncio.run(objects.get(key)) == text.encode()
+
+    def test_a_refused_save_leaves_no_object(self, held):
+        store, objects = held
+        first, _ = save(store, limits=replace(CONTROL_LIMITS, max_controls=2))
+        before = self.keys(objects)
+        refused = [
+            control(name=first.document.name, scope=("process", "API", [])),
+            control(name="Alias", scope=("store", "Ledger", ["orders-db"])),
+        ]
+        for again, texts in refused:
+            assert asyncio.run(
+                store.add_control(again, texts, limits=CONTROL_LIMITS, principal=None)
+            ) in {"name_in_use", "alias_in_use"}
+        save(store, name="Second", scope=("process", "API", []))
+        over, texts = control(name="Over", scope=("process", "Admin", []))
+        assert (
+            asyncio.run(
+                store.add_control(
+                    over,
+                    texts,
+                    limits=replace(CONTROL_LIMITS, max_controls=2),
+                    principal=None,
+                )
+            )
+            == "over_limit"
+        )
+        assert len(self.keys(objects) - before) == 1
+        kept = {
+            evidence_key("alice", held.document.id, file.id)
+            for held in asyncio.run(store.list_controls("alice"))
+            for file in held.document.evidence
+        }
+        assert self.keys(objects) == kept
+
+    def test_a_replace_removes_a_dropped_object_and_a_refusal_adds_none(self, held):
+        store, objects = held
+        first, texts = save(store)
+        save(store, name="Taken", scope=("process", "API", []))
+        [old] = texts
+        control_id = first.document.id
+        added, new_texts = control(files=[("new.tf", "kms = true\n")])
+        refused = edited(first, name="Taken", evidence=added.document.evidence)
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    refused,
+                    new_texts,
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=first.updated_at,
+                )
+            )
+            == "name_in_use"
+        )
+        [new] = new_texts
+        assert asyncio.run(objects.get(evidence_key("alice", control_id, new))) is None
+        changed = edited(first, evidence=added.document.evidence)
+        assert (
+            asyncio.run(
+                store.replace_control(
+                    changed,
+                    new_texts,
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=first.updated_at,
+                )
+            )
+            == "replaced"
+        )
+        assert asyncio.run(objects.get(evidence_key("alice", control_id, old))) is None
+
+    def test_a_delete_removes_each_object(self, held):
+        store, objects = held
+        first, texts = save(store, files=[("a.txt", "a\n"), ("b.txt", "b\n")])
+        asyncio.run(store.delete_control(first.document.id, "alice"))
+        for evidence_id in texts:
+            key = evidence_key("alice", first.document.id, evidence_id)
+            assert asyncio.run(objects.get(key)) is None
+
+    def test_a_file_that_a_replace_drops_during_a_read_reads_as_missing(self, held):
+        store, objects = held
+        first, texts = save(store)
+        [evidence_id] = texts
+        added, new_texts = control(files=[("new.tf", "kms = true\n")])
+        changed = edited(first, evidence=added.document.evidence)
+        read = objects.get
+
+        async def replaced_first(key: str) -> bytes | None:
+            await store.replace_control(
+                changed,
+                new_texts,
+                limits=CONTROL_LIMITS,
+                expected_updated_at=first.updated_at,
+            )
+            return await read(key)
+
+        objects.get = replaced_first
+        assert (
+            asyncio.run(store.read_evidence(first.document.id, evidence_id, "alice"))
+            is None
+        )
+
+    def test_a_text_that_fails_its_digest_raises(self, held):
+        store, objects = held
+        first, texts = save(store)
+        [evidence_id] = texts
+        key = evidence_key("alice", first.document.id, evidence_id)
+        asyncio.run(objects.delete(key))
+        asyncio.run(objects.put(key, b"changed"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.read_evidence(first.document.id, evidence_id, "alice"))
+
+    def test_the_sweep_deletes_an_evidence_object_that_no_row_lists(self, held):
+        store, objects = held
+        first, texts = save(store)
+        control_id = first.document.id
+        [listed] = texts
+        unlisted = evidence_key("alice", control_id, f"evidence-{uuid4().hex}")
+        unknown = evidence_key("alice", f"control-{uuid4().hex}", listed)
+        foreign = evidence_key("bob", control_id, listed)
+        for key in (unlisted, unknown, foreign):
+            asyncio.run(objects.put(key, b"x"))
+        assert asyncio.run(store.sweep_orphans(later())) == 3
+        assert self.keys(objects) == {evidence_key("alice", control_id, listed)}
+        assert asyncio.run(store.read_evidence(control_id, listed, "alice")) is not None
+
+    def test_the_sweep_keeps_a_young_evidence_object(self, held):
+        store, objects = held
+        orphan = evidence_key(
+            "alice", f"control-{uuid4().hex}", f"evidence-{uuid4().hex}"
+        )
+        asyncio.run(objects.put(orphan, b"x"))
+        assert asyncio.run(store.sweep_orphans(earlier())) == 0

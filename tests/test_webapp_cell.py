@@ -10,6 +10,7 @@ that holds now.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -90,7 +91,7 @@ def current_over(store: JobStore, tiers, runner, **settings) -> Current:
 def broken(tiers) -> Startup:
     """The startup of a Deployment that did not build."""
     return Startup(
-        settings=None, frameworks=(), tiers=tiers, error=ConfigError("no model")
+        settings=None, carried_frameworks=(), tiers=tiers, error=ConfigError("no model")
     )
 
 
@@ -98,6 +99,7 @@ def queued_job(store: JobStore) -> str:
     """The ID of a queued job of the operator, put in ``store``."""
     principal = Principal.new(OPERATOR)
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=principal.owner_id,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -254,3 +256,18 @@ def test_a_cross_origin_post_is_refused_before_the_empty_cell(tiers, path):
     response = client.post(path, json={}, headers={"Sec-Fetch-Site": "cross-site"})
 
     assert response.status_code == 403
+
+
+def test_a_refused_path_reaches_the_log_with_no_control_character(tiers, caplog):
+    client = TestClient(create_app(broken(tiers)), base_url=LOOPBACK)
+    with caplog.at_level(logging.WARNING, logger="webapp"):
+        response = client.post(
+            "/answer/x%1b%5B2J%1b%5D0;pwned%07",
+            json={},
+            headers={"Sec-Fetch-Site": "cross-site"},
+        )
+
+    assert response.status_code == 403
+    (record,) = caplog.records
+    assert "pwned" in record.getMessage()
+    assert record.getMessage().isprintable()

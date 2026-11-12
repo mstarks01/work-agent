@@ -47,7 +47,6 @@ whole path is free.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import tempfile
 from collections import Counter
@@ -60,6 +59,7 @@ from typing import Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.claims import FrameworkName
+from analysis_service.config_files import xdg_dir
 from analysis_service.errors import error_place
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.system_model import ModelIndex
@@ -79,6 +79,7 @@ from evals.harness.reference import (
     ReferenceClaim,
     load_case,
     load_corpus,
+    read_digest,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -165,13 +166,14 @@ DraftState = Literal["open", "finished"]
 #: What the store reports for a draft it cannot read. It is not a state the
 #: file can name: no file says this about itself, and a file that will not
 #: read cannot say anything about itself at all.
-UNREADABLE = "unreadable"
+Unreadable = Literal["unreadable"]
+UNREADABLE: Unreadable = "unreadable"
 
 #: What a live draft puts on its rail row, keyed by the state in the file so
 #: a state the shape gains arrives here rather than through an ``if``. A key
 #: it does not hold raises, which is the whole reason it is a table: a state
 #: nobody wrote a row for stops the rail rather than drawing a wrong one.
-DRAFT_ROW: Mapping[str, tuple[str, RowState]] = {
+DRAFT_ROW: Mapping[DraftState, tuple[str, RowState]] = {
     "open": ("draft in progress", "draft"),
     "finished": ("finished, not submitted", "finished"),
 }
@@ -227,8 +229,7 @@ class Draft(BaseModel):
 class DraftStatus:
     """What the store says about one case, for the rail that reads it."""
 
-    #: A :data:`DraftState`, or :data:`UNREADABLE`.
-    state: str
+    state: DraftState | Unreadable
     #: The file itself, because the refusal an unreadable draft gets names it.
     path: Path
 
@@ -236,10 +237,13 @@ class DraftStatus:
 def draft_root() -> Path:
     """Where drafts live when a caller names nowhere else.
 
-    A function rather than a constant, so importing this module resolves no
-    home directory and a test can pass a temporary one instead.
+    ``sittings`` in the state directory of
+    :func:`~analysis_service.config_files.xdg_dir`: under ``XDG_STATE_HOME``,
+    else under ``~/.local/state``. A function rather than a constant, so
+    importing this module resolves no home directory and a test can pass a
+    temporary one instead.
     """
-    return Path.home() / ".local" / "state" / "work-agent" / "sittings"
+    return xdg_dir(os.environ, "state") / "sittings"
 
 
 def draft_path(root: Path, login: str, case_id: str) -> Path:
@@ -324,7 +328,10 @@ def first_problem(error: ValidationError) -> str:
     The reader's next step is to open the file this message already names, so
     one field and one reason is what carries them there. The place comes from
     :func:`~analysis_service.errors.error_place`, because a sitting route
-    returns this message, and a refusal never repeats a key the caller sent.
+    returns this message, and the place stops before an extra field that the
+    caller made up. The place does name a key of a declared mapping, such as
+    the fingerprint that keys a mark, because that key names the entry that is
+    wrong.
     """
     first = error.errors()[0]
     where = error_place(first) or "the file"
@@ -449,9 +456,7 @@ def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
             resolved = target.resolve()
             outside = not resolved.is_relative_to(root)
             readable = not outside and resolved.is_file()
-            digests_match = (
-                readable and hashlib.sha256(resolved.read_bytes()).hexdigest() == digest
-            )
+            digests_match = readable and read_digest(resolved) == digest
         except RESOLVE_ERRORS:
             # Unreadable is not stale-or-not; it is a file this process cannot
             # answer for, and it must not escape as a traceback.
@@ -494,7 +499,7 @@ def rail(
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
     ``signatures`` says who cleared each case, from
-    :func:`evals.review_submission.rail_signatures` — the one reader of
+    :func:`evals.review_submission.rail_signatures`, which answers
     that question. It is passed in rather than read here because a submission
     is a merged file rather than a fact about a case directory, and this
     module is what a submission is validated against.
@@ -594,9 +599,7 @@ def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
             raise SittingError(
                 f"{name}: not in the case directory, so it cannot be read"
             )
-        records.append(
-            ReadRecord(file=name, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
-        )
+        records.append(ReadRecord(file=name, sha256=read_digest(path)))
     return records
 
 

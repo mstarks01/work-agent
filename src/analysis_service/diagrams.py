@@ -1,0 +1,255 @@
+"""A ``diagram`` Source's structure, as Mermaid's own parsers read it (ADR 0121).
+
+Mermaid has no specification apart from its grammars, so the service does not
+write a parser: ``diagram_reader/read.mjs`` runs Mermaid's flowchart grammar
+or the ``architecture-beta`` grammar of ``@mermaid-js/parser`` in Node, and
+:func:`read_diagram` calls it as a subprocess.
+
+**The structure is syntax, never meaning.** An architecture service keeps its
+icon as written. A flowchart node carries no shape, because a flowchart shape
+is a drawing choice with no fixed meaning, and the diagram text still shows
+it. Whether a node is an External Entity, or a group a trust zone, is
+extraction's judgement, because a person can draw the wrong shape as they can
+write the wrong word.
+
+**Two readings, and an install fault that is neither.** A diagram the parsers
+read is a :class:`DiagramStructure`. One they cannot read, through a syntax
+error or another diagram type, is a :class:`DiagramRefusal`, and extraction
+reads that diagram as text. A missing reader, Node or package, or a Node that
+cannot run, raises :class:`DiagramReaderMissing`, because reading the diagram
+another way would make the same job run two ways on two deployments.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+from contextlib import suppress
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+from analysis_service.errors import refusal_text
+
+__all__ = [
+    "Arrow",
+    "DiagramEdge",
+    "DiagramGroup",
+    "DiagramJunction",
+    "DiagramNode",
+    "DiagramReaderMissing",
+    "DiagramReading",
+    "DiagramRefusal",
+    "DiagramStructure",
+    "install_reader",
+    "node_names",
+    "read_diagram",
+    "reader_fault",
+]
+
+#: The longest a reading may take, and the most memory Node may hold for it.
+#: Mermaid's own limit of 500 edges bounds the work far below both.
+READ_TIMEOUT_SECONDS = 20
+READ_MEMORY_MB = 256
+
+#: The exit code ``read.mjs`` gives when a package is missing.
+_MISSING_PACKAGE = 3
+
+#: The longest the install of the locked packages may take.
+INSTALL_TIMEOUT_SECONDS = 300
+
+#: What the ends of an edge say about its direction: ``forward`` from source
+#: to target, ``backward`` from target to source, ``both`` and ``none`` either.
+Arrow = Literal["forward", "backward", "both", "none"]
+
+
+class _Reading(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class DiagramGroup(_Reading):
+    """A flowchart subgraph or an architecture group."""
+
+    id: str
+    label: str
+    parent: str | None
+    line: int | None
+
+
+class DiagramNode(_Reading):
+    """A flowchart node or an architecture service. ``shape`` is the
+    architecture icon as written, and ``None`` for a flowchart node."""
+
+    id: str
+    label: str
+    shape: str | None
+    group: str | None
+    line: int | None
+
+
+class DiagramJunction(_Reading):
+    """An architecture junction: a point where edges meet, never an element."""
+
+    id: str
+    group: str | None
+    line: int | None
+
+
+class DiagramEdge(_Reading):
+    """An edge between two nodes, groups or junctions, by their diagram IDs."""
+
+    source: str
+    target: str
+    label: str
+    arrow: Arrow
+    line: int | None
+
+
+class DiagramStructure(_Reading):
+    """What Mermaid's parser read from a diagram."""
+
+    kind: Literal["flowchart", "architecture"]
+    groups: tuple[DiagramGroup, ...]
+    nodes: tuple[DiagramNode, ...]
+    junctions: tuple[DiagramJunction, ...]
+    edges: tuple[DiagramEdge, ...]
+
+
+class DiagramRefusal(_Reading):
+    """A diagram Mermaid's parsers cannot read, and the reason they gave."""
+
+    refused: str
+
+
+DiagramReading = DiagramStructure | DiagramRefusal
+
+#: Where a label's detail starts: its first colon or opening bracket.
+_DETAIL = re.compile(r"[:(\[]")
+
+
+def node_names(label: str) -> tuple[str, ...]:
+    """The names an element drawn as this node may take: the whole label, or
+    the part before its first colon or bracket, as in ``Orders DB (Postgres)``.
+    """
+    head = _DETAIL.split(label, maxsplit=1)[0].strip()
+    return tuple(dict.fromkeys(name for name in (label, head) if name))
+
+
+class DiagramReaderMissing(RuntimeError):
+    """An install fault: the reader, Node or the reader's packages are not
+    installed, or Node cannot run."""
+
+
+def read_diagram(text: str) -> DiagramReading:
+    """The structure of one diagram, or why it has none.
+
+    Raises :class:`DiagramReaderMissing` where the reader's script, Node or a
+    package is missing, or where Node cannot run. A reading that runs past
+    :data:`READ_TIMEOUT_SECONDS`, or that Node ends with no JSON object on its
+    last line, is a refusal: the fault is in the diagram, and extraction can
+    still read its text. A structure of a shape that :class:`DiagramStructure`
+    refuses raises its :class:`~pydantic.ValidationError`.
+    """
+    # Imported here: the deployment module reaches the gate, which reads the
+    # types above, so a module-level import closes a cycle.
+    from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR
+
+    script = DEFAULT_DIAGRAM_READER_DIR / "read.mjs"
+    if not script.is_file():
+        raise DiagramReaderMissing(
+            f"the diagram reader is not installed: {script} does not exist"
+        )
+    install = " ".join(_install_argv())
+    try:
+        done = subprocess.run(
+            ["node", f"--max-old-space-size={READ_MEMORY_MB}", str(script)],
+            input=text,
+            capture_output=True,
+            text=True,
+            timeout=READ_TIMEOUT_SECONDS,
+            cwd=DEFAULT_DIAGRAM_READER_DIR,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise DiagramReaderMissing(
+            f"a diagram Source needs Node to read it; install Node, then run: {install}"
+        ) from exc
+    except OSError as exc:
+        raise DiagramReaderMissing(
+            f"Node cannot run the diagram reader ({exc.strerror}); check the"
+            " install of Node"
+        ) from exc
+    except subprocess.TimeoutExpired:
+        return DiagramRefusal(
+            refused=f"the reading took longer than {READ_TIMEOUT_SECONDS} s"
+        )
+    if done.returncode == _MISSING_PACKAGE:
+        raise DiagramReaderMissing(
+            f"the diagram reader's packages are not installed; run: {install}"
+        )
+    try:
+        found = json.loads(done.stdout.strip().splitlines()[-1])
+    except (IndexError, json.JSONDecodeError):
+        found = None
+    if not isinstance(found, dict):
+        return DiagramRefusal(
+            refused=f"the reader ended with code {done.returncode} and no reading"
+        )
+    if "structure" in found:
+        return DiagramStructure.model_validate(found["structure"])
+    return DiagramRefusal(
+        refused=str(found.get("refused", "the reader gave no reading"))
+    )
+
+
+def reader_fault() -> str | None:
+    """Why the diagram reader cannot read a valid flowchart, or ``None`` where
+    it can.
+
+    It reads one small flowchart, so it asks :func:`read_diagram` the same
+    question that a diagram Source asks. Each outcome but a structure is a
+    fault: an install fault, a refusal, and a structure of the wrong shape.
+    """
+    try:
+        reading = read_diagram("flowchart LR\n  a --> b\n")
+    except DiagramReaderMissing as missing:
+        return str(missing)
+    except ValidationError as exc:
+        return (
+            "the diagram reader gave a structure of the wrong shape:"
+            f" {refusal_text(exc)}"
+        )
+    if isinstance(reading, DiagramRefusal):
+        return f"the diagram reader refused a valid flowchart: {reading.refused}"
+    return None
+
+
+def _install_argv() -> list[str]:
+    """The install step of the reader's locked packages. ``--ignore-scripts``
+    runs no package's own install script."""
+    from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR
+
+    return [
+        "npm",
+        "ci",
+        "--ignore-scripts",
+        "--prefix",
+        str(DEFAULT_DIAGRAM_READER_DIR),
+    ]
+
+
+def install_reader() -> None:
+    """Install the reader's locked packages (ADR 0122).
+
+    It does nothing where npm is missing or cannot run, and it ignores a
+    failed install, because :func:`reader_fault` then names the step for a
+    person to run.
+    """
+    with suppress(OSError, subprocess.TimeoutExpired):
+        subprocess.run(
+            _install_argv(),
+            capture_output=True,
+            timeout=INSTALL_TIMEOUT_SECONDS,
+            check=False,
+        )

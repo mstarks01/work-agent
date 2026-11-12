@@ -1,0 +1,516 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:calling-service",
+        "name": "calling service",
+        "description": "A service that calls the inference gateway.",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[calling service] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ml engineer",
+        "description": "An engineer interacting with the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[ml engineer] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:model-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "inference gateway",
+        "description": "A gateway for inference requests.",
+        "assets": [],
+        "source_excerpt": "service n2(server)[inference gateway] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:serving-edge",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "model server",
+        "description": "A server for model inference.",
+        "assets": [],
+        "source_excerpt": "service n3(server)[model server] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:model-registry-bucket",
+        "name": "model registry bucket",
+        "description": "A bucket containing the model registry.",
+        "assets": [],
+        "source_excerpt": "service n4(database)[model registry bucket] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "bucket",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "A Redis feature store.",
+        "assets": [],
+        "source_excerpt": "service n5(database)[Redis feature store] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Redis",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "inference log",
+        "description": "A log of inference activity.",
+        "assets": [],
+        "source_excerpt": "service n6(database)[inference log] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:serving-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-service>process:inference-gateway>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the calling service to the inference gateway.",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:calling-service",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the inference gateway to the model server.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the model server to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:model-server",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:redis-feature-store>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the model server to the Redis feature store.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:model-server",
+        "destination": "store:redis-feature-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the inference gateway to the inference log.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the ml engineer to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone public internet.",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:serving-edge",
+        "name": "serving edge",
+        "description": "Trust zone serving edge.",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone serving edge]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "model network",
+        "description": "Trust zone model network.",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone model network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The calling service is an external system rather than a component of the modeled system.",
+        "element_id": "entity:calling-service",
+        "attribute": "kind",
+        "basis": "The node is named \"calling service\" and initiates the flow to the inference gateway."
+      },
+      {
+        "assumption": "The ml engineer is a human external entity.",
+        "element_id": "entity:ml-engineer",
+        "attribute": "kind",
+        "basis": "The node is named \"ml engineer\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:calling-service",
+        "name": "calling service",
+        "description": "A service that calls the inference gateway.",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[calling service] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ml engineer",
+        "description": "An engineer interacting with the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[ml engineer] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:model-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "inference gateway",
+        "description": "A gateway for inference requests.",
+        "assets": [],
+        "source_excerpt": "service n2(server)[inference gateway] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:serving-edge",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:model-server",
+        "name": "model server",
+        "description": "A server for model inference.",
+        "assets": [],
+        "source_excerpt": "service n3(server)[model server] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:model-registry-bucket",
+        "name": "model registry bucket",
+        "description": "A bucket containing the model registry.",
+        "assets": [],
+        "source_excerpt": "service n4(database)[model registry bucket] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "bucket",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "A Redis feature store.",
+        "assets": [],
+        "source_excerpt": "service n5(database)[Redis feature store] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Redis",
+        "trust_zone": "boundary:model-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "inference log",
+        "description": "A log of inference activity.",
+        "assets": [],
+        "source_excerpt": "service n6(database)[inference log] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:serving-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-service>process:inference-gateway>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the calling service to the inference gateway.",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:calling-service",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the inference gateway to the model server.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the model server to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:model-server",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:redis-feature-store>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the model server to the Redis feature store.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:model-server",
+        "destination": "store:redis-feature-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the inference gateway to the inference log.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "Data transfer from the ml engineer to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone public internet.",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:serving-edge",
+        "name": "serving edge",
+        "description": "Trust zone serving edge.",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone serving edge]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "model network",
+        "description": "Trust zone model network.",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone model network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The calling service is an external system rather than a component of the modeled system.",
+        "element_id": "entity:calling-service",
+        "attribute": "kind",
+        "basis": "The node is named \"calling service\" and initiates the flow to the inference gateway."
+      },
+      {
+        "assumption": "The ml engineer is a human external entity.",
+        "element_id": "entity:ml-engineer",
+        "attribute": "kind",
+        "basis": "The node is named \"ml engineer\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

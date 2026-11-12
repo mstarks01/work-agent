@@ -50,7 +50,9 @@ class TestTheTable:
 
 class TestTheSeam:
     def issues(self, ref):
-        problems = review_issues([sample_draft("S-01")], rulings_of(ref), valid_model())
+        problems = review_issues(
+            [sample_draft("S-01")], rulings_of(ref), valid_model(), {}
+        )
         return [m for m in problems.messages if "question" in m]
 
     def test_a_kind_about_an_element_of_the_model_passes(self):
@@ -158,7 +160,7 @@ class TestOneSpellingPerFact:
         (ruling,) = snap_rulings(rulings_of(ECHO), {STORE})
         assert ruling.verdict.related_unknowns == [ECHO]
         problems = review_issues(
-            [sample_draft("S-01")], rulings_of(ECHO), valid_model()
+            [sample_draft("S-01")], rulings_of(ECHO), valid_model(), {}
         )
         assert any("3 ways at once" in m for m in problems.messages)
 
@@ -206,6 +208,18 @@ class TestTheFacets:
         for kind in QUESTION_KINDS.values():
             for facet in kind.facets:
                 assert facet.question.endswith("?")
+
+    def test_a_yes_no_kind_states_its_own_protection_and_no_other_does(self):
+        for name, kind in QUESTION_KINDS.items():
+            stated = kind.statement is not None and kind.protects is not None
+            assert stated == (kind.answer == "yes-no"), name
+
+    def test_every_statement_is_a_sentence_and_no_question(self):
+        statements = [kind.statement for kind in QUESTION_KINDS.values()] + [
+            facet.statement for kind in QUESTION_KINDS.values() for facet in kind.facets
+        ]
+        for statement in filter(None, statements):
+            assert statement.endswith(".") and "?" not in statement, statement
 
     def test_the_value_lists_the_facets_in_the_kind_s_order(self):
         key = (STORE, "", "", "", "capacity-limits", "")

@@ -58,8 +58,8 @@ from tests.factories import (
     translator_of,
 )
 
-# This install's one package's critic nodes. Named per framework now, because
-# two packages each bring their own critic and its bounded re-ask.
+# This install's one package's critic nodes. Named per framework, because two
+# packages each bring their own critic and its bounded re-ask.
 _STRIDE = FrameworkNodes("stride")
 CRITIC_NODE = _STRIDE.node(graph.CRITIC_ROLE)
 #: This graph's node -> tier map, built for the selection above. Not a module
@@ -208,6 +208,7 @@ def test_every_bundled_root_is_one_the_service_reads():
         module.DEFAULT_PROMPTS_DIR.name,
         module.DEFAULT_DOMAINS_DIR.name,
         module.DEFAULT_FRAMEWORKS_DIR.name,
+        module.DEFAULT_DIAGRAM_READER_DIR.name,
         module.DEFAULT_SAMPLING_PATH.parent.name,
     }
 
@@ -511,8 +512,8 @@ def test_the_pipeline_binds_retry_and_timeout():
 
     Both ride the adapter. The timeout is read in seconds here because that is
     LiteLLM's unit and the adapter kwarg is the last hop before it — asserting
-    the file's milliseconds against something ADK hands on unchanged is how the
-    bound came to mean 3.5 days.
+    the file's milliseconds against something ADK hands on unchanged would let
+    the bound mean 3.5 days.
     """
     from google.adk.models.lite_llm import LiteLlm
 
@@ -660,7 +661,7 @@ def test_every_carried_package_builds_from_its_bare_name():
     on the job and not on the graph. #690 read the full selection rule here
     and refused every such package on every job, and no test built one."""
     deployment = Deployment.from_env(env=VERTEX_TIERS)
-    carried = tuple(deployment.frameworks)
+    carried = tuple(deployment.carried_frameworks)
 
     assert deployment.selection(carried) == carried
     pipeline = deployment.pipeline(carried, resolve_model=lambda tier_node: "scripted")
@@ -822,7 +823,7 @@ def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
 
 
 def test_asking_for_more_output_than_the_model_serves_fails_the_build():
-    """The truncation failure, moved from request time to build time.
+    """The truncation failure fails the build, not a request.
 
     Every provider accepts ``max_output_tokens``, so the supported-param gate
     passes an over-ceiling value and the serving model rejects it on node one.
@@ -1180,9 +1181,12 @@ def test_require_certified_is_off_unless_explicitly_affirmative():
 
 
 def test_the_carried_variable_replaces_the_list_of_the_file():
-    assert Deployment.from_env(env=VERTEX_TIERS).frameworks == ("asvs", "stride")
+    assert Deployment.from_env(env=VERTEX_TIERS).carried_frameworks == (
+        "asvs",
+        "stride",
+    )
     narrowed = Deployment.from_env(env=VERTEX_TIERS | {CARRIED_VAR: "stride"})
-    assert narrowed.frameworks == ("stride",)
+    assert narrowed.carried_frameworks == ("stride",)
 
 
 def test_the_v1_service_carries_what_the_variable_names(monkeypatch):
@@ -1191,7 +1195,7 @@ def test_the_v1_service_carries_what_the_variable_names(monkeypatch):
 
     app = create_app(store=InMemoryJobStore(), verifier=object())
 
-    assert app.state.frameworks == ("stride",)
+    assert app.state.carried_frameworks == ("stride",)
 
 
 @pytest.mark.parametrize(

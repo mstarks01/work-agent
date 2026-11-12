@@ -14,10 +14,12 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import stat
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -27,11 +29,12 @@ from sqlalchemy import create_engine
 
 from analysis_service import jobs as jobs_module
 from analysis_service import store_backends
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.api import create_app
 from analysis_service.carried_renames import ElementRename
 from analysis_service.certification import CertifyResult
 from analysis_service.fact_answers import FactAnswer
+from analysis_service.job_controls import AppliedScope, ControlFact, ControlFacts
 from analysis_service.jobs import (
     GENERIC_FAILURE_MESSAGE,
     RESTART_FAILURE_MESSAGE,
@@ -53,6 +56,8 @@ from analysis_service.sources import Source
 from analysis_service.sql_store import (
     METADATA,
     CorruptObject,
+    RecordObjectField,
+    RevisionNotHeld,
     SqlJobStore,
     database_url,
     engine_for,
@@ -77,6 +82,7 @@ from tests.test_api import (
     auth,
     submission,
 )
+from tests.test_controls import CONTROL_ID, copied_control
 from tests.test_job_store import DeletingReads, follow_up, new_record
 from tests.test_resume import LINK
 from tests.test_webapp_questions import PausingRunner
@@ -101,7 +107,7 @@ def app_over(store: JobStore, runner=None):
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=TEST_MAX_ACTIVE_JOBS,
         budget=SEEDING_BUDGET,
-        frameworks=DEFAULT_FRAMEWORKS,
+        carried_frameworks=DEFAULT_FRAMEWORKS,
         carries_catalog=True,
     )
 
@@ -114,6 +120,7 @@ def start(env: dict[str, str]) -> None:
 
 def queued(store: JobStore) -> str:
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -239,8 +246,63 @@ class TestTheStartupRefusals:
 
     def test_a_schema_that_is_not_at_the_latest_revision(self, env, tmp_path):
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
-        with pytest.raises(StoreConfigError, match="revision None"):
+        with pytest.raises(
+            StoreConfigError, match="revision None.*run python -m .* first$"
+        ):
             start(env)
+
+    def test_a_revision_this_build_does_not_hold(self, env):
+        """No migration reaches the head from a revision the tree does not
+        hold, so the refusal names the remedy that works."""
+        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        engine = create_engine(f"sqlite:///{database}")
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "UPDATE alembic_version SET version_num = 'r9999'"
+            )
+        engine.dispose()
+        with pytest.raises(RevisionNotHeld, match="r9999, which this build") as refused:
+            start(env)
+        assert "delete its file" in str(refused.value)
+        assert "python -m analysis_service.migrations" in str(refused.value)
+        assert database not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("change", "difference"),
+        [
+            ("DROP TABLE owner_files", "no owner_files table"),
+            ("DROP TABLE controls", "no controls table"),
+            (
+                "ALTER TABLE jobs DROP COLUMN carried_renames",
+                "no jobs.carried_renames column",
+            ),
+            (
+                (
+                    "ALTER TABLE owner_files ADD COLUMN format VARCHAR(64) NOT NULL"
+                    " DEFAULT 'text/plain'"
+                ),
+                "an unknown owner_files.format column",
+            ),
+        ],
+    )
+    def test_a_database_made_before_a_schema_change(self, env, change, difference):
+        """A schema change edits revision 0001 in place, so a database made
+        before it is at the head revision, and the migration changes nothing
+        in it. The refusal names the remedy that works, and no path."""
+        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        engine = create_engine(f"sqlite:///{database}")
+        with engine.begin() as connection:
+            connection.exec_driver_sql(change)
+        engine.dispose()
+        migrate(Path(database))
+        with pytest.raises(StoreConfigError, match=re.escape(difference)) as refused:
+            start(env)
+        assert "delete its file" in str(refused.value)
+        assert "drop the database and create it again" in str(refused.value)
+        assert database not in str(refused.value)
+
+    def test_a_current_database_starts(self, env):
+        start(env)
 
     def test_a_missing_database_file(self, env, tmp_path):
         """The service never makes the file: only the migration step does."""
@@ -455,6 +517,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     held = Checkpoint(system_model=valid_model(), assertions=None)
     answers = AnswerSet(links=(LINK,), facts=(FactAnswer(key=KEY, value="TLS 1.3"),))
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=owner_id,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -470,15 +533,33 @@ def every_field(owner_id: str = "alice") -> JobRecord:
         parent_revision=3,
         carried=AnswerSet(facts=(FactAnswer(key=KEY, value="mTLS"),)),
         ask_questions=True,
+        continues_at_pause=True,
         reserved_tokens=500,
     )
     record.transition("running")
     record.record_node("extract")
     record.corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
-    record.draft = AnswerSet(facts=(FactAnswer(key=KEY, value="none"),))
+    record.draft = SentAnswers(facts=(FactAnswer(key=KEY, value="none"),))
     record.revision = 2
     record.carried_renames = [
         ElementRename(earlier="store:orders-database", element="store:orders-db")
+    ]
+    record.controls = [copied_control()]
+    record.control_scopes = [
+        AppliedScope(
+            control=CONTROL_ID, outcome="matched-by-name", element="store:orders-db"
+        )
+    ]
+    record.control_facts = [
+        ControlFacts(
+            control=CONTROL_ID,
+            name="Encrypted",
+            facts=[
+                ControlFact(
+                    answer=FactAnswer(key=KEY, value="TLS 1.3"), state="written"
+                )
+            ],
+        )
     ]
     record.checkpoint = held
     record.validation_issues = [
@@ -487,6 +568,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.certification = CertifyResult(certified=True)
     record.unreported_nodes = [NodeRun(node="extract", model="m", duration_ms=10)]
     record.error = "a stored message"
+    record.continue_refusal = "Untick one."
     record.report = sample_report()
     record.transition("completed")
     return record
@@ -509,6 +591,7 @@ class TestTheJsonRoundTrip:
         store = build_store(env)
         record = every_field()
         parent = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
@@ -528,6 +611,7 @@ class TestTheJsonRoundTrip:
 
 def completed_job(store: JobStore) -> JobRecord:
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="alice",
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -646,6 +730,7 @@ class TestTheReport:
     def test_the_restart_scan_fails_a_job_of_another_schema_version(self, env):
         store = build_store(env)
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
@@ -719,6 +804,7 @@ def in_flight(
     """The ID of a job of ``owner`` in ``status``, last updated ``days_ago``
     days ago."""
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=owner,
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
@@ -797,6 +883,7 @@ class TestAStoredValueThisServiceDoesNotList:
         job = in_flight(store, status)
         store_unlisted(database_of(env), job, case)
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
@@ -1038,7 +1125,9 @@ class TestAStoreFailureAsARunStartsOrEnds:
         assert "running" not in statuses(stored)
 
     def test_a_report_put_that_fails(self, env):
-        store = SqlJobStore(engine_for(env), ReportPutFails(env))
+        store = SqlJobStore(
+            engine_for(env), ReportPutFails(env), migrator="the migration step"
+        )
         runner = CountingRunner()
         stored = executed(store, runner)
         assert runner.runs == 1
@@ -1071,7 +1160,11 @@ class TestAStoreFailureAsARunStartsOrEnds:
         # The bound covers every store call, so it leaves room for an SQLite
         # commit on a loaded runner; only the hanging put reaches it.
         monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 1.0)
-        store = SqlJobStore(engine_for(env), ReportPutFails(env, hang=True))
+        store = SqlJobStore(
+            engine_for(env),
+            ReportPutFails(env, hang=True),
+            migrator="the migration step",
+        )
         stored = executed(store, CountingRunner())
         assert stored.status == "failed"
         assert stored.measured_tokens == METERED
@@ -1119,3 +1212,8 @@ def test_the_migration_creates_the_tables_the_store_reads(tmp_path):
         differences = compare_metadata(MigrationContext.configure(connection), METADATA)
     engine.dispose()
     assert differences == []
+
+
+def test_the_record_object_fields_name_fields_of_a_record():
+    """``RecordObjectField`` spells field names of ``JobRecord`` a second time."""
+    assert set(get_args(RecordObjectField)) <= set(JobRecord.model_fields)

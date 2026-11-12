@@ -66,5 +66,130 @@
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 7: 09-cookbook-sokify-retail T-02"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:mobile-app>process:web-api>api-traffic",
+          "process:web-api"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 60"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:catalogue-spreadsheet"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 61"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:process:mobile-app>process:web-api>api-traffic"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 62"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "inject",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:web-api"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 64"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "intercept",
+        "affected_element_ids": [
+          "flow:process:mobile-app>process:web-api>api-traffic"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 65"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:user-database"
+        ]
+      },
+      "position": "storage-copy",
+      "ruling": "The ballot proposed storage-copy, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 66"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "entity:customer",
+          "process:web-api"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 68"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:web-api"
+        ]
+      },
+      "ruling": "Operating the macros is required. The claim does not specify the operator's account or require code execution in the spreadsheet process.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 63"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "flow:process:fax-gateway>entity:customer>confirmation-fax",
+          "process:fax-gateway"
+        ]
+      },
+      "ruling": "The wrong recipient gets the fax through normal delivery. No attacker's interface access or on-path interception is required.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 67"
+    }
   ]
 }

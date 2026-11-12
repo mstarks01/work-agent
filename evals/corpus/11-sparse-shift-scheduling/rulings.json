@@ -89,6 +89,140 @@
       "ruling": "The draft explicitly includes a colleague reaching the manager's rota-writing capability through missing role enforcement, which is the reference threat. Its additional horizontal access scenario does not remove that match.",
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 12: 11-sparse-shift-scheduling E-01"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:process:scheduling-service>store:file-share>write-payroll-export"
+        ]
+      },
+      "reading": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:entity:payroll-system>store:file-share>collect-payroll-export"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Same: rule the collect flow in.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-03-01, the maintainer's answer of 2026-11-03 on 11/10: the stage 2 and 3 draft read the file share on the payroll system's collect flow"
+    }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:entity:colleague>process:scheduling-web-app>view-shifts",
+          "entity:colleague"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 77"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:entity:store-manager>process:scheduling-web-app>build-rota",
+          "entity:store-manager"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 78"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:entity:payroll-system>store:file-share>collect-payroll-export",
+          "store:file-share"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 79"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:rota-database"
+        ]
+      },
+      "position": "storage-copy",
+      "ruling": "The ballot proposed storage-copy, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 81"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:process:scheduling-service>store:file-share>write-payroll-export"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 82"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:scheduling-web-app",
+          "flow:entity:colleague>process:scheduling-web-app>view-shifts"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 84"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:entity:payroll-system>store:file-share>collect-payroll-export"
+        ]
+      },
+      "ruling": "The export must be writable before pickup. The claim does not specify how the writer reaches it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 80"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "store:file-share",
+          "process:scheduling-service"
+        ]
+      },
+      "ruling": "Preventing the export is sufficient. The claim specifies no particular way of doing so.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 83"
     }
   ]
 }

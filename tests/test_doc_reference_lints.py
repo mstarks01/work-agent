@@ -126,6 +126,17 @@ ROLES_LEFT_OUT: dict[str, str] = {
 #: entry fails.
 DELIBERATE: dict[tuple[str, str], str] = {
     (
+        "frameworks/stride/critic.md",
+        "audit.yaml",
+    ): "the label of an owner's evidence file in a worked case of the critic's"
+    " control step. The critic reads the label beside the excerpt, and the"
+    " repository holds no owner's files.",
+    (
+        "frameworks/stride/critic.md",
+        "lb.yaml",
+    ): "the label of an owner's evidence file in a worked case of the critic's"
+    " control step, for the reason audit.yaml gives.",
+    (
         "docs/HTTP-API.md",
         "/etc/analysis/logging.json",
     ): "an example log configuration that an operator writes on the host of the"

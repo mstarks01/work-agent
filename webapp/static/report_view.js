@@ -30,6 +30,9 @@
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
   // True for a report the follow-up wrote: it asks nothing more (ADR 0054).
   const FINAL = JSON.parse(document.getElementById("final").textContent);
+  // False for an analysis submitted with no questions: its report has no
+  // Questions section.
+  const ANALYSIS_ASKS = JSON.parse(document.getElementById("asks").textContent);
   // The run this report's follow-up started, where one locks it: the report
   // then asks nothing, and its follow-up's report is the next one to read.
   const RESUMED_BY = JSON.parse(document.getElementById("resumed_by").textContent);
@@ -53,7 +56,7 @@
   const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.key, a.element]));
   // The saved shares by `shareKey` (ADR 0114): the draft's over those the
   // report's run read. A follow-up share replaces the saved one of its
-  // question, so a box sends the parts that one covers too.
+  // question, so a box sends the elements that one covers too.
   const SAVED_SHARES = new Map([...(EARLIER.shares || []), ...(DRAFT.shares || [])]
     .map(share => [shareKey(share.answer.key), share]));
   // An answer to start an editor from: the draft's, over a kept answer's.
@@ -73,6 +76,11 @@
   // analysis_service.open_facts.reference_labels, so the page parses no
   // reference.
   const NAMES = JSON.parse(document.getElementById("names").textContent);
+  // The hue of each element, from analysis_service.element_hues: its tags,
+  // its box in the diagram and the Mermaid download share it.
+  const HUES = JSON.parse(document.getElementById("element_hues").textContent);
+  // Each data flow by its ID, so a reference to one draws its two endpoints.
+  const FLOWS = new Map(R.system_model.data_flows.map(flow => [flow.id, flow]));
   // The field each framework stamps a finding's lane into, or null where it
   // stamps none: the service's own table, so a framework added later needs
   // no edit here.
@@ -87,15 +95,11 @@
   const ANSWERED_ATTRIBUTES = new Set(
     (PROVENANCE.answered_attributes || []).map(([element, attribute]) => `${element}>${attribute}`));
   const CONDITIONS = PROVENANCE.conditions || {};
+  // The words for each value of a closed service set, from the service
+  // (webapp.page_words.REPORT_WORDS).
+  const WORDS = JSON.parse(document.getElementById("report_words").textContent);
   // Why an open fact is still open, as the owner reads it.
-  const WHY_OPEN = {
-    unknown: "nobody knew: an answer said \"I don't know\"",
-    partial: "you answered part of it, and the parts left open keep it conditional",
-    skipped: "skipped before the analysis",
-    unanswered: "shown before the analysis and left blank",
-    answered: "you answered it, and the analysis still did not find it settled",
-    open: "not asked yet",
-  };
+  const WHY_OPEN = WORDS.why_open;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -120,10 +124,34 @@
   // elements, appended. A quote never comes through here. Its text is the
   // submitter's own words, and a backtick among them is one of those words.
   const CODE_SPAN = /`([^`\n]+)`/g;
-  // A labelled identifier as its label, the identifier on hover; any other as code.
-  const ref = (id) => Object.hasOwn(NAMES, id)
-    ? Object.assign(el("span", "ref", NAMES[id]), { title: id })
-    : code(id);
+  // An element's colour on a node: its hue as the --h custom property, which
+  // the CSS reads. A property set through the style object passes the CSP.
+  const paint = (node, id) => {
+    if (Object.hasOwn(HUES, id)) node.style.setProperty("--h", String(HUES[id]));
+    return node;
+  };
+  // A labelled identifier as a tag in its element's colour, the identifier on
+  // hover; a zone or another reference takes a grey tag.
+  const hueOf = (id) => (Object.hasOwn(HUES, id) ? HUES[id] : undefined);
+  const tag = (id) => elementTag(NAMES[id], id, hueOf(id));
+  const arrow = () => {
+    const glyph = el("span", "flow-arrow", "\u2192");
+    glyph.setAttribute("aria-hidden", "true");
+    return glyph;
+  };
+  // A flow as its two endpoint tags with an arrow, its name and ID on hover;
+  // any other labelled identifier as its tag; anything else as code.
+  const ref = (id) => {
+    const flow = FLOWS.get(id);
+    if (flow && Object.hasOwn(NAMES, flow.source) && Object.hasOwn(NAMES, flow.destination)) {
+      const chip = el("span", "ref-flow");
+      chip.title = `${flow.name} (${id})`;
+      chip.setAttribute("aria-label", `${NAMES[flow.source]} to ${NAMES[flow.destination]}`);
+      chip.append(tag(flow.source), arrow(), tag(flow.destination));
+      return chip;
+    }
+    return Object.hasOwn(NAMES, id) ? tag(id) : code(id);
+  };
   const prose = (text) => {
     const line = String(text);
     const frag = document.createDocumentFragment();
@@ -144,63 +172,39 @@
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
-  // What a scope state means to a reader, and the class that colours it. The
-  // wording is the point: `not-raised` must not read as `applicable`, because
-  // the only fact is that no lane filed on the unit (#659). Each says what
-  // happened, and none of them says "satisfied".
-  const SCOPE_STATE = {
-    "not-raised": ["No claim filed",
-      "The lane ran and raised nothing on this unit. That is not a finding that it is met, and not a ruling that it applies."],
-    "not-applicable": ["Does not apply",
-      "Ruled out for a system of this shape."],
-    "undecidable": ["Never decided",
-      "The input never said whether this framework applies at all, so no lane ran."],
-    "needs-other-evidence": ["Needs other evidence",
-      "The unit applies and this input cannot settle it. Supplying the evidence named below can."],
-  };
+  // The label of a scope state and what it means to a reader.
+  const SCOPE_STATE = WORDS.scope_state;
 
-  // A claim the critic rejected for `evidence` rules its unit out, and the
-  // page says which reader did it: the lane excluded it and the critic
-  // agreed, while "Does it apply here?" on the same row still carries the
-  // rule's own answer, which may be unknown.
-  const REVIEW_EXCLUDED = ["Excluded by review",
-    "A lane excluded it and the critic agreed. The rule's own answer is above."];
+  // The label and the meaning of a rejected claim that rules on its unit, by
+  // the step that ended it. For `evidence` the page says which reader ruled:
+  // the lane excluded it and the critic agreed, while "Does it apply here?" on
+  // the same row still carries the rule's own answer, which may be unknown.
+  const UNIT_RULING = WORDS.unit_ruling;
 
-  // The same for a claim's verdict, in this service's terms rather than the
-  // schema's. No verdict here reports a pass, and the wording says so.
-  const VERDICT_STATE = {
-    "confirmed": ["Gap", "Applies, and the input does not show it satisfied."],
-    "needs-info": ["Needs info", "Applies, and the input does not settle it."],
-    "rejected": ["Rejected", "The critic ruled this draft out. The reason says which check ended it."],
-  };
+  // The same for a claim's verdict, in the service's words (UNIT_VERDICT_WORDS).
+  const UNIT_VERDICT = JSON.parse(document.getElementById("unit_verdict_words").textContent);
 
-  // A rejection for `evidence` is the one rejection that rules on the unit a
-  // draft names: for a framework that answers in units it means the unit does
-  // not apply, and the reason says why. That is an answer about the
-  // requirement, so it belongs on the requirement's own row and not in the
-  // list of drafts that argued badly. Only a block with unit rows reads it so:
+  // A rejection for `evidence` or `control` rules on the unit a draft names:
+  // for a framework that answers in units, `evidence` means the unit does not
+  // apply, and `control` means the owner states that a Control covers it. Each
+  // is an answer about the requirement, so it belongs on the requirement's own
+  // row and not in the list of drafts that argued badly. Only a block with unit rows reads it so:
   // for a framework whose claims are an open set, an `evidence` rejection is a
   // draft that failed on its own substance, and it stays dismissed. A
   // rejection with no cause, from a report read back, is a ruling too, as
   // `RuledClaim.rules_on_unit` reads it.
   const answersInUnits = (block) => (UNITS[block.framework] || []).length > 0;
-  const rulesOut = (block, c) =>
+  const rulingStep = (c) => c.verdict.rejected_because ?? "evidence";
+  const rulesOnUnit = (block, c) =>
     answersInUnits(block) && c.verdict.status === "rejected"
-    && (c.verdict.rejected_because ?? "evidence") === "evidence";
+    && Object.hasOwn(UNIT_RULING, rulingStep(c));
+  const coveredByControl = (c) => c.verdict.rejected_because === "control";
 
   // Each kind named in its own words, so they read as different *kinds* of
   // justification rather than formattings of one. The two attribute kinds
   // carry identical fields, and so do the two assertion kinds, so this line is
   // the only place a reader can tell "nobody said" from "somebody said".
-  const GROUND_KIND = {
-    "quote": "Quoted from the submission",
-    "unknown-attribute": "Unstated in the submission",
-    "absent-attribute": "Stated absent in the submission",
-    "derived-fact": "Derived from the model",
-    "absent-element": "Named nowhere in the submission",
-    "assertion": "Stated as a fact in the submission",
-    "unknown-assertion": "Left open by the submission",
-  };
+  const GROUND_KIND = WORDS.ground_kind;
   // Past this, a quote is clamped to three lines behind a toggle. Short quotes
   // are the common case and get no affordance.
   const CLAMP_OVER = 220;
@@ -267,24 +271,31 @@
     // invented ID never had a claim -- so they render as a block-level note
     // rather than on a finding, grouped by kind.
     const unreconciled = (block.unreconciled_rulings || []);
-    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled };
+    // Claims the review kept against every Control row they were shown. The
+    // job holds no evidence of the kind their unit needs, so the unit is listed
+    // as needing other evidence, and the claim is gone from the block. Each
+    // entry keeps the review's reason for each row it refused.
+    const returned = (block.returned_claims || []);
+    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled, returned };
   }
 
-  const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
-  // Every severity level, most severe first: the service's own order. SEV
-  // holds a label and a colour for each level, and a test holds its keys to
-  // the same set.
+  // The label of each severity level.
+  const SEV = WORDS.severity;
+  // Every severity level, most severe first: the service's own order.
   const SEV_ORDER = JSON.parse(document.getElementById("severity_order").textContent);
-  const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
-  // What the tally says for each kind of change. A kind the table does not
-  // hold throws, so it cannot render as a verdict.
-  const CHANGE_LINE = {
-    new: () => "new",
-    unchanged: () => "unchanged",
-    changed: (c) => `${VERDICT[c.before][0]} \u2192 ${VERDICT[c.after][0]}`,
-    gone: () => "no longer raised",
-  };
-  const svar = (lvl) => `var(${SEV[lvl][1]})`;
+  // A finding's severity level and its mitigations' summaries, or nothing
+  // where its record declares no such field. The CSV export reads the same
+  // cells through `JUDGEMENT_CELLS`, and
+  // `test_the_report_page_reads_the_judgement_cells_the_csv_writes` holds the
+  // two to each other.
+  const severityLevel = (t) => (t.severity ? t.severity.level : "");
+  const mitigationSummaries = (t) => (t.mitigations || []).map((m) => m.summary);
+  // The label of each verdict status, in the service's words (VERDICT_LABELS),
+  // and the glyph beside it on a finding's row.
+  const VERDICT = JSON.parse(document.getElementById("verdict_labels").textContent);
+  const VERDICT_GLYPH = { "confirmed": "✓", "needs-info": "?", "rejected": "✕" };
+  // The colour of a severity level: the style sheet names one for each level.
+  const svar = (lvl) => `var(--sev-${lvl})`;
 
   // The run ID of a served report: this page's own path, /report/{run}.
   // Undefined for an exported page.
@@ -308,7 +319,8 @@
   // The page has three sections: the report, its questions, and how it was
   // made. The report is the one a reader lands on, and ?view= names another,
   // so a reload stays where the reader was.
-  const SECTIONS = ["report", "questions", "about"];
+  const SECTIONS = ANALYSIS_ASKS ? ["report", "questions", "about"] : ["report", "about"];
+  $("questions-tab").hidden = !ANALYSIS_ASKS;
   const showSection = (name) => {
     SECTIONS.forEach(each => {
       $(`${each}-view`).hidden = each !== name;
@@ -334,7 +346,7 @@
   // so this renders identically in every block.
   function groundEntry(marks, claimId, ground, index) {
     const row = el("div", "ground " + ground.kind);
-    row.append(el("div", "kind", GROUND_KIND[ground.kind] || ground.kind));
+    row.append(el("div", "kind", GROUND_KIND[ground.kind]));
     const body = el("div", "body");
     if (ground.kind === "quote") {
       const unverified = marks.unverified.get(`${claimId}#${index}`);
@@ -420,11 +432,7 @@
   // The heading over a finding's two recommendations, by its verdict: a
   // conditional finding's are not actions yet, and a dismissed one's are not
   // actions at all.
-  const RECOMMENDATIONS = {
-    "confirmed": "Recommended actions",
-    "needs-info": "Potential mitigations · if confirmed",
-    "rejected": "Original proposed mitigations · not active actions",
-  };
+  const RECOMMENDATIONS = WORDS.recommendations;
   // The first thing a reader can do about a finding, for its closed row.
   const nextAction = (t) => {
     const waits = CONDITIONS[findingKey(t)] || [];
@@ -432,7 +440,8 @@
       return `Information needed: ${waits[0].label}`;
     }
     if (t.verdict.status === "rejected") return "Dismissed";
-    return t.mitigations && t.mitigations.length ? prose(t.mitigations[0].summary) : "";
+    const [first] = mitigationSummaries(t);
+    return first ? prose(first) : "";
   };
 
   function findingBody(marks, t) {
@@ -443,7 +452,7 @@
     if (moved && moved.change === "new") {
       body.append(el("div", "meta", "New since the earlier report."));
     } else if (moved && moved.change === "changed") {
-      body.append(el("div", "meta", `Was ${VERDICT[moved.before][0]} in the earlier report.`));
+      body.append(el("div", "meta", `Was ${VERDICT[moved.before]} in the earlier report.`));
     }
     // A final report's owner changed an answer this finding rests on, after
     // the analysis ran; the analysis did not run again (ADR 0054).
@@ -457,18 +466,19 @@
     const facts = el("div", "badges");
     const lane = laneOf(t.framework, t);
     if (lane) facts.append(el("span", "cat", lane));
-    if (t.severity) {
+    const level = severityLevel(t);
+    if (level) {
       const sev = el("span", "chip");
       const swatch = el("span", "swatch");
-      swatch.style.background = svar(t.severity.level);
-      sev.append(swatch, SEV[t.severity.level][0]);
+      swatch.style.background = svar(level);
+      sev.append(swatch, SEV[level]);
       // A property assignment, not an attribute: there is no markup context
       // to escape out of.
-      sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${t.severity.level}`;
+      sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${level}`;
       facts.append(sev);
     }
-    const [vlabel, vglyph] = VERDICT[t.verdict.status];
-    facts.append(el("span", "chip verdict", `${vglyph} ${vlabel}`));
+    const status = t.verdict.status;
+    facts.append(el("span", "chip verdict", `${VERDICT_GLYPH[status]} ${VERDICT[status]}`));
     if (t.confidence) facts.append(el("span", "chip confidence", `confidence: ${t.confidence}`));
     body.append(facts);
 
@@ -493,7 +503,7 @@
         } else {
           item.append(w.label);
         }
-        item.append(el("span", "meta", ` — ${WHY_OPEN[w.status] || w.status}`));
+        item.append(el("span", "meta", ` — ${WHY_OPEN[w.status]}`));
         list.append(item);
       });
       needed.append(list);
@@ -513,14 +523,17 @@
 
     const refs = el("div", "field refs");
     refs.append(el("div", "lbl", "Affected components and flows"));
-    t.affected_element_ids.forEach(r => refs.append(ref(r)));
+    // Put a pipe between two references. A flow is one reference, so its
+    // arrow gets no pipe.
+    t.affected_element_ids.forEach((r, i) => refs.append(...(i ? [" | "] : []), ref(r)));
     body.append(refs);
 
     const next = el("div", "field");
     next.append(el("div", "lbl", RECOMMENDATIONS[t.verdict.status]));
-    if (t.mitigations && t.mitigations.length) {
+    const summaries = mitigationSummaries(t);
+    if (summaries.length) {
       const list = el("ul", "mits");
-      t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
+      summaries.forEach(summary => list.append(proseEl("li", null, summary)));
       next.append(list);
     } else if (marks.unmitigated.has(t.id)) {
       next.append(el("div", "caveat",
@@ -577,10 +590,11 @@
     row.id = findingId(t);
     const head = el("summary");
     const sev = el("span", "finding-sev");
-    if (t.severity) {
+    const level = severityLevel(t);
+    if (level) {
       const swatch = el("span", "swatch");
-      swatch.style.background = svar(t.severity.level);
-      sev.append(swatch, SEV[t.severity.level][0]);
+      swatch.style.background = svar(level);
+      sev.append(swatch, SEV[level]);
     }
     const what = el("span", "finding-what");
     what.append(proseEl("span", "finding-title", t.title));
@@ -598,8 +612,8 @@
   // Severity order where every claim is graded, and the given order otherwise
   // — the package's declared lane order, the only ranking a framework that
   // grades nothing has.
-  const bySeverity = (list) => list.every(c => c.severity)
-    ? [...list].sort((a, b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level))
+  const bySeverity = (list) => list.every(severityLevel)
+    ? [...list].sort((a, b) => SEV_ORDER.indexOf(severityLevel(a)) - SEV_ORDER.indexOf(severityLevel(b)))
     : list;
   // Open every `details` around a node, and the node itself, so a link to it
   // lands on it.
@@ -645,10 +659,10 @@
       const claim = row.claim_id ? byId[row.claim_id] : null;
       const entry = byUnit[row.unit];
       const [label, meaning] = claim
-        ? (rulesOut(block, claim)
-            ? REVIEW_EXCLUDED
-            : (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""]))
-        : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
+        ? (rulesOnUnit(block, claim)
+            ? UNIT_RULING[rulingStep(claim)]
+            : UNIT_VERDICT[claim.verdict.status])
+        : SCOPE_STATE[entry ? entry.state : "not-raised"];
 
       const box = el("details", "unit");
       const head = el("summary");
@@ -709,7 +723,7 @@
     const graded = block.summary.by_severity_confirmed;
     if (graded && confirmed) {
       lead += ": " + SEV_ORDER.filter(l => graded[l])
-        .map(l => `${graded[l]} ${SEV[l][0].toLowerCase()}`).join(", ");
+        .map(l => `${graded[l]} ${SEV[l].toLowerCase()}`).join(", ");
     }
     first.append(el("b", null, `${lead}.`));
     box.append(first);
@@ -747,7 +761,7 @@
     }
     // A requirement ruled out by review is an answer about the requirement,
     // and sits on its unit's row; a draft dismissed for arguing badly is not.
-    const dismissed = bySeverity(block.rejected_claims.filter(c => !rulesOut(block, c)));
+    const dismissed = bySeverity(block.rejected_claims.filter(c => !rulesOnUnit(block, c)));
     const confirmed = bySeverity(block.claims.filter(c => c.verdict.status === "confirmed"));
     const conditional = bySeverity(block.claims.filter(c => c.verdict.status === "needs-info"));
     section.append(summaryOf(block, conditional.length, dismissed.length));
@@ -810,14 +824,7 @@
   // reaches agree.
   const QUESTION_ROWS = new Map();
   // What became of a question before this report, in the words its row shows.
-  const HISTORY = {
-    open: "New question from this analysis",
-    unanswered: "Earlier answer: left blank",
-    skipped: "Earlier answer: skipped",
-    partial: "Earlier answer: answered in part",
-    unknown: "Earlier answer: I don't know",
-    answered: "Earlier answer: given, and the analysis did not find it settled",
-  };
+  const HISTORY = WORDS.question_history;
   const questionTotal = FACT_QUESTIONS.length + LINK_QUESTIONS.length;
   $("questions-tab").textContent = questionTotal ? `Questions (${questionTotal})` : "Questions";
 
@@ -898,6 +905,7 @@
       }),
       contextOf: whyAsked,
       notes,
+      hueOf,
     });
     let prev = null;
     entries.forEach(({ q, kind, saved, compact }) => {
@@ -967,8 +975,7 @@
   // service keeps the earlier answer to a facet left out. A changed detail
   // alone sends the facets it starts from, which the service keeps as they
   // are.
-  const sendable = (row) => {
-    const answer = row.read ? row.read() : null;
+  const sendable = (row, answer) => {
     if (!answer || sameAnswer(answer, row.start)) return null;
     if (!answer.facets || !row.start || !row.start.facets) return answer;
     const before = row.start.facets;
@@ -977,9 +984,13 @@
     if (Object.keys(given).length) return withDetail({ key: answer.key, facets: given }, answer.detail || "");
     return (answer.detail || "") !== (row.start.detail || "") ? answer : null;
   };
-  // Every row whose answer would be sent, with what it sends.
+  // Every row whose answer would be sent, with what it sends and the whole
+  // answer it read, which a save keeps as the row's start.
   const changes = () => [...QUESTION_ROWS.values()]
-    .map(row => ({ row, answer: sendable(row) }))
+    .map(row => {
+      const read = row.read ? row.read() : null;
+      return { row, read, answer: sendable(row, read) };
+    })
     .filter(({ answer }) => answer);
 
   if (RESUMED_BY) {
@@ -1024,8 +1035,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ facts, revision: CORRECTIONS.revision }),
           });
-          const body = await saved.json();
-          if (!saved.ok) throw new Error(body.message);
+          if (!saved.ok) throw new Error(await messageOf(saved, "The service did not save your corrections. They are still on this page."));
           location.href = location.pathname + "?view=questions";
         } catch (error) {
           problem.textContent = error.message || "The connection was interrupted. Your corrections are still on this page.";
@@ -1072,7 +1082,9 @@
       waitsOn.get(finding).push(index);
     }));
     const factRow = index => QUESTION_ROWS.get(questionKey(FACT_QUESTIONS[index].key));
-    const needOf = (index, finding) => (FACT_QUESTIONS[index].needs || {})[finding] || [];
+    // The service sends the facets each waiting finding needs, every facet
+    // included (FactQuestion.to_json), so the page reads them as sent.
+    const needOf = (index, finding) => FACT_QUESTIONS[index].needs[finding];
     const knownFor = (index, facets) => {
       const row = factRow(index);
       return row.knownFor ? row.knownFor(facets) : row.known();
@@ -1107,7 +1119,7 @@
       },
       notes: (row) => {
         const lines = [];
-        if (row.q.history) lines.push(el("div", "meta question-history", HISTORY[row.q.history] || row.q.history));
+        if (row.q.history) lines.push(el("div", "meta question-history", HISTORY[row.q.history]));
         if ((row.q.findings || []).length) lines.push(usedBy(row.q.findings));
         return lines;
       },
@@ -1123,15 +1135,17 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        reply = await response.json();
+        reply = response.ok ? await jsonOf(response) : null;
+        // An accepted answer that is not JSON reads as a lost connection.
+        if (response.ok && !reply) throw new Error();
       } catch {
         throw new Error("The connection was interrupted. Your answers are still on this page;"
           + " reload it to check what was saved, or try again.");
       }
-      if (!response.ok) throw new Error(reply.message);
+      if (!response.ok) throw new Error(await messageOf(response, "The service did not save your answers. They are still on this page."));
       return reply;
     };
-    // A part that holds its box's shared answer sends no answer of its own:
+    // An element that holds its box's shared answer sends no answer of its own:
     // the box's share carries it (ADR 0114).
     const entered = () => {
       const edited = changes();
@@ -1143,10 +1157,8 @@
         shares: list.changedShares((key) => SAVED_SHARES.get(key) || null),
       };
     };
-    // Each part a share covers counts as one fact answer in a request.
-    const coveredParts = (shares) => shares.reduce((n, share) => n + share.covers.length, 0);
     const fitsOne = ({ links, facts, shares }) => links.length <= ANSWER_LIMITS.links
-      && facts.length + coveredParts(shares) <= ANSWER_LIMITS.facts;
+      && facts.length + coveredCount(shares) <= ANSWER_LIMITS.facts;
     // Save the answers in as many requests as the limits need, each naming
     // the revision the last one returned: the answers in parts, then each
     // share. A row then starts from what it saved.
@@ -1165,8 +1177,8 @@
         const reply = await post({ ...request, save: true, revision });
         revision = reply.revision;
       }
-      edited.forEach(({ row, answer }) => {
-        row.start = row.read();
+      edited.forEach(({ row, read, answer }) => {
+        row.start = read;
         if (row.kind === "link") DRAFT_LINKS.set(row.q.key, answer.element);
         else DRAFT_FACTS.set(questionKey(answer.key), answer);
       });
@@ -1280,8 +1292,7 @@
   if (CHANGES.length) {
     const tally = new Map();
     CHANGES.forEach(c => {
-      const line = CHANGE_LINE[c.change](c);
-      tally.set(line, (tally.get(line) || 0) + 1);
+      tally.set(c.line, (tally.get(c.line) || 0) + 1);
     });
     const box = el("div", "meta");
     box.append(`Since the report your answers came from, ${counted(CHANGES.length, "finding", "findings")}: ` +
@@ -1297,6 +1308,117 @@
   // In the job's own selection order, which the envelope has already checked
   // against `job.frameworks`.
   R.analyses.forEach(renderBlock);
+
+  // ---- Controls ---------------------------------------------------------------
+  // Each Control the job copied: what it matched, each fact it wrote with the
+  // state the job keeps, and each row with its outcome over the job's
+  // rulings (ADR 0127). The service builds every value and sentence here,
+  // and the scope line starts with the service's phrase (scope_phrase). Each
+  // one lands as text.
+  const CONTROLS = JSON.parse(document.getElementById("controls").textContent);
+  // One line for each stage, from the service (section_summary).
+  const CONTROLS_SUMMARY = JSON.parse(document.getElementById("controls_summary").textContent);
+  const controlMatch = (entry) => {
+    const scope = entry.scope_phrase.charAt(0).toUpperCase() + entry.scope_phrase.slice(1);
+    if (entry.state === "left-out") return [`${scope}: ${entry.state_text}, because ${entry.meaning}`];
+    if (!entry.elements.length) return [`${scope} (${entry.meaning})`];
+    return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),
+      ` (${entry.meaning})`];
+  };
+  // The list each ruling sits under, from the service (RULING_LISTS).
+  const RULING_LISTS = JSON.parse(document.getElementById("ruling_lists").textContent);
+  const controlRow = (row) => {
+    const open = el("details", "control-row");
+    const summary = el("summary", null, `${row.title}${row.label ? ` · ${row.label}` : ""} `);
+    summary.append(el("span", `tag ${row.outcome}`, row.outcome_text));
+    const lists = Object.entries(RULING_LISTS)
+      .map(([verdict, heading]) => [heading, row.rulings.filter((ruling) => ruling.ruling === verdict)])
+      .filter(([, rulings]) => rulings.length);
+    if (row.tally) summary.append(" ", el("span", "meta", row.tally));
+    open.append(summary);
+    for (const [heading, rulings] of lists) {
+      const items = el("ul", "ruling-list");
+      for (const ruling of rulings) {
+        const item = el("li", null);
+        item.append(code(ruling.claim), ": ", ruling.reason);
+        items.append(item);
+      }
+      open.append(el("p", "ruling-heading", heading), items);
+    }
+    for (const quoted of row.quoted) {
+      open.append(el("p", "meta", `${quoted.file} · ${quoted.class} · line ${quoted.line}`), el("blockquote", "excerpt", quoted.text));
+    }
+    open.append(el("p", "meta", row.meaning));
+    return open;
+  };
+  if (CONTROLS.length) {
+    const section = el("section", "controls-section");
+    section.id = "controls-section";
+    section.append(el("h2", null, "Controls"),
+      el("p", "meta", "The Controls this analysis applied, as they were when it ran. The critic judged each row against the findings. A Control settles nothing on its own, and the service verified nothing."));
+    const summary = el("dl", "controls-summary");
+    for (const [stage, line] of CONTROLS_SUMMARY) summary.append(el("dt", null, stage), el("dd", null, line));
+    section.append(summary);
+    const table = el("table", "controls-table");
+    const head = el("tr");
+    ["Control", "Match", "Facts", "Rows and outcomes"].forEach((text) => {
+      const th = el("th", null, text);
+      th.scope = "col";
+      head.append(th);
+    });
+    table.append(el("thead"), el("tbody"));
+    table.tHead.append(head);
+    for (const entry of CONTROLS) {
+      const tr = el("tr");
+      const facts = el("ul");
+      for (const fact of entry.facts) {
+        const item = el("li", null, `${fact.label}: ${fact.value} — ${fact.meaning}.`);
+        if (fact.stated) item.append(el("span", "meta", ` The description states “${fact.stated}”.`));
+        facts.append(item);
+      }
+      const rows = el("td");
+      entry.rows.forEach((row) => rows.append(controlRow(row)));
+      const match = el("td");
+      match.append(...controlMatch(entry));
+      tr.append(el("td", "name", entry.name), match, el("td"), rows);
+      tr.children[2].append(facts);
+      table.tBodies[0].append(tr);
+    }
+    section.append(table);
+    $("analyses").append(section);
+  }
+  // The three downloads: the report as Markdown and as JSON, each with the
+  // Controls section, and its findings as CSV.
+  for (const format of ["md", "json", "csv"]) {
+    $(`export-${format}`).href = `/report/${encodeURIComponent(R.job.id)}/export.${format}`;
+  }
+  // The download icon opens a menu of the three formats, as the + of the
+  // analysis form opens its menu: arrows move, Escape and a click outside close.
+  const downloadButton = $("export-download");
+  const downloadMenu = $("export-menu");
+  const downloadItems = [...downloadMenu.querySelectorAll("[role=menuitem]")];
+  const showDownloads = (open) => {
+    downloadMenu.hidden = !open;
+    downloadButton.setAttribute("aria-expanded", String(open));
+    if (open) downloadItems[0].focus();
+  };
+  downloadButton.addEventListener("click", () => showDownloads(downloadMenu.hidden));
+  downloadMenu.addEventListener("keydown", (event) => {
+    const at = downloadItems.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      showDownloads(false);
+      downloadButton.focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      downloadItems[(at + step + downloadItems.length) % downloadItems.length].focus();
+    }
+  });
+  downloadItems.forEach((item) => item.addEventListener("click", () => showDownloads(false)));
+  document.addEventListener("click", (event) => {
+    const inside = downloadButton.contains(event.target) || downloadMenu.contains(event.target);
+    if (!downloadMenu.hidden && !inside) showDownloads(false);
+  });
 
   // ---- About the analysis -----------------------------------------------------
   // How this report was made: its identifiers, its times and the versions
@@ -1347,12 +1469,17 @@
     if (block.scope.length) {
       const byState = {};
       block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
-      const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
+      const onUnit = block.rejected_claims.filter(c => rulesOnUnit(block, c));
+      const ruledOutClaims = onUnit.filter(c => !coveredByControl(c));
+      const coveredClaims = onUnit.filter(coveredByControl);
       const lines = [`${counted(block.scope.length, "unit", "units")} with no claim raised`];
       const count = (state) => (byState[state] || []).length;
       if (count("not-applicable")) lines.push(`${count("not-applicable")} ruled out — does not apply`);
       if (ruledOutClaims.length) {
         lines.push(`${ruledOutClaims.length} ruled out by review — does not apply; each on its own row in the report`);
+      }
+      if (coveredClaims.length) {
+        lines.push(`${coveredClaims.length} covered by a Control the owner states — not verified; each on its own row in the report`);
       }
       if (count("undecidable")) {
         lines.push(`${count("undecidable")} undecidable — the input never says whether this framework applies`);
@@ -1394,6 +1521,22 @@
       marks.groundless.forEach(m => {
         const item = el("li");
         item.append(code(m.claim_id), " — ", prose(m.title), " (", prose(m.reason), ")");
+        list.append(item);
+      });
+      note.append(list);
+      notes.append(note);
+    }
+    if (marks.returned.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${counted(marks.returned.length, "finding", "findings")} the review kept against every Control row, so each unit needs other evidence`));
+      const list = el("ul");
+      marks.returned.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " — ", code(m.unit), ` needs ${m.needs}`);
+        m.refused_controls.forEach(r => {
+          item.append("; row ", code(r.unit), " of ", code(r.control), " refused: ", prose(r.reason));
+        });
         list.append(item);
       });
       note.append(list);
@@ -1477,11 +1620,9 @@
     });
     return (out.length > 2 ? [out[0], out.slice(1).join(" ")] : out).map(line => clip(line, width));
   };
-  const KIND_WORDS = {
-    "external-entity": "external entity",
-    "process": "process",
-    "data-store": "data store",
-  };
+  // The noun of each element type, by its ID prefix, in the service's words
+  // (ELEMENT_TYPE_NOUNS).
+  const TYPE_NOUNS = JSON.parse($("element_type_nouns").textContent);
   // The geometry, in viewBox units.
   const DIAGRAM = { pad: 12, inset: 14, nodeW: 128, nodeH: 54, slotGap: 18,
     columnGap: 26, rowGap: 68, bottom: 16 };
@@ -1501,9 +1642,9 @@
 
   function drawModel(model) {
     const nodes = [
-      ...model.external_entities.map(e => ({ kind: "external-entity", e })),
+      ...model.external_entities.map(e => ({ kind: "entity", e })),
       ...model.processes.map(e => ({ kind: "process", e })),
-      ...model.data_stores.map(e => ({ kind: "data-store", e })),
+      ...model.data_stores.map(e => ({ kind: "store", e })),
     ];
     if (!nodes.length) return null;
     const index = new Map(nodes.map((node, i) => [node.e.id, i]));
@@ -1798,11 +1939,11 @@
     columns.forEach(column => column.members.forEach(i => {
       const { kind, e } = nodes[i];
       const { x, y } = place.get(i);
-      const group = svg("g", { class: `element ${kind}`, "data-element": e.id,
-        "data-zone": column.id === null ? "" : column.id });
+      const group = paint(svg("g", { class: `element ${kind}`, "data-element": e.id,
+        "data-zone": column.id === null ? "" : column.id }), e.id);
       const assumed = ASSUMED_ZONES.has(e.id);
-      group.append(svg("title", {}, `${e.name} (${KIND_WORDS[kind]})${assumed ? ", zone assumed" : ""}`));
-      if (kind === "data-store") {
+      group.append(svg("title", {}, `${e.name} (${TYPE_NOUNS[kind]})${assumed ? ", zone assumed" : ""}`));
+      if (kind === "store") {
         group.append(
           svg("rect", { x, y, width: D.nodeW, height: D.nodeH, class: "element-fill" }),
           svg("path", { d: `M${x},${y} H${x + D.nodeW} M${x},${y + D.nodeH} H${x + D.nodeW}`, class: "element-line" }),
@@ -1831,6 +1972,15 @@
       "box a process, and two lines a data store. A coloured arrow crosses a trust " +
       "boundary, and a dotted arrow may cross one, because a zone is not stated.");
     $("model-diagram").append(diagram, caption);
+    // The same model as Mermaid text, written by the service, to paste into
+    // a document that renders Mermaid.
+    const mermaid = JSON.parse($("mermaid").textContent);
+    if (mermaid) {
+      const link = el("a", "mermaid-link", "Download as Mermaid");
+      link.href = URL.createObjectURL(new Blob([mermaid], { type: "text/plain" }));
+      link.download = "system-model.mmd";
+      caption.append(" ", link);
+    }
   } else {
     $("model-diagram").hidden = true;
   }
@@ -1842,7 +1992,9 @@
   // `protocol`, `authentication` and `data_classification` are free text
   // copied out of submitted prose.
   const mark = (v) => (v === "unknown" ? el("span", "unk", "unknown") : String(v));
-  const named = (e) => cell(Object.assign(el("span", "ref", e.name), { title: e.id }));
+  const named = (e) => cell(Object.hasOwn(HUES, e.id)
+    ? elementTag(e.name, e.id, HUES[e.id])
+    : Object.assign(el("span", null, e.name), { title: e.id }));
   const zoneCell = (zone) => cell(zone === "unknown" ? mark(zone) : ref(zone));
   const ELEMENT_TABLES = [
     { title: "External entities", rows: R.system_model.external_entities,
@@ -1859,7 +2011,7 @@
         cell(mark(e.data_classification)), cell(mark(e.encryption_at_rest))] },
     { title: "Data flows", rows: R.system_model.data_flows,
       head: ["Name", "From → to", "Protocol", "Authentication", "Encrypted in transit"],
-      cells: e => [named(e), cell(ref(e.source), " → ", ref(e.destination)), cell(mark(e.protocol)),
+      cells: e => [named(e), cell(ref(e.id)), cell(mark(e.protocol)),
         cell(mark(e.authentication)), cell(mark(e.encryption_in_transit))] },
   ];
   ELEMENT_TABLES.filter(t => t.rows.length).forEach(t => {
@@ -1889,12 +2041,12 @@
     $(`${id}-title`).hidden = $(id).hidden = !items.length;
   };
   listed("crossings", "Boundary crossings", R.boundary_crossings, c => [
-    ref(c.flow_id), ": ", ref(c.source_zone), " → ", ref(c.destination_zone),
+    ref(c.flow_id), " | ", ref(c.source_zone), " ", arrow(), " ", ref(c.destination_zone),
     ...(c.decided ? [] : [" — may cross, because a zone is not stated"]),
     ...c.assumed_endpoints.flatMap(id => [" — assumed zone for ", ref(id)]),
   ]);
   listed("assumptions", "Assumptions", R.system_model.assumptions, a => [
-    ref(a.element_id), `: ${a.assumption} — ${a.basis}`,
+    ref(a.element_id), ` | ${a.assumption} — ${a.basis}`,
   ]);
 
   // What the model leaves unstated, on the most elements first. An element
@@ -1909,7 +2061,7 @@
       const words = NAMES[g.attribute] || g.attribute;
       const where = el("td");
       g.elements.forEach((e, i) => {
-        if (i) where.append(", ");
+        if (i) where.append(" | ");
         where.append(ref(e.id));
         if (QUESTION_ROWS.has(questionKey(e.key)) && ASKS) {
           const answer = el("a", null, "Answer");
@@ -1992,11 +2144,9 @@
   // The rows the Questions section draws, under their group headings. An
   // earlier answer prints as its text; an open question prints its history
   // and the findings it informs.
-  // An answer a share wrote prints so, with how many parts the share covers
-  // (ADR 0114). A corrected answer is its part's own.
-  const sharesRead = FINAL ? (CORRECTIONS.shares || []) : [...SAVED_SHARES.values()];
-  const shareOfKey = new Map(sharesRead.flatMap(share => share.covers
-    .map(element => [questionKey([element, ...share.answer.key.slice(1)]), share])));
+  // An answer a share wrote prints so, with how many elements the share covers
+  // (ADR 0114). A corrected answer is its element's own.
+  const shareOfKey = sharesByKey(FINAL ? (CORRECTIONS.shares || []) : [...SAVED_SHARES.values()]);
   const byGroup = new Map();
   ENTRIES.forEach(entry => {
     const group = entry.q.group_heading;
@@ -2011,10 +2161,10 @@
       if (q.answer) {
         item.append(el("div", "meta", `Answer: ${kind === "link" ? linkAnswerText(q.answer) : answerText(q.answer)}`));
         const share = kind === "fact" && !q.corrected && shareOfKey.get(questionKey(q.key));
-        if (share) item.append(el("div", "meta", `One shared answer for ${counted(share.covers.length, "part", "parts")}`));
+        if (share) item.append(el("div", "meta", `One shared answer for ${counted(coveredCount([share]), "part", "parts")}`));
       }
       item.append(...correctionNote(q));
-      if (q.history) item.append(el("div", "meta", HISTORY[q.history] || q.history));
+      if (q.history) item.append(el("div", "meta", HISTORY[q.history]));
       if ((q.findings || []).length) {
         item.append(el("div", "meta", "Used by: " +
           q.findings.map(f => (FINDINGS.get(f) || { id: f }).id).join(" \u00b7 ")));
@@ -2038,7 +2188,7 @@
     beforeExport.closed.forEach(d => { d.open = true; });
     $("report-view").hidden = false;
     $("questions-view").hidden = true;
-    exportQuestions.hidden = false;
+    exportQuestions.hidden = !ANALYSIS_ASKS;
     $("about-view").hidden = false;
     $("preview-bar").hidden = false;
   };
@@ -2084,9 +2234,3 @@
     landed.scrollIntoView();
   }
 
-  // theme toggle
-  $("themebtn").addEventListener("click", () => {
-    const cur = document.documentElement.getAttribute("data-theme");
-    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
-  });

@@ -243,8 +243,8 @@ def refusals(full: Arm, compact: Arm) -> list[str]:
         # An arm whose reports are missing reads as zero faults and full
         # validity, which is the shape of a pass. So a sweep that wrote no
         # report beside its artifact is refused rather than counted: the two
-        # failure-rate criteria and first-pass validity are read from here and
-        # from nowhere else.
+        # failure-rate criteria and first-pass validity are read from these
+        # reports.
         for artifact, sweep in zip(arm.artifacts, arm.reports, strict=True):
             if len(sweep) != len(artifact["mode_output"]):
                 faults.append(

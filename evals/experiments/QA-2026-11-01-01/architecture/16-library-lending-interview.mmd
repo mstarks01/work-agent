@@ -1,0 +1,15 @@
+architecture-beta
+    group z0(cloud)[Trust zone internet]
+    group z1(cloud)[Trust zone branch network]
+    group z2(cloud)[Trust zone council data centre]
+    service n0(internet)[member] in z0
+    service n1(internet)[desk staff] in z1
+    service n2(server)[lending API] in z2
+    service n3(server)[library app] in z0
+    service n4(server)[self-service kiosk] in z1
+    service n5(database)[loans database] in z2
+    n0:R --> L:n3
+    n3:R --> L:n2
+    n4:R --> L:n2
+    n1:R --> L:n2
+    n2:R --> L:n5

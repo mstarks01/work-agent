@@ -1,0 +1,568 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "insurance partner",
+        "description": "An external insurance partner.",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[insurance partner] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-partner-network"
+      },
+      {
+        "id": "entity:data-analyst",
+        "name": "data analyst",
+        "description": "A human data analyst.",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[data analyst] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:ingest-scheduler",
+        "name": "ingest scheduler",
+        "description": "A scheduler for ingestion.",
+        "assets": [],
+        "source_excerpt": "service n2(server)[ingest scheduler] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "name": "Spark transform job",
+        "description": "A Spark transformation job.",
+        "assets": [],
+        "source_excerpt": "service n3(server)[Spark transform job] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:trust-zone-warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "A landing bucket.",
+        "assets": [],
+        "source_excerpt": "service n4(database)[landing bucket] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-database",
+        "name": "Airflow metadata database",
+        "description": "An Airflow metadata database.",
+        "assets": [],
+        "source_excerpt": "service n5(database)[Airflow metadata database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Airflow",
+        "trust_zone": "boundary:trust-zone-landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:claims-warehouse",
+        "name": "claims warehouse",
+        "description": "A warehouse for claims data.",
+        "assets": [
+          "health"
+        ],
+        "source_excerpt": "service n6(database)[claims warehouse] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-warehouse-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the insurance partner to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:landing-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the ingest scheduler to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:airflow-metadata-database>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the ingest scheduler to the Airflow metadata database.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:airflow-metadata-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>process:spark-transform-job>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the ingest scheduler to the Spark transform job.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "process:spark-transform-job",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform-job>store:claims-warehouse>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the Spark transform job to the claims warehouse.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform-job",
+        "destination": "store:claims-warehouse",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:data-analyst>store:claims-warehouse>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the data analyst to the claims warehouse.",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:data-analyst",
+        "destination": "store:claims-warehouse",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-partner-network",
+        "name": "Trust zone partner network",
+        "description": "The partner network trust zone.",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone partner network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-landing-network",
+        "name": "Trust zone landing network",
+        "description": "The landing network trust zone.",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone landing network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-warehouse-network",
+        "name": "Trust zone warehouse network",
+        "description": "The warehouse network trust zone.",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone warehouse network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The insurance partner is an external system.",
+        "element_id": "entity:insurance-partner",
+        "attribute": "kind",
+        "basis": "The element is named \"insurance partner\" and is modelled as an external partner."
+      },
+      {
+        "assumption": "The data analyst is a human external entity.",
+        "element_id": "entity:data-analyst",
+        "attribute": "kind",
+        "basis": "The element is named \"data analyst,\" identifying a person."
+      },
+      {
+        "assumption": "The partner network is a network trust zone.",
+        "element_id": "boundary:trust-zone-partner-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone partner network.\""
+      },
+      {
+        "assumption": "The landing network is a network trust zone.",
+        "element_id": "boundary:trust-zone-landing-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone landing network.\""
+      },
+      {
+        "assumption": "The warehouse network is a network trust zone.",
+        "element_id": "boundary:trust-zone-warehouse-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone warehouse network.\""
+      },
+      {
+        "assumption": "The claims warehouse contains health or claims data, so its classification is confidential.",
+        "element_id": "store:claims-warehouse",
+        "attribute": "data_classification",
+        "basis": "The store is explicitly named \"claims warehouse\"; claims data is classified as health data by the extraction vocabulary."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "insurance partner",
+        "description": "An external insurance partner.",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[insurance partner] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-partner-network"
+      },
+      {
+        "id": "entity:data-analyst",
+        "name": "data analyst",
+        "description": "A human data analyst.",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[data analyst] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:ingest-scheduler",
+        "name": "ingest scheduler",
+        "description": "A scheduler for ingestion.",
+        "assets": [],
+        "source_excerpt": "service n2(server)[ingest scheduler] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "name": "Spark transform job",
+        "description": "A Spark transformation job.",
+        "assets": [],
+        "source_excerpt": "service n3(server)[Spark transform job] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:trust-zone-warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "A landing bucket.",
+        "assets": [],
+        "source_excerpt": "service n4(database)[landing bucket] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-database",
+        "name": "Airflow metadata database",
+        "description": "An Airflow metadata database.",
+        "assets": [],
+        "source_excerpt": "service n5(database)[Airflow metadata database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Airflow",
+        "trust_zone": "boundary:trust-zone-landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:claims-warehouse",
+        "name": "claims warehouse",
+        "description": "A warehouse for claims data.",
+        "assets": [
+          "health"
+        ],
+        "source_excerpt": "service n6(database)[claims warehouse] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-warehouse-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the insurance partner to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:landing-bucket>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the ingest scheduler to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:airflow-metadata-database>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the ingest scheduler to the Airflow metadata database.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:airflow-metadata-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>process:spark-transform-job>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the ingest scheduler to the Spark transform job.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "process:spark-transform-job",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform-job>store:claims-warehouse>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the Spark transform job to the claims warehouse.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform-job",
+        "destination": "store:claims-warehouse",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:data-analyst>store:claims-warehouse>data-transfer",
+        "name": "data transfer",
+        "description": "A directed interaction from the data analyst to the claims warehouse.",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:data-analyst",
+        "destination": "store:claims-warehouse",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-partner-network",
+        "name": "Trust zone partner network",
+        "description": "The partner network trust zone.",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone partner network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-landing-network",
+        "name": "Trust zone landing network",
+        "description": "The landing network trust zone.",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone landing network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-warehouse-network",
+        "name": "Trust zone warehouse network",
+        "description": "The warehouse network trust zone.",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone warehouse network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The insurance partner is an external system.",
+        "element_id": "entity:insurance-partner",
+        "attribute": "kind",
+        "basis": "The element is named \"insurance partner\" and is modelled as an external partner."
+      },
+      {
+        "assumption": "The data analyst is a human external entity.",
+        "element_id": "entity:data-analyst",
+        "attribute": "kind",
+        "basis": "The element is named \"data analyst,\" identifying a person."
+      },
+      {
+        "assumption": "The partner network is a network trust zone.",
+        "element_id": "boundary:trust-zone-partner-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone partner network.\""
+      },
+      {
+        "assumption": "The landing network is a network trust zone.",
+        "element_id": "boundary:trust-zone-landing-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone landing network.\""
+      },
+      {
+        "assumption": "The warehouse network is a network trust zone.",
+        "element_id": "boundary:trust-zone-warehouse-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone warehouse network.\""
+      },
+      {
+        "assumption": "The claims warehouse contains health or claims data, so its classification is confidential.",
+        "element_id": "store:claims-warehouse",
+        "attribute": "data_classification",
+        "basis": "The store is explicitly named \"claims warehouse\"; claims data is classified as health data by the extraction vocabulary."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

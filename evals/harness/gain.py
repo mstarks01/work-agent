@@ -13,8 +13,8 @@ Three gates answer that. By default each reads the development cases only
   standard deviation of the repeat spread. This half works offline, and it is
   what a flooded run fails first.
 * ``reviewed`` — every unmatched finding of the candidate is answered by a
-  vote. A finding nobody judged cannot count for or against the gain, so the
-  gain waits for the votes.
+  live vote. A finding nobody judged cannot count for or against the gain, and
+  a stale vote judged an earlier argument, so the gain waits for the votes.
 * ``rejected-rate`` — the share of findings a person rejected may not rise by
   more than one standard deviation of the spread.
 
@@ -24,7 +24,7 @@ spread nobody has measured reads ``inconclusive``, and a gain with an unread
 gate is not a promotion.
 
 ``--held-out`` is rung 5 of the experiment protocol, held-out confirmation:
-the same gates over the held-out cases alone. Each case it reads spends one of
+the same gates over the held-out cases alone. Each case it reads uses one of
 that case's ``HOLDOUT_READS``, so the reading names each case for the row's
 ``holdout_reads``, and it refuses a case the ledger has exhausted, which is a
 development case now (:func:`~evals.harness.audit.held_out`).
@@ -47,11 +47,18 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
+from analysis_service.parsing import table_entry
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
 from evals.harness.instruments import Cases
-from evals.harness.promotion import Reading, in_spreads, read_spread
+from evals.harness.promotion import (
+    GainGateName,
+    Reading,
+    in_spreads,
+    read_spread,
+)
+from evals.harness.scorer import review_coverage
 
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.
@@ -113,10 +120,12 @@ def _stride_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     return _mean([row["counts"]["eligible"] for row in cases.rows(blocks, "scores")])
 
 
-def _stride_unvoted(blocks: Mapping[str, Any], cases: Cases) -> float | None:
-    """Unmatched findings no vote answers, summed over the cases."""
-    rows = cases.rows(blocks, "scores")
-    return float(sum(row["counts"]["unvoted"] for row in rows)) if rows else None
+def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
+    """Unmatched findings no live vote answers, summed over the cases."""
+    coverage = [review_coverage(row["counts"]) for row in cases.rows(blocks, "scores")]
+    if not coverage:
+        return None
+    return float(sum(eligible - answered for answered, eligible in coverage))
 
 
 def _stride_rejected(blocks: Mapping[str, Any], cases: Cases) -> float | None:
@@ -141,7 +150,7 @@ class Readers:
     """One package's readers for the three gates. ``None`` is a stated absence."""
 
     volume: Reader
-    unvoted: Reader | None
+    unanswered: Reader | None
     rejected: Reader | None
     #: Why a vote reader is absent, printed where its gate reads.
     absent: str = ""
@@ -154,12 +163,12 @@ READERS: Mapping[FrameworkName, Readers] = MappingProxyType(
     {
         "stride": Readers(
             volume=_stride_volume,
-            unvoted=_stride_unvoted,
+            unanswered=_stride_unanswered,
             rejected=_stride_rejected,
         ),
         "asvs": Readers(
             volume=_asvs_volume,
-            unvoted=None,
+            unanswered=None,
             rejected=None,
             absent=(
                 "the applicability rows carry no vote standing: an over-applied"
@@ -193,7 +202,7 @@ def split(
     held_out: bool,
     ledger: Sequence[audit.Experiment] | None = None,
 ) -> CaseSplit:
-    """The cases a reading counts, through the one reader of the split.
+    """The cases a reading counts, through the case split.
 
     A development reading counts an exhausted holdout and names it. A held-out
     reading refuses one, and raises :class:`RefusedError` where an artifact
@@ -220,9 +229,9 @@ def split(
             f"the {' and the '.join(empty)} {verb} no case that is still held"
             " out, so no held-out case is left to confirm a gain on"
         )
-    spent = audit.exhausted(ledger)
+    exhausted = audit.exhausted(ledger)
     still = audit.still_held_out(flagged, ledger)
-    refused = {case: spent[case] for case in sorted(flagged - still)}
+    refused = {case: exhausted[case] for case in sorted(flagged - still)}
     reads = audit.exposure(ledger)
     read = sorted(held["baseline"] | held["candidate"])
     notes = [
@@ -232,7 +241,7 @@ def split(
         for case, count in refused.items()
     ]
     notes.append(
-        "Each case read here spends one of its reads. Record every one in the"
+        "Each case read here uses one of its reads. Record every one in the"
         " experiment row's `holdout_reads`: "
         + ", ".join(
             f"{case} (read {len(reads.get(case, ()))} of {audit.HOLDOUT_READS}"
@@ -258,7 +267,7 @@ class GainGate:
     limit: float
 
 
-GATES: Mapping[str, GainGate] = MappingProxyType(
+GATES: Mapping[GainGateName, GainGate] = MappingProxyType(
     {
         "volume": GainGate(
             question="did the candidate say more than the spread explains?",
@@ -266,7 +275,7 @@ GATES: Mapping[str, GainGate] = MappingProxyType(
             limit=1.0,
         ),
         "reviewed": GainGate(
-            question="is every unmatched finding of the candidate answered?",
+            question="does a live vote answer every unmatched finding of the candidate?",
             unit="count",
             limit=0.0,
         ),
@@ -279,11 +288,11 @@ GATES: Mapping[str, GainGate] = MappingProxyType(
 )
 
 
-def _reader(framework: FrameworkName, gate: str) -> Reader | None:
+def _reader(framework: FrameworkName, gate: GainGateName) -> Reader | None:
     readers = READERS[framework]
     return {
         "volume": readers.volume,
-        "reviewed": readers.unvoted,
+        "reviewed": readers.unanswered,
         "rejected-rate": readers.rejected,
     }[gate]
 
@@ -320,7 +329,7 @@ def read(
 
 
 def _decide(
-    name: str,
+    name: GainGateName,
     gate: GainGate,
     before: float | None,
     after: float | None,
@@ -364,7 +373,7 @@ def render(
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        gate = GATES[row.gate]
+        gate = table_entry(GATES, row.gate)
         cells = [
             "—" if value is None else f"{value:.4g}"
             for value in (row.measured, row.baseline, row.against_limit)
@@ -376,7 +385,9 @@ def render(
     lines.append("")
     for row in readings:
         if row.verdict == "fail":
-            lines.append(f"- `{row.gate}` fails: {GATES[row.gate].question}")
+            lines.append(
+                f"- `{row.gate}` fails: {table_entry(GATES, row.gate).question}"
+            )
         elif row.verdict == "inconclusive":
             lines.append(f"- `{row.gate}` unread: {row.why}")
     if all(row.verdict == "pass" for row in readings):
@@ -409,7 +420,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         "--held-out",
         action="store_true",
         help="rung 5, held-out confirmation: read the gates on the held-out"
-        " cases alone. Each case read spends one of its HOLDOUT_READS; record"
+        " cases alone. Each case read uses one of its HOLDOUT_READS; record"
         " it in the experiment row's holdout_reads",
     )
 

@@ -12,6 +12,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from analysis_service.frameworks.stride.record import ArchivedThreatProposals
 from evals.harness.descendants import FRAMEWORK, lane_must_finds
 from evals.harness.lane_replay import prepare_today
 from evals.harness.provenance import REPO_ROOT
@@ -36,7 +37,7 @@ def main(run_dir):
         if (case_id, arm) not in prepared:
             prepared[case_id, arm] = prepare_today(cases[case_id], FRAMEWORK, arm)
         state = prepared[case_id, arm].state
-        batch = json.loads(answer.read_text())
+        batch = ArchivedThreatProposals.model_validate_json(answer.read_text())
         matched = lane_must_finds(cases[case_id], state, lane, batch)
         wanted = targets[f"{case_id}:{lane}"]
         hits[answer.parent.name] += [f"{case_id}/{i}" for i in matched if i in wanted]

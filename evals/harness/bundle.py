@@ -27,6 +27,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, get_args
 
+from pydantic import ValidationError
+
 from analysis_service.assertions import (
     GRAPH_BOUND,
     REGISTRY,
@@ -35,19 +37,46 @@ from analysis_service.assertions import (
     CatalogIssue,
     CatalogProposal,
     Quarantined,
+    parse_predicate,
     project,
     subject_id,
 )
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.compact import FULL_FORMAT, parse_extraction
+from analysis_service.errors import refusal_text
+from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
+from analysis_service.graph import STATE_DIAGRAM_READINGS, diagram_readings
 from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import CaseKind, archive_bytes, case_suffix
 from evals.harness.artifact import CORPUS_DIR, EvalArtifact, load_artifact
 from evals.harness.reference import GoldenCase, case_ids
+
+
+class UnreadableReport(modes.EvalRunError):
+    """An archived report that today's :class:`Report` refuses.
+
+    A report holds the schema of the day its sweep ran. No reader migrates an
+    archived report, so the harness refuses the file and names the field.
+    """
+
+
+def read_report(path: Path) -> Report:
+    """The report archived at ``path``, read by today's :class:`Report`.
+
+    **The one reader of an archived report.** Raises :class:`UnreadableReport`
+    where the file does not parse, in one line that names the file and each
+    field :class:`Report` refuses.
+    """
+    try:
+        return Report.model_validate_json(path.read_bytes())
+    except ValidationError as error:
+        raise UnreadableReport(
+            f"{path}: today's Report refuses {refusal_text(error)}"
+        ) from None
 
 
 def framework_block(report: Report, framework: FrameworkName) -> FrameworkAnalysis:
@@ -178,7 +207,9 @@ def check_out(*paths: str | Path | None) -> None:
             raise modes.EvalRunError(f"{path}: the folder {path.parent} is read-only")
 
 
-def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -> None:
+def write_reports(
+    out: str, mode: modes.SweepMode, runs: Mapping[str, modes.AnalysisRun]
+) -> None:
     """Persist every finished case's whole report beside the artifact.
 
     A sweep is paid work and the report is the only record of what the agents
@@ -235,7 +266,7 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
 
 
 def write_assertions(
-    out: str, mode: str, resolved: Mapping[str, modes.AssertionResult]
+    out: str, mode: modes.SweepMode, resolved: Mapping[str, modes.AssertionResult]
 ) -> None:
     """Persist every assertion run beside the artifact, so it can be re-read.
 
@@ -309,7 +340,7 @@ def write_assertions(
 
 
 def write_extractions(
-    out: str, mode: str, extracted: Mapping[str, modes.ExtractionResult]
+    out: str, mode: modes.SweepMode, extracted: Mapping[str, modes.ExtractionResult]
 ) -> None:
     """Persist every extraction beside the artifact, so it can be re-scored.
 
@@ -417,7 +448,7 @@ KEPT_WHEN_FAILED: frozenset[CaseKind] = frozenset(
 #: writes the catalog for a mode that ``replay.KEEPS`` names. A finished
 #: ``heads`` case carries no emission: its outcome holds the catalog alone.
 #: Keyed by ``modes.MODE_ENTRIES``, so a new mode needs a row here.
-FINISHED_KINDS: Mapping[str, frozenset[CaseKind]] = {
+FINISHED_KINDS: Mapping[modes.SweepMode, frozenset[CaseKind]] = {
     "extraction": frozenset({"extraction"}),
     "assertions": frozenset({"assertions"}),
     "heads": frozenset({"assertions"}),
@@ -491,7 +522,7 @@ def runs_from_reports(
         proposals_path = finished_file(artifact, case.id, "proposals")
         # A finished case: finished_file returns each path or raises.
         assert drafts_path is not None and proposals_path is not None
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        report = read_report(report_path)
         raw = json.loads(drafts_path.read_text(encoding="utf-8"))
         if stray := sorted(set(raw) - set(PACKAGES)):
             raise modes.EvalRunError(
@@ -570,14 +601,17 @@ def extractions_from_reports(
     results = {}
     for case, written in _case_files(artifact, cases, "extraction"):
         model, issues = parse_extraction(
-            written["raw"], FULL_FORMAT, sources=_source_texts(case)
+            written["raw"],
+            FULL_FORMAT,
+            sources=_source_texts(case),
+            diagrams=diagram_readings(seed_state(case.sources)[STATE_DIAGRAM_READINGS]),
         )
         results[case.id] = modes.ExtractionResult(
             case_id=case.id,
             extracted=model,
             issues=tuple(issues),
             raw=written["raw"],
-            # ``.get``: an emission archived before the key existed came from
+            # ``.get``: an archived emission that holds no such key came from
             # a sweep that ran no repair, which is what an absent key means.
             repair=written.get("repair"),
         )
@@ -699,8 +733,8 @@ def _redrawn_entry(entry, moved: Mapping[str, str]):
     update: dict[str, str] = {}
     if entry.subject in moved:
         update["subject"] = moved[entry.subject]
-    predicate = REGISTRY.get(entry.predicate)
-    names_a_subject = predicate is not None and predicate.value == "reference"
+    name = parse_predicate(entry.predicate)
+    names_a_subject = name is not None and REGISTRY[name].value == "reference"
     if names_a_subject and entry.value in moved:
         update["value"] = moved[entry.value]
     return entry.model_copy(update=update) if update else entry

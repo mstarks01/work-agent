@@ -1,0 +1,574 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "Member",
+        "description": "Library member",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "member(Member)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "Desk staff",
+        "description": "Staff using the circulation page",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "desk(Desk staff)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:library-app-phone",
+        "name": "Library app (phone)",
+        "description": "Library application on a phone",
+        "assets": [],
+        "source_excerpt": "app[\"Library app (phone)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "Self-service kiosk",
+        "description": "Self-service kiosk",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "kiosk[Self-service kiosk]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lending-api-rest",
+        "name": "Lending API (REST)",
+        "description": "REST lending API",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[\"Lending API (REST)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "REST",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:desk-staff",
+        "name": "Desk staff",
+        "description": "Staff using the circulation page",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "desk(Desk staff)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database-members-loans-reservations",
+        "name": "Loans database: members, loans, reservations",
+        "description": "Database containing members, loans, and reservations",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "db[(\"Loans database: members, loans, reservations\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app-phone>borrow-renew-reserve",
+        "name": "borrow, renew, reserve",
+        "description": "Borrow, renew, and reserve requests",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "member -->|\"borrow, renew, reserve\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:library-app-phone",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "borrow, renew, reserve",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app-phone>process:lending-api-rest>data",
+        "name": "data",
+        "description": "Unlabelled interaction from the library app to the lending API",
+        "assets": [],
+        "source_excerpt": "app --> api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:library-app-phone",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>process:self-service-kiosk>library-card-book-scans",
+        "name": "library card, book scans",
+        "description": "Library card and book scans",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "member -->|\"library card, book scans\"| kiosk",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:self-service-kiosk",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "library card, book scans",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api-rest>loans-returns",
+        "name": "loans, returns",
+        "description": "Loans and returns",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "kiosk -->|\"loans, returns\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans, returns",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api-rest>extend-loan-clear-block-mark-returned-circulation-page",
+        "name": "extend loan, clear block, mark returned (circulation page)",
+        "description": "Circulation actions",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "desk -->|\"extend loan, clear block, mark returned (circulation page)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "extend loan, clear block, mark returned (circulation page)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:lending-api-rest>store:loans-database-members-loans-reservations>members-loans-reservations",
+        "name": "members, loans, reservations",
+        "description": "Members, loans, and reservations",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"members, loans, reservations\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lending-api-rest",
+        "destination": "store:loans-database-members-loans-reservations",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:loans-database-members-loans-reservations>process:lending-api-rest>members-loans-reservations",
+        "name": "members, loans, reservations",
+        "description": "Members, loans, and reservations",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"members, loans, reservations\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:loans-database-members-loans-reservations",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:branch-network",
+        "name": "Branch network",
+        "description": "Branch network",
+        "assets": [],
+        "source_excerpt": "subgraph branch[\"Branch network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "Council data centre",
+        "description": "Council data centre",
+        "assets": [],
+        "source_excerpt": "subgraph dc[\"Council data centre\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The loans database data is confidential because it contains member records and operational loan and reservation records.",
+        "element_id": "store:loans-database-members-loans-reservations",
+        "attribute": "data_classification",
+        "basis": "The database is named as containing members, loans, and reservations."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "Member",
+        "description": "Library member",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "member(Member)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "Desk staff",
+        "description": "Staff using the circulation page",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "desk(Desk staff)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:library-app-phone",
+        "name": "Library app (phone)",
+        "description": "Library application on a phone",
+        "assets": [],
+        "source_excerpt": "app[\"Library app (phone)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "Self-service kiosk",
+        "description": "Self-service kiosk",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "kiosk[Self-service kiosk]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lending-api-rest",
+        "name": "Lending API (REST)",
+        "description": "REST lending API",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[\"Lending API (REST)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "REST",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:desk-staff",
+        "name": "Desk staff",
+        "description": "Staff using the circulation page",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "desk(Desk staff)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database-members-loans-reservations",
+        "name": "Loans database: members, loans, reservations",
+        "description": "Database containing members, loans, and reservations",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "db[(\"Loans database: members, loans, reservations\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app-phone>borrow-renew-reserve",
+        "name": "borrow, renew, reserve",
+        "description": "Borrow, renew, and reserve requests",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "member -->|\"borrow, renew, reserve\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:library-app-phone",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "borrow, renew, reserve",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app-phone>process:lending-api-rest>data",
+        "name": "data",
+        "description": "Unlabelled interaction from the library app to the lending API",
+        "assets": [],
+        "source_excerpt": "app --> api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:library-app-phone",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>process:self-service-kiosk>library-card-book-scans",
+        "name": "library card, book scans",
+        "description": "Library card and book scans",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "member -->|\"library card, book scans\"| kiosk",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:self-service-kiosk",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "library card, book scans",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api-rest>loans-returns",
+        "name": "loans, returns",
+        "description": "Loans and returns",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "kiosk -->|\"loans, returns\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans, returns",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api-rest>extend-loan-clear-block-mark-returned-circulation-page",
+        "name": "extend loan, clear block, mark returned (circulation page)",
+        "description": "Circulation actions",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "desk -->|\"extend loan, clear block, mark returned (circulation page)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "extend loan, clear block, mark returned (circulation page)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:lending-api-rest>store:loans-database-members-loans-reservations>members-loans-reservations",
+        "name": "members, loans, reservations",
+        "description": "Members, loans, and reservations",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"members, loans, reservations\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lending-api-rest",
+        "destination": "store:loans-database-members-loans-reservations",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:loans-database-members-loans-reservations>process:lending-api-rest>members-loans-reservations",
+        "name": "members, loans, reservations",
+        "description": "Members, loans, and reservations",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api <-->|\"members, loans, reservations\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:loans-database-members-loans-reservations",
+        "destination": "process:lending-api-rest",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:branch-network",
+        "name": "Branch network",
+        "description": "Branch network",
+        "assets": [],
+        "source_excerpt": "subgraph branch[\"Branch network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "Council data centre",
+        "description": "Council data centre",
+        "assets": [],
+        "source_excerpt": "subgraph dc[\"Council data centre\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The loans database data is confidential because it contains member records and operational loan and reservation records.",
+        "element_id": "store:loans-database-members-loans-reservations",
+        "attribute": "data_classification",
+        "basis": "The database is named as containing members, loans, and reservations."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

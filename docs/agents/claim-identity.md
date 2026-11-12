@@ -263,9 +263,9 @@ and `Vote.joins_the_pool` are the two booleans that carry it.
 
 `needs-evidence` is not a verdict about the finding at all. It says the reviewer
 cannot answer from what they were shown — an ungrounded finding demands more
-evidence, not a vote. So it moves no number and it is not spent: it holds for
+evidence, not a vote. So it moves no number and it is not kept: it holds for
 its own sitting, and a later one asks again over whatever evidence exists by
-then. Every other verdict is spent once and kept for ever.
+then. Every other verdict is cast once and kept for ever.
 
 ### Two mechanisms under one key are two findings
 
@@ -289,6 +289,17 @@ is one place with that flow, and `identity.channels` reads the siblings that
 A cited assertion row adds its control too: the attribute its predicate
 projects into, or the predicate's own name. With the assertion pass on, a
 stated control reaches the mechanism through its row (ADR 0062).
+
+A draft's **Attacker Position** is not part of the key or the mechanism. Two
+drafts at one key with two positions are one finding to a vote unless their
+mechanisms are apart. The position rule has one reader in the evals,
+`scorer.position_fate`. The scorer gate calls it through `holds_position` to
+match a reference with a ruled position only to a draft that states it. The
+loss report calls it to charge a miss to `position`, or to `unstated` where no
+draft at the place states a position. A `ONE_READERS` row in
+`tests/test_one_reader_lints.py` refuses a comparison of a draft's position, a
+ruled position or a position reader in any other function; a local name that
+holds a position, or a position reader, under another name is not seen.
 
 ### A vote also records what it judged
 
@@ -347,7 +358,7 @@ reader's reasoning may be about a mechanism the new claim does not use (#1135).
 
 ## What this buys, in reviewer minutes
 
-A vote is spent once and kept forever, because it hangs on a fingerprint rather
+A vote is cast once and kept forever, because it hangs on a fingerprint rather
 than on a run. So `evals/harness/queue.py` shows only what nobody has answered:
 
 - first sitting over a corpus — everything, a few hundred findings

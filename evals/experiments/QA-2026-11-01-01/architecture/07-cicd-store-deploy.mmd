@@ -1,0 +1,20 @@
+architecture-beta
+    group z0(cloud)[Trust zone corporate network]
+    group z1(cloud)[Trust zone build environment]
+    group z2(cloud)[Trust zone store estate]
+    group z3(cloud)[Trust zone internet]
+    service n0(internet)[developer] in z0
+    service n1(internet)[public package registry] in z3
+    service n2(server)[build runner] in z1
+    service n3(server)[deploy controller] in z0
+    service n4(server)[store server] in z2
+    service n5(database)[git server] in z0
+    service n6(database)[image registry] in z1
+    n0:R --> L:n5
+    n0:R --> L:n2
+    n2:R --> L:n5
+    n2:R --> L:n1
+    n2:R --> L:n6
+    n2:R --> L:n3
+    n4:R --> L:n3
+    n4:R --> L:n6

@@ -67,7 +67,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.candidates import Fact, Match, Rule, clip_fact, with_effects
 from analysis_service.frameworks import NoRule, PredicateReader
-from analysis_service.system_model import DataFlow, SystemModel
+from analysis_service.system_model import BoundaryKind, DataFlow, SystemModel
 
 __all__ = [
     "ENTERED_ZONE_KINDS",
@@ -87,7 +87,7 @@ SHARED_DEPENDENCY_MIN = 2
 # network hop. ``network`` and ``other`` are excluded: every boundary crossing
 # is already surfaced to every agent, and a rule that fires on all of them adds
 # no attention anywhere.
-ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
+ENTERED_ZONE_KINDS: frozenset[BoundaryKind] = frozenset({"privilege", "tenant"})
 
 # The zone kind a crossing *leaves* to be one as well, and the asymmetry is the
 # point. Entering a ``privilege`` zone is the transition and leaving it is not:
@@ -96,7 +96,7 @@ ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
 # authority to a party we do not control, and outward is a party we do not
 # control reaching a zone we do. That second direction is the multi-tenancy
 # escape, and reading only the destination makes it invisible.
-LEFT_ZONE_KINDS = frozenset({"tenant"})
+LEFT_ZONE_KINDS: frozenset[BoundaryKind] = frozenset({"tenant"})
 
 _clip = clip_fact
 
@@ -196,7 +196,7 @@ def _principals_of(catalog: AssertionCatalog, element_id: str) -> tuple[str, ...
     whose own gate rule refuses a basis this service inferred. So a wrong lead
     needs a source that states the wrong thing, rather than a rule that decided
     two names looked alike. Every rule that places a fact about a principal
-    asks this, so the identification has one reader.
+    asks this.
     """
     return tuple(
         subject.id
@@ -490,6 +490,10 @@ def _store_at_rest_unverified(
         )
 
 
+#: The operations that prove a caller reads a store.
+_READS = frozenset({"read", "read-write"})
+
+
 def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
     """A store holding a graded asset, with every element that reads it.
 
@@ -501,30 +505,39 @@ def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Ma
     the readers, so the lane can ask what one of them, or a grant like theirs,
     exposes.
 
-    A reader is the initiator of a flow into the store whose ``operations``
-    is ``read``, ``read-write`` or ``unknown``; a flow stating ``write`` only
-    is skipped, for the reason :func:`_unverified_write_to_store` skips a read.
+    **A caller's status comes from all of its flows into the store.** A
+    caller with one flow stating ``read`` or ``read-write`` is a reader, and
+    the fact ``readers`` names it. A caller whose flows state ``unknown`` and
+    never a read may or may not read, so ``callers_of_unknown_operation``
+    names it and the question asks the lane to settle the operation first. A
+    caller that only writes supplies no lead, for the reason
+    :func:`_unverified_write_to_store` skips a read. Each caller appears once,
+    at the strongest status its flows support (#2105).
     """
     for store in model.data_stores:
         assets = sensitive_assets(store)
         if not assets:
             continue
+        operations: dict[str, set[str]] = {}
+        for flow in inbound_flows(model, store.id):
+            operations.setdefault(flow.source, set()).add(flow.operations)
         readers = sorted(
-            {
-                flow.source
-                for flow in inbound_flows(model, store.id)
-                if flow.operations != "write"
-            }
+            caller for caller, stated in operations.items() if stated & _READS
         )
-        if not readers:
+        unknown = sorted(
+            caller
+            for caller, stated in operations.items()
+            if "unknown" in stated and not stated & _READS
+        )
+        if not readers and not unknown:
             continue
-        yield (
-            (store.id, *readers),
-            {
-                "readers": _clip(", ".join(readers)),
-                "assets": ", ".join(assets),
-            },
-        )
+        facts: dict[str, Fact] = {}
+        if readers:
+            facts["readers"] = _clip(", ".join(readers))
+        if unknown:
+            facts["callers_of_unknown_operation"] = _clip(", ".join(unknown))
+        facts["assets"] = ", ".join(assets)
+        yield (store.id, *readers, *unknown), facts
 
 
 # --- Denial of service ------------------------------------------------------
@@ -596,20 +609,18 @@ def _privilege_zone_crossing(
     # do. A flow that somehow does not resolve yields no candidate instead.
     flows = {flow.id: flow for flow in model.data_flows}
     for crossing in model.boundary_crossings():
-        # The one crossing-keyed rule that skips an undecidable crossing, and
-        # its premise is why: this rule fires on what the two zones *are*, and
-        # an unknown zone has no kind to read. An undecidable crossing confers
-        # eligibility for analysis and never a privilege transition, so firing
-        # here would assert the authority change the crossing cannot establish
-        # (ADR 0039 rule 4). Stated rather than left to the empty kind that
-        # falls through both sets below.
-        if not crossing.decided:
-            continue
+        # This rule fires on what the zones *are*, so it reads the kind of the
+        # zone it names. A flow into a privilege or tenant zone fires on that
+        # zone's kind, also where no source places the other endpoint: the
+        # crossing stays undecided in the facts, so the lead confers
+        # eligibility for analysis and no transition (ADR 0039 rule 4, ADR
+        # 0128). A flow out of a tenant zone fires only on a decided crossing,
+        # because an unplaced destination may sit in the same zone.
         source_kind = kinds.get(crossing.source_zone, "")
         destination_kind = kinds.get(crossing.destination_zone, "")
         if destination_kind in ENTERED_ZONE_KINDS:
             zone, direction = crossing.destination_zone, "into"
-        elif source_kind in LEFT_ZONE_KINDS:
+        elif crossing.decided and source_kind in LEFT_ZONE_KINDS:
             zone, direction = crossing.source_zone, "out-of"
         else:
             continue
@@ -813,9 +824,11 @@ _RULES: tuple[Rule, ...] = (
         rule_id="information-disclosure-store-readers",
         lane="information-disclosure",
         question=(
-            "These elements read this store through access they already hold."
-            " Who else holds a grant like theirs, and what does compromising one"
-            " of these readers expose?"
+            "Each element under `readers` reads this store through access it"
+            " already holds. Each element under `callers_of_unknown_operation`"
+            " sends this store a flow whose operation the sources do not state,"
+            " so it is a reader only if that flow reads. Who else holds a grant"
+            " like a reader's, and what does compromising one of them expose?"
         ),
         find=_store_readers,
     ),
@@ -864,7 +877,7 @@ _RULES: tuple[Rule, ...] = (
 
 
 #: What an answer about a fact each rule reads informs, as the early list shows
-#: it to the owner. The maintainer reviews each sentence.
+#: it to the owner.
 EFFECTS: Mapping[str, str] = MappingProxyType(
     {
         "spoofing-unverified-boundary-auth": (

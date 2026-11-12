@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
+from tests.test_sitting_app import unruled
 from webapp import sitting
 from webapp.page import client_script
 
@@ -87,24 +88,26 @@ def record_one(client: TestClient) -> None:
     )
 
 
-def central_review(tree: Path, author: str = "ada") -> Path:
-    prepared = sittings.prepare(tree / "evals" / "corpus" / CASE)
+def _answers(tree: Path, case: str) -> envelopes.CaseAnswers:
+    prepared = sittings.prepare(tree / "evals" / "corpus" / case)
+    return envelopes.CaseAnswers(
+        own_list=OWN_LIST,
+        marks={target.fingerprint: "agree" for target in prepared.mark_targets},
+        missing=["a missed authorization edge"],
+        notes="reviewer context",
+        opened_digests=sittings.digests(
+            tree / "evals" / "corpus" / case, prepared.files
+        ),
+    )
+
+
+def central_review(tree: Path, author: str = "ada", cases=(CASE,)) -> Path:
     envelope = envelopes.Envelope(
         envelope=envelopes.VERSION,
         submitted_by=author,
         submitted_for=author,
         generated="2026-09-05",
-        cases={
-            CASE: envelopes.CaseAnswers(
-                own_list=OWN_LIST,
-                marks={target.fingerprint: "agree" for target in prepared.mark_targets},
-                missing=["a missed authorization edge"],
-                notes="reviewer context",
-                opened_digests=sittings.digests(
-                    tree / "evals" / "corpus" / CASE, prepared.files
-                ),
-            )
-        },
+        cases={case: _answers(tree, case) for case in cases},
     )
     path = tree / review_submissions.relative_path(envelope)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -446,7 +449,7 @@ def test_a_record_whose_set_moved_is_sent_back_to_the_case(tmp_path: Path, monke
     monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
     path = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
     claims = json.loads(path.read_text("utf-8"))
-    claims[0]["verb"] = "replay"
+    claims[unruled(tree, CASE)]["verb"] = "replay"
     path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
 
     response = client.post("/api/contribute", json={"reviewer": "anonymous"})
@@ -476,7 +479,7 @@ def test_the_way_out_sits_above_the_file_preview():
     assert page.index('id="result"') < page.index('id="filePreview"')
     assert ".file-preview pre { max-height:40vh; overflow:auto; }" in page
     script = client_script("sitting.js")
-    assert 'hide("filePreview");' in script.split('$("submit").addEventListener', 1)[1]
+    assert "closePreview();" in script.split('$("submit").addEventListener', 1)[1]
     assert "$(steps).scrollIntoView" in script
     assert page.index('id="uploadSteps"') < page.index('id="filePreview"')
 

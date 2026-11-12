@@ -18,11 +18,22 @@ from typing import get_args
 
 import pytest
 
+from analysis_service import graph
+from analysis_service.critic_round import CriticRound
 from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.job_controls import (
+    AppliedControl,
+    AppliedScope,
+    CopiedEvidence,
+    CopiedRow,
+)
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
+from evals.critic_review import __main__ as critic_review
 from evals.critic_review import replay as R
 from evals.critic_review.loading import (
+    CASES,
     REPO_ROOT,
     corpus_model,
     corpus_sources,
@@ -31,13 +42,19 @@ from evals.critic_review.loading import (
 from evals.critic_review.model import CriticFixture, Expectation
 from evals.harness import critic_replay
 from evals.harness.assembly import ruling_type
+from evals.harness.bundle import write_reports
+from evals.harness.provenance import ProvenanceError
+from evals.harness.run_record import loaded
+from tests import test_evals_run_grounds as grounds
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
     finished,
+    record_requests,
     recorded,
 )
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE = PACKAGES["stride"]
+AUDIT_YAML = "order_changes:\n  audit: append-only\n  identity: caller\n"
 PACKAGE_RULINGS = schemas_for("stride").rulings
 
 
@@ -118,6 +135,79 @@ def test_the_replays_request_is_the_graphs(recorded, case):  # noqa: F811
     assert sent[instruction] == [turn]
 
 
+#: One Control the graph applies to every STRIDE draft: the whole application,
+#: a row on each lane and one evidence file.
+EVERY_LANE = AppliedControl(
+    name="Order audit log",
+    scope=AppliedScope(control="control-" + "a" * 32, outcome="application"),
+    rows=[
+        CopiedRow(framework="stride", unit=lane, version=PACKAGE.version, ticked=True)
+        for lane in PACKAGE.lanes
+    ],
+    evidence=[
+        CopiedEvidence.model_validate(
+            {
+                "id": "evidence-" + "e" * 32,
+                "name": "audit.yaml",
+                "class": "config",
+                "sha256": text_digest(AUDIT_YAML),
+                "text": AUDIT_YAML,
+            }
+        )
+    ],
+)
+
+
+def test_the_replays_request_is_the_graphs_with_a_control(
+    monkeypatch,
+    case,  # noqa: F811
+    tmp_path,
+):
+    """With a Control applied, each draft carries a ``controls`` key, and the
+    request this harness sends still equals the one the graph sent.
+
+    The scripted critic answers no row, so the row check is off for this
+    sweep. This test holds the request, and ``tests/test_critic_controls.py``
+    holds the check.
+    """
+    monkeypatch.setattr(graph, "held_controls", lambda state: [EVERY_LANE])
+    monkeypatch.setattr(CriticRound, "shown", lambda self: {})
+    seen = record_requests(monkeypatch)
+    run = grounds.sweep(monkeypatch, case, None)
+    out = tmp_path / "artifact.json"
+    write_reports(str(out), "analysis", run.runs)
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    fixtures = [
+        CriticFixture(
+            id=draft.id,
+            kind="control-covers",
+            framework="stride",
+            case=case.id,
+            draft=draft.model_dump(mode="json"),
+            expect=Expectation(survives=False),
+            rationale="a draft the recorded run produced",
+            controls=[EVERY_LANE],
+        )
+        for draft in archived.drafts
+    ]
+
+    instruction, turn = asyncio.run(
+        R.compose(
+            fixtures,
+            archived.model,
+            case.sources,
+            PACKAGE,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+        )
+    )
+
+    sent = {text: contents for text, contents in seen}
+    assert instruction in sent, "no node sent this critic instruction"
+    assert sent[instruction] == [turn]
+    assert '"excerpt"' in instruction
+
+
 def re_placeholders(text: str) -> list[str]:
     return re.findall(r"\{([a-z_]+)\}", text)
 
@@ -192,6 +282,11 @@ def survivors(fixtures) -> list:
     return [f for f in fixtures if f.expect.survives]
 
 
+#: Each fixture by its draft's ID, so a scripted ruling answers the Control
+#: rows the draft is shown.
+FIXTURE_OF_DRAFT = {fixture.draft["id"]: fixture for fixture in load_fixtures()}
+
+
 def rule(claim_id: str, status: str, reason: str = "") -> dict:
     """One scripted ruling, in the shape this package's critic really emits.
 
@@ -202,11 +297,41 @@ def rule(claim_id: str, status: str, reason: str = "") -> dict:
 
     The critic writes no status, so ``status`` is the one the fields decide: a
     rejection names its check, and any other ruling leaves the verdict to the
-    draft's own unknown grounds, as :func:`surviving_status` reads them.
+    draft's own unknown grounds, as :func:`surviving_status` reads them. A
+    fixture whose reader expects a ``control`` rejection is rejected on its
+    first row, with a reason that quotes that row's Control by name, and every
+    other row it is shown is refused.
     """
     verdict: dict = {"reason": reason}
-    if status == "rejected":
+    fixture = FIXTURE_OF_DRAFT.get(claim_id)
+    rows = (
+        []
+        if fixture is None
+        else [
+            {"control": control.id, "unit": row.unit}
+            for control in fixture.controls
+            for row in control.rows
+        ]
+    )
+    if (
+        status == "rejected"
+        and fixture
+        and fixture.expect.rejected_because == "control"
+    ):
+        verdict["rejected_because"] = "control"
+        verdict["control_row"], *rows = rows
+        applied = next(
+            c for c in fixture.controls if c.id == verdict["control_row"]["control"]
+        )
+        verdict["reason"] = f"{reason}: “{applied.name}”"
+    elif status == "rejected":
         verdict["rejected_because"] = "reasoning"
+        rows = []
+    if rows:
+        verdict["refused_controls"] = [
+            {**row, "reason": "it shows nothing the draft calls missing"}
+            for row in rows
+        ]
     return {"id": claim_id, "verdict": verdict, **PACKAGE_REQUIRED}
 
 
@@ -244,7 +369,8 @@ def test_a_critic_answering_every_fixture_correctly_scores_both_halves(fixtures,
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.unsupported_removed == (5, 5)
+    removed = len(fixtures) - len(survivors(fixtures))
+    assert score.unsupported_removed == (removed, removed)
     kept = len(survivors(fixtures))
     assert score.valid_preserved == (kept, kept)
     assert score.rejected_without_engaging == ()
@@ -265,10 +391,11 @@ def test_a_critic_that_rejects_everything_fails_the_preserved_half(fixtures, mod
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.valid_preserved == (0, len(survivors(fixtures)))
+    kept = len(survivors(fixtures))
+    assert score.valid_preserved == (0, kept)
     # And it does not even earn the removals: none of those reasons engages.
-    assert score.unsupported_removed == (0, 5)
-    assert len(score.rejected_without_engaging) == 5
+    assert score.unsupported_removed == (0, len(fixtures) - kept)
+    assert len(score.rejected_without_engaging) == len(fixtures) - kept
 
 
 def test_killing_the_right_draft_for_the_wrong_reason_is_reported_apart(
@@ -285,7 +412,7 @@ def test_killing_the_right_draft_for_the_wrong_reason_is_reported_apart(
 
     kept = len(survivors(fixtures))
     assert score.valid_preserved == (kept, kept)
-    assert score.unsupported_removed == (0, 5)
+    assert score.unsupported_removed == (0, len(fixtures) - kept)
     assert {o.fixture_id for o in score.rejected_without_engaging} == {
         f.id for f in fixtures if not f.expect.survives
     }
@@ -332,11 +459,11 @@ def test_the_replay_parses_what_this_package_asks_a_critic_for():
 def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
     """The third half: what the critic made of the recommendation.
 
-    A critic that read the advice and one that never looked emitted the same
-    ruling, so a fixture's `recommendation_sound` could not be checked against
-    anything. The package's ruling carries the reading now, and this drives the
-    three answers it can give: agreeing with the reader, disagreeing, and
-    making no reading at all.
+    A ruling with no reading would be the same for a critic that read the
+    advice and one that never looked, so a fixture's `recommendation_sound`
+    could not be checked against anything. The package's ruling carries the
+    reading, and this drives the three answers it can give: agreeing with the
+    reader, disagreeing, and making no reading at all.
     """
     payload = {"claims": []}
     for fixture in fixtures:
@@ -471,9 +598,10 @@ def test_a_word_inside_a_longer_word_is_not_an_anchor():
 def test_a_dismissal_is_recorded_so_relevance_can_be_read(fixtures, model):
     """#894's question, in a field the replay reads.
 
-    A critic that weighed an unknown and found it irrelevant and one that never
-    opened the question emitted the same ruling. A confirmed is reachable only
-    by naming every such pair, so the ruling now states it.
+    Without the field, a critic that weighed an unknown and found it
+    irrelevant and one that never opened the question would emit the same
+    ruling. A confirmed is reachable only by naming every such pair, so the
+    ruling states it.
     """
     shielded = next(
         f
@@ -588,8 +716,8 @@ def test_a_deficient_set_is_not_reported_as_a_killed_discriminator(fixtures, mod
 def test_the_gate_and_the_run_read_the_set_through_one_rule():
     """The lint over the file and the score over a run, against each other.
 
-    Two readers of "can this set discriminate" is how the warning came to
-    name the wrong cause. They are one function now, so the fixture set is
+    Two readers of "can this set discriminate" can disagree, and the warning
+    then names the wrong cause. They are one function, so the fixture set is
     driven through both spellings of its rows here rather than each being
     trusted against its own expectation.
     """
@@ -713,3 +841,21 @@ def test_the_user_turn_is_the_merge_nodes_output_over_the_fixture_drafts(
         "unverified_count": 0,
         "unresolved_mention_count": 0,
     }
+
+
+def test_a_critic_review_record_names_each_prompt_and_package_file(monkeypatch):
+    """A record from a changed tree still names the text the critic read."""
+    held = {}
+
+    def record(outputs, command, table, inputs):
+        held.update(inputs)
+        raise ProvenanceError("stop before the call")
+
+    monkeypatch.setattr(critic_review, "run_record_for", record)
+
+    assert critic_review.main(["--accept-cost", "unknown"]) == 1
+
+    framework = next(iter({entry.framework for entry in load_fixtures()}))
+    package = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
+    prompts = MarkdownLoader(REPO_ROOT / "prompts")
+    assert held.keys() == {CASES, *loaded((package, prompts))}

@@ -3,9 +3,9 @@
 A third package, built here and registered for one test, has what the two
 shipped packages do not: three bands, a dense catalog where each capability
 settles many units, an empty question prior, capabilities it shares with ASVS
-and capabilities of its own, and a precondition that reads a field no prior
-names (a flow's ``operations``). The tests drive the production planner with
-two and three packages selected.
+and capabilities of its own, a precondition that reads a field no prior names
+(a flow's ``operations``), and units of its own. The tests drive the production
+planner with two and three packages selected.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from analysis_service.capabilities import CapabilityNeed
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import QUESTION_PRIOR, PriorRow
 from analysis_service.fact_answers import FactAnswer
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES, Unit, check_unit
 from analysis_service.frameworks.asvs.record import DraftRequirementRuling
 from analysis_service.system_model import SystemModel
 from tests.factories import carrying, valid_model
@@ -63,6 +63,13 @@ class ThirdRecord(DraftRequirementRuling):
         return True
 
 
+#: Two grains of the package's own, the finer inside the coarser.
+THIRD_UNITS = (
+    Unit(id="T1", grain="chapter", lane="authentication", inside=None),
+    Unit(id="T1.1", grain="section", lane="authentication", inside="T1"),
+)
+
+
 def _operations_stated(model: SystemModel) -> str:
     unstated = [flow for flow in model.data_flows if flow.operations == "unknown"]
     return "undecidable" if unstated else "satisfied"
@@ -85,6 +92,8 @@ def third(monkeypatch):
         record=ThirdRecord,
         precondition=_operations_stated,
         precondition_facts=_operations_facts,
+        units=THIRD_UNITS,
+        control_unit_of=lambda claim: THIRD_UNITS[1].id,
     )
     carrying(monkeypatch, package)
     # The planner's modules read the registry by the name they imported.
@@ -99,7 +108,7 @@ def third(monkeypatch):
 
 
 PRIOR: dict[str, PriorRow] = {name: row for name, row in QUESTION_PRIOR.items()}
-PRIOR[THIRD] = PriorRow(runs=(), revision=None, cases=0, rates={})
+PRIOR[THIRD] = PriorRow(record=None, runs=(), cases=0, rates={})
 ALL = {"stride": {}, "asvs": {"level": 2}, THIRD: {"level": 2}}
 
 
@@ -120,6 +129,7 @@ def _paused(selection, answers=(), model=None):
             None,
             selection,
             (),
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=tuple(answers)),
             final=False,
@@ -212,3 +222,10 @@ def test_another_package_s_bands_do_not_move_a_framework_s_floor(third):
     assert under(both) == under(alone)
     own_low = [q for q in both.below_floor if q.frameworks == (THIRD,)]
     assert not own_low, "the package's own highest band still passes"
+
+
+def test_a_third_package_offers_its_own_units_to_the_unit_check(third):
+    for unit in THIRD_UNITS:
+        check_unit(THIRD, unit.id)
+    with pytest.raises(ValueError, match="'V2.1'"):
+        check_unit(THIRD, "V2.1")

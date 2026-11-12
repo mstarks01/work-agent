@@ -25,12 +25,18 @@ from analysis_service.critic import (
     snap_rulings,
 )
 from analysis_service.fan_in import join_drafts, snap_drafts
-from analysis_service.frameworks import schemas_for
+from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import RecommendationReading
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import mentioned_ids
-from tests.factories import sample_draft, sample_ruling, severity, valid_model
+from tests.factories import (
+    asvs_draft,
+    sample_draft,
+    sample_ruling,
+    severity,
+    valid_model,
+)
 
 #: The five model-facing shapes STRIDE's own nodes speak in. ``assemble_claims``
 #: needs the ruled record to build; the package itself carries the draft.
@@ -137,7 +143,7 @@ class TestAssembleThreats:
                 ),
             ),
         ]
-        threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
+        threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS, {})
         assert [t.id for t in threats] == ["S-01", "S-02"]
         assert rejected == []
 
@@ -153,7 +159,7 @@ class TestAssembleThreats:
                 ),
             ),
         ]
-        threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
+        threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS, {})
         assert [t.id for t in threats] == ["S-01"]
         assert [t.id for t in rejected] == ["S-02"]
 
@@ -164,31 +170,31 @@ class TestAssembleThreats:
             sample_draft("S-03", severity=severity("medium", "high")),
         ]
         rulings = [sample_ruling(f"S-0{n}") for n in (1, 2, 3)]
-        threats, _ = assemble_claims(drafts, rulings, model, SCHEMAS)
+        threats, _ = assemble_claims(drafts, rulings, model, SCHEMAS, {})
         assert [t.id for t in threats] == ["S-02", "S-03", "S-01"]
 
     def test_ties_break_on_threat_id(self, model):
         drafts = [sample_draft("S-02"), sample_draft("S-01")]
         rulings = [sample_ruling("S-02"), sample_ruling("S-01")]
-        threats, _ = assemble_claims(drafts, rulings, model, SCHEMAS)
+        threats, _ = assemble_claims(drafts, rulings, model, SCHEMAS, {})
         assert [t.id for t in threats] == ["S-01", "S-02"]
 
     def test_a_dropped_draft_fails_closed(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
         with pytest.raises(CriticOutputError, match="dropped draft 'S-02'"):
-            assemble_claims(drafts, [sample_ruling("S-01")], model, SCHEMAS)
+            assemble_claims(drafts, [sample_ruling("S-01")], model, SCHEMAS, {})
 
     def test_an_invented_threat_fails_closed(self, model):
         with pytest.raises(CriticOutputError, match="no lane agent drafted"):
             assemble_claims(
-                [sample_draft("S-01")], [sample_ruling("S-02")], model, SCHEMAS
+                [sample_draft("S-01")], [sample_ruling("S-02")], model, SCHEMAS, {}
             )
 
     def test_a_duplicated_ruling_fails_closed(self, model):
         drafts = [sample_draft("S-01")]
         rulings = [sample_ruling("S-01"), sample_ruling("S-01")]
         with pytest.raises(CriticOutputError, match="used by 2 drafts"):
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
     def test_needs_info_unknowns_must_resolve(self, model):
         drafts = [sample_draft("S-01")]
@@ -204,7 +210,7 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="hangs its needs-info verdict"):
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
     def test_facets_on_an_entry_that_is_not_a_question_are_a_fault(self, model):
         """A facet names a part of a question kind, so a subject entry with
@@ -222,7 +228,7 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="names facets on a subject entry"):
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
     def test_a_question_with_no_place_in_the_model_resolves(self, model):
         """The second spelling passes the seam with no element to point at.
@@ -246,7 +252,7 @@ class TestAssembleThreats:
             )
         ]
 
-        assembled = assemble_claims(drafts, rulings, model, SCHEMAS)
+        assembled = assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
         assert assembled.claims[0].verdict.related_unknowns[0].subject
 
@@ -264,7 +270,7 @@ class TestAssembleThreats:
         ]
 
         with pytest.raises(CriticOutputError, match="nothing says what has to be"):
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
     @pytest.mark.parametrize(
         "subject",
@@ -286,7 +292,7 @@ class TestAssembleThreats:
                 related_unknowns=[UnknownRef(subject=subject)],
             ),
         )
-        problems = review_issues([sample_draft("S-01")], [ruling], model)
+        problems = review_issues([sample_draft("S-01")], [ruling], model, {})
         assert [problem.kind for problem in problems.problems] == ["unresolved-unknown"]
         assert "one line" in problems.messages[0]
 
@@ -312,7 +318,7 @@ class TestAssembleThreats:
         ]
 
         with pytest.raises(CriticOutputError) as raised:
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
         assert "That element has:" in str(raised.value)
         assert "encryption_at_rest" in str(raised.value)
@@ -339,7 +345,7 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="does not have"):
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
     def test_a_needs_info_on_notes_names_no_attribute(self, model):
         """``notes`` is a pydantic field and not a security attribute.
@@ -364,10 +370,10 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="That element has: technology"):
-            assemble_claims(drafts, rulings, model, SCHEMAS)
+            assemble_claims(drafts, rulings, model, SCHEMAS, {})
 
     def test_empty_analysis_assembles_to_empty_arrays(self, model):
-        assert assemble_claims([], [], model, SCHEMAS) == ([], [])
+        assert assemble_claims([], [], model, SCHEMAS, {}) == ([], [])
 
 
 class TestVerdictShapeIsReAskableRatherThanFatal:
@@ -393,7 +399,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         asked = UnknownRef(subject="is it logged")
         rulings = self._rulings(related_unknowns=[asked])
 
-        problems = review_issues([sample_draft("S-01")], rulings, model)
+        problems = review_issues([sample_draft("S-01")], rulings, model, {})
 
         assert "states no reason" not in "; ".join(problems.messages)
         (completed,) = complete_rulings([sample_draft("S-01")], rulings)
@@ -411,6 +417,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
                 ],
             ),
             model,
+            {},
         )
 
         assert "also names open facts" in "; ".join(problems.messages)
@@ -420,6 +427,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
             [sample_draft("S-01")],
             self._rulings(rejected_because="reasoning"),
             model,
+            {},
         )
 
         assert "states no reason" in "; ".join(problems.messages)
@@ -431,6 +439,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
             [sample_draft("S-01")],
             self._rulings(rejected_because="reasoning"),
             model,
+            {},
         )
 
         assert problems.implicated == frozenset({"S-01"})
@@ -447,6 +456,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
                 ],
             ),
             model,
+            {},
         )
 
         assert len(problems.messages) == 2
@@ -460,7 +470,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         """
         ruling = sample_ruling("S-01").model_copy(update={"id": "S-1"})
 
-        problems = review_issues([sample_draft("S-01")], [ruling], model)
+        problems = review_issues([sample_draft("S-01")], [ruling], model, {})
 
         assert "dropped draft 'S-01'" in "; ".join(problems.messages)
         assert "'S-1', which no lane agent drafted" in "; ".join(problems.messages)
@@ -475,13 +485,14 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
                 self._rulings(rejected_because="reasoning"),
                 model,
                 SCHEMAS,
+                {},
             )
 
     def test_a_passing_ruling_is_promoted_to_the_reports_own_verdict(self, model):
         """``ProposedVerdict`` in, ``Verdict`` out — so a threat on the report
         carries the shape the report defines, whatever the critic emitted."""
         threats, _ = assemble_claims(
-            [sample_draft("S-01")], self._rulings(), model, SCHEMAS
+            [sample_draft("S-01")], self._rulings(), model, SCHEMAS, {}
         )
 
         assert type(threats[0].verdict) is Verdict
@@ -521,7 +532,9 @@ class TestRulingsMergeOntoDrafts:
             description="Stolen cookies let an attacker impersonate the customer.",
             affected_element_ids=["flow:entity:customer>process:web-app>login"],
         )
-        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+        (threat,), _ = assemble_claims(
+            [draft], [sample_ruling("S-01")], model, SCHEMAS, {}
+        )
         assert threat.title == draft.title
         assert threat.description == draft.description
         assert threat.affected_element_ids == draft.affected_element_ids
@@ -529,7 +542,9 @@ class TestRulingsMergeOntoDrafts:
 
     def test_a_ruling_without_severity_keeps_the_agents_rating(self, model):
         draft = sample_draft("S-01", severity=severity("low", "medium"))
-        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+        (threat,), _ = assemble_claims(
+            [draft], [sample_ruling("S-01")], model, SCHEMAS, {}
+        )
         assert threat.severity == draft.severity
         assert threat.severity.level == "low"
 
@@ -541,7 +556,9 @@ class TestRulingsMergeOntoDrafts:
 
     def test_the_critics_judgements_reach_the_threat(self, model):
         rulings = [sample_ruling("S-01", confidence="medium")]
-        (threat,), _ = assemble_claims([sample_draft("S-01")], rulings, model, SCHEMAS)
+        (threat,), _ = assemble_claims(
+            [sample_draft("S-01")], rulings, model, SCHEMAS, {}
+        )
         assert threat.confidence == "medium"
         assert threat.verdict.status == "confirmed"
 
@@ -561,7 +578,7 @@ class TestRulingsMergeOntoDrafts:
                 ),
             ),
         ]
-        _, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
+        _, rejected = assemble_claims(drafts, rulings, model, SCHEMAS, {})
         assert [t.id for t in rejected] == ["S-01", "S-02"]
 
 
@@ -690,8 +707,8 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         the claim rests on, so code makes it ``needs-info`` on that pair."""
         ruling = sample_ruling("S-01")
 
-        assert not review_issues([self._draft()], [ruling], model)
-        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
+        assert not review_issues([self._draft()], [ruling], model, {})
+        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS, {})
         verdict = assembled.claims[0].verdict
         assert verdict.status == "needs-info"
         assert verdict.related_unknowns == [
@@ -717,7 +734,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        assert not review_issues([self._draft()], [ruling], model)
+        assert not review_issues([self._draft()], [ruling], model, {})
 
     def test_a_ruling_dismissing_only_some_rests_on_what_is_left(self, model):
         """The claim hangs on the pairs not dismissed, and only on those."""
@@ -747,7 +764,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        assembled = assemble_claims([draft], [ruling], model, SCHEMAS)
+        assembled = assemble_claims([draft], [ruling], model, SCHEMAS, {})
 
         assert [
             ref.attribute for ref in assembled.claims[0].verdict.related_unknowns
@@ -782,7 +799,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        problems = review_issues([draft], [ruling], model)
+        problems = review_issues([draft], [ruling], model, {})
         (completed,) = problems.rulings
 
         assert not problems
@@ -826,7 +843,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ``needs-info`` for a claim nobody reviewed, silently, on the path where
         the critic failed. The re-ask exists for exactly this.
         """
-        problems = review_issues([self._draft()], [], model)
+        problems = review_issues([self._draft()], [], model, {})
 
         assert problems
         assert "S-01" in "; ".join(problems.messages)
@@ -842,7 +859,13 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         conditional, plain = self._draft(), sample_draft("S-02")
 
         shown = critic.critic_view(
-            [conditional, plain], only=None, repaired=(), unverified=(), assertions=None
+            [conditional, plain],
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert [view["id"] for view in shown] == ["S-01", "S-02"]
@@ -850,8 +873,8 @@ class TestAnUnknownGroundMakesTheClaimConditional:
     def test_a_bare_needs_info_is_completed_from_the_grounds(self, model):
         ruling = sample_ruling("S-01", confidence="low", verdict=ProposedVerdict())
 
-        assert not review_issues([self._draft()], [ruling], model)
-        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
+        assert not review_issues([self._draft()], [ruling], model, {})
+        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS, {})
         verdict = assembled.claims[0].verdict
         assert verdict.related_unknowns == [
             UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
@@ -875,7 +898,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             grounds=[Ground(kind="unknown-assertion", assertion=OPEN_ROW)],
         )
 
-        silent = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+        silent = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS, {})
 
         assert silent.claims[0].verdict.related_unknowns == [
             UnknownRef(assertion=OPEN_ROW)
@@ -888,7 +911,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        assert not review_issues([draft], [dismissed], model)
+        assert not review_issues([draft], [dismissed], model, {})
 
     def test_two_open_rows_are_two_dismissals(self, model):
         """A reference is compared by all three of its fields.
@@ -911,7 +934,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        assembled = assemble_claims([draft], [ruling], model, SCHEMAS)
+        assembled = assemble_claims([draft], [ruling], model, SCHEMAS, {})
 
         assert assembled.claims[0].verdict.related_unknowns == [
             UnknownRef(assertion=SECOND_OPEN_ROW)
@@ -938,7 +961,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             grounds=[Ground(kind="unknown-assertion", assertion=OPEN_ROW)],
         )
 
-        assert not review_issues([draft], [ruling], model)
+        assert not review_issues([draft], [ruling], model, {})
 
     def test_a_reference_naming_nothing_at_all_is_still_refused(self, model):
         """Widening the shape must not widen it to the empty reference."""
@@ -951,7 +974,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        problems = review_issues([self._draft()], [ruling], model)
+        problems = review_issues([self._draft()], [ruling], model, {})
 
         assert "unresolved-unknown" in {p.kind for p in problems.problems}
 
@@ -999,7 +1022,9 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             grounds=[Ground(kind="unknown-assertion", assertion=row) for row in rows],
         )
 
-        assembled = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+        assembled = assemble_claims(
+            [draft], [sample_ruling("S-01")], model, SCHEMAS, {}
+        )
 
         verdict = assembled.claims[0].verdict
         assert len(verdict.reason) <= REASON_MAX_CHARS
@@ -1018,7 +1043,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
+        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS, {})
         verdict = assembled.claims[0].verdict
         assert verdict.reason == "Also depends on who can reach the store."
         assert [ref.attribute for ref in verdict.related_unknowns] == [
@@ -1035,10 +1060,12 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ),
         )
 
-        assert not review_issues([self._draft()], [ruling], model)
+        assert not review_issues([self._draft()], [ruling], model, {})
 
     def test_a_draft_with_no_unknown_ground_is_untouched(self, model):
-        assert not review_issues([sample_draft("S-01")], [sample_ruling("S-01")], model)
+        assert not review_issues(
+            [sample_draft("S-01")], [sample_ruling("S-01")], model, {}
+        )
 
 
 class TestAMisfiledVerbIsRejectedInCode:
@@ -1051,7 +1078,9 @@ class TestAMisfiledVerbIsRejectedInCode:
     def test_a_confirmation_becomes_a_rejection_naming_the_lane(self, model):
         draft = sample_draft("S-01", verb="flood")
 
-        assembled = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+        assembled = assemble_claims(
+            [draft], [sample_ruling("S-01")], model, SCHEMAS, {}
+        )
 
         assert assembled.claims == []
         (rejected,) = assembled.rejected_claims
@@ -1092,7 +1121,9 @@ class TestAnAbsenceRidesTheCriticPath:
     def test_it_reaches_the_report(self, draft):
         model = valid_model()
 
-        assembled = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+        assembled = assemble_claims(
+            [draft], [sample_ruling("S-01")], model, SCHEMAS, {}
+        )
 
         (claim,) = assembled.claims
         assert claim.grounds == [Ground(kind="absent-element", term="ldap")]
@@ -1117,7 +1148,14 @@ def test_ruling_view_keeps_every_field_the_critic_rules_on():
     """
     draft = sample_draft("S-01", "spoofing")
 
-    (view,) = critic._ruling_view([draft], repaired=(), unverified=(), assertions=None)
+    (view,) = critic._ruling_view(
+        [draft],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
+    )
 
     for field in ("id", "category", "description", "affected_element_ids"):
         assert field in view, f"the critic rules on {field!r}"
@@ -1132,7 +1170,14 @@ def test_ruling_view_drops_a_grounds_empty_branches_and_nothing_else():
     """The empty branches go; every field a verdict is reached from stays."""
     draft = sample_draft("S-01", "spoofing")
 
-    (view,) = critic._ruling_view([draft], repaired=(), unverified=(), assertions=None)
+    (view,) = critic._ruling_view(
+        [draft],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
+    )
 
     # A quote carries text and source_label; the other four fields are the
     # empty string its own validator requires them to be.
@@ -1151,7 +1196,14 @@ def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
     draft = sample_draft("S-01", "spoofing")
     assert draft.mitigations, "the fixture must carry one for this to prove anything"
 
-    (view,) = critic._ruling_view([draft], repaired=(), unverified=(), assertions=None)
+    (view,) = critic._ruling_view(
+        [draft],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
+    )
 
     assert view["mitigations"]
     assert view["mitigations"][0]["summary"] == draft.mitigations[0].summary
@@ -1164,9 +1216,16 @@ def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
         repaired=(),
         unverified=(),
         assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
     )
     (clean,) = critic._ruling_view(
-        [sample_draft("S-01")], repaired=(), unverified=(), assertions=None
+        [sample_draft("S-01")],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
     )
 
     assert "denial-of-service" in view["filed_in_wrong_lane"]
@@ -1179,10 +1238,22 @@ class TestTheCriticView:
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
 
         (narrowed,) = critic.critic_view(
-            drafts, only={"S-01"}, repaired=(), unverified=(), assertions=None
+            drafts,
+            only={"S-01"},
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         whole = critic.critic_view(
-            drafts, only=None, repaired=(), unverified=(), assertions=None
+            drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert narrowed == next(view for view in whole if view["id"] == "S-01")
@@ -1199,6 +1270,8 @@ class TestTheCriticView:
             repaired=(),
             unverified=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert not any("same_action_as" in view for view in views)
@@ -1208,7 +1281,13 @@ class TestTheCriticView:
 
         assert (
             critic.critic_view(
-                drafts, only=set(), repaired=(), unverified=(), assertions=None
+                drafts,
+                only=set(),
+                repaired=(),
+                unverified=(),
+                assertions=None,
+                package=PACKAGES["stride"],
+                controls=(),
             )
             == []
         )
@@ -1223,10 +1302,22 @@ class TestTheCriticView:
         valid_model()
 
         first_pass = critic.critic_view(
-            drafts, only=None, repaired=(), unverified=(), assertions=None
+            drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         re_ask = critic.critic_view(
-            drafts, only={"S-01", "T-01"}, repaired=(), unverified=(), assertions=None
+            drafts,
+            only={"S-01", "T-01"},
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert first_pass == re_ask
@@ -1246,7 +1337,12 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
     from analysis_service.frameworks.asvs.record import RequirementRuling
 
     (stride_view,) = critic._ruling_view(
-        [sample_draft("S-01", "spoofing")], repaired=(), unverified=(), assertions=None
+        [sample_draft("S-01", "spoofing")],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
     )
     asvs = RequirementRuling(
         id="v5.0.0-6.2.1",
@@ -1265,7 +1361,12 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
         verdict=Verdict(status="confirmed"),
     )
     (asvs_view,) = critic._ruling_view(
-        [asvs], repaired=(), unverified=(), assertions=None
+        [asvs],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+        package=PACKAGES["stride"],
+        controls=(),
     )
 
     assert "unit_text" not in stride_view
@@ -1282,6 +1383,7 @@ PRODUCERS = {
     "duplicate-id": ("_duplicate_id", "S-01"),
     "verdict-shape": ("_verdict_shape", "S-01"),
     "unresolved-unknown": ("_unresolved_unknown", "S-01"),
+    "control-row": ("_control_row", "S-01"),
     "unbriefed-change": ("_unbriefed_change", "S-01"),
 }
 
@@ -1300,36 +1402,28 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
     table nobody compares to its registry fails as quietly as a branch.
     """
 
-    def _asvs_draft(self):
-        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-        return DraftRequirementRuling.model_validate(
-            {
-                **sample_draft("S-01").model_dump(
-                    exclude={"category", "verb", "severity", "mitigations"}
-                ),
-                "id": "v5.0.0-6.2.1",
-                "chapter": "authentication",
-            }
-        )
-
     def _dropped_and_invented(self):
         """One typo: the draft goes unruled and the ID nobody drafted arrives."""
         ruling = sample_ruling("S-01").model_copy(update={"id": "S-1"})
-        return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
+        return review_issues(
+            [sample_draft("S-01")], [ruling], valid_model(), {}
+        ).problems
 
     def _duplicate_id(self):
         return review_issues(
             [sample_draft("S-01")],
             [sample_ruling("S-01"), sample_ruling("S-01")],
             valid_model(),
+            {},
         ).problems
 
     def _verdict_shape(self):
         ruling = sample_ruling(
             "S-01", verdict=ProposedVerdict(rejected_because="reasoning")
         )
-        return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
+        return review_issues(
+            [sample_draft("S-01")], [ruling], valid_model(), {}
+        ).problems
 
     def _unresolved_unknown(self):
         ruling = sample_ruling(
@@ -1341,7 +1435,18 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
                 ],
             ),
         )
-        return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
+        return review_issues(
+            [sample_draft("S-01")], [ruling], valid_model(), {}
+        ).problems
+
+    def _control_row(self):
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(rejected_because="control", reason="it is covered"),
+        )
+        return review_issues(
+            [sample_draft("S-01")], [ruling], valid_model(), {}
+        ).problems
 
     def _unbriefed_change(self):
         first = sample_ruling("S-01").model_dump(mode="json")
@@ -1389,6 +1494,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
                 )
             ],
             valid_model(),
+            {},
         )
 
         assert review.messages == [p.message for p in problems]
@@ -1425,7 +1531,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
 
         ruling = sample_ruling("S-01").model_copy(update={"id": ""})
 
-        problems = review_issues([sample_draft("S-01")], [ruling], valid_model())
+        problems = review_issues([sample_draft("S-01")], [ruling], valid_model(), {})
 
         invented = [p for p in problems.problems if p.kind == "invented"]
         assert [p.claim_id for p in invented] == [UNNAMED_CLAIM]
@@ -1438,7 +1544,9 @@ def test_the_critic_cannot_reject_a_draft_as_a_duplicate():
 
     from analysis_service.claims import Verdict
 
-    with pytest.raises(ValidationError, match="'evidence', 'reasoning' or 'lane'"):
+    with pytest.raises(
+        ValidationError, match="'evidence', 'reasoning', 'lane' or 'control'"
+    ):
         ProposedVerdict(reason="same as S-02", rejected_because="duplicate")
     archived = Verdict(
         status="rejected", reason="same as S-02", rejected_because="duplicate"
@@ -1461,7 +1569,7 @@ def test_a_rejected_threat_carries_no_reading_of_its_advice(verdict, kept):
     ruling = sample_ruling("S-01", verdict=verdict, recommendation=reading)
 
     assembled = assemble_claims(
-        [sample_draft("S-01")], [ruling], valid_model(), SCHEMAS
+        [sample_draft("S-01")], [ruling], valid_model(), SCHEMAS, {}
     )
 
     claims = list(assembled.claims) + list(assembled.rejected_claims)
@@ -1473,24 +1581,10 @@ def test_a_rejected_threat_carries_no_reading_of_its_advice(verdict, kept):
 class TestAConfirmedExclusion:
     """An ASVS draft that rules its requirement out is never ``confirmed`` (#1559)."""
 
-    def _draft(self, direction):
-        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-        return DraftRequirementRuling.model_validate(
-            {
-                **sample_draft("S-01").model_dump(
-                    exclude={"category", "verb", "severity", "mitigations"}
-                ),
-                "id": "v5.0.0-6.2.1",
-                "chapter": "authentication",
-                "direction": direction,
-            }
-        )
-
     def _problems(self, direction, verdict):
-        draft = self._draft(direction)
+        draft = asvs_draft(direction=direction)
         ruling = Ruling(id=draft.id, verdict=verdict)
-        return review_issues([draft], [ruling], valid_model())
+        return review_issues([draft], [ruling], valid_model(), {})
 
     def test_it_goes_to_the_re_ask(self):
         problems = self._problems("excluded", ProposedVerdict())
@@ -1510,7 +1604,7 @@ class TestAConfirmedExclusion:
 
     def test_a_stride_draft_never_excludes(self):
         problems = review_issues(
-            [sample_draft("S-01")], [sample_ruling("S-01")], valid_model()
+            [sample_draft("S-01")], [sample_ruling("S-01")], valid_model(), {}
         )
 
         assert not problems
@@ -1523,12 +1617,12 @@ class TestAnUnruledMisfiledDraft:
         return sample_draft("S-01", verb="flood")
 
     def test_it_raises_no_problem_for_the_re_ask(self):
-        problems = review_issues([self._misfiled()], [], valid_model())
+        problems = review_issues([self._misfiled()], [], valid_model(), {})
 
         assert not problems
 
     def test_it_reaches_the_report_as_a_lane_rejection_nobody_rated(self):
-        assembled = assemble_claims([self._misfiled()], [], valid_model(), SCHEMAS)
+        assembled = assemble_claims([self._misfiled()], [], valid_model(), SCHEMAS, {})
 
         assert assembled.claims == []
         (claim,) = list(assembled.rejected_claims)
@@ -1537,6 +1631,30 @@ class TestAnUnruledMisfiledDraft:
         assert claim.confidence is None
 
     def test_a_draft_in_its_own_lane_still_goes_to_the_re_ask(self):
-        problems = review_issues([sample_draft("S-01")], [], valid_model())
+        problems = review_issues([sample_draft("S-01")], [], valid_model(), {})
 
         assert "dropped draft 'S-01'" in "; ".join(problems.messages)
+
+
+@pytest.mark.parametrize(
+    ("ref", "sound", "mixed"),
+    [
+        (UnknownRef(), False, False),
+        (
+            UnknownRef(attribute="encryption_at_rest", element_id="store:db"),
+            True,
+            False,
+        ),
+        (UnknownRef(question="capacity-limits", element_id="process:api"), True, False),
+        (
+            UnknownRef(attribute="encryption_at_rest", capability="database"),
+            False,
+            True,
+        ),
+    ],
+)
+def test_a_reference_is_sound_mixed_or_neither(ref, sound, mixed):
+    """A reference is sound with one spelling, mixed with more than one, and
+    neither with none. The one-reader row of the count holds the two
+    properties to one count."""
+    assert (ref.sound, ref.mixed) == (sound, mixed)

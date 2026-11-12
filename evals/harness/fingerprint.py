@@ -25,8 +25,8 @@ Version 4 reads the action verb as written beside the place, because place
 alone has a measured drawback. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
 negatives, and the reference merges the frontier table in
-``docs/agents/claim-identity.md`` carries. That table is the one reader of the
-reference column, so this module states it nowhere.
+``docs/agents/claim-identity.md`` carries. That table holds the
+reference column, so this module does not state it.
 
 The verb takes the candidate merges from 69 to 2.
 It takes the false splits from 12 to 13 over 169 labelled pairs, which is the
@@ -54,7 +54,6 @@ recomputation rather than by a re-vote.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -62,6 +61,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.record import requirement_of
+from analysis_service.sources import text_digest
 from evals.harness.content import stored_version
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.verbs import canonical, check_verb
@@ -165,7 +165,7 @@ class Components:
     #: from :func:`~analysis_service.claim_identity.grounded_mechanism`. **Not part of
     #: the fingerprint**: it tells apart two findings that share one key, by
     #: :func:`~analysis_service.claim_identity.distinct_mechanisms`, and a vote stored
-    #: without it reads as empty, which binds as before (ADR 0060).
+    #: without it reads as empty, which binds on the key alone (ADR 0060).
     mechanism: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
@@ -340,7 +340,7 @@ def fingerprint(components: Components, version: int) -> str:
         parts.append(components.identifier)
     # NUL joins the parts because it cannot occur in any of them, so no value
     # can impersonate a boundary between two others.
-    digest = hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
+    digest = text_digest("\0".join(parts))
     return f"v{version}:{digest[:16]}"
 
 
@@ -359,9 +359,9 @@ def key_claim(
     The single spelling of "which version keys this package, and which
     component that version reads". Every site that keys a produced claim goes
     through here — the review queue, the scorer, the sitting page, the writing
-    instrument and the tests that stand in for them — so a finding counted under
-    one key and asked about under another cannot happen by one site being edited
-    and another missed.
+    instrument and the tests that stand in for them — so an edit to the rule
+    here reaches each of them, and none counts a finding under one key while
+    another asks about it under a second key.
 
     ``scope`` is positional and second, beside the framework, because it is the
     half of a place an **Element ID** does not carry and a caller that omitted

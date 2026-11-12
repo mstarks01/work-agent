@@ -1,0 +1,73 @@
+{
+  "views": [
+    {
+      "file": "e4-trt-I-01-dropped-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "e4-trt-I-01-duplicate-id-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "e4-trt-I-01-invented-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "e4-trt-I-01-unresolved-unknown-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "e4-trt-I-01-verdict-shape-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "e4-trt-I-02-control-row-missing-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "rejected -> rejected"
+    },
+    {
+      "file": "e4-trt-I-02-control-row-not-shown-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "rejected -> rejected"
+    }
+  ],
+  "repaired": 7,
+  "total": 7,
+  "new_problems": 0,
+  "unbriefed": 0,
+  "unread": 0,
+  "status_changed": 0
+}

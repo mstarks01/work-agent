@@ -7,11 +7,16 @@ The repository's decisions live in ``docs/adr/`` and in the tickets, so prose
 that cites one points there and describes the current rule.
 
 The scan reads every Python docstring and comment under :data:`SEARCHED`, every
-full-line comment in the page scripts, every full-line ``#`` comment in the
-files of :data:`HASH_COMMENTED`, and every paragraph of the guides in
-:data:`GUIDES`. A string a page serves or a test asserts is data, and an
-identifier is not prose, so neither is read. ``docs/adr/``, ``docs/research/``
-and ``docs/history/`` are records of a past state, so they are not read either.
+``//`` comment and every ``/* */`` comment in the scripts of :data:`SCRIPTS`,
+every ``/* */`` and ``<!-- -->`` comment in the pages and style sheets of
+:data:`MARKUP`, every ``#`` comment in the files of :data:`HASH_COMMENTED` and
+:data:`SHELL`, every ``%%`` comment in the diagrams of :data:`DIAGRAMS`, and
+every paragraph of the guides and model texts in :data:`GUIDES`. A comment at
+the end of a line of code is read as well as a comment on its own line. A
+string a page serves or a test asserts is data, and an identifier is not
+prose, so neither is read. ``docs/adr/``, ``docs/research/``,
+``docs/history/`` and ``evals/experiments/`` are records of a past state, so
+they are not read either.
 
 Each docstring, each run of comment lines and each guide paragraph is read as
 one text, so a phrase that wraps across two lines is still seen. The phrases in
@@ -24,83 +29,178 @@ nobody reads.
 from __future__ import annotations
 
 import ast
-import io
 import re
-import tokenize
+import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from tests.source_tree import (
-    CONFIG,
+    HOOKS,
+    MODEL_TEXT,
     PYTHON,
     REPO_ROOT,
     TESTS,
+    WHOLE_TREE,
     WORKFLOWS,
+    block_comments,
+    comment_runs,
     guide_files,
+    held_files,
+    joined_runs,
+    line_comments,
     parse,
-    prompt_files,
     source_files,
     without,
 )
+from tests.test_five_class_read import HELD_ROWS
+
+if TYPE_CHECKING:
+    from five_class_read import HeldRule
 
 pytestmark = pytest.mark.lint
 
 SEARCHED = source_files(*PYTHON, *TESTS)
 
-#: The page scripts whose comments are read.
-SCRIPTS = source_files(*PYTHON, suffixes=(".js",))
+#: The page scripts and the diagram reader, whose comments are read.
+SCRIPTS = source_files(*WHOLE_TREE, suffixes=(".js", ".mjs"))
 
-#: The guides a reader follows as a statement of the current state, and the
-#: prompts a model reads as its instructions.
+#: The page templates and style sheets, whose block comments are read.
+MARKUP = source_files(*PYTHON, suffixes=(".html", ".css"))
+
+#: The guides a reader follows as a statement of the current state, and every
+#: text a model reads: the prompts, each framework package's own text and the
+#: Domain Packs.
 GUIDES: tuple[Path, ...] = (
     *guide_files(),
     *without(
-        prompt_files(),
+        source_files(*MODEL_TEXT, suffixes=(".md",)),
         {
-            "frameworks": (
-                "a lane skill's passive 'used' phrases read as history to this"
-                " scan, and the ASVS ones carry a governed licence"
-                " (docs/agents/licensing.md)"
+            "frameworks/asvs/lanes": (
+                "the ASVS lane skills carry a governed licence"
+                " (docs/agents/licensing.md), and their 'used to', 'previously'"
+                " and 'the old' name a key, a token or a password of the system"
+                " under review"
+            ),
+            "domains/http-api.md": (
+                "'the old' names an earlier API version of the system under"
+                " review, not an earlier state of this code"
             ),
         },
     ),
 )
 
-#: The config files and workflows whose full-line ``#`` comments are read.
+#: Every TOML file and every workflow, whose ``#`` comments are read.
 HASH_COMMENTED: tuple[Path, ...] = (
-    *source_files(*CONFIG, suffixes=(".toml",)),
+    *source_files(*WHOLE_TREE, suffixes=(".toml",)),
     *source_files(*WORKFLOWS, suffixes=(".yml",)),
 )
 
-#: Each phrase names an earlier state of the code. Case-insensitive.
+#: The shell scripts and the git hooks, whose ``#`` comments are read.
+SHELL: tuple[Path, ...] = (
+    *source_files(*WHOLE_TREE, suffixes=(".sh",)),
+    *held_files(*HOOKS),
+)
+
+#: The Mermaid diagram sources, whose ``%%`` comments are read.
+DIAGRAMS = without(
+    source_files(*WHOLE_TREE, suffixes=(".mmd",)),
+    {
+        "evals/experiments": (
+            "frozen prose, which records an experiment as it ran and never changes"
+        ),
+    },
+)
+
+#: What a record carries or names, as the "predates" and "written before"
+#: templates of :data:`HISTORY` read it after the verb: the thing whose absence
+#: the sentence dates.
+_DATED = (
+    r"(fields?|keys?|pin|map|instruments?|blocks?|generator|naming|versioning"
+    r"|identities)"
+)
+
+#: Each phrase names an earlier state of the code. Case-insensitive. A phrase
+#: that also describes run-time data is held to its history reading:
+#:
+#: * "as it was before" and "rather than before" are not matched;
+#: * a singular "an earlier version of" matches only before "this file",
+#:   "this module", "this note" or "this page", because a finding and a
+#:   target have versions too;
+#: * "replaced" matches only between "which", "that", "this" or "it" and
+#:   "the", or in the sentence of a cutover;
+#: * a rename matches only as "renamed from";
+#: * a "now it" phrase matches only at the start of a sentence, and only
+#:   before "is", "was" or "does";
+#: * "any more" matches only after a negated "does", "do", "is", "are" or
+#:   "can", with at most two words between;
+#: * "predecessor" matches only before "to this" or "of this", because a
+#:   graph node has predecessors;
+#: * a version's possessive matches only with a lower-case "v" before the
+#:   number, because an ASVS chapter is "V6";
+#: * "came to" matches only after "how" and at most five words, because a
+#:   proposal "came to" a result at run time;
+#: * "retired" matches only after "when" and a subject, because a key or a
+#:   model is retired as a state;
+#: * "was removed" matches only before "rather than", because an answer is
+#:   removed at run time;
+#: * "moved from" matches only after a comma, as a heading of what changed,
+#:   because a tier row is moved from one vendor to another;
+#: * a commit matches only after a capital "At" that opens a sentence;
+#: * "what changed" matches only before "is";
+#: * "until ... existed" matches only "this"; "before ... existed" matches
+#:   only "this", a quoted name with or without
+#:   a role, or a part of a record (a field, a key, a mark, an instrument, a
+#:   cause, a block or a table, one or many, after "the", "a", "an", "those",
+#:   "these" or "its"), because a guide says what holds before a new package
+#:   existed.
+#: * "predates", "written before", "taken before" and "recorded before" match
+#:   only before a noun of :data:`_DATED`, with two words or fewer between;
+#:   "predates" also matches before a quoted name, and the three "before"
+#:   forms before "this was recorded" or "that was recorded". A signature
+#:   that predates a revocation, a ledger written before a rule change and an
+#:   object written before a quoted time are time relations that the code
+#:   reads.
+#:
+#: "legacy" is not matched, because a vendor's legacy name order and a legacy
+#: client are facts of the present. "now" before a verb is not matched,
+#: because "the price map now disagrees" and "the part now has another name"
+#: describe run-time data.
 HISTORY = re.compile(
     r"\b(used to|was written for|before this (\w+ )?(existed|one)|previously"
     r"|had been|until now|the old |now that|in the past|formerly|originally"
     r"|historically|once (had|took|wrote|sat|listed|lacked|missed|floored|ended)"
     r"|before this[,:.]|until #\d+|this replaced|(branch|if`?|list) it replaced"
     r"|went stale|went unnoticed|nothing caught"
-    r"|an earlier version of this (note|module|page)"
-    r"|version \d+ (adds|added|makes|made|renames|renamed|removed)"
+    r"|an earlier version of this (note|module|page|file)"
+    r"|earlier versions of|of earlier versions|as before|(?<!rather )than before"
+    r"|(which|that|this|it) replaced the|cutover[^.]{0,80}\breplaced"
+    r"|(was|were) renamed from|(?<![\w,] )now it (is|was|does)"
+    r"|(does|do|is|are|can)(n't| not) (\w+ ){0,2}any ?more|anymore"
+    r"|version \d+ (\([^)]*\) )?"
+    r"(adds|added|makes|made|renames|renamed|removed|dropped)"
     r"|bumped (to|from) (version |v)?\d+|bumped nothing"
     r"|hard cutover from|no v\d+ shim|(was|were) (migrated|re-?sealed)"
-    r"|(was|were) once|once did)\b",
+    r"|(was|were) once|once did"
+    r"|the predecessor (to|of) this|(?-i:v\d+'s)|the first version of"
+    r"|since (report )?schema \d|before this was enforced|how (\S+ ){1,5}came to"
+    r"|when \w+ retired|(was|were) removed rather than|, moved from"
+    r"|(?-i:(?<![\w,] )At (?=[0-9a-f]*\d)[0-9a-f]{7,40})|what changed is"
+    r"|(was|were) the \w+ here"
+    r"|until this (\w+ )?existed"
+    r"|before (the|a|an|those|these|its)"
+    r" (fields?|keys?|marks?|instruments?|causes?|blocks?|tables?) existed"
+    r"|before (:\w+:)?`+[\w.~]+`+ existed"
+    r"|(predat(es?|ed|ing) ([\w-]+ ){0,2}(`+[\w.~]+|" + _DATED + ")"
+    r"|(written|taken|recorded) before"
+    r" ((this|that) was recorded|([\w-]+ ){0,2}" + _DATED + ")))\\b",
     re.IGNORECASE,
 )
 
 _DOCUMENTED = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 _FENCE = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
-
-
-def _runs(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
-    """Consecutive numbered lines joined into one text, at its first line."""
-    runs: list[tuple[int, str]] = []
-    for lineno, text in lines:
-        if runs and lineno == runs[-1][0] + runs[-1][1].count("\n") + 1:
-            runs[-1] = (runs[-1][0], f"{runs[-1][1]}\n{text}")
-        else:
-            runs.append((lineno, text))
-    return runs
 
 
 def _prose(path: Path) -> list[tuple[int, str]]:
@@ -112,33 +212,22 @@ def _prose(path: Path) -> list[tuple[int, str]]:
             docstring = first.value if isinstance(first, ast.Expr) else None
             if isinstance(docstring, ast.Constant) and isinstance(docstring.value, str):
                 texts.append((first.lineno, docstring.value))
-    source = path.read_text(encoding="utf-8")
-    comments = [
-        (token.start[0], token.string.lstrip("#").strip())
-        for token in tokenize.generate_tokens(io.StringIO(source).readline)
-        if token.type == tokenize.COMMENT
-    ]
-    return texts + _runs(comments)
+    return texts + comment_runs(path)
 
 
 def _script_prose(path: Path) -> list[tuple[int, str]]:
-    """Every run of full-line ``//`` comments in one page script, at its line."""
-    comments = [
-        (lineno, line.strip().removeprefix("//").strip())
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        if line.lstrip().startswith("//")
-    ]
-    return _runs(comments)
+    """Every ``//`` comment in one page script, at its line."""
+    return line_comments(path, "//")
 
 
 def _hash_prose(path: Path) -> list[tuple[int, str]]:
-    """Every run of full-line ``#`` comments in one config file, at its line."""
-    comments = [
-        (lineno, line.strip().removeprefix("#").strip())
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        if line.lstrip().startswith("#")
-    ]
-    return _runs(comments)
+    """Every ``#`` comment in one config file or shell script, at its line."""
+    return line_comments(path, "#")
+
+
+def _diagram_prose(path: Path) -> list[tuple[int, str]]:
+    """Every ``%%`` comment in one diagram source, at its line."""
+    return line_comments(path, "%%")
 
 
 def _guide_prose(path: Path) -> list[tuple[int, str]]:
@@ -152,17 +241,45 @@ def _guide_prose(path: Path) -> list[tuple[int, str]]:
         for lineno, line in enumerate(text.splitlines(), 1)
         if line.strip()
     ]
-    return _runs(lines)
+    return joined_runs(lines)
 
 
 def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
     """Each text that narrates an earlier state, as ``path:line phrase``."""
     where = path.relative_to(REPO_ROOT)
     return [
-        f"{where}:{lineno + text[: match.start()].count(chr(10))} {match.group(0)!r}"
+        f"{where}:{lineno + _breaks_before(text, flat[: match.start()])}"
+        f" {match.group(0)!r}"
         for lineno, text in texts
-        for match in [HISTORY.search(" ".join(text.split("\n")))]
+        for flat in [" ".join(text.split())]
+        for match in [HISTORY.search(flat)]
         if match
+    ]
+
+
+def _breaks_before(text: str, read: str) -> int:
+    """The line breaks of ``text`` before the phrase that follows ``read``.
+
+    ``read`` is a start of ``text`` with each run of white space as one space,
+    and it ends where the phrase starts."""
+    left = len("".join(read.split()))
+    breaks = 0
+    for char in text:
+        if char == "\n":
+            breaks += 1
+        elif not char.isspace():
+            if not left:
+                break
+            left -= 1
+    return breaks
+
+
+def test_a_hit_names_the_line_its_phrase_starts_on():
+    texts = [(7, "One line.\nIt used to hold a key\n    written before\n  the field.")]
+
+    assert _hits(REPO_ROOT / "x.py", texts) == ["x.py:8 'used to'"]
+    assert _hits(REPO_ROOT / "x.py", [(7, "A row\n  written before\n the field.")]) == [
+        "x.py:8 'written before the field'"
     ]
 
 
@@ -171,7 +288,17 @@ def history() -> list[str]:
     return [
         *(hit for path in SEARCHED for hit in _hits(path, _prose(path))),
         *(hit for path in SCRIPTS for hit in _hits(path, _script_prose(path))),
-        *(hit for path in HASH_COMMENTED for hit in _hits(path, _hash_prose(path))),
+        *(
+            hit
+            for path in (*SCRIPTS, *MARKUP)
+            for hit in _hits(path, block_comments(path))
+        ),
+        *(
+            hit
+            for path in (*HASH_COMMENTED, *SHELL)
+            for hit in _hits(path, _hash_prose(path))
+        ),
+        *(hit for path in DIAGRAMS for hit in _hits(path, _diagram_prose(path))),
         *(hit for path in GUIDES for hit in _hits(path, _guide_prose(path))),
     ]
 
@@ -188,8 +315,9 @@ def test_no_docstring_comment_or_guide_narrates_an_earlier_state():
 
 def test_the_scan_reads_every_kind_of_prose(tmp_path):
     """Positive control: a docstring, a wrapped comment, a script comment, a
-    config comment and a guide paragraph are each seen, and code and a fenced
-    block are not."""
+    config comment, a shell comment, a diagram comment and a guide paragraph
+    are each seen, a comment at the end of a line of code included, and code,
+    a quoted marker and a fenced block are not."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         '"""It used to do this."""\n'
@@ -201,10 +329,30 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
         encoding="utf-8",
     )
     script = tmp_path / "page.js"
-    script.write_text("const a = 1;\n// This went\n// unnoticed.\n", encoding="utf-8")
+    script.write_text(
+        "const a = 1;\n// This went\n// unnoticed.\n/* A block\n * comment. */ /**/\n"
+        'fetch("https://example.test/ // not a comment"); // trailing\n',
+        encoding="utf-8",
+    )
+    page = tmp_path / "page.html"
+    page.write_text(
+        '<p title="as before">x</p>\n<!-- A page\n     comment. -->\n'
+        "<style>\n  /* A style\n     comment. */\n</style>\n",
+        encoding="utf-8",
+    )
     config = tmp_path / "config.toml"
     config.write_text(
-        "version = 9  # inline\n# Version 9 adds\n# a table.\n", encoding="utf-8"
+        'version = 9  # inline\n# Version 9 adds\n# a table.\nname = "a # b"\n',
+        encoding="utf-8",
+    )
+    shell = tmp_path / "hook"
+    shell.write_text(
+        "# A hook.\n[ $# -eq 0 ] && exit  # done\n",
+        encoding="utf-8",
+    )
+    diagram = tmp_path / "model.mmd"
+    diagram.write_text(
+        'flowchart LR\n    %% A shape key.\n    n0["a %% b"]\n', encoding="utf-8"
     )
     guide = tmp_path / "guide.md"
     guide.write_text(
@@ -217,31 +365,119 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
     assert any("the list it replaced" in text for text in texts)
     assert not any("the old one" in text for text in texts)
     assert [" ".join(t.split()) for _, t in _script_prose(script)] == [
-        "This went unnoticed."
+        "This went unnoticed.",
+        "trailing",
+    ]
+    assert [(n, " ".join(t.split())) for n, t in block_comments(script)] == [
+        (4, "A block comment."),
+        (5, ""),
+    ]
+    assert [(n, " ".join(t.split())) for n, t in block_comments(page)] == [
+        (2, "A page comment."),
+        (5, "A style comment."),
     ]
     guide_texts = [" ".join(t.split()) for _, t in _guide_prose(guide)]
     assert "It went stale." in guide_texts
     assert not any("used to" in text for text in guide_texts)
     assert [" ".join(t.split()) for _, t in _hash_prose(config)] == [
-        "Version 9 adds a table."
+        "Version 9 adds a table.",
+        "inline",
     ]
+    assert [" ".join(t.split()) for _, t in _hash_prose(shell)] == [
+        "A hook.",
+        "done",
+    ]
+    assert [" ".join(t.split()) for _, t in _diagram_prose(diagram)] == ["A shape key."]
     assert HISTORY.search("Version 9 adds a table.")
     assert not HISTORY.search("Version 1 drops the type prefix.")
     assert not HISTORY.search("an earlier reference bumped to a different position")
+
+
+def test_the_history_phrases_hold_to_their_history_reading():
+    """Positive control: each phrase matches where it narrates an earlier state,
+    and the same words that describe run-time data do not."""
+    history = (
+        "A record naming none behaves exactly as before.",
+        "It is faster than before.",
+        "Earlier versions of this file shipped a model.",
+        "The list replaced the single description of earlier versions.",
+        "The cutover (#8, 2026-07-28) replaced it with one adapter.",
+        "The field was renamed from kind.",
+        "It was evicted (F4). Now it is refused.",
+        "The page does not read it any more.",
+        "Nothing reads it anymore.",
+        "Version 2 (wayfinder #15) dropped the four backoff knobs.",
+        "The predecessor to this rule was an allowlist.",
+        "a deployment still carrying v2's ANALYSIS_MODEL_FLASH",
+        "The first version of these tests called the override.",
+        "Per block since schema 3.0.",
+        "Cases that shipped before this was enforced are unread.",
+        "That is how the warning came to name the wrong cause.",
+        "It broke when Google retired them.",
+        "That is why the schedule was removed rather than left to fail.",
+        "The truncation failure, moved from request time to build time.",
+        "At 2fae7d3 the page kept a part hidden.",
+        "What changed is that the score says so.",
+        "`endsWith` was the spelling here.",
+        "A draft that a run wrote before the field existed states none.",
+        "A sweep recorded before the instrument existed carries no block.",
+        "A run wrote it before ``attacker_position`` existed.",
+        "A report written before those fields existed reads as no schema.",
+        "A report written before the field carries no answer.",
+        "A sweep that predates the instrument omits the key.",
+        "It predates `AssertionBacking`, so it backs nothing.",
+        "A sweep taken before the pin was recorded carries no key.",
+        "A sweep taken before that was recorded carries no pin.",
+        "A rule about writes read both as writes until this field existed.",
+        "It cost 13.5 seconds of CPU before :data:`HISTORY` existed.",
+    )
+    for text in history:
+        assert HISTORY.search(text), text
+    present = (
+        "It puts each element back as it was before the repair.",
+        "The loop reads each row until this one.",
+        "It runs on every merge rather than before a release.",
+        "Every vote cast on an earlier version of the finding.",
+        "The note replaced the agent's wording.",
+        "A flow whose endpoint was renamed under a ruling.",
+        "The page reads it now, and now it is shown.",
+        "A record that names no finding any more is dropped.",
+        "A retired model is refused.",
+        "A retired key still verifies what it signed.",
+        "It refuses signatures that predate the revocation.",
+        "A ledger written before a rule change is re-keyed.",
+        "A bump never reuses a blessing taken before it.",
+        "It removes each object written before ``before``.",
+        "A request made before the key expires is served.",
+        "It waits for every predecessor of the node.",
+        "V6's opening section asks for the design.",
+        "What one proposal came to against the graph.",
+        "Staging-only TLS was removed by an answer.",
+        "A tier row moved from one vendor to another keeps its rule.",
+        "The ledger is pinned at 2e9d31be.",
+        "What changed in the list since the last payload.",
+        "The vendor's legacy order puts the generation first.",
+        "The price map now disagrees with the Baseline.",
+        "They certify against fingerprints blessed before the package existed.",
+    )
+    for text in present:
+        assert not HISTORY.search(text), text
 
 
 #: The money words the maintainer ruled out for a technical fact. A literal
 #: money word such as "bill" for a provider charge is not here. Case-insensitive.
 MONEY = re.compile(r"\b(debts?|clean bill|ow(e|es|ed|ing))\b", re.IGNORECASE)
 
-#: Every code file of the project and its tests, every guide, and the config
-#: files and workflows, read whole: comments, docstrings, strings and
-#: identifiers. The prompts are not here: a prompt edit changes model input.
+#: Every code file of the project and its tests, every guide, the config files
+#: and workflows, and every text a model reads, read whole: comments,
+#: docstrings, strings and identifiers. A hit in model text that a row of
+#: ``.github/scripts/held_wording.toml`` holds for the lint's rule is skipped.
 MONEY_SEARCHED = without(
     [
         *source_files(*PYTHON, *TESTS, suffixes=(".py", ".js", ".html", ".css")),
         *guide_files(),
         *HASH_COMMENTED,
+        *source_files(*MODEL_TEXT, suffixes=(".md",)),
     ],
     {
         "evals/experiments": (
@@ -251,8 +487,49 @@ MONEY_SEARCHED = without(
             "this module states the words the lint refuses, so the lint always"
             " finds them here"
         ),
+        ".github/scripts/held_wording.toml": (
+            "each row quotes a held phrase exactly, and the lints read the rows"
+            " to skip that phrase where it is held"
+        ),
     },
 )
+
+
+def held(rule: HeldRule) -> dict[str, tuple[str, ...]]:
+    """Each file against the phrases that the held rows of ``rule`` hold in it."""
+    phrases: dict[str, tuple[str, ...]] = {}
+    for row in HELD_ROWS:
+        if row["rule"] == rule:
+            phrases[row["file"]] = (*phrases.get(row["file"], ()), row["phrase"])
+    return phrases
+
+
+def _wording_hits(
+    pattern: re.Pattern[str],
+    paths: Iterable[Path],
+    phrases: Mapping[str, Iterable[str]],
+) -> list[str]:
+    """Each match of ``pattern`` in ``paths`` that no phrase of its file in
+    ``phrases`` covers on its line, as ``path:line 'match'``."""
+    found: list[str] = []
+    for path in paths:
+        where = path.relative_to(REPO_ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            spans = [
+                occurrence.span()
+                for phrase in phrases.get(where, ())
+                for occurrence in re.finditer(re.escape(phrase), line)
+            ]
+            found.extend(
+                f"{where}:{lineno} {match.group(0)!r}"
+                for match in pattern.finditer(line)
+                if not any(
+                    start <= match.start() and match.end() <= end
+                    for start, end in spans
+                )
+            )
+    return found
 
 
 def test_no_file_uses_a_ruled_out_money_word():
@@ -261,17 +538,108 @@ def test_no_file_uses_a_ruled_out_money_word():
     The sentence names the concrete fact instead: what the code drops, refuses,
     runs, needs or gives.
     """
-    found = [
-        f"{path.relative_to(REPO_ROOT)}:{lineno} {match.group(0)!r}"
-        for path in MONEY_SEARCHED
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        for match in MONEY.finditer(line)
-    ]
+    found = _wording_hits(MONEY, MONEY_SEARCHED, held("money"))
 
     assert not found, (
         f"these lines use a ruled-out money word: {found}. Say what the code"
-        " drops, refuses, runs, needs or gives."
+        " drops, refuses, runs, needs or gives. In model text, a hit stays only"
+        " where a row of .github/scripts/held_wording.toml holds it."
     )
+
+
+#: What a metaphorical "spend" spends: a thing that is never money. That is a
+#: choice, a read, a place, a vote, an answer, a judgement, a pass, a quote, a
+#: question, effort, attention, time, seconds or minutes, a turn, a retry or an
+#: attempt. Each is counted, used or taken, never paid. Case-insensitive.
+_SPENT_THING = (
+    r"(?:choices?|reads?|places?|votes?|answers?|judge?ments?|pass(?:es)?|quotes?"
+    r"|questions?|efforts?|attention|time|seconds?|minutes?|turns?|retr(?:y|ies)"
+    r"|attempts?)"
+)
+
+#: A budget that is not money, such as a retry budget or a budget of scan work.
+#: A budget of a vendor, a model or tokens buys model calls, so it is money.
+_SPENT_BUDGET = r"(?<!vendor )(?<!model )(?<!token )(?<!tokens )budgets?"
+
+#: A word between "spend" and what it spends. "And" opens a new phrase, and a
+#: spend "on" or "over" something names what money buys or a period of it.
+_BETWEEN = r"(?:(?!(?:and|on|over)\b)[\w'`-]+ )"
+
+SPEND = re.compile(
+    rf"\b(?:re-?)?spen(?:d|ds|t|ding) {_BETWEEN}{{0,3}}?"
+    rf"(?:{_SPENT_THING}|{_SPENT_BUDGET})\b"
+    rf"|\b{_SPENT_THING} (?:is|are|was|were) (?:\w+ )?spent\b"
+    rf"|\bspent {_SPENT_THING}\b",
+    re.IGNORECASE,
+)
+
+#: The files the spend lint reads: those of the money lint, but the prompt
+#: outcome table, whose rows quote prompt sentences word for word.
+SPEND_SEARCHED = without(
+    MONEY_SEARCHED,
+    {
+        ".github/scripts/prompt_outcomes.toml": (
+            "each outcome row quotes a prompt sentence exactly, and a prompt edit"
+            " changes model input"
+        ),
+    },
+)
+
+
+def test_no_file_spends_a_choice_a_read_or_a_vote():
+    """A choice, a read or a vote is counted or used, never spent.
+
+    The sentence says what the code does with it: counts it, uses it, takes it
+    or makes it.
+    """
+    found = _wording_hits(SPEND, SPEND_SEARCHED, held("spend"))
+
+    assert not found, (
+        f"these lines spend something that is not money: {found}. Say that the"
+        " code counts, uses, takes or makes it. In model text, a hit stays only"
+        " where a row of .github/scripts/held_wording.toml holds it."
+    )
+
+
+def test_the_spend_pattern_matches_only_a_metaphor():
+    """Positive control: a spend of a thing that is never money matches, and a
+    spend of money, of quota or of a vendor's budget does not."""
+    for text in (
+        "Each save spends at least one choice.",
+        "Each case read spends one of its reads.",
+        "A vote is spent once.",
+        "an `unsure` is a spent answer",
+        "the critic's rule against re-spending judgement",
+        "it would spend `repair`'s single pass",
+        "and it spends a quote",
+        "Spend your effort on the flows",
+        "spend your attention on a lane",
+        "A body that has spent its thirty seconds",
+        "it spends minutes on a retry",
+        "the model spends a turn on it",
+        "the process had spent its retry budget",
+        "a run that spends its budget on retried 429s",
+        "asking anyway spends an attempt",
+        "the scan is cached, and spent against a budget",
+    ):
+        assert SPEND.search(text), text
+    for text in (
+        "the audit would spend $0.79 of $1.00",
+        "a provider-side spend limit",
+        "price a fix before spending and read a band",
+        "a reader spent a week on words",
+        "the walk takes at most its budget",
+        "a save runs nothing and spends nothing",
+        "a contributor may spend any amount",
+        "a wide filter would spend your vendor budget",
+        "a wider filter would spend live model budget",
+        "the smoke run spends no quota",
+        "nobody has chosen to spend on a second route",
+        "the window bounds the spend over time",
+        "the budget is spent against the job's bytes",
+        "a settled draft: spend nothing on it",
+    ):
+        assert not SPEND.search(text), text
 
 
 def test_the_money_words_match_only_the_ruled_out_words():
@@ -281,3 +649,36 @@ def test_the_money_words_match_only_the_ruled_out_words():
         assert MONEY.search(word), word
     for word in ("bowed", "lower", "billed", "the provider bill", "indebted"):
         assert not MONEY.search(word), word
+
+
+def test_the_wording_lints_read_model_text():
+    prompt = REPO_ROOT / "prompts" / "critic.md"
+
+    assert prompt in MONEY_SEARCHED
+    assert prompt in SPEND_SEARCHED
+
+
+def test_a_hit_in_model_text_that_no_row_holds_fails(tmp_path, monkeypatch):
+    """Positive control: a held phrase frees the hit it covers in its own file,
+    and nothing else: not the same words in another file, and not a hit that it
+    does not cover."""
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+    prompt = tmp_path / "prompts" / "probe.md"
+    prompt.parent.mkdir()
+    prompt.write_text(
+        "A rule.\nNever spend a vote on it. Spend a quote.\n", encoding="utf-8"
+    )
+    vote = f"prompts/probe.md:2 {'spend a vote'!r}"
+    quote = f"prompts/probe.md:2 {'Spend a quote'!r}"
+
+    assert _wording_hits(SPEND, [prompt], {}) == [vote, quote]
+    assert _wording_hits(
+        SPEND, [prompt], {"prompts/probe.md": ["Never spend a vote on it"]}
+    ) == [quote]
+    assert _wording_hits(
+        SPEND, [prompt], {"prompts/other.md": ["Never spend a vote on it"]}
+    ) == [vote, quote]
+    assert _wording_hits(SPEND, [prompt], {"prompts/probe.md": ["a vote on"]}) == [
+        vote,
+        quote,
+    ]

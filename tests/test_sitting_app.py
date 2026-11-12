@@ -48,7 +48,11 @@ def unruled(tree: Path, case: str = CASE) -> int:
     moves one that ``rulings.json`` leaves alone, read through :func:`load_case`.
     """
     golden = load_case(tree / "evals" / "corpus" / case)
-    named = {*golden.ruled_readings, *golden.refused_readings}
+    named = {
+        *golden.ruled_readings,
+        *golden.refused_readings,
+        *golden.ruled_positions,
+    }
     return next(
         index for index in range(len(golden.stride_claims())) if index not in named
     )
@@ -212,7 +216,7 @@ def draft_file(tree, case, reviewer="ada") -> Path:
 
 
 def every_mark(app, case=CASE, value="agree"):
-    """A mark on every finding part two offers, which a record now needs."""
+    """A mark on every finding part two offers, which a record needs."""
     payload = app.get(f"/api/part-two?case={case}").json()
     return {target["fingerprint"]: value for target in payload["marks"]}
 
@@ -426,6 +430,20 @@ class TestTheOwnListRuleIsEnforced:
         drift from the endpoint that actually holds the rule."""
         app, _, _ = client
         assert f"const MIN_OWN_LIST = {MIN_OWN_LIST};" in app.get("/").text
+
+    def test_the_page_bounds_the_notes_and_the_username_as_the_server_does(
+        self, client
+    ):
+        from webapp.sitting import AUTHOR_MAX_CHARS
+        from webapp.sitting_base import NOTES_MAX_CHARS
+
+        app, _, _ = client
+        page = app.get("/").text
+        assert f'<textarea id="notes" maxlength="{NOTES_MAX_CHARS}"' in page
+        assert (
+            f'id="githubAuthor" class="text-input" maxlength="{AUTHOR_MAX_CHARS}"'
+            in page
+        )
 
 
 class TestThePosture:
@@ -1883,6 +1901,18 @@ class TestTheDraftStore:
         assert held[CASE].state == "open"
         assert held[OTHER].state == sittings.UNREADABLE
 
+    def test_a_draft_that_names_the_unreadable_state_is_refused(self, tmp_path):
+        """``unreadable`` is what the store says, never a state a file names."""
+        root = self.store(tmp_path)
+        path = sittings.draft_path(root, "ada", CASE)
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            json.dumps({"case": CASE, "state": sittings.UNREADABLE}), encoding="utf-8"
+        )
+        with pytest.raises(sittings.DraftError):
+            sittings.load_draft(root, "ada", CASE)
+        assert sittings.draft_states(root, "ada")[CASE].state == sittings.UNREADABLE
+
     def test_a_survey_of_a_reader_with_no_store_is_empty(self, tmp_path):
         assert sittings.draft_states(self.store(tmp_path), "ada") == {}
 
@@ -1894,12 +1924,17 @@ class TestTheDraftStore:
         with pytest.raises(sittings.DraftError):
             sittings.draft_states(self.store(tmp_path), login)
 
-    def test_the_default_root_is_outside_any_repository(self, tmp_path):
+    def test_the_default_root_is_outside_any_repository(self, monkeypatch):
         """Under the reader's own state directory, which is where a store
         that must never merge belongs."""
+        monkeypatch.delenv("XDG_STATE_HOME", raising=False)
         root = sittings.draft_root()
         assert root.parts[-4:] == (".local", "state", "work-agent", "sittings")
         assert root.is_absolute()
+
+    def test_the_default_root_follows_xdg_state_home(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+        assert sittings.draft_root() == tmp_path / "work-agent" / "sittings"
 
     def test_a_session_takes_the_root_its_caller_names(self, tree, tmp_path):
         """The whole reason the root is a field: a test points it at a
@@ -2894,8 +2929,8 @@ def test_two_merged_marks_that_fold_and_disagree_refuse_the_case_with_a_409(
     assert "two marks name one recorded finding" in response.json()["detail"]
 
 
-def test_the_first_problem_names_no_key_the_caller_invented():
-    """A sitting route returns this message, so it names the place, never the key."""
+def test_the_first_problem_names_no_extra_field():
+    """A sitting route returns this message, so it names no extra field."""
     with pytest.raises(ValidationError) as caught:
         envelopes.CaseAnswers.model_validate({"own_list": ["one line"], "hunter2": 1})
 

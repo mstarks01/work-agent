@@ -15,8 +15,8 @@ last predecessor finished — the point the graph could have started it — to t
 moment the executor observed its own output.
 
 The submitted sources are untrusted text (OWASP LLM01). This module never
-renders them: it hands the job's sources to the executor, which is the single
-place a job becomes prompt bytes, and takes back the digest that ties the
+renders them: it hands the job's sources to the executor, which turns a job
+into prompt bytes, and takes back the digest that ties the
 report to what was submitted.
 
 Which config this runner is built from is not this module's business: see
@@ -45,7 +45,9 @@ from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_HEAD_ONLY,
     ENTRY_RESUME,
+    STATE_APPLIED_CONTROLS,
     STATE_ASSERTION_CATALOG,
+    STATE_CONTROL_LINES,
     STATE_FACT_ANSWERS,
     STATE_FRAMEWORK_OPTIONS,
     STATE_LINK_ANSWERS,
@@ -56,6 +58,11 @@ from analysis_service.graph import (
     Rejected,
     paused_at,
 )
+from analysis_service.job_controls import (
+    AppliedControl,
+    applied_controls,
+    control_lines,
+)
 from analysis_service.jobs import (
     Checkpoint,
     JobRecord,
@@ -65,7 +72,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.links import LinkAnswer
+from analysis_service.links import ControlLines, LinkAnswer
 from analysis_service.report import (
     InputRef,
     Job,
@@ -103,7 +110,7 @@ class AdkPipelineRunner:
         *,
         session_service: BaseSessionService | None = None,
         app_name: str = DEFAULT_APP_NAME,
-        certification: CertificationGate | None = None,
+        certification: CertificationGate | None,
     ) -> None:
         self._pipeline = pipeline
         self._certification = certification
@@ -237,6 +244,8 @@ def answered_state(
     model: SystemModel | None,
     links: Sequence[LinkAnswer],
     facts: Sequence[FactAnswer],
+    controls: ControlLines = (),
+    applied: Sequence[AppliedControl] = (),
 ) -> dict[str, Any]:
     """The state a run starts from with a submitter's answers.
 
@@ -245,11 +254,17 @@ def answered_state(
     each attribute answer written in, or ``None`` for a run that extracts its
     own. The catalog pass reads the link and fact answers: it writes each
     assertion answer over its open row, and removes every unscoped row that
-    reaches an answered attribute.
+    reaches an answered attribute. ``controls`` are the Control lines of the
+    answers Source (:func:`~analysis_service.links.with_link_answers`), and
+    ``applied`` each Control that applies to ``model``.
     """
     state: dict[str, Any] = {
         STATE_LINK_ANSWERS: [link.model_dump() for link in links],
         STATE_FACT_ANSWERS: [fact.model_dump() for fact in facts],
+        STATE_CONTROL_LINES: [[name, fact.model_dump()] for name, fact in controls],
+        STATE_APPLIED_CONTROLS: [
+            control.model_dump(mode="json") for control in applied
+        ],
     }
     if model is not None:
         state[STATE_VALID_MODEL] = answered_model(model, facts).model_dump(mode="json")
@@ -261,13 +276,21 @@ def _seeded_state(job: JobRecord) -> dict[str, Any]:
 
     A resumed job is seeded at the keys the validity gate and ``prepare`` write
     in a full run, so the resumed graph's ``prepare`` reads them exactly as it
-    reads its own. A job that starts from its sources carries only its answers.
+    reads its own, with each Control that applies to the held model. A job
+    that starts from its sources carries only its answers.
     """
     held = None if job.resumption is None else job.resumption.checkpoint
+    controls = job.control_facts or []
     seeded = answered_state(
         None if held is None else held.system_model,
         job.answers.links,
-        job.answers.facts,
+        job.written_answers().facts,
+        control_lines(controls),
+        (
+            ()
+            if held is None
+            else applied_controls(job.controls, job.control_scopes, held.system_model)
+        ),
     )
     if held is not None and held.assertions is not None:
         seeded[STATE_ASSERTION_CATALOG] = held.assertions.model_dump(mode="json")

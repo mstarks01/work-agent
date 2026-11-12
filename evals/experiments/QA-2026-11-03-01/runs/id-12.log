@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from d51830a1fa4ffbdb5348b1713bae9fa0b2b2a2f2
+- Supplier compliance documents may be intercepted on the unverified public-to-vendor portal path | ['flow:entity:supplier>process:supplier-portal>upload-documents', 'entity:supplier', 'process:supplier-portal']
+- Category-manager document reviews may be intercepted across the corporate-to-vendor boundary | ['flow:entity:category-manager>process:supplier-portal>review-documents', 'entity:category-manager', 'process:supplier-portal']
+- Uploaded documents may be readable on the unverified portal-to-document-store path | ['flow:process:supplier-portal>store:document-store>store-documents', 'process:supplier-portal', 'store:document-store']
+- Nightly supplier extract may be intercepted between the vendor and landing bucket | ['flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'entity:portal-vendor', 'store:landing-bucket']
+- Supplier master service may receive the extract over an unverified bucket read path | ['flow:process:supplier-master-service>store:landing-bucket>load-extract', 'process:supplier-master-service', 'store:landing-bucket']
+- Supplier records may be intercepted on the unverified service-to-database write path | ['flow:process:supplier-master-service>store:supplier-database>write-supplier-records', 'process:supplier-master-service', 'store:supplier-database']
+- Vendor document-store copies may expose supplier documents if encryption at rest is absent | ['store:document-store']
+- A storage-layer copy of the landing bucket may disclose the nightly supplier extract | ['store:landing-bucket']
+- A storage-layer copy of the supplier database may disclose supplier records | ['store:supplier-database']
+- Code running in the supplier master service may read the raw landing-bucket extract through its unverified access path | ['process:supplier-master-service', 'flow:process:supplier-master-service>store:landing-bucket>load-extract', 'store:landing-bucket']
+spent: $0.0554 reported
+must-finds matched: []

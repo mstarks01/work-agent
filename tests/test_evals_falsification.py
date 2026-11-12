@@ -39,11 +39,15 @@ class TestTheTableAnswersTheAcceptanceList:
         assert not set(falsify.PROBES) & set(falsify.UNPROBED)
 
     @pytest.mark.parametrize("name", sorted(falsify.PROBES))
-    def test_every_probe_declares_a_registered_fate(self, name: str) -> None:
+    def test_every_probe_declares_a_registered_fate(
+        self, name: falsify.ProbeName
+    ) -> None:
         assert set(falsify.PROBES[name].fates) <= set(ROW_FATES)
 
     @pytest.mark.parametrize("name", sorted(falsify.PROBES))
-    def test_every_probe_declares_a_registered_refusal(self, name: str) -> None:
+    def test_every_probe_declares_a_registered_refusal(
+        self, name: falsify.ProbeName
+    ) -> None:
         assert set(falsify.PROBES[name].refuses) <= GATE_REFUSALS
 
     def test_the_command_is_registered(self) -> None:
@@ -77,8 +81,8 @@ class TestEveryProbeHolds:
         printed = capsys.readouterr().out
         for name in falsify.PROBES:
             assert f"`{name}`" in printed
-        for name in falsify.UNPROBED:
-            assert f"no probe for `{name}`" in printed
+        for criterion in falsify.UNPROBED:
+            assert f"no probe for `{criterion}`" in printed
 
     @pytest.mark.parametrize("reviewed", [False, True])
     def test_the_command_fails_on_a_critical_failure(
@@ -163,7 +167,9 @@ class TestAProbeThatCostsNothingFails:
             return falsify.Corruption(rows)
 
         probe = falsify.Probe(case_id="01-payments-checkout", corrupt=corrupt)
-        monkeypatch.setattr(falsify, "PROBES", {"stranded": probe})
+        # The stub replaces the whole table under a real key, because
+        # ``run_probe`` takes a ``ProbeName``. It is not the real probe.
+        monkeypatch.setattr(falsify, "PROBES", {"absence-inferred": probe})
         case = next(
             case
             for case in falsify.development_cases(falsify.load_corpus(CORPUS))
@@ -172,7 +178,7 @@ class TestAProbeThatCostsNothingFails:
 
         reference = falsify.signed_reference(CORPUS, case)
         assert reference is not None
-        outcome = falsify.run_probe("stranded", case, reference)
+        outcome = falsify.run_probe("absence-inferred", case, reference)
 
         assert outcome.refused == ("dangling-premise", "unsupported-assertion")
 

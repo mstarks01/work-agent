@@ -1,0 +1,14 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Landing-bucket extracts may be intercepted on the scheduler read path | ['flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'process:ingest-scheduler', 'store:landing-bucket']
+- Airflow connection strings and partner keys may be intercepted in transit | ['flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'process:ingest-scheduler', 'store:airflow-metadata-database']
+- Cross-zone transform requests may disclose processing metadata | ['flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform', 'process:ingest-scheduler', 'process:spark-transform-job']
+- Normalized claim records may be intercepted during warehouse loading | ['flow:process:spark-transform-job>store:claims-warehouse>load-records', 'process:spark-transform-job', 'store:claims-warehouse']
+- Analyst query results may be exposed on an unverified transport path | ['flow:entity:data-analyst>store:claims-warehouse>run-queries', 'entity:data-analyst', 'store:claims-warehouse']
+- A landing-bucket storage copy could expose partner health extracts | ['store:landing-bucket']
+- An unencrypted Airflow metadata copy could reveal partner credentials | ['store:airflow-metadata-database']
+- A claims-warehouse storage copy could disclose the normalized corpus | ['store:claims-warehouse']
+- A compromised scheduler can read every landing-bucket extract | ['process:ingest-scheduler', 'flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'store:landing-bucket']
+- A compromised scheduler can recover credentials from Airflow metadata | ['process:ingest-scheduler', 'flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'store:airflow-metadata-database']
+- Dataset-wide analyst access exposes member-identifying claim columns | ['entity:data-analyst', 'flow:entity:data-analyst>store:claims-warehouse>run-queries', 'store:claims-warehouse']
+spent: $0.0604 reported
+must-finds matched: [9]

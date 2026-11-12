@@ -24,14 +24,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import submit as submit_spine
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.reference import (
     ANONYMOUS,
-    CorpusError,
-    corpus_refusal,
     is_submitted_for,
 )
 from webapp import sitting_base as base
-from webapp.page import client_script
+from webapp.page import client_scripts
 
 sittings = base.sittings
 REPO_ROOT = base.REPO_ROOT
@@ -43,10 +42,16 @@ LOCAL_SUBMITTER = "local-review"
 #: Whether a submission names the reviewer or files under the anonymous name.
 ReviewerMode = Literal["self", "anonymous"]
 
+#: How a review contribution reaches GitHub: a pull request that the ``gh``
+#: login opens, or a file that the reader takes to GitHub in the browser.
+#: ``sitting.js`` reads it.
+ContributionMode = Literal["direct", "browser"]
+
 #: What the page calls each rail state. One table, keyed by
 #: :data:`~evals.harness.sitting.RowState`. ``/api/review-states`` hands the
 #: page the state and the label together, so the page keys its own behaviour
 #: on the state vocabulary the rail already speaks and spells no label itself.
+#: The offline page has no server, so its payload carries the whole table.
 REVIEW_LABELS: dict[sittings.RowState, str] = {
     "todo": "Not reviewed",
     "draft": "In progress",
@@ -57,10 +62,15 @@ REVIEW_LABELS: dict[sittings.RowState, str] = {
 assert set(REVIEW_LABELS) == set(get_args(sittings.RowState))
 
 
+#: The longest GitHub username the contribution takes. The page's username
+#: box takes the same bound.
+AUTHOR_MAX_CHARS = 64
+
+
 class ContributionChoice(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reviewer: ReviewerMode = "anonymous"
-    author: str | None = Field(default=None, max_length=64)
+    author: str | None = Field(default=None, max_length=AUTHOR_MAX_CHARS)
 
 
 build_session = base.build_session
@@ -274,7 +284,7 @@ nav { flex:0 0 20rem; background:var(--sidebar); border-right:1px solid var(--li
       flex-direction:column; overflow-x:hidden; }
 #cases { flex:1; overflow-y:auto; overflow-x:hidden; list-style:none; padding:0; margin:12px 0; }
 main { flex:1; margin:0; padding:36px 36px 6rem; max-width:52rem; }
-h1 { font-size:18px; margin:0 0 4px; } h2 { font-size:19px; } h3 { font-size:16px; }
+h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:17px; } h3 { font-size:15px; }
 .sub { color:var(--muted); margin-top:0; }
 input[type=radio] { width:auto; padding:0; accent-color:var(--accent); }
 .help-button,.pin button { width:100%; }.pin { border-top:1px solid var(--line); padding-top:12px; }
@@ -387,7 +397,7 @@ details.standard { margin:5px 0 2px; font-size:14px; } details.standard summary 
 <h2>What did your independent review find that these findings missed?</h2><p class="note">If something on your original list is not represented by the framework findings you reviewed, enter it here, one per line. Leave this blank if nothing is missing.</p>
 <textarea id="missing" placeholder="one potentially missed issue per line"></textarea>
 <h2>Notes</h2><p id="markCounts" class="note"></p><p class="hint">Counts are calculated automatically. Use notes only for context the structured choices do not capture.</p>
-<textarea id="notes" placeholder="optional context or explanation"></textarea>
+<textarea id="notes" maxlength="<!--noteschars-->" placeholder="optional context or explanation"></textarea>
 <p><button class="primary" id="finish" disabled>Record review</button><span id="saveStatus" class="save-status" role="status"></span></p><p id="finishHint" class="hint" role="status"></p>
 <p><button id="resetReview" type="button">Reset review answers</button></p><p class="hint">Reset clears Part 2 marks, missed issues, notes, and any recorded result for this case. Your independent Part 1 list remains locked because the model findings have already been revealed.</p>
 </section>
@@ -409,7 +419,7 @@ details.standard { margin:5px 0 2px; font-size:14px; } details.standard summary 
 <section id="waysOut"><h2>Contribute (optional)</h2>
 <p>Contribution sends one structured JSON review file in a pull request. The file contains your independent list, marks, missed issues, notes, and digests of the case material you reviewed. The app uses an existing GitHub CLI login when available; otherwise it prepares the same single file for GitHub's browser flow. It never asks for your GitHub password or token.</p>
 <fieldset class="attribution"><legend>Reviewer attribution</legend><label><input type="radio" name="reviewerAttribution" value="anonymous" checked> Anonymous / on behalf of someone else</label><label><input type="radio" name="reviewerAttribution" value="self"> Myself</label><p class="hint">Anonymous hides reviewer attribution, not the GitHub account that opens the pull request.</p></fieldset>
-<div id="browserIdentity" class="hidden"><label for="githubAuthor"><b>GitHub username for the pull request</b></label><br><input id="githubAuthor" class="text-input" autocomplete="username" spellcheck="false"><p class="hint">CI requires this name to match the GitHub account that opens the pull request.</p></div>
+<div id="browserIdentity" class="hidden"><label for="githubAuthor"><b>GitHub username for the pull request</b></label><br><input id="githubAuthor" class="text-input" maxlength="<!--authorchars-->" autocomplete="username" spellcheck="false"><p class="hint">CI requires this name to match the GitHub account that opens the pull request.</p></div>
 <p><button id="showFiles">Show files</button> <button class="primary" id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
 <pre id="result" class="hidden"></pre><p id="thanks" class="hidden">Thank you for contributing this review.</p>
 <div id="browserSteps" class="note hidden"><p><b>Your review is ready to publish.</b></p><p>The link below opens GitHub with the file and its name already filled in. Sign in if you need to. GitHub shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="contributeLink" href="#" target="_blank" rel="noopener">Open the pull request on GitHub</a></p><p class="sub">A copy has also been downloaded, in case you would rather upload it by hand.</p></div>
@@ -428,7 +438,11 @@ const DONE = <!--donestates-->;
 
 
 def create_app(session: Session) -> FastAPI:
-    app = base.create_app(session, _PAGE, client_script("sitting.js"))
+    page = _PAGE.replace("<!--noteschars-->", str(base.NOTES_MAX_CHARS)).replace(
+        "<!--authorchars-->", str(AUTHOR_MAX_CHARS)
+    )
+    script = client_scripts("service_answer.js", "sitting.js")
+    app = base.create_app(session, page, script)
     app.title = "Review"
 
     @app.get("/api/review-states")
@@ -482,7 +496,7 @@ def create_app(session: Session) -> FastAPI:
         base.refuse_cross_origin(request)
         base.require_token(request, session)
         login = _gh_login(session.root)
-        return JSONResponse({"mode": "direct" if login else "browser", "author": login})
+        return JSONResponse({"mode": _contribution_mode(login), "author": login})
 
     @app.post("/api/contribution-preview")
     def contribution_preview(
@@ -502,9 +516,10 @@ def create_app(session: Session) -> FastAPI:
         login = _gh_login(session.root)
         author = _author(login or body.author)
         envelope = _review_envelope(session, author, body.reviewer)
-        if not login:
+        mode = _contribution_mode(login)
+        if mode == "browser":
             return JSONResponse(
-                {"mode": "browser", "ok": True, **_preview(session, envelope)}
+                {"mode": mode, "ok": True, **_preview(session, envelope)}
             )
         try:
             url = review_submissions.open_pull_request(session.root, envelope)
@@ -514,7 +529,7 @@ def create_app(session: Session) -> FastAPI:
         warnings = _clean_local_record(session, cases)
         return JSONResponse(
             {
-                "mode": "direct",
+                "mode": mode,
                 "ok": True,
                 "url": url,
                 "author": author,
@@ -523,6 +538,10 @@ def create_app(session: Session) -> FastAPI:
         )
 
     return app
+
+
+def _contribution_mode(login: str) -> ContributionMode:
+    return "direct" if login else "browser"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -553,9 +572,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         session = build_session(root, submitted_by, submitted_for, args.case)
-    except CorpusError as exc:
-        print(corpus_refusal(exc), file=sys.stderr)
-        return 1
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
 
     import uvicorn
 

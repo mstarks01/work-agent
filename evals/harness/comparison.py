@@ -45,7 +45,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from evals.harness import audit, baseline, standings
@@ -75,9 +75,12 @@ NO_VOTES = "no votes when sealed"
 #: Baseline's figures, so none is borrowed from elsewhere.
 UNSPREAD = "spread unmeasured"
 
+#: The heading of each table a framework block prints.
+PartHeading = Literal["development cases", "held-out cases"]
+
 #: The two tables each framework block prints, keyed by the heading each
 #: carries, with whether it reads the held-out cases.
-PARTS: Mapping[str, bool] = {"development cases": False, "held-out cases": True}
+PARTS: Mapping[PartHeading, bool] = {"development cases": False, "held-out cases": True}
 
 
 @dataclass(frozen=True)
@@ -96,7 +99,7 @@ class Row:
     reported_usd: float | None
     #: ``{series: {framework: {part: {column label: cell}}}}``, already
     #: rendered, where a part is a key of :data:`PARTS`.
-    cells: dict[str, dict[str, dict[str, dict[str, str]]]]
+    cells: dict[str, dict[str, dict[PartHeading, dict[str, str]]]]
     #: (findings a person answered, findings offered) across every sweep, so
     #: a reader can weigh how much of the row rests on judgement.
     coverage: tuple[int, int]
@@ -140,8 +143,8 @@ def flagged_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
     Read from the rows rather than from today's corpus, because a development case
     can be flagged after the sweep ran, and the sweep's figure was taken under
     the flag it carried then. Framework-neutral: any per-case block whose rows
-    carry ``holdout`` answers. A row written before the field existed carries
-    none, and no such sweep scored a holdout case.
+    carry ``holdout`` answers. An archived row may carry none, and no
+    sweep with such a row scored a holdout case.
     """
     return frozenset(
         row["case"]
@@ -226,8 +229,8 @@ def read_baseline(directory: Path, root: Path) -> Row | None:
         for case in flagged_cases(blocks)
     )
     held_out = audit.still_held_out(flagged, ledger)
-    spent = audit.exhausted(ledger)
-    cells: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
+    exhausted = audit.exhausted(ledger)
+    cells: dict[str, dict[str, dict[PartHeading, dict[str, str]]]] = {}
     for series, sweeps in per_series.items():
         for framework in identity.get("frameworks", []):
             for part, holdout in PARTS.items():
@@ -267,7 +270,7 @@ def read_baseline(directory: Path, root: Path) -> Row | None:
         cells=cells,
         coverage=coverage,
         held_out=held_out,
-        exhausted={case: spent[case] for case in sorted(flagged - held_out)},
+        exhausted={case: exhausted[case] for case in sorted(flagged - held_out)},
     )
 
 

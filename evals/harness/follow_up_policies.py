@@ -49,6 +49,8 @@ from analysis_service.questions import (
 )
 from analysis_service.report import Report
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
+from evals.harness.run_record import run_record
 
 #: The owner effort, in choices, at which each order is read.
 BUDGETS = (1, 2, 3, 5, 10, 15, 20)
@@ -175,12 +177,12 @@ def readings(path: str, report: Report, built: Report | None = None) -> list[Rea
         for effort in EFFORTS:
             cost = efforts[effort]
             for budget in (*BUDGETS, None):
-                spent = 0
+                choices = 0
                 answered: set[UnknownKey] = set()
                 for key in order:
-                    if budget is not None and spent + cost(key) > budget:
+                    if budget is not None and choices + cost(key) > budget:
                         break
-                    spent += cost(key)
+                    choices += cost(key)
                     answered.add(key)
                 done = [
                     labels[finding]
@@ -194,7 +196,7 @@ def readings(path: str, report: Report, built: Report | None = None) -> list[Rea
                         policy=policy,
                         effort=effort,
                         budget=budget,
-                        choices=spent,
+                        choices=choices,
                         findings=len(needs.waiting),
                         completed=len(done),
                         finding_bands=dict(Counter(labels.values())),
@@ -230,8 +232,11 @@ def with_rulings(report: Report, rulings: Path) -> Report:
     return report.model_copy(update={"analyses": blocks})
 
 
-def crossed(baseline: Path, samples: Sequence[Path]) -> list[Reading]:
-    """Each order built from one critic sample and scored on the other.
+def crossed(
+    baseline: Path, samples: Sequence[Path]
+) -> tuple[list[Reading], list[Path]]:
+    """Each order built from one critic sample and scored on the other, and
+    each file read.
 
     ``baseline`` holds the reports whose drafts both samples ruled on, and
     each sample directory a ``<case>.rulings.json`` per case. An order that
@@ -240,12 +245,14 @@ def crossed(baseline: Path, samples: Sequence[Path]) -> list[Reading]:
     read again would be.
     """
     found = []
+    read: list[Path] = []
     for path in sorted(baseline.rglob(f"*{case_suffix('report')}")):
         case = path.name.removesuffix(case_suffix("report"))
         sources = [sample / f"{case}.rulings.json" for sample in samples]
         if not all(source.is_file() for source in sources):
             continue
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        read.extend((path, *sources))
+        report = read_report(path)
         for build_from, score_on in (
             (sources[0], sources[1]),
             (sources[1], sources[0]),
@@ -255,17 +262,19 @@ def crossed(baseline: Path, samples: Sequence[Path]) -> list[Reading]:
             found.extend(
                 readings(f"{build_from} on {score_on.parent.name}", scored, built)
             )
-    return found
+    return found, read
 
 
-def sweep(root: Path) -> list[Reading]:
-    """Every archived report of one framework under ``root``."""
+def sweep(root: Path) -> tuple[list[Reading], list[Path]]:
+    """Every archived report of one framework under ``root``, and each one read."""
     found = []
+    read: list[Path] = []
     for path in sorted(root.rglob(f"*{case_suffix('report')}")):
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         if len(report.job.frameworks) == 1:
+            read.append(path)
             found.extend(readings(str(path), report))
-    return found
+    return found, read
 
 
 #: The counts a summary sums over reports, each read off a reading.
@@ -301,7 +310,9 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         default=Path("evals"),
         help="the directory whose archived *.report.json files are read",
     )
-    parser.add_argument("--out", type=Path, help="write the summary here as JSON")
+    parser.add_argument(
+        "--out", type=Path, help="write the run record and the summary as JSON"
+    )
     parser.add_argument(
         "--samples",
         type=Path,
@@ -313,7 +324,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 def command_follow_up_policies(args: argparse.Namespace) -> int:
     """Read every policy on every archived report, and print the sums."""
-    found = (
+    found, read = (
         sweep(args.root) if args.samples is None else crossed(args.root, args.samples)
     )
     if not found:
@@ -322,5 +333,20 @@ def command_follow_up_policies(args: argparse.Namespace) -> int:
     table = summary(found)
     print(json.dumps(table, indent=2))
     if args.out is not None:
-        args.out.write_text(json.dumps(table, indent=2) + "\n", encoding="utf-8")
+        record = run_record(
+            "follow-up-policies",
+            {
+                "policies": list(POLICIES),
+                "efforts": EFFORTS,
+                "budgets": BUDGETS,
+                "samples": None
+                if args.samples is None
+                else list(map(str, args.samples)),
+            },
+            {path: {} for path in read},
+        )
+        args.out.write_text(
+            json.dumps({"record": record, "summary": table}, indent=2) + "\n",
+            encoding="utf-8",
+        )
     return 0

@@ -31,8 +31,9 @@ in `GLOSSARY.md`.
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
 captured lane request again, and `run.py lane-replay --append` adds a user part
 after the captured input. `run.py critic-replay` does the same for a critic
-call. `run.py lane-replay --fresh-leads` rebuilds a lane's leads with the
-current rules through the function the prepare node calls. A replay costs one
+call, and `run.py recritic-replay` sends one critic re-ask over one injected
+fault of a named shape. `run.py lane-replay --fresh-leads` rebuilds a lane's
+leads with the current rules through the function the prepare node calls. A replay costs one
 model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
 refuses it.
 
@@ -103,7 +104,10 @@ only store lead, whose question asks who reaches the storage layer. The
 that read such a store. In a blind ruling it stated the access-path threat at
 4 of 8 reference places over two passes, against 1 of 8 without it
 (`QA-2026-10-05-02-E3`). It recovers the two read-grant references (02/6,
-12/8) and neither compromised-reader reference (05/6, 05/7).
+12/8) and neither compromised-reader reference (05/6, 05/7). A caller whose
+flows into the store state no read and at least one `unknown` reaches the
+lane under `callers_of_unknown_operation`, with a conditional question, and
+never as a reader (#2105).
 
 **Prose-only mismatches (8 rows).** A different principal impersonated, a
 different resource flooded, or a defining part missing

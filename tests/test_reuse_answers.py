@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer
 from analysis_service.jobs import JobRecord
@@ -51,13 +51,14 @@ def _submit(client, answers_from, *, questions=True, token="alice-token"):
 class TestWhatAJobHolds:
     def test_a_later_answer_lies_over_an_earlier_one(self):
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description(DESCRIPTION_TEXT)],
             frameworks=sample_selection(),
             carried=AnswerSet(facts=(_fact("carried"), _fact("kept", "protocol"))),
             answers=AnswerSet(facts=(_fact("answered"),)),
         )
-        record.draft = AnswerSet(facts=(_fact("drafted"),))
+        record.draft = SentAnswers(facts=(_fact("drafted"),))
         record.corrections = [_fact("corrected")]
 
         held_facts = {fact.key[1]: fact.value for fact in record.held_answers().facts}
@@ -67,6 +68,7 @@ class TestWhatAJobHolds:
     def test_it_holds_the_link_answers_too(self):
         link = LinkAnswer(principal="shoppers", element="entity:shopper")
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description(DESCRIPTION_TEXT)],
             frameworks=sample_selection(),

@@ -28,7 +28,7 @@ from webapp.main import render_report
 _SHIM = r"""
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
-    this.style = {}; this.listeners = {}; this.attributes = {}; this.value = "";
+    this.style = { setProperty(name, value) { this[name] = value; } }; this.listeners = {}; this.attributes = {}; this.value = "";
     this.classList = { add() {}, remove() {}, toggle() { return true; }, contains() { return false; } }; }
   append(...kids) { this.children.push(...kids); }
   prepend(...kids) { this.children.unshift(...kids); }
@@ -64,10 +64,13 @@ globalThis.document = {
   createDocumentFragment: () => new Node("#fragment"),
   querySelector: () => new Node("query"),
   querySelectorAll: () => [],
+  addEventListener: () => {},
   body: new Node("body"),
+  documentElement: new Node("html"),
 };
 globalThis.window = globalThis;
 globalThis.addEventListener = () => {};
+globalThis.matchMedia = () => ({ matches: false, addEventListener() {} });
 globalThis.location = { pathname: "/report/r1", href: "", search: "" };
 globalThis.history = { replaceState() {} };
 """
@@ -87,8 +90,11 @@ def payloads_of(html: str) -> dict[str, str]:
 def page_script() -> str:
     """The report page's whole client script, as a rendered page carries it."""
     report = sample_report()
-    html = render_report(report, report_state(report), previous=None, parent=None).html
-    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    html = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
+    # The head's theme script, then the page's code slot.
+    _, script = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     return script
 
 
@@ -103,7 +109,8 @@ def run_report_page(html: str, search: str = "") -> dict[str, str]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the report page")
-    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    # The head's theme script, then the page's code slot.
+    _, script = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     program = (
         shim(payloads_of(html))
         + f"location.search = {json.dumps(search)};\n"
@@ -138,6 +145,7 @@ def page(answered=(), shown=(), final=False, skipped=()):
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
 
 
@@ -191,7 +199,9 @@ def two_findings():
         update={"id": "S-02", "title": "Cookies cross the network in clear"}
     )
     report = sample_report([sample_threat(), waiting])
-    return render_report(report, report_state(report), previous=None, parent=None).html
+    return render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
 
 
 def test_the_summary_counts_the_confirmed_and_the_waiting_findings():
@@ -243,7 +253,9 @@ def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
     ]
     report = sample_report(threats)
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
     assert (
         "One shared action addresses 2 findings: Add encryption in transit to"
@@ -264,7 +276,9 @@ def test_conditional_and_dismissed_findings_each_keep_their_own_row():
     )
     report = sample_report([asking_threat(ASKED)], [rejected])
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
     assert "Conditional findings · 1" in text
     assert "Dismissed findings · 1HighAdmin traffic is readableDismissedI-01" in text
@@ -316,6 +330,7 @@ def test_a_corrected_finding_is_marked_on_its_card():
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
     assert "Corrected after this report" in run_report_page(html)["analyses"]
 
@@ -332,42 +347,36 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     derived = sample_threat().grounds[1]
     report = sample_report([sample_threat(grounds=[quote, derived])])
     html = render_report(
-        report, report_state(report, answered=[answer]), previous=None, parent=None
+        report,
+        report_state(report, answered=[answer]),
+        previous=None,
+        parent=None,
+        controls=(),
     ).html
     text = run_report_page(html)["analyses"]
     assert "your answer; the service did not check it" in text
     assert f"— {ANSWERS_LABEL}" not in text
 
 
-def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
-    """The page's WHY_OPEN table and FactStatus are one set."""
-    from typing import get_args
-
-    from analysis_service.report_conditions import FactStatus
-    from tests.test_webapp import viewer_javascript
-
-    table = re.search(
-        r"const WHY_OPEN = \{(.*?)\n  \};", viewer_javascript(), re.DOTALL
-    )
-    keys = set(re.findall(r"^\s*(\w+):", table.group(1), re.MULTILINE))
-    assert keys == set(get_args(FactStatus))
-
-
-@pytest.mark.parametrize("step", [None, "evidence", "reasoning", "lane", "duplicate"])
+@pytest.mark.parametrize(
+    "step", [None, "evidence", "reasoning", "lane", "duplicate", "control"]
+)
 def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
-    """The page's ``rulesOut`` and ``RuledClaim.rules_on_unit`` are two readers of
+    """The page's ``rulesOnUnit`` and ``RuledClaim.rules_on_unit`` are two readers of
     one rule, so each rejection cause is put to both."""
     from types import SimpleNamespace
     from typing import get_args
 
     from analysis_service.claims import RejectionStep, RuledClaim
     from tests.test_webapp import viewer_javascript
+    from webapp.page_words import UNIT_RULING_WORDS
 
     assert set(get_args(RejectionStep)) == {
         "evidence",
         "reasoning",
         "lane",
         "duplicate",
+        "control",
     }
     node = shutil.which("node")
     if node is None:
@@ -375,12 +384,13 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
     javascript = viewer_javascript()
     rule = "\n".join(
         re.search(rf"const {name} = .*?;\n", javascript, re.DOTALL)[0]
-        for name in ("answersInUnits", "rulesOut")
+        for name in ("answersInUnits", "rulingStep", "rulesOnUnit")
     )
     verdict = {"status": "rejected", "rejected_because": step}
     program = (
-        f"const UNITS = {{asvs: ['1.1.1']}};\n{rule}\n"
-        f"console.log(JSON.stringify(rulesOut("
+        f"const UNITS = {{asvs: ['1.1.1']}};\n"
+        f"const UNIT_RULING = {json.dumps(dict(UNIT_RULING_WORDS))};\n{rule}\n"
+        f"console.log(JSON.stringify(rulesOnUnit("
         f"{{framework: 'asvs'}}, {{verdict: {json.dumps(verdict)}}})));"
     )
     done = subprocess.run(
@@ -429,10 +439,13 @@ def test_a_description_names_an_element_by_its_name():
     )
     report = sample_report([described])
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
 
-    endpoints = f"{by_id[flow.source]} → {by_id[flow.destination]}"
+    # A flow is its two endpoint tags and an arrow between them.
+    endpoints = f"{by_id[flow.source]}→{by_id[flow.destination]}"
     assert (
         f"{by_id[flow.source]} sends {endpoints} with encryption in transit unknown."
         in text
@@ -471,7 +484,9 @@ def test_a_description_names_an_evidence_reference_by_its_label():
     described = sample_threat(description=f"It rests on `{unstated}` and `{crosses}`.")
     report = sample_report([described])
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
 
     def endpoints(f):
@@ -497,7 +512,8 @@ def _split_by_provenance(html: str) -> tuple[str, str]:
             re.DOTALL,
         )
     )
-    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    # The head's theme script, then the page's code slot.
+    _, script = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     walk = r"""
 const text = (n) => typeof n === "object" ? n.textContent : String(n);
 const split = (n, out) => {
@@ -554,7 +570,7 @@ def test_a_follow_up_says_how_each_finding_moved():
     )
     after = sample_report([sample_threat()])
     html = render_report(
-        after, report_state(after, final=True), before, parent=None
+        after, report_state(after, final=True), before, parent=None, controls=()
     ).html
     text = run_report_page(html)["analyses"]
 
@@ -624,7 +640,9 @@ def test_every_ground_kind_renders_its_label_and_its_reference():
         )
     )
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
 
     assert "undefined" not in text
@@ -642,57 +660,94 @@ def _page_table_keys(name):
     return set(re.findall(r'(?:^|[,\n])\s*"?([\w-]+)"?\s*:', body))
 
 
-def _scope_states():
-    from analysis_service.claims import ScopeEntry
+def test_the_glyph_table_answers_for_each_verdict_status():
+    """The page's glyph table holds every verdict status. A status the table
+    lacks renders as ``undefined`` beside its label."""
+    from typing import get_args
 
-    return ScopeEntry.model_fields["state"].annotation
+    from analysis_service.claims import VerdictStatus
+
+    assert _page_table_keys("VERDICT_GLYPH") == set(get_args(VerdictStatus))
 
 
 @pytest.mark.parametrize(
     ("table", "vocabulary"),
     [
-        ("GROUND_KIND", "analysis_service.claims:GroundKind"),
-        ("SEV", "analysis_service.claims:SeverityLevel"),
-        ("VERDICT", "analysis_service.claims:VerdictStatus"),
-        ("VERDICT_STATE", "analysis_service.claims:VerdictStatus"),
-        ("SCOPE_STATE", None),
-        ("CHANGE_LINE", "analysis_service.report_changes:Change"),
-        ("RECOMMENDATIONS", "analysis_service.claims:VerdictStatus"),
-        ("HISTORY", "analysis_service.report_conditions:FactStatus"),
+        ("VERDICT_LABELS", "VerdictStatus"),
+        ("UNIT_VERDICT_WORDS", "VerdictStatus"),
+        ("REJECTION_MEANINGS", "RejectionStep"),
     ],
 )
-def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
-    """A page table keyed by a closed vocabulary holds every value of it.
-
-    A value the table lacks renders as a raw key or as nothing.
-    """
-    import importlib
+def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
+    """A table of the words for a closed set holds every value of it, and no
+    other. A value the table lacks raises where the export or the page reads
+    it."""
     from typing import get_args
 
-    if vocabulary is None:
-        values = get_args(_scope_states())
-    else:
-        module, name = vocabulary.split(":")
-        values = get_args(getattr(importlib.import_module(module), name))
+    from analysis_service import claims
 
-    assert _page_table_keys(table) == set(values)
+    assert set(getattr(claims, table)) == set(get_args(getattr(claims, vocabulary)))
+
+
+@pytest.mark.parametrize(
+    ("island", "table", "words"),
+    [
+        ("verdict_labels", "VERDICT", "VERDICT_LABELS"),
+        ("unit_verdict_words", "UNIT_VERDICT", "UNIT_VERDICT_WORDS"),
+    ],
+)
+def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
+    """The page labels a verdict with the words the server sends, which the
+    Markdown export reads too."""
+    from analysis_service import claims
+    from tests.test_webapp import _island, viewer_javascript
+
+    assert _island(page(), island) == json.loads(
+        json.dumps(dict(getattr(claims, words)))
+    )
+    assert re.search(
+        rf'const {table} = JSON\.parse\(document\.getElementById\("{island}"\)',
+        viewer_javascript(),
+    )
+
+
+def test_the_page_reads_the_service_s_element_type_nouns():
+    """The report page names an element type with the words the server
+    sends."""
+    from analysis_service.system_model import ELEMENT_TYPE_NOUNS
+    from tests.test_webapp import _island, viewer_javascript
+
+    assert _island(page(), "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
+    assert re.search(
+        r'const TYPE_NOUNS = JSON\.parse\(\$\("element_type_nouns"\)',
+        viewer_javascript(),
+    )
+
+
+def test_the_page_script_holds_no_verdict_labels():
+    """The page holds no copy of the verdict words the server sends it."""
+    from analysis_service import claims
+    from tests.test_webapp import viewer_javascript
+
+    script = viewer_javascript()
+    labels = [
+        *claims.VERDICT_LABELS.values(),
+        *(text for pair in claims.UNIT_VERDICT_WORDS.values() for text in pair),
+    ]
+    for label in labels:
+        assert f'"{label}"' not in script, label
 
 
 def test_the_page_reads_the_service_s_severity_order():
     """The page orders severity by ``SEVERITY_ORDER`` as the server sends it.
 
     The page holds no order of its own, so a level the service adds lands in
-    the summary and the finding rows. ``SEV`` labels each level, and the
-    table test holds its keys.
+    the summary and the finding rows. ``SEVERITY_LABELS`` labels each level.
     """
     from analysis_service.critic import SEVERITY_ORDER
-    from tests.test_webapp import viewer_javascript
+    from tests.test_webapp import _island, viewer_javascript
 
-    (order,) = re.findall(
-        r'<script type="application/json" id="severity_order"[^>]*>(.*?)</script>',
-        page(),
-    )
-    assert json.loads(order) == list(SEVERITY_ORDER)
+    assert _island(page(), "severity_order") == list(SEVERITY_ORDER)
     assert re.search(
         r'const SEV_ORDER = JSON\.parse\(document\.getElementById\("severity_order"\)',
         viewer_javascript(),
@@ -739,7 +794,9 @@ def test_a_count_of_one_reads_in_the_singular():
         ],
     )
     parts = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )
     assert "1 confirmed finding: 1 high." in parts["analyses"]
     assert "1 was dismissed." in parts["analyses"]
@@ -774,6 +831,7 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
     printed = run_report_page(follow_up)["export-questions"]
     assert "Answers this report readbatch loaderAnswer: none of these" in printed
@@ -788,6 +846,7 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
     printed = run_report_page(final)["export-questions"]
     assert "Answer: I don't know" in printed
@@ -799,7 +858,9 @@ def test_the_page_carries_the_zones_the_service_assumed():
     report = sample_report([sample_threat()])
     (assumed,) = re.findall(
         r'id="assumed_zones"[^>]*>(.*?)</script>',
-        render_report(report, report_state(report), previous=None, parent=None).html,
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html,
     )
     assert json.loads(assumed) == sorted(report.system_model.assumed_zone_elements())
 
@@ -859,7 +920,9 @@ def test_the_pipeline_shows_each_fingerprint_once_with_its_steps():
         }
     )
     nodes = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["nodes"]
     assert "StepModelTime" in nodes
     assert "analyze_agemini-2.5-pro14.5 s" in nodes

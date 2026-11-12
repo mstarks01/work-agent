@@ -183,7 +183,7 @@ class RefusedCompletionError(UnfinishedCompletionError):
 
 
 class RetryBudgetExhausted(RuntimeError):
-    """A retry was refused because the process had spent its retry budget.
+    """A retry was refused because the process had used up its retry budget.
 
     Raised in place of the transient error that would have been retried, so the
     job fails naming the budget rather than the 429 — a run that dies here died
@@ -250,7 +250,7 @@ _LOWEST_SERVER_STATUS_CODE = 500
 #: Whether a stated rate-limit dimension clears on the timescale a retry waits.
 #: **Not every 429 is a moment.** A request-per-minute ceiling is one, and a
 #: spend cap is not: asking again in eight seconds reaches the same refusal,
-#: having spent an attempt, a budget token and the wall-clock of a paid job.
+#: having used an attempt, a budget token and the wall-clock time of a paid job.
 #:
 #: The pinned translator states the dimension on the exception. Measured on
 #: litellm 1.104.0: every ``RateLimitError`` carries ``category`` (defaulting to
@@ -326,8 +326,8 @@ def _clears_with_time(exc: BaseException) -> bool:
     """Whether the limit this error names is one that reopens on its own.
 
     ``True`` where the provider named no dimension, which is the ordinary case
-    and the safe one: an unstated limit is judged by its status code exactly as
-    before, and a genuine throttle must survive a vocabulary this table has not
+    and the safe one: an unstated limit is judged by its status code alone,
+    and a genuine throttle must survive a vocabulary this table has not
     met.
 
     The value arrives as an enum member or as its string — litellm ships
@@ -425,11 +425,11 @@ def _asks_a_longer_wait_than_we_take(failure: ProviderFailure) -> bool:
     Read as evidence rather than as a delay. A provider that says "come back in
     an hour" has answered the question a retry exists to ask — will asking again
     shortly work — and the answer is no. Sleeping the hour would park a paid job
-    on a third party's number; sleeping less and asking anyway spends an attempt
+    on a third party's number; sleeping less and asking anyway uses an attempt
     and a budget token to reach the same refusal.
 
     Only a stated hint decides this. A failure carrying none is judged by its
-    ``retryable`` as before, because an absent header says nothing about how
+    ``retryable`` alone, because an absent header says nothing about how
     long capacity will take to return.
     """
     stated = failure.retry_after_seconds
@@ -518,9 +518,9 @@ class ProviderFailure:
 def classify(exc: BaseException) -> ProviderFailure:
     """One provider failure as a value, read off the exception exactly once.
 
-    The single place this module turns a third party's object into facts. Every
-    other reader takes the :class:`ProviderFailure`, so the rules keep the one
-    reader each that they have, and a caller on the far side of a process
+    Here this module turns a third party's object into facts. Every
+    other reader takes the :class:`ProviderFailure`, so each rule keeps its own
+    reader, and a caller on the far side of a process
     boundary gets the same answer without the object.
     """
     retryable = _is_transient(exc)
@@ -537,8 +537,8 @@ def classify(exc: BaseException) -> ProviderFailure:
 def _kind_of(exc: BaseException, retryable: bool) -> FailureKind:
     """Name what this failure was, having already decided whether to retry it.
 
-    Takes ``retryable`` rather than asking again: the decision has one reader
-    and this is a label on its answer. A 429 splits on the same dimension
+    Takes ``retryable`` rather than asking again: this is a label on the
+    answer :func:`classify` already decided. A 429 splits on the same dimension
     :data:`_RATE_LIMIT_CLEARS_WITH_TIME` reads — a window that reopens is a
     throttle, a cap that does not is a spent quota — so the two meanings of one
     status code stay distinguishable in a record.
@@ -637,7 +637,7 @@ class RetryPolicy:
         failure never spends a token it was never going to benefit from.
 
         Called **once** per failed attempt, because the last branch mutates:
-        :meth:`RetryBudget.withdraw` spends the token this answer grants.
+        :meth:`RetryBudget.withdraw` withdraws the token this answer grants.
         """
         if attempt >= self.attempts:
             return RetryRefusal.ATTEMPTS_SPENT

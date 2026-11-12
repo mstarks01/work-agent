@@ -59,14 +59,14 @@ from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.envelope import VERSION, stamp
 from evals.harness.reference import (
     ANONYMOUS,
-    CorpusError,
-    corpus_refusal,
     is_submitted_for,
 )
 from webapp.page import WORKSPACE_STYLE, client_script, script_json
+from webapp.sitting import REVIEW_LABELS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -119,6 +119,8 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
         "editor_url_limit": review_submissions.EDITOR_URL_LIMIT,
         "min_own_list": sittings.MIN_OWN_LIST,
         "marks": list(sittings.MARKS),
+        # The words for each row state. The page has no server to ask.
+        "review_labels": REVIEW_LABELS,
         "cases": cases,
     }
 
@@ -143,9 +145,9 @@ _PAGE = """<!doctype html>
 #rail{width:270px;flex:none;background:var(--sidebar);border-right:1px solid var(--line);
 padding:28px 14px;position:sticky;top:0;height:100vh;overflow:auto}
 #stage{flex:1;padding:36px;max-width:900px}
-h1{font-size:18px;margin:0 0 4px}
+h1{font-size:20px;margin:0 0 4px}
 h2{font-size:17px;margin:28px 0 8px}
-h3{font-size:14px;margin:18px 0 6px;color:var(--muted)}
+h3{font-size:15px;margin:18px 0 6px;color:var(--muted)}
 .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
 .row{display:block;width:100%;min-height:0;text-align:left;background:none;border:0;
 padding:10px 12px;border-radius:7px;color:var(--text);font-weight:400}
@@ -230,9 +232,8 @@ def main(argv: list[str] | None = None) -> int:
     # to fix, and it names the case rather than a pydantic frame.
     try:
         page = build(sittings.CORPUS_DIR, submitted_by, submitted_for)
-    except CorpusError as exc:
-        print(corpus_refusal(exc), file=sys.stderr)
-        return 1
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
 
     out = Path(args.out)
     out.write_text(page, encoding="utf-8")

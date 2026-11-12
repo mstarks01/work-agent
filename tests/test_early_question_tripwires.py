@@ -16,7 +16,7 @@ from analysis_service.answer_state import passes_floor
 from analysis_service.assertions import REGISTRY, AssertionCatalog, settled
 from analysis_service.early_questions import early_questions
 from analysis_service.open_facts import prepared_model
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.report import Report
 from analysis_service.system_model import Process, SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
@@ -66,8 +66,8 @@ def _cannot_measure() -> list[str]:
     """What the tripwire reads and no longer finds, or nothing."""
     missing = []
     for kind, facet in STATED_FACETS:
-        question = QUESTION_KINDS.get(kind)
-        if question is None or facet not in {f.id for f in question.facets}:
+        name = parse_question_kind(kind)
+        if name is None or facet not in {f.id for f in QUESTION_KINDS[name].facets}:
             missing.append(f"the facet {kind}.{facet}")
     exposure = REGISTRY.get("internet-exposure")
     if "exposure" not in Process.model_fields or exposure is None:

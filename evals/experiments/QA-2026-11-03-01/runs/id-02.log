@@ -1,0 +1,9 @@
+material from today's prepare, catalog signed; prompt files from d51830a1fa4ffbdb5348b1713bae9fa0b2b2a2f2
+- Unverified transport protection may expose sensor readings crossing into the gateway | ['flow:entity:sensor-node>process:device-gateway>publish-readings', 'entity:sensor-node', 'process:device-gateway']
+- Unverified transport protection may expose dashboard data en route to the telemetry lake | ['flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'entity:fleet-operator', 'store:telemetry-lake']
+- Unverified Pub/Sub transport may disclose normalized readings to a path observer | ['flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer', 'store:pub-sub']
+- A storage copy of the device registry may reveal reusable fleet credentials | ['store:device-registry', 'flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway']
+- An unencrypted telemetry-lake copy could disclose customer occupancy data | ['store:telemetry-lake']
+- An unencrypted Pub/Sub retention copy may expose sensor-reading payloads | ['store:pub-sub', 'flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings']
+spent: $0.0538 reported
+must-finds matched: [7]

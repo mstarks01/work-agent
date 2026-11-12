@@ -27,9 +27,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from functools import partial
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 import anyio.to_thread
 
@@ -55,10 +55,21 @@ from analysis_service.claims import (
 )
 from analysis_service.deployment import FrameworkNotCarried
 from analysis_service.detected_facts import detected_facts
+from analysis_service.element_hues import element_hues
 from analysis_service.errors import ConfigError, refusal_text
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, fact_label
 from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
+from analysis_service.job_controls import (
+    CONTROL_GONE,
+    FACT_MEANINGS,
+    ControlScopeEntry,
+    CopiedControl,
+    changes_nothing,
+    control_offer,
+    not_for_this_analysis,
+    resolve_scopes,
+)
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
     Admission,
@@ -72,14 +83,19 @@ from analysis_service.jobs import (
     UnreadableSchema,
     readable,
 )
-from analysis_service.links import LinkAnswer, NoCatalogError, with_link_answers
+from analysis_service.links import (
+    LinkAnswer,
+    NoCatalogError,
+    refuse_owner_file_sources,
+    with_link_answers,
+)
 from analysis_service.pipeline import entry_of
 from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report import Report
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.selection import Requested, resolve_selection
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import LimitBreach, Source, SourceLimits
 from analysis_service.system_model import SystemModel
 
 logger = logging.getLogger(__name__)
@@ -192,6 +208,14 @@ class Refused(ValueError):
         return {"contradiction": {"part": list(part), "ancestor": list(ancestor)}}
 
 
+#: The refusal of a submission that names an Owner File the owner does not
+#: hold: one sentence for a deleted file and for another owner's ID.
+OWNER_FILE_GONE = (
+    "A file that this analysis names is no longer in Files. Remove it from the"
+    " analysis to continue."
+)
+
+
 class RunnerUnavailable(Exception):
     """The deployment cannot build a runner now: its configuration is incomplete.
 
@@ -248,6 +272,7 @@ class Answerable:
                 for selection in record.whole_frameworks()
             },
             analyses=self.analyses,
+            asks=record.ask_questions,
             waiting=record.status == "awaiting-answers",
             final=record.final(),
             sources=record.whole_sources(),
@@ -260,18 +285,32 @@ class Answerable:
             draft=record.draft,
             carried_in=record.carried,
             renames=tuple(record.carried_renames),
+            controls=tuple(record.controls),
+            scopes=None
+            if record.control_scopes is None
+            else tuple(record.control_scopes),
+            stored_facts=None
+            if record.control_facts is None
+            else tuple(record.control_facts),
         )
 
     def payload(self) -> dict[str, Any]:
         """Every question the job asks, with its drafts, corrections and limits."""
         record = self.record
         state = self.state()
+        asked = state.questions.to_json()
+        # "Your answers" marks each answer with its rung (ADR 0125).
+        for row in cast(list[dict[str, Any]], asked["answered_early"]):
+            origin = state.fact_origin(tuple(row["key"]))
+            row["origin"] = None if origin is None else asdict(origin)
         return (
-            state.questions.to_json()
+            asked
             | state.carried.to_json(self.model)
             | {
                 "fallback": question_fallback(self.analyses).to_json(),
                 "revision": record.revision,
+                # A job that asks nobody offers no amendment.
+                "asks": record.ask_questions,
                 "draft_links": [
                     link.model_dump(mode="json") for link in record.draft.links
                 ],
@@ -296,8 +335,37 @@ class Answerable:
                 # What the extraction read, for a person to review at the
                 # pause; a finished report shows its model itself.
                 "detected_facts": detected_facts(self.model) if state.waiting else [],
+                # Each element's hue, so a question row shows the element's tag.
+                "element_hues": element_hues(self.model),
             }
+            | self._controls(state)
         )
+
+    def _controls(self, state: AnswerState) -> dict[str, Any]:
+        """The offer of each copied Control at the pause (ADR 0124), and each
+        fact an applied Control writes with its state (ADR 0125). A job with
+        no copy, which each ``/v1`` job is, gets no key."""
+        record = self.record
+        if not record.controls or record.status != "awaiting-answers":
+            return {}
+        return {
+            "controls": control_offer(
+                record.controls, record.control_scopes, self.model
+            ),
+            "control_facts": [
+                {
+                    "control": entry.control,
+                    "name": entry.name,
+                    "label": fact_label(fact.answer.key, self.model),
+                    "state": fact.state,
+                    "meaning": FACT_MEANINGS[fact.state],
+                    "stated": fact.stated,
+                    "answer": fact.answer.model_dump(mode="json"),
+                }
+                for entry in state.control_facts
+                for fact in entry.facts
+            ],
+        }
 
 
 @dataclass(frozen=True)
@@ -331,7 +399,9 @@ class Submission:
     ``frameworks`` is the selection as the caller listed it. ``system_name``
     passed :func:`~analysis_service.sources.clean_system_name` already: each
     route refuses an unclean name in its own way. ``answers_from`` names the
-    earlier job whose answers the new job carries (ADR 0079).
+    earlier job whose answers the new job carries (ADR 0079). ``owner_files``
+    names the Owner Files whose text the new job copies (ADR 0119), and
+    ``controls`` the Controls it copies (ADR 0127).
     """
 
     sources: Sequence[Source]
@@ -340,6 +410,8 @@ class Submission:
     links: Sequence[LinkAnswer] = ()
     questions: bool = False
     answers_from: str | None = None
+    owner_files: Sequence[str] = ()
+    controls: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -372,8 +444,8 @@ class JobAnswers:
 
     ``runner_for`` looks a runner up by selection and entry. ``limits`` bounds
     what a job may carry, ``ceiling`` how many jobs one owner may have in
-    flight, and ``budget`` the tokens a window admits. ``frameworks`` is what
-    the deployment carries, in ``config/frameworks.toml`` order, which is
+    flight, and ``budget`` the tokens a window admits. ``carried_frameworks``
+    is what the deployment carries, in ``config/frameworks.toml`` order, which is
     what a submission selects from and the order its report's blocks take
     (ADR 0102). ``carries_catalog``
     says whether a job here builds an assertion catalog. A link answer places
@@ -389,9 +461,9 @@ class JobAnswers:
     limits: SourceLimits
     ceiling: int
     budget: BudgetPolicy
-    frameworks: Sequence[FrameworkName]
+    carried_frameworks: Sequence[FrameworkName]
     carries_catalog: bool
-    gate: CertificationGate | None = None
+    gate: CertificationGate | None
 
     def withheld(self, record: JobRecord) -> CertifyResult | None:
         """The certification that withholds this job's output, or ``None``.
@@ -477,19 +549,34 @@ class JobAnswers:
             raise UnreadableSchema(record.schema_version)
         return record
 
-    async def answerable(self, job_id: str, owner_id: str) -> Answerable:
+    async def answerable(
+        self,
+        job_id: str,
+        owner_id: str,
+        *,
+        sources: Sequence[Source] | None = None,
+        controls: Sequence[CopiedControl] | None = None,
+    ) -> Answerable:
         """What this caller may ask or answer about, read once.
 
         **The one reader of "what does this job ask about".** Each part that
         the envelope leaves out is read by name, once, after :meth:`parsable`.
+        ``sources`` and ``controls`` are the job's sources and its copy of its
+        Controls where the caller read them already, so neither is read twice.
         """
         record = await self.parsable(job_id, owner_id)
         store = self.store
         # The envelope leaves the sources out, and the answers compose with them.
-        sources = await store.sources(job_id, owner_id)
         if sources is None:
-            await self.missing(record, "sources")
-        record.sources = sources
+            sources = await store.sources(job_id, owner_id)
+            if sources is None:
+                await self.missing(record, "sources")
+        record.sources = list(sources)
+        if controls is None:
+            controls = await store.controls(job_id, owner_id)
+            if controls is None:
+                await self.missing(record, "controls")
+        record.controls = list(controls)
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
             # to the head's verdict as a report answers to its run's.
@@ -522,11 +609,13 @@ class JobAnswers:
 
     async def questions(self, job_id: str, owner_id: str) -> dict[str, Any]:
         """Every question the job asks the submitter, derived at read time.
+        A read carries no admission bound."""
+        return await self.payload_of(await self.answerable(job_id, owner_id))
 
-        The derivation grows with the report, and a read carries no admission
-        bound, so it runs off the event loop.
-        """
-        answerable = await self.answerable(job_id, owner_id)
+    @staticmethod
+    async def payload_of(answerable: Answerable) -> dict[str, Any]:
+        """Every question that ``answerable`` asks. The derivation grows with
+        the report, so it runs off the event loop."""
         return await anyio.to_thread.run_sync(answerable.payload)
 
     async def submit(
@@ -542,12 +631,15 @@ class JobAnswers:
         1. the selection, by :func:`~analysis_service.selection.resolve_selection`,
            which orders it in the deployment's carried order and raises
            :class:`~analysis_service.selection.SelectionError`;
-        2. the sources with the link answers composed in, which raises the
-           :class:`NoCatalog` refusal :meth:`answer` makes, or :class:`Refused`
-           for the ``ValueError`` of
-           :func:`~analysis_service.links.with_link_answers`; the answers go
-           only onto a job that has sources of its own, because answers alone
-           would carry the body past the ladder's empty-sources rung;
+        2. the sources: the body's, with a caller's ``owner_file_id`` refused
+           (:func:`~analysis_service.links.refuse_owner_file_sources`), then a
+           copy of each Owner File it names (:meth:`owner_file_sources`), then
+           the link answers composed in, which raises the :class:`NoCatalog`
+           refusal :meth:`answer` makes, or :class:`Refused` for the
+           ``ValueError`` of :func:`~analysis_service.links.with_link_answers`;
+           the answers go only onto a job that has sources of its own, because
+           answers alone would carry the body past the ladder's empty-sources
+           rung;
         3. the source limits, which raise
            :class:`~analysis_service.answer_state.SourcesOverLimit`;
         4. the owner, by :meth:`submitter`;
@@ -562,10 +654,17 @@ class JobAnswers:
         hears about the limit; both answers refuse it, and neither runs a
         model.
         """
-        selection = resolve_selection(self.frameworks, submission.frameworks)
+        selection = resolve_selection(self.carried_frameworks, submission.frameworks)
         if submission.links and not self.carries_catalog:
             raise NoCatalog()
         sources = list(submission.sources)
+        self._refusing(refuse_owner_file_sources, sources)
+        sources += await self.owner_file_sources(identity, submission.owner_files)
+        controls = await self.control_copies(identity, submission.controls)
+        names = [framework.name for framework in selection]
+        for copy in controls:
+            if changes_nothing(copy, names):
+                raise Refused(not_for_this_analysis(copy.document.name))
         if sources:
             sources = self._refusing(with_link_answers, sources, submission.links)
         breach = self.limits.breach(sources)
@@ -582,28 +681,133 @@ class JobAnswers:
             system_name=submission.system_name,
             answers=AnswerSet(links=tuple(submission.links)),
             carried=carried,
+            controls=controls,
             ask_questions=submission.questions,
+            continues_at_pause=bool(controls) and not submission.questions,
+            assertion_pass=self.carries_catalog,
             reserved_tokens=budgets.estimate(sources, selection),
         )
         return await self.admit(record, start=start, principal=submitter.new)
 
+    async def owner_file_sources(
+        self, identity: Identity, file_ids: Sequence[str]
+    ) -> list[Source]:
+        """A copy of each Owner File that ``file_ids`` names, as a Source
+        (ADR 0119).
+
+        Each copy takes the row's kind, the row's name as its label, the text
+        the store holds and the file's ID. The identity's principal is read
+        with no create, so a submission that names a file creates no
+        principal. A missing ID and another owner's ID get one refusal, which
+        names no ID, and so does a repeated ID. More IDs than the source limit
+        are refused before the store is read.
+        """
+        if not file_ids:
+            return []
+        if len(file_ids) > self.limits.max_sources:
+            raise SourcesOverLimit(
+                LimitBreach(
+                    "count",
+                    f"{len(file_ids)} files named, over the"
+                    f" {self.limits.max_sources} source limit",
+                )
+            )
+        if len(set(file_ids)) != len(file_ids):
+            raise Refused("The analysis names one file from Files twice.")
+        held = await self.store.principal(identity)
+        sources = []
+        for file_id in file_ids:
+            found = (
+                None
+                if held is None
+                else await self.store.file_text(file_id, held.owner_id)
+            )
+            if found is None:
+                raise Refused(OWNER_FILE_GONE)
+            file, text = found
+            sources.append(
+                Source(
+                    kind=file.kind, label=file.name, text=text, owner_file_id=file.id
+                )
+            )
+        return sources
+
+    async def control_copies(
+        self, identity: Identity, control_ids: Sequence[str]
+    ) -> list[CopiedControl]:
+        """A copy of each Control that ``control_ids`` names, with the text of
+        each evidence file (ADR 0127).
+
+        The identity's principal is read with no create, as
+        :meth:`owner_file_sources` reads it, and one read lists the owner's
+        Controls. A missing ID and another owner's ID get one refusal, which
+        names no ID, and so does an evidence file that a delete removed during
+        the copy.
+        """
+        if not control_ids:
+            return []
+        if len(set(control_ids)) != len(control_ids):
+            raise Refused("The analysis names one Control twice.")
+        held = await self.store.principal(identity)
+        owned = (
+            {}
+            if held is None
+            else {
+                control.document.id: control
+                for control in await self.store.list_controls(held.owner_id)
+            }
+        )
+        copies = []
+        for control_id in control_ids:
+            control = owned.get(control_id)
+            if control is None:
+                raise Refused(CONTROL_GONE)
+            texts = {}
+            for file in control.document.evidence:
+                text = await self.store.read_evidence(
+                    control_id, file.id, control.owner_id
+                )
+                if text is None:
+                    raise Refused(CONTROL_GONE)
+                texts[file.id] = text
+            copies.append(CopiedControl.of(control, texts))
+        return copies
+
     async def answer(
-        self, job_id: str, owner_id: str, answers: Answers, *, start: Start
+        self,
+        job_id: str,
+        owner_id: str,
+        answers: Answers,
+        *,
+        start: Start,
+        control_scopes: Sequence[ControlScopeEntry] | None = None,
     ) -> DraftSaved | AnswersSaved | Started:
         """Keep the answers or a draft, or start the Resumed Job the answers start.
 
         A save keeps a waiting job's answers or a finished report's draft, and
         starts nothing. A send without ``save`` starts the Resumed Job, which
         is admitted as a new job against the ceiling and the budget, because
-        its lanes and critics spend model calls.
+        its lanes and critics spend model calls. ``control_scopes`` states the
+        resolution of each copied Control of a waiting job (ADR 0124); left
+        out, the job keeps the resolution it holds. The Resumed Job copies the
+        Controls and their resolution, and reads no Control from the store.
         """
         if answers.given.links and not self.carries_catalog:
             raise NoCatalog()
         answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
         state = answerable.state()
+        scopes = parent.control_scopes
+        if control_scopes is not None:
+            if parent.status != "awaiting-answers":
+                raise Refused("A Control's match is confirmed at the pause.")
+            scopes = self._refusing(
+                resolve_scopes, control_scopes, parent.controls, answerable.model
+            )
+            state = replace(state, scopes=tuple(scopes))
+        sent = replace(answers, resolves_controls=control_scopes is not None)
         outcome = await anyio.to_thread.run_sync(
-            partial(self._refusing, state.answer, answers, limits=self.limits)
+            partial(self._refusing, state.answer, sent, limits=self.limits)
         )
         if isinstance(outcome, SavedDraft):
             if not await self.store.save_draft(
@@ -624,6 +828,8 @@ class JobAnswers:
                 outcome.skipped,
                 outcome.revision,
                 renames=outcome.renames,
+                control_scopes=scopes,
+                control_facts=outcome.control_facts,
             ):
                 raise SaveConflict(
                     "the job no longer waits on answers, or another save landed"
@@ -637,6 +843,9 @@ class JobAnswers:
             frameworks=parent.whole_frameworks(),
             system_name=parent.system_name,
             title=parent.title,
+            # The Resumed Job never pauses, and its report asks what the
+            # analysis asks.
+            ask_questions=parent.ask_questions,
             answers=outcome.answers,
             shown_early=outcome.shown,
             skipped_early=list(outcome.skipped),
@@ -647,11 +856,32 @@ class JobAnswers:
                 follow_up=outcome.follow_up,
             ),
             parent_revision=parent.revision,
+            controls=parent.controls,
+            control_scopes=scopes,
+            control_facts=outcome.control_facts,
+            assertion_pass=parent.assertion_pass,
             reserved_tokens=budgets.estimate(
                 outcome.sources, parent.whole_frameworks()
             ),
         )
         return await self.admit(record, start=start)
+
+    async def continue_at_pause(
+        self, job_id: str, owner_id: str, *, start: Start
+    ) -> None:
+        """Continue a job that pauses for its Controls alone, with no own
+        answers, as a continue with an empty answer list does (ADR 0125).
+
+        Each copied Control takes the resolution the job holds and writes its
+        open facts. A job that does not wait at its pause, because its run
+        failed, stopped or was rejected, starts nothing. A refusal raises as
+        :meth:`answer` raises it, and the job stays paused.
+        """
+        record = await self.envelope(job_id, owner_id)
+        if record.waits_to_continue():
+            await self.answer(
+                job_id, owner_id, Answers(revision=record.revision), start=start
+            )
 
     async def amend(
         self,
@@ -666,7 +896,9 @@ class JobAnswers:
 
         The new job reads the paused job's sources with the amendment added,
         pauses again, and carries the paused job's answers, which its own
-        questions take where they still ask them.
+        questions take where they still ask them. It copies the paused job's
+        Controls with no store read, and matches them again against its own
+        model.
         """
         answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
@@ -686,6 +918,8 @@ class JobAnswers:
             amends=parent.id,
             parent_revision=parent.revision,
             carried=parent.held_answers(),
+            controls=parent.controls,
+            assertion_pass=self.carries_catalog,
             reserved_tokens=budgets.estimate(
                 amended.sources, parent.whole_frameworks()
             ),
@@ -797,8 +1031,8 @@ class JobAnswers:
         **The one admission.** A submission, a Resumed Job and an amended job
         are all new jobs: each takes an in-flight slot and a share of the
         token budget, and each is refused the same way when it cannot have
-        one. Every refusal is logged, because it is the only place these
-        bounds are observable from outside the caller they refused, and the
+        one. Every refusal is logged, because only the log shows these
+        bounds outside the caller they refused, and the
         log carries the deployment-wide figure a response withholds.
 
         A selection that names a framework the Deployment no longer carries

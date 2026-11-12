@@ -220,6 +220,7 @@ class TestAPopulationIsFrozenBeforeReview:
         assert population.command_freeze_population(args) == 1
         assert out.read_text(encoding="utf-8") == first
         assert set(json.loads(first)["cases"]) == {str(tmp_path / "case")}
+        assert json.loads(first)["record"]["inputs"][0]["path"] == str(source)
 
     def test_the_command_is_registered(self) -> None:
         assert COMMANDS["freeze-population"].run is (
@@ -263,6 +264,8 @@ class TestReassessingAReport:
         written = json.loads(args.out.read_text(encoding="utf-8"))
         assert len(written["rejected"]) == 1
         assert len(written["withdrawn"]) == 1
+        assert written["record"]["command"] == "reassess"
+        assert written["assertions"]["catalog"]
 
     def test_verdicts_for_another_catalog_are_refused(self, tmp_path) -> None:
         args = self.write(tmp_path, digest="0" * 64)

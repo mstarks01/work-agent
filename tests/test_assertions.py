@@ -57,7 +57,6 @@ from analysis_service.assertions import (
     contradiction_issues,
     contradictions,
     identity_parts,
-    merged,
     offered,
     project,
     projected_attribute,
@@ -1219,13 +1218,6 @@ class TestARowNamesItsWriter:
     def test_an_answer_row_is_an_answer(self):
         row = Assertion.model_validate(self.raw("answer", "answers"))
         assert answered(row)
-
-    def test_a_merge_of_an_answer_and_a_pass_row_is_refused(self):
-        """A merge that joined the two would hide which spans the answer wrote."""
-        pass_row = Assertion.model_validate(self.raw("assertion-pass", "description"))
-        answer_row = Assertion.model_validate(self.raw("answer", "answers"))
-        with pytest.raises(ValidationError, match="answers Source"):
-            merged(catalog([pass_row]), catalog([answer_row]))
 
 
 class TestResolvingAProposal:
@@ -2517,25 +2509,6 @@ class TestTheImplementationAudit:
         assert len(entry.support) == MAX_SPANS
         assert codes(record.issues) == ["support-truncated"]
         assert record.refused_rows() == 0
-
-    def test_a_merge_outside_the_resolver_cuts_as_the_resolver_does(self):
-        """``merged`` cuts and records, so a patch adding a ninth quote to a
-        fact keeps the fact rather than rolling the batch back."""
-        many = [
-            f"Segment {index} says password authentication applies."
-            for index in range(MAX_SPANS + 1)
-        ]
-        text = " ".join(many)
-        rows = [stated(support=[support_span(quote, "test", text)]) for quote in many]
-        joined = catalog(rows[:1])
-        cut = []
-        for row in rows[1:]:
-            joined, cut = merged(joined, catalog([row]))
-
-        (entry,) = joined.entries
-        assert len(entry.support) == MAX_SPANS
-        assert codes(cut) == ["support-truncated"]
-        assert gated(joined, sources={"test": text}) == []
 
 
 @pytest.mark.parametrize("reason", ["unmeasured", "truncated"])

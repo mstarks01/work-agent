@@ -50,7 +50,7 @@ Six of the per-framework nodes are structural rather than analytical:
 
 * ``revalidate`` is the second run of the same validate function, after the one
   repair pass. It is two nodes rather than a back-edge because the repair budget
-  is exactly one. The graph cannot loop, so it cannot spend a second pass, and
+  is exactly one. The graph cannot loop, so it cannot run a second pass, and
   "one repair, then reject" is visible in the topology rather than enforced by a
   counter.
 * ``reject`` is where the second failure lands. It is a terminal node that parks
@@ -77,10 +77,10 @@ its skills through :mod:`analysis_service.skills`, and its prompt through
 ``analyze/stride`` in the tier config becomes ``analyze_stride_spoofing`` and its
 five siblings here. :func:`tier_node_by_graph_node` is the only place that
 correspondence lives. The tier config keys one ``analyze/<framework>`` where the
-graph builds one node per lane, which is ``model_tiers.toml`` v5's own rule: a
+graph builds one node per lane, which is ``model_tiers.toml``'s own rule: a
 lane is a framework's internal fact, and all of them run the same judgement on
-the same tier. The graph names carry the framework as well, and that is the bump
-report schema 3.0 earned. A consumer that keys on ``analyze_spoofing`` in
+the same tier. The graph names carry the framework as well, as report schema
+3.0 defines. A consumer that keys on ``analyze_spoofing`` in
 ``nodes[].node`` does not error; it matches nothing, silently.
 
 The bookends are deliberately deterministic, because mechanical work belongs in
@@ -110,13 +110,12 @@ critic seams here.
 from __future__ import annotations
 
 import functools
-import hashlib
 import json
 import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_args
 
 import anyio.to_thread
 from google.adk.agents import LlmAgent
@@ -125,7 +124,7 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from analysis_service.assertions import (
     ANSWER_ISSUES,
@@ -171,6 +170,7 @@ from analysis_service.critic_round import (
     critic_instruction,
     recritic_instruction,
 )
+from analysis_service.diagrams import DiagramReading
 from analysis_service.domains import select_domain_packs
 from analysis_service.errors import error_place
 from analysis_service.evidence import (
@@ -180,7 +180,7 @@ from analysis_service.evidence import (
     render_element_roster,
 )
 from analysis_service.fact_answers import STORED, FactAnswer
-from analysis_service.fan_in import fan_in
+from analysis_service.fan_in import fan_in, returned_to_deferred
 from analysis_service.field_capabilities import with_field_capabilities
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
@@ -195,6 +195,7 @@ from analysis_service.frameworks import (
     schemas_for,
 )
 from analysis_service.identity import IDENTITY_VERSION, build_identity
+from analysis_service.job_controls import AppliedControl, covered_units
 from analysis_service.knowledge import (
     MAX_CASES,
     MAX_NOTES,
@@ -241,9 +242,10 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import render_fenced
+from analysis_service.sources import render_fenced, text_digest
 from analysis_service.system_model import (
     BoundaryCrossing,
+    ElementSourceField,
     EmittedSystemModel,
     SystemModel,
 )
@@ -267,6 +269,39 @@ ModelResolver = Callable[[str], str | BaseLlm]
 logger = logging.getLogger(__name__)
 
 # --- Node names -------------------------------------------------------------
+
+#: The name of each shared node.
+SharedNode = Literal[
+    "extract",
+    "assert",
+    "capabilities",
+    "stated",
+    "catalog",
+    "pause",
+    "read",
+    "validate",
+    "repair",
+    "revalidate",
+    "reject",
+    "prepare",
+    "assemble",
+]
+#: Each :data:`SharedNode`.
+SHARED_NODES: tuple[SharedNode, ...] = get_args(SharedNode)
+
+#: What a node of one framework does. :meth:`FrameworkNodes.node` gives the
+#: name of the node.
+NodeRole = Literal[
+    "join", "merge", "critic", "router", "recritic", "rereview", "critic_failed"
+]
+
+#: The step of each lane agent.
+LANE_STEP: Literal["analyze"] = "analyze"
+
+#: What a graph node does, whichever framework or lane it serves: a shared node
+#: by its name, a lane agent as ``analyze``, and a node of one framework by its
+#: role. :func:`step_by_graph_node` gives the step of each node name.
+NodeStep = Literal[SharedNode, NodeRole, "analyze"]
 
 # The shared half of the topology: one extraction, one validity gate, one
 # preparation, one assembly. #162 ruled that one **Valid System Model** serves
@@ -319,15 +354,11 @@ CRITIC_FAILED_ROLE = "critic_failed"
 #: Every per-framework role, so :meth:`FrameworkNodes.node` names a set rather
 #: than a count. A tuple is a fact ``tests/test_graph.py`` reads; a count in
 #: prose is not.
-ROLES: tuple[str, ...] = (
-    JOIN_ROLE,
-    MERGE_ROLE,
-    CRITIC_ROLE,
-    ROUTER_ROLE,
-    RECRITIC_ROLE,
-    REREVIEW_ROLE,
-    CRITIC_FAILED_ROLE,
-)
+ROLES: tuple[NodeRole, ...] = get_args(NodeRole)
+
+
+#: An artifact a lane agent is given, by the prompt placeholder it fills.
+LaneArtifact = Literal["candidates", "scope", "reference_notes", "prior_cases"]
 
 
 # The per-lane artifacts, as ``{placeholder}`` in ``analyze.md`` against the
@@ -343,7 +374,7 @@ ROLES: tuple[str, ...] = (
 # other people's leads, and the material genuinely differs per lane — the candidate
 # rules that selected the corpus documents fired per lane, and the rule counts
 # behind the scope differ per category.
-LANE_ARTIFACTS: Mapping[str, str] = MappingProxyType(
+LANE_ARTIFACTS: Mapping[LaneArtifact, str] = MappingProxyType(
     {
         "candidates": "candidates",
         "scope": "scope",
@@ -393,7 +424,7 @@ class Lane:
         """Where this lane agent parks its proposals for its framework's merge."""
         return f"drafts_{self.slug}"
 
-    def key(self, artifact: str) -> str:
+    def key(self, artifact: LaneArtifact) -> str:
         """Where ``prepare`` parks one of this lane's inputs."""
         return f"{LANE_ARTIFACTS[artifact]}_{self.slug}"
 
@@ -411,7 +442,7 @@ class Lane:
             **{name: f"{{{self.key(name)}}}" for name in LANE_ARTIFACTS},
         }
 
-    def state(self, artifacts: Mapping[str, str]) -> dict[str, str]:
+    def state(self, artifacts: Mapping[LaneArtifact, str]) -> dict[str, str]:
         """This lane's state entries, given one rendered value per artifact.
 
         Keyed by placeholder on the way in and by state key on the way out,
@@ -441,9 +472,8 @@ class FrameworkNodes:
     subgraphs never touch: they fan out from the one prepared model and fan back
     in at ``assemble``, which is the only node that sees both.
 
-    Like :class:`Lane`, this is the one place its names are spelled. A node name
-    and the state key it writes are derived from the same ``name``, so a graph
-    carrying two frameworks cannot cross their wires.
+    A node name and the state key it writes are derived from the same
+    ``name``, so a graph carrying two frameworks cannot cross their wires.
     """
 
     name: FrameworkName
@@ -523,6 +553,51 @@ def tier_node_by_graph_node(
             for node, tier in FrameworkNodes(name).tier_nodes.items()
         },
     }
+
+
+def step_by_graph_node(frameworks: Sequence[FrameworkName]) -> dict[str, NodeStep]:
+    """Graph node name -> its step, for each node that a graph of this
+    selection can hold, whichever entry builds the graph.
+    ``tests/test_progress_words.py`` holds the names to each built graph."""
+    selected = [FrameworkNodes(name) for name in frameworks]
+    return {
+        **{node: node for node in SHARED_NODES},
+        **{nodes.node(role): role for nodes in selected for role in ROLES},
+        **{lane.node_name: LANE_STEP for nodes in selected for lane in nodes.lanes},
+    }
+
+
+def entry_steps(
+    entry: Entry, *, assertions: bool, capability_reader: bool
+) -> frozenset[NodeStep]:
+    """The step of each node that :func:`build_pipeline` builds for ``entry``
+    and the two pass switches, whichever selection, with no build. Raises
+    :class:`ValueError` where the builder refuses the entry and the switches,
+    whichever selection; the builder also refuses a capability reader for a
+    selection that reads no capability. ``tests/test_progress_words.py``
+    holds it to each built graph and to each refusal."""
+    if assertions and entry not in CATALOGUING_ENTRIES:
+        raise ValueError(f"entry {entry!r} ends in no catalog")
+    if capability_reader and entry not in READING_ENTRIES:
+        raise ValueError(f"entry {entry!r} extracts no model to pass on")
+    if entry == ENTRY_EXTRACT_ONLY:
+        return frozenset({"extract"})
+    if entry == ENTRY_ASSERT_ONLY:
+        return frozenset({"read", "assert"})
+    steps: set[NodeStep] = set()
+    if entry in EXTRACTING_ENTRIES:
+        steps |= {"extract", "repair", "validate", "revalidate", "reject"}
+    if capability_reader:
+        steps |= {"capabilities", "stated"}
+    if assertions:
+        steps |= {"read", "assert"}
+    if entry != ENTRY_HEAD_ONLY:
+        steps |= {"prepare", LANE_STEP, "assemble", *ROLES}
+    elif assertions:
+        steps.add("catalog")
+    else:
+        steps.add("pause")
+    return frozenset(steps)
 
 
 # --- Routes -----------------------------------------------------------------
@@ -694,6 +769,10 @@ STATE_INPUT_TEXT = "input_text"
 # bytes *rendered* — one key per view, under this module's rule that a rendered
 # key is written once and never read back by Python.
 STATE_SOURCE_TEXTS = "source_texts"
+# Each ``diagram`` Source's reading as JSON, by label (ADR 0121): the structure
+# rendered into :data:`STATE_INPUT_TEXT`, kept structured for the gate.
+STATE_DIAGRAM_READINGS = "diagram_readings"
+_READING: TypeAdapter[DiagramReading] = TypeAdapter(DiagramReading)
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_EVIDENCE_CATALOG = "evidence_catalog"
@@ -759,6 +838,14 @@ STATE_LINK_ANSWERS = "link_answers"
 # attribute answer is already written onto the seeded model; ``prepare``
 # writes the assertion answers over the open rows they answer.
 STATE_FACT_ANSWERS = "fact_answers"
+# Each fact a Control writes, with the Control's name (ADR 0125), seeded the
+# same way. Each is one line of the answers Source, which ``prepare`` composes
+# again so that each quote reads that text.
+STATE_CONTROL_LINES = "control_lines"
+# Each Control that applies to the job, with its resolved scope, its ticked
+# rows and the text of its evidence (ADR 0126), seeded the same way. The
+# fan-in keeps each unit a row covers, and the critic is shown each row.
+STATE_APPLIED_CONTROLS = "applied_controls"
 
 #: The job-wide state keys ``analyze.md`` templates, which every lane of every
 #: framework reads as one value. With :data:`LANE_ARTIFACTS` and ``{lane}`` they
@@ -802,6 +889,10 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     # Unit -> why this job could not settle it. Written by the fan-in, read by
     # ``assemble``, and empty for a package that defers nothing.
     "deferred",
+    # Unit -> the kind a Control row kept it from ``deferred`` for. Written by
+    # the fan-in, read by ``assemble``, which returns a unit whose draft the
+    # critic kept against every row.
+    "undeferred",
     # Unit -> why the package's own rules ruled it out of this model, before
     # any lane ran. Written by ``prepare``, read by ``assemble``, and empty
     # for a package whose rules rule nothing out.
@@ -847,6 +938,7 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
 SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
+        STATE_DIAGRAM_READINGS,
         STATE_EXTRACTED_MODEL,
         STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
@@ -859,6 +951,8 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_FRAMEWORK_OPTIONS,
         STATE_LINK_ANSWERS,
         STATE_FACT_ANSWERS,
+        STATE_CONTROL_LINES,
+        STATE_APPLIED_CONTROLS,
         STATE_REPAIR_BASELINE,
         STATE_MODEL_REPAIR,
     }
@@ -1040,8 +1134,8 @@ class Analysis:
     service over a job, the eval harness over a corpus case — and neither copies
     a field across itself. Two copies would have to agree with nothing checking
     that they did, and a field added here and missed in one driver would produce
-    a report with a block silently absent. :meth:`into_report` is the one place
-    that mapping lives; a driver hands over the four things the graph cannot
+    a report with a block silently absent. :meth:`into_report` holds that
+    mapping; a driver hands over the four things the graph cannot
     know and reads nothing out of this object itself.
 
     **One shared model, N finished blocks.** The blocks arrive whole — each
@@ -1231,9 +1325,10 @@ def unfence(rendered: str) -> str:
 # become the session's state delta.
 
 
-#: How many node bodies may hold a worker thread at once, across every job in
-#: the process. Separate from anyio's default limiter on purpose: that one is
-#: also what `require_identity` verifies a bearer token through, and a graph that
+#: How many node bodies the live jobs of the process may await on a worker
+#: thread at once. A body whose job the deadline or a stop settled holds no
+#: token. Separate from anyio's default limiter on purpose: that one is also
+#: what `require_identity` verifies a bearer token through, and a graph that
 #: could fill it would make every arriving caller wait for a node body.
 #:
 #: Small because a node body is CPU-bound, so more threads than cores gives
@@ -1256,12 +1351,13 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     ADK awaits a body that is a coroutine function, so wrapping it in one moves
     the work to a worker thread and gives the loop back. It does **not** make
     the deadline able to stop a running body -- nothing can, short of a process
-    boundary -- so the wrapper holds the task until the body ends and the
-    deadline lands between nodes. The
-    wrapper keeps the wrapped signature, which is what ADK binds parameters
-    from, and touches nothing else: a node reaches the session only through
-    :class:`SessionState`, whose writes are plain dict writes, and only one
-    node of a run is in flight at a time.
+    boundary. The job deadline is an ``asyncio.timeout``, and a stop ends that
+    same scope. So at the deadline or a stop the await ends at once, the token
+    goes back to :data:`_NODE_THREADS` and the thread runs on until its body
+    ends. The wrapper keeps the wrapped signature, which is what ADK binds
+    parameters from, and touches nothing else: a node reaches the session only
+    through :class:`SessionState`, whose writes are plain dict writes, and only
+    one node of a run is in flight at a time.
     """
 
     @functools.wraps(func)
@@ -1271,13 +1367,18 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
         # filling all forty slots put an arriving caller behind a whole body
         # before their token was even read.
         #
-        # A cancelled await here does NOT stop the body. `run_sync` takes its
-        # token outside the scope `abandon_on_cancel=False` shields, so the
-        # deadline returns the token, settles the job and frees its subject's
-        # slot while the thread runs on. Nothing in-process can stop a running
-        # Python call, so what keeps that harmless is that a body is short:
-        # `grounding.MAX_REPAIR_SECONDS_PER_BODY` is the bound that makes it
-        # so, and it is the reason this is a wrapper and not a supervisor.
+        # A cancelled await here does NOT stop the body. The job deadline and
+        # the stop control cancel the job task, and ADK then cancels each node
+        # task in its cleanup. Each is a native asyncio cancel, and the shield
+        # of `abandon_on_cancel=False` holds only against an anyio scope. So
+        # the await ends at the deadline, the token returns, the job settles
+        # and its subject's slot is free while the thread runs on.
+        # `_NODE_THREADS` therefore bounds the bodies that a live job awaits,
+        # not the threads that a settled job left. Nothing in-process can stop
+        # a running Python call, so what keeps that harmless is that a body is
+        # short: `grounding.MAX_REPAIR_SECONDS_PER_BODY` is the bound that
+        # makes it so, and it is the reason this is a wrapper and not a
+        # supervisor.
         return await anyio.to_thread.run_sync(
             functools.partial(func, **kwargs), limiter=_NODE_THREADS
         )
@@ -1294,6 +1395,17 @@ def after_gate(model: SystemModel) -> SystemModel:
     closed field proves (ADR 0085). Neither writes into what extraction read.
     """
     return with_field_capabilities(with_protocol_defaults(model))
+
+
+def diagram_readings(
+    stored: Mapping[str, Any] | None,
+) -> dict[str, DiagramReading]:
+    """Each diagram Source's reading, by label, from what
+    :data:`STATE_DIAGRAM_READINGS` holds, as the gate reads it."""
+    return {
+        label: _READING.validate_python(reading)
+        for label, reading in (stored or {}).items()
+    }
 
 
 def validate_extraction(
@@ -1348,8 +1460,12 @@ def validate_extraction(
         # The first gate, on every route out of it: what arrived is kept
         # before ``repair`` can write over the key it arrived in.
         state.put(STATE_FIRST_PASS, extracted_model)
+    diagrams = diagram_readings(state.get(STATE_DIAGRAM_READINGS))
     model, issues = parse_extraction(
-        extracted_model, extraction_format, sources=source_texts or {}
+        extracted_model,
+        extraction_format,
+        sources=source_texts or {},
+        diagrams=diagrams,
     )
     if model is None and extraction_format != FULL_FORMAT:
         # The emission was not a compact model at all, so there is nothing for
@@ -1376,7 +1492,10 @@ def validate_extraction(
             )
             repair = repair.model_copy(update={"restored": restored})
             model, issues = parse_and_validate(
-                overlaid, normalize_ids=True, sources=source_texts or {}
+                overlaid,
+                normalize_ids=True,
+                sources=source_texts or {},
+                diagrams=diagrams,
             )
         state.put(STATE_MODEL_REPAIR, repair.model_dump(mode="json"))
     if issues or model is None:
@@ -1429,7 +1548,7 @@ def reject_model(validation_issues: str, ctx, keys: GraphKeys) -> dict[str, Any]
 # Element fields stripped from the model rendered to every lane agent and every
 # critic. They survive on STATE_VALID_MODEL, so the report still
 # carries them.
-_ELEMENT_SOURCE_FIELDS = ("source_excerpt", "source_label", "source_speaker")
+_ELEMENT_SOURCE_FIELDS: tuple[ElementSourceField, ...] = get_args(ElementSourceField)
 
 
 def render_model(valid_model: dict) -> str:
@@ -1749,13 +1868,17 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
         FactAnswer.model_validate(fact, context=STORED)
         for fact in state.get(STATE_FACT_ANSWERS) or []
     ]
+    controls = [
+        (name, FactAnswer.model_validate(fact, context=STORED))
+        for name, fact in state.get(STATE_CONTROL_LINES) or []
+    ]
     if held is not None or links or facts:
         # The submitter's answers settle what they answer, so they are written
         # over whatever the node proposed and gated with the rest. A held
         # record is gated only after that: a resumed job's catalog holds its
         # parent's answered rows, and their quotes read the answers Source the
         # parent composed until this run writes them again.
-        linked, unplaced = apply_answers(record.catalog, model, links, facts)
+        linked, unplaced = apply_answers(record.catalog, model, links, facts, controls)
         record = AssertionRecord.over(
             linked,
             model,
@@ -1771,6 +1894,14 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
         )
     state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
     return record
+
+
+def held_controls(state: SessionState) -> list[AppliedControl]:
+    """The Controls that apply to the job, as the driver seeded them."""
+    return [
+        AppliedControl.model_validate(control)
+        for control in state.get(STATE_APPLIED_CONTROLS) or []
+    ]
 
 
 def held_assertions(state: SessionState) -> AssertionCatalog | None:
@@ -1808,7 +1939,7 @@ def prepare_node(
     return _node(prepare_analysis_node, PREPARE_NODE)
 
 
-def _claims_of(payload: object) -> list[Any]:
+def claims_of(payload: object) -> list[Any]:
     """The list inside an LLM node's emission, or empty if the node never ran.
 
     Lane agents and review nodes emit ``{"claims": [...]}`` rather than a bare
@@ -1840,7 +1971,7 @@ def _batch_of(payload: object) -> dict[str, Any]:
     The node already validated and dumped the batch, so state holds both its
     lists, and re-validating the whole payload keeps the invalid entries the
     node salvaged. A key that was never written reads as a batch of nothing,
-    the same absence :func:`_claims_of` reads for the review nodes.
+    the same absence :func:`claims_of` reads for the review nodes.
 
     A payload that is a mapping goes back as it stands, including one carrying
     no ``claims``. That shape is nothing this graph writes, so the caller's
@@ -1922,6 +2053,7 @@ def merge_drafts(
         )
     proposal_batch = nodes.schemas.proposals
     model = SystemModel.model_validate(valid_model)
+    controls = held_controls(state)
     merged = fan_in(
         {
             lane.lane: proposal_batch.model_validate(
@@ -1935,8 +2067,10 @@ def merge_drafts(
         state.get(nodes.key("ruled_out")) or {},
         held_assertions(state),
         state.get(nodes.key("ruled_in")) or {},
+        covered=covered_units(nodes.package, controls),
     )
     state.put(nodes.key("deferred"), merged.deferred)
+    state.put(nodes.key("undeferred"), merged.undeferred)
     state.put(
         nodes.key("drafts"), [draft.model_dump(mode="json") for draft in merged.drafts]
     )
@@ -1945,7 +2079,7 @@ def merge_drafts(
         nodes.key("coverage"), [row.model_dump(mode="json") for row in merged.coverage]
     )
     critic_round = CriticRound.of(
-        nodes.name, model, merged.drafts, merged.marks, held_assertions(state)
+        nodes.name, model, merged.drafts, merged.marks, held_assertions(state), controls
     )
     state.prompt(nodes.key("draft_view"), render_fenced(critic_round.view()))
     return _routed(
@@ -2009,7 +2143,7 @@ def route_review(
     """
     state = keys.state(ctx)
     critic_round = _parked_round(state, SystemModel.model_validate(valid_model), nodes)
-    emitted = _claims_of(state.get(nodes.key("reviewed")))
+    emitted = claims_of(state.get(nodes.key("reviewed")))
     recorded = list(critic_round.marks.unreconciled_rulings)
     first = state.get(nodes.key("first_review"))
     if first is None:
@@ -2022,16 +2156,10 @@ def route_review(
         recorded += drift
         outcome = critic_round.outcome(merged)
     if isinstance(outcome, Reask):
-        # ``previous_review`` is the emission itself rather than anything
-        # recomputed, because what the re-ask must reconcile with is the bytes
-        # the critic actually returned. ``first_review`` is the same rulings
-        # in the spelling the second look merges onto.
-        state.prompt(nodes.key("previous_review"), render_fenced(emitted))
-        state.prompt(nodes.key("critic_issues"), render_fenced(outcome.messages))
-        state.prompt(nodes.key("draft_roster"), render_fenced(outcome.roster))
-        state.prompt(
-            nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
-        )
+        # ``first_review`` is the first pass in the spelling the second look
+        # merges onto.
+        for artifact, text in outcome.rendered_artifacts.items():
+            state.prompt(nodes.key(artifact), text)
         state.put(nodes.key("first_review"), outcome.first.rulings)
         state.put(nodes.key("repairable"), outcome.first.repairable)
     if isinstance(outcome, Accepted):
@@ -2055,7 +2183,7 @@ def route_review(
         )
     if isinstance(outcome, Accepted):
         return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
-    return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
+    return _routed(ROUTE_REVISE, outcome.revise_output)
 
 
 def _parked_round(
@@ -2076,6 +2204,7 @@ def _parked_round(
         _drafts_of(state.get(nodes.key("drafts")) if accepted else None, nodes.package),
         AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
         held_assertions(state),
+        held_controls(state),
     )
 
 
@@ -2095,8 +2224,8 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
 
     The two keys are read from state for the reason :func:`route_review` gives,
     and it matters most of all here: this is the node a silent critic *reaches*,
-    so a binding failure would kill the run at the one place built to report why
-    it died.
+    so a binding failure would kill the run at the node whose job is to report
+    why it died.
     """
     state = keys.state(ctx)
     # The second look parked the merged set on ``reviewed`` and routed here, so
@@ -2104,7 +2233,7 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
     # reconcile.
     outcome = _parked_round(
         state, SystemModel.model_validate(valid_model), nodes
-    ).outcome(_claims_of(state.get(nodes.key("reviewed"))))
+    ).outcome(claims_of(state.get(nodes.key("reviewed"))))
     if isinstance(outcome, Failed):
         raise outcome.error
     raise AssertionError("fail_review reached on reconciled critic output")
@@ -2265,7 +2394,7 @@ class LaneInputs:
     """What one framework's lanes are given, and what the prepare node records."""
 
     #: Lane name -> the four rendered artifacts, keyed by placeholder.
-    artifacts: Mapping[str, Mapping[str, str]]
+    artifacts: Mapping[str, Mapping[LaneArtifact, str]]
     candidates: Mapping[str, CandidateSet]
     ruled_out: Mapping[str, str]
     ruled_in: Mapping[str, str]
@@ -2299,7 +2428,7 @@ def framework_lane_inputs(
     ]
     notes_by_lane = select_per_lane(package.knowledge.notes, fired_by_lane, MAX_NOTES)
     cases_by_lane = select_per_lane(package.knowledge.cases, fired_by_lane, MAX_CASES)
-    artifacts: dict[str, dict[str, str]] = {}
+    artifacts: dict[str, dict[LaneArtifact, str]] = {}
     retrieved: list[str] = []
     ruled_out: dict[str, str] = {}
     ruled_in: dict[str, str] = {}
@@ -2425,12 +2554,19 @@ def _framework_block(
     accepted = bool(state.get(nodes.key("accepted")))
     critic_round = _parked_round(state, model, nodes, accepted=accepted)
     outcome = critic_round.outcome(
-        _claims_of(state.get(nodes.key("reviewed")) if accepted else None)
+        claims_of(state.get(nodes.key("reviewed")) if accepted else None)
     )
     if isinstance(outcome, Failed):
         raise outcome.error
-    claims, rejected = outcome.claims, outcome.rejected
-    marks = critic_round.marks
+    claims, returned, back = returned_to_deferred(
+        outcome.claims,
+        outcome.rejected,
+        state.get(nodes.key("undeferred")) or {},
+        package.record,
+    )
+    rejected = outcome.rejected
+    # A returned claim leaves the block, so each mark on it leaves too.
+    marks = critic_round.marks.on_claims([claim.id for claim in (*claims, *rejected)])
     retrieved = state.get(nodes.key("retrieved")) or {}
     refusal = _refusal(package, state.get(nodes.key("precondition")))
     return schemas.block(
@@ -2444,7 +2580,7 @@ def _framework_block(
             claims=(*claims, *rejected),
             options=options,
             refusal=refusal,
-            deferred=state.get(nodes.key("deferred")) or {},
+            deferred={**(state.get(nodes.key("deferred")) or {}), **back},
             ruled_out=state.get(nodes.key("ruled_out")) or {},
             ruled_in=state.get(nodes.key("ruled_in")) or {},
         ),
@@ -2456,6 +2592,7 @@ def _framework_block(
             LaneCoverage.model_validate(row)
             for row in state.get(nodes.key("coverage")) or []
         ],
+        returned_claims=returned,
         fired_rules=list(retrieved.get("fired_rules", [])),
         knowledge_docs=list(retrieved.get("knowledge_docs", [])),
         catalog_leads=retrieved.get("catalog_leads"),
@@ -2474,7 +2611,7 @@ def _framework_block(
 # because the remedy differs: ``refuted`` says do not name this framework for
 # this system, and ``undecidable`` says the input never said, which the
 # submitter answers by submitting more.
-_REFUSALS: Mapping[str, Refusal] = MappingProxyType(
+_REFUSALS: Mapping[PreconditionResult, Refusal] = MappingProxyType(
     {
         "refuted": Refusal(
             "not-applicable",
@@ -2490,7 +2627,9 @@ _REFUSALS: Mapping[str, Refusal] = MappingProxyType(
 )
 
 
-def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
+def _refusal(
+    package: FrameworkPackage, result: PreconditionResult | None
+) -> Refusal | None:
     """Why this framework did not run, as a scope state and a reason, or ``None``.
 
     What the reason is *used for* is the block's own — the neutral base answers
@@ -2503,7 +2642,7 @@ def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
     model and runs no gate, and reporting a refusal there would describe one that
     never happened.
     """
-    refusal = _REFUSALS.get(str(result))
+    refusal = _REFUSALS.get(result or "satisfied")
     if refusal is None:
         return None
     return Refusal(refusal.state, refusal.reason.format(framework=package.name))
@@ -2791,8 +2930,9 @@ def _stated_node_func(keys: GraphKeys) -> Callable[..., Any]:
 
     It runs right behind the reader, ahead of every node that reads the valid
     model, so a pause, its early questions and ``prepare`` all read the
-    capabilities the sources state. The rows are checked here and nowhere
-    else (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
+    capabilities the sources state. The rows are checked here, in ``stated``,
+    and nowhere else
+    (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
     """
 
     def stated(valid_model: dict, ctx, source_texts: dict | None = None) -> dict:
@@ -3331,7 +3471,7 @@ def instruction_sizes(llm_nodes: Sequence[LlmAgent]) -> dict[str, InstructionSiz
             raise TypeError(f"node {node.name!r} carries a computed instruction")
         sizes[node.name] = InstructionSize(
             tokens=estimate_tokens(node.instruction),
-            sha256=hashlib.sha256(node.instruction.encode("utf-8")).hexdigest(),
+            sha256=text_digest(node.instruction),
         )
     return sizes
 
@@ -3363,7 +3503,7 @@ def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return text_digest(payload)
 
 
 def _node_sampling(

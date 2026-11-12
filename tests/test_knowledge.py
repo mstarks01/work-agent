@@ -181,34 +181,14 @@ class TestComposition:
 class TestTheCorpusCannotBecomeEvidence:
     """The rule the whole corpus lives under, checked where it could break."""
 
-    def test_no_document_is_reachable_from_the_evidence_seam(self):
-        """Retrieval feeds the prompt and stops there.
-
-        The importers of this module are the graph (which composes the prompt
-        blocks) and nothing else — in particular not ``evidence.py``, which
-        builds the closed set of citable facts, and not ``critic.py``, which
-        resolves what a finding rests on. There is no code path by which a
-        retrieved document could become a Ground.
-
-        Recursive, and keyed by path rather than bare filename: a package
-        under a subpackage (``frameworks/<name>/``) must stay covered by this
-        allowlist rather than escaping a flat, non-recursive glob.
-        """
-        package = PROJECT_ROOT / "src" / "analysis_service"
-        importers = {
-            path.relative_to(package).as_posix()
-            for path in package.rglob("*.py")
-            if "from analysis_service.knowledge import" in path.read_text()
-        }
-        assert importers == {"graph.py"}
-
     def test_evidence_and_critic_never_import_knowledge(self):
-        """The two modules the docstring above names, checked directly.
+        """Retrieval feeds the prompt and stops there, so no retrieved document
+        can become a Ground.
 
-        A narrower, harder-to-fool companion to the allowlist test: it names
-        the two modules that must never import ``knowledge`` and reads them
-        by path, so it keeps failing loud even if the allowlist test above is
-        ever weakened or deleted.
+        A narrower, harder-to-fool companion to the allowlist lint
+        ``tests/test_import_lints.py``: it names the two modules that must never
+        import ``knowledge`` and reads them by path, so it keeps failing loud
+        even if the allowlist lint is ever weakened or deleted.
         """
         package = PROJECT_ROOT / "src" / "analysis_service"
         for module in ("evidence.py", "critic.py"):

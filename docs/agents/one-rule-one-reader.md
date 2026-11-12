@@ -28,7 +28,7 @@ Five corollaries:
 - **A self-sized fence is safe only while its neighbours are fenced too.** Ask
   what sits beside the value, not only what wraps it.
 - **A bound that predicts a cost from its inputs is wrong whenever the cost
-  turns on which inputs survive a filter.** Spend a budget where the work
+  turns on which inputs survive a filter.** Count a budget where the work
   happens.
 - **A rule that re-derives a value must compare it against the material it
   derives from, never against a value something else derived earlier.** The two

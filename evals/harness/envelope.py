@@ -41,6 +41,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.errors import MAX_RENDERED_ERRORS, shown_errors
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import carries_line_break
 from evals.harness import sitting as sittings
@@ -63,9 +64,9 @@ VERSION = 1
 MAX_LINE = 500
 MAX_LINES = 200
 
-#: The notes field, which is the one place a reader writes prose rather than a
-#: line. Every one of these values is written into a document that a pull
-#: request then carries, so the ceiling is on what merges, not on what parses.
+#: The notes field, where a reader writes prose rather than a line. Every one
+#: of these values is written into a document that a pull request then
+#: carries, so the ceiling is on what merges, not on what parses.
 MAX_NOTES = 20_000
 
 
@@ -92,6 +93,20 @@ def _one_line(value: str) -> str:
 
 
 Line = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_one_line)]
+
+
+def _printable_key(value: str) -> str:
+    if not value.isprintable():
+        raise ValueError("a key holds only printable characters")
+    return value
+
+
+#: A key of an envelope: a case ID, a fingerprint or a path. A refusal quotes
+#: the key in one line of a terminal or of a CI log, so the key holds only
+#: printable characters, as ``str.isprintable`` reads them: no line break, no
+#: control, format, surrogate, private-use or unassigned character, and no
+#: space other than the ASCII space.
+Key = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_printable_key)]
 
 #: A generous ceiling on one envelope's cases and marks. The corpus is 13
 #: cases with tens of records each; these bound a hostile file rather than a
@@ -120,8 +135,24 @@ def stamp(now: datetime | None = None) -> str:
     return (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H%M%SZ")
 
 
+def _printable(text: str) -> str:
+    """``text`` with each character a terminal could act on written as its
+    escape."""
+    return "".join(
+        char if char.isprintable() or char == "\n" else ascii(char)[1:-1]
+        for char in text
+    )
+
+
 class EnvelopeError(RuntimeError):
-    """An envelope this operator's tree will not take, and why."""
+    """An envelope this operator's tree will not take, and why.
+
+    The reason quotes the envelope, and the envelope is untrusted, so the
+    message holds no character a terminal could act on.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(_printable(reason))
 
 
 class CaseAnswers(BaseModel):
@@ -137,14 +168,14 @@ class CaseAnswers(BaseModel):
     own_list: list[Line] = Field(min_length=1, max_length=MAX_LINES)
     #: Keyed by the finding's fingerprint, as a mark is keyed everywhere else,
     #: so an insertion into a claim file moves no mark.
-    marks: dict[str, Mark] = Field(default_factory=dict, max_length=MAX_MARKS)
+    marks: dict[Key, Mark] = Field(default_factory=dict, max_length=MAX_MARKS)
     missing: list[Line] = Field(default_factory=list, max_length=MAX_LINES)
     notes: str = Field(default="", max_length=MAX_NOTES)
     #: Each required file as it stood when the page was built. Compared
     #: against the tree at import, never trusted as the digest that merges.
     #: The value is shaped here so a file that carries something other than a
     #: digest refuses, rather than reading as a file that moved.
-    opened_digests: dict[Line, Sha256Hex] = Field(
+    opened_digests: dict[Key, Sha256Hex] = Field(
         default_factory=dict, max_length=MAX_LINES
     )
 
@@ -171,7 +202,7 @@ class Envelope(BaseModel):
     #: one case. It is not the sitting's date: the entry is dated when it is
     #: recorded, because that is when the digests are taken.
     generated: str = Field(pattern=GENERATED_PATTERN)
-    cases: dict[str, CaseAnswers] = Field(max_length=MAX_CASES)
+    cases: dict[Key, CaseAnswers] = Field(max_length=MAX_CASES)
 
 
 def read(path: Path) -> Envelope:
@@ -197,7 +228,19 @@ def read(path: Path) -> Envelope:
     try:
         envelope = Envelope.model_validate(raw)
     except ValidationError as exc:
-        raise EnvelopeError(f"{path}: not a sitting envelope — {exc}") from exc
+        # The repr of each place, never the place: it quotes a key that the
+        # schema refused, so the key can hold a line break. An empty place is
+        # the top of the file. The entry after the limit has no place either:
+        # it counts the errors not shown.
+        refused = "\n".join(
+            f"{error.place!r}: {error.message}"
+            if error.place
+            else f"the top of the file: {error.message}"
+            if index < MAX_RENDERED_ERRORS
+            else error.message
+            for index, error in enumerate(shown_errors(exc.errors(include_input=False)))
+        )
+        raise EnvelopeError(f"{path}: not a sitting envelope —\n{refused}") from exc
     if envelope.envelope != VERSION:
         raise EnvelopeError(
             f"{path} is envelope version {envelope.envelope} and this tree"

@@ -44,7 +44,7 @@ once for the follow-up. The rounds at the pause run no model.
 **The follow-up must add information.** A submission whose every answer is
 "I don't know", or repeats an earlier answer, is refused, and the follow-up is
 still available. Only a new or moved link, or an answer whose known content
-changes, counts. Without this, one uninformed submission spent the only rerun
+changes, counts. Without this, one uninformed submission used the only rerun
 on a run that read nothing new (#1289).
 
 **The follow-up is optional and says so.** The report shows it as a closed

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from analysis_service.answer_forms import YES_NO, answer_choices
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import EARLY_RULES, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
@@ -47,9 +47,9 @@ PROCESS = "process:web-app"
 
 def prior_of(rates) -> dict[str, PriorRow]:
     """A STRIDE prior with these rates, and an empty row for every other package."""
-    empty = PriorRow(runs=(), revision=None, cases=0, rates={})
+    empty = PriorRow(record=None, runs=(), cases=0, rates={})
     return {
-        name: PriorRow(runs=("test",), revision="t", cases=1, rates=rates)
+        name: PriorRow(record=None, runs=("test",), cases=1, rates=rates)
         if name == "stride"
         else empty
         for name in PACKAGES
@@ -246,8 +246,9 @@ CORPUS_MODELS = sorted((REPO_ROOT / "evals/corpus").glob("*/model.json"))
 def test_an_idle_lane_leads_no_early_question(level):
     """At level 1 the logging and WebRTC lanes hold no requirement, so their
     agents are never called. The early list still scored their candidates and
-    gave a logging rule's question as the reason on 14 of 15 corpus models
-    (#1289, B3)."""
+    gave a logging rule's reason on 14 of 15 corpus models (#1289, B3). A
+    reason is a rule's effect sentence, so no effect of an idle lane's rule
+    may be one."""
     package = PACKAGES["asvs"]
     options = {"level": level}
     led = 0
@@ -258,9 +259,9 @@ def test_an_idle_lane_leads_no_early_question(level):
         }
         found = generate_candidates(model, package.lanes, package.rules, None)
         led += sum(len(found[lane].candidates) for lane in idle)
-        idle_asks = {rule.question for rule in package.rules if rule.lane in idle}
+        idle_effects = {rule.effect for rule in package.rules if rule.lane in idle}
         asked = early_questions(model, {"asvs": options}, None)
-        assert not [q.key for q in asked if set(q.reasons) & idle_asks], path
+        assert not [q.key for q in asked if set(q.reasons) & idle_effects], path
     # The reproduction needs an idle lane whose rules fire; above level 1 the
     # corpus has none.
     assert led if level == 1 else led == 0
@@ -492,6 +493,7 @@ def _paused(model, selection, answers=()):
         None,
         selection,
         (),
+        asks=True,
         waiting=True,
         answered=AnswerSet(facts=tuple(answers)),
         final=False,
@@ -504,10 +506,10 @@ LEVEL_2 = {"asvs": {"level": 2}}
 
 class TestTheFrameworkGates:
     """A paused job reads each framework's precondition before it asks for it
-    (#1542 F1, ADR 0067). At 2fae7d3 a model whose processes are all
-    ``non-web`` refutes ASVS, and a level 2 pause still asked 15 questions; a
-    model whose interfaces and protocols are unknown is undecidable, and no
-    question asked its ``interface_kind``."""
+    (#1542 F1, ADR 0067). A model whose processes are all ``non-web``
+    refutes ASVS, so a pause asks no ASVS question. A model whose interfaces
+    and protocols are unknown leaves ASVS undecidable, so a pause asks only
+    what decides it, an ``interface_kind`` among them."""
 
     def test_a_refuted_framework_asks_nothing(self):
         asked = _paused(_with_interfaces("non-web"), LEVEL_2)
@@ -563,7 +565,7 @@ class TestTheFrameworkGates:
         admitted = asked.admit(
             sources=(),
             earlier=NO_ANSWERS,
-            given=AnswerSet(facts=tuple(facts)),
+            given=SentAnswers(facts=tuple(facts)),
             save=True,
         )
         after = _paused(model, LEVEL_2, admitted.answers.facts)

@@ -25,8 +25,8 @@ Run everything from the repository root, under `uv run`.
 | `python -m evals.harness.run calibrate` | how far the identity rule agrees with the calibration labels |
 | `python -m evals.harness.run review --voter <login> <artifacts>` | what a reviewer has waiting over a finished sweep |
 | `python -m evals.harness.run near-misses <artifact> --out ballot.csv` | the missed must-finds a free same-lane draft may state with another verb or place, as a ballot a person answers; `near-miss-rulings` records the answers in `rulings.json` |
-| `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --spread spread.json` | whether a coverage gain rests on supported output: unmatched volume, unvoted findings and rejected rate, on development cases |
-| `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --held-out` | rung 5, held-out confirmation: the same gates on the held-out cases alone. It costs no money but spends one read of each held-out case, refuses an exhausted case, and names each case to record in `holdout_reads` |
+| `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --spread spread.json` | whether a coverage gain rests on supported output: unmatched volume, findings no live vote answers, and rejected rate, on development cases |
+| `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --held-out` | rung 5, held-out confirmation: the same gates on the held-out cases alone. It costs no money but uses one read of each held-out case, refuses an exhausted case, and names each case to record in `holdout_reads` |
 | `python -m evals.harness.run experiments` | what a prior audit already tested, and whether the tree moved under it |
 | `python -m evals.harness.run phases` | the six phases and the graph nodes each owns; `--node` answers for one node |
 | `python evals/verify_corpus.py` | the corpus lint: what each case holds, how much of it is unsigned, and whether a verified input carries a reference answer |
@@ -64,7 +64,18 @@ this checkout's, and the command prints both commits. To compare a lane with and
 with no artifact: it runs today's `prepare` offline, so the two arms differ only in the
 catalog, and it prints the must-finds the lane's drafts match.
 
-Both replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
+`python -m evals.harness.run recritic-replay <artifact> --case <case> --framework <package> --faults <file> --draft <id> --fault <shape> --accept-cost unknown`
+costs one re-ask call. It reads the case's critic first pass from its report,
+applies the one Control the fault set holds, answers each row it shows with the
+refusal the file states, and puts one fault of the shape on the draft.
+`FaultShape` in `evals/harness/recritic_replay.py` lists the shapes: Control
+row faults, and at least one shape for each other kind of problem the check
+names. The round's check must name exactly the problems `PROBLEMS_BY_SHAPE`
+gives the shape, or the command refuses the view before the call. With `--out
+<file>` it writes the problems the re-ask was sent, its answer, the problems
+that remain and each ruling it changed that no problem named.
+
+The three replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
 names say "replay"; their cost says paid. `replay` and `score` above re-read an
 archive and are free.
 
