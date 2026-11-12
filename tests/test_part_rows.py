@@ -381,6 +381,40 @@ class TestADisputedPlace:
         assert sorted(row.value for row in rows) == sorted([PROCESS, STORE])
         assert issues == []
 
+    @pytest.mark.parametrize(
+        ("predicate", "stated", "given"),
+        [
+            ("mfa-requirement", "required", ABSENT),
+            ("authentication-mechanism", "mutual TLS", ABSENT),
+        ],
+    )
+    def test_an_assertion_answer_replaces_a_settled_row_it_disagrees_with(
+        self, model, predicate, stated, given
+    ):
+        open_row = Assertion(
+            subject=LOGIN,
+            predicate=predicate,
+            value=UNKNOWN,
+            reason="silent",
+            basis="inferred",
+            origin="assertion-pass",
+            explanation="the notes do not say",
+        )
+        held = AssertionCatalog(
+            subjects=[Subject(id=LOGIN, type="interaction", label="Login")],
+            entries=[inferred(LOGIN, predicate, stated), open_row],
+        )
+        fact = FactAnswer(
+            key=UnknownRef(assertion=assertion_id(open_row)).key, value=given
+        )
+        linked, issues = apply_answers(held, model, [], [fact])
+        (only,) = answer(linked, LOGIN, predicate).settled
+        assert (only.value, only.origin) == (given, "answer")
+        assert [issue.code for issue in issues] == ["superseded-by-answer"]
+        again, issues = apply_answers(linked, model, [], [fact])
+        assert issues == []
+        assert [r.value for r in answer(again, LOGIN, predicate).rows] == [given]
+
     def test_a_row_draws_one_issue_when_two_answers_reach_it(self, model):
         open_row = Assertion(
             subject=LOGIN,

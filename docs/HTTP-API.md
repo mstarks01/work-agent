@@ -564,9 +564,10 @@ inferred trust zone that you answer is no longer marked as inferred. An
 assertion answer replaces the open fact with a stated one. An answer to a
 question kind writes a stated fact for each part it answers, about that
 element, unless the sources state that part. An assertion answer, or a part,
-removes each other unscoped catalog fact at its place, such as two facts that
-disagree, and a `superseded-by-answer` issue names each removed fact that holds
-a value. A subject answer reaches the analysis as your words in the
+removes each unscoped catalog fact at its place that is open or disagrees with
+your answer, and a `superseded-by-answer` issue names each removed fact that
+holds a value. A fact that can hold beside your answer, such as a second
+mechanism of one connection, stays. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said
 otherwise. Fact answers need no assertion catalog, so every deployment takes
 them.

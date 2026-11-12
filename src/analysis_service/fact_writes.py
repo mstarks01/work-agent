@@ -33,9 +33,9 @@ from analysis_service.assertions import (
     SupportSpan,
     answered,
     assertion_id,
+    conflicts,
     graph_subject_type,
     projected_attribute,
-    settled,
     subjects_of,
 )
 from analysis_service.capabilities import lineage, parse_capability_key
@@ -385,10 +385,11 @@ def fact_rows(
 
     **A question-kind answer writes a row for each part it answers** (ADR
     0117), about the element it asks of, through :func:`_part_rows`. **An
-    assertion answer or a part row removes each other unscoped source row at
-    its place**: the fact was open, so such a row is open, disputed or set
-    aside, and the answer settles it. A ``superseded-by-answer`` issue names
-    each removed row that holds a value.
+    assertion answer or a part row removes each unscoped source row at its
+    place that is open, has the answer's identity or disagrees with it**, so
+    the answer settles the fact. A row that can hold beside the answer stays.
+    A ``superseded-by-answer`` issue names each removed row that holds a
+    value.
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
@@ -467,35 +468,37 @@ def fact_rows(
         catalog, model, answers, spans, replaced.values(), attributes.keys()
     )
     rewritten = {assertion_id(row) for row in replaced.values()}
-    stood = {
-        (row.subject, row.predicate)
-        for row in settled(catalog)
-        if not row.scope and not answered(row)
-    }
-    settled_here = {
-        *parts,
-        *(
-            place
+    written_here = {
+        **{
+            (row.subject, row.predicate): row
             for row in replaced.values()
-            if not row.scope and (place := (row.subject, row.predicate)) not in stood
-        ),
+            if not row.scope
+        },
+        **parts,
     }
 
     def answered_over(entry: Assertion) -> bool:
         """An earlier run's part row, or a source row an answer settles now.
 
-        A part is written only where no settled source row stands, and an
-        assertion answer settles its place only where none stands: on a
-        predicate of many values a settled row is another true fact. So each
-        other unscoped source row at such a place is open, disputed or set
-        aside. A row an attribute answer removes is that step's.
+        At a place an answer writes, a source row goes where it is open,
+        where it is the answer's own identity, or where it disagrees with the
+        answer (:func:`~analysis_service.assertions.conflicts`). A row that can
+        hold beside the answer, such as another value of a predicate of many,
+        stays. A row an attribute answer removes is that step's.
         """
         place = (entry.subject, entry.predicate)
         if entry.scope or assertion_id(entry) in superseded:
             return False
         if answered(entry):
             return place in asked and assertion_id(entry) not in rewritten
-        return place in settled_here and assertion_id(entry) not in replaced
+        written_row = written_here.get(place)
+        if written_row is None or assertion_id(entry) in replaced:
+            return False
+        return (
+            entry.value == UNKNOWN
+            or assertion_id(entry) == assertion_id(written_row)
+            or bool(conflicts(AssertionCatalog(entries=[entry, written_row])))
+        )
 
     issues.extend(
         CatalogIssue(
