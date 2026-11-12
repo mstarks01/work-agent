@@ -26,6 +26,7 @@ from analysis_service.assertions import (
     Subject,
     SupportSpan,
     answer,
+    assertion_id,
     catalog_issues,
 )
 from analysis_service.claims import UnknownRef
@@ -136,6 +137,11 @@ class TestTheRegistryHoldsEachPart:
             "yes": "principal",
             "no": ABSENT,
         }
+
+    def test_a_meaning_names_no_placeholder(self):
+        # A page shows a row as "subject: meaning — value".
+        for name, predicate in REGISTRY.items():
+            assert "{" not in predicate.meaning, name
 
     def test_the_names_type_holds_every_row(self):
         assert set(get_args(PredicateName)) == set(REGISTRY)
@@ -306,6 +312,44 @@ class TestADisputedPlace:
         assert (settled.value, settled.origin) == ("principal", "answer")
         assert len(answer(linked, PROCESS, "record-attribution").rows) == 1
         assert sorted(issue.code for issue in issues) == ["superseded-by-answer"] * 2
+
+    def test_a_resume_keeps_one_row_and_raises_nothing_new(self, model):
+        held = self.held(
+            inferred(PROCESS, "record-attribution", "principal"),
+            inferred(PROCESS, "record-attribution", "intermediary"),
+        )
+        fact = kind_answer(PROCESS, "audit-evidence", records_actor="yes")
+        first, _ = apply_answers(held, model, [], [fact])
+        again, issues = apply_answers(first, model, [], [fact])
+        assert issues == []
+        (only,) = answer(again, PROCESS, "record-attribution").rows
+        assert (only.value, only.origin) == ("principal", "answer")
+
+    def test_an_assertion_answer_settles_a_disputed_place(self, model):
+        open_row = Assertion(
+            subject=PROCESS,
+            predicate="record-attribution",
+            value=UNKNOWN,
+            reason="silent",
+            basis="inferred",
+            origin="assertion-pass",
+            explanation="the notes do not say",
+        )
+        held = self.held(
+            open_row,
+            inferred(PROCESS, "record-attribution", "principal"),
+            inferred(PROCESS, "record-attribution", "intermediary"),
+        )
+        fact = FactAnswer(
+            key=UnknownRef(assertion=assertion_id(open_row)).key, value="principal"
+        )
+        linked, issues = apply_answers(held, model, [], [fact])
+        (only,) = answer(linked, PROCESS, "record-attribution").rows
+        assert (only.value, only.origin) == ("principal", "answer")
+        assert [issue.code for issue in issues] == ["superseded-by-answer"] * 2
+        again, issues = apply_answers(linked, model, [], [fact])
+        assert issues == []
+        assert len(answer(again, PROCESS, "record-attribution").rows) == 1
 
     def test_the_answer_settles_a_row_set_aside(self, model):
         aside = inferred(PROCESS, "record-attribution", "principal").model_copy(

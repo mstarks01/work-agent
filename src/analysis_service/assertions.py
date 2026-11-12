@@ -566,11 +566,11 @@ _ASKED_SUBJECTS: frozenset[SubjectType] = frozenset({"component", "interaction"}
 def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
     """A predicate only an owner or a Control answers, with extraction off.
 
-    Its value is the answer itself, so its question is its meaning too, and
-    its terms are the values its answers write.
+    Its value is the answer itself, so its meaning is its question with "it"
+    for the subject, and its terms are the values its answers write.
     """
     return Predicate(
-        meaning=question,
+        meaning=asked.question or question.format(subject="it"),
         question=question,
         subjects=_ASKED_SUBJECTS,
         value="term",
@@ -1242,8 +1242,9 @@ CatalogIssueCode = Literal[
     "unknown-link-element",
     # A submitter's answer to an open row this catalog does not hold.
     "unmatched-answer",
-    # Not a refused row. A submitter's answer to a graph attribute replaced
-    # this unscoped row, which reached the same attribute; see
+    # Not a refused row. An answer replaced this unscoped row: an answer to
+    # the graph attribute the row reached, or an answer that settles the
+    # row's own fact, which the row disputed; see
     # :func:`~analysis_service.fact_writes.fact_rows`.
     "superseded-by-answer",
 ]

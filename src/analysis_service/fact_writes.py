@@ -383,7 +383,11 @@ def fact_rows(
     :func:`~analysis_service.assertions.project` lets outrank it.
 
     **A question-kind answer writes a row for each part it answers** (ADR
-    0117), about the element it asks of, through :func:`_part_rows`.
+    0117), about the element it asks of, through :func:`_part_rows`. **An
+    assertion answer or a part row removes each other unscoped source row at
+    its place**: the fact was open, so such a row is open, disputed or set
+    aside, and the answer settles it. A ``superseded-by-answer`` issue names
+    each removed row that holds a value.
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
@@ -404,7 +408,7 @@ def fact_rows(
     issues.extend(
         CatalogIssue(
             code="superseded-by-answer",
-            message="the submitter's answer to this row's attribute replaced it",
+            message="an answer to this row's attribute replaced it",
             subject=entry.subject,
             assertion=assertion_id(entry),
         )
@@ -462,29 +466,33 @@ def fact_rows(
         catalog, model, answers, spans, replaced.values(), attributes.keys()
     )
     rewritten = {assertion_id(row) for row in replaced.values()}
+    settled_here = {
+        *parts,
+        *((row.subject, row.predicate) for row in replaced.values() if not row.scope),
+    }
 
-    def answered_by_part(entry: Assertion) -> bool:
-        """An earlier run's part row, or a source row a part answers now.
+    def answered_over(entry: Assertion) -> bool:
+        """An earlier run's part row, or a source row an answer settles now.
 
-        A part is written only where no settled source row stands, so each
-        unscoped source row at its place is open, disputed or set aside.
+        An answer is written only over an open fact, so each other unscoped
+        source row at its place is open, disputed or set aside.
         """
         place = (entry.subject, entry.predicate)
-        if entry.scope or place not in asked:
+        if entry.scope:
             return False
         if answered(entry):
-            return assertion_id(entry) not in rewritten
-        return place in parts
+            return place in asked and assertion_id(entry) not in rewritten
+        return place in settled_here and assertion_id(entry) not in replaced
 
     issues.extend(
         CatalogIssue(
             code="superseded-by-answer",
-            message="the submitter's answer to this row's part replaced it",
+            message="an answer to this row's fact replaced it",
             subject=entry.subject,
             assertion=assertion_id(entry),
         )
         for entry in catalog.entries
-        if answered_by_part(entry) and not answered(entry) and entry.value != UNKNOWN
+        if answered_over(entry) and not answered(entry) and entry.value != UNKNOWN
     )
 
     entries = [
@@ -495,7 +503,7 @@ def fact_rows(
                 for entry in catalog.entries
                 if assertion_id(entry) not in superseded
             )
-            if not answered_by_part(entry)
+            if not answered_over(entry)
         ),
         *written.values(),
         *parts.values(),
