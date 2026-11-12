@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -166,6 +167,33 @@ class TestTheReader:
         )
         assert isinstance(reading, DiagramStructure)
         assert [e.label for e in reading.edges] == ["writes orders"]
+
+    def test_an_architecture_label_decodes_each_entity_as_mermaid_draws_it(self):
+        reading = read_diagram(
+            "architecture-beta\n"
+            "    service a(server)[A #amp; B #60;b#62;]\n"
+            "    service b(database)[C &amp; D &#35;]\n"
+            "    a:R -[x #quot;y#quot;]- L:b\n"
+        )
+        assert isinstance(reading, DiagramStructure)
+        assert [n.label for n in reading.nodes] == ["A & B <b>", "C & D &#"]
+        assert [e.label for e in reading.edges] == ['x "y"']
+
+    def test_the_docs_state_the_node_floor_of_the_lock(self):
+        lock = json.loads(Path("diagram_reader/package-lock.json").read_text())
+        floor = max(
+            tuple(int(part) for part in re.findall(r"\d+", engines["node"]))
+            for package in lock["packages"].values()
+            if (engines := package.get("engines")) and "node" in engines
+        )
+        stated = {
+            version
+            for doc in ("README.md", "docs/First-Run.md", "docs/HTTP-API.md")
+            for version in re.findall(
+                r"Node (\d+(?:\.\d+)*)\s+or\s+newer", Path(doc).read_text()
+            )
+        }
+        assert stated == {".".join(map(str, floor[:2]))}
 
     def test_mermaid_and_the_reader_share_one_parser(self):
         lock = json.loads(Path("diagram_reader/package-lock.json").read_text())

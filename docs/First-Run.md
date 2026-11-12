@@ -5,7 +5,7 @@ mode: the local app calls the models you configure.
 
 ## 1. Install
 
-You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/) and Node 20 or newer.
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/) and Node 22.12 or newer.
 
 ```sh
 git clone https://github.com/mstarks01/work-agent.git
@@ -13,7 +13,7 @@ cd work-agent
 uv sync
 ```
 
-The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 20
+The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 22.12
 or newer. At its first start, the app installs the parsers' locked packages,
 so that start needs a network connection. Where the install fails, the app
 logs a warning that names the command to run.

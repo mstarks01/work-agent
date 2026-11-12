@@ -35,11 +35,15 @@ function lineOf(...tokens) {
 }
 
 // A label as plain text: a line break a space, any other markup dropped, and
-// each entity decoded as Mermaid's own render decodes it. Mermaid writes
-// `#quot;` and `#34;` as placeholders, which become `&quot;` and `&#34;` again
-// before the DOM decodes them. Only the flowchart path has a DOM.
+// each entity decoded as Mermaid's own render decodes it. Mermaid encodes
+// `#quot;` and `#34;` in the source before it parses, so the flowchart parser
+// gives placeholders. The architecture parser reads the source as written, so
+// the codes are encoded here first. Each becomes `&quot;` or `&#34;` before the
+// DOM decodes it.
 function plain(label) {
   const text = String(label ?? "")
+    .replace(/#(\d+);/g, "ﬂ°°$1¶ß")
+    .replace(/#(\w+);/g, "ﬂ°$1¶ß")
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]*>/g, "")
     .replace(/ﬂ°°/g, "&#")
@@ -49,7 +53,6 @@ function plain(label) {
 }
 
 function decoded(text) {
-  if (!globalThis.document) return text;
   const area = document.createElement("textarea");
   area.innerHTML = text;
   return area.value;
@@ -61,11 +64,15 @@ function arrowOf(type) {
   return "forward";
 }
 
-async function flowchart() {
+// Mermaid's flowchart grammar and the entity decode both need a DOM.
+async function useDom() {
   const { JSDOM } = await import("jsdom");
   const dom = new JSDOM("<!doctype html><body></body>");
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
+}
+
+async function flowchart() {
   const { default: mermaid } = await import("mermaid");
   mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
   const db = (await mermaid.mermaidAPI.getDiagramFromText(text)).db;
@@ -127,6 +134,7 @@ try {
   if (!read) {
     console.log(JSON.stringify({ refused: "the diagram is not a flowchart or an architecture-beta diagram" }));
   } else {
+    await useDom();
     console.log(JSON.stringify({ structure: await read() }));
   }
 } catch (error) {
