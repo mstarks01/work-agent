@@ -15,7 +15,7 @@ it, so it admits only what the writer then accepts.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from typing import Literal, get_args
 
 from pydantic import ValidationError
@@ -458,17 +458,34 @@ def fact_rows(
                 "support": [span],
             }
         )
-    asked, parts = _part_rows(catalog, model, answers, spans, replaced.values())
+    asked, parts = _part_rows(
+        catalog, model, answers, spans, replaced.values(), attributes.keys()
+    )
     rewritten = {assertion_id(row) for row in replaced.values()}
 
     def answered_by_part(entry: Assertion) -> bool:
-        """An earlier run's part row, or an open row a part answers now."""
+        """An earlier run's part row, or a source row a part answers now.
+
+        A part is written only where no settled source row stands, so each
+        unscoped source row at its place is open, disputed or set aside.
+        """
         place = (entry.subject, entry.predicate)
         if entry.scope or place not in asked:
             return False
         if answered(entry):
             return assertion_id(entry) not in rewritten
-        return entry.value == UNKNOWN and place in parts
+        return place in parts
+
+    issues.extend(
+        CatalogIssue(
+            code="superseded-by-answer",
+            message="the submitter's answer to this row's part replaced it",
+            subject=entry.subject,
+            assertion=assertion_id(entry),
+        )
+        for entry in catalog.entries
+        if answered_by_part(entry) and not answered(entry) and entry.value != UNKNOWN
+    )
 
     entries = [
         *(
@@ -505,15 +522,18 @@ def _part_rows(
     answers: Sequence[FactAnswer],
     spans: Sequence[SupportSpan],
     assertion_rows: Iterable[Assertion],
+    attributes: Collection[tuple[str, str]],
 ) -> tuple[frozenset[tuple[str, str]], dict[tuple[str, str], Assertion]]:
     """The places that question-kind answers ask about, and the rows they write.
 
     A place is an element and a predicate. Each part of a kind that admits the
     element's subject type is asked there, whatever the answer. A part writes
     a stated row where its answer has a value (:attr:`~analysis_service.assertions.OwnerQuestion.values`),
-    the sources do not state it (:func:`source_states`), and no assertion
-    answer in ``assertion_rows`` writes the same place: a stated fact stands,
-    and a Control fills only an open fact (ADR 0125).
+    the sources do not state it (:func:`source_states`), no assertion answer
+    in ``assertion_rows`` writes the same place, and no attribute answer in
+    ``attributes`` settles the attribute it projects into: a stated fact
+    stands, a Control fills only an open fact (ADR 0125), and an answer to the
+    attribute itself is the narrower one.
     """
     answered_places = {
         (row.subject, row.predicate) for row in assertion_rows if not row.scope
@@ -533,6 +553,7 @@ def _part_rows(
             if (
                 value is None
                 or place in answered_places
+                or (element_id, projected_attribute(name, element_id)) in attributes
                 or source_states(model, catalog, element_id, name)
             ):
                 continue

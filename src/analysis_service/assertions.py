@@ -444,9 +444,12 @@ def graph_subject_type(element_id: str) -> SubjectType | None:
 #: cap: what a real extraction emits is #926 Phase 3's measurement.
 #:
 #: It bounds model output, so a row an answer wrote does not count. The answer
-#: bounds hold those: one answer writes a row for each part of its kind. On 311
-#: archived reports the largest catalog holds 48 rows, and the largest pause
-#: asks about 200 question kinds, which could write about 500 rows (#2054).
+#: bounds hold those: a job holds at most ``MAX_HELD_FACTS`` answers, and one
+#: answer writes a row for each part of its kind, at most ``MAX_FACETS``, so
+#: 4000 rows. The gate read 3776 distinct answer rows in 0.25 s, and 1000 in
+#: 0.07 s. On 311 archived reports the largest extracted catalog holds 48 rows,
+#: and the largest pause asks 262 questions, so one cap over both would refuse
+#: a real job (#2054).
 MAX_ASSERTIONS = 500
 
 #: The most subjects one catalog may hold: the element cap, plus this layer's
@@ -564,14 +567,14 @@ def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
     """A predicate only an owner or a Control answers, with extraction off.
 
     Its value is the answer itself, so its question is its meaning too, and
-    its terms are the answers.
+    its terms are the values its answers write.
     """
     return Predicate(
         meaning=question,
         question=question,
         subjects=_ASKED_SUBJECTS,
         value="term",
-        terms=frozenset(asked.values),
+        terms=frozenset(asked.values.values()),
         asked=asked,
     )
 
@@ -861,9 +864,9 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             stated_only=True,
         ),
         # The parts of the question kinds that only an owner or a Control
-        # answers (ADR 0117), with the wording the maintainer reviewed with
-        # the kinds. A yes-no kind's question names its subject; a facet's
-        # says "it", because its page names the element above it.
+        # answers (ADR 0117), in the wording of the kinds. A yes-no kind's
+        # question names its subject; a facet's says "it", because its page
+        # names the element above it.
         "capacity-limits-rate": _facet(
             "Does it limit the rate of requests?",
             "Limits the rate of requests.",

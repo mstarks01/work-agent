@@ -2969,7 +2969,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the predicate a part of a question kind writes": _OneReader(
         lambda node: _is_attribute(node, "predicate", "facet", "kind"),
-        ("src/analysis_service/fact_answers.py", "part_answers"),
+        ("src/analysis_service/question_kinds.py", "parts"),
         {},
         "",
     ),

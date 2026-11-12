@@ -87,7 +87,7 @@ class Facet:
         """The part as a question, with "it" for the element."""
         question = _asked(self.predicate).question
         if question is None:
-            raise KeyError(f"{self.predicate!r} has no part question")
+            raise LookupError(f"{self.predicate!r} has no part question")
         return question
 
     @property
@@ -126,6 +126,17 @@ class QuestionKind:
     facets: tuple[Facet, ...]
 
     @property
+    def parts(self) -> tuple[tuple[str | None, PredicateName], ...]:
+        """Each part of the kind: a facet's ID and its predicate, or ``None``
+        and the predicate of a ``yes-no`` kind, which is its own one part.
+
+        **The one reader of which predicate each part of a kind writes.**
+        """
+        if self.predicate is not None:
+            return ((None, self.predicate),)
+        return tuple((facet.id, facet.predicate) for facet in self.facets)
+
+    @property
     def statement(self) -> str | None:
         """The protection a Control states of a ``yes-no`` kind, and ``None``
         for every other: a ``facets`` kind states each facet's."""
@@ -143,7 +154,7 @@ def _asked(predicate: PredicateName) -> OwnerQuestion:
     and ``tests/test_question_kinds.py`` holds it."""
     asked = REGISTRY[predicate].asked
     if asked is None:
-        raise KeyError(f"{predicate!r} is asked by no question kind")
+        raise LookupError(f"{predicate!r} is asked by no question kind")
     return asked
 
 

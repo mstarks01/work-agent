@@ -38,14 +38,9 @@ def _stated_parts(
     0117, so a part whose predicate the assertion pass extracts counts here
     from the run that turns it on.
     """
-    kind = QUESTION_KINDS[name]
-    predicates = (
-        [kind.predicate]
-        if kind.predicate is not None
-        else [facet.predicate for facet in kind.facets]
-    )
     return sum(
-        source_states(model, catalog, element_id, predicate) for predicate in predicates
+        source_states(model, catalog, element_id, predicate)
+        for _, predicate in QUESTION_KINDS[name].parts
     )
 
 
@@ -67,7 +62,7 @@ def _stated_choices(report: Report) -> int:
 def test_stated_parts_stay_rare():
     """Fails when early questions ask enough stated parts to warrant skipping them."""
     asked = {
-        facet.predicate for kind in QUESTION_KINDS.values() for facet in kind.facets
+        predicate for kind in QUESTION_KINDS.values() for _, predicate in kind.parts
     }
     if not BASELINES or not asked & EXTRACTED.keys():
         pytest.fail(

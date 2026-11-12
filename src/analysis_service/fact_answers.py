@@ -408,20 +408,18 @@ def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
 def part_answers(fact: FactAnswer) -> tuple[tuple[PredicateName, str], ...]:
     """Each predicate a question-kind answer names, with what it answers that part.
 
-    **The one reader of "which predicate does each part of an answer write"**
-    (ADR 0117). A ``facets`` kind names one for each facet, and a facet the
-    answer leaves out reads ``unknown``. A ``yes-no`` kind names its own.
+    Each part comes from :attr:`~analysis_service.question_kinds.QuestionKind.parts`
+    (ADR 0117). A facet the answer leaves out reads ``unknown``, and a
+    ``yes-no`` kind's one part reads the answer's value.
     Empty for every other fact, and for a kind this table no longer holds.
     """
     name = parse_question_kind(key_ref(fact.key).question)
     if fact.kind != "question" or name is None:
         return ()
-    kind = QUESTION_KINDS[name]
-    if kind.predicate is not None:
-        return ((kind.predicate, fact.value),)
     given = fact.facets or {}
     return tuple(
-        (facet.predicate, given.get(facet.id, UNKNOWN)) for facet in kind.facets
+        (predicate, fact.value if facet is None else given.get(facet, UNKNOWN))
+        for facet, predicate in QUESTION_KINDS[name].parts
     )
 
 

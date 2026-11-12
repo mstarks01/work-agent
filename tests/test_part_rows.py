@@ -35,6 +35,7 @@ from analysis_service.prompts import render_predicates
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import Source
 from tests.factories import valid_model
+from tests.test_links import inferred
 
 PROCESS = "process:web-app"
 STORE = "store:orders-db"
@@ -104,25 +105,21 @@ def row(catalog, subject, predicate):
 
 class TestTheRegistryHoldsEachPart:
     def test_each_part_names_a_predicate_that_asks_it(self):
-        named: list[str] = []
-        for kind in QUESTION_KINDS.values():
-            if kind.answer == "yes-no":
-                assert kind.predicate is not None and not kind.facets
-                predicate = REGISTRY[kind.predicate]
-                assert predicate.asked is not None
-                assert predicate.question.format(subject="X") == kind.template.format(
-                    element="X"
-                )
-                named.append(kind.predicate)
-            else:
-                assert kind.predicate is None
-            for facet in kind.facets:
-                assert REGISTRY[facet.predicate].asked is not None
-                assert facet.question.endswith("?")
-                named.append(facet.predicate)
+        named = [p for kind in QUESTION_KINDS.values() for _, p in kind.parts]
         asked = [name for name, p in REGISTRY.items() if p.asked is not None]
         assert sorted(named) == sorted(asked)
         assert len(named) == 34
+        for kind in QUESTION_KINDS.values():
+            # A yes-no kind is its own one part; a facets kind has one per facet.
+            assert (kind.answer == "yes-no") == (kind.parts[0][0] is None)
+            for facet in kind.facets:
+                assert facet.question.endswith("?")
+
+    def test_a_yes_no_kinds_template_asks_its_predicates_question(self):
+        for kind in QUESTION_KINDS.values():
+            if kind.predicate is not None:
+                asked = REGISTRY[kind.predicate].question.format(subject="X")
+                assert asked == kind.template.format(element="X")
 
     def test_a_new_part_takes_its_answers_and_an_old_one_maps_them(self):
         for predicate in REGISTRY.values():
@@ -234,16 +231,6 @@ class TestTheRowsAnAnswerWrites:
 
 
 class TestTheSubjectRule:
-    def stated(self, subject, predicate, value):
-        return Assertion(
-            subject=subject,
-            predicate=predicate,
-            value=value,
-            basis="inferred",
-            origin="assertion-pass",
-            explanation="the notes describe it",
-        )
-
     def held(self, model, *entries):
         return AssertionCatalog(
             subjects=[
@@ -257,14 +244,14 @@ class TestTheSubjectRule:
         )
 
     def test_a_stated_row_about_the_element_stands(self, model):
-        held = self.held(model, self.stated(PROCESS, "record-attribution", "principal"))
+        held = self.held(model, inferred(PROCESS, "record-attribution", "principal"))
         fact = kind_answer(PROCESS, "audit-evidence", records_actor="no")
         catalog = written(model, [fact], held)
         rows = answer(catalog, PROCESS, "record-attribution").rows
         assert [(r.value, r.origin) for r in rows] == [("principal", "assertion-pass")]
 
     def test_a_flows_row_never_answers_a_question_about_an_element(self, model):
-        held = self.held(model, self.stated(LOGIN, "capacity-limits-rate", "yes"))
+        held = self.held(model, inferred(LOGIN, "capacity-limits-rate", "yes"))
         fact = kind_answer(PROCESS, "capacity-limits", rate="no")
         catalog = written(model, [fact], held)
         assert row(catalog, PROCESS, "capacity-limits-rate").value == "no"
@@ -299,6 +286,52 @@ class TestTheSubjectRule:
         # And a run with the same answer writes the same one row again.
         again = written(model, [later], catalog)
         assert row(again, PROCESS, "internet-exposure").value == "internal"
+
+
+class TestADisputedPlace:
+    def held(self, *entries):
+        return AssertionCatalog(
+            subjects=[Subject(id=PROCESS, type="component", label="Web app")],
+            entries=list(entries),
+        )
+
+    def test_the_answer_settles_two_source_rows_that_disagree(self, model):
+        held = self.held(
+            inferred(PROCESS, "record-attribution", "principal"),
+            inferred(PROCESS, "record-attribution", "intermediary"),
+        )
+        fact = kind_answer(PROCESS, "audit-evidence", records_actor="yes")
+        linked, issues = apply_answers(held, model, [], [fact])
+        (settled,) = answer(linked, PROCESS, "record-attribution").settled
+        assert (settled.value, settled.origin) == ("principal", "answer")
+        assert len(answer(linked, PROCESS, "record-attribution").rows) == 1
+        assert sorted(issue.code for issue in issues) == ["superseded-by-answer"] * 2
+
+    def test_the_answer_settles_a_row_set_aside(self, model):
+        aside = inferred(PROCESS, "record-attribution", "principal").model_copy(
+            update={"assessment": "unsupported", "assessor": "a reviewer"}
+        )
+        fact = kind_answer(PROCESS, "audit-evidence", records_actor="yes")
+        catalog = written(model, [fact], self.held(aside))
+        (only,) = answer(catalog, PROCESS, "record-attribution").rows
+        assert (only.value, only.origin) == ("principal", "answer")
+
+
+class TestAnAttributeAnswerBesideAPart:
+    def test_the_attribute_answer_stands_on_every_run(self, model):
+        model.processes[0].exposure = "unknown"
+        attribute = FactAnswer(
+            key=UnknownRef(element_id=PROCESS, attribute="exposure").key,
+            value="internal",
+        )
+        part = kind_answer(PROCESS, "reachability", internet="yes")
+        first = written(model, [attribute, part])
+        assert row(first, PROCESS, "internet-exposure") is None
+        # A parent part row, written before the attribute was answered.
+        parent = written(model, [part])
+        assert row(parent, PROCESS, "internet-exposure").value == "internet-facing"
+        again = written(model, [attribute, part], parent)
+        assert row(again, PROCESS, "internet-exposure") is None
 
 
 class TestTheBound:
