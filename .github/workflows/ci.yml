@@ -48,6 +48,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # The Node that CI runs is the lowest version that the reader's locked
+      # packages accept. When the lock needs more, the Node floor test in
+      # tests/test_diagrams.py fails.
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: diagram_reader/.node-version
+
       # The diagram reader runs Mermaid's own parsers in Node (ADR 0121). npm ci
       # installs the reviewed package-lock.json exactly, and no package runs an
       # install script.

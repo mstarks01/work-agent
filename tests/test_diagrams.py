@@ -179,7 +179,7 @@ class TestTheReader:
         assert [n.label for n in reading.nodes] == ["A & B <b>", "C & D &#"]
         assert [e.label for e in reading.edges] == ['x "y"']
 
-    def test_the_docs_state_the_node_floor_of_the_lock(self):
+    def test_the_docs_and_ci_state_the_node_floor_of_the_lock(self):
         lock = json.loads(Path("diagram_reader/package-lock.json").read_text())
         ranges = [
             engines["node"]
@@ -188,7 +188,7 @@ class TestTheReader:
         ]
         floors = [re.fullmatch(r">=\s*v?(\d+(?:\.\d+)*)", r) for r in ranges]
         assert all(floors), "a Node range in the lock is not a plain >= floor"
-        floor = max(tuple(map(int, f.group(1).split("."))) for f in floors)
+        floor = max((*map(int, f.group(1).split(".")), 0, 0)[:3] for f in floors)
         stated = {
             version
             for doc in ("README.md", "docs/First-Run.md", "docs/HTTP-API.md")
@@ -197,6 +197,8 @@ class TestTheReader:
             )
         }
         assert stated == {".".join(map(str, floor[:2]))}
+        ci = Path("diagram_reader/.node-version").read_text().strip()
+        assert ci == ".".join(map(str, floor))
 
     def test_mermaid_and_the_reader_share_one_parser(self):
         lock = json.loads(Path("diagram_reader/package-lock.json").read_text())
