@@ -264,7 +264,7 @@ def test_the_form_page_reads_the_service_s_element_type_nouns(client):
 def test_the_form_page_reads_its_word_tables_from_the_service(client):
     """The form page carries each table of ``FORM_WORDS`` and the facet
     answers, and its scripts read them from the islands."""
-    from analysis_service.fact_answers import FACET_ANSWERS
+    from analysis_service.assertions import FACET_ANSWERS
     from webapp.page_words import FORM_WORDS, island_tables
 
     page = client.get("/").text

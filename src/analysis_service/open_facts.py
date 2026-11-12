@@ -5,8 +5,9 @@ Every surface that shows such a fact words it here, so the early list, the
 report, ``/v1`` and a refusal ask it alike: :func:`label_of` for the question,
 :func:`group_of` for the group a page lists it in. This module also names the
 elements and references a report writes (:func:`reference_labels`), lists the
-attributes the model leaves unstated (:func:`gaps`), and decides which
-attribute may be asked (:func:`open_attribute`).
+attributes the model leaves unstated (:func:`gaps`), decides which
+attribute may be asked (:func:`open_attribute`), and which part of a question
+kind the sources state (:func:`source_states`).
 
 **Deterministic, and derived from the report alone.** No model is asked, and
 nothing here is stored on the report: it is computed wherever a reader needs
@@ -23,9 +24,13 @@ from analysis_service.analysis import ControlAttribute, control_state
 from analysis_service.assertions import (
     REGISTRY,
     AssertionCatalog,
+    PredicateName,
+    answer,
+    answered,
     assertion_id,
     identity_parts,
     parse_predicate,
+    projected_attribute,
     read_assertion_id,
 )
 from analysis_service.capabilities import CAPABILITIES, parse_capability_key
@@ -358,6 +363,34 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
     return element is not None and (unverified or assumed)
+
+
+def source_states(
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    element_id: str,
+    predicate: PredicateName,
+) -> bool:
+    """True where the sources settle ``predicate`` about this element (ADR 0117).
+
+    **The subject rule.** The writer of an answer's rows asks it, and so does
+    the tripwire that measures stated parts. Only a settled, unscoped row about the element itself counts, so a flow's
+    row never answers a question about an element, and a scoped row answers
+    nothing wider. A row an answer wrote is not the sources'. A predicate that
+    projects into an attribute is stated too where ``model`` states the
+    attribute and no answer wrote a row of it here, because that value is the
+    sources' and the row would outrank it.
+    """
+    held = answer(catalog or AssertionCatalog(), element_id, predicate)
+    if any(not row.scope and not answered(row) for row in held.settled):
+        return True
+    attribute = projected_attribute(predicate, element_id)
+    answer_wrote = any(answered(row) for row in held.rows)
+    return (
+        bool(attribute)
+        and not answer_wrote
+        and not open_attribute(model, element_id, attribute)
+    )
 
 
 def stated_capability(model: SystemModel, capability: str) -> str | None:

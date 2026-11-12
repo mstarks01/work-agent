@@ -26,10 +26,9 @@ from analysis_service.answer_bodies import BodyRefused, read_answers
 from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
-from analysis_service.assertions import AssertionRecord
+from analysis_service.assertions import FACET_ANSWERS, AssertionRecord
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
-    FACET_ANSWERS,
     MAX_FACT_ANSWERS,
     FactAnswer,
     merged_facts,

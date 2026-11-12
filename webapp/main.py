@@ -166,6 +166,7 @@ from analysis_service.api import (
     max_body_bytes,
     max_control_body_bytes,
 )
+from analysis_service.assertions import FACET_ANSWERS
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
 from analysis_service.claims import UNIT_VERDICT_WORDS, VERDICT_LABELS, UnknownKey
@@ -192,7 +193,6 @@ from analysis_service.element_hues import element_hues
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
-    FACET_ANSWERS,
     FactAnswer,
     SkipKey,
     answer_facets,

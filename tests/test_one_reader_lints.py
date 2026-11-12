@@ -2967,6 +2967,18 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "",
     ),
+    "the predicate a part of a question kind writes": _OneReader(
+        lambda node: _is_attribute(node, "predicate", "facet", "kind"),
+        ("src/analysis_service/fact_answers.py", "part_answers"),
+        {},
+        "",
+    ),
+    "the predicates the assertion pass extracts": _OneReader(
+        lambda node: _is_attribute(node, "extracted"),
+        ("src/analysis_service/assertions.py", MODULE_OWNER),
+        {},
+        "src/analysis_service/",
+    ),
 }
 
 

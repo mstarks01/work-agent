@@ -964,6 +964,14 @@ EFFECTS: Mapping[str, str] = MappingProxyType(
 RULES: tuple[Rule, ...] = with_effects(_RULES, EFFECTS)
 
 
+#: Why no rule here reads a part of a question kind (ADR 0117). Only an owner's
+#: answer or a Control writes such a row, and the lane reads it as evidence.
+_OWNER_ANSWERED = NoRule(
+    "only an owner's answer or a Control writes the row, and the lane reads it"
+    " as evidence beside the answer's line"
+)
+
+
 #: Every assertion predicate with no graph field, and the rule here that reads
 #: it or why none does. A fact of these kinds reaches a lane as an evidence row
 #: whatever this table says; an entry decides only whether it is also a lead.
@@ -1007,5 +1015,37 @@ PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
             "it identifies the element a principal is, and the rules read it"
             " to place every other fact about that principal"
         ),
+        "capacity-limits-rate": _OWNER_ANSWERED,
+        "capacity-limits-size": _OWNER_ANSWERED,
+        "capacity-limits-concurrency": _OWNER_ANSWERED,
+        "capacity-limits-quota": _OWNER_ANSWERED,
+        "audit-evidence-record-protected": _OWNER_ANSWERED,
+        "authorization-scope-checks-each-request": _OWNER_ANSWERED,
+        "authorization-scope-least-privilege": _OWNER_ANSWERED,
+        "authorization-scope-checks-ownership": _OWNER_ANSWERED,
+        "stored-copy-integrity": _OWNER_ANSWERED,
+        "stored-copy-access-encrypted": _OWNER_ANSWERED,
+        "stored-copy-access-restricted": _OWNER_ANSWERED,
+        "reachability-named-callers": _OWNER_ANSWERED,
+        "provenance-sender": _OWNER_ANSWERED,
+        "provenance-integrity": _OWNER_ANSWERED,
+        "code-execution": _OWNER_ANSWERED,
+        "physical-access": _OWNER_ANSWERED,
+        "content-validation-validates": _OWNER_ANSWERED,
+        "content-validation-encodes": _OWNER_ANSWERED,
+        "destination": _OWNER_ANSWERED,
+        "security-configuration-cookies": _OWNER_ANSWERED,
+        "security-configuration-headers": _OWNER_ANSWERED,
+        "security-configuration-cross-origin": _OWNER_ANSWERED,
+        "security-configuration-secret-store": _OWNER_ANSWERED,
+        "failure-handling-fails-closed": _OWNER_ANSWERED,
+        "failure-handling-alerts": _OWNER_ANSWERED,
+        "failure-handling-recovers": _OWNER_ANSWERED,
+        "update-process-scheduled": _OWNER_ANSWERED,
+        "update-process-vulnerability-alerts": _OWNER_ANSWERED,
+        "update-process-tested": _OWNER_ANSWERED,
+        "data-exposure-minimal-fields": _OWNER_ANSWERED,
+        "data-exposure-clean-logs": _OWNER_ANSWERED,
+        "data-exposure-restricted-readers": _OWNER_ANSWERED,
     }
 )

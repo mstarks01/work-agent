@@ -378,7 +378,8 @@ def apply_answers(
 
     A fact answer about an attribute is written onto the model instead, by
     :func:`~analysis_service.fact_writes.answered_model`, and one about a subject
-    has no row; both still quote their lines of the answers Source.
+    has no row; both still quote their lines of the answers Source. A
+    question-kind answer writes a row for each part it answers.
     """
     text, link_spans, fact_spans = _composed(links, facts, controls)
     digest = text_digest(text)
@@ -393,7 +394,7 @@ def apply_answers(
         )
         for start, end in fact_spans
     ]
-    answered, unmatched = fact_rows(linked, facts, spans)
+    answered, unmatched = fact_rows(linked, model, facts, spans)
     return answered, [*issues, *unmatched]
 
 
