@@ -1281,7 +1281,7 @@ hold, such as one from a later build, takes the same repair.
 
 The service reads a `diagram` Source with Mermaid's own parsers, which run in
 Node (ADR 0121). The service installs nothing at its startup. Before you
-start it, install Node 20 or newer. Then install the reader's locked packages
+start it, install Node 22.12 or newer. Then install the reader's locked packages
 from the checkout:
 
 ```bash

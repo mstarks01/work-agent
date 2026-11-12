@@ -85,7 +85,7 @@ sparse or inaccurate system model, which limits everything downstream.
 
 <!-- every-vendor -->
 
-You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), Node 20 or
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), Node 22.12 or
 newer, and credentials for one registered vendor: Vertex AI, Anthropic, OpenAI,
 Bedrock, the Gemini Developer API or OpenRouter.
 
@@ -97,7 +97,7 @@ cd work-agent
 uv sync
 ```
 
-The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 20
+The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 22.12
 or newer. At its first start, the app installs the parsers' locked packages,
 so that start needs a network connection. Where the install fails, the app
 logs a warning that names the command to run.

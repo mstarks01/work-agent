@@ -34,15 +34,30 @@ function lineOf(...tokens) {
   return index < 0 ? null : index + 1;
 }
 
-// A label as plain text: Mermaid's placeholder for an entity code decoded, a
-// line break a space, and any other markup dropped.
+// A label as plain text: a line break a space, any other markup dropped, and
+// each entity code decoded to its character. A flowchart label then reads as
+// Mermaid draws it. An architecture label reads as its author meant it: Mermaid
+// draws that label as SVG text, which decodes only `&amp;`, `&lt;`, `&gt;` and
+// `&#39;`. Mermaid encodes `#quot;` and `#34;` in the source before it parses,
+// so the flowchart parser gives placeholders. The architecture parser reads the
+// source as written, so the codes are encoded here first. Each becomes `&quot;`
+// or `&#34;` before the DOM decodes it.
 function plain(label) {
-  return String(label ?? "")
-    .replace(/ﬂ°°(\d+)¶ß/g, (_, code) => String.fromCodePoint(Number(code)))
+  const text = String(label ?? "")
+    .replace(/#(\d+);/g, "ﬂ°°$1¶ß")
+    .replace(/#(\w+);/g, "ﬂ°$1¶ß")
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]*>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/ﬂ°°/g, "&#")
+    .replace(/ﬂ°/g, "&")
+    .replace(/¶ß/g, ";");
+  return decoded(text).replace(/\s+/g, " ").trim();
+}
+
+function decoded(text) {
+  const area = document.createElement("textarea");
+  area.innerHTML = text;
+  return area.value;
 }
 
 function arrowOf(type) {
@@ -51,11 +66,15 @@ function arrowOf(type) {
   return "forward";
 }
 
-async function flowchart() {
+// Mermaid's flowchart grammar and the entity decode both need a DOM.
+async function useDom() {
   const { JSDOM } = await import("jsdom");
   const dom = new JSDOM("<!doctype html><body></body>");
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
+}
+
+async function flowchart() {
   const { default: mermaid } = await import("mermaid");
   mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
   const db = (await mermaid.mermaidAPI.getDiagramFromText(text)).db;
@@ -104,7 +123,7 @@ async function architecture() {
     junctions: ast.junctions.map((junction) => ({
       id: junction.id, group: junction.in ?? null, line: astLine(junction) })),
     edges: ast.edges.map((edge) => ({
-      source: end(edge.lhsId, edge.lhsGroup), target: end(edge.rhsId, edge.rhsGroup), label: "",
+      source: end(edge.lhsId, edge.lhsGroup), target: end(edge.rhsId, edge.rhsGroup), label: plain(edge.title),
       arrow: edge.lhsInto && edge.rhsInto ? "both" : edge.rhsInto ? "forward" : edge.lhsInto ? "backward" : "none",
       line: astLine(edge) })),
   };
@@ -117,6 +136,7 @@ try {
   if (!read) {
     console.log(JSON.stringify({ refused: "the diagram is not a flowchart or an architecture-beta diagram" }));
   } else {
+    await useDom();
     console.log(JSON.stringify({ structure: await read() }));
   }
 } catch (error) {
