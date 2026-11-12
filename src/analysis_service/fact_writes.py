@@ -15,7 +15,7 @@ it, so it admits only what the writer then accepts.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Iterable, Sequence
 from typing import Literal, get_args
 
 from pydantic import ValidationError
@@ -24,13 +24,18 @@ from analysis_service.analysis import control_state
 from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.assertions import (
     ABSENT,
+    REGISTRY,
     UNKNOWN,
     Assertion,
     AssertionCatalog,
     CatalogIssue,
+    Subject,
     SupportSpan,
+    admissible,
     answered,
     assertion_id,
+    conflicts,
+    graph_subject_type,
     projected_attribute,
     subjects_of,
 )
@@ -45,10 +50,12 @@ from analysis_service.fact_answers import (
     fact_line,
     key_ref,
     merged_facts,
+    part_answers,
 )
 from analysis_service.open_facts import (
     open_attribute,
     prepared_model,
+    source_states,
     stated_capability,
 )
 from analysis_service.question_kinds import parse_question_kind
@@ -356,6 +363,7 @@ def capability_statements(
 
 def fact_rows(
     catalog: AssertionCatalog,
+    model: SystemModel,
     answers: Sequence[FactAnswer],
     spans: Sequence[SupportSpan],
 ) -> tuple[AssertionCatalog, list[CatalogIssue]]:
@@ -375,6 +383,15 @@ def fact_rows(
     stays**, because it states a narrower fact that the answer does not settle.
     Where one stays, the answer is written as an unscoped row beside it, which
     :func:`~analysis_service.assertions.project` lets outrank it.
+
+    **A question-kind answer writes a row for each part it answers** (ADR
+    0117), about the element it asks of, through :func:`_part_rows`. **An
+    assertion answer or a part row removes each unscoped source row at its
+    place that is open, is set aside, has the answer's identity or disagrees
+    with it**, so
+    the answer settles the fact. A row that can hold beside the answer stays.
+    A ``superseded-by-answer`` issue names each removed row that holds a
+    value.
     """
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
@@ -395,7 +412,7 @@ def fact_rows(
     issues.extend(
         CatalogIssue(
             code="superseded-by-answer",
-            message="the submitter's answer to this row's attribute replaced it",
+            message="an answer to this row's attribute replaced it",
             subject=entry.subject,
             assertion=assertion_id(entry),
         )
@@ -449,18 +466,130 @@ def fact_rows(
                 "support": [span],
             }
         )
+    asked, parts = _part_rows(
+        catalog, model, answers, spans, replaced.values(), attributes.keys()
+    )
+    rewritten = {assertion_id(row) for row in replaced.values()}
+    written_here = {
+        **{
+            (row.subject, row.predicate): row
+            for row in replaced.values()
+            if not row.scope
+        },
+        **parts,
+    }
+
+    def answered_over(entry: Assertion) -> bool:
+        """An earlier run's part row, or a source row an answer settles now.
+
+        At a place an answer writes, a source row goes where it is open, set
+        aside, the answer's own identity, or where it disagrees with the
+        answer (:func:`~analysis_service.assertions.conflicts`). A row that can
+        hold beside the answer, such as another value of a predicate of many,
+        stays. A row an attribute answer removes is that step's.
+        """
+        place = (entry.subject, entry.predicate)
+        if entry.scope or assertion_id(entry) in superseded:
+            return False
+        if answered(entry):
+            return place in asked and assertion_id(entry) not in rewritten
+        written_row = written_here.get(place)
+        if written_row is None or assertion_id(entry) in replaced:
+            return False
+        return (
+            entry.value == UNKNOWN
+            or not admissible(entry)
+            or assertion_id(entry) == assertion_id(written_row)
+            or bool(conflicts(AssertionCatalog(entries=[entry, written_row])))
+        )
+
+    issues.extend(
+        CatalogIssue(
+            code="superseded-by-answer",
+            message="an answer to this row's fact replaced it",
+            subject=entry.subject,
+            assertion=assertion_id(entry),
+        )
+        for entry in catalog.entries
+        if answered_over(entry) and not answered(entry) and entry.value != UNKNOWN
+    )
+
     entries = [
         *(
-            replaced.get(assertion_id(entry), entry)
-            for entry in catalog.entries
-            if assertion_id(entry) not in superseded
+            entry
+            for entry in (
+                replaced.get(assertion_id(entry), entry)
+                for entry in catalog.entries
+                if assertion_id(entry) not in superseded
+            )
+            if not answered_over(entry)
         ),
         *written.values(),
+        *parts.values(),
     ]
-    labels = {subject.id: subject for subject in catalog.subjects}
+    labels = {
+        **{
+            element.id: Subject(id=element.id, type=subject_type, label=element.name)
+            for element in model.elements()
+            if (subject_type := graph_subject_type(element.id)) is not None
+        },
+        **{subject.id: subject for subject in catalog.subjects},
+    }
     return (
         catalog.model_copy(
             update={"subjects": subjects_of(entries, labels), "entries": entries}
         ),
         issues,
     )
+
+
+def _part_rows(
+    catalog: AssertionCatalog,
+    model: SystemModel,
+    answers: Sequence[FactAnswer],
+    spans: Sequence[SupportSpan],
+    assertion_rows: Iterable[Assertion],
+    attributes: Collection[tuple[str, str]],
+) -> tuple[frozenset[tuple[str, str]], dict[tuple[str, str], Assertion]]:
+    """The places that question-kind answers ask about, and the rows they write.
+
+    A place is an element and a predicate. Each part of a kind that admits the
+    element's subject type is asked there, whatever the answer. A part writes
+    a stated row where its answer has a value (:attr:`~analysis_service.assertions.OwnerQuestion.values`),
+    the sources do not state it (:func:`source_states`), no assertion answer
+    in ``assertion_rows`` writes the same place, and no attribute answer in
+    ``attributes`` settles the attribute it projects into: a stated fact
+    stands, a Control fills only an open fact (ADR 0125), and an answer to the
+    attribute itself is the narrower one.
+    """
+    answered_places = {
+        (row.subject, row.predicate) for row in assertion_rows if not row.scope
+    }
+    asked: set[tuple[str, str]] = set()
+    rows: dict[tuple[str, str], Assertion] = {}
+    for fact, span in zip(answers, spans, strict=True):
+        element_id = key_ref(fact.key).element_id
+        subject_type = graph_subject_type(element_id)
+        for name, given in part_answers(fact):
+            predicate = REGISTRY[name]
+            if subject_type not in predicate.subjects or predicate.asked is None:
+                continue
+            place = (element_id, name)
+            asked.add(place)
+            value = predicate.asked.values.get(given)
+            if (
+                value is None
+                or place in answered_places
+                or (element_id, projected_attribute(name, element_id)) in attributes
+                or source_states(model, catalog, element_id, name)
+            ):
+                continue
+            rows[place] = Assertion(
+                subject=element_id,
+                predicate=name,
+                value=value,
+                basis="stated",
+                origin="answer",
+                support=[span],
+            )
+    return frozenset(asked), rows

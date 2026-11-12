@@ -290,12 +290,12 @@ class TestTheRegistryAnswersItsVocabularies:
         field the graph already holds joins the projecting side, which
         `data-classification` did; one for a fact the graph has no field for
         joins the other, which `origin-verification`, `credential-lifetime`,
-        `credential-revocation`, `record-attribution` and `content-validation`
-        did.
+        `credential-revocation`, `record-attribution`, `content-validation`
+        and the 32 parts of the question kinds (ADR 0117) did.
         """
         unprojected = len(REGISTRY) - len(projection_fields())
 
-        assert (len(REGISTRY), unprojected) == (23, 16)
+        assert (len(REGISTRY), unprojected) == (55, 48)
         assert unprojected > len(projection_fields())
 
     def test_two_predicates_can_project_into_one_field(self):

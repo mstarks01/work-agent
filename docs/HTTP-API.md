@@ -561,7 +561,14 @@ about that attribute, and a `superseded-by-answer` issue names each removed
 fact. A fact that the sources state only for a scope, such as one environment,
 stays in the catalog beside your answer, and your answer settles the attribute. An
 inferred trust zone that you answer is no longer marked as inferred. An
-assertion answer replaces the open fact with a stated one. A subject answer reaches the analysis as your words in the
+assertion answer replaces the open fact with a stated one. An answer to a
+question kind writes a stated fact for each part it answers, about that
+element, unless the sources state that part. An assertion answer, or a part,
+removes each unscoped catalog fact at its place that is open, set aside
+(`unsupported` or `unresolved`) or disagrees with your answer, and a
+`superseded-by-answer` issue names each removed fact that holds a value. A fact
+that can hold beside your answer, such as a second mechanism of one connection,
+stays. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said
 otherwise. Fact answers need no assertion catalog, so every deployment takes
 them.

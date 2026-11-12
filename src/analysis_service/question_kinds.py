@@ -19,6 +19,11 @@ typed questions, and ``reviewed_by`` names who accepted it. A new row carries
 question that opens with "Are", "Can" or "Does" asks whether something holds.
 A compound question is answered in its facets, which the maintainer reviewed
 with the kinds on 2026-09-29 (#1289).
+
+**Each part is a predicate** (ADR 0117). A facet, and a ``yes-no`` kind, names
+the :data:`~analysis_service.assertions.REGISTRY` row that holds its question,
+the protection a Control states and the row each answer writes. A kind is the
+group of predicates that a page asks together about one element.
 """
 
 from __future__ import annotations
@@ -28,6 +33,12 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
+from analysis_service.assertions import (
+    REGISTRY,
+    OwnerQuestion,
+    PredicateName,
+    ProtectiveAnswer,
+)
 from analysis_service.parsing import member
 
 __all__ = [
@@ -35,7 +46,6 @@ __all__ = [
     "MAX_FACETS",
     "QUESTION_KINDS",
     "Facet",
-    "ProtectiveAnswer",
     "QuestionKind",
     "QuestionKindName",
     "parse_question_kind",
@@ -62,11 +72,6 @@ QuestionKindName = Literal[
 ]
 
 
-#: The answer to a part that makes it a protection. Most parts protect on
-#: "yes"; a part that asks whether a harm can happen protects on "no".
-ProtectiveAnswer = Literal["yes", "no"]
-
-
 @dataclass(frozen=True)
 class Facet:
     """One short part of a compound question kind, answered yes, no, not
@@ -74,12 +79,26 @@ class Facet:
 
     #: Stable within its kind; an answer names the facet by it.
     id: str
-    #: The part as a question, with "it" for the element.
-    question: str
-    #: The part as a protection that a Control states, with no subject.
-    statement: str
-    #: The answer that makes the part a protection.
-    protects: ProtectiveAnswer
+    #: The predicate an answer to this part writes.
+    predicate: PredicateName
+
+    @property
+    def question(self) -> str:
+        """The part as a question, with "it" for the element."""
+        question = _asked(self.predicate).question
+        if question is None:
+            raise LookupError(f"{self.predicate!r} has no part question")
+        return question
+
+    @property
+    def statement(self) -> str:
+        """The part as a protection that a Control states, with no subject."""
+        return _asked(self.predicate).statement
+
+    @property
+    def protects(self) -> ProtectiveAnswer:
+        """The answer that makes the part a protection."""
+        return _asked(self.predicate).protects
 
 
 @dataclass(frozen=True)
@@ -100,14 +119,43 @@ class QuestionKind:
     #: asks who, what or how and no facet fits. No default, so a new row says
     #: which.
     answer: Literal["yes-no", "facets", "text"]
-    #: The protection a Control states of a ``yes-no`` kind, and ``None`` for
-    #: every other: a ``facets`` kind states each facet's.
-    statement: str | None
-    #: The answer to a ``yes-no`` kind that makes it a protection, and ``None``
-    #: for every other.
-    protects: ProtectiveAnswer | None
+    #: The predicate an answer to a ``yes-no`` kind writes, and ``None`` for
+    #: every other: a ``facets`` kind names one for each facet.
+    predicate: PredicateName | None
     #: The parts a ``facets`` kind is answered in, and empty for every other.
     facets: tuple[Facet, ...]
+
+    @property
+    def parts(self) -> tuple[tuple[str | None, PredicateName], ...]:
+        """Each part of the kind: a facet's ID and its predicate, or ``None``
+        and the predicate of a ``yes-no`` kind, which is its own one part.
+
+        **The one reader of which predicate each part of a kind writes.**
+        """
+        if self.predicate is not None:
+            return ((None, self.predicate),)
+        return tuple((facet.id, facet.predicate) for facet in self.facets)
+
+    @property
+    def statement(self) -> str | None:
+        """The protection a Control states of a ``yes-no`` kind, and ``None``
+        for every other: a ``facets`` kind states each facet's."""
+        return None if self.predicate is None else _asked(self.predicate).statement
+
+    @property
+    def protects(self) -> ProtectiveAnswer | None:
+        """The answer to a ``yes-no`` kind that makes it a protection, and
+        ``None`` for every other."""
+        return None if self.predicate is None else _asked(self.predicate).protects
+
+
+def _asked(predicate: PredicateName) -> OwnerQuestion:
+    """How a page asks ``predicate``. Every predicate this table names has one,
+    and ``tests/test_question_kinds.py`` holds it."""
+    asked = REGISTRY[predicate].asked
+    if asked is None:
+        raise LookupError(f"{predicate!r} is asked by no question kind")
+    return asked
 
 
 QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
@@ -119,33 +167,12 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Request limits",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "rate",
-                    "Does it limit the rate of requests?",
-                    statement="Limits the rate of requests.",
-                    protects="yes",
-                ),
-                Facet(
-                    "size",
-                    "Does it limit the size of a request or message?",
-                    statement="Limits the size of a request or message.",
-                    protects="yes",
-                ),
-                Facet(
-                    "concurrency",
-                    "Does it limit how much work runs at once?",
-                    statement="Limits how much work runs at once.",
-                    protects="yes",
-                ),
-                Facet(
-                    "quota",
-                    "Does it set a quota per user or tenant?",
-                    statement="Sets a quota per user or tenant.",
-                    protects="yes",
-                ),
+                Facet("rate", "capacity-limits-rate"),
+                Facet("size", "capacity-limits-size"),
+                Facet("concurrency", "capacity-limits-concurrency"),
+                Facet("quota", "capacity-limits-quota"),
             ),
         ),
         "audit-evidence": QuestionKind(
@@ -155,21 +182,10 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Audit records",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "records-actor",
-                    "Does it record who performed each action?",
-                    statement="Records who performed each action.",
-                    protects="yes",
-                ),
-                Facet(
-                    "record-protected",
-                    "Is that record kept where the people it records cannot change or delete it?",
-                    statement="Keeps that record where the people it records cannot change or delete it.",
-                    protects="yes",
-                ),
+                Facet("records-actor", "record-attribution"),
+                Facet("record-protected", "audit-evidence-record-protected"),
             ),
         ),
         "authorization-scope": QuestionKind(
@@ -179,27 +195,11 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Authorization",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "checks-each-request",
-                    "Does it check each request against what the caller may do?",
-                    statement="Checks each request against what the caller may do.",
-                    protects="yes",
-                ),
-                Facet(
-                    "least-privilege",
-                    "Are permissions narrower than full access, such as roles or scopes?",
-                    statement="Grants permissions narrower than full access, such as roles or scopes.",
-                    protects="yes",
-                ),
-                Facet(
-                    "checks-ownership",
-                    "Does it check that the caller owns the object it names?",
-                    statement="Checks that the caller owns the object it names.",
-                    protects="yes",
-                ),
+                Facet("checks-each-request", "authorization-scope-checks-each-request"),
+                Facet("least-privilege", "authorization-scope-least-privilege"),
+                Facet("checks-ownership", "authorization-scope-checks-ownership"),
             ),
         ),
         "stored-copy-integrity": QuestionKind(
@@ -209,8 +209,7 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Backup integrity",
             reviewed_by="mstarks01",
             answer="yes-no",
-            statement="Checks its backups, snapshots and restores for tampering before it uses them.",
-            protects="yes",
+            predicate="stored-copy-integrity",
             facets=(),
         ),
         "stored-copy-access": QuestionKind(
@@ -219,21 +218,10 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Backup access",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "encrypted",
-                    "Are its backups and snapshots encrypted?",
-                    statement="Encrypts its backups and snapshots.",
-                    protects="yes",
-                ),
-                Facet(
-                    "restricted",
-                    "Can only named operators get its disks, backups or snapshots?",
-                    statement="Only named operators can get its disks, backups or snapshots.",
-                    protects="yes",
-                ),
+                Facet("encrypted", "stored-copy-access-encrypted"),
+                Facet("restricted", "stored-copy-access-restricted"),
             ),
         ),
         "reachability": QuestionKind(
@@ -242,21 +230,10 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Reachability",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "internet",
-                    "Can the internet reach it?",
-                    statement="The internet cannot reach it.",
-                    protects="no",
-                ),
-                Facet(
-                    "named-callers",
-                    "Can only named callers reach it, such as through an allow-list, a private network or a VPN?",
-                    statement="Only named callers can reach it, such as through an allow-list, a private network or a VPN.",
-                    protects="yes",
-                ),
+                Facet("internet", "internet-exposure"),
+                Facet("named-callers", "reachability-named-callers"),
             ),
         ),
         "provenance": QuestionKind(
@@ -266,21 +243,10 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Provenance",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "sender",
-                    "Does it check who sent what it takes, such as by a signature or an authenticated sender?",
-                    statement="Checks who sent what it takes, such as by a signature or an authenticated sender.",
-                    protects="yes",
-                ),
-                Facet(
-                    "integrity",
-                    "Does it check that what it takes was not altered?",
-                    statement="Checks that what it takes was not altered.",
-                    protects="yes",
-                ),
+                Facet("sender", "provenance-sender"),
+                Facet("integrity", "provenance-integrity"),
             ),
         ),
         "code-execution": QuestionKind(
@@ -289,8 +255,7 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Code execution",
             reviewed_by="mstarks01",
             answer="yes-no",
-            statement="Content it takes cannot run code with its authority.",
-            protects="no",
+            predicate="code-execution",
             facets=(),
         ),
         "physical-access": QuestionKind(
@@ -300,8 +265,7 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Physical access",
             reviewed_by="mstarks01",
             answer="yes-no",
-            statement="Physical access to it does not let anyone read its secrets or change it.",
-            protects="no",
+            predicate="physical-access",
             facets=(),
         ),
         "content-validation": QuestionKind(
@@ -311,21 +275,10 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Input handling",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "validates",
-                    "Does it check the values it takes against what it expects?",
-                    statement="Checks the values it takes against what it expects.",
-                    protects="yes",
-                ),
-                Facet(
-                    "encodes",
-                    "Does it encode or bind values where it uses them, such as in queries, commands or pages?",
-                    statement="Encodes or binds values where it uses them, such as in queries, commands or pages.",
-                    protects="yes",
-                ),
+                Facet("validates", "content-validation-validates"),
+                Facet("encodes", "content-validation-encodes"),
             ),
         ),
         "destination": QuestionKind(
@@ -335,8 +288,7 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Delivery",
             reviewed_by="mstarks01",
             answer="yes-no",
-            statement="Checks that what it sends reaches the intended recipient.",
-            protects="yes",
+            predicate="destination",
             facets=(),
         ),
         "security-configuration": QuestionKind(
@@ -346,33 +298,12 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Security settings",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "cookies",
-                    "Are its cookies set Secure, HttpOnly and SameSite?",
-                    statement="Sets its cookies Secure, HttpOnly and SameSite.",
-                    protects="yes",
-                ),
-                Facet(
-                    "headers",
-                    "Does it send security headers such as CSP and HSTS?",
-                    statement="Sends security headers such as CSP and HSTS.",
-                    protects="yes",
-                ),
-                Facet(
-                    "cross-origin",
-                    "Does it limit cross-origin requests to named origins?",
-                    statement="Limits cross-origin requests to named origins.",
-                    protects="yes",
-                ),
-                Facet(
-                    "secret-store",
-                    "Are its secrets kept in a secret store, not in code or files?",
-                    statement="Keeps its secrets in a secret store, not in code or files.",
-                    protects="yes",
-                ),
+                Facet("cookies", "security-configuration-cookies"),
+                Facet("headers", "security-configuration-headers"),
+                Facet("cross-origin", "security-configuration-cross-origin"),
+                Facet("secret-store", "security-configuration-secret-store"),
             ),
         ),
         "failure-handling": QuestionKind(
@@ -381,27 +312,11 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Failures",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "fails-closed",
-                    "When a dependency fails, does it refuse requests rather than skip its checks?",
-                    statement="Refuses requests when a dependency fails, and does not skip its checks.",
-                    protects="yes",
-                ),
-                Facet(
-                    "alerts",
-                    "Is someone alerted when it fails or stops?",
-                    statement="Alerts someone when it fails or stops.",
-                    protects="yes",
-                ),
-                Facet(
-                    "recovers",
-                    "Does it restart or recover on its own?",
-                    statement="Restarts or recovers on its own.",
-                    protects="yes",
-                ),
+                Facet("fails-closed", "failure-handling-fails-closed"),
+                Facet("alerts", "failure-handling-alerts"),
+                Facet("recovers", "failure-handling-recovers"),
             ),
         ),
         "update-process": QuestionKind(
@@ -410,27 +325,11 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Updates",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "scheduled",
-                    "Are its components updated on a schedule?",
-                    statement="Updates its components on a schedule.",
-                    protects="yes",
-                ),
-                Facet(
-                    "vulnerability-alerts",
-                    "Is someone alerted about known vulnerabilities in its components?",
-                    statement="Alerts someone about known vulnerabilities in its components.",
-                    protects="yes",
-                ),
-                Facet(
-                    "tested",
-                    "Are updates tested before they reach production?",
-                    statement="Tests updates before they reach production.",
-                    protects="yes",
-                ),
+                Facet("scheduled", "update-process-scheduled"),
+                Facet("vulnerability-alerts", "update-process-vulnerability-alerts"),
+                Facet("tested", "update-process-tested"),
             ),
         ),
         "data-exposure": QuestionKind(
@@ -439,27 +338,11 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
             topic="Data exposure",
             reviewed_by="mstarks01",
             answer="facets",
-            statement=None,
-            protects=None,
+            predicate=None,
             facets=(
-                Facet(
-                    "minimal-fields",
-                    "Does it return only the fields the caller needs?",
-                    statement="Returns only the fields the caller needs.",
-                    protects="yes",
-                ),
-                Facet(
-                    "clean-logs",
-                    "Does it keep secrets and personal data out of its logs?",
-                    statement="Keeps secrets and personal data out of its logs.",
-                    protects="yes",
-                ),
-                Facet(
-                    "restricted-readers",
-                    "Can only authorised readers see what it records?",
-                    statement="Lets only authorised readers see what it records.",
-                    protects="yes",
-                ),
+                Facet("minimal-fields", "data-exposure-minimal-fields"),
+                Facet("clean-logs", "data-exposure-clean-logs"),
+                Facet("restricted-readers", "data-exposure-restricted-readers"),
             ),
         ),
     }

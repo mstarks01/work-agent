@@ -110,6 +110,8 @@ __all__ = [
     "ABSENT",
     "ANSWER_ISSUES",
     "CATALOG_REFUSALS",
+    "EXTRACTED",
+    "FACET_ANSWERS",
     "GATE_REFUSALS",
     "MAX_ASSERTIONS",
     "MAX_PREMISES",
@@ -139,11 +141,13 @@ __all__ = [
     "Conflict",
     "Contradiction",
     "Origin",
+    "OwnerQuestion",
     "Predicate",
     "PredicateName",
     "ProjectedField",
     "Projection",
     "ProjectionReason",
+    "ProtectiveAnswer",
     "Qualifier",
     "QualifierKind",
     "Quarantined",
@@ -165,6 +169,7 @@ __all__ = [
     "contradiction_issues",
     "contradictions",
     "disputed",
+    "graph_subject_type",
     "offered",
     "parse_predicate",
     "parse_subject_type",
@@ -203,7 +208,10 @@ __all__ = [
 #:   closed ``credential-expiry`` value (#1054).
 #: * ``record-attribution`` and ``content-validation`` (#1242) say which writer
 #:   a record names, and whether anything validates content beyond its schema.
-REGISTRY_VERSION = 8
+#: * A predicate with :attr:`Predicate.asked` is a part of a question kind that
+#:   an owner answers (ADR 0117). One whose ``extracted`` is false has only the
+#:   rows that an owner's answer or a Control writes.
+REGISTRY_VERSION = 9
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -344,6 +352,38 @@ PredicateName = Literal[
     "record-attribution",
     "content-validation",
     "represented-by",
+    "capacity-limits-rate",
+    "capacity-limits-size",
+    "capacity-limits-concurrency",
+    "capacity-limits-quota",
+    "audit-evidence-record-protected",
+    "authorization-scope-checks-each-request",
+    "authorization-scope-least-privilege",
+    "authorization-scope-checks-ownership",
+    "stored-copy-integrity",
+    "stored-copy-access-encrypted",
+    "stored-copy-access-restricted",
+    "reachability-named-callers",
+    "provenance-sender",
+    "provenance-integrity",
+    "code-execution",
+    "physical-access",
+    "content-validation-validates",
+    "content-validation-encodes",
+    "destination",
+    "security-configuration-cookies",
+    "security-configuration-headers",
+    "security-configuration-cross-origin",
+    "security-configuration-secret-store",
+    "failure-handling-fails-closed",
+    "failure-handling-alerts",
+    "failure-handling-recovers",
+    "update-process-scheduled",
+    "update-process-vulnerability-alerts",
+    "update-process-tested",
+    "data-exposure-minimal-fields",
+    "data-exposure-clean-logs",
+    "data-exposure-restricted-readers",
 ]
 
 #: Whether two values of one predicate, at one subject and scope, can both hold.
@@ -376,6 +416,20 @@ GRAPH_BOUND: frozenset[SubjectType] = frozenset(
     if prefixes <= frozenset(_ELEMENT_TYPES)
 )
 
+
+def graph_subject_type(element_id: str) -> SubjectType | None:
+    """The graph-bound subject type whose ID ``element_id`` is, or ``None``."""
+    prefix = element_prefix(element_id)
+    return next(
+        (
+            subject_type
+            for subject_type in GRAPH_BOUND
+            if prefix in SUBJECT_PREFIXES[subject_type]
+        ),
+        None,
+    )
+
+
 # --- Bounds ----------------------------------------------------------------
 #
 # Blast-radius guards rather than quality thresholds, in the shape
@@ -388,6 +442,14 @@ GRAPH_BOUND: frozenset[SubjectType] = frozenset(
 #: element cap — at three assertions each, with room for the principals and
 #: credentials the graph has no node for. Awaiting evidence, like the element
 #: cap: what a real extraction emits is #926 Phase 3's measurement.
+#:
+#: It bounds model output, so a row an answer wrote does not count. The answer
+#: bounds hold those: a job holds at most ``MAX_HELD_FACTS`` answers, and one
+#: answer writes a row for each part of its kind, at most ``MAX_FACETS``, so
+#: 4000 rows. The gate read 3776 distinct answer rows in 0.25 s, and 1000 in
+#: 0.07 s. On 311 archived reports the largest extracted catalog holds 48 rows,
+#: and the largest pause asks 262 questions, so one cap over both would refuse
+#: a real job (#2054).
 MAX_ASSERTIONS = 500
 
 #: The most subjects one catalog may hold: the element cap, plus this layer's
@@ -405,6 +467,31 @@ MAX_PREMISES = 8
 #: The most qualifiers one scope may carry, one per :data:`QualifierKind` and
 #: one over.
 MAX_QUALIFIERS = 6
+
+
+#: The answer to a part of a question kind that makes it a protection. Most
+#: parts protect on "yes"; a part that asks whether a harm can happen protects
+#: on "no".
+ProtectiveAnswer = Literal["yes", "no"]
+
+#: The answers an owner gives a part of a question kind, beside ``unknown``.
+FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
+
+
+@dataclass(frozen=True)
+class OwnerQuestion:
+    """How a page asks a predicate as one part of a question kind (ADR 0117)."""
+
+    #: The part as a question, with "it" for the element, or ``None`` for a
+    #: ``yes-no`` kind, whose template asks it.
+    question: str | None
+    #: The part as a protection that a Control states, with no subject.
+    statement: str
+    #: The answer that makes the part a protection.
+    protects: ProtectiveAnswer
+    #: The value of the row that each answer writes. An answer with no value
+    #: here writes no row, and stays a line of the answers Source.
+    values: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -446,6 +533,12 @@ class Predicate:
     #: value already needs a span the gate verifies against the source text,
     #: so requiring the basis is what puts the identification behind a quote.
     stated_only: bool = False
+    #: Whether the assertion pass extracts this predicate. Off by default, so
+    #: a new predicate reaches no model input until a row turns it on.
+    extracted: bool = False
+    #: How a page asks this predicate as a part of a question kind, or
+    #: ``None`` where no question kind asks it.
+    asked: OwnerQuestion | None = None
 
     def admits(self, value: str, known_subjects: Collection[str]) -> bool:
         """Whether ``value`` is legal for this predicate.
@@ -465,6 +558,50 @@ class Predicate:
         return keeps_text(value)
 
 
+#: The subjects a part of a question kind is about: the elements an owner is
+#: asked about, a component or a flow.
+_ASKED_SUBJECTS: frozenset[SubjectType] = frozenset({"component", "interaction"})
+
+
+def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
+    """A predicate only an owner or a Control answers, with extraction off.
+
+    Its value is the answer itself, so its meaning is its question with "it"
+    for the subject, and its terms are the values its answers write.
+    """
+    return Predicate(
+        meaning=asked.question or question.format(subject="it"),
+        question=question,
+        subjects=_ASKED_SUBJECTS,
+        value="term",
+        terms=frozenset(asked.values.values()),
+        asked=asked,
+    )
+
+
+def _same(terms: Sequence[str]) -> Mapping[str, str]:
+    """Each answer as the value of the row it writes."""
+    return {term: term for term in terms}
+
+
+def _facet(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
+    """A part of a ``facets`` kind: yes, no or not applicable.
+
+    ``question`` says "it", so the predicate's question names the subject
+    before it.
+    """
+    asked = OwnerQuestion(question, statement, protects, _same(FACET_ANSWERS))
+    return _owner_only(f"{{subject}}: {question}", asked)
+
+
+def _yes_no(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
+    """A ``yes-no`` kind: yes or no, the answers its page offers. The kind's
+    template asks it, so it has no part question."""
+    return _owner_only(
+        question, OwnerQuestion(None, statement, protects, _same(("yes", "no")))
+    )
+
+
 #: The predicates this service registers, and the whole of what extraction may
 #: assert. A fact outside this table stays source material: extraction does not
 #: invent a predicate and does not force a fact into the nearest wrong one.
@@ -476,6 +613,7 @@ class Predicate:
 REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
     {
         "authentication-mechanism": Predicate(
+            extracted=True,
             meaning="how the initiator of this interaction proves who it is",
             question="How does the initiator of {subject} prove who it is?",
             subjects=frozenset({"interaction", "component"}),
@@ -484,6 +622,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             projects_into="authentication",
         ),
         "credential-presented": Predicate(
+            extracted=True,
             meaning="what the initiator presents: a cookie, a token, a key",
             question="What does the initiator of {subject} present to prove who it"
             " is, such as a cookie, a token or a key?",
@@ -494,6 +633,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             projects_into="authentication",
         ),
         "mfa-requirement": Predicate(
+            extracted=True,
             meaning="whether a second factor is required to authenticate",
             question="Does {subject} require a second factor to authenticate?",
             subjects=frozenset({"interaction", "principal"}),
@@ -501,6 +641,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             terms=frozenset({"required"}),
         ),
         "authorization-grant": Predicate(
+            extracted=True,
             meaning="what this principal may do, to which resource",
             question="What may {subject} do, and to which resource?",
             subjects=frozenset({"principal"}),
@@ -509,6 +650,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             multiplicity="many",
         ),
         "credential-sharing": Predicate(
+            extracted=True,
             meaning="how many principals hold this credential",
             question="How many principals hold {subject}?",
             subjects=frozenset({"credential"}),
@@ -516,6 +658,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             terms=frozenset({"per-principal", "shared"}),
         ),
         "credential-rotation": Predicate(
+            extracted=True,
             meaning="whether this credential is replaced after it is issued",
             question="Is {subject} replaced after it is issued?",
             subjects=frozenset({"credential"}),
@@ -523,12 +666,14 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             terms=frozenset({"rotated", "not-rotated"}),
         ),
         "credential-custody": Predicate(
+            extracted=True,
             meaning="where this credential is kept",
             question="Where is {subject} kept?",
             subjects=frozenset({"credential"}),
             value="text",
         ),
         "credential-expiry": Predicate(
+            extracted=True,
             meaning="whether this credential stops working on its own",
             question="Does {subject} stop working on its own?",
             subjects=frozenset({"credential"}),
@@ -542,12 +687,14 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
         # withdraw is a twelve-hour compromise, and ``expires`` alone reads as a
         # control being present (#1054).
         "credential-lifetime": Predicate(
+            extracted=True,
             meaning="how long this credential works before it expires",
             question="How long does {subject} work before it expires?",
             subjects=frozenset({"credential"}),
             value="text",
         ),
         "credential-revocation": Predicate(
+            extracted=True,
             meaning="whether this credential can be withdrawn before it expires",
             question="Can {subject} be withdrawn before it expires?",
             subjects=frozenset({"credential"}),
@@ -555,6 +702,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             terms=frozenset({"revocable"}),
         ),
         "transport-encryption": Predicate(
+            extracted=True,
             meaning="what protects this interaction's data on the wire",
             question="What protects the data of {subject} on the wire?",
             subjects=frozenset({"interaction"}),
@@ -562,6 +710,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             projects_into="encryption_in_transit",
         ),
         "storage-encryption": Predicate(
+            extracted=True,
             meaning="what protects this component's data at rest",
             question="What protects the data in {subject} at rest?",
             subjects=frozenset({"component"}),
@@ -574,6 +723,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
         # the contents supports a tier as an inference, and ASVS's
         # CLASSIFIED_STORE_TEST finds ``confidential`` in the projected field.
         "data-classification": Predicate(
+            extracted=True,
             meaning="which sensitivity tier this component's data is in,"
             " never a list of what it holds",
             question="Which sensitivity tier is the data in {subject} in?",
@@ -583,6 +733,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             projects_into="data_classification",
         ),
         "signature-verification": Predicate(
+            extracted=True,
             meaning="whether the receiver checks who signed the artifact it took",
             question="Does the receiver of {subject} check who signed it?",
             subjects=frozenset({"artifact", "interaction"}),
@@ -598,6 +749,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
         # whose folder it landed in", which names no signature and is the fact
         # neither other predicate could carry (#1053).
         "origin-verification": Predicate(
+            extracted=True,
             meaning="whether the receiver checks who supplied what it took",
             question="Does the receiver of {subject} check who supplied it?",
             subjects=frozenset({"interaction"}),
@@ -605,6 +757,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             terms=frozenset({"verified"}),
         ),
         "destination-verification": Predicate(
+            extracted=True,
             meaning="whether the sender checks it is sending to the right place",
             question="Does the sender of {subject} check that it sends to the right"
             " place?",
@@ -613,14 +766,22 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             terms=frozenset({"verified"}),
         ),
         "internet-exposure": Predicate(
+            extracted=True,
             meaning="whether this component can be reached from the internet",
             question="Can {subject} be reached from the internet?",
             subjects=frozenset({"component"}),
             value="term",
             terms=frozenset({"internet-facing", "internal"}),
             projects_into="exposure",
+            asked=OwnerQuestion(
+                "Can the internet reach it?",
+                statement="The internet cannot reach it.",
+                protects="no",
+                values={"yes": "internet-facing", "no": "internal"},
+            ),
         ),
         "network-membership": Predicate(
+            extracted=True,
             meaning="which zone a sentence about where this component runs"
             " puts it in; its own name, what reaches it and what it talks to"
             " or sits on place it nowhere",
@@ -631,6 +792,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             projects_into="trust_zone",
         ),
         "administrative-authority": Predicate(
+            extracted=True,
             meaning="which component this principal administers",
             question="Which component does {subject} administer?",
             subjects=frozenset({"principal"}),
@@ -639,6 +801,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             multiplicity="many",
         ),
         "tenant-ownership": Predicate(
+            extracted=True,
             meaning="which party controls this component",
             question="Which party controls {subject}?",
             subjects=frozenset({"component", "zone"}),
@@ -650,6 +813,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
         # is the repudiation question, and it is a stated fact rather than an
         # absence of logging: the record exists and names somebody else.
         "record-attribution": Predicate(
+            extracted=True,
             meaning="whom this component's records name as the one who acted:"
             " the principal who asked, or only the component that passed the"
             " request on",
@@ -659,12 +823,22 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             subjects=frozenset({"component"}),
             value="term",
             terms=frozenset({"principal", "intermediary"}),
+            # An owner's "no" can mean a record that names only an
+            # intermediary or no record at all. ``absent`` covers both for the
+            # rule that reads it, and the maintainer chose it (#2054).
+            asked=OwnerQuestion(
+                "Does it record who performed each action?",
+                statement="Records who performed each action.",
+                protects="yes",
+                values={"yes": "principal", "no": ABSENT},
+            ),
         ),
         # A check on what the thing says, not on who sent it or whether it
         # parses: ``origin-verification`` asks who supplied it, and a schema
         # check is a format check. Case 03's rows pass the schema and nothing
         # reads their values before they reach the warehouse.
         "content-validation": Predicate(
+            extracted=True,
             meaning="whether the receiver checks the contents of what it takes,"
             " beyond its format or schema",
             question="Does the receiver of {subject} check its contents, beyond"
@@ -680,6 +854,7 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
         # about that principal onto the wrong element with nothing to show it
         # had moved.
         "represented-by": Predicate(
+            extracted=True,
             meaning="which element of the model stands for this principal,"
             " where the sources say the two are the same thing",
             question="Which element of the model stands for {subject}?",
@@ -688,7 +863,191 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             refers_to=frozenset({"component"}),
             stated_only=True,
         ),
+        # The parts of the question kinds that only an owner or a Control
+        # answers (ADR 0117), in the wording of the kinds. A yes-no kind's
+        # question names its subject; a facet's says "it", because its page
+        # names the element above it.
+        "capacity-limits-rate": _facet(
+            "Does it limit the rate of requests?",
+            "Limits the rate of requests.",
+            protects="yes",
+        ),
+        "capacity-limits-size": _facet(
+            "Does it limit the size of a request or message?",
+            "Limits the size of a request or message.",
+            protects="yes",
+        ),
+        "capacity-limits-concurrency": _facet(
+            "Does it limit how much work runs at once?",
+            "Limits how much work runs at once.",
+            protects="yes",
+        ),
+        "capacity-limits-quota": _facet(
+            "Does it set a quota per user or tenant?",
+            "Sets a quota per user or tenant.",
+            protects="yes",
+        ),
+        "audit-evidence-record-protected": _facet(
+            "Is that record kept where the people it records cannot"
+            " change or delete it?",
+            "Keeps that record where the people it records cannot change or delete it.",
+            protects="yes",
+        ),
+        "authorization-scope-checks-each-request": _facet(
+            "Does it check each request against what the caller may do?",
+            "Checks each request against what the caller may do.",
+            protects="yes",
+        ),
+        "authorization-scope-least-privilege": _facet(
+            "Are permissions narrower than full access, such as roles or scopes?",
+            "Grants permissions narrower than full access, such as roles or scopes.",
+            protects="yes",
+        ),
+        "authorization-scope-checks-ownership": _facet(
+            "Does it check that the caller owns the object it names?",
+            "Checks that the caller owns the object it names.",
+            protects="yes",
+        ),
+        "stored-copy-integrity": _yes_no(
+            "Are backups, snapshots and restores of {subject} checked"
+            " for tampering before they are used?",
+            "Checks its backups, snapshots and restores for tampering"
+            " before it uses them.",
+            protects="yes",
+        ),
+        "stored-copy-access-encrypted": _facet(
+            "Are its backups and snapshots encrypted?",
+            "Encrypts its backups and snapshots.",
+            protects="yes",
+        ),
+        "stored-copy-access-restricted": _facet(
+            "Can only named operators get its disks, backups or snapshots?",
+            "Only named operators can get its disks, backups or snapshots.",
+            protects="yes",
+        ),
+        "reachability-named-callers": _facet(
+            "Can only named callers reach it, such as through an"
+            " allow-list, a private network or a VPN?",
+            "Only named callers can reach it, such as through an"
+            " allow-list, a private network or a VPN.",
+            protects="yes",
+        ),
+        "provenance-sender": _facet(
+            "Does it check who sent what it takes, such as by a"
+            " signature or an authenticated sender?",
+            "Checks who sent what it takes, such as by a signature or an"
+            " authenticated sender.",
+            protects="yes",
+        ),
+        "provenance-integrity": _facet(
+            "Does it check that what it takes was not altered?",
+            "Checks that what it takes was not altered.",
+            protects="yes",
+        ),
+        "code-execution": _yes_no(
+            "Can content that {subject} takes run code with its authority?",
+            "Content it takes cannot run code with its authority.",
+            protects="no",
+        ),
+        "physical-access": _yes_no(
+            "Can someone with physical access to {subject} read its"
+            " secrets or change it?",
+            "Physical access to it does not let anyone read its secrets or change it.",
+            protects="no",
+        ),
+        "content-validation-validates": _facet(
+            "Does it check the values it takes against what it expects?",
+            "Checks the values it takes against what it expects.",
+            protects="yes",
+        ),
+        "content-validation-encodes": _facet(
+            "Does it encode or bind values where it uses them, such as"
+            " in queries, commands or pages?",
+            "Encodes or binds values where it uses them, such as in"
+            " queries, commands or pages.",
+            protects="yes",
+        ),
+        "destination": _yes_no(
+            "Does {subject} check that what it sends reaches the intended recipient?",
+            "Checks that what it sends reaches the intended recipient.",
+            protects="yes",
+        ),
+        "security-configuration-cookies": _facet(
+            "Are its cookies set Secure, HttpOnly and SameSite?",
+            "Sets its cookies Secure, HttpOnly and SameSite.",
+            protects="yes",
+        ),
+        "security-configuration-headers": _facet(
+            "Does it send security headers such as CSP and HSTS?",
+            "Sends security headers such as CSP and HSTS.",
+            protects="yes",
+        ),
+        "security-configuration-cross-origin": _facet(
+            "Does it limit cross-origin requests to named origins?",
+            "Limits cross-origin requests to named origins.",
+            protects="yes",
+        ),
+        "security-configuration-secret-store": _facet(
+            "Are its secrets kept in a secret store, not in code or files?",
+            "Keeps its secrets in a secret store, not in code or files.",
+            protects="yes",
+        ),
+        "failure-handling-fails-closed": _facet(
+            "When a dependency fails, does it refuse requests rather"
+            " than skip its checks?",
+            "Refuses requests when a dependency fails, and does not skip its checks.",
+            protects="yes",
+        ),
+        "failure-handling-alerts": _facet(
+            "Is someone alerted when it fails or stops?",
+            "Alerts someone when it fails or stops.",
+            protects="yes",
+        ),
+        "failure-handling-recovers": _facet(
+            "Does it restart or recover on its own?",
+            "Restarts or recovers on its own.",
+            protects="yes",
+        ),
+        "update-process-scheduled": _facet(
+            "Are its components updated on a schedule?",
+            "Updates its components on a schedule.",
+            protects="yes",
+        ),
+        "update-process-vulnerability-alerts": _facet(
+            "Is someone alerted about known vulnerabilities in its components?",
+            "Alerts someone about known vulnerabilities in its components.",
+            protects="yes",
+        ),
+        "update-process-tested": _facet(
+            "Are updates tested before they reach production?",
+            "Tests updates before they reach production.",
+            protects="yes",
+        ),
+        "data-exposure-minimal-fields": _facet(
+            "Does it return only the fields the caller needs?",
+            "Returns only the fields the caller needs.",
+            protects="yes",
+        ),
+        "data-exposure-clean-logs": _facet(
+            "Does it keep secrets and personal data out of its logs?",
+            "Keeps secrets and personal data out of its logs.",
+            protects="yes",
+        ),
+        "data-exposure-restricted-readers": _facet(
+            "Can only authorised readers see what it records?",
+            "Lets only authorised readers see what it records.",
+            protects="yes",
+        ),
     }
+)
+
+
+#: The predicates the assertion pass extracts, in registry order. The prompt's
+#: table, the proposal schema and the resolver read this table, never
+#: :attr:`Predicate.extracted` itself, so a predicate with extraction off
+#: reaches no model input and no proposed row (ADR 0117).
+EXTRACTED: Mapping[PredicateName, Predicate] = MappingProxyType(
+    {name: predicate for name, predicate in REGISTRY.items() if predicate.extracted}
 )
 
 
@@ -883,8 +1242,9 @@ CatalogIssueCode = Literal[
     "unknown-link-element",
     # A submitter's answer to an open row this catalog does not hold.
     "unmatched-answer",
-    # Not a refused row. A submitter's answer to a graph attribute replaced
-    # this unscoped row, which reached the same attribute; see
+    # Not a refused row. An answer replaced this unscoped row: an answer to
+    # the graph attribute the row reached, or an answer that settles the
+    # row's own fact, which the row disputed; see
     # :func:`~analysis_service.fact_writes.fact_rows`.
     "superseded-by-answer",
 ]
@@ -1772,11 +2132,12 @@ def catalog_issues(
                 f" rows; this service reads version {REGISTRY_VERSION}",
             )
         ]
-    if len(catalog.entries) > MAX_ASSERTIONS:
+    extracted = sum(1 for entry in catalog.entries if not answered(entry))
+    if extracted > MAX_ASSERTIONS:
         return [
             CatalogIssue(
                 code="too-many-assertions",
-                message=f"{len(catalog.entries)} assertions; the cap is {MAX_ASSERTIONS}",
+                message=f"{extracted} assertions; the cap is {MAX_ASSERTIONS}",
             )
         ]
     if len(catalog.subjects) > MAX_SUBJECTS:
@@ -2205,7 +2566,7 @@ class AssertionProposal(BaseModel):
     predicate: str = Field(
         min_length=1,
         max_length=60,
-        json_schema_extra={"enum": [*sorted(REGISTRY)]},
+        json_schema_extra={"enum": [*sorted(EXTRACTED)]},
     )
     value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
     reason: ProposedReason | None = None
@@ -2396,6 +2757,9 @@ def _resolve_row(
     name = parse_predicate(row.predicate)
     if name is None:
         drop("unknown-predicate", f"{row.predicate!r} is not a registered predicate")
+        return None
+    if name not in EXTRACTED:
+        drop("unknown-predicate", f"{row.predicate!r} is not extracted")
         return None
     predicate = REGISTRY[name]
 

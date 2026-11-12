@@ -14,10 +14,12 @@ them, and :func:`fact_kind` says which.
 * An **assertion** row the sources left open. The answer replaces the row with
   a stated one, quoting its line of the answers Source.
 * A **question** of one of the kinds in
-  :data:`~analysis_service.question_kinds.QUESTION_KINDS`, about one element,
-  or a free-text **subject** where no kind fits. Nothing structured can hold
-  either answer, so it reaches the lanes only as its line of the answers
-  Source.
+  :data:`~analysis_service.question_kinds.QUESTION_KINDS`, about one element.
+  Each part of the kind is a predicate (ADR 0117), so the answer writes a
+  stated row for each part it answers (:func:`part_answers`), quoting its line
+  of the answers Source, and the lanes read it in both forms.
+* A free-text **subject** where no kind fits. Nothing structured can hold the
+  answer, so it reaches the lanes only as its line of the answers Source.
 * A **capability** of the whole application, answered yes or no. The answer
   replaces what the sources stated about it with a statement on the model
   that quotes its line of the answers Source.
@@ -55,9 +57,11 @@ from pydantic import (
 )
 
 from analysis_service.assertions import (
+    FACET_ANSWERS,
     UNKNOWN,
     Assertion,
     AssertionCatalog,
+    PredicateName,
     answered,
     assertion_id,
 )
@@ -76,7 +80,6 @@ from analysis_service.sources import FORMATTING_CATEGORIES, plain_name, quotable
 from analysis_service.system_model import SystemModel
 
 __all__ = [
-    "FACET_ANSWERS",
     "FACT_VALUE_MAX_CHARS",
     "MAX_FACT_ANSWERS",
     "MAX_HELD_FACTS",
@@ -101,6 +104,7 @@ __all__ = [
     "merged_facts",
     "needed_facets",
     "needs_of",
+    "part_answers",
     "refuse_repeated_facts",
     "with_element",
 ]
@@ -134,9 +138,6 @@ SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length
 #: The five kinds of fact are the five spellings of a reference to one.
 FactKind = Spelling
 
-
-#: The answers a facet takes, beside ``unknown``.
-FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 
 #: The validation context of an answer that the service reads back: a record
 #: that a store holds, or an answer that a run's state carries. An answer read
@@ -402,6 +403,24 @@ def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
         else None
     )
     return () if name is None else QUESTION_KINDS[name].facets
+
+
+def part_answers(fact: FactAnswer) -> tuple[tuple[PredicateName, str], ...]:
+    """Each predicate a question-kind answer names, with what it answers that part.
+
+    Each part comes from :attr:`~analysis_service.question_kinds.QuestionKind.parts`
+    (ADR 0117). A facet the answer leaves out reads ``unknown``, and a
+    ``yes-no`` kind's one part reads the answer's value.
+    Empty for every other fact, and for a kind this table no longer holds.
+    """
+    name = parse_question_kind(key_ref(fact.key).question)
+    if fact.kind != "question" or name is None:
+        return ()
+    given = fact.facets or {}
+    return tuple(
+        (predicate, fact.value if facet is None else given.get(facet, UNKNOWN))
+        for facet, predicate in QUESTION_KINDS[name].parts
+    )
 
 
 def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:

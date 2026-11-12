@@ -119,6 +119,14 @@ _CONTAINERS = frozenset({"tuple", "frozenset", "set", "list", "dict", "Mapping"}
 #: suppression: the constant still has to stay a subset, which
 #: :func:`test_no_declaration_outlives_its_subset` checks.
 PARTIAL: dict[tuple[str, str], str] = {
+    ("analysis_service.assertions", "_ASKED_SUBJECTS"): (
+        "the subject types of the elements an owner is asked about, which are"
+        " a component and a flow and never a principal, a credential or a zone"
+    ),
+    ("analysis_service.assertions", "EXTRACTED"): (
+        "the predicates the assertion pass extracts, which leaves out each"
+        " predicate whose extraction is off (ADR 0117)"
+    ),
     ("evals.experiments.QA-2026-11-02-05.control_ballot", "CONTROL_CHECKS"): (
         "the checks of the item 4 control arm, which has no spoofing runs"
     ),

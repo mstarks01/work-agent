@@ -14,6 +14,7 @@ from typing import get_args
 import pytest
 
 from analysis_service.answer_state import EmptyListReason
+from analysis_service.assertions import FACET_ANSWERS
 from analysis_service.claims import (
     GroundKind,
     ScopeState,
@@ -21,7 +22,7 @@ from analysis_service.claims import (
     UnitRuling,
     VerdictStatus,
 )
-from analysis_service.fact_answers import FACET_ANSWERS, FactStatus
+from analysis_service.fact_answers import FactStatus
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.job_state import PageStatus
 from analysis_service.report_changes import Change, FindingChange
