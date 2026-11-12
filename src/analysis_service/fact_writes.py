@@ -31,6 +31,7 @@ from analysis_service.assertions import (
     CatalogIssue,
     Subject,
     SupportSpan,
+    admissible,
     answered,
     assertion_id,
     conflicts,
@@ -386,7 +387,8 @@ def fact_rows(
     **A question-kind answer writes a row for each part it answers** (ADR
     0117), about the element it asks of, through :func:`_part_rows`. **An
     assertion answer or a part row removes each unscoped source row at its
-    place that is open, has the answer's identity or disagrees with it**, so
+    place that is open, is set aside, has the answer's identity or disagrees
+    with it**, so
     the answer settles the fact. A row that can hold beside the answer stays.
     A ``superseded-by-answer`` issue names each removed row that holds a
     value.
@@ -480,8 +482,8 @@ def fact_rows(
     def answered_over(entry: Assertion) -> bool:
         """An earlier run's part row, or a source row an answer settles now.
 
-        At a place an answer writes, a source row goes where it is open,
-        where it is the answer's own identity, or where it disagrees with the
+        At a place an answer writes, a source row goes where it is open, set
+        aside, the answer's own identity, or where it disagrees with the
         answer (:func:`~analysis_service.assertions.conflicts`). A row that can
         hold beside the answer, such as another value of a predicate of many,
         stays. A row an attribute answer removes is that step's.
@@ -496,6 +498,7 @@ def fact_rows(
             return False
         return (
             entry.value == UNKNOWN
+            or not admissible(entry)
             or assertion_id(entry) == assertion_id(written_row)
             or bool(conflicts(AssertionCatalog(entries=[entry, written_row])))
         )

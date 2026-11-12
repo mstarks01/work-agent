@@ -446,6 +446,16 @@ class TestADisputedPlace:
         named = [issue.assertion for issue in issues]
         assert len(named) == len(set(named))
 
+    def test_an_answer_removes_a_row_set_aside_that_disagrees(self, model):
+        aside = inferred(PROCESS, "record-attribution", "intermediary").model_copy(
+            update={"assessment": "unsupported", "assessor": "a reviewer"}
+        )
+        fact = kind_answer(PROCESS, "audit-evidence", records_actor="yes")
+        linked, issues = apply_answers(self.held(aside), model, [], [fact])
+        (only,) = answer(linked, PROCESS, "record-attribution").rows
+        assert (only.value, only.origin) == ("principal", "answer")
+        assert [issue.code for issue in issues] == ["superseded-by-answer"]
+
     def test_the_answer_settles_a_row_set_aside(self, model):
         aside = inferred(PROCESS, "record-attribution", "principal").model_copy(
             update={"assessment": "unsupported", "assessor": "a reviewer"}
