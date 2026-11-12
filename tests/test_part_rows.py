@@ -351,6 +351,67 @@ class TestADisputedPlace:
         assert issues == []
         assert len(answer(again, PROCESS, "record-attribution").rows) == 1
 
+    def test_an_assertion_answer_keeps_a_settled_row_of_many_values(self, model):
+        principal = "principal:operators"
+        open_row = Assertion(
+            subject=principal,
+            predicate="administrative-authority",
+            value=UNKNOWN,
+            reason="silent",
+            basis="inferred",
+            origin="assertion-pass",
+            explanation="the notes do not say",
+        )
+        held = AssertionCatalog(
+            subjects=[
+                Subject(id=principal, type="principal", label="operators"),
+                Subject(id=PROCESS, type="component", label="Web app"),
+                Subject(id=STORE, type="component", label="Orders"),
+            ],
+            entries=[
+                inferred(principal, "administrative-authority", PROCESS),
+                open_row,
+            ],
+        )
+        fact = FactAnswer(
+            key=UnknownRef(assertion=assertion_id(open_row)).key, value=STORE
+        )
+        linked, issues = apply_answers(held, model, [], [fact])
+        rows = answer(linked, principal, "administrative-authority").rows
+        assert sorted(row.value for row in rows) == sorted([PROCESS, STORE])
+        assert issues == []
+
+    def test_a_row_draws_one_issue_when_two_answers_reach_it(self, model):
+        open_row = Assertion(
+            subject=LOGIN,
+            predicate="authentication-mechanism",
+            value=UNKNOWN,
+            reason="silent",
+            basis="inferred",
+            origin="assertion-pass",
+            explanation="the notes do not say",
+        )
+        held = AssertionCatalog(
+            subjects=[Subject(id=LOGIN, type="interaction", label="Login")],
+            entries=[
+                inferred(LOGIN, "authentication-mechanism", "mutual TLS"),
+                open_row,
+            ],
+        )
+        facts = [
+            FactAnswer(
+                key=UnknownRef(assertion=assertion_id(open_row)).key,
+                value="a bearer token",
+            ),
+            FactAnswer(
+                key=UnknownRef(element_id=LOGIN, attribute="authentication").key,
+                value="OAuth tokens",
+            ),
+        ]
+        _, issues = apply_answers(held, model, [], facts)
+        named = [issue.assertion for issue in issues]
+        assert len(named) == len(set(named))
+
     def test_the_answer_settles_a_row_set_aside(self, model):
         aside = inferred(PROCESS, "record-attribution", "principal").model_copy(
             update={"assessment": "unsupported", "assessor": "a reviewer"}

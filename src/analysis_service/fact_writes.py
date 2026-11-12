@@ -35,6 +35,7 @@ from analysis_service.assertions import (
     assertion_id,
     graph_subject_type,
     projected_attribute,
+    settled,
     subjects_of,
 )
 from analysis_service.capabilities import lineage, parse_capability_key
@@ -466,19 +467,31 @@ def fact_rows(
         catalog, model, answers, spans, replaced.values(), attributes.keys()
     )
     rewritten = {assertion_id(row) for row in replaced.values()}
+    stood = {
+        (row.subject, row.predicate)
+        for row in settled(catalog)
+        if not row.scope and not answered(row)
+    }
     settled_here = {
         *parts,
-        *((row.subject, row.predicate) for row in replaced.values() if not row.scope),
+        *(
+            place
+            for row in replaced.values()
+            if not row.scope and (place := (row.subject, row.predicate)) not in stood
+        ),
     }
 
     def answered_over(entry: Assertion) -> bool:
         """An earlier run's part row, or a source row an answer settles now.
 
-        An answer is written only over an open fact, so each other unscoped
-        source row at its place is open, disputed or set aside.
+        A part is written only where no settled source row stands, and an
+        assertion answer settles its place only where none stands: on a
+        predicate of many values a settled row is another true fact. So each
+        other unscoped source row at such a place is open, disputed or set
+        aside. A row an attribute answer removes is that step's.
         """
         place = (entry.subject, entry.predicate)
-        if entry.scope:
+        if entry.scope or assertion_id(entry) in superseded:
             return False
         if answered(entry):
             return place in asked and assertion_id(entry) not in rewritten
