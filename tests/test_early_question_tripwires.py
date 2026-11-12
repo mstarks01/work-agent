@@ -15,7 +15,11 @@ from analysis_service.assertions import EXTRACTED, AssertionCatalog
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import key_ref
 from analysis_service.open_facts import prepared_model, source_states
-from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
+from analysis_service.question_kinds import (
+    QUESTION_KINDS,
+    QuestionKindName,
+    parse_question_kind,
+)
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
@@ -30,7 +34,10 @@ STATED_PART_THRESHOLD = 1.0
 
 
 def _stated_parts(
-    model: SystemModel, catalog: AssertionCatalog | None, element_id: str, name: str
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    element_id: str,
+    name: QuestionKindName,
 ) -> int:
     """The parts of the kind ``name`` that the sources state about the element.
 
