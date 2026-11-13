@@ -1,10 +1,11 @@
 """The three early-list orders of QA-2026-11-13-01 that were not shipped.
 
-E2 lets only STRIDE rules rank a question kind. E3 and E4 change the turn rule
-that ``answer_state.by_turn`` applies: each takes a question kind's rows as one
-unit, as ``grouped()`` lays them. E3 gives the next unit to the framework that
-``whose_turn`` names. E4 adds the cost of each framework's next unit to its
-charge before it asks ``whose_turn``. Build the folder of reports the
+E2 lets only STRIDE rules rank a question kind. The ASVS prior holds no
+question kind, so no ASVS rule meets a kind's field, and E2 equals E1 by
+construction. E3 and E4 change the turn rule that ``answer_state.by_turn``
+applies: each takes a question kind's rows as one unit, as ``grouped()`` lays
+them. E3 takes the units in the shipped turns. E4 adds the cost of each
+framework's next unit to its charge before it asks ``whose_turn``. Build the folder of reports the
 comparison read, and run it::
 
     while read -r path; do
@@ -54,35 +55,41 @@ def _units(questions):
     return units
 
 
-def _by_unit(lookahead):
-    """A turn rule that takes one unit at a time."""
+def _unit_turns(questions, charged):
+    """The shipped turn rule, over units."""
+    units = answer_state._in_turn(
+        _units(questions),
+        serves=lambda unit: {name for q in unit for name in q.frameworks},
+        choices=lambda unit: sum(q.decisions for q in unit),
+        charged=charged,
+    )
+    return [question for unit in units for question in unit]
 
-    def by_turn(questions, charged):
-        charged = Counter(charged or {})
-        left = _units(questions)
-        order = []
-        while left:
-            served = {name for unit in left for q in unit for name in q.frameworks}
-            if not served:
-                return order + [q for unit in left for q in unit]
-            first = {
-                name: next(u for u in left if any(name in q.frameworks for q in u))
-                for name in served
-            }
-            cost = {
-                name: charged[name]
-                + (sum(q.decisions for q in unit) if lookahead else 0)
-                for name, unit in first.items()
-            }
-            unit = first[answer_state.whose_turn(served, cost)]
-            left.remove(unit)
-            order += unit
-            for question in unit:
-                for holder in question.frameworks:
-                    charged[holder] += question.decisions
-        return order
 
-    return by_turn
+def _lookahead_turns(questions, charged):
+    """The turn rule over units, with each framework's next unit in its charge."""
+    charged = Counter(charged or {})
+    left = _units(questions)
+    order = []
+    while left:
+        served = {name for unit in left for q in unit for name in q.frameworks}
+        if not served:
+            return order + [q for unit in left for q in unit]
+        first = {
+            name: next(u for u in left if any(name in q.frameworks for q in u))
+            for name in served
+        }
+        cost = {
+            name: charged[name] + sum(q.decisions for q in unit)
+            for name, unit in first.items()
+        }
+        unit = first[answer_state.whose_turn(served, cost)]
+        left.remove(unit)
+        order += unit
+        for question in unit:
+            for holder in question.frameworks:
+                charged[holder] += question.decisions
+    return order
 
 
 def stride_rules_only(model, chosen):
@@ -93,13 +100,13 @@ def stride_rules_only(model, chosen):
 
 def unit_turns(model, chosen):
     """E3: a kind's rows take one turn."""
-    with mock.patch.object(answer_state, "by_turn", _by_unit(lookahead=False)):
+    with mock.patch.object(answer_state, "by_turn", _unit_turns):
         return _each(_shipped_list(model, chosen))
 
 
 def lookahead_turns(model, chosen):
     """E4: a kind's rows take one turn, and the turn reads the next unit's cost."""
-    with mock.patch.object(answer_state, "by_turn", _by_unit(lookahead=True)):
+    with mock.patch.object(answer_state, "by_turn", _lookahead_turns):
         return _each(_shipped_list(model, chosen))
 
 
