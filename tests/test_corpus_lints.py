@@ -284,8 +284,8 @@ def test_a_case_declaring_a_framework_its_model_does_not_satisfy_is_caught():
 def test_a_pending_entry_whose_precondition_no_longer_holds_is_caught(monkeypatch):
     """A named gap for a framework the case no longer runs names nothing.
 
-    The batch pipeline refutes ASVS's precondition, so an entry saying that
-    case still needs an ASVS set would outlive the gap it describes.
+    The batch pipeline refutes ASVS's precondition, so an entry that says the
+    case still needs an ASVS set would outlive the gap that it describes.
     """
     case_dir = next(
         path for path in verify_corpus.case_dirs() if path.name.endswith("pipeline")
@@ -313,6 +313,18 @@ def test_a_pending_entry_for_no_case_is_caught(monkeypatch):
     (problem,) = verify_corpus._stale_pending_entries({"01-payments-checkout"})
 
     assert "99-nowhere" in problem
+
+
+def test_a_pending_entry_for_no_framework_is_caught(monkeypatch):
+    monkeypatch.setattr(
+        verify_corpus,
+        "PENDING_REFERENCE_SETS",
+        {"01-payments-checkout": frozenset({"asv"})},
+    )
+
+    (problem,) = verify_corpus._stale_pending_entries({"01-payments-checkout"})
+
+    assert "'asv'" in problem
 
 
 def test_each_declared_source_digests_to_what_it_claims():

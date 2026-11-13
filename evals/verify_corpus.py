@@ -1014,6 +1014,10 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
     meet is worse than no expectation. ``refuted`` and ``undecidable`` are still
     kept apart everywhere their remedy differs; here their consequence is the
     same and the check treats them alike.
+
+    It also reads :data:`PENDING_REFERENCE_SETS` for the case. An entry names a
+    framework the case satisfies and does not declare yet, so an entry for a
+    framework the case does not satisfy, or one it already declares, fails.
     """
     declared = set(declared_names(meta))
     pending = PENDING_REFERENCE_SETS.get(case_dir.name, frozenset())
@@ -1034,9 +1038,10 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
                 )
             continue
         if name not in declared:
-            # A named gap is not silence: the case is listed, what it still
-            # needs is written down, and an entry that no longer applies fails
-            # below.
+            # A named gap is not silence: the case is listed and what it still
+            # needs is written down. An entry that no longer applies fails:
+            # above where the precondition does not hold, below where the case
+            # declares the framework, and in _stale_pending_entries otherwise.
             if name not in pending:
                 yield (
                     f"case.json does not declare {name!r}, whose precondition"
@@ -1056,16 +1061,23 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
 
 
 def _stale_pending_entries(case_ids: set[str]) -> Iterator[str]:
-    """Entries of :data:`PENDING_REFERENCE_SETS` for a case the corpus lacks.
+    """Entries of :data:`PENDING_REFERENCE_SETS` that no case reads.
 
-    :func:`framework_issues` reads the table one case at a time, so an entry
-    whose case was renamed or removed is never read there.
+    :func:`framework_issues` reads the table one case and one registered
+    package at a time. So it never reads an entry for a case the corpus lacks,
+    or for a framework that ``PACKAGES`` does not register.
     """
-    for case_id in sorted(PENDING_REFERENCE_SETS.keys() - case_ids):
-        yield (
-            f"PENDING_REFERENCE_SETS holds {case_id}, which is not a case in the"
-            " corpus; delete the entry"
-        )
+    for case_id, names in sorted(PENDING_REFERENCE_SETS.items()):
+        if case_id not in case_ids:
+            yield (
+                f"PENDING_REFERENCE_SETS holds {case_id}, which is not a case in"
+                " the corpus; delete the entry"
+            )
+        for name in sorted(names - PACKAGES.keys()):
+            yield (
+                f"PENDING_REFERENCE_SETS lists {name!r} for {case_id}, which is not"
+                " a registered framework; correct or delete it"
+            )
 
 
 #: Lanes the corpus cannot measure, each with the reason it cannot.

@@ -53,7 +53,7 @@ node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it: cases 01, 04, 09, 11 and 13 on 2026-09-16,
 the other eight on 2026-09-18 (#1048), and case 16 on 2026-10-10. The maintainer signed case 16's
 `network-membership` row for `process:library-app` on 2026-10-15. Cases 17 and
-18 carry a `facts.json` too, and no row in either is signed yet. The rulings and the model
+18 carry a `facts.json` too, and the maintainer signed no row in either yet. The rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
 placement is not graded as a fact. A file may carry signed alias rulings for
