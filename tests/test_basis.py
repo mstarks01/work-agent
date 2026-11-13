@@ -25,7 +25,7 @@ from evals.harness.reference import load_case
 
 # The figures published in the module docstring's table. Re-derived below, so
 # the prose and the code cannot drift apart.
-CORPUS_VALUES = 39
+CORPUS_VALUES = 41
 CORPUS_FLAGGED_WEAK = 0
 CORPUS_FLAGGED_STRICT = 17
 
@@ -289,7 +289,7 @@ def test_the_published_weak_rung_rate_is_what_the_corpus_gives(corpus_values):
 
 
 def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
-    """17 in 39, which is why the strict rung is recorded and not shipped."""
+    """17 in 41, which is why the strict rung is recorded and not shipped."""
     flagged = [
         case_id
         for case_id, tokens, source in corpus_values
@@ -302,7 +302,7 @@ def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
 def test_the_corpus_is_read_in_full_so_its_clean_rate_means_something(
     corpus_values,
 ):
-    """0 flags over 39 values, and 39 of 39 actually searched (#925).
+    """0 flags over 41 values, and 41 of 41 actually searched (#925).
 
     The published rate is only a rate if the denominator was read. This ties
     the table's ``values`` column to the coverage of the same walk: were a case

@@ -1,0 +1,25 @@
+{
+  "id": "18-podcast-host-quotas",
+  "title": "A podcast host whose parts state quotas, limits and their absence",
+  "domain": "podcast hosting",
+  "provenance": "Synthetic system authored for this corpus (issue #2054, phase 2). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "holdout": false,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee"
+    }
+  ],
+  "source_sha256": "742087786601c723410305cc058c93614924e283d45c42d14035ced907b293db",
+  "frameworks": [
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "The case exists for issue #2054. It measures the assertion pass on the capacity-limits predicates, beside case 17. It states the shapes case 17 does not: a quota per show on the upload API, a stated absence of a rate limit on the public feed service, a stated absence of a concurrency limit on the stats importer, and a hedged size limit on one upload that must stay unknown. The transcoder states a concurrency limit. The denial-of-service must-find rests on the feed service's stated absence of a rate limit. The domain is podcast hosting, which no other case covers."
+}

@@ -1,0 +1,166 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:applicant>process:permit-gateway>submit-applications",
+      "entity:applicant"
+    ],
+    "claim": "If the portal does not authenticate applicants, an attacker submits or changes permit applications as another applicant.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source never says how an applicant signs in, so authentication is unknown and the finding is conditional.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:inspector>process:permit-service>review-and-decide",
+      "entity:inspector"
+    ],
+    "claim": "An attacker who learns a district's shared inspector login records permit decisions as any inspector in that district.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated: \"All inspectors in a district use one shared inspector login.\" A login many people hold is a login many people can leak.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings",
+      "store:plan-store"
+    ],
+    "claim": "If the plan upload service does not check who owns an application, an attacker uploads drawings that replace another applicant's plans in the plan store.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The upload path skips the gateway and the source states no authentication or ownership check on it.",
+    "verb": "alter"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:entity:applicant>process:permit-gateway>submit-applications"
+    ],
+    "claim": "If application requests are not encrypted in transit, an attacker on the network path changes an application on its way to the gateway.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source says nothing about transport encryption on any flow.",
+    "verb": "alter-in-transit"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:inspector>process:permit-service>review-and-decide",
+      "entity:inspector"
+    ],
+    "claim": "An inspector approves or refuses a permit under the district's shared login, and nothing shows which inspector made the decision.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "Stated shared login. A permit decision is the record a dispute turns on.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:plan-store"
+    ],
+    "claim": "If the plan store does not restrict who reads it, an attacker reads other applicants' plan drawings.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source states nothing about access to the plan store. Plan drawings show the layout of private homes.",
+    "verb": "read"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings"
+    ],
+    "claim": "If uploads are not encrypted in transit, an attacker on the network path reads plan drawings as applicants upload them.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source says nothing about transport encryption on the upload path.",
+    "verb": "intercept"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:plan-upload-service",
+      "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings",
+      "store:plan-store"
+    ],
+    "claim": "An attacker sends very large PDFs, or very many of them, straight to the plan upload service and fills it and the plan store until applicants cannot upload drawings.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "This case exists for this finding. The source states the absence of both limits: \"The plan upload service has no size limit and no rate limit.\" The service is on the internet and outside the gateway, so the gateway's limits do not cover it. An assertion pass that writes the two stated absences gives the lane the facts this finding rests on.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:plan-renderer",
+      "flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files"
+    ],
+    "claim": "An attacker uploads many large drawings so that the plan renderer, which runs four conversions at a time, falls far behind and inspectors wait for tiles.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "The concurrency limit is stated: \"It runs four conversions at a time; anything more waits.\" The limit protects the renderer, and the queue in front of it has no stated bound.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:permit-gateway",
+      "flow:entity:applicant>process:permit-gateway>submit-applications",
+      "process:permit-service"
+    ],
+    "claim": "An attacker sends requests from many IP addresses at once, which the gateway's limit of 60 requests a minute per address does not stop, until the permit service stops serving applicants.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The gateway's rate limit and size limit are stated. The rate limit is per IP address, so it does not bound a flood spread over many addresses.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:plan-renderer",
+      "flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files"
+    ],
+    "claim": "An attacker uploads a crafted PDF that exploits the plan renderer's conversion and runs code with the renderer's access to the plan store and the city's cloud account.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The renderer parses files that anyone on the internet uploads. The source states nothing about how the conversion is isolated.",
+    "verb": "escalate"
+  }
+]

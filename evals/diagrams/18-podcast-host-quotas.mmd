@@ -1,0 +1,27 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: internet"]
+        n0["podcaster"]
+        n1["podcast app"]
+        n2["ad partner"]
+    end
+    subgraph z1["Trust zone: hosting account"]
+        n3("upload API")
+        n4("transcoder")
+        n5("feed service")
+        n6("stats importer")
+        n7[("media store")]
+        n8[("show database")]
+        n9[("stats database")]
+    end
+    n0 -->|"upload episodes"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n3 -->|"store audio"| n7
+    n3 -->|"store episode details"| n8
+    n4 -->|"pick up audio"| n7
+    n1 -->|"fetch feeds"| n5
+    linkStyle 4 stroke:#c0392b,stroke-width:2px
+    n5 -->|"read show details"| n8
+    n2 -->|"send download counts"| n6
+    linkStyle 6 stroke:#c0392b,stroke-width:2px
+    n6 -->|"write counts"| n9

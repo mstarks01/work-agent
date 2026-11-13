@@ -549,6 +549,10 @@ _CATALOG_ROW_IDS = (
 #: its members as a type. :func:`test_no_open_declaration_outlives_its_table`
 #: refuses an entry that names no such table.
 OPEN: dict[tuple[str, str], str] = {
+    ("evals.verify_corpus", "PENDING_REFERENCE_SETS"): (
+        "corpus case names, which are directory names under the corpus and not a"
+        " type, so a new case that has no reference set adds a member"
+    ),
     ("analysis_service.auth", "_CANONICAL_ALGORITHMS"): (
         "a table of algorithm names that maps the free text of an operator's"
         " algorithm setting to the canonical spelling"

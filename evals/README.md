@@ -32,27 +32,28 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**Every case has a merged Case Sitting.** That is the
+**A merged Case Sitting clears a case.** A sitting is the
 reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under
 `evals/review/submissions/` — who read it, what they wrote before the sets
-opened, and the digest of each file they read. `tests/test_case_review.py`
-derives the count from that directory, so this sentence and the gate cannot
-disagree. Case `01-payments-checkout` carries a filled reading document dated
+opened, and the digest of each file they read. Some cases wait for one, and
+`uv run python webapp/sitting.py --list` names them. Case `01-payments-checkout` carries a filled reading document dated
 2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
 reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
 reader's own words and the template for the method, and no submission clears
 the case (ADR 24).
-`tests/test_case_review.py` fails a new case that arrives without a sitting, and
-fails a read file that changes under its recorded digest.
+`tests/test_case_review.py` fails a case that no sitting clears unless its
+`UNREVIEWED` table names the case, and fails a read file that changes under its
+recorded digest.
 
 **Fourteen cases carry signed reference facts.** Cases 01 to 13 and 16 carry a
 `facts.json`, one row per fact the sources state, in the shape the assertion
 node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it: cases 01, 04, 09, 11 and 13 on 2026-09-16,
 the other eight on 2026-09-18 (#1048), and case 16 on 2026-10-10. The maintainer signed case 16's
-`network-membership` row for `process:library-app` on 2026-10-15. The rulings and the model
+`network-membership` row for `process:library-app` on 2026-10-15. Cases 17 and
+18 carry a `facts.json` too, and the maintainer signed no row in either yet. The rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
 placement is not graded as a fact. A file may carry signed alias rulings for
@@ -84,7 +85,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call:
-**13 false splits of 169, 2 false merges of 92 and 2 false merges of 365.**
+**13 false splits of 169, 2 false merges of 92 and 2 false merges of 375.**
 The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
@@ -94,7 +95,7 @@ denominators are different populations and none is a rate over what a live run
 emits.
 
 Equivalently by population: 13 false splits over 169 equivalent candidate pairs,
-2 false merges over 92 candidate negatives, and 2 false merges over 365
+2 false merges over 92 candidate negatives, and 2 false merges over 375
 distinct reference pairs.
 
 The 288 calibration fixtures retain their original order and reference claims.
@@ -259,7 +260,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 365 with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 375 with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | Which **Data Flow** identity version a graph spells, and the table that lifts an archived artifact's old flow IDs to the version the corpus spells. The table comes from the graph's endpoints, because a version 1 ID omits the endpoint types. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
@@ -804,7 +805,7 @@ Three properties make the record worth keeping:
 
 ## The corpus
 
-Sixteen cases, each sized so a person can enumerate its threats exhaustively
+18 cases, each sized so a person can enumerate its threats exhaustively
 (roughly 8–22 elements).
 
 The shipped prompts teach by example, and every lane's `exemplars.md` works its
@@ -839,6 +840,8 @@ too. The gap is tracked and watched, but never fails a build.
 | `14-loyalty-oauth-platform` | identity & access | far | synthetic (exhausted holdout) |
 | `15-multitenant-invoicing` | multi-tenant SaaS | far | synthetic (exhausted holdout) |
 | `16-library-lending-interview` | library lending | far | synthetic (two sources, one a transcript) |
+| `17-permit-portal-limits` | municipal permits | far | synthetic (request limits stated, absent and hedged) |
+| `18-podcast-host-quotas` | podcast hosting | far | synthetic (request limits stated, absent and hedged) |
 
 The Cookbook cases come from the [OWASP Threat Model
 Cookbook](https://github.com/OWASP/threat-model-cookbook) (CC-BY 4.0), converted

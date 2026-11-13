@@ -80,7 +80,7 @@ MEASURED = {
 #: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order
 #: no rule reads, so a claim naming two processes says nothing about which way
 #: the attacker moves between them. A claim naming a **Data Flow** says it
-#: through that flow's endpoints, and 194 of 285 corpus claims name exactly one.
+#: through that flow's endpoints, and 211 of 305 corpus claims name exactly one.
 #:
 #: The two readings of an absent direction are both dead ends, and the numbers
 #: below are why. Read it as a mismatch and the rule splits 90 of the 186
@@ -89,10 +89,10 @@ MEASURED = {
 #: that survive the verb the coarser side cites no flow.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 285,
-    "one_flow_cited": 194,
+    "claims": 305,
+    "one_flow_cited": 211,
     "several_flows_cited": 9,
-    "no_flow_cited": 82,
+    "no_flow_cited": 85,
     # Over the 2 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 0,
     "merges_that_run_opposite_ways": 0,
@@ -139,7 +139,7 @@ FRONTIER = {
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 187,
+        "reference_merges": 190,
     },
 }
 
@@ -406,8 +406,8 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
 #: is what survives the verb. The gap between them is what the verb adds.
 VERB_MEASURED = {
-    "cases": 16,
-    "within_lane_pairs": 365,
+    "cases": 18,
+    "within_lane_pairs": 375,
     "subset": 42,
     "subset_verb": 2,
 }

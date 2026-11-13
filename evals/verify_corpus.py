@@ -984,10 +984,14 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
 #:
 #: **Missing work, never an exemption.** Every entry is a case the corpus should
 #: grade and does not, so every ASVS number in the suite is computed over less of
-#: the corpus than it could be. The list is empty. It stays for the next package
-#: whose precondition can refuse a case: a case that starts satisfying one and
+#: the corpus than it could be. A case that starts satisfying a precondition and
 #: carries no records for it belongs here by name, not in silence.
-PENDING_REFERENCE_SETS: dict[str, frozenset[str]] = {}
+PENDING_REFERENCE_SETS: dict[str, frozenset[FrameworkName]] = {
+    # Written for #2054 to measure the STRIDE lanes on capacity facts. Each
+    # still needs an ASVS reference set at level 1 and a sitting that reads it.
+    "17-permit-portal-limits": frozenset({"asvs"}),
+    "18-podcast-host-quotas": frozenset({"asvs"}),
+}
 
 
 def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator[str]:
@@ -1010,8 +1014,13 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
     meet is worse than no expectation. ``refuted`` and ``undecidable`` are still
     kept apart everywhere their remedy differs; here their consequence is the
     same and the check treats them alike.
+
+    It also reads :data:`PENDING_REFERENCE_SETS` for the case. An entry names a
+    framework that the case satisfies and does not declare yet. An entry for
+    any other framework fails.
     """
     declared = set(declared_names(meta))
+    pending = PENDING_REFERENCE_SETS.get(case_dir.name, frozenset())
     for name, package in PACKAGES.items():
         result = run_precondition(package, model)
         if result != "satisfied":
@@ -1021,12 +1030,20 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
                     f" {result} for this case; only a satisfied framework runs its"
                     " lanes, so only one carries a reference set"
                 )
+            if name in pending:
+                yield (
+                    f"PENDING_REFERENCE_SETS lists {name!r} for this case, but its"
+                    f" precondition answers {result}; the case needs no reference"
+                    " set for it, so remove the entry"
+                )
             continue
         if name not in declared:
-            # A named gap is not silence: the case is listed, what it still
-            # needs is written down, and an entry that no longer applies fails
-            # below.
-            if name not in PENDING_REFERENCE_SETS.get(case_dir.name, frozenset()):
+            # A named gap is not silence: the case is listed and what it still
+            # needs is written down. An entry that no longer applies fails:
+            # above where the precondition does not hold, below where the case
+            # declares the framework, and in _stale_pending_entries where the
+            # corpus has no such case.
+            if name not in pending:
                 yield (
                     f"case.json does not declare {name!r}, whose precondition"
                     " satisfies this case; every framework a case runs must carry"
@@ -1034,7 +1051,7 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
                     " PENDING_REFERENCE_SETS with what the case is missing"
                 )
             continue
-        if name in PENDING_REFERENCE_SETS.get(case_dir.name, frozenset()):
+        if name in pending:
             yield (
                 f"case.json declares {name!r} and PENDING_REFERENCE_SETS still"
                 f" lists {case_dir.name!r} as missing it; the reference set"
@@ -1042,6 +1059,19 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
             )
         if not claims_file(case_dir, name).is_file():
             yield f"case.json declares {name!r}, but {CLAIMS_DIR}/{name}.json is absent"
+
+
+def _stale_pending_entries(case_ids: set[str]) -> Iterator[str]:
+    """Entries of :data:`PENDING_REFERENCE_SETS` for a case the corpus lacks.
+
+    :func:`framework_issues` reads the table one case at a time, so it never
+    reads an entry for a case that the corpus does not hold.
+    """
+    for case_id in sorted(PENDING_REFERENCE_SETS.keys() - case_ids):
+        yield (
+            f"PENDING_REFERENCE_SETS holds {case_id}, which is not a case in the"
+            " corpus; delete the entry"
+        )
 
 
 #: Lanes the corpus cannot measure, each with the reason it cannot.
@@ -1512,6 +1542,10 @@ def main() -> int:
         failures += 1
 
     for problem in _stale_escalate_declarations(raised):
+        print(f"merge bar: {problem}")
+        failures += 1
+
+    for problem in _stale_pending_entries({path.name for path in case_dirs()}):
         print(f"merge bar: {problem}")
         failures += 1
 

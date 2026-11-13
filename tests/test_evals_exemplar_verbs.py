@@ -98,17 +98,22 @@ def test_the_two_populations_still_split_where_they_did(swept):
     assert len(swept) - len(near) == 14
 
 
-def test_all_but_one_case_carries_a_disagreement(corpus, swept):
+def test_all_but_three_cases_carry_a_disagreement(corpus, swept):
     """The reach is why this is not three rows to re-bless by hand.
 
-    Case 16 asks only for verbs its lanes demonstrate, so it carries none.
+    Cases 16, 17 and 18 ask only for verbs their lanes demonstrate, so they
+    carry none.
     """
     graded = {
         case.id
         for case in development_cases(corpus)
         if any(framework in case.frameworks for framework in verb_keyed_frameworks())
     }
-    assert graded - {entry.case for entry in swept} == {"16-library-lending-interview"}
+    assert graded - {entry.case for entry in swept} == {
+        "16-library-lending-interview",
+        "17-permit-portal-limits",
+        "18-podcast-host-quotas",
+    }
 
 
 def test_a_swept_package_disagrees_with_its_own_corpus_and_no_other(corpus):

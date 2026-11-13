@@ -412,7 +412,7 @@ def test_the_merge_direction_refuses_a_package_with_no_contract():
 #: catalog claim set should have, and a rise in the third column would mean two
 #: rulings on one requirement in one place — one vote answering for both.
 PACKAGE_COLLISIONS = {
-    "stride": {"comparable_pairs": 365, "collisions": 2},
+    "stride": {"comparable_pairs": 375, "collisions": 2},
     "asvs": {"comparable_pairs": 100, "collisions": 0},
 }
 

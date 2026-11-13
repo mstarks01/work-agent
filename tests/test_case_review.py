@@ -66,6 +66,14 @@ UNREVIEWED: dict[str, str] = {
         " as a process; ten claims and two signed facts moved to the new flow ID,"
         " their text unchanged, and no reader has read the moved model"
     ),
+    "17-permit-portal-limits": (
+        "written for #2054 by an agent; no reader has read the source, the model or"
+        " the reference set, and every reference fact is unsigned"
+    ),
+    "18-podcast-host-quotas": (
+        "written for #2054 by an agent; no reader has read the source, the model or"
+        " the reference set, and every reference fact is unsigned"
+    ),
 }
 
 
