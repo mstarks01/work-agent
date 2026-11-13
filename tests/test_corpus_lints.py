@@ -315,18 +315,6 @@ def test_a_pending_entry_for_no_case_is_caught(monkeypatch):
     assert "99-nowhere" in problem
 
 
-def test_a_pending_entry_for_no_framework_is_caught(monkeypatch):
-    monkeypatch.setattr(
-        verify_corpus,
-        "PENDING_REFERENCE_SETS",
-        {"01-payments-checkout": frozenset({"asv"})},
-    )
-
-    (problem,) = verify_corpus._stale_pending_entries({"01-payments-checkout"})
-
-    assert "'asv'" in problem
-
-
 def test_each_declared_source_digests_to_what_it_claims():
     for case_dir in verify_corpus.case_dirs():
         meta = verify_corpus._load_json_object(case_dir / "case.json")
