@@ -1,8 +1,24 @@
 {
   "record": {
     "command": "order_variants.py",
-    "commit": "9f1665514afdd628c8439cb05bae4c9348275930",
+    "commit": "e700f1c336e740452d58ebbec6bc0a74864409f1",
     "clean": false,
+    "table": {
+      "policies": [
+        "stride-rules-only",
+        "unit-turns",
+        "lookahead-turns"
+      ],
+      "budgets": [
+        5,
+        10,
+        15,
+        20,
+        30,
+        45,
+        60
+      ]
+    },
     "inputs": [
       {
         "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/01-payments-checkout.report.json",

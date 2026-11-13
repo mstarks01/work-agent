@@ -221,9 +221,9 @@ DECLARED: dict[str, str] = {
     ),
     "evals/experiments/QA-2026-11-13-01/order_variants.py": (
         "A recorded experiment's script. E2 removes the question-kind reads of"
-        " the package whose figures fell. Its prior holds no question kind, so"
-        " the variant records that its rows cannot cause the loss. The other"
-        " variants change the turn rule, which names no package."
+        " one package. That package's prior holds no question kind, so the"
+        " variant equals E1 by construction. The other variants change the"
+        " turn rule, which names no package."
     ),
     "evals/experiments/QA-2026-10-27-01/price.py": (
         "This code is that framework's. It prices trial lead rules against the"
