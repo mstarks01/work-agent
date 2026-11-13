@@ -21,11 +21,16 @@ with the answer in hand.
 score, so every candidate on an element keeps a question eligible. The list
 ranks a field question by its relevance: the same product with only the
 candidates whose rule reads that fact (:func:`reads`). A candidate that reads
-another fact of the element does not move the question up. A rule reads a
-question kind where it names one of the kind's parts in
-:attr:`~analysis_service.candidates.Rule.informed_by` (ADR 0117). On the
-archive this order completed 12% to 14% more STRIDE findings than the score
-did at 10 and 15 choices.
+another fact of the element does not move the question up. On the archive,
+where a kind ranked by its prior alone, this order completed 12% to 14% more
+STRIDE findings than the score did at 10 and 15 choices.
+
+**A rule reads a question kind where it names one of the kind's parts** in
+:attr:`~analysis_service.candidates.Rule.informed_by` (ADR 0117). Over 250
+archived reports, STRIDE then completed 14 more findings at 15 choices and 35
+more at 20. With STRIDE also selected, ASVS settled 144 fewer units at 20
+choices (833 to 689), because a costly kind's rows take the choices before
+the next turn of ASVS.
 
 **The list ranks a question by its relevance per choice.** A question answered in
 facets costs a choice a facet, so a table of four facets must score four
@@ -421,7 +426,8 @@ def reads(
     zone, and the attribute it names where it reads a named attribute. It
     reads a question kind where ``informed_by``, the rule's
     :attr:`~analysis_service.candidates.Rule.informed_by`, names one of the
-    kind's parts.
+    kind's parts. It reads that kind on each element the candidate names, so
+    a part of the process at a flow's source can inform a rule about the flow.
     """
     kind = parse_question_kind(field)
     if kind is not None:

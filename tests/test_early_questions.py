@@ -194,6 +194,7 @@ class TestTheOrder:
         for question in asked:
             ref = key_ref(question.key)
             field = ref.attribute or ref.question
+            assert field, "the prior names no zone, so each key names a field"
             found = self.candidates_on(ref.element_id)
             reading = [c for c in found if reads(c, informed[c.rule_id], field)]
             assert question.relevance == 1 + len(reading)

@@ -1091,11 +1091,13 @@ def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
     )
 
 
-#: Why no ASVS candidate rule reads an assertion predicate. The rules here find
-#: where a requirement applies, by a technology or a structure the graph shows,
-#: and a requirement is a control the lane checks rather than a weakness it is
-#: led to. So a stated fact changes how a lane rules a requirement, never which
-#: requirements it is shown, and the lane reads the settled row as evidence.
+#: Why no ASVS candidate rule fires on an assertion predicate. The rules here
+#: find where a requirement applies, by a technology or a structure the graph
+#: shows, and a requirement is a control the lane checks rather than a weakness
+#: it is led to. So a stated fact changes how a lane rules a requirement, never
+#: which requirements it is shown, and the lane reads the settled row as
+#: evidence. Each rule that a fact informs names its predicate in
+#: :data:`INFORMED_BY`, which ranks the early list.
 _RULED_AS_EVIDENCE = NoRule(
     "a candidate rule of this framework selects requirements by what the graph"
     " shows is present; a stated fact bears on how a lane rules a requirement,"

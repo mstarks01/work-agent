@@ -60,8 +60,11 @@ def test_a_rule_names_only_registered_predicates(name):
 
 
 def test_every_part_informs_a_stride_rule():
-    """The STRIDE table holds every part, so each kind can rank in its lanes."""
-    named = set().union(*lane_predicates("stride").values())
+    """The STRIDE table holds every part, so each kind can rank in its lanes.
+
+    Only ``informed_by`` ranks a kind, so a ``PREDICATE_READERS`` rule does
+    not count here."""
+    named = set().union(*(rule.informed_by for rule in PACKAGES["stride"].rules))
     assert sorted(PARTS - named) == []
 
 
