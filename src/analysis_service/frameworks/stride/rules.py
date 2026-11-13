@@ -63,9 +63,10 @@ from analysis_service.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
+    PredicateName,
     answer,
 )
-from analysis_service.candidates import Fact, Match, Rule, clip_fact, with_effects
+from analysis_service.candidates import Fact, Match, Rule, clip_fact, with_rule_tables
 from analysis_service.frameworks import NoRule, PredicateReader
 from analysis_service.system_model import BoundaryKind, DataFlow, SystemModel
 
@@ -961,14 +962,114 @@ EFFECTS: Mapping[str, str] = MappingProxyType(
     }
 )
 
-RULES: tuple[Rule, ...] = with_effects(_RULES, EFFECTS)
+
+#: The predicates whose fact bears on each rule's finding (ADR 0117). The early
+#: list ranks a question kind on an element by the rules here that name one of
+#: its parts (:func:`~analysis_service.early_questions.reads`).
+INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
+    {
+        "spoofing-unverified-boundary-auth": frozenset(
+            {"provenance-sender", "reachability-named-callers"}
+        ),
+        "spoofing-unverified-external-caller": frozenset(
+            {"provenance-sender", "reachability-named-callers"}
+        ),
+        "spoofing-second-factor-stated-absent": frozenset(),
+        "spoofing-origin-stated-unverified": frozenset({"provenance-sender"}),
+        "spoofing-standing-credential": frozenset(
+            {"security-configuration-secret-store"}
+        ),
+        "tampering-unprotected-transit-crossing": frozenset({"provenance-integrity"}),
+        "tampering-unverified-write-to-store": frozenset(
+            {"authorization-scope-checks-each-request"}
+        ),
+        "tampering-signature-stated-unverified": frozenset(
+            {"provenance-sender", "provenance-integrity"}
+        ),
+        "tampering-content-stated-unvalidated": frozenset(
+            {"content-validation-validates", "content-validation-encodes"}
+        ),
+        "repudiation-unattributable-action": frozenset(
+            {"record-attribution", "audit-evidence-record-protected"}
+        ),
+        "repudiation-shared-credential": frozenset({"record-attribution"}),
+        "repudiation-record-names-intermediary": frozenset(
+            {"audit-evidence-record-protected"}
+        ),
+        "information-disclosure-unprotected-sensitive-transit": frozenset(
+            {
+                "security-configuration-cookies",
+                "security-configuration-headers",
+                "security-configuration-cross-origin",
+                "data-exposure-minimal-fields",
+            }
+        ),
+        "information-disclosure-destination-stated-unverified": frozenset(
+            {"destination"}
+        ),
+        "information-disclosure-store-at-rest-unverified": frozenset(
+            {
+                "stored-copy-access-encrypted",
+                "stored-copy-access-restricted",
+                "stored-copy-integrity",
+                "physical-access",
+            }
+        ),
+        "information-disclosure-store-readers": frozenset(
+            {"data-exposure-restricted-readers", "data-exposure-clean-logs"}
+        ),
+        "denial-of-service-internet-exposed-process": frozenset(
+            {
+                "capacity-limits-rate",
+                "capacity-limits-size",
+                "capacity-limits-concurrency",
+                "capacity-limits-quota",
+                "internet-exposure",
+                "reachability-named-callers",
+            }
+        ),
+        "denial-of-service-shared-dependency": frozenset(
+            {
+                "capacity-limits-rate",
+                "capacity-limits-size",
+                "capacity-limits-concurrency",
+                "capacity-limits-quota",
+                "failure-handling-fails-closed",
+                "failure-handling-alerts",
+                "failure-handling-recovers",
+            }
+        ),
+        "elevation-of-privilege-privilege-zone-crossing": frozenset(
+            {
+                "authorization-scope-checks-each-request",
+                "authorization-scope-least-privilege",
+                "authorization-scope-checks-ownership",
+            }
+        ),
+        "elevation-of-privilege-inbound-from-exposed-process": frozenset(
+            {
+                "authorization-scope-least-privilege",
+                "code-execution",
+                "update-process-scheduled",
+                "update-process-vulnerability-alerts",
+                "update-process-tested",
+                "internet-exposure",
+            }
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_rule_tables(_RULES, EFFECTS, INFORMED_BY)
 
 
-#: Why no rule here reads a part of a question kind (ADR 0117). Only an owner's
-#: answer or a Control writes such a row, and the lane reads it as evidence.
+#: Why no rule here fires on a part of a question kind (ADR 0117). Only an
+#: owner's answer or a Control writes such a row, and the lane reads it as
+#: evidence. Each rule that the answer informs names the part in
+#: :data:`INFORMED_BY`.
 _OWNER_ANSWERED = NoRule(
     "only an owner's answer or a Control writes the row, and the lane reads it"
-    " as evidence beside the answer's line"
+    " as evidence beside the answer's line; each rule the answer informs names"
+    " it in INFORMED_BY"
 )
 
 

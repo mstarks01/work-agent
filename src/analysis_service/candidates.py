@@ -25,7 +25,7 @@ from dataclasses import dataclass, replace
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import AssertionCatalog, PredicateName
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -37,7 +37,7 @@ __all__ = [
     "Rule",
     "clip_fact",
     "generate_candidates",
-    "with_effects",
+    "with_rule_tables",
 ]
 
 # How much of a caller-authored attribute value a fact carries. Facts exist to
@@ -76,19 +76,32 @@ class Candidate(BaseModel):
     facts: dict[str, Fact] = Field(default_factory=dict)
 
 
-def with_effects(rules: Sequence[Rule], effects: Mapping[str, str]) -> tuple[Rule, ...]:
-    """``rules``, each with its sentence from a package's ``effects`` table.
+def with_rule_tables(
+    rules: Sequence[Rule],
+    effects: Mapping[str, str],
+    informed_by: Mapping[str, frozenset[PredicateName]],
+) -> tuple[Rule, ...]:
+    """``rules``, each with its row of a package's ``effects`` and ``informed_by`` tables.
 
-    The table is checked against the rules: a rule with no sentence, or a
-    sentence for no rule, raises, so a new rule cannot reach the early list
-    with the analyst's question as its reason.
+    Each table is checked against the rules: a rule with no row, or a row for
+    no rule, raises. So a new rule cannot reach the early list with the
+    analyst's question as its reason, and cannot leave out which predicates
+    inform it.
     """
     ids = {rule.rule_id for rule in rules}
-    if missing := sorted(ids - effects.keys()):
-        raise ValueError(f"no effect sentence for the rules {missing}")
-    if extra := sorted(effects.keys() - ids):
-        raise ValueError(f"effect sentences for no rule: {extra}")
-    return tuple(replace(rule, effect=effects[rule.rule_id]) for rule in rules)
+    for name, table in (("effect sentence", effects), ("informed_by row", informed_by)):
+        if missing := sorted(ids - table.keys()):
+            raise ValueError(f"no {name} for the rules {missing}")
+        if extra := sorted(table.keys() - ids):
+            raise ValueError(f"{name}s for no rule: {extra}")
+    return tuple(
+        replace(
+            rule,
+            effect=effects[rule.rule_id],
+            informed_by=informed_by[rule.rule_id],
+        )
+        for rule in rules
+    )
 
 
 class CandidateSet(BaseModel):
@@ -120,9 +133,13 @@ class Rule:
     question: str
     find: Callable[[SystemModel, AssertionCatalog], Iterator[Match]]
     #: What an answer about a fact the rule reads informs, as the early list
-    #: shows it to the owner (:func:`with_effects`). ``question`` is what the
+    #: shows it to the owner (:func:`with_rule_tables`). ``question`` is what the
     #: lane reads.
     effect: str = ""
+    #: The predicates whose fact bears on this rule's finding (ADR 0117), from
+    #: its package's table (:func:`with_rule_tables`). The rule need not fire
+    #: on a row of one; the early list reads this to rank a question kind.
+    informed_by: frozenset[PredicateName] = frozenset()
 
     def fire(self, model: SystemModel, catalog: AssertionCatalog) -> list[Candidate]:
         """Every candidate this rule produces for this model, in model order."""

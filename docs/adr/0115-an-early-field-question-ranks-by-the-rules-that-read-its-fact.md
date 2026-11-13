@@ -5,6 +5,9 @@
 - **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029) (package 5)
 - **Amends**: [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),
   whose list ranked a field question by its score per choice
+- **Amended by**: [ADR 0117](0117-each-question-kind-facet-is-a-predicate.md),
+  under which a rule names the parts of a question kind that inform it, so a
+  kind ranks by those rules
 - **Relates to**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
   whose list this orders
 

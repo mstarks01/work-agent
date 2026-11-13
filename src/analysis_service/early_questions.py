@@ -21,10 +21,16 @@ with the answer in hand.
 score, so every candidate on an element keeps a question eligible. The list
 ranks a field question by its relevance: the same product with only the
 candidates whose rule reads that fact (:func:`reads`). A candidate that reads
-another fact of the element does not move the question up. No rule reads a
-question kind, so a kind ranks by its prior alone. On the archive this order
-completed 12% to 14% more STRIDE findings than the score did at 10 and 15
-choices.
+another fact of the element does not move the question up. On the archive,
+where a kind ranked by its prior alone, this order completed 12% to 14% more
+STRIDE findings than the score did at 10 and 15 choices.
+
+**A rule reads a question kind where it names one of the kind's parts** in
+:attr:`~analysis_service.candidates.Rule.informed_by` (ADR 0117). Over 250
+archived reports, STRIDE then completed 14 more findings at 15 choices and 35
+more at 20. With STRIDE also selected, ASVS settled 144 fewer units at 20
+choices (833 to 689), because a costly kind's rows take the choices before
+the next turn of ASVS.
 
 **The list ranks a question by its relevance per choice.** A question answered in
 facets costs a choice a facet, so a table of four facets must score four
@@ -83,7 +89,7 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import AssertionCatalog, PredicateName
 from analysis_service.candidates import Candidate, generate_candidates
 from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import (
@@ -252,7 +258,7 @@ class EarlyQuestion:
     #: Why the fact matters before any finding exists: the effect sentence
     #: (:attr:`~analysis_service.candidates.Rule.effect`) of each rule
     #: that reads this fact on this element, :data:`KIND_REASON` for a
-    #: question kind no rule reads, or :data:`PRIOR_REASON` where no rule
+    #: question kind no rule there reads, or :data:`PRIOR_REASON` where no rule
     #: reads it. Never a rule that only names the element.
     reasons: tuple[str, ...]
     #: The selected frameworks an answer serves, by name, in name order.
@@ -410,14 +416,24 @@ def early_questions(
 ZONE_FACTS = frozenset({"source_zone", "destination_zone"})
 
 
-def reads(candidate: Candidate, field: str) -> bool:
+def reads(
+    candidate: Candidate, informed_by: Collection[PredicateName], field: str
+) -> bool:
     """Whether ``candidate``'s rule read ``field`` on the elements it names.
 
     **The one reader of the facts a candidate reads.** A rule reads each fact
     it names, the ``trust_zone`` of a flow's end where it names that end's
-    zone, and the attribute it names where it reads a named attribute. No rule
-    names a question kind, so a kind is never read.
+    zone, and the attribute it names where it reads a named attribute. It
+    reads a question kind where ``informed_by``, the rule's
+    :attr:`~analysis_service.candidates.Rule.informed_by`, names one of the
+    kind's parts. It reads that kind on each element the candidate names, so
+    a part of the process at a flow's source can inform a rule about the flow.
     """
+    kind = parse_question_kind(field)
+    if kind is not None:
+        return any(
+            predicate in informed_by for _, predicate in QUESTION_KINDS[kind].parts
+        )
     read = set(candidate.facts)
     if read & ZONE_FACTS:
         read.add("trust_zone")
@@ -461,7 +477,7 @@ def _early_questions(
     reasons: dict[UnknownKey, list[str]] = {}
     for name in runnable:
         package = PACKAGES[name]
-        effects = {rule.rule_id: rule.effect for rule in package.rules}
+        rules = {rule.rule_id: rule for rule in package.rules}
         named: dict[str, list[Candidate]] = {}
         for lane, found in generate_candidates(
             model, package.lanes, package.rules, catalog
@@ -478,14 +494,18 @@ def _early_questions(
                 if key is None or key in decided:
                     continue
                 on_element = named.get(element.id, [])
-                reading = [one for one in on_element if reads(one, field)]
+                reading = [
+                    one
+                    for one in on_element
+                    if reads(one, rules[one.rule_id].informed_by, field)
+                ]
                 score[key] = score.get(key, 0.0) + rate * (1 + len(on_element))
                 relevance[key] = relevance.get(key, 0.0) + rate * (1 + len(reading))
                 helps.setdefault(key, []).append(name)
                 said = reasons.setdefault(key, [])
                 for candidate in reading:
-                    if effects[candidate.rule_id] not in said:
-                        said.append(effects[candidate.rule_id])
+                    if rules[candidate.rule_id].effect not in said:
+                        said.append(rules[candidate.rule_id].effect)
     asked = [
         _question(
             key,

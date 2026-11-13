@@ -2679,9 +2679,15 @@ ONE_READERS: dict[str, _OneReader] = {
         "",
     ),
     "the facts a candidate reads": _OneReader(
-        lambda node: _loads(node, "ZONE_FACTS"),
+        lambda node: (
+            _loads(node, "ZONE_FACTS") or _loads_attribute(node, "informed_by")
+        ),
         ("src/analysis_service/early_questions.py", "reads"),
-        {},
+        {
+            ("src/analysis_service/early_questions.py", "_early_questions"): (
+                "it passes each rule's informed_by to reads, and tests no part"
+            ),
+        },
         "",
     ),
     "whether a selection reads capabilities": _OneReader(
