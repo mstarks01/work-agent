@@ -76,7 +76,7 @@ as content, which costs a diagnostic line and never a rejection.
 The measurement
 ===============
 
-Over the 16 corpus models and their sources, every stated value of the three
+Over the 18 corpus models and their sources, every stated value of the three
 in-scope attributes. A flag on a blessed value is a **false rejection**: the
 corpus is the closest thing to ground truth this repo has, so a value it carries
 is treated as one a person would keep.
@@ -84,15 +84,15 @@ is treated as one a person would keep.
 =====================================  ======  =======  ============
 rung                                   values  flagged  false-reject
 =====================================  ======  =======  ============
-every content token present                39       17        43.6%
-**at least one content token present**     39        0         0.0%
+every content token present                41       17        41.5%
+**at least one content token present**     41        0         0.0%
 =====================================  ======  =======  ============
 
 **The strict rung is dead, and not because the values are wrong.** It fails on
 the prose around the mechanism: ``"static per-partner key issued at onboarding,
 never rotated"`` names a key the source names, and then loses on ``issued``,
 ``onboarding`` and ``rotated`` — the writer's summary of a source that said the
-same thing in other words. Sixteen of the 39 fail that way. So the rule is the
+same thing in other words. Sixteen of the 41 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
@@ -112,7 +112,7 @@ eval corpus; this one needs only the job's own sources and so runs on every job.
 It is carried on :class:`~evals.harness.modes.ExtractionScore` beside that
 score, so a sweep reports the pair.
 
-**Read the rate for what it is.** 39 values is a small sample beside the 206
+**Read the rate for what it is.** 41 values is a small sample beside the 206
 element excerpts that calibrated the grounding ladder, and the corpus is
 agent-authored — no case has been read by a person (#226). A 0% flag rate may
 mean a blessed model reuses its source's wording, which is exactly what an agent

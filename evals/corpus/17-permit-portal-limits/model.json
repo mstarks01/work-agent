@@ -1,0 +1,307 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:applicant",
+      "name": "applicant",
+      "description": "A homeowner, builder or architect who applies for a building permit on the portal from anywhere, and uploads plan drawings for an application.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Applicants (homeowners, builders, architects) apply for building permits on the portal from anywhere.",
+      "source_label": "System description",
+      "kind": "human",
+      "trust_zone": "boundary:internet"
+    },
+    {
+      "id": "entity:inspector",
+      "name": "inspector",
+      "description": "A city inspector who reviews applications and records decisions through the permit service from the city network. All inspectors in a district use one shared login.",
+      "assets": [],
+      "source_excerpt": "Inspectors review applications and record their decisions through the permit service from the city network.",
+      "source_label": "System description",
+      "kind": "human",
+      "trust_zone": "boundary:city-network"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:permit-gateway",
+      "name": "permit gateway",
+      "description": "The internet-facing gateway that every application request goes through. It limits each IP address to 60 requests a minute, rejects any request body over 5 MB, and passes each request on to the permit service.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Every application request goes through the permit gateway, which faces the internet.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:internet",
+      "exposure": "internet-facing",
+      "interface_kind": "unknown",
+      "notes": "Limits stated in the source: \"The gateway allows 60 requests a minute from one IP address and rejects any request body over 5 MB.\" The source does not say where the gateway runs; the closing list of what runs in the city's cloud account does not name it."
+    },
+    {
+      "id": "process:permit-service",
+      "name": "permit service",
+      "description": "Receives each application request from the gateway, keeps applications, their status and inspectors' decisions in the permit database, and serves inspectors on the city network.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The permit service keeps applications, their status and the inspectors' decisions in the permit database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:city-cloud-account",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "A limit on open applications per account is hedged, not stated: \"Marta thinks the permit service limits how many open applications one account can have, but nobody has checked that.\""
+    },
+    {
+      "id": "process:plan-upload-service",
+      "name": "plan upload service",
+      "description": "Takes plan drawings straight from applicants over the internet, outside the gateway, saves each file in the plan store and hands it to the plan renderer. It has no size limit and no rate limit.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Applicants upload them straight to the plan upload service, which is also on the internet.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:city-cloud-account",
+      "exposure": "internet-facing",
+      "interface_kind": "unknown",
+      "notes": "Stated absence of limits: \"The plan upload service has no size limit and no rate limit: architects send very large PDFs and we did not want to turn anyone away.\" Drawings do not pass the gateway: \"Plan drawings do not go through the gateway, because they are too big.\""
+    },
+    {
+      "id": "process:plan-renderer",
+      "name": "plan renderer",
+      "description": "Converts each uploaded PDF into image tiles that inspectors can zoom into and writes the tiles back to the plan store. It runs four conversions at a time, and the rest wait.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The plan renderer converts each PDF into image tiles that inspectors can zoom into, and writes the tiles back to the plan store.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:city-cloud-account",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "Stated concurrency limit: \"It runs four conversions at a time; anything more waits.\" The source does not say how inspectors reach the tiles."
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:permit-database",
+      "name": "permit database",
+      "description": "Holds permit applications, their status and the inspectors' decisions.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The permit service keeps applications, their status and the inspectors' decisions in the permit database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:city-cloud-account",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:plan-store",
+      "name": "plan store",
+      "description": "Holds the uploaded plan drawings and the image tiles the plan renderer makes from them.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "It saves each file in the plan store and hands it to the plan renderer.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:city-cloud-account",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:entity:applicant>process:permit-gateway>submit-applications",
+      "name": "submit applications",
+      "description": "An applicant sends a permit application request to the portal through the gateway.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Every application request goes through the permit gateway, which faces the internet.",
+      "source_label": "System description",
+      "source": "entity:applicant",
+      "destination": "process:permit-gateway",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "permit application requests",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:permit-gateway>process:permit-service>forward-application-requests",
+      "name": "forward application requests",
+      "description": "The gateway passes each application request it accepts on to the permit service.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "It passes each request on to the permit service.",
+      "source_label": "System description",
+      "source": "process:permit-gateway",
+      "destination": "process:permit-service",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "permit application requests",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:permit-service>store:permit-database>keep-applications-and-decisions",
+      "name": "keep applications and decisions",
+      "description": "The permit service reads and writes applications, their status and inspectors' decisions in the permit database.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The permit service keeps applications, their status and the inspectors' decisions in the permit database.",
+      "source_label": "System description",
+      "source": "process:permit-service",
+      "destination": "store:permit-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "applications, their status and inspectors' decisions",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
+    },
+    {
+      "id": "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings",
+      "name": "upload plan drawings",
+      "description": "An applicant uploads plan drawings, often very large PDFs, straight to the plan upload service over the internet.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Applicants upload them straight to the plan upload service, which is also on the internet.",
+      "source_label": "System description",
+      "source": "entity:applicant",
+      "destination": "process:plan-upload-service",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "plan drawings as PDF files",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:plan-upload-service>store:plan-store>save-plan-files",
+      "name": "save plan files",
+      "description": "The plan upload service saves each uploaded file in the plan store.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "It saves each file in the plan store and hands it to the plan renderer.",
+      "source_label": "System description",
+      "source": "process:plan-upload-service",
+      "destination": "store:plan-store",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "plan drawings as PDF files",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files",
+      "name": "hand over plan files",
+      "description": "The plan upload service hands each saved file to the plan renderer to convert.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "It saves each file in the plan store and hands it to the plan renderer.",
+      "source_label": "System description",
+      "source": "process:plan-upload-service",
+      "destination": "process:plan-renderer",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "plan drawings as PDF files",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:plan-renderer>store:plan-store>write-image-tiles",
+      "name": "write image tiles",
+      "description": "The plan renderer writes the image tiles it makes from each PDF back to the plan store.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The plan renderer converts each PDF into image tiles that inspectors can zoom into, and writes the tiles back to the plan store.",
+      "source_label": "System description",
+      "source": "process:plan-renderer",
+      "destination": "store:plan-store",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "image tiles made from plan drawings",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:entity:inspector>process:permit-service>review-and-decide",
+      "name": "review and decide",
+      "description": "An inspector reads applications and records a decision through the permit service from the city network, signed in with the district's shared inspector login.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Inspectors review applications and record their decisions through the permit service from the city network.",
+      "source_label": "System description",
+      "source": "entity:inspector",
+      "destination": "process:permit-service",
+      "protocol": "unknown",
+      "authentication": "one inspector login shared by all inspectors in a district",
+      "data_description": "applications and inspectors' decisions",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write",
+      "notes": "\"All inspectors in a district use one shared inspector login.\" The source does not name the mechanism behind the login."
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:internet",
+      "name": "internet",
+      "description": "Where applicants reach the gateway and the plan upload service from.",
+      "assets": [],
+      "source_excerpt": "Applicants (homeowners, builders, architects) apply for building permits on the portal from anywhere.",
+      "source_label": "System description",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:city-cloud-account",
+      "name": "city cloud account",
+      "description": "The city's cloud account, where the permit service, the plan upload service, the plan renderer, the permit database and the plan store run.",
+      "assets": [],
+      "source_excerpt": "The permit service, the plan upload service, the plan renderer, the permit database and the plan store run in the city's cloud account.",
+      "source_label": "System description",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:city-network",
+      "name": "city network",
+      "description": "The network inspectors work from.",
+      "assets": [],
+      "source_excerpt": "Inspectors review applications and record their decisions through the permit service from the city network.",
+      "source_label": "System description",
+      "kind": "network"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "Applicants are placed on the internet because the schema requires a zone.",
+      "element_id": "entity:applicant",
+      "attribute": "trust_zone",
+      "basis": "They apply \"from anywhere\" and reach the gateway and the plan upload service over the internet; the source does not state where applicants are."
+    },
+    {
+      "assumption": "The permit gateway is placed on the internet because the schema requires a zone.",
+      "element_id": "process:permit-gateway",
+      "attribute": "trust_zone",
+      "basis": "The source says the gateway faces the internet and does not name it among what runs in the city's cloud account."
+    }
+  ]
+}

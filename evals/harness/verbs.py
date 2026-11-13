@@ -7,7 +7,7 @@ measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
 
 The figures are measured rather than asserted, over the whole corpus, and
-all 285 reference claims carry a verb. ``tests/test_evals_identity.py``'s
+all 305 reference claims carry a verb. ``tests/test_evals_identity.py``'s
 ``FRONTIER`` prices the rule on every error at once, and the frontier table in
 ``docs/agents/claim-identity.md`` carries every row of it. That table also
 holds the reference-merge column, so this module does not state it.

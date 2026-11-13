@@ -1,0 +1,135 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:podcaster>process:upload-api>upload-episodes",
+      "entity:podcaster"
+    ],
+    "claim": "An attacker guesses or reuses a podcaster's password at the upload API and publishes or replaces episodes as that podcaster.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated: podcasters sign in with an email address and a password. The source states nothing that slows guesses at sign-in.",
+    "verb": "guess-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:ad-partner>process:stats-importer>send-download-counts",
+      "entity:ad-partner"
+    ],
+    "claim": "If the stats importer does not authenticate the ad partner, an attacker sends files of download counts as the ad partner.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source never says how the ad partner's files arrive or how the importer knows who sent them.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:media-store"
+    ],
+    "claim": "If the media store does not restrict who writes to it, an attacker replaces an episode's audio in the media store.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source states nothing about access to the media store.",
+    "verb": "alter"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:podcaster>process:upload-api>upload-episodes",
+      "entity:podcaster"
+    ],
+    "claim": "A podcaster replaces an episode and denies it, and nothing records which account made the change.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "The source states no record of who uploads or changes an episode.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:podcaster>process:upload-api>upload-episodes"
+    ],
+    "claim": "If the upload API's sign-in is not encrypted in transit, an attacker on the network path reads podcasters' email addresses and passwords.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The source says nothing about encryption in transit, and passwords cross this flow.",
+    "verb": "intercept"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:feed-service",
+      "flow:entity:podcast-app>process:feed-service>fetch-feeds"
+    ],
+    "claim": "An attacker requests RSS feeds from the public feed service as fast as they can, from many clients, until the feed service and the show database stop serving feeds to podcast apps.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "The finding this case exists for. The source states the absence: \"We do not rate limit the feed service\". The service is public. An assertion pass that writes the stated absence gives the lane the fact this finding rests on.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:stats-importer",
+      "flow:entity:ad-partner>process:stats-importer>send-download-counts"
+    ],
+    "claim": "An attacker who can send files to the stats importer sends a great many files at once, and the importer starts a job for each one until it exhausts its host.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated absence: \"with no cap on how many run together\". The attacker must reach the importer's input, which the source does not describe.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:upload-api",
+      "store:media-store"
+    ],
+    "claim": "An attacker opens many shows and fills each one to its 50 GB, until the media store runs out of space for every podcaster.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The quota is stated per show: \"Each show gets 50 GB of storage in total\". The source states no limit on how many shows one person opens.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:transcoder",
+      "flow:process:transcoder>store:media-store>pick-up-audio"
+    ],
+    "claim": "An attacker uploads a crafted audio file that exploits the transcoder and runs code with the transcoder's access to the media store and the hosting account.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The transcoder parses files that any podcaster uploads. The source states nothing about how transcoding is isolated.",
+    "verb": "escalate"
+  }
+]

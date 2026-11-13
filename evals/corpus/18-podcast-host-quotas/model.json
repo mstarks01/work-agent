@@ -1,0 +1,325 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:podcaster",
+      "name": "podcaster",
+      "description": "A person who publishes a show: uploads each episode's audio.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Podcasters publish their shows with us.",
+      "source_label": "System description",
+      "kind": "human",
+      "trust_zone": "boundary:internet"
+    },
+    {
+      "id": "entity:podcast-app",
+      "name": "podcast app",
+      "description": "A listener's podcast app, which polls each show's RSS feed all day and downloads episodes.",
+      "assets": [],
+      "source_excerpt": "Listeners' podcast apps fetch each show's RSS feed from the feed service, which is public.",
+      "source_label": "System description",
+      "kind": "external-system",
+      "trust_zone": "boundary:internet"
+    },
+    {
+      "id": "entity:ad-partner",
+      "name": "ad partner",
+      "description": "The ad partner, which sends files of download counts every night.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Every night our ad partner sends us files of download counts.",
+      "source_label": "System description",
+      "kind": "external-system",
+      "trust_zone": "boundary:internet"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:upload-api",
+      "name": "upload API",
+      "description": "Takes each episode's audio file from podcasters over the internet, refuses an upload that would take a show over its 50 GB of storage, and stores the audio in the media store and the episode details in the show database.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "A podcaster uploads each episode's audio file through the upload API, which is on the internet.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "exposure": "internet-facing",
+      "interface_kind": "unknown",
+      "notes": "Stated quota: \"Each show gets 50 GB of storage in total, and the upload API refuses an upload that would take a show over its 50 GB.\" A size limit on one file is hedged, not stated: \"Leo says the upload API probably also has a size limit on a single file, but he would have to check.\""
+    },
+    {
+      "id": "process:transcoder",
+      "name": "transcoder",
+      "description": "Picks up each new audio file from the media store and makes the smaller versions that listeners' apps download. Each transcoder runs at most two jobs at once.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The transcoder picks up each new audio file from the media store and makes the smaller versions that listeners' apps download.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "Stated concurrency limit: \"Each transcoder runs at most two jobs at once.\" The source does not say where the smaller versions are kept."
+    },
+    {
+      "id": "process:feed-service",
+      "name": "feed service",
+      "description": "The public service that builds each show's RSS feed from the show database and serves it to podcast apps. It has no rate limit.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Listeners' podcast apps fetch each show's RSS feed from the feed service, which is public.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "exposure": "internet-facing",
+      "interface_kind": "unknown",
+      "notes": "Stated absence of a rate limit: \"We do not rate limit the feed service, because apps poll feeds all day and we never want an app to miss a new episode.\""
+    },
+    {
+      "id": "process:stats-importer",
+      "name": "stats importer",
+      "description": "Starts a new import job for every file of download counts the ad partner sends, with no cap on how many run together, and writes the counts to the stats database.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The stats importer starts a new import job for every file that arrives, with no cap on how many run together, and writes the counts to the stats database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "Stated absence of a concurrency limit: \"with no cap on how many run together\"."
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:media-store",
+      "name": "media store",
+      "description": "Holds each episode's uploaded audio file.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The upload API stores the audio in the media store and the episode details in the show database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:show-database",
+      "name": "show database",
+      "description": "Holds the episode details of every show, which the feed service reads to build each feed.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The upload API stores the audio in the media store and the episode details in the show database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:stats-database",
+      "name": "stats database",
+      "description": "Holds the download counts the stats importer writes.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The stats importer starts a new import job for every file that arrives, with no cap on how many run together, and writes the counts to the stats database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:hosting-account",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:entity:podcaster>process:upload-api>upload-episodes",
+      "name": "upload episodes",
+      "description": "A podcaster signs in and uploads an episode's audio file and its details.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "A podcaster uploads each episode's audio file through the upload API, which is on the internet.",
+      "source_label": "System description",
+      "source": "entity:podcaster",
+      "destination": "process:upload-api",
+      "protocol": "unknown",
+      "authentication": "password sign-in with an email address and a password",
+      "data_description": "episode audio files and episode details",
+      "encryption_in_transit": "unknown",
+      "operations": "write",
+      "notes": "\"Podcasters sign in with an email address and a password.\""
+    },
+    {
+      "id": "flow:process:upload-api>store:media-store>store-audio",
+      "name": "store audio",
+      "description": "The upload API stores each episode's audio in the media store.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The upload API stores the audio in the media store and the episode details in the show database.",
+      "source_label": "System description",
+      "source": "process:upload-api",
+      "destination": "store:media-store",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "episode audio files",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:upload-api>store:show-database>store-episode-details",
+      "name": "store episode details",
+      "description": "The upload API stores each episode's details in the show database.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The upload API stores the audio in the media store and the episode details in the show database.",
+      "source_label": "System description",
+      "source": "process:upload-api",
+      "destination": "store:show-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "episode details",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:transcoder>store:media-store>pick-up-audio",
+      "name": "pick up audio",
+      "description": "The transcoder picks up each new audio file from the media store.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The transcoder picks up each new audio file from the media store and makes the smaller versions that listeners' apps download.",
+      "source_label": "System description",
+      "source": "process:transcoder",
+      "destination": "store:media-store",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "episode audio files",
+      "encryption_in_transit": "unknown",
+      "operations": "read"
+    },
+    {
+      "id": "flow:entity:podcast-app>process:feed-service>fetch-feeds",
+      "name": "fetch feeds",
+      "description": "A podcast app fetches a show's RSS feed, and polls it all day.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Listeners' podcast apps fetch each show's RSS feed from the feed service, which is public.",
+      "source_label": "System description",
+      "source": "entity:podcast-app",
+      "destination": "process:feed-service",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "RSS feeds",
+      "encryption_in_transit": "unknown",
+      "operations": "read"
+    },
+    {
+      "id": "flow:process:feed-service>store:show-database>read-show-details",
+      "name": "read show details",
+      "description": "The feed service reads the show database to build each feed.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The feed service reads the show database to build each feed.",
+      "source_label": "System description",
+      "source": "process:feed-service",
+      "destination": "store:show-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "episode details",
+      "encryption_in_transit": "unknown",
+      "operations": "read"
+    },
+    {
+      "id": "flow:entity:ad-partner>process:stats-importer>send-download-counts",
+      "name": "send download counts",
+      "description": "The ad partner sends files of download counts every night.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Every night our ad partner sends us files of download counts.",
+      "source_label": "System description",
+      "source": "entity:ad-partner",
+      "destination": "process:stats-importer",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "files of download counts",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:stats-importer>store:stats-database>write-counts",
+      "name": "write counts",
+      "description": "Each import job writes the download counts to the stats database.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The stats importer starts a new import job for every file that arrives, with no cap on how many run together, and writes the counts to the stats database.",
+      "source_label": "System description",
+      "source": "process:stats-importer",
+      "destination": "store:stats-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "download counts",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:internet",
+      "name": "internet",
+      "description": "Where podcasters, podcast apps and the ad partner reach the hosting account from.",
+      "assets": [],
+      "source_excerpt": "A podcaster uploads each episode's audio file through the upload API, which is on the internet.",
+      "source_label": "System description",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:hosting-account",
+      "name": "hosting account",
+      "description": "The one hosting account everything the platform team runs is in.",
+      "assets": [],
+      "source_excerpt": "All of this runs in one hosting account, except the listeners' apps and the ad partner.",
+      "source_label": "System description",
+      "kind": "network"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "Podcasters are placed on the internet because the schema requires a zone.",
+      "element_id": "entity:podcaster",
+      "attribute": "trust_zone",
+      "basis": "They reach the upload API on the internet; the source does not state where podcasters are."
+    },
+    {
+      "assumption": "Podcast apps are placed on the internet because the schema requires a zone.",
+      "element_id": "entity:podcast-app",
+      "attribute": "trust_zone",
+      "basis": "They fetch feeds from the public feed service; the source places them outside the hosting account and says no more."
+    },
+    {
+      "assumption": "The ad partner is placed on the internet because the schema requires a zone.",
+      "element_id": "entity:ad-partner",
+      "attribute": "trust_zone",
+      "basis": "The source places it outside the hosting account and does not say how its files arrive."
+    }
+  ]
+}

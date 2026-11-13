@@ -84,7 +84,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call:
-**13 false splits of 169, 2 false merges of 92 and 2 false merges of 365.**
+**13 false splits of 169, 2 false merges of 92 and 2 false merges of 375.**
 The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
@@ -94,7 +94,7 @@ denominators are different populations and none is a rate over what a live run
 emits.
 
 Equivalently by population: 13 false splits over 169 equivalent candidate pairs,
-2 false merges over 92 candidate negatives, and 2 false merges over 365
+2 false merges over 92 candidate negatives, and 2 false merges over 375
 distinct reference pairs.
 
 The 288 calibration fixtures retain their original order and reference claims.
@@ -259,7 +259,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 365 with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 375 with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | Which **Data Flow** identity version a graph spells, and the table that lifts an archived artifact's old flow IDs to the version the corpus spells. The table comes from the graph's endpoints, because a version 1 ID omits the endpoint types. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
@@ -804,7 +804,7 @@ Three properties make the record worth keeping:
 
 ## The corpus
 
-Sixteen cases, each sized so a person can enumerate its threats exhaustively
+18 cases, each sized so a person can enumerate its threats exhaustively
 (roughly 8–22 elements).
 
 The shipped prompts teach by example, and every lane's `exemplars.md` works its
@@ -839,6 +839,8 @@ too. The gap is tracked and watched, but never fails a build.
 | `14-loyalty-oauth-platform` | identity & access | far | synthetic (exhausted holdout) |
 | `15-multitenant-invoicing` | multi-tenant SaaS | far | synthetic (exhausted holdout) |
 | `16-library-lending-interview` | library lending | far | synthetic (two sources, one a transcript) |
+| `17-permit-portal-limits` | municipal permits | far | synthetic (request limits stated, absent and hedged) |
+| `18-podcast-host-quotas` | podcast hosting | far | synthetic (request limits stated, absent and hedged) |
 
 The Cookbook cases come from the [OWASP Threat Model
 Cookbook](https://github.com/OWASP/threat-model-cookbook) (CC-BY 4.0), converted

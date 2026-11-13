@@ -1,0 +1,25 @@
+{
+  "id": "17-permit-portal-limits",
+  "title": "A city building-permit portal whose parts state different request limits",
+  "domain": "municipal permits",
+  "provenance": "Synthetic system authored for this corpus (issue #2054, phase 2). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "holdout": false,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5"
+    }
+  ],
+  "source_sha256": "8819fb90e9046a24c2ba1b716fe7e3847cafd1debfef571302361762cf7da7cf",
+  "frameworks": [
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "Written for issue #2054 to measure the assertion pass on the capacity-limits predicates. The source states the four shapes a capacity fact takes, each on its own element: the gateway states a rate limit and a size limit, the plan upload service states that it has neither, the plan renderer states a concurrency limit, and a quota on the permit service is a hedge that must stay unknown. The denial-of-service must-find rests on the stated absences on the plan upload service, which is on the internet and outside the gateway. The repudiation must-find rests on the district's shared inspector login. The domain is a city permit office, which no other case covers."
+}
