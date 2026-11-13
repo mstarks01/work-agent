@@ -313,7 +313,7 @@
       "assumption": "Podcasters are placed on the internet because the schema requires a zone.",
       "element_id": "entity:podcaster",
       "attribute": "trust_zone",
-      "basis": "They reach the upload API on the internet; the source does not state where podcasters are."
+      "basis": "They reach the upload API on the internet; the source places them outside the hosting account and says no more."
     },
     {
       "assumption": "Podcast apps are placed on the internet because the schema requires a zone.",

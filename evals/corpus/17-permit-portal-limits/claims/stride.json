@@ -105,7 +105,8 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:plan-upload-service",
-      "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings"
+      "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings",
+      "store:plan-store"
     ],
     "claim": "An attacker sends very large PDFs, or very many of them, straight to the plan upload service and fills it and the plan store until applicants cannot upload drawings.",
     "tier": "must-find",

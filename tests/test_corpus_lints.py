@@ -281,6 +281,40 @@ def test_a_case_declaring_a_framework_its_model_does_not_satisfy_is_caught():
     )
 
 
+def test_a_pending_entry_whose_precondition_no_longer_holds_is_caught(monkeypatch):
+    """A named gap for a framework the case no longer runs names nothing.
+
+    The batch pipeline refutes ASVS's precondition, so an entry saying that
+    case still needs an ASVS set would outlive the gap it describes.
+    """
+    case_dir = next(
+        path for path in verify_corpus.case_dirs() if path.name.endswith("pipeline")
+    )
+    model, _ = parse_and_validate(verify_corpus._load_json(case_dir / "model.json"))
+    assert model is not None
+    monkeypatch.setattr(
+        verify_corpus, "PENDING_REFERENCE_SETS", {case_dir.name: frozenset({"asvs"})}
+    )
+
+    problems = list(verify_corpus.framework_issues(case_dir, {"frameworks": []}, model))
+
+    assert any(
+        "PENDING_REFERENCE_SETS lists 'asvs'" in problem
+        and "precondition answers refuted" in problem
+        for problem in problems
+    )
+
+
+def test_a_pending_entry_for_no_case_is_caught(monkeypatch):
+    monkeypatch.setattr(
+        verify_corpus, "PENDING_REFERENCE_SETS", {"99-nowhere": frozenset({"asvs"})}
+    )
+
+    (problem,) = verify_corpus._stale_pending_entries({"01-payments-checkout"})
+
+    assert "99-nowhere" in problem
+
+
 def test_each_declared_source_digests_to_what_it_claims():
     for case_dir in verify_corpus.case_dirs():
         meta = verify_corpus._load_json_object(case_dir / "case.json")

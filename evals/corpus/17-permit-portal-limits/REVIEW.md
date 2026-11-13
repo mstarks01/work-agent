@@ -203,7 +203,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** An attacker sends very large PDFs, or very many of them, straight to the plan upload service and fills it and the plan store until applicants cannot upload drawings.
 
-- `process:plan-upload-service`, `flow:entity:applicant>process:plan-upload-service>upload-plan-drawings`
+- `process:plan-upload-service`, `flow:entity:applicant>process:plan-upload-service>upload-plan-drawings`, `store:plan-store`
 - severity: high/medium · verb: `flood`
 - This case exists for this finding. The source states the absence of both limits: "The plan upload service has no size limit and no rate limit." The service is on the internet and outside the gateway, so the gateway's limits do not cover it. An assertion pass that writes the two stated absences gives the lane the facts this finding rests on.
 
@@ -282,7 +282,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
       "model.json": "6d46ca38340a493a2672944db1c4cd8ef900dfdf18c6902f7374d62c77b4001a",
-      "claims/stride.json": "5bb806e02f1337028b14aff281cadd59f3ddb563816e159a4917a25907881fc8"
+      "claims/stride.json": "d3ccaba0895b494ace4b93b45124d862fe2b2b8324c98e144668f32f393ad46a"
       }
     }
   }

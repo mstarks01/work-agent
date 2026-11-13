@@ -99,7 +99,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `process:feed-service` — The feed service presents a web interface. (basis: It serves each show's RSS feed to podcast apps that fetch it, and an RSS feed is a document fetched by its URL, the HTTP family that prompts/extract.md calls web.)
-- `entity:podcaster` — Podcasters are placed on the internet because the schema requires a zone. (basis: They reach the upload API on the internet; the source does not state where podcasters are.)
+- `entity:podcaster` — Podcasters are placed on the internet because the schema requires a zone. (basis: They reach the upload API on the internet; the source places them outside the hosting account and says no more.)
 - `entity:podcast-app` — Podcast apps are placed on the internet because the schema requires a zone. (basis: They fetch feeds from the public feed service; the source places them outside the hosting account and says no more.)
 - `entity:ad-partner` — The ad partner is placed on the internet because the schema requires a zone. (basis: The source places it outside the hosting account and does not say how its files arrive.)
 
@@ -267,7 +267,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
-      "model.json": "15696ddcc8f13b51b14bd6d552956faacc13868693a035d4693c8ba1fc6ae0d0",
+      "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
       "claims/stride.json": "e2dd88107eec3b42f6b55897b5d9a2c129d1b307d17cd6a36a539c8c312cc4e6"
       }
     }

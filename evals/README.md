@@ -32,13 +32,13 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**Merged Case Sittings clear 15 of the 18 cases.** A sitting is the
+**A merged Case Sitting clears a case.** A sitting is the
 reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under
 `evals/review/submissions/` — who read it, what they wrote before the sets
-opened, and the digest of each file they read. Case 16's model moved after
-its sitting, and nobody has read cases 17 and 18. Case `01-payments-checkout` carries a filled reading document dated
+opened, and the digest of each file they read. Some cases wait for one, and
+`uv run python webapp/sitting.py --list` names them. Case `01-payments-checkout` carries a filled reading document dated
 2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
 reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
 reader's own words and the template for the method, and no submission clears
@@ -52,7 +52,8 @@ recorded digest.
 node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it: cases 01, 04, 09, 11 and 13 on 2026-09-16,
 the other eight on 2026-09-18 (#1048), and case 16 on 2026-10-10. The maintainer signed case 16's
-`network-membership` row for `process:library-app` on 2026-10-15. The rulings and the model
+`network-membership` row for `process:library-app` on 2026-10-15. Cases 17 and
+18 carry a `facts.json` too, and no row in either is signed yet. The rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
 placement is not graded as a fact. A file may carry signed alias rulings for

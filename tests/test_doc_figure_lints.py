@@ -401,7 +401,7 @@ FIGURES: tuple[Figure, ...] = (
         name="the corpus size",
         compute=_corpus,
         claims=(
-            ("evals/README.md", "{word} cases", 2),
+            ("evals/README.md", "{word} cases", 1),
             ("evals/BLESSING.md", "All {value} cases", 1),
         ),
     ),
