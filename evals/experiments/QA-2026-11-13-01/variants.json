@@ -1,6 +1,6 @@
 {
   "record": {
-    "command": "variants.py",
+    "command": "order_variants.py",
     "commit": "9f1665514afdd628c8439cb05bae4c9348275930",
     "clean": false,
     "inputs": [

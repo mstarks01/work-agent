@@ -10,7 +10,7 @@ comparison read, and run it::
     while read -r path; do
         mkdir -p "<root>/$(dirname "$path")" && ln -s "$PWD/$path" "<root>/$path"
     done < evals/experiments/QA-2026-11-13-01/reports.txt
-    python evals/experiments/QA-2026-11-13-01/variants.py <root>
+    python evals/experiments/QA-2026-11-13-01/order_variants.py <root>
 
 It reads each order with ``early-policies``'s walk and prints each figure that
 differs from ``variants.json``.
