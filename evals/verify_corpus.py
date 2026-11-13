@@ -1016,8 +1016,8 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
     same and the check treats them alike.
 
     It also reads :data:`PENDING_REFERENCE_SETS` for the case. An entry names a
-    framework the case satisfies and does not declare yet, so an entry for a
-    framework the case does not satisfy, or one it already declares, fails.
+    framework that the case satisfies and does not declare yet. An entry for
+    any other framework fails.
     """
     declared = set(declared_names(meta))
     pending = PENDING_REFERENCE_SETS.get(case_dir.name, frozenset())

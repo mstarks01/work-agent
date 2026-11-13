@@ -10,8 +10,7 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **Some cases wait for a sitting**, and `uv run python webapp/sitting.py --list`
-> names them. All 18 cases in
+> **Some cases wait for a sitting.** All 18 cases in
 > `evals/corpus/` were written by an agent. On 2026-09-21 a single **Case
 > Sitting** cleared the first 13, and sittings on 2026-10-03 and 2026-10-04
 > cleared the two holdout cases, and two on 2026-10-10 cleared case 16. The first sitting wrote 130 own-list threats blind, then
@@ -22,9 +21,8 @@ bookkeeping around it.
 > [`calibration_labels/REVIEW-02.md`](calibration_labels/REVIEW-02.md) on
 > 2026-09-02. Step 6 is the step that clears a case: a **Case Sitting** merges
 > as one JSON file under `evals/review/submissions/`, and
-> `tests/test_case_review.py` derives the count from that directory — so this
-> sentence and the gate cannot disagree. Read the count off
-> `uv run python webapp/sitting.py --list` rather than from prose here. Case
+> `uv run python webapp/sitting.py --list` reads that directory to name each
+> case that waits for one. Case
 > `01-payments-checkout` carries a reading document one person filled on
 > 2026-08-23,
 > [`corpus/01-payments-checkout/REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md),
