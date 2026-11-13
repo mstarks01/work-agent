@@ -856,7 +856,8 @@ EFFECTS: Mapping[str, str] = MappingProxyType(
 #: (ADR 0117). The early list ranks a question kind by the rules that name one
 #: of its parts (:func:`~analysis_service.early_questions.reads`), but this
 #: framework's prior names no question kind, so these rows do not move the
-#: early order. ``tests/test_rule_informed_by.py`` holds each lane to a row.
+#: early order. ``tests/test_rule_informed_by.py`` holds each lane to at least
+#: one predicate.
 INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
     {
         "encoding-and-sanitization-database": frozenset({"content-validation-encodes"}),

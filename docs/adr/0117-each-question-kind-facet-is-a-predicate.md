@@ -119,7 +119,7 @@ ASVS lane.
   questions.
 - The ASVS rules name the predicates that inform them too, but the ASVS prior
   names no question kind. So the ASVS rows do not move the early order, and
-  only the coverage test reads them. They move it when the ASVS prior names a
+  only the tests in `tests/test_rule_informed_by.py` read them. They move it when the ASVS prior names a
   kind.
 - A description or a configuration document that states a covered control
   settles its question once extraction is on for that group, and the page

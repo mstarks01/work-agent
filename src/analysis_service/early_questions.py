@@ -27,8 +27,8 @@ STRIDE findings than the score did at 10 and 15 choices.
 
 **A rule reads a question kind where it names one of the kind's parts** in
 :attr:`~analysis_service.candidates.Rule.informed_by` (ADR 0117). A
-framework's rules meet only the fields of its own prior, and the ASVS prior
-names no question kind, so only STRIDE rules move a kind. On the archive,
+framework's candidates count only toward the fields of its own prior, and the
+ASVS prior names no question kind, so only STRIDE rules move a kind. On the archive,
 STRIDE then completed 14 more findings at 15 choices and 35 more at 20. With
 STRIDE also selected, ASVS settled 144 fewer units at 20 choices (833 to 689)
 (``QA-2026-11-13-01-E1``).
