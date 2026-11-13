@@ -986,7 +986,7 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
 #: grade and does not, so every ASVS number in the suite is computed over less of
 #: the corpus than it could be. A case that starts satisfying a precondition and
 #: carries no records for it belongs here by name, not in silence.
-PENDING_REFERENCE_SETS: dict[str, frozenset[str]] = {
+PENDING_REFERENCE_SETS: dict[str, frozenset[FrameworkName]] = {
     # Written for #2054 to measure the STRIDE lanes on capacity facts. Each
     # still needs an ASVS reference set at level 1 and a sitting that reads it.
     "17-permit-portal-limits": frozenset({"asvs"}),
