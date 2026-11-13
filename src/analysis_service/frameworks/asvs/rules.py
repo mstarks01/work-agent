@@ -853,9 +853,11 @@ EFFECTS: Mapping[str, str] = MappingProxyType(
 )
 
 #: The predicates whose fact bears on whether each rule's requirements apply
-#: (ADR 0117). The early list ranks a question kind on an element by the rules
-#: here that name one of its parts
-#: (:func:`~analysis_service.early_questions.reads`).
+#: (ADR 0117). The early list ranks a question kind by the rules that name one
+#: of its parts (:func:`~analysis_service.early_questions.reads`), but this
+#: framework's prior names no question kind, so these rows do not move the
+#: early order. ``tests/test_rule_informed_by.py`` holds each lane to at least
+#: one predicate.
 INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
     {
         "encoding-and-sanitization-database": frozenset({"content-validation-encodes"}),
@@ -1097,7 +1099,7 @@ def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
 #: it is led to. So a stated fact changes how a lane rules a requirement, never
 #: which requirements it is shown, and the lane reads the settled row as
 #: evidence. Each rule that a fact informs names its predicate in
-#: :data:`INFORMED_BY`, which ranks the early list.
+#: :data:`INFORMED_BY`.
 _RULED_AS_EVIDENCE = NoRule(
     "a candidate rule of this framework selects requirements by what the graph"
     " shows is present; a stated fact bears on how a lane rules a requirement,"

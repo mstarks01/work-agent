@@ -117,6 +117,9 @@ ASVS lane.
 - Phase 1 alone gives the rules and the early order a structured fact for
   each answer, and gives each STRIDE lane a predicate. It does not ask fewer
   questions.
+- The ASVS rules name the predicates that inform them too, but the ASVS prior
+  names no question kind. So the ASVS rows do not move the early order. They
+  move it when the ASVS prior names a kind.
 - A description or a configuration document that states a covered control
   settles its question once extraction is on for that group, and the page
   shows the fact with its source. Until then, only a Control removes the
