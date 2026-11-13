@@ -219,6 +219,12 @@ DECLARED: dict[str, str] = {
         " experiment measures the STRIDE lanes; the ASVS prior holds no"
         " question kinds, so there is nothing for another package to read."
     ),
+    "evals/experiments/QA-2026-11-13-01/order_variants.py": (
+        "A recorded experiment's script. E2 removes the question-kind reads of"
+        " one package. That package's prior holds no question kind, so the"
+        " variant equals E1 by construction. The other variants change the"
+        " turn rule, which names no package."
+    ),
     "evals/experiments/QA-2026-10-27-01/price.py": (
         "This code is that framework's. It prices trial lead rules against the"
         " lanes that read them, which exists only for a package whose leads"
