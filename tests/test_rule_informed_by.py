@@ -13,9 +13,9 @@ import pytest
 from analysis_service.assertions import REGISTRY
 from analysis_service.candidates import Candidate
 from analysis_service.claims import FrameworkName
-from analysis_service.early_questions import reads
+from analysis_service.early_questions import load_prior, reads
 from analysis_service.frameworks import PACKAGES, unprojected_predicates
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 
 #: Each predicate of a part of a question kind.
 PARTS = frozenset(
@@ -34,6 +34,12 @@ UNREAD = frozenset(
         "tenant-ownership",
     }
 )
+
+#: Whether each package's prior names a question kind, so that its
+#: ``informed_by`` rows move the early order. Where a value is False, the
+#: package's ``INFORMED_BY`` comment, the ``early_questions`` docstring,
+#: ``GLOSSARY.md`` and ADR 0117 say that its rows do not move the order.
+MOVES_THE_EARLY_ORDER: dict[FrameworkName, bool] = {"stride": True, "asvs": False}
 
 
 def lane_predicates(name: FrameworkName) -> dict[str, set[str]]:
@@ -88,3 +94,16 @@ def test_a_kind_is_read_by_a_rule_that_names_one_of_its_parts():
     candidate = Candidate(rule_id=rule.rule_id, lane=rule.lane, element_ids=("p",))
     assert reads(candidate, rule.informed_by, "capacity-limits")
     assert not reads(candidate, rule.informed_by, "audit-evidence")
+
+
+def test_a_package_moves_the_early_order_only_where_its_prior_names_a_kind():
+    prior = load_prior()
+    names_a_kind = {
+        name: any(
+            parse_question_kind(field) is not None
+            for rates in prior[name].rates.values()
+            for field in rates
+        )
+        for name in PACKAGES
+    }
+    assert names_a_kind == MOVES_THE_EARLY_ORDER
