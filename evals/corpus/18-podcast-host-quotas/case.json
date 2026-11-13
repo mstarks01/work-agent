@@ -10,10 +10,10 @@
       "kind": "description",
       "label": "System description",
       "file": "source.md",
-      "sha256": "e9fca91658ac0edf2625f194bd5a3e17dd2944f32fdd49ec157b2097ec507403"
+      "sha256": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee"
     }
   ],
-  "source_sha256": "174dc802196dacf0f2de034a0d207ca1409bd776922536333fb5faac3993001f",
+  "source_sha256": "742087786601c723410305cc058c93614924e283d45c42d14035ced907b293db",
   "frameworks": [
     {
       "name": "stride",
@@ -21,5 +21,5 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Written for issue #2054 to measure the assertion pass on the capacity-limits predicates, beside case 17. It states the shapes case 17 does not: a quota per show on the upload API, a stated absence of a rate limit on the public feed service, a stated absence of a concurrency limit on the stats importer, and a hedged size limit on one upload that must stay unknown. The transcoder states a concurrency limit. The denial-of-service must-find rests on the feed service's stated absence of a rate limit. The domain is podcast hosting, which no other case covers."
+  "notes": "The case exists for issue #2054. It measures the assertion pass on the capacity-limits predicates, beside case 17. It states the shapes case 17 does not: a quota per show on the upload API, a stated absence of a rate limit on the public feed service, a stated absence of a concurrency limit on the stats importer, and a hedged size limit on one upload that must stay unknown. The transcoder states a concurrency limit. The denial-of-service must-find rests on the feed service's stated absence of a rate limit. The domain is podcast hosting, which no other case covers."
 }

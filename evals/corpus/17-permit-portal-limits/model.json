@@ -37,7 +37,7 @@
       "technology": "unknown",
       "trust_zone": "boundary:internet",
       "exposure": "internet-facing",
-      "interface_kind": "unknown",
+      "interface_kind": "web",
       "notes": "Limits stated in the source: \"The gateway allows 60 requests a minute from one IP address and rejects any request body over 5 MB.\" The source does not say where the gateway runs; the closing list of what runs in the city's cloud account does not name it."
     },
     {
@@ -302,6 +302,12 @@
       "element_id": "process:permit-gateway",
       "attribute": "trust_zone",
       "basis": "The source says the gateway faces the internet and does not name it among what runs in the city's cloud account."
+    },
+    {
+      "assumption": "The permit gateway presents a web interface.",
+      "element_id": "process:permit-gateway",
+      "attribute": "interface_kind",
+      "basis": "Applicants apply on the portal, and every application request goes through the gateway. A portal is web, as prompts/extract.md rules."
     }
   ]
 }

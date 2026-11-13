@@ -15,7 +15,7 @@
     {
       "id": "entity:podcast-app",
       "name": "podcast app",
-      "description": "A listener's podcast app, which polls each show's RSS feed all day and downloads episodes.",
+      "description": "A listener's podcast app, which polls each show's RSS feed all day and downloads episodes. The source does not say where an app downloads an episode from, so the model holds no flow for it.",
       "assets": [],
       "source_excerpt": "Listeners' podcast apps fetch each show's RSS feed from the feed service, which is public.",
       "source_label": "System description",
@@ -79,7 +79,7 @@
       "technology": "unknown",
       "trust_zone": "boundary:hosting-account",
       "exposure": "internet-facing",
-      "interface_kind": "unknown",
+      "interface_kind": "web",
       "notes": "Stated absence of a rate limit: \"We do not rate limit the feed service, because apps poll feeds all day and we never want an app to miss a new episode.\""
     },
     {
@@ -156,7 +156,7 @@
       "source": "entity:podcaster",
       "destination": "process:upload-api",
       "protocol": "unknown",
-      "authentication": "password sign-in with an email address and a password",
+      "authentication": "password sign-in with an email address",
       "data_description": "episode audio files and episode details",
       "encryption_in_transit": "unknown",
       "operations": "write",
@@ -297,12 +297,18 @@
       "name": "hosting account",
       "description": "The one hosting account everything the platform team runs is in.",
       "assets": [],
-      "source_excerpt": "All of this runs in one hosting account, except the listeners' apps and the ad partner.",
+      "source_excerpt": "All of this runs in one hosting account. The podcasters, the listeners' apps and the ad partner are outside it.",
       "source_label": "System description",
       "kind": "network"
     }
   ],
   "assumptions": [
+    {
+      "assumption": "The feed service presents a web interface.",
+      "element_id": "process:feed-service",
+      "attribute": "interface_kind",
+      "basis": "It serves each show's RSS feed to podcast apps that fetch it, and an RSS feed is a document fetched by its URL, the HTTP family that prompts/extract.md calls web."
+    },
     {
       "assumption": "Podcasters are placed on the internet because the schema requires a zone.",
       "element_id": "entity:podcaster",

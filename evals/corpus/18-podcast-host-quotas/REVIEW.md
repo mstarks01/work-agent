@@ -37,7 +37,7 @@ Roughly an hour.
 >
 > Leo says the upload API probably also has a size limit on a single file, but he would have to check.
 >
-> All of this runs in one hosting account, except the listeners' apps and the ad partner.
+> All of this runs in one hosting account. The podcasters, the listeners' apps and the ad partner are outside it.
 
 ### What the model says is in it
 
@@ -57,7 +57,7 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|
 | process:upload-api | internet-facing | unknown | boundary:hosting-account | unknown |
 | process:transcoder | unknown | unknown | boundary:hosting-account | unknown |
-| process:feed-service | internet-facing | unknown | boundary:hosting-account | unknown |
+| process:feed-service | internet-facing | web | boundary:hosting-account | unknown |
 | process:stats-importer | unknown | unknown | boundary:hosting-account | unknown |
 
 **Data stores**
@@ -72,7 +72,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:entity:podcaster>process:upload-api>upload-episodes | entity:podcaster | process:upload-api | unknown | password sign-in with an email address and a password | unknown |
+| flow:entity:podcaster>process:upload-api>upload-episodes | entity:podcaster | process:upload-api | unknown | password sign-in with an email address | unknown |
 | flow:process:upload-api>store:media-store>store-audio | process:upload-api | store:media-store | unknown | unknown | unknown |
 | flow:process:upload-api>store:show-database>store-episode-details | process:upload-api | store:show-database | unknown | unknown | unknown |
 | flow:process:transcoder>store:media-store>pick-up-audio | process:transcoder | store:media-store | unknown | unknown | unknown |
@@ -98,6 +98,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
+- `process:feed-service` — The feed service presents a web interface. (basis: It serves each show's RSS feed to podcast apps that fetch it, and an RSS feed is a document fetched by its URL, the HTTP family that prompts/extract.md calls web.)
 - `entity:podcaster` — Podcasters are placed on the internet because the schema requires a zone. (basis: They reach the upload API on the internet; the source does not state where podcasters are.)
 - `entity:podcast-app` — Podcast apps are placed on the internet because the schema requires a zone. (basis: They fetch feeds from the public feed service; the source places them outside the hosting account and says no more.)
 - `entity:ad-partner` — The ad partner is placed on the internet because the schema requires a zone. (basis: The source places it outside the hosting account and does not say how its files arrive.)
@@ -188,9 +189,9 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker requests RSS feeds from the public feed service as fast as they can, from many clients, until the feed service and the show database stop serving feeds to podcast apps.
 
-- `process:feed-service`, `flow:entity:podcast-app>process:feed-service>fetch-feeds`
+- `process:feed-service`, `flow:entity:podcast-app>process:feed-service>fetch-feeds`, `store:show-database`
 - severity: high/medium · verb: `flood`
-- The finding this case exists for. The source states the absence: "We do not rate limit the feed service". The service is public. An assertion pass that writes the stated absence gives the lane the fact this finding rests on.
+- This case exists for this finding. The source states the absence: "We do not rate limit the feed service". The service is public. An assertion pass that writes the stated absence gives the lane the fact this finding rests on.
 
 > mark:
 
@@ -265,9 +266,9 @@ your missing list, your notes and a digest of each file you read:
       "missing": ["<what the recorded sets do not name>"],
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
-      "source.md": "e9fca91658ac0edf2625f194bd5a3e17dd2944f32fdd49ec157b2097ec507403",
-      "model.json": "8318b195c1a43fdaa91e9fdb0ca5073e578067f428ae525c39262765deb755a5",
-      "claims/stride.json": "a903401626a2434565eb058355ddb7733257cbbf0d39259c0d014fcbeb242984"
+      "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
+      "model.json": "15696ddcc8f13b51b14bd6d552956faacc13868693a035d4693c8ba1fc6ae0d0",
+      "claims/stride.json": "e2dd88107eec3b42f6b55897b5d9a2c129d1b307d17cd6a36a539c8c312cc4e6"
       }
     }
   }

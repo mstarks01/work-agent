@@ -10,4 +10,4 @@ Every night our ad partner sends us files of download counts. The stats importer
 
 Leo says the upload API probably also has a size limit on a single file, but he would have to check.
 
-All of this runs in one hosting account, except the listeners' apps and the ad partner.
+All of this runs in one hosting account. The podcasters, the listeners' apps and the ad partner are outside it.

@@ -54,7 +54,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:permit-gateway | internet-facing | unknown | boundary:internet | unknown |
+| process:permit-gateway | internet-facing | web | boundary:internet | unknown |
 | process:permit-service | unknown | unknown | boundary:city-cloud-account | unknown |
 | process:plan-upload-service | internet-facing | unknown | boundary:city-cloud-account | unknown |
 | process:plan-renderer | unknown | unknown | boundary:city-cloud-account | unknown |
@@ -99,6 +99,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `entity:applicant` — Applicants are placed on the internet because the schema requires a zone. (basis: They apply "from anywhere" and reach the gateway and the plan upload service over the internet; the source does not state where applicants are.)
 - `process:permit-gateway` — The permit gateway is placed on the internet because the schema requires a zone. (basis: The source says the gateway faces the internet and does not name it among what runs in the city's cloud account.)
+- `process:permit-gateway` — The permit gateway presents a web interface. (basis: Applicants apply on the portal, and every application request goes through the gateway. A portal is web, as prompts/extract.md rules.)
 
 ### Your list
 
@@ -204,7 +205,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:plan-upload-service`, `flow:entity:applicant>process:plan-upload-service>upload-plan-drawings`
 - severity: high/medium · verb: `flood`
-- The finding this case exists for. The source states the absence of both limits: "The plan upload service has no size limit and no rate limit." The service is on the internet and outside the gateway, so the gateway's limits do not cover it. An assertion pass that writes the two stated absences gives the lane the facts this finding rests on.
+- This case exists for this finding. The source states the absence of both limits: "The plan upload service has no size limit and no rate limit." The service is on the internet and outside the gateway, so the gateway's limits do not cover it. An assertion pass that writes the two stated absences gives the lane the facts this finding rests on.
 
 > mark:
 
@@ -218,7 +219,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker sends requests from many IP addresses at once, which the gateway's limit of 60 requests a minute per address does not stop, until the permit service stops serving applicants.
 
-- `process:permit-gateway`, `flow:entity:applicant>process:permit-gateway>submit-applications`
+- `process:permit-gateway`, `flow:entity:applicant>process:permit-gateway>submit-applications`, `process:permit-service`
 - severity: medium/medium · verb: `flood`
 - The gateway's rate limit and size limit are stated. The rate limit is per IP address, so it does not bound a flood spread over many addresses.
 
@@ -280,8 +281,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
-      "model.json": "bd038c1f4db3971c0f09bcacf461e1801c380710c9be8d43c1213115517c9d11",
-      "claims/stride.json": "df9e8a7d6d42462795e09a0503948dd097b2660e212e89341e842337a0ad2315"
+      "model.json": "6d46ca38340a493a2672944db1c4cd8ef900dfdf18c6902f7374d62c77b4001a",
+      "claims/stride.json": "5bb806e02f1337028b14aff281cadd59f3ddb563816e159a4917a25907881fc8"
       }
     }
   }

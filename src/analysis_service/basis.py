@@ -114,7 +114,7 @@ score, so a sweep reports the pair.
 
 **Read the rate for what it is.** 41 values is a small sample beside the 206
 element excerpts that calibrated the grounding ladder, and the corpus is
-agent-authored — no case has been read by a person (#226). A 0% flag rate may
+agent-authored — a person reads a case after an agent writes it (#226). A 0% flag rate may
 mean a blessed model reuses its source's wording, which is exactly what an agent
 writing one would do. So the number measures agreement with an unreviewed
 reference, not correctness, and it is a floor under the gate question rather
@@ -219,7 +219,7 @@ FUNCTION_WORDS: frozenset[str] = frozenset(
 #:
 #: Measured, on the tree that carries this constant: a search runs at about
 #: 930,000 characters per millisecond, so 20 million characters is about 21 ms
-#: of CPU (#1316). The worst of the 16 corpus cases spends 58,788, which is 340 times
+#: of CPU (#1316). The worst of the 18 corpus cases spends 58,788, which is 340 times
 #: under the budget. A job that spends it names over a thousand different words
 #: across its controls and matches none of them, which is not a model this
 #: measures usefully.

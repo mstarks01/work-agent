@@ -113,7 +113,7 @@
       "likelihood": "high",
       "impact": "medium"
     },
-    "notes": "The finding this case exists for. The source states the absence of both limits: \"The plan upload service has no size limit and no rate limit.\" The service is on the internet and outside the gateway, so the gateway's limits do not cover it. An assertion pass that writes the two stated absences gives the lane the facts this finding rests on.",
+    "notes": "This case exists for this finding. The source states the absence of both limits: \"The plan upload service has no size limit and no rate limit.\" The service is on the internet and outside the gateway, so the gateway's limits do not cover it. An assertion pass that writes the two stated absences gives the lane the facts this finding rests on.",
     "verb": "flood"
   },
   {
@@ -135,7 +135,8 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:permit-gateway",
-      "flow:entity:applicant>process:permit-gateway>submit-applications"
+      "flow:entity:applicant>process:permit-gateway>submit-applications",
+      "process:permit-service"
     ],
     "claim": "An attacker sends requests from many IP addresses at once, which the gateway's limit of 60 requests a minute per address does not stop, until the permit service stops serving applicants.",
     "tier": "expected",

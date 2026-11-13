@@ -76,7 +76,8 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:feed-service",
-      "flow:entity:podcast-app>process:feed-service>fetch-feeds"
+      "flow:entity:podcast-app>process:feed-service>fetch-feeds",
+      "store:show-database"
     ],
     "claim": "An attacker requests RSS feeds from the public feed service as fast as they can, from many clients, until the feed service and the show database stop serving feeds to podcast apps.",
     "tier": "must-find",
@@ -84,7 +85,7 @@
       "likelihood": "high",
       "impact": "medium"
     },
-    "notes": "The finding this case exists for. The source states the absence: \"We do not rate limit the feed service\". The service is public. An assertion pass that writes the stated absence gives the lane the fact this finding rests on.",
+    "notes": "This case exists for this finding. The source states the absence: \"We do not rate limit the feed service\". The service is public. An assertion pass that writes the stated absence gives the lane the fact this finding rests on.",
     "verb": "flood"
   },
   {

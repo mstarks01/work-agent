@@ -32,20 +32,20 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**Every case has a merged Case Sitting.** That is the
+**Merged Case Sittings clear 15 of the 18 cases.** A sitting is the
 reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under
 `evals/review/submissions/` — who read it, what they wrote before the sets
-opened, and the digest of each file they read. `tests/test_case_review.py`
-derives the count from that directory, so this sentence and the gate cannot
-disagree. Case `01-payments-checkout` carries a filled reading document dated
+opened, and the digest of each file they read. Case 16's model moved after
+its sitting, and nobody has read cases 17 and 18. Case `01-payments-checkout` carries a filled reading document dated
 2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
 reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
 reader's own words and the template for the method, and no submission clears
 the case (ADR 24).
-`tests/test_case_review.py` fails a new case that arrives without a sitting, and
-fails a read file that changes under its recorded digest.
+`tests/test_case_review.py` fails a case that no sitting clears unless its
+`UNREVIEWED` table names the case, and fails a read file that changes under its
+recorded digest.
 
 **Fourteen cases carry signed reference facts.** Cases 01 to 13 and 16 carry a
 `facts.json`, one row per fact the sources state, in the shape the assertion
