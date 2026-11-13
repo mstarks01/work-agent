@@ -62,8 +62,8 @@ from analysis_service.analysis import (
     names_term,
     states_a_protocol,
 )
-from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import Match, Rule, clip_fact, with_effects
+from analysis_service.assertions import AssertionCatalog, PredicateName
+from analysis_service.candidates import Match, Rule, clip_fact, with_rule_tables
 from analysis_service.claims import UnknownRef
 from analysis_service.frameworks import NoRule, PreconditionResult, PredicateReader
 from analysis_service.protocol_defaults import NEGATED
@@ -852,8 +852,99 @@ EFFECTS: Mapping[str, str] = MappingProxyType(
     }
 )
 
-RULES: tuple[Rule, ...] = with_effects(
-    (*(_rule_of(test) for test in PRESENCE_TESTS), *STRUCTURAL_RULES), EFFECTS
+#: The predicates whose fact bears on whether each rule's requirements apply
+#: (ADR 0117). The early list ranks a question kind on an element by the rules
+#: here that name one of its parts
+#: (:func:`~analysis_service.early_questions.reads`).
+INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
+    {
+        "encoding-and-sanitization-database": frozenset({"content-validation-encodes"}),
+        "encoding-and-sanitization-rich-text-input": frozenset(
+            {"content-validation-encodes"}
+        ),
+        "encoding-and-sanitization-xml-parser": frozenset(
+            {"content-validation-encodes", "code-execution"}
+        ),
+        "validation-and-business-logic-client-side-code": frozenset(
+            {"content-validation-validates"}
+        ),
+        "validation-and-business-logic-multi-step-flow": frozenset(
+            {"authorization-scope-checks-each-request"}
+        ),
+        "validation-and-business-logic-crossing-from-an-entity": frozenset(
+            {
+                "content-validation-validates",
+                "capacity-limits-rate",
+                "capacity-limits-quota",
+            }
+        ),
+        "web-frontend-security-browser-frontend": frozenset(
+            {"security-configuration-headers"}
+        ),
+        "web-frontend-security-cookies": frozenset({"security-configuration-cookies"}),
+        "web-frontend-security-cors": frozenset(
+            {"security-configuration-cross-origin"}
+        ),
+        "api-and-web-service-websocket": frozenset(
+            {"security-configuration-cross-origin", "capacity-limits-size"}
+        ),
+        "file-handling-file-upload": frozenset(
+            {"capacity-limits-size", "code-execution", "content-validation-validates"}
+        ),
+        "authentication-authentication": frozenset({"capacity-limits-rate"}),
+        "authentication-password-auth": frozenset({"capacity-limits-rate"}),
+        "session-management-sessions": frozenset({"security-configuration-cookies"}),
+        "authorization-privileged-role": frozenset(
+            {
+                "authorization-scope-checks-each-request",
+                "authorization-scope-least-privilege",
+                "authorization-scope-checks-ownership",
+            }
+        ),
+        "authorization-shared-account": frozenset({"record-attribution"}),
+        "self-contained-tokens-self-contained-tokens": frozenset(
+            {"provenance-sender", "provenance-integrity"}
+        ),
+        "oauth-and-oidc-oauth": frozenset({"destination", "provenance-sender"}),
+        "cryptography-encryption": frozenset(
+            {"stored-copy-access-encrypted", "security-configuration-secret-store"}
+        ),
+        "secure-communication-transport": frozenset({"transport-encryption"}),
+        "secure-communication-unverified-transit": frozenset({"transport-encryption"}),
+        "configuration-secret-material": frozenset(
+            {"security-configuration-secret-store"}
+        ),
+        "data-protection-browser-frontend": frozenset({"data-exposure-minimal-fields"}),
+        "data-protection-classified-store": frozenset(
+            {"data-exposure-restricted-readers", "stored-copy-access-restricted"}
+        ),
+        "secure-coding-and-architecture-third-party-component": frozenset(
+            {
+                "update-process-scheduled",
+                "update-process-vulnerability-alerts",
+                "update-process-tested",
+            }
+        ),
+        "security-logging-and-error-handling-log-or-audit-trail": frozenset(
+            {
+                "audit-evidence-record-protected",
+                "data-exposure-clean-logs",
+                "failure-handling-alerts",
+            }
+        ),
+        "security-logging-and-error-handling-write-with-no-record": frozenset(
+            {"record-attribution"}
+        ),
+        "webrtc-real-time-media": frozenset(
+            {"capacity-limits-rate", "capacity-limits-size"}
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_rule_tables(
+    (*(_rule_of(test) for test in PRESENCE_TESTS), *STRUCTURAL_RULES),
+    EFFECTS,
+    INFORMED_BY,
 )
 
 

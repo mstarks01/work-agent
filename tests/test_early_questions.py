@@ -172,21 +172,35 @@ class TestTheOrder:
 
     def test_only_a_rule_that_reads_the_fact_raises_its_rank(self):
         """A candidate that reads another fact of the element does not move
-        the question up, and no rule reads a question kind (ADR 0115)."""
+        the question up (ADR 0115). A rule reads a question kind where it
+        names one of the kind's parts (ADR 0117)."""
         asked = early_questions(
             valid_model(),
             {"stride": {}},
             None,
-            prior_of({"DataFlow": {"audit-evidence": 1.0, "authentication": 1.0}}),
+            prior_of(
+                {
+                    "DataFlow": {
+                        "audit-evidence": 1.0,
+                        "data-exposure": 1.0,
+                        "authentication": 1.0,
+                    }
+                }
+            ),
         )
+        informed = {rule.rule_id: rule.informed_by for rule in PACKAGES["stride"].rules}
         unrelated = 0
+        kinds_read = 0
         for question in asked:
             ref = key_ref(question.key)
+            field = ref.attribute or ref.question
             found = self.candidates_on(ref.element_id)
-            reading = [c for c in found if ref.attribute and reads(c, ref.attribute)]
+            reading = [c for c in found if reads(c, informed[c.rule_id], field)]
             assert question.relevance == 1 + len(reading)
             unrelated += len(found) - len(reading)
+            kinds_read += bool(ref.question and reading)
         assert unrelated, "the fixture holds candidates that read another fact"
+        assert kinds_read, "a rule names a part of a kind asked about a flow"
         relevance = [q.relevance / q.decisions for q in asked]
         assert relevance == sorted(relevance, reverse=True)
 

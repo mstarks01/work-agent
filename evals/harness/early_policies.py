@@ -230,7 +230,9 @@ def _merge(
 def _element_count(model: SystemModel, chosen: Selection) -> list[Charge]:
     """The shipped list ranked by the score, as the floor reads it: every
     candidate on an element counts toward each of its fields (ADR 0115)."""
-    with mock.patch.object(early_module, "reads", lambda candidate, field: True):
+    with mock.patch.object(
+        early_module, "reads", lambda candidate, informed_by, field: True
+    ):
         return _each(_shipped_list(model, chosen))
 
 
