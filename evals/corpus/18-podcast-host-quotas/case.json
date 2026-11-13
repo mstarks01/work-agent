@@ -10,10 +10,10 @@
       "kind": "description",
       "label": "System description",
       "file": "source.md",
-      "sha256": ""
+      "sha256": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee"
     }
   ],
-  "source_sha256": "",
+  "source_sha256": "742087786601c723410305cc058c93614924e283d45c42d14035ced907b293db",
   "frameworks": [
     {
       "name": "stride",
