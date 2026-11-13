@@ -6,6 +6,159 @@
       "assertion": {
         "subject_type": "component",
         "subject": "process:upload-api",
+        "predicate": "capacity-limits-quota",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Each show gets 50 GB of storage in total, and the upload API refuses an upload that would take a show over its 50 GB."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated quota per show.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:upload-api",
+        "predicate": "capacity-limits-size",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Leo says the upload API probably also has a size limit on a single file, but he would have to check."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A hedge: the speaker would have to check, so the row states no value.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:upload-api",
+        "predicate": "capacity-limits-rate",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states no limit on how often a podcaster uploads.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:upload-api",
+        "predicate": "capacity-limits-concurrency",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about how many uploads run at once.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:feed-service",
+        "predicate": "capacity-limits-rate",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "We do not rate limit the feed service, because apps poll feeds all day and we never want an app to miss a new episode."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence of a rate limit.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:feed-service",
+        "predicate": "capacity-limits-concurrency",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about how much work the feed service runs at once.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:transcoder",
+        "predicate": "capacity-limits-concurrency",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Each transcoder runs at most two jobs at once."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated limit on how much work runs at once.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:stats-importer",
+        "predicate": "capacity-limits-concurrency",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The stats importer starts a new import job for every file that arrives, with no cap on how many run together, and writes the counts to the stats database."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence of a concurrency limit.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:upload-api",
         "predicate": "internet-exposure",
         "value": "internet-facing",
         "reason": null,

@@ -6,6 +6,196 @@
       "assertion": {
         "subject_type": "component",
         "subject": "process:permit-gateway",
+        "predicate": "capacity-limits-rate",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The gateway allows 60 requests a minute from one IP address and rejects any request body over 5 MB."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated limit on the rate of requests, per IP address.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:permit-gateway",
+        "predicate": "capacity-limits-size",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The gateway allows 60 requests a minute from one IP address and rejects any request body over 5 MB."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated limit on the size of a request body.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:permit-gateway",
+        "predicate": "capacity-limits-concurrency",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states no limit on how much work the gateway runs at once.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:permit-gateway",
+        "predicate": "capacity-limits-quota",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states no quota per applicant at the gateway.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:plan-upload-service",
+        "predicate": "capacity-limits-size",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The plan upload service has no size limit and no rate limit: architects send very large PDFs and we did not want to turn anyone away."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the service has no size limit.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:plan-upload-service",
+        "predicate": "capacity-limits-rate",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The plan upload service has no size limit and no rate limit: architects send very large PDFs and we did not want to turn anyone away."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the service has no rate limit.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:plan-upload-service",
+        "predicate": "capacity-limits-concurrency",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about how many uploads the service takes at once.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:plan-upload-service",
+        "predicate": "capacity-limits-quota",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states no quota per applicant on uploads.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:plan-renderer",
+        "predicate": "capacity-limits-concurrency",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It runs four conversions at a time; anything more waits."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated limit on how much work runs at once.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:permit-service",
+        "predicate": "capacity-limits-quota",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Marta thinks the permit service limits how many open applications one account can have, but nobody has checked that."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A hedge: the speaker thinks there is a limit and says nobody checked, so the row states no value.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:permit-gateway",
         "predicate": "internet-exposure",
         "value": "internet-facing",
         "reason": null,
