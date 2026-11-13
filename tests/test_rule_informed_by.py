@@ -12,6 +12,7 @@ import pytest
 
 from analysis_service.assertions import REGISTRY
 from analysis_service.candidates import Candidate
+from analysis_service.claims import FrameworkName
 from analysis_service.early_questions import reads
 from analysis_service.frameworks import PACKAGES, unprojected_predicates
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -35,7 +36,7 @@ UNREAD = frozenset(
 )
 
 
-def lane_predicates(name: str) -> dict[str, set[str]]:
+def lane_predicates(name: FrameworkName) -> dict[str, set[str]]:
     """Each lane of the package ``name``, with every predicate its rules name."""
     package = PACKAGES[name]
     lane_of = {rule.rule_id: rule.lane for rule in package.rules}
