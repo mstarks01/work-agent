@@ -506,7 +506,7 @@ def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
 def test_a_direction_is_underivable_on_a_third_of_the_corpus(corpus, flows_by_case):
     """#652's first obstacle: the field a direction would come from is absent.
 
-    A component the corpus cannot state on 86 of 244 claims is not a component
+    A component the corpus cannot state on 94 of 320 claims is not a component
     the identity can read. Moving this number means a blessing pass re-cited
     claims against flows, which is the one thing that would reopen the question.
     """
@@ -532,8 +532,8 @@ def test_a_direction_component_is_a_no_op_or_a_catastrophe(corpus, flows_by_case
 
     Both readings of an absent direction are measured, because the choice
     between them is the whole design and neither survives it. As a mismatch it
-    splits 90 of the 186 labelled pairs the rule merges correctly, to recover 2
-    of its 3 candidate merges. As a wildcard it moves nothing.
+    splits 71 of the 156 labelled pairs the rule merges correctly, to recover 1
+    of its 2 candidate merges. As a wildcard it moves nothing.
     """
     result = measure_direction(
         corpus, load_pairs(), flows_by_case, SubsetVerbIdentity(flows_by_case)
