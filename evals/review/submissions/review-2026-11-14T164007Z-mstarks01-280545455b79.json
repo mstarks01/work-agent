@@ -1,0 +1,94 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-11-14T164007Z",
+  "cases": {
+    "17-permit-portal-limits": {
+      "own_list": [
+        "Unlimited direct plan uploads bypass both gateway controls. Large files or rapid repeated uploads can exhaust ingress bandwidth, upload-service resources and plan-store capacity, or drive cloud costs.",
+        "Four simultaneous conversions limit concurrency, not backlog. Uploads can arrive faster than rendering completes; the waiting queue can grow and delay legitimate permit reviews. No queue bound or backpressure is stated.",
+        "A complex or malicious PDF can consume excessive CPU, memory or time, or produce huge numbers of tiles. Four such jobs can occupy every renderer slot; no per-job time, memory, page or output-size limit is stated.",
+        "The gateway limit is per IP. Requests spread across many IP addresses can overload the permit service or database despite each address staying below 60 requests per minute; no aggregate limit is stated.",
+        "Legitimate applicants sharing a public IP can collectively exceed 60 requests per minute and be blocked. One abusive user on that IP can consume the allowance for everyone behind it.",
+        "The 5 MB body cap does not bound total stored applications or processing cost. Repeated accepted submissions can fill the permit database and review workload; the claimed per-account open-application limit is unverified.",
+        "The district-wide shared inspector login prevents reliable individual attribution of decisions. Credential sharing or compromise can enable impersonation, and revoking one inspector without affecting colleagues is difficult.",
+        "Applicant authentication and object-level authorization are unspecified. If inadequate, a user could read or alter another applicant's application or plans, or submit decisions without inspector authority.",
+        "Untrusted PDFs reach the renderer. If parsing, isolation or cloud permissions are weak, a crafted file could exploit the renderer and expose or corrupt plans or other resources in the city cloud account.",
+        "Authentication and transport protection between components are unknown. If absent or misconfigured, requests, plans or inspector decisions could be intercepted, forged or altered; being on the city network is not proof of protection.",
+        "How inspectors retrieve tiles is missing from the model. That unmodeled path may expose plans or permit unauthorized tile access, and its availability and authorization cannot be assessed until the serving component and flow are identified.",
+        "Plan-store and permit-database access controls, encryption, recovery and cross-service isolation are unspecified. Misconfiguration or a compromised service could disclose drawings, alter decisions or destroy records and interrupt reviews."
+      ],
+      "marks": {
+        "v6:3eaeadf56b53340b": "agree",
+        "v6:e388b92464f9208e": "agree",
+        "v6:4254c1454e8ef0b0": "agree",
+        "v6:e51bece73d4618df": "agree",
+        "v6:02a55e0a2b386dce": "agree",
+        "v6:bf6034832507be77": "agree",
+        "v6:19c24fcafa9af1b7": "agree",
+        "v6:3204cf7386e1dadb": "agree",
+        "v6:5bf53afa0abe031f": "agree",
+        "v6:c66fb15b22699c37": "agree",
+        "v6:2dabafd659899e9f": "agree"
+      },
+      "missing": [
+        "An abusive applicant behind a shared public IP can consume the gateway's 60-request allowance and block legitimate applicants using that IP. This collateral denial of service differs from the distributed flood in mark 10.",
+        "Repeated accepted applications can accumulate stored records and review work even below gateway rate and body-size limits. If the unverified per-account open-application quota is absent or ineffective, one account can exhaust database capacity or staff workload.",
+        "A syntactically valid but expensive PDF can monopolize renderer slots or generate excessive tiles without exploiting a code-execution vulnerability. If per-job time, memory, page and output-size limits are inadequate, a few jobs can exhaust resources despite four-job concurrency (distinct from marks 9 and 11).",
+        "If permit-service object and role authorization is inadequate, an authenticated applicant or inspector can read or alter applications or decisions outside their authority. Applicant authentication alone (mark 1) and plan ownership checks (mark 3) do not cover this.",
+        "The inspector tile-retrieval path is unspecified. If the eventual serving path fails to enforce application-level authorization, it could expose another applicant's tiles even when direct plan-store access is restricted. This remains conditional; no endpoint or direct store flow is inferred.",
+        "If inspector-to-service or internal service-to-store traffic lacks peer authentication and integrity protection, an attacker able to access those paths can forge or alter decisions or stored data. Marks 4 and 7 cover only applicant-facing transport, not these paths."
+      ],
+      "notes": "Model rulings:\n- process:permit-gateway: KEEP the web assumption, explicitly labeled as an inference: a permit portal reasonably suggests a web interface. The source does not establish a specific protocol or HTTPS. This judgment does not rely on the embedded reference to prompts/extract.md.\n- process:plan-renderer: KEEP without an invented tile-access flow. Inspector use of tiles is stated, but the serving component and route are not. Record the missing delivery path as a modeling gap and confirm it before adding concrete endpoints; do not assume direct plan-store or renderer access.\n- flow:entity:inspector>process:permit-service>review-and-decide: KEEP the shared-login text as the authentication value. It is an explicit source fact about authentication and preserves the accountability risk. The mechanism remains unknown; do not infer password, SSO or MFA. No supplied schema restricts this field to mechanism names.\n\nMarks:\n- v6:3eaeadf56b53340b (agree): Appropriately conditional: applicant authentication is unknown. Impersonation also requires the portal to accept an asserted applicant identity; no missing authentication control is established.\n- v6:e388b92464f9208e (agree): The shared login supports district-account impersonation, but does not establish the ability to select any individual inspector identity. Rewrite as: An attacker who obtains a district's shared inspector login can record decisions as that district's inspector account, without the login identifying the individual actor.\n- v6:4254c1454e8ef0b0 (agree): Ownership-check failure is a valid conditional risk. Replacing an existing file additionally requires an overwrite or reassociation capability, which is not stated. Rewrite as: If ownership checks are inadequate and uploads can overwrite or be associated with an existing application, an attacker can substitute drawings for another applicant's plans.\n- v6:e51bece73d4618df (agree): Valid on-path tampering concern, but integrity protection is the relevant control; lack of encryption alone does not prove that signed data can be modified undetected. Rewrite as: If application requests lack authenticated transport integrity and equivalent message-integrity protection, an on-path attacker can alter an application before it reaches the gateway.\n- v6:02a55e0a2b386dce (agree): Shared credentials undermine individual attribution. The absolute claim that nothing identifies the inspector is unsupported because other audit evidence is unspecified. Rewrite as: An inspector can dispute a decision made under the district's shared login; the login alone cannot reliably identify which inspector acted, unless independent evidence supplies individual attribution.\n- v6:bf6034832507be77 (agree): A valid conditional confidentiality risk. Store read-access restrictions are unknown, not established as absent.\n- v6:19c24fcafa9af1b7 (agree): A valid conditional disclosure risk for plan uploads accessible to an on-path attacker; transit encryption is unknown.\n- v6:3204cf7386e1dadb (agree): Direct internet uploads explicitly lack both size and rate limits and bypass gateway controls. Resource exhaustion is a credible scenario, although actual exhaustion depends on available capacity.\n- v6:5bf53afa0abe031f (agree): Four concurrent jobs do not bound incoming work or waiting time. Sustained uploads can exceed processing throughput; an unlimited queue is not itself a stated fact.\n- v6:c66fb15b22699c37 (agree): A distributed flood can remain within each IP allowance while exceeding aggregate capacity. Other defenses are unspecified; the stated per-IP limit alone does not stop this scenario.\n- v6:2dabafd659899e9f (agree): A parser-exploitation scenario is credible but requires a vulnerability. Cloud placement does not imply broad cloud-account permissions, and anonymous upload access is not established. Rewrite as: An attacker able to upload a PDF could exploit a vulnerable conversion component to execute code with the renderer's actual permissions, potentially altering tiles or plan-store data accessible to it.\n\nFacts not signed:\n- flow:entity:inspector>process:permit-service>review-and-decide authentication-mechanism: The predicate asks for an authentication mechanism, but the source establishes only a shared login. Set this mechanism to unknown and retain credential-sharing=shared in row 21. This refines round one: the generic authentication text can preserve the known shared-login fact, while this narrower mechanism predicate cannot.",
+      "opened_digests": {
+        "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
+        "model.json": "6d46ca38340a493a2672944db1c4cd8ef900dfdf18c6902f7374d62c77b4001a",
+        "claims/stride.json": "d3ccaba0895b494ace4b93b45124d862fe2b2b8324c98e144668f32f393ad46a"
+      }
+    },
+    "18-podcast-host-quotas": {
+      "own_list": [
+        "The public feed service has no rate limit. Aggressive polling or deliberate floods can exhaust service capacity and make feeds unavailable to legitimate listeners.",
+        "Feed requests trigger show-database reads. Repeated requests can overload that database and interfere with publishing as well as feed delivery; caching and aggregate resource controls are not stated.",
+        "The 50 GB per-show quota limits stored bytes, not upload bandwidth, concurrent uploads or parsing cost. Large or repeated uploads can overload the upload API; the suggested per-file limit is unverified.",
+        "A per-show quota does not bound account-wide storage. If show creation or the number of shows is unrestricted, many shows can multiply storage consumption and costs.",
+        "If quota checking and storage reservation are not atomic, concurrent uploads can each pass the same remaining-space check and collectively exceed 50 GB. The enforcement mechanism is unspecified.",
+        "Two jobs per transcoder cap local concurrency, not queue size, total workers or total work. Upload bursts can build a backlog, delay episode publication and potentially drive fleet costs; no global bound is stated.",
+        "Malformed or computationally expensive audio can exhaust a transcoder's CPU, memory or job time, or exploit its decoder. Two stuck jobs can occupy a worker; per-job limits and isolation are unspecified.",
+        "The stats importer starts a job for every arriving file with no concurrency cap. A large nightly batch or a compromised partner can exhaust compute, connections or stats-database write capacity.",
+        "Partner-file authentication, validation and replay handling are unspecified. Spoofed, malformed, duplicate or conflicting files could corrupt download totals, double-count activity or cause repeated processing failures.",
+        "Podcasters use email and password sign-in. If guessing protection, secure credential handling and show-level authorization are inadequate, stolen or guessed credentials could enable unauthorized publishing or access to another show.",
+        "The storage and delivery path for transcoded episodes is missing. Download authorization, integrity, bandwidth limits and egress costs are therefore unassessed; neither direct media-store access nor delivery by the feed service can be assumed.",
+        "Transport encryption, store protection and service isolation are unknown. If weak, uploaded audio or episode details could be exposed or altered, and compromise or resource exhaustion in the shared hosting account could affect multiple services."
+      ],
+      "marks": {
+        "v6:cf2b55bbd69a0c5d": "agree",
+        "v6:b2863927ccf29dbf": "agree",
+        "v6:52dcbd91ea9ceaca": "agree",
+        "v6:d690a071782fe127": "reject",
+        "v6:cd29342ce34eac48": "agree",
+        "v6:5eb835a01db4f3c6": "agree",
+        "v6:5d73fe65c996a391": "agree",
+        "v6:43e912186e1de7d7": "agree",
+        "v6:9c0120c101510621": "agree"
+      },
+      "missing": [
+        "A podcaster can overload upload bandwidth or processing with large or concurrent uploads even while staying within a show's 50 GB stored-data quota. Upload rate and concurrency limits are unspecified and the per-file size limit is unverified.",
+        "If quota checks and reservations are not atomic, concurrent uploads can each pass the remaining-space check and collectively exceed the 50 GB show quota. The source states enforcement intent, not the concurrency implementation; this is a hypothesis to test.",
+        "Uploads arriving faster than transcoding completes can build a backlog and delay publication. The two-job limit is per transcoder and does not establish a queue bound, global job limit or cost ceiling.",
+        "Audio that is expensive to decode can consume excessive CPU, memory or time without code execution. Inadequate per-job limits let a few jobs occupy all transcoder slots; mark 20 addresses exploitation, not resource amplification.",
+        "Even authenticated partner files can contain duplicate, replayed, conflicting or malformed counts. Without validation, idempotency and safe retry handling, imports can double-count downloads or corrupt statistics; partner spoofing (mark 13) and job exhaustion (mark 18) do not cover this integrity risk.",
+        "If show-level authorization is inadequate, an authenticated podcaster can publish to or alter another show without stealing its password. This is distinct from password takeover (mark 12) and direct media-store write access (mark 14).",
+        "The episode-delivery endpoint and storage of transcoded versions are unspecified. If that path lacks appropriate resource limits, repeated downloads can exhaust bandwidth or egress budget; if integrity protection is inadequate, delivered audio can be substituted. Do not infer that the feed service or media store serves downloads.",
+        "If transport integrity or write authorization for episode metadata in the show database is inadequate, an attacker with access to that path can alter published feed details. This differs from changing original audio in the media store (mark 14)."
+      ],
+      "notes": "Model rulings:\n- entity:podcast-app: KEEP without an invented episode-download flow. Downloads are stated, but their serving endpoint and the location of transcoded files are unspecified. Record that missing path for clarification; do not assume downloads come from the feed service, transcoder or media store.\n- process:feed-service: KEEP web as an explicit, revisable assumption: public RSS retrieval by podcast apps reasonably suggests a web interface. RSS alone does not prove HTTP or HTTPS, so retain unknown protocol and encryption. The embedded reference to prompts/extract.md is not independent evidence.\n\nMarks:\n- v6:cf2b55bbd69a0c5d (agree): Password-based account takeover is credible; successful guessing or reuse must defeat any additional controls. Episode replacement is not stated, whereas publishing is. Rewrite as: An attacker who successfully authenticates with a guessed or reused podcaster password, defeating any additional sign-in controls, can publish episodes with that account's permissions.\n- v6:b2863927ccf29dbf (agree): Correctly conditional on missing partner authentication and attacker access to the ingestion path; the delivery mechanism is unknown.\n- v6:52dcbd91ea9ceaca (agree): Valid conditional tampering scenario if an attacker can reach a write path lacking authorization. Store permissions are unspecified.\n- v6:d690a071782fe127 (reject): As written, this turns silence into a definite absence of audit records and assumes an episode-replacement operation. Password sign-in does not prove either adequate logging or missing logging. Rewrite as: If publishing actions lack reliable audit records tying the upload to an account and content version, a podcaster can deny publishing an episode and the operator may be unable to establish attribution.\n- v6:cd29342ce34eac48 (agree): Email/password sign-in is explicit and transit protection is unknown; the claim correctly conditions interception on missing encryption.\n- v6:5eb835a01db4f3c6 (agree): The public feed service explicitly lacks rate limiting and reads the show database. Flooding can exhaust either tier; this is distinct from upload or import exhaustion.\n- v6:5d73fe65c996a391 (agree): The source explicitly states uncapped import concurrency. The claim appropriately conditions the attack on being able to deliver files; public importer exposure is not assumed.\n- v6:43e912186e1de7d7 (agree): Per-show quotas leave a possible aggregate resource gap, but unlimited show creation and a fixed shared storage ceiling are not established. Rewrite as: If an attacker can create many shows without an aggregate account or platform quota, filling each to 50 GB can exhaust shared storage capacity or budget and disrupt legitimate uploads.\n- v6:9c0120c101510621 (agree): A vulnerable decoder can be exploited, but a vulnerability and the attacker's upload capability are prerequisites. Hosting-account placement does not imply account-wide privileges. Rewrite as: An attacker able to upload audio could exploit a vulnerable transcoder to execute code with its actual permissions, potentially disclosing media it can read or affecting other resources it is authorized to access.",
+      "opened_digests": {
+        "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
+        "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
+        "claims/stride.json": "e2dd88107eec3b42f6b55897b5d9a2c129d1b307d17cd6a36a539c8c312cc4e6"
+      }
+    }
+  }
+}
