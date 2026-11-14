@@ -65,14 +65,14 @@ the last colon gives a wrong label for a typed endpoint.
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
 of being wrong — false splits over the 169 labelled match pairs, false merges
-over the 92 scored candidate negatives, and 7 false merges over the 424
+over the 92 scored candidate negatives, and 9 false merges over the 424
 within-lane reference pairs:
 
 | Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 424) |
 |---|---|---|---|
-| equality | 72 | 20 | 6 |
+| equality | 72 | 20 | 5 |
 | endpoint subset | 12 | 69 | 50 |
-| **endpoint subset + verb** | **13** | **2** | **7** |
+| **endpoint subset + verb** | **13** | **2** | **9** |
 | overlap | 3 | 66 | 71 |
 | endpoint overlap | 1 | 81 | 207 |
 
@@ -131,9 +131,11 @@ is the measurement #201's third bullet asks for: that the rule is not obviously
 worse than a model judge. It is not a claim about accuracy, and
 nothing downstream should quote it as one.
 
-**The two merges the verb does not break** are in `verbs.UNSEPARATED`, each
-with the reason. Neither is a gap in the vocabulary: one is a repudiation lane
-where no attacker acts so no verb applies, and one is a corpus wording gap.
+**The nine merges the verb does not break** are in `verbs.UNSEPARATED`, as
+four entries, each with the reason. In case 08, one is a repudiation lane where
+no attacker acts so no verb applies, and one is a corpus wording gap. In cases
+17 and 18, seven pairs of `flood` findings share elements and exhaust different
+resources; the verb names the exhaustion, and no field names the resource.
 Review 02 labels the disputed case-13 "writes"/"alters" pair `unclear` rather
 than forcing it to move either the rule or the score.
 
@@ -147,8 +149,8 @@ answered it: a direction is not available, and it would not pay if it were.
 **A direction is not a field.** `affected_element_ids` is a list whose order no
 rule reads, so a claim naming two processes says nothing about which way the
 attacker moves between them. Only a claim naming a **Data Flow** states a
-direction, through that flow's endpoints. 215 of the 320 corpus claims name
-exactly one flow; 10 name several and 95 name none, and neither of those yields
+direction, through that flow's endpoints. 216 of the 320 corpus claims name
+exactly one flow; 10 name several and 94 name none, and neither of those yields
 the single direction a comparison needs.
 
 #652's ruling rests on the priced reading below, not on one pair.
@@ -407,7 +409,7 @@ no reviewer sees it go. So every package carries a collision rule, and
 
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
-| `stride` | 424 | 7 |
+| `stride` | 424 | 9 |
 | `asvs` | 100 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
@@ -435,7 +437,7 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
 model. The rule's known error costs are the record above: 13 of 169 labelled
-matches split, 2 of 92 candidate negatives merged, 7 of 424 reference pairs
+matches split, 2 of 92 candidate negatives merged, 9 of 424 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.

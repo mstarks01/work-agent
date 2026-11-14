@@ -229,15 +229,15 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:upload-api`, `flow:entity:podcaster>process:upload-api>upload-episodes`
 - severity: medium/medium · verb: `flood`
-- Accept with conditional wording. Mark 19 concerns aggregate stored bytes across shows; this concerns transient upload resources. Unspecified controls are not asserted absent.
+- The source states a quota on stored bytes per show, hedges a size limit on one file ("he would have to check"), and states no limit on upload rate or concurrency. This exhausts upload bandwidth or processing, not stored space.
 
 > mark:
 
 **11.** If concurrent upload quota checks and storage reservations are not atomic or otherwise coordinated, a podcaster can submit simultaneous uploads that each pass the remaining-space check but together exceed the show's 50 GB quota.
 
-- `process:upload-api`, `store:media-store`
-- severity: low/low · verb: `abuse-grant`
-- Accept as a conditional implementation test, not an observed defect. Distinct from mark 19: a race within one show versus multiplication across shows. The stated quota requirement remains valid. Clarification: Verify quota enforcement under concurrent uploads; adequate coordination would rule out this scenario.
+- `process:upload-api`, `store:media-store`, `flow:entity:podcaster>process:upload-api>upload-episodes`
+- severity: low/low · verb: `flood`
+- The source states that the upload API refuses an upload that would take a show over 50 GB, and not how it checks concurrent uploads. Uploads that each pass the check can exceed the quota together. A coordinated check rules this out, so verify enforcement under concurrent uploads.
 
 > mark:
 
@@ -245,7 +245,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:upload-api`, `process:transcoder`, `store:media-store`
 - severity: medium/low · verb: `flood`
-- Accept with conditional wording. No existing podcast mark covers transcoding backlog. Per-worker concurrency does not establish an aggregate work or queue bound.
+- Each transcoder runs at most two jobs at once, and the source states no bound on the queue, the number of transcoders or the total work. Uploads that arrive faster than transcoding build a backlog that delays publication.
 
 > mark:
 
@@ -253,7 +253,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:transcoder`, `flow:process:transcoder>store:media-store>pick-up-audio`
 - severity: medium/medium · verb: `flood`
-- Accept with rewrite. Distinct from mark 20's code execution and new mark 29's arrival-rate backlog: a small number of expensive jobs can exhaust active capacity.
+- The source states no limit on time or resources for one transcoding job. A few costly files hold the two slots on each transcoder. This differs from the backlog of many uploads and from code execution in the transcoder.
 
 > mark:
 
@@ -264,7 +264,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `entity:ad-partner`, `process:stats-importer`, `store:stats-database`
 - severity: medium/medium · verb: `replay`
-- Accept with an explicit threat actor. Even authenticated files can corrupt totals; this differs from sender spoofing in mark 13 and concurrent-job exhaustion in mark 18.
+- The source says nothing about how the importer checks the files it receives. A file sent again, or false counts from a compromised partner, give false totals even when the sender is authentic. This differs from a sender who impersonates the partner.
 
 > mark:
 
@@ -275,7 +275,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:upload-api`, `store:show-database`, `flow:entity:podcaster>process:upload-api>upload-episodes`
 - severity: medium/high · verb: `escalate`
-- Accept with narrower wording. Does not assume an episode-edit operation. Distinct from stolen credentials in mark 12 and direct storage writes in mark 14.
+- Podcasters sign in with an email address and a password, and the source states nothing about how the upload API checks which shows an account controls. The attack needs no stolen password and no direct write to the media store.
 
 > mark:
 
@@ -286,7 +286,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `entity:podcast-app`
 - severity: medium/medium · verb: `flood`
-- Split and accept conditionally: resource exhaustion. Mark 17 covers RSS polling, not episode downloads. The serving endpoint and its controls are unknown. Clarification: Identify the episode-serving endpoint, storage for transcoded files, download path and delivery resource controls.
+- The source says apps download episodes, and not from where, or where the smaller versions are kept. Feed polling does not cover downloads. Identify the episode-serving endpoint, the storage for transcoded files, the download path and its resource controls.
 
 > mark:
 
@@ -297,7 +297,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `entity:podcast-app`
 - severity: low/medium · verb: `alter-in-transit`
-- Split and accept conditionally: tampering. Distinct from direct media-store writes in mark 14 and download-resource exhaustion in new mark 33. No serving component is invented. Clarification: Identify the episode-delivery path and verify its transport or content-integrity protections.
+- The source does not describe the delivery path for episodes, so its transport and content protection are unknown. This changes audio on its way to listeners' apps, not audio in the media store. Identify the delivery path and verify its integrity protection.
 
 > mark:
 
@@ -305,7 +305,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:process:upload-api>store:show-database>store-episode-details`, `store:show-database`, `process:feed-service`
 - severity: low/medium · verb: `alter-in-transit`
-- Accept with narrower path scope. Distinct from direct audio changes in mark 14 and show-level API authorization in new mark 32; this concerns the internal metadata-write path.
+- The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches every feed the feed service builds. This differs from a change to audio in the media store.
 
 > mark:
 
@@ -355,7 +355,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
       "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
-      "claims/stride.json": "9d4c018381c8572349770c2abbed9134d32de804065009cc3d2786c385c268a9"
+      "claims/stride.json": "9d702e950a90e9694c381b4a25cc9371f111c15a7aa375eb8787145bc35c7ac6"
       }
     }
   }

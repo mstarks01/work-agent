@@ -59,7 +59,7 @@ from evals.harness.reference import GoldenCase, ReferenceThreat, load_corpus
 #: different question over a different population: within one case and one lane,
 #: how often do the two shipped readers of "one place" disagree, whoever is
 #: right. Recorded exactly, for the reason ``FRONTIER`` records its rows.
-MATCHER_WIDER_THAN_FINGERPRINT = 2
+MATCHER_WIDER_THAN_FINGERPRINT = 9
 
 #: Reference claims the existing fields cannot tell apart, each with the reason
 #: the corpus is right to carry both. An entry says two distinct findings share

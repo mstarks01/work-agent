@@ -145,14 +145,15 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Accept with conditional wording. Mark 19 concerns aggregate stored bytes across shows; this concerns transient upload resources. Unspecified controls are not asserted absent.",
+    "notes": "The source states a quota on stored bytes per show, hedges a size limit on one file (\"he would have to check\"), and states no limit on upload rate or concurrency. This exhausts upload bandwidth or processing, not stored space.",
     "verb": "flood"
   },
   {
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:upload-api",
-      "store:media-store"
+      "store:media-store",
+      "flow:entity:podcaster>process:upload-api>upload-episodes"
     ],
     "claim": "If concurrent upload quota checks and storage reservations are not atomic or otherwise coordinated, a podcaster can submit simultaneous uploads that each pass the remaining-space check but together exceed the show's 50 GB quota.",
     "tier": "expected",
@@ -160,8 +161,8 @@
       "likelihood": "low",
       "impact": "low"
     },
-    "notes": "Accept as a conditional implementation test, not an observed defect. Distinct from mark 19: a race within one show versus multiplication across shows. The stated quota requirement remains valid. Clarification: Verify quota enforcement under concurrent uploads; adequate coordination would rule out this scenario.",
-    "verb": "abuse-grant"
+    "notes": "The source states that the upload API refuses an upload that would take a show over 50 GB, and not how it checks concurrent uploads. Uploads that each pass the check can exceed the quota together. A coordinated check rules this out, so verify enforcement under concurrent uploads.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
@@ -176,7 +177,7 @@
       "likelihood": "medium",
       "impact": "low"
     },
-    "notes": "Accept with conditional wording. No existing podcast mark covers transcoding backlog. Per-worker concurrency does not establish an aggregate work or queue bound.",
+    "notes": "Each transcoder runs at most two jobs at once, and the source states no bound on the queue, the number of transcoders or the total work. Uploads that arrive faster than transcoding build a backlog that delays publication.",
     "verb": "flood"
   },
   {
@@ -191,7 +192,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Accept with rewrite. Distinct from mark 20's code execution and new mark 29's arrival-rate backlog: a small number of expensive jobs can exhaust active capacity.",
+    "notes": "The source states no limit on time or resources for one transcoding job. A few costly files hold the two slots on each transcoder. This differs from the backlog of many uploads and from code execution in the transcoder.",
     "verb": "flood"
   },
   {
@@ -207,7 +208,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Accept with an explicit threat actor. Even authenticated files can corrupt totals; this differs from sender spoofing in mark 13 and concurrent-job exhaustion in mark 18.",
+    "notes": "The source says nothing about how the importer checks the files it receives. A file sent again, or false counts from a compromised partner, give false totals even when the sender is authentic. This differs from a sender who impersonates the partner.",
     "verb": "replay"
   },
   {
@@ -223,7 +224,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Accept with narrower wording. Does not assume an episode-edit operation. Distinct from stolen credentials in mark 12 and direct storage writes in mark 14.",
+    "notes": "Podcasters sign in with an email address and a password, and the source states nothing about how the upload API checks which shows an account controls. The attack needs no stolen password and no direct write to the media store.",
     "verb": "escalate"
   },
   {
@@ -237,7 +238,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Split and accept conditionally: resource exhaustion. Mark 17 covers RSS polling, not episode downloads. The serving endpoint and its controls are unknown. Clarification: Identify the episode-serving endpoint, storage for transcoded files, download path and delivery resource controls.",
+    "notes": "The source says apps download episodes, and not from where, or where the smaller versions are kept. Feed polling does not cover downloads. Identify the episode-serving endpoint, the storage for transcoded files, the download path and its resource controls.",
     "verb": "flood"
   },
   {
@@ -251,7 +252,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Split and accept conditionally: tampering. Distinct from direct media-store writes in mark 14 and download-resource exhaustion in new mark 33. No serving component is invented. Clarification: Identify the episode-delivery path and verify its transport or content-integrity protections.",
+    "notes": "The source does not describe the delivery path for episodes, so its transport and content protection are unknown. This changes audio on its way to listeners' apps, not audio in the media store. Identify the delivery path and verify its integrity protection.",
     "verb": "alter-in-transit"
   },
   {
@@ -267,7 +268,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Accept with narrower path scope. Distinct from direct audio changes in mark 14 and show-level API authorization in new mark 32; this concerns the internal metadata-write path.",
+    "notes": "The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches every feed the feed service builds. This differs from a change to audio in the media store.",
     "verb": "alter-in-transit"
   }
 ]

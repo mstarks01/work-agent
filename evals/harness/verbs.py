@@ -111,11 +111,12 @@ UNSEPARATED: tuple[tuple[str, str, str], ...] = (
         "18-podcast-host-quotas",
         "denial-of-service",
         (
-            "Three pairs of `flood` findings on shared elements. Feed polling"
+            "Five pairs of `flood` findings on shared elements. Feed polling"
             " and episode downloads share the podcast app; the shows that fill"
-            " storage, the transcoding backlog and the costly audio share the"
-            " upload API or the transcoder. The verb names the exhaustion, and"
-            " the resource is not a field."
+            " storage, the quota race, the upload overload, the transcoding"
+            " backlog and the costly audio share the upload API or the"
+            " transcoder. The verb names the exhaustion, and the resource is"
+            " not a field."
         ),
     ),
 )

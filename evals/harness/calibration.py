@@ -492,7 +492,7 @@ class IdentityValidation:
     collides: Callable[[Any, Any, CaseFlows], bool]
     #: The collisions this corpus is known to carry, as ``(case, lane) ->
     #: reason``. A collision outside this table fails
-    #: ``tests/test_evals_identity.py``: three recorded exceptions must not
+    #: ``tests/test_evals_identity.py``: the recorded exceptions must not
     #: become a floor nobody notices rising.
     recorded_collisions: Mapping[tuple[str, str], str]
 

@@ -175,7 +175,7 @@
       "likelihood": "medium",
       "impact": "low"
     },
-    "notes": "Accept. The stated per-IP limit creates shared-IP contention; unlike mark 10, this attack exhausts an allowance rather than aggregate service capacity.",
+    "notes": "Stated: the gateway allows 60 requests a minute from one IP address. Everyone behind one address shares that allowance, so this exhausts the allowance and not the permit service, which is what the distributed flood exhausts.",
     "verb": "flood"
   },
   {
@@ -191,7 +191,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Accept with conditional wording. Cumulative application growth differs from mark 10's request flood; the source explicitly leaves the account quota unverified. Clarification: Confirm the per-account open-application quota and retention or workload controls.",
+    "notes": "The quota on open applications is hedged: \"nobody has checked that.\" Stored applications and review work grow inside the gateway's rate and size limits. Confirm the quota per account and the controls on retention and workload.",
     "verb": "flood"
   },
   {
@@ -207,7 +207,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Accept with rewrite. Distinct from high-arrival-rate backlog in mark 9 and code execution in mark 11. PDF validity is not required for this resource-exhaustion scenario.",
+    "notes": "The renderer runs four conversions at a time, and the source states no limit on time, memory, pages or output for one conversion. A few costly files hold every slot. This differs from the backlog of many uploads and from code execution in the renderer.",
     "verb": "flood"
   },
   {
@@ -222,7 +222,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Accept with rewrite. Authentication in mark 1 and plan-upload ownership in mark 3 do not cover service-level authorization. No direct applicant-to-service flow is inferred.",
+    "notes": "The source states nothing about authorization inside the permit service. Applicant authentication and the ownership check on uploads do not decide what an authenticated user may read or change. The model holds no direct flow from applicants to the service, and the claim assumes none.",
     "verb": "escalate"
   },
   {
@@ -237,7 +237,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Accept as a conditional threat pending flow clarification. Mark 6 covers store access; this concerns authorization at a serving layer whose identity is unknown. Clarification: Identify the tile-serving component, inspector request path and authorization scope. Do not add concrete flow endpoints until confirmed.",
+    "notes": "The source says inspectors zoom into tiles, and not which component serves them. A restricted plan store does not cover a serving layer that skips the check. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.",
     "verb": "elicit"
   },
   {
@@ -252,7 +252,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Accept with narrower wording. These are modeled paths outside the applicant-facing flows covered by marks 4 and 7. Attacker path access and inadequate protection are explicit prerequisites.",
+    "notes": "The source says nothing about authentication or integrity on the inspectors' flow or on the permit service's path to its database. The tampering claim on applicants' requests does not cover these paths. The attacker must reach the path, and its protection must be inadequate.",
     "verb": "alter-in-transit"
   }
 ]
