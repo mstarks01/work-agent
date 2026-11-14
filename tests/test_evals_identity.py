@@ -80,20 +80,20 @@ MEASURED = {
 #: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order
 #: no rule reads, so a claim naming two processes says nothing about which way
 #: the attacker moves between them. A claim naming a **Data Flow** says it
-#: through that flow's endpoints, and 211 of 305 corpus claims name exactly one.
+#: through that flow's endpoints, and 215 of 320 corpus claims name exactly one.
 #:
 #: The two readings of an absent direction are both dead ends, and the numbers
-#: below are why. Read it as a mismatch and the rule splits 90 of the 186
-#: labelled pairs it merges correctly today, to recover 2 of its 3 candidate
-#: merges. Read it as a wildcard and it changes nothing at all: in both merges
-#: that survive the verb the coarser side cites no flow.
+#: below are why. Read it as a mismatch and the rule splits 71 of the 156
+#: labelled pairs it merges correctly today, to recover 1 of its 2 candidate
+#: merges. Read it as a wildcard and it changes nothing at all: in every merge
+#: that survives the verb the coarser side cites no flow.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 305,
-    "one_flow_cited": 211,
-    "several_flows_cited": 9,
-    "no_flow_cited": 85,
-    # Over the 2 reference merges the shipped rule makes.
+    "claims": 320,
+    "one_flow_cited": 215,
+    "several_flows_cited": 10,
+    "no_flow_cited": 95,
+    # Over the 7 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 0,
     "merges_that_run_opposite_ways": 0,
     # Over the 261 scored pairs, an absent direction read each way.
@@ -120,26 +120,26 @@ DIRECTION = {
 #: survivable on reference pairs and is barely a rule on the candidates a run
 #: produces, and the verb closes that for one further split.
 FRONTIER = {
-    "equality": {"splits": 72, "candidate_merges": 20, "reference_merges": 5},
+    "equality": {"splits": 72, "candidate_merges": 20, "reference_merges": 6},
     #: The rule #201 argues for, and the only row here that is usable.
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
     "endpoint subset + verb": {
         "splits": 13,
         "candidate_merges": 2,
-        "reference_merges": 2,
+        "reference_merges": 7,
     },
-    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
-    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
-    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 42},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 58},
+    "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 16},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 22},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 50},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 71},
     # Case 02's calibration pair about disabling the Pub/Sub topic names
     # ``store:pub-sub`` (#925), which is one candidate that does not merge
     # under the loosest rung.
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 190,
+        "reference_merges": 207,
     },
 }
 
@@ -407,9 +407,9 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: is what survives the verb. The gap between them is what the verb adds.
 VERB_MEASURED = {
     "cases": 18,
-    "within_lane_pairs": 375,
-    "subset": 42,
-    "subset_verb": 2,
+    "within_lane_pairs": 424,
+    "subset": 50,
+    "subset_verb": 7,
 }
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the

@@ -83,26 +83,25 @@ def test_a_sibling_is_a_demonstrated_verb_of_the_same_family(corpus):
 
 
 def test_the_undemonstrated_count_is_what_the_sweep_measured(swept):
-    """51 of 285, 21 of them must-find. See this module's docstring when it
+    """54 of 320, 21 of them must-find. See this module's docstring when it
     moves."""
-    assert len(swept) == 51
+    assert len(swept) == 54
     assert sum(1 for entry in swept if entry.must_find) == 21
 
 
 def test_the_two_populations_still_split_where_they_did(swept):
-    """37 near misses and 14 with no neighbour. The split is the finding: a near
+    """39 near misses and 15 with no neighbour. The split is the finding: a near
     miss wants a draft demonstrating the member, and the rest want a draft
     demonstrating the family at all."""
     near = [entry for entry in swept if entry.siblings]
-    assert len(near) == 37
-    assert len(swept) - len(near) == 14
+    assert len(near) == 39
+    assert len(swept) - len(near) == 15
 
 
-def test_all_but_three_cases_carry_a_disagreement(corpus, swept):
+def test_all_but_one_case_carries_a_disagreement(corpus, swept):
     """The reach is why this is not three rows to re-bless by hand.
 
-    Cases 16, 17 and 18 ask only for verbs their lanes demonstrate, so they
-    carry none.
+    Case 16 asks only for verbs its lanes demonstrate, so it carries none.
     """
     graded = {
         case.id
@@ -110,9 +109,7 @@ def test_all_but_three_cases_carry_a_disagreement(corpus, swept):
         if any(framework in case.frameworks for framework in verb_keyed_frameworks())
     }
     assert graded - {entry.case for entry in swept} == {
-        "16-library-lending-interview",
-        "17-permit-portal-limits",
-        "18-podcast-host-quotas",
+        "16-library-lending-interview"
     }
 
 

@@ -117,7 +117,7 @@ category.
 
 ---
 
-## Part 2 — the 9 recorded STRIDE threats
+## Part 2 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -135,7 +135,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker guesses or reuses a podcaster's password at the upload API and publishes or replaces episodes as that podcaster.
+**1.** An attacker who successfully authenticates with a guessed or reused podcaster password, defeating any additional sign-in controls, can publish episodes with that account's permissions.
 
 - `flow:entity:podcaster>process:upload-api>upload-episodes`, `entity:podcaster`
 - severity: medium/medium · verb: `guess-credential`
@@ -165,7 +165,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**4.** A podcaster replaces an episode and denies it, and nothing records which account made the change.
+**4.** If publishing actions lack reliable audit records tying the upload to an account and content version, a podcaster can deny publishing an episode and the operator may be unable to establish attribution.
 
 - `flow:entity:podcaster>process:upload-api>upload-episodes`, `entity:podcaster`
 - severity: low/low · verb: `unattributable`
@@ -203,7 +203,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** An attacker opens many shows and fills each one to its 50 GB, until the media store runs out of space for every podcaster.
+**8.** If an attacker can create many shows without an aggregate account or platform quota, filling each to 50 GB can exhaust shared storage capacity or budget and disrupt legitimate uploads.
 
 - `process:upload-api`, `store:media-store`
 - severity: low/medium · verb: `flood`
@@ -214,11 +214,98 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**9.** An attacker uploads a crafted audio file that exploits the transcoder and runs code with the transcoder's access to the media store and the hosting account.
+**9.** An attacker able to upload audio could exploit a vulnerable transcoder to execute code with its actual permissions, potentially disclosing media it can read or affecting other resources it is authorized to access.
 
 - `process:transcoder`, `flow:process:transcoder>store:media-store>pick-up-audio`
 - severity: low/high · verb: `escalate`
 - The transcoder parses files that any podcaster uploads. The source states nothing about how transcoding is isolated.
+
+> mark:
+
+
+### denial-of-service
+
+**10.** If upload rate, concurrency or per-request resource controls are inadequate, a podcaster can overload upload bandwidth or processing with large or concurrent uploads while staying within the show's 50 GB storage quota.
+
+- `process:upload-api`, `flow:entity:podcaster>process:upload-api>upload-episodes`
+- severity: medium/medium · verb: `flood`
+- Accept with conditional wording. Mark 19 concerns aggregate stored bytes across shows; this concerns transient upload resources. Unspecified controls are not asserted absent.
+
+> mark:
+
+**11.** If concurrent upload quota checks and storage reservations are not atomic or otherwise coordinated, a podcaster can submit simultaneous uploads that each pass the remaining-space check but together exceed the show's 50 GB quota.
+
+- `process:upload-api`, `store:media-store`
+- severity: low/low · verb: `abuse-grant`
+- Accept as a conditional implementation test, not an observed defect. Distinct from mark 19: a race within one show versus multiplication across shows. The stated quota requirement remains valid. Clarification: Verify quota enforcement under concurrent uploads; adequate coordination would rule out this scenario.
+
+> mark:
+
+**12.** If queue bounds or backpressure are inadequate, a podcaster can submit audio faster than it is transcoded and build a backlog that delays episode availability despite the two-job limit on each transcoder.
+
+- `process:upload-api`, `process:transcoder`, `store:media-store`
+- severity: medium/low · verb: `flood`
+- Accept with conditional wording. No existing podcast mark covers transcoding backlog. Per-worker concurrency does not establish an aggregate work or queue bound.
+
+> mark:
+
+**13.** If per-job time and resource limits are inadequate, a podcaster can upload audio that consumes excessive decoding CPU, memory or time and occupies transcoder slots, delaying other jobs without exploiting a code-execution vulnerability.
+
+- `process:transcoder`, `flow:process:transcoder>store:media-store>pick-up-audio`
+- severity: medium/medium · verb: `flood`
+- Accept with rewrite. Distinct from mark 20's code execution and new mark 29's arrival-rate backlog: a small number of expensive jobs can exhaust active capacity.
+
+> mark:
+
+
+### tampering
+
+**14.** If validation and duplicate or replay handling are inadequate, a compromised ad partner or attacker able to resubmit accepted files can cause the stats importer to store false or double-counted download totals.
+
+- `entity:ad-partner`, `process:stats-importer`, `store:stats-database`
+- severity: medium/medium · verb: `replay`
+- Accept with an explicit threat actor. Even authenticated files can corrupt totals; this differs from sender spoofing in mark 13 and concurrent-job exhaustion in mark 18.
+
+> mark:
+
+
+### elevation-of-privilege
+
+**15.** If the upload API fails to enforce show-level authorization, an authenticated podcaster can publish episode data to a show that the account does not control.
+
+- `process:upload-api`, `store:show-database`, `flow:entity:podcaster>process:upload-api>upload-episodes`
+- severity: medium/high · verb: `escalate`
+- Accept with narrower wording. Does not assume an episode-edit operation. Distinct from stolen credentials in mark 12 and direct storage writes in mark 14.
+
+> mark:
+
+
+### denial-of-service
+
+**16.** If the episode-delivery path lacks effective resource controls, a client able to download episodes can repeatedly fetch them and exhaust delivery bandwidth or the hosting budget, disrupting legitimate downloads.
+
+- `entity:podcast-app`
+- severity: medium/medium · verb: `flood`
+- Split and accept conditionally: resource exhaustion. Mark 17 covers RSS polling, not episode downloads. The serving endpoint and its controls are unknown. Clarification: Identify the episode-serving endpoint, storage for transcoded files, download path and delivery resource controls.
+
+> mark:
+
+
+### tampering
+
+**17.** If episode delivery lacks authenticated integrity protection or an equivalent content-verification mechanism, an attacker able to modify traffic on that path can substitute audio delivered to listeners' apps.
+
+- `entity:podcast-app`
+- severity: low/medium · verb: `alter-in-transit`
+- Split and accept conditionally: tampering. Distinct from direct media-store writes in mark 14 and download-resource exhaustion in new mark 33. No serving component is invented. Clarification: Identify the episode-delivery path and verify its transport or content-integrity protections.
+
+> mark:
+
+**18.** If episode-metadata writes lack effective authorization or integrity protection, an attacker able to reach the upload-API-to-show-database path can alter episode details that the feed service later publishes.
+
+- `flow:process:upload-api>store:show-database>store-episode-details`, `store:show-database`, `process:feed-service`
+- severity: low/medium · verb: `alter-in-transit`
+- Accept with narrower path scope. Distinct from direct audio changes in mark 14 and show-level API authorization in new mark 32; this concerns the internal metadata-write path.
 
 > mark:
 
@@ -268,7 +355,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
       "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
-      "claims/stride.json": "e2dd88107eec3b42f6b55897b5d9a2c129d1b307d17cd6a36a539c8c312cc4e6"
+      "claims/stride.json": "9d4c018381c8572349770c2abbed9134d32de804065009cc3d2786c385c268a9"
       }
     }
   }

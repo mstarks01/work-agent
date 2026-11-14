@@ -77,7 +77,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:process:plan-upload-service>store:plan-store>save-plan-files | process:plan-upload-service | store:plan-store | unknown | unknown | unknown |
 | flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files | process:plan-upload-service | process:plan-renderer | unknown | unknown | unknown |
 | flow:process:plan-renderer>store:plan-store>write-image-tiles | process:plan-renderer | store:plan-store | unknown | unknown | unknown |
-| flow:entity:inspector>process:permit-service>review-and-decide | entity:inspector | process:permit-service | unknown | one inspector login shared by all inspectors in a district | unknown |
+| flow:entity:inspector>process:permit-service>review-and-decide | entity:inspector | process:permit-service | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -115,7 +115,7 @@ category.
 
 ---
 
-## Part 2 — the 11 recorded STRIDE threats
+## Part 2 — the 17 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -141,7 +141,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker who learns a district's shared inspector login records permit decisions as any inspector in that district.
+**2.** An attacker who obtains a district's shared inspector login can record decisions as that district's inspector account, without the login identifying the individual actor.
 
 - `flow:entity:inspector>process:permit-service>review-and-decide`, `entity:inspector`
 - severity: medium/high · verb: `use-credential`
@@ -152,7 +152,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**3.** If the plan upload service does not check who owns an application, an attacker uploads drawings that replace another applicant's plans in the plan store.
+**3.** If ownership checks are inadequate and uploads can overwrite or be associated with an existing application, an attacker can substitute drawings for another applicant's plans.
 
 - `flow:entity:applicant>process:plan-upload-service>upload-plan-drawings`, `store:plan-store`
 - severity: medium/medium · verb: `alter`
@@ -160,7 +160,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**4.** If application requests are not encrypted in transit, an attacker on the network path changes an application on its way to the gateway.
+**4.** If application requests lack authenticated transport integrity and equivalent message-integrity protection, an on-path attacker can alter an application before it reaches the gateway.
 
 - `flow:entity:applicant>process:permit-gateway>submit-applications`
 - severity: low/medium · verb: `alter-in-transit`
@@ -171,7 +171,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**5.** An inspector approves or refuses a permit under the district's shared login, and nothing shows which inspector made the decision.
+**5.** An inspector can dispute a decision made under the district's shared login; the login alone cannot reliably identify which inspector acted, unless independent evidence supplies individual attribution.
 
 - `flow:entity:inspector>process:permit-service>review-and-decide`, `entity:inspector`
 - severity: high/medium · verb: `unattributable`
@@ -228,11 +228,71 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**11.** An attacker uploads a crafted PDF that exploits the plan renderer's conversion and runs code with the renderer's access to the plan store and the city's cloud account.
+**11.** An attacker able to upload a PDF could exploit a vulnerable conversion component to execute code with the renderer's actual permissions, potentially altering tiles or plan-store data accessible to it.
 
 - `process:plan-renderer`, `flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files`
 - severity: low/high · verb: `escalate`
 - The renderer parses files that anyone on the internet uploads. The source states nothing about how the conversion is isolated.
+
+> mark:
+
+
+### denial-of-service
+
+**12.** An attacker sharing a public IP with legitimate applicants can consume the gateway's 60-requests-per-minute allowance and cause their application requests to be rejected.
+
+- `process:permit-gateway`, `entity:applicant`
+- severity: medium/low · verb: `flood`
+- Accept. The stated per-IP limit creates shared-IP contention; unlike mark 10, this attack exhausts an allowance rather than aggregate service capacity.
+
+> mark:
+
+**13.** If the unverified open-application quota is absent or ineffective, an applicant can repeatedly submit accepted applications within gateway limits and accumulate enough records or review work to exhaust storage or delay legitimate processing.
+
+- `process:permit-gateway`, `process:permit-service`, `store:permit-database`
+- severity: low/medium · verb: `flood`
+- Accept with conditional wording. Cumulative application growth differs from mark 10's request flood; the source explicitly leaves the account quota unverified. Clarification: Confirm the per-account open-application quota and retention or workload controls.
+
+> mark:
+
+**14.** If per-conversion resource and output limits are inadequate, an attacker able to upload expensive PDFs can monopolize the four renderer slots or generate excessive tiles, exhausting processing or plan-store capacity without exploiting a code-execution vulnerability.
+
+- `process:plan-upload-service`, `process:plan-renderer`, `store:plan-store`
+- severity: medium/medium · verb: `flood`
+- Accept with rewrite. Distinct from high-arrival-rate backlog in mark 9 and code execution in mark 11. PDF validity is not required for this resource-exhaustion scenario.
+
+> mark:
+
+
+### elevation-of-privilege
+
+**15.** If permit-service object or role authorization is inadequate, an authenticated user can read applications or change decisions outside that user's permitted scope.
+
+- `process:permit-service`, `store:permit-database`
+- severity: medium/high · verb: `escalate`
+- Accept with rewrite. Authentication in mark 1 and plan-upload ownership in mark 3 do not cover service-level authorization. No direct applicant-to-service flow is inferred.
+
+> mark:
+
+
+### information-disclosure
+
+**16.** If the service that delivers tiles to inspectors fails to enforce application-level authorization, an inspector can retrieve tiles outside their permitted scope even when direct plan-store reads are restricted.
+
+- `entity:inspector`, `store:plan-store`
+- severity: low/medium · verb: `elicit`
+- Accept as a conditional threat pending flow clarification. Mark 6 covers store access; this concerns authorization at a serving layer whose identity is unknown. Clarification: Identify the tile-serving component, inspector request path and authorization scope. Do not add concrete flow endpoints until confirmed.
+
+> mark:
+
+
+### tampering
+
+**17.** If inspector decision traffic or permit-service database writes lack effective peer authentication and integrity protection, an attacker able to access those paths can forge or alter decisions or application records.
+
+- `flow:entity:inspector>process:permit-service>review-and-decide`, `flow:process:permit-service>store:permit-database>keep-applications-and-decisions`
+- severity: low/high · verb: `alter-in-transit`
+- Accept with narrower wording. These are modeled paths outside the applicant-facing flows covered by marks 4 and 7. Attacker path access and inadequate protection are explicit prerequisites.
 
 > mark:
 
@@ -281,8 +341,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
-      "model.json": "6d46ca38340a493a2672944db1c4cd8ef900dfdf18c6902f7374d62c77b4001a",
-      "claims/stride.json": "d3ccaba0895b494ace4b93b45124d862fe2b2b8324c98e144668f32f393ad46a"
+      "model.json": "02caa9d1c92306d0bf58cd0017d1c1d9c87cce2d7a490b2c2bf21bcc4b3100c1",
+      "claims/stride.json": "3e762230bfba8f455fbb7524fe3a7684d909f9d8c455e91f57ae4324d31fffbc"
       }
     }
   }
