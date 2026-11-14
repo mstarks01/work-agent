@@ -108,9 +108,7 @@ def test_all_but_one_case_carries_a_disagreement(corpus, swept):
         for case in development_cases(corpus)
         if any(framework in case.frameworks for framework in verb_keyed_frameworks())
     }
-    assert graded - {entry.case for entry in swept} == {
-        "16-library-lending-interview"
-    }
+    assert graded - {entry.case for entry in swept} == {"16-library-lending-interview"}
 
 
 def test_a_swept_package_disagrees_with_its_own_corpus_and_no_other(corpus):
