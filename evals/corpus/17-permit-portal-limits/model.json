@@ -254,7 +254,7 @@
       "source": "entity:inspector",
       "destination": "process:permit-service",
       "protocol": "unknown",
-      "authentication": "one inspector login shared by all inspectors in a district",
+      "authentication": "unknown",
       "data_description": "applications and inspectors' decisions",
       "encryption_in_transit": "unknown",
       "operations": "read-write",

@@ -117,7 +117,7 @@ category.
 
 ---
 
-## Part 2 — the 9 recorded STRIDE threats
+## Part 2 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -135,7 +135,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker guesses or reuses a podcaster's password at the upload API and publishes or replaces episodes as that podcaster.
+**1.** An attacker who successfully authenticates with a guessed or reused podcaster password, defeating any additional sign-in controls, can publish episodes with that account's permissions.
 
 - `flow:entity:podcaster>process:upload-api>upload-episodes`, `entity:podcaster`
 - severity: medium/medium · verb: `guess-credential`
@@ -165,7 +165,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**4.** A podcaster replaces an episode and denies it, and nothing records which account made the change.
+**4.** If publishing actions lack reliable audit records tying the upload to an account and content version, a podcaster can deny publishing an episode and the operator may be unable to establish attribution.
 
 - `flow:entity:podcaster>process:upload-api>upload-episodes`, `entity:podcaster`
 - severity: low/low · verb: `unattributable`
@@ -203,7 +203,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** An attacker opens many shows and fills each one to its 50 GB, until the media store runs out of space for every podcaster.
+**8.** If an attacker can create many shows without an aggregate account or platform quota, filling each to 50 GB can exhaust shared storage capacity or budget and disrupt legitimate uploads.
 
 - `process:upload-api`, `store:media-store`
 - severity: low/medium · verb: `flood`
@@ -214,11 +214,98 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**9.** An attacker uploads a crafted audio file that exploits the transcoder and runs code with the transcoder's access to the media store and the hosting account.
+**9.** An attacker able to upload audio could exploit a vulnerable transcoder to execute code with its actual permissions, potentially disclosing media it can read or affecting other resources it is authorized to access.
 
 - `process:transcoder`, `flow:process:transcoder>store:media-store>pick-up-audio`
 - severity: low/high · verb: `escalate`
 - The transcoder parses files that any podcaster uploads. The source states nothing about how transcoding is isolated.
+
+> mark:
+
+
+### denial-of-service
+
+**10.** If upload rate, concurrency or per-request resource controls are inadequate, a podcaster can overload upload bandwidth or processing with large or concurrent uploads while staying within the show's 50 GB storage quota.
+
+- `process:upload-api`, `flow:entity:podcaster>process:upload-api>upload-episodes`
+- severity: medium/medium · verb: `flood`
+- The source states a quota on stored bytes per show, hedges a size limit on one file ("he would have to check"), and states no limit on upload rate or concurrency. This exhausts upload bandwidth or processing, not stored space.
+
+> mark:
+
+**11.** If concurrent upload quota checks and storage reservations are not atomic or otherwise coordinated, a podcaster can submit simultaneous uploads that each pass the remaining-space check but together exceed the show's 50 GB quota.
+
+- `process:upload-api`, `store:media-store`, `flow:entity:podcaster>process:upload-api>upload-episodes`
+- severity: low/low · verb: `flood`
+- The source states that the upload API refuses an upload that would take a show over 50 GB, and not how it checks concurrent uploads. Uploads that each pass the check can exceed the quota together. A coordinated check rules this out, so verify enforcement under concurrent uploads.
+
+> mark:
+
+**12.** If queue bounds or backpressure are inadequate, a podcaster can submit audio faster than it is transcoded and build a backlog that delays episode availability despite the two-job limit on each transcoder.
+
+- `process:upload-api`, `process:transcoder`, `store:media-store`
+- severity: medium/low · verb: `flood`
+- Each transcoder runs at most two jobs at once, and the source states no bound on the queue, the number of transcoders or the total work. Uploads that arrive faster than transcoding build a backlog that delays publication.
+
+> mark:
+
+**13.** If per-job time and resource limits are inadequate, a podcaster can upload audio that consumes excessive decoding CPU, memory or time and occupies transcoder slots, delaying other jobs without exploiting a code-execution vulnerability.
+
+- `process:transcoder`, `flow:process:transcoder>store:media-store>pick-up-audio`
+- severity: medium/medium · verb: `flood`
+- The source states no limit on time or resources for one transcoding job. A few costly files hold the two slots on each transcoder. This differs from the backlog of many uploads and from code execution in the transcoder.
+
+> mark:
+
+
+### tampering
+
+**14.** If validation and duplicate or replay handling are inadequate, a compromised ad partner or attacker able to resubmit accepted files can cause the stats importer to store false or double-counted download totals.
+
+- `entity:ad-partner`, `process:stats-importer`, `store:stats-database`
+- severity: medium/medium · verb: `replay`
+- The source says nothing about how the importer checks the files it receives. A file sent again, or false counts from a compromised partner, give false totals even when the sender is authentic. This differs from a sender who impersonates the partner.
+
+> mark:
+
+
+### elevation-of-privilege
+
+**15.** If the upload API fails to enforce show-level authorization, an authenticated podcaster can publish episode data to a show that the account does not control.
+
+- `process:upload-api`, `store:show-database`, `flow:entity:podcaster>process:upload-api>upload-episodes`
+- severity: medium/high · verb: `escalate`
+- Podcasters sign in with an email address and a password, and the source states nothing about how the upload API checks which shows an account controls. The attack needs no stolen password and no direct write to the media store.
+
+> mark:
+
+
+### denial-of-service
+
+**16.** If the episode-delivery path lacks effective resource controls, a client able to download episodes can repeatedly fetch them and exhaust delivery bandwidth or the hosting budget, disrupting legitimate downloads.
+
+- `entity:podcast-app`
+- severity: medium/medium · verb: `flood`
+- The source says apps download episodes, and not from where, or where the smaller versions are kept. Feed polling does not cover downloads. Identify the episode-serving endpoint, the storage for transcoded files, the download path and its resource controls.
+
+> mark:
+
+
+### tampering
+
+**17.** If episode delivery lacks authenticated integrity protection or an equivalent content-verification mechanism, an attacker able to modify traffic on that path can substitute audio delivered to listeners' apps.
+
+- `entity:podcast-app`
+- severity: low/medium · verb: `alter-in-transit`
+- The source does not describe the delivery path for episodes, so its transport and content protection are unknown. This changes audio on its way to listeners' apps, not audio in the media store. Identify the delivery path and verify its integrity protection.
+
+> mark:
+
+**18.** If episode-metadata writes lack effective authorization or integrity protection, an attacker able to reach the upload-API-to-show-database path can alter episode details that the feed service later publishes.
+
+- `flow:process:upload-api>store:show-database>store-episode-details`, `store:show-database`, `process:feed-service`
+- severity: low/medium · verb: `alter-in-transit`
+- The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches the show's feed when the feed service next builds it. This differs from a change to audio in the media store.
 
 > mark:
 
@@ -268,7 +355,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
       "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
-      "claims/stride.json": "e2dd88107eec3b42f6b55897b5d9a2c129d1b307d17cd6a36a539c8c312cc4e6"
+      "claims/stride.json": "0c73ee3fe132be0fa6cab03d8dcd24b10eeb602a9a77b8a3b45e4af67876e58f"
       }
     }
   }

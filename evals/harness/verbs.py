@@ -7,7 +7,7 @@ measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
 
 The figures are measured rather than asserted, over the whole corpus, and
-all 305 reference claims carry a verb. ``tests/test_evals_identity.py``'s
+all 320 reference claims carry a verb. ``tests/test_evals_identity.py``'s
 ``FRONTIER`` prices the rule on every error at once, and the frontier table in
 ``docs/agents/claim-identity.md`` carries every row of it. That table also
 holds the reference-merge column, so this module does not state it.
@@ -94,6 +94,29 @@ UNSEPARATED: tuple[tuple[str, str, str], ...] = (
             "The source never states the attacker's means for one side, so both"
             " take `disable` conservatively. A corpus wording gap, fixable in a"
             " blessing pass, not a gap in the vocabulary."
+        ),
+    ),
+    (
+        "17-permit-portal-limits",
+        "denial-of-service",
+        (
+            "Two pairs of `flood` findings on shared elements. The renderer"
+            " backlog fills the queue and the costly PDF holds the four slots;"
+            " the distributed flood exhausts the permit service and the shared"
+            " address exhausts one address's allowance. The verb names the"
+            " exhaustion, and the resource is not a field."
+        ),
+    ),
+    (
+        "18-podcast-host-quotas",
+        "denial-of-service",
+        (
+            "Five pairs of `flood` findings on shared elements. Feed polling"
+            " and episode downloads share the podcast app; the shows that fill"
+            " storage, the quota race, the upload overload, the transcoding"
+            " backlog and the costly audio share the upload API or the"
+            " transcoder. The verb names the exhaustion, and the resource is"
+            " not a field."
         ),
     ),
 )

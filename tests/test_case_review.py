@@ -67,12 +67,13 @@ UNREVIEWED: dict[str, str] = {
         " their text unchanged, and no reader has read the moved model"
     ),
     "17-permit-portal-limits": (
-        "written for #2054 by an agent; no reader has read the source, the model or"
-        " the reference set, and every reference fact is unsigned"
+        "the sitting's rulings rewrote five claims, added six, and set the"
+        " inspector flow's authentication to unknown; no reader has read the"
+        " changed set, and one reference fact is unsigned"
     ),
     "18-podcast-host-quotas": (
-        "written for #2054 by an agent; no reader has read the source, the model or"
-        " the reference set, and every reference fact is unsigned"
+        "the sitting's rulings rewrote three claims, replaced one and added nine;"
+        " no reader has read the changed set"
     ),
 }
 
