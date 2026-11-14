@@ -222,7 +222,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The source states nothing about authorization inside the permit service. Applicant authentication and the ownership check on uploads do not decide what an authenticated user may read or change. The model holds no direct flow from applicants to the service, and the claim assumes none.",
+    "notes": "The source states nothing about authorization inside the permit service, so nothing in it says what an authenticated user may read or change. The model holds no direct flow from applicants to the service, and the claim assumes none.",
     "verb": "escalate"
   },
   {
@@ -237,7 +237,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The source says inspectors zoom into tiles, and not which component serves them. A restricted plan store does not cover a serving layer that skips the check. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.",
+    "notes": "The source says inspectors zoom into tiles, and not which component serves them or how it checks access. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.",
     "verb": "elicit"
   },
   {
@@ -252,7 +252,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The source says nothing about authentication or integrity on the inspectors' flow or on the permit service's path to its database. The tampering claim on applicants' requests does not cover these paths. The attacker must reach the path, and its protection must be inadequate.",
+    "notes": "The source names a shared login on the inspectors' flow and no mechanism behind it, and says nothing about integrity protection on that flow or on the permit service's path to its database. The tampering claim on applicants' requests does not cover these paths. The attacker must reach the path, and its protection must be inadequate.",
     "verb": "alter-in-transit"
   }
 ]

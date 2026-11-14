@@ -268,7 +268,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches every feed the feed service builds. This differs from a change to audio in the media store.",
+    "notes": "The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches the show's feed when the feed service next builds it. This differs from a change to audio in the media store.",
     "verb": "alter-in-transit"
   }
 ]

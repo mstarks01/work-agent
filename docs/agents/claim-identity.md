@@ -164,7 +164,7 @@ labelled pairs the shipped rule merges today:
 | a wildcard | 0 | 0 |
 
 Read as a mismatch, a direction destroys half of what the rule gets right. Read
-as a wildcard it changes nothing, because in both surviving merges the
+as a wildcard it changes nothing, because in both candidate merges the
 coarser side cites no flow. `tests/test_evals_identity.py` asserts both numbers
 and the flow-citation counts, so a blessing pass that re-cites claims against
 flows reopens the question by failing.

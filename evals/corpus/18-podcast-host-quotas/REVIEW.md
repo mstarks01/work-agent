@@ -305,7 +305,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:process:upload-api>store:show-database>store-episode-details`, `store:show-database`, `process:feed-service`
 - severity: low/medium · verb: `alter-in-transit`
-- The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches every feed the feed service builds. This differs from a change to audio in the media store.
+- The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches the show's feed when the feed service next builds it. This differs from a change to audio in the media store.
 
 > mark:
 
@@ -355,7 +355,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
       "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
-      "claims/stride.json": "9d702e950a90e9694c381b4a25cc9371f111c15a7aa375eb8787145bc35c7ac6"
+      "claims/stride.json": "0c73ee3fe132be0fa6cab03d8dcd24b10eeb602a9a77b8a3b45e4af67876e58f"
       }
     }
   }

@@ -270,7 +270,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:permit-service`, `store:permit-database`
 - severity: medium/high · verb: `escalate`
-- The source states nothing about authorization inside the permit service. Applicant authentication and the ownership check on uploads do not decide what an authenticated user may read or change. The model holds no direct flow from applicants to the service, and the claim assumes none.
+- The source states nothing about authorization inside the permit service, so nothing in it says what an authenticated user may read or change. The model holds no direct flow from applicants to the service, and the claim assumes none.
 
 > mark:
 
@@ -281,7 +281,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `entity:inspector`, `store:plan-store`
 - severity: low/medium · verb: `elicit`
-- The source says inspectors zoom into tiles, and not which component serves them. A restricted plan store does not cover a serving layer that skips the check. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.
+- The source says inspectors zoom into tiles, and not which component serves them or how it checks access. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.
 
 > mark:
 
@@ -292,7 +292,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:entity:inspector>process:permit-service>review-and-decide`, `flow:process:permit-service>store:permit-database>keep-applications-and-decisions`
 - severity: low/high · verb: `alter-in-transit`
-- The source says nothing about authentication or integrity on the inspectors' flow or on the permit service's path to its database. The tampering claim on applicants' requests does not cover these paths. The attacker must reach the path, and its protection must be inadequate.
+- The source names a shared login on the inspectors' flow and no mechanism behind it, and says nothing about integrity protection on that flow or on the permit service's path to its database. The tampering claim on applicants' requests does not cover these paths. The attacker must reach the path, and its protection must be inadequate.
 
 > mark:
 
@@ -342,7 +342,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
       "model.json": "02caa9d1c92306d0bf58cd0017d1c1d9c87cce2d7a490b2c2bf21bcc4b3100c1",
-      "claims/stride.json": "922df4552268112b401b877aca5b17b3cd6162fbe617a929b044cfbd58188a9f"
+      "claims/stride.json": "d3a177b2494f5617bfbb65ac8ffaead88f7201d142dd05e4991fd0ae69672f0d"
       }
     }
   }
