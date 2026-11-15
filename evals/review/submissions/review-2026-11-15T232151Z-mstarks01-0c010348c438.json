@@ -1,0 +1,93 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-11-15T232151Z",
+  "cases": {
+    "17-permit-portal-limits": {
+      "own_list": [
+        "Unlimited direct plan uploads bypass both gateway controls. Large files or rapid repeated uploads can exhaust ingress bandwidth, upload-service resources and plan-store capacity, or drive cloud costs.",
+        "Four simultaneous conversions limit concurrency, not backlog. Uploads can arrive faster than rendering completes; the waiting queue can grow and delay legitimate permit reviews. No queue bound or backpressure is stated.",
+        "A complex or malicious PDF can consume excessive CPU, memory or time, or produce huge numbers of tiles. Four such jobs can occupy every renderer slot; no per-job time, memory, page or output-size limit is stated.",
+        "The gateway limit is per IP. Requests spread across many IP addresses can overload the permit service or database despite each address staying below 60 requests per minute; no aggregate limit is stated.",
+        "Legitimate applicants sharing a public IP can collectively exceed 60 requests per minute and be blocked. One abusive user on that IP can consume the allowance for everyone behind it.",
+        "The 5 MB body cap does not bound total stored applications or processing cost. Repeated accepted submissions can fill the permit database and review workload; the claimed per-account open-application limit is unverified.",
+        "The district-wide shared inspector login prevents reliable individual attribution of decisions. Credential sharing or compromise can enable impersonation, and revoking one inspector without affecting colleagues is difficult.",
+        "Applicant authentication and object-level authorization are unspecified. If inadequate, a user could read or alter another applicant's application or plans, or submit decisions without inspector authority.",
+        "Untrusted PDFs reach the renderer. If parsing, isolation or cloud permissions are weak, a crafted file could exploit the renderer and expose or corrupt plans or other resources in the city cloud account.",
+        "Authentication and transport protection between components are unknown. If absent or misconfigured, requests, plans or inspector decisions could be intercepted, forged or altered; being on the city network is not proof of protection.",
+        "How inspectors retrieve tiles is missing from the model. That unmodeled path may expose plans or permit unauthorized tile access, and its availability and authorization cannot be assessed until the serving component and flow are identified.",
+        "Plan-store and permit-database access controls, encryption, recovery and cross-service isolation are unspecified. Misconfiguration or a compromised service could disclose drawings, alter decisions or destroy records and interrupt reviews."
+      ],
+      "marks": {
+        "v6:e388b92464f9208e": "agree",
+        "v6:4254c1454e8ef0b0": "agree",
+        "v6:e51bece73d4618df": "agree",
+        "v6:02a55e0a2b386dce": "agree",
+        "v6:2dabafd659899e9f": "agree",
+        "v6:9ece0cd32d6a823a": "agree",
+        "v6:68b6883ba0dc33af": "agree",
+        "v6:6cc5d70147526f85": "agree",
+        "v6:045ee1369f18f8b7": "agree",
+        "v6:73ea8b9435cd54ab": "agree",
+        "v6:3b8b7166751e5ad2": "agree",
+        "v6:19c24fcafa9af1b7": "agree",
+        "v6:3204cf7386e1dadb": "agree",
+        "v6:3eaeadf56b53340b": "agree",
+        "v6:5bf53afa0abe031f": "agree",
+        "v6:bf6034832507be77": "agree",
+        "v6:c66fb15b22699c37": "agree"
+      },
+      "missing": [],
+      "notes": "Confirming sitting on the changes of #2256, ruled as CSV in conversation. Row numbers refer to the confirming ballot.\nThe own list is the reader's own list of the sitting of 2026-11-14 (#2254), reused unchanged.\n\nRow 1 (v6:e388b92464f9208e, rewritten): agree. The rewrite correctly limits impersonation to the shared district account and does not invent individual inspector identities.\nRow 2 (v6:4254c1454e8ef0b0, rewritten): agree. The claim now makes both inadequate ownership checks and overwrite or association capability explicit prerequisites. Tampering/alter fits.\nRow 3 (v6:e51bece73d4618df, rewritten): agree. Authenticated integrity, rather than encryption alone, is the correct condition for undetected on-path modification.\nRow 4 (v6:02a55e0a2b386dce, rewritten): agree. The login alone cannot attribute individual actions; independent evidence remains possible. The stated shared login supports prioritizing this repudiation concern.\nRow 5 (v6:2dabafd659899e9f, rewritten): agree. Accept as conditional exploitation of a vulnerable parser, with effects bounded by actual renderer permissions. The rationale should not imply anonymous uploads are established: internet reachability does not prove anyone can upload.\nRow 6 (v6:9ece0cd32d6a823a, new): agree. Distinct from the carried distributed flood: this consumes a shared IP allowance and blocks co-located users. Flood is adequate for repeated requests. The low impact is provisional because the number of affected users is unknown.\nRow 7 (v6:68b6883ba0dc33af, new): agree. The quota is explicitly unverified. Persistent record and review-work accumulation differs from an immediate request flood. Flood is a broad but usable label for repeated submissions. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 8 (v6:6cc5d70147526f85, new): agree. Change: verb: exhaust-resources (proposed vocabulary addition); category: denial-of-service unchanged. A few expensive conversions can exhaust active capacity or amplify stored output; high arrival volume is unnecessary. Keep denial-of-service, but propose exhaust-resources as a new verb rather than misdescribe the mechanism as flooding. If the lane cannot add verbs, flood is only a documented coarse fallback, not a reason to merge this with backlog. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 9 (v6:045ee1369f18f8b7, new): agree. Object/role authorization failure crosses an existing permission boundary, so elevation-of-privilege/escalate is appropriate. No direct applicant-to-service flow is assumed. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 10 (v6:73ea8b9435cd54ab, new): agree. Change: verb: read; category: information-disclosure unchanged. Use read for unauthorized retrieval; do not choose elicit merely to prevent an automatic merge. Keep information-disclosure. This is distinct from direct plan-store reading because the serving-layer check can fail while store access is restricted. A merge must preserve that separate path and prerequisite. Serving endpoint and flow still need confirmation. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 11 (v6:3b8b7166751e5ad2, new): agree. The modeled inspector and database-write paths are distinct from applicant-facing transport. Tampering/alter-in-transit fits the forgery or modification scenario under the stated path-access prerequisite. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\n\nEvery other finding carries the reader's agree mark of #2254: v6:19c24fcafa9af1b7, v6:3204cf7386e1dadb, v6:3eaeadf56b53340b, v6:5bf53afa0abe031f, v6:bf6034832507be77, v6:c66fb15b22699c37.\n\nFacts row signed yes: flow:entity:inspector>process:permit-service>review-and-decide authentication-mechanism=unknown. The source establishes credential sharing but does not identify an authentication mechanism. Unknown is correct; retain shared login separately as credential-sharing=shared.",
+      "opened_digests": {
+        "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
+        "model.json": "02caa9d1c92306d0bf58cd0017d1c1d9c87cce2d7a490b2c2bf21bcc4b3100c1",
+        "claims/stride.json": "d3a177b2494f5617bfbb65ac8ffaead88f7201d142dd05e4991fd0ae69672f0d"
+      }
+    },
+    "18-podcast-host-quotas": {
+      "own_list": [
+        "The public feed service has no rate limit. Aggressive polling or deliberate floods can exhaust service capacity and make feeds unavailable to legitimate listeners.",
+        "Feed requests trigger show-database reads. Repeated requests can overload that database and interfere with publishing as well as feed delivery; caching and aggregate resource controls are not stated.",
+        "The 50 GB per-show quota limits stored bytes, not upload bandwidth, concurrent uploads or parsing cost. Large or repeated uploads can overload the upload API; the suggested per-file limit is unverified.",
+        "A per-show quota does not bound account-wide storage. If show creation or the number of shows is unrestricted, many shows can multiply storage consumption and costs.",
+        "If quota checking and storage reservation are not atomic, concurrent uploads can each pass the same remaining-space check and collectively exceed 50 GB. The enforcement mechanism is unspecified.",
+        "Two jobs per transcoder cap local concurrency, not queue size, total workers or total work. Upload bursts can build a backlog, delay episode publication and potentially drive fleet costs; no global bound is stated.",
+        "Malformed or computationally expensive audio can exhaust a transcoder's CPU, memory or job time, or exploit its decoder. Two stuck jobs can occupy a worker; per-job limits and isolation are unspecified.",
+        "The stats importer starts a job for every arriving file with no concurrency cap. A large nightly batch or a compromised partner can exhaust compute, connections or stats-database write capacity.",
+        "Partner-file authentication, validation and replay handling are unspecified. Spoofed, malformed, duplicate or conflicting files could corrupt download totals, double-count activity or cause repeated processing failures.",
+        "Podcasters use email and password sign-in. If guessing protection, secure credential handling and show-level authorization are inadequate, stolen or guessed credentials could enable unauthorized publishing or access to another show.",
+        "The storage and delivery path for transcoded episodes is missing. Download authorization, integrity, bandwidth limits and egress costs are therefore unassessed; neither direct media-store access nor delivery by the feed service can be assumed.",
+        "Transport encryption, store protection and service isolation are unknown. If weak, uploaded audio or episode details could be exposed or altered, and compromise or resource exhaustion in the shared hosting account could affect multiple services."
+      ],
+      "marks": {
+        "v6:cf2b55bbd69a0c5d": "agree",
+        "v6:d690a071782fe127": "agree",
+        "v6:43e912186e1de7d7": "agree",
+        "v6:9c0120c101510621": "agree",
+        "v6:8174155683e5f2e2": "agree",
+        "v6:830f36b0d0f9d974": "agree",
+        "v6:bf69a35d48ac5787": "agree",
+        "v6:3c1c09a11d559cbb": "agree",
+        "v6:2394a304466e8ec1": "agree",
+        "v6:affc86bc0619b549": "agree",
+        "v6:fbafa6241c1d9ece": "agree",
+        "v6:316c0abdc70a46c2": "agree",
+        "v6:72120852d88cad02": "agree",
+        "v6:52dcbd91ea9ceaca": "agree",
+        "v6:5d73fe65c996a391": "agree",
+        "v6:5eb835a01db4f3c6": "agree",
+        "v6:b2863927ccf29dbf": "agree",
+        "v6:cd29342ce34eac48": "agree"
+      },
+      "missing": [],
+      "notes": "Confirming sitting on the changes of #2256, ruled as CSV in conversation. Row numbers refer to the confirming ballot.\nThe own list is the reader's own list of the sitting of 2026-11-14 (#2254), reused unchanged.\n\nRow 12 (v6:cf2b55bbd69a0c5d, rewritten): agree. Change: verb: use-credential; category: spoofing unchanged. The rewrite preserves both guessed and reused passwords and additional controls. Use-credential covers both routes; guess-credential describes only one. Keep spoofing.\nRow 13 (v6:d690a071782fe127, replaced): agree. The replacement is acceptable: it conditions repudiation on inadequate audit evidence and concerns the stated publishing operation. This supersedes my rejection of the former unconditional claim; source silence is not proof that logging is absent.\nRow 14 (v6:43e912186e1de7d7, rewritten): agree. The aggregate-storage scenario now explicitly requires ability to create many shows without effective aggregate quota. It does not contradict the stated per-show quota.\nRow 15 (v6:9c0120c101510621, rewritten): agree. The rewrite correctly requires a vulnerable transcoder and limits execution to actual permissions, without assuming hosting-account-wide privileges.\nRow 16 (v6:8174155683e5f2e2, new): agree. Stored-byte quotas do not establish rate, concurrency or transient resource protection. The conditional upload-resource threat is distinct from aggregate stored-space exhaustion. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 17 (v6:830f36b0d0f9d974, new): agree. Accept as a conditional quota-enforcement test, not evidence that the stated quota fails. Flood is a coarse label for concurrent submissions; the specific mechanism is a check/reservation race. A quota overrun alone does not establish denial of service: retain that category only for potential downstream shared-capacity or budget exhaustion. Likelihood/impact and expected tier remain provisional.\nRow 18 (v6:bf69a35d48ac5787, new): agree. Queue bounds and backpressure are explicitly conditional. Two jobs per transcoder do not bound backlog or fleet-wide work; this differs from a few costly jobs occupying active slots. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 19 (v6:3c1c09a11d559cbb, new): agree. Change: verb: exhaust-resources (proposed vocabulary addition); category: denial-of-service unchanged. Keep denial-of-service and propose exhaust-resources as a new verb: expensive decoding can monopolize active slots without a high-volume flood or code execution. If the lane is closed, flood is only a coarse fallback. The source establishes two slots per transcoder, not that a few files necessarily occupy every worker in the fleet. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 20 (v6:2394a304466e8ec1, new): agree. Change: verb: alter; category: tampering unchanged. Keep tampering; use alter for the resulting corruption of stored totals. Replay is one route, while a compromised partner can submit fresh false counts. Preserve both mechanisms in notes and tests; do not merge this with partner impersonation or import-job exhaustion. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 21 (v6:affc86bc0619b549, new): agree. Show-level authorization failure is distinct from account takeover and direct store access. Elevation-of-privilege/escalate fits an authenticated user acting beyond the account scope. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 22 (v6:fbafa6241c1d9ece, new): agree. Accept conditional episode-download exhaustion, distinct from RSS polling. The delivery endpoint and controls are unknown; identify them before adding a concrete modeled flow. The draft likelihood and impact are provisional.\nRow 23 (v6:316c0abdc70a46c2, new): agree. Accept conditional on-path audio tampering, distinct from direct media-store writes. Identify the delivery path and integrity protections before adding concrete endpoints. Tampering/alter-in-transit fits. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\nRow 24 (v6:72120852d88cad02, new): agree. Change: verb: alter; category: tampering unchanged. Keep tampering, but use alter to cover both unauthorized metadata writes and modification in transit. Alter-in-transit is narrower than the stated authorization-or-integrity failure. Preserve the internal write path distinction from show-level API authorization. Draft likelihood/impact and tier are provisional review judgments, not measured source facts.\n\nEvery other finding carries the reader's agree mark of #2254: v6:52dcbd91ea9ceaca, v6:5d73fe65c996a391, v6:5eb835a01db4f3c6, v6:b2863927ccf29dbf, v6:cd29342ce34eac48.",
+      "opened_digests": {
+        "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
+        "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
+        "claims/stride.json": "0c73ee3fe132be0fa6cab03d8dcd24b10eeb602a9a77b8a3b45e4af67876e58f"
+      }
+    }
+  }
+}
