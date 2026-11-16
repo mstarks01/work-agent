@@ -763,7 +763,7 @@
       "process:spark-transform-job",
       "store:landing-bucket"
     ],
-    "reference_verb": "flood",
+    "reference_verb": "exhaust-resources",
     "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
@@ -4375,7 +4375,7 @@
       "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
-    "reference_verb": "flood",
+    "reference_verb": "exhaust-resources",
     "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
@@ -5791,7 +5791,7 @@
       "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
-    "reference_verb": "flood",
+    "reference_verb": "exhaust-resources",
     "candidate_verb": "flood",
     "label": "match",
     "note": "A narrower instance of the same action and the same silent-staleness consequence."

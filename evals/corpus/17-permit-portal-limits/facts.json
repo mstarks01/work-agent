@@ -237,7 +237,7 @@
         "exclusive": false
       },
       "rationale": "The source names a shared login and no mechanism behind it. The shared login is the credential-sharing row.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {

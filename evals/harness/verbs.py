@@ -14,8 +14,8 @@ holds the reference-merge column, so this module does not state it.
 
 Against ``endpoint subset`` alone, the verb moves the two columns below.
 It takes the false merges from 69 to 2 over 92 candidate negatives.
-It takes the false splits from 12 to 13 over 169 labelled pairs.
-Scored against the recorded labels, the verb rule agrees on 246/261.
+It takes the false splits from 12 to 15 over 169 labelled pairs.
+Scored against the recorded labels, the verb rule agrees on 244/261.
 Element agreement alone agrees on 169/261.
 
 The candidate column is the one that argues for the vocabulary. Priced on
@@ -98,25 +98,33 @@ UNSEPARATED: tuple[tuple[str, str, str], ...] = (
     ),
     (
         "17-permit-portal-limits",
+        "information-disclosure",
+        (
+            "Two `read` findings on the plan store. One reads the store"
+            " directly; the other retrieves tiles through a serving check that"
+            " can fail while the store's own check holds. The source names no"
+            " serving component, so the second path has no element to cite."
+        ),
+    ),
+    (
+        "17-permit-portal-limits",
         "denial-of-service",
         (
-            "Two pairs of `flood` findings on shared elements. The renderer"
-            " backlog fills the queue and the costly PDF holds the four slots;"
-            " the distributed flood exhausts the permit service and the shared"
-            " address exhausts one address's allowance. The verb names the"
-            " exhaustion, and the resource is not a field."
+            "One pair of `flood` findings on the gateway. The distributed flood"
+            " exhausts the permit service and the shared address exhausts one"
+            " address's allowance. The verb names the exhaustion, and the"
+            " resource is not a field."
         ),
     ),
     (
         "18-podcast-host-quotas",
         "denial-of-service",
         (
-            "Five pairs of `flood` findings on shared elements. Feed polling"
+            "Four pairs of `flood` findings on shared elements. Feed polling"
             " and episode downloads share the podcast app; the shows that fill"
-            " storage, the quota race, the upload overload, the transcoding"
-            " backlog and the costly audio share the upload API or the"
-            " transcoder. The verb names the exhaustion, and the resource is"
-            " not a field."
+            " storage, the quota race, the upload overload and the transcoding"
+            " backlog share the upload API. The verb names the exhaustion, and"
+            " the resource is not a field."
         ),
     ),
 )

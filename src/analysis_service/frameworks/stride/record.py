@@ -152,7 +152,7 @@ def _threat_id(lane: StrideCategory, sequence: int) -> str:
 #: The lanes each action verb may be filed in. **A table, checked against the
 #: corpus**: ``tests/test_stride_lanes_of_verb.py`` fails if any reference claim
 #: files a verb in a lane this table does not allow, so the table can never sit
-#: narrower than the blessed sets. Twelve verbs take one lane — a flood is
+#: narrower than the blessed sets. Thirteen verbs take one lane — a flood is
 #: denial of service wherever it lands — and eight take several, because the
 #: corpus files them so: forging a message is spoofing when the identity is the
 #: point and tampering when the content is, and deleting a record is tampering,
@@ -167,6 +167,7 @@ LANES_OF_VERB: dict[ActionVerb, tuple[StrideCategory, ...]] = {
     "impersonate": ("spoofing",),
     "alter-in-transit": ("tampering",),
     "flood": ("denial-of-service",),
+    "exhaust-resources": ("denial-of-service",),
     "disable": ("denial-of-service",),
     "escalate": ("elevation-of-privilege",),
     "unattributable": ("repudiation",),

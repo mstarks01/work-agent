@@ -138,7 +138,7 @@ on either of them. That is the finding this sitting exists for.
 **1.** An attacker who successfully authenticates with a guessed or reused podcaster password, defeating any additional sign-in controls, can publish episodes with that account's permissions.
 
 - `flow:entity:podcaster>process:upload-api>upload-episodes`, `entity:podcaster`
-- severity: medium/medium · verb: `guess-credential`
+- severity: medium/medium · verb: `use-credential`
 - Stated: podcasters sign in with an email address and a password. The source states nothing that slows guesses at sign-in.
 
 > mark:
@@ -252,7 +252,7 @@ on either of them. That is the finding this sitting exists for.
 **13.** If per-job time and resource limits are inadequate, a podcaster can upload audio that consumes excessive decoding CPU, memory or time and occupies transcoder slots, delaying other jobs without exploiting a code-execution vulnerability.
 
 - `process:transcoder`, `flow:process:transcoder>store:media-store>pick-up-audio`
-- severity: medium/medium · verb: `flood`
+- severity: medium/medium · verb: `exhaust-resources`
 - The source states no limit on time or resources for one transcoding job. A few costly files hold the two slots on each transcoder. This differs from the backlog of many uploads and from code execution in the transcoder.
 
 > mark:
@@ -263,7 +263,7 @@ on either of them. That is the finding this sitting exists for.
 **14.** If validation and duplicate or replay handling are inadequate, a compromised ad partner or attacker able to resubmit accepted files can cause the stats importer to store false or double-counted download totals.
 
 - `entity:ad-partner`, `process:stats-importer`, `store:stats-database`
-- severity: medium/medium · verb: `replay`
+- severity: medium/medium · verb: `alter`
 - The source says nothing about how the importer checks the files it receives. A file sent again, or false counts from a compromised partner, give false totals even when the sender is authentic. This differs from a sender who impersonates the partner.
 
 > mark:
@@ -304,7 +304,7 @@ on either of them. That is the finding this sitting exists for.
 **18.** If episode-metadata writes lack effective authorization or integrity protection, an attacker able to reach the upload-API-to-show-database path can alter episode details that the feed service later publishes.
 
 - `flow:process:upload-api>store:show-database>store-episode-details`, `store:show-database`, `process:feed-service`
-- severity: low/medium · verb: `alter-in-transit`
+- severity: low/medium · verb: `alter`
 - The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches the show's feed when the feed service next builds it. This differs from a change to audio in the media store.
 
 > mark:
@@ -355,7 +355,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
       "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
-      "claims/stride.json": "0c73ee3fe132be0fa6cab03d8dcd24b10eeb602a9a77b8a3b45e4af67876e58f"
+      "claims/stride.json": "1bbc93662c0ec798a69b7e3da025be0d87d42d52aa4e0ba5d77abd675df78254"
       }
     }
   }

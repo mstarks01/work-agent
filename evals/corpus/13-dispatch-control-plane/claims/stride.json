@@ -239,7 +239,7 @@
       "impact": "medium"
     },
     "notes": "The failure is silent staleness rather than an outage: the API keeps answering and the work it holds is yesterday's.",
-    "verb": "flood"
+    "verb": "exhaust-resources"
   },
   {
     "category": "elevation-of-privilege",

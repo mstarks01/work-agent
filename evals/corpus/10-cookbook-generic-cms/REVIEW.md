@@ -327,7 +327,7 @@ on either of them. That is the finding this sitting exists for.
 **15.** An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.
 
 - `store:mysql-database`, `flow:entity:admin>store:mysql-database>direct-administration`
-- severity: low/high · verb: `flood`
+- severity: low/high · verb: `exhaust-resources`
 - The database is shared between the admin path and the site, and the source describes no separation between them.
 
 > mark:
@@ -412,7 +412,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "b65455924d2682e8d7ffd3f60cc9c5a29d7b5ff3335fbba4e5ad9ade51c1c5d0",
       "claims/asvs.json": "94a4b8bb0cc5e626225766a800eafa32eb85fe99ff00af49f5f8cc7e477ea19f",
-      "claims/stride.json": "a1c33bccbe54c5298af5ac049486a85dc0426efec4943563acf7e2ab8e42dbd8"
+      "claims/stride.json": "fc616a1f4fedde30448b15e09cd98a12b4b5037dc41ffd8e7083ed0b5ff465d0"
       }
     }
   }

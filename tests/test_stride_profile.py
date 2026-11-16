@@ -57,7 +57,7 @@ def test_the_document_names_every_lane_and_no_other(profile):
 
 
 def test_the_document_counts_the_action_vocabulary_correctly(profile):
-    """ "20 action verbs" is a number, and a number is decidable.
+    """The size of the action vocabulary is a number, and a number is decidable.
 
     The vocabulary is half of what a fingerprint keys a finding on, so it grows
     when a blessing pass needs an action it cannot spell — and nothing about

@@ -208,7 +208,7 @@
       "impact": "medium"
     },
     "notes": "The renderer runs four conversions at a time, and the source states no limit on time, memory, pages or output for one conversion. A few costly files hold every slot. This differs from the backlog of many uploads and from code execution in the renderer.",
-    "verb": "flood"
+    "verb": "exhaust-resources"
   },
   {
     "category": "elevation-of-privilege",
@@ -238,7 +238,7 @@
       "impact": "medium"
     },
     "notes": "The source says inspectors zoom into tiles, and not which component serves them or how it checks access. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.",
-    "verb": "elicit"
+    "verb": "read"
   },
   {
     "category": "tampering",
