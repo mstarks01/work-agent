@@ -73,7 +73,7 @@ PRE_0117 = frozenset(
     }
 )
 
-#: The part predicates whose group ADR 0117's phase 2 turned extraction on for.
+#: The part predicates the assertion pass extracts (ADR 0117).
 EXTRACTED_PARTS = frozenset(
     {
         "capacity-limits-rate",
