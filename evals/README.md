@@ -42,8 +42,8 @@ opened, and the digest of each file they read.
 Case `01-payments-checkout` carries a filled reading document dated
 2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
 reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
-reader's own words and the template for the method, and no submission clears
-the case (ADR 24).
+reader's own words and the template for the method. The document is not a
+submission, so it does not clear the case (ADR 24).
 `tests/test_case_review.py` fails a case that no sitting clears unless its
 `UNREVIEWED` table names the case, and fails a read file that changes under its
 recorded digest.

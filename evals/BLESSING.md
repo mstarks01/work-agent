@@ -14,8 +14,9 @@ bookkeeping around it.
 > `evals/corpus/` were written by an agent. On 2026-09-21 a single **Case
 > Sitting** cleared the first 13, and sittings on 2026-10-03 and 2026-10-04
 > cleared the two holdout cases, and two on 2026-10-10 cleared case 16.
-> Sittings from 2026-11-14 to 2026-11-16 cleared cases 17 and 18, and
-> cleared case 16 on its current model. The first sitting wrote 130 own-list
+> Sittings from 2026-11-14 to 2026-11-16 cleared cases 17 and 18, and a
+> sitting on 2026-11-16 cleared case 16 with its rewritten alter-in-transit
+> claim. The first sitting wrote 130 own-list
 > threats blind, then
 > marked all 344 recorded claims: 233 `agree`, 61 `unsure`, 26 `reject`, 24 `duplicate`. Two
 > calibration reviews read the pairs step 5 produces:
@@ -734,8 +735,8 @@ the second one. A merged submission is never removed, so sit it again.
 
 `tests/test_case_review.py` fails on a new case that arrives with no submission
 clearing it, and its `UNREVIEWED` table says what each unread case leaves
-unchecked. Some cases have no submission that clears them, and
-`uv run python webapp/sitting.py --list` names them. The table is not the
+unchecked. `uv run python webapp/sitting.py --list` names each case that no
+submission clears. The table is not the
 count — `evals.review_submission` derives that from the corpus and the merged
 submissions, so no list can disagree with it — and an entry for a case that a
 submission clears can be deleted.
