@@ -32,7 +32,7 @@ Six rules hold in every lane. A credential the attacker holds and presents is `u
 
 Between the disclosure verbs, ask who hands the data over. Where the attacker gets to the data itself — the store, a backup, a stolen copy, a message that lands in the wrong hands — the verb is `read`; on the path between two ends, it is `intercept`. Where the system returns the data **in answer to what the attacker sends** — a crafted request, a guessed identifier, a parameter the system trusts — the verb is `elicit`, even though the data comes from a store, because the fix is to the answer and not to the store.
 
-Between the availability verbs, ask what exhausts the resource: many requests is `flood`, and one costly item — a huge file, a heavy query — is `exhaust-resources`.
+Between the availability verbs, ask what exhausts the resource: many items is `flood`, **however large each is**; one costly item — a huge file, a heavy query — is `exhaust-resources`.
 
 - **`attacker_position`** — where the attacker stands when it acts. `outside`: it reaches the target only through an interface the target exposes, also with a credential it took from an element. `on-path`: it observes or alters the traffic of a flow. `storage-copy`: it holds a copy of a store's media, backup or snapshot. `in-component`: it runs code in an element in the roster, or controls its host, and acts with that element's access. `authorized-principal`: a legitimate account acts beyond its purpose. One verb at one place with two positions is two threats: encryption at rest stops a storage copy and does nothing against code in the store's reader.
 - **`severity`** — `likelihood` and `impact` (`low | medium | high`) plus a `justification` that cites model facts for both axes. Omit any band; it is derived.

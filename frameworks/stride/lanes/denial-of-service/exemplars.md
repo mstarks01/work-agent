@@ -55,7 +55,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
 {
   "sequence": 2,
   "title": "Database connection exhaustion cascades into total transfer outage",
-  "description": "Every payment path terminates at `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api`, or slow-running queries induced by expensive request shapes, exhausts that capacity. Second-order: `process:ledger-service`, which every payment path depends on, cannot complete or roll back transfers once the pool is starved, `flow:process:ledger-service>store:audit-log>append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
+  "description": "Every payment path terminates at `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api` exhausts that capacity. Second-order: `process:ledger-service`, which every payment path depends on, cannot complete or roll back transfers once the pool is starved, `flow:process:ledger-service>store:audit-log>append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
   "affected_element_ids": [
     "store:accounts-db",
     "process:ledger-service",
