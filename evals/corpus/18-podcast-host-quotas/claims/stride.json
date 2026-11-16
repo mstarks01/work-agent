@@ -12,7 +12,7 @@
       "impact": "medium"
     },
     "notes": "Stated: podcasters sign in with an email address and a password. The source states nothing that slows guesses at sign-in.",
-    "verb": "guess-credential"
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
@@ -193,7 +193,7 @@
       "impact": "medium"
     },
     "notes": "The source states no limit on time or resources for one transcoding job. A few costly files hold the two slots on each transcoder. This differs from the backlog of many uploads and from code execution in the transcoder.",
-    "verb": "flood"
+    "verb": "exhaust-resources"
   },
   {
     "category": "tampering",
@@ -209,7 +209,7 @@
       "impact": "medium"
     },
     "notes": "The source says nothing about how the importer checks the files it receives. A file sent again, or false counts from a compromised partner, give false totals even when the sender is authentic. This differs from a sender who impersonates the partner.",
-    "verb": "replay"
+    "verb": "alter"
   },
   {
     "category": "elevation-of-privilege",
@@ -269,6 +269,6 @@
       "impact": "medium"
     },
     "notes": "The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches the show's feed when the feed service next builds it. This differs from a change to audio in the media store.",
-    "verb": "alter-in-transit"
+    "verb": "alter"
   }
 ]

@@ -24,7 +24,7 @@ Eleven fields — the five shared ones plus `sequence`, `affected_element_ids`, 
 - *credential*: `recover-credential`, `guess-credential`, `use-credential`
 - *integrity*: `alter`, `alter-in-transit`, `inject`, `plant`, `delete`
 - *identity*: `impersonate`, `forge`, `replay`, `ride-session`
-- *availability*: `flood`, `disable`
+- *availability*: `flood`, `exhaust-resources`, `disable`
 - *authorization*: `escalate`, `abuse-grant`
 - *attribution*: `unattributable`
 

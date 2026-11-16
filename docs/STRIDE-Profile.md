@@ -34,7 +34,7 @@ published taxonomy, and each lane walks the elements its category can apply to.
 Each of these is a choice with a reason. None is required by STRIDE, and a
 different tool may reasonably choose otherwise.
 
-**A closed set of 20 action verbs.** A finding names one attacker action from
+**A closed set of 21 action verbs.** A finding names one attacker action from
 `analysis_service.actions.ACTION_VERBS`, grouped into families. STRIDE names
 categories, not actions. The vocabulary exists so two spellings of one attack
 compare equal without a model call — it is half of what

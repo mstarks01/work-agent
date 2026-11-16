@@ -258,7 +258,7 @@ on either of them. That is the finding this sitting exists for.
 **14.** If per-conversion resource and output limits are inadequate, an attacker able to upload expensive PDFs can monopolize the four renderer slots or generate excessive tiles, exhausting processing or plan-store capacity without exploiting a code-execution vulnerability.
 
 - `process:plan-upload-service`, `process:plan-renderer`, `store:plan-store`
-- severity: medium/medium · verb: `flood`
+- severity: medium/medium · verb: `exhaust-resources`
 - The renderer runs four conversions at a time, and the source states no limit on time, memory, pages or output for one conversion. A few costly files hold every slot. This differs from the backlog of many uploads and from code execution in the renderer.
 
 > mark:
@@ -280,7 +280,7 @@ on either of them. That is the finding this sitting exists for.
 **16.** If the service that delivers tiles to inspectors fails to enforce application-level authorization, an inspector can retrieve tiles outside their permitted scope even when direct plan-store reads are restricted.
 
 - `entity:inspector`, `store:plan-store`
-- severity: low/medium · verb: `elicit`
+- severity: low/medium · verb: `read`
 - The source says inspectors zoom into tiles, and not which component serves them or how it checks access. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.
 
 > mark:
@@ -342,7 +342,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
       "model.json": "02caa9d1c92306d0bf58cd0017d1c1d9c87cce2d7a490b2c2bf21bcc4b3100c1",
-      "claims/stride.json": "d3a177b2494f5617bfbb65ac8ffaead88f7201d142dd05e4991fd0ae69672f0d"
+      "claims/stride.json": "da262e95dc4b60071fa458dfb461b13500c0a5f5badbec17e95aba3b17693fb0"
       }
     }
   }

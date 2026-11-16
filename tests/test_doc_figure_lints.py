@@ -262,6 +262,7 @@ def _exemplar_verbs() -> Mapping[str, object]:
         "first": by_verb.most_common(1)[0][1],
         "second": by_verb.most_common(2)[1][1],
         "third": by_verb.most_common(3)[2][1],
+        "fifth": by_verb.most_common(5)[4][1],
         "widest_lane": widest,
         "widest_count": widest_count,
     }
@@ -549,8 +550,8 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "docs/agents/claim-identity.md",
                 (
-                    "The verb takes that to {cand_merges}, and it costs one"
-                    " split to do it \u2014 {floor_splits} becomes {splits}"
+                    "The verb takes that to {cand_merges}, and it costs three"
+                    " splits to do it \u2014 {floor_splits} becomes {splits}"
                 ),
                 1,
             ),
@@ -674,8 +675,9 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "evals/harness/exemplar_verbs.py",
                 (
-                    "``disable`` accounts for {first} of them, and ``plant``,"
-                    " ``replay`` and ``elicit``\n  for {second} each."
+                    "``disable`` accounts for {first} of them, ``plant`` for"
+                    " {second}, ``replay`` and\n  ``elicit`` for {third} each, and"
+                    " ``exhaust-resources`` for {fifth}."
                 ),
                 1,
             ),

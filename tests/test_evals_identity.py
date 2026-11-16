@@ -83,7 +83,7 @@ MEASURED = {
 #: through that flow's endpoints, and 216 of 320 corpus claims name exactly one.
 #:
 #: The two readings of an absent direction are both dead ends, and the numbers
-#: below are why. Read it as a mismatch and the rule splits 71 of the 156
+#: below are why. Read it as a mismatch and the rule splits 71 of the 154
 #: labelled pairs it merges correctly today, to recover 1 of its 2 candidate
 #: merges. Read it as a wildcard and it changes nothing at all: no merge that
 #: survives the verb runs two ways.
@@ -93,7 +93,7 @@ DIRECTION = {
     "one_flow_cited": 216,
     "several_flows_cited": 10,
     "no_flow_cited": 94,
-    # Over the 9 reference merges the shipped rule makes.
+    # Over the 8 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 1,
     "merges_that_run_opposite_ways": 0,
     # Over the 261 scored pairs, an absent direction read each way.
@@ -125,9 +125,9 @@ FRONTIER = {
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
     "endpoint subset + verb": {
-        "splits": 13,
+        "splits": 15,
         "candidate_merges": 2,
-        "reference_merges": 9,
+        "reference_merges": 8,
     },
     "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
     "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 22},
@@ -409,7 +409,7 @@ VERB_MEASURED = {
     "cases": 18,
     "within_lane_pairs": 424,
     "subset": 50,
-    "subset_verb": 9,
+    "subset_verb": 8,
 }
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
@@ -420,7 +420,7 @@ VERB_MEASURED = {
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
 #: are agent-authored, so this measures reproduction and not correctness.
-SUBSET_VERB_AGREEMENT = {"agreements": 246, "total": 261}
+SUBSET_VERB_AGREEMENT = {"agreements": 244, "total": 261}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
@@ -532,7 +532,7 @@ def test_a_direction_component_is_a_no_op_or_a_catastrophe(corpus, flows_by_case
 
     Both readings of an absent direction are measured, because the choice
     between them is the whole design and neither survives it. As a mismatch it
-    splits 71 of the 156 labelled pairs the rule merges correctly, to recover 1
+    splits 71 of the 154 labelled pairs the rule merges correctly, to recover 1
     of its 2 candidate merges. As a wildcard it moves nothing.
     """
     result = measure_direction(

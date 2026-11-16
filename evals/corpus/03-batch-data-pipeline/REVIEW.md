@@ -255,7 +255,7 @@ on either of them. That is the finding this sitting exists for.
 **13.** An attacker deposits an enormous or malformed file that consumes the nightly window and prevents genuine extracts from being processed.
 
 - `store:landing-bucket`, `process:ingest-scheduler`
-- severity: medium/medium · verb: `flood`
+- severity: medium/medium · verb: `exhaust-resources`
 - The batch shape is the vulnerability: a missed window is a lost day, not a slow request.
 
 > mark:
@@ -347,7 +347,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
       "model.json": "3800082a9fa433aff29c46f4b0e170d578d64b05bde8186dff0d11b0252ce73d",
-      "claims/stride.json": "a2578768e3e3ee80f491cad4286d7baaa926de991e8c4220ea28cf823e6d7135"
+      "claims/stride.json": "56b82a9dac716a4e2c9a88083931f4408edcb575377f0ab1706f72cb91163179"
       }
     }
   }

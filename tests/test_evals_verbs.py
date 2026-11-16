@@ -68,9 +68,9 @@ def test_canonical_is_identity_outside_the_shipped_group():
 
 
 def test_the_unseparated_pairs_carry_a_reason_each():
-    """Four, each with why — a rate would say the vocabulary is imperfect and
+    """Five, each with why — a rate would say the vocabulary is imperfect and
     nothing about which distinction it cannot draw."""
-    assert len(UNSEPARATED) == 4
+    assert len(UNSEPARATED) == 5
     for case, lane, reason in UNSEPARATED:
         assert case and lane
         assert len(reason) > 80, f"{case}/{lane} needs a reason, not a label"

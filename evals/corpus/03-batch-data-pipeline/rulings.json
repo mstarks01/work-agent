@@ -125,7 +125,7 @@
     {
       "lane": "denial-of-service",
       "reference": {
-        "verb": "flood",
+        "verb": "exhaust-resources",
         "affected_element_ids": [
           "store:landing-bucket",
           "process:ingest-scheduler"

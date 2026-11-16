@@ -22,9 +22,9 @@ what?**
 | lane | the block, from the field its package's `id_rule` declares (`lane_field`) | v4, v5, v6 |
 | targets | `affected_element_ids`, endpoint-resolved | v4, v5, v6 |
 | scope | the case ID, which names the **System Model** the claim was reached in | v4, v5, v6 |
-| action verb, as written | `analysis_service.actions`, a closed set of 20 | v4 only |
+| action verb, as written | `analysis_service.actions`, a closed set of 21 | v4 only |
 | catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v5 only |
-| action verb, read through `evals.harness.verbs.EQUIVALENT` | `analysis_service.actions`, a closed set of 20 | v6 only |
+| action verb, read through `evals.harness.verbs.EQUIVALENT` | `analysis_service.actions`, a closed set of 21 | v6 only |
 
 `SUPPORTED_VERSIONS` in `evals/harness/fingerprint.py` holds the versions the
 code computes, and `EXTRA_COMPONENT` holds the part each version reads beside
@@ -65,14 +65,14 @@ the last colon gives a wrong label for a typed endpoint.
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
 of being wrong — false splits over the 169 labelled match pairs, false merges
-over the 92 scored candidate negatives, and 9 false merges over the 424
+over the 92 scored candidate negatives, and 8 false merges over the 424
 within-lane reference pairs:
 
 | Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 424) |
 |---|---|---|---|
 | equality | 72 | 20 | 5 |
 | endpoint subset | 12 | 69 | 50 |
-| **endpoint subset + verb** | **13** | **2** | **9** |
+| **endpoint subset + verb** | **15** | **2** | **8** |
 | overlap | 3 | 66 | 71 |
 | endpoint overlap | 1 | 81 | 207 |
 
@@ -82,7 +82,7 @@ destroys 207 findings. **The verb row is the first one that is.**
 **Read the candidate column, not the reference one.** On reference pairs alone
 `endpoint subset` merges 50 of 424 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
-rule. The verb takes that to 2, and it costs one split to do it — 12 becomes 13,
+rule. The verb takes that to 2, and it costs three splits to do it — 12 becomes 15,
 which is the whole price in the first column. The candidate column rests on
 the element and verb assignments that
 [#511](https://github.com/mstarks01/work-agent/issues/511) gives the negative
@@ -116,7 +116,7 @@ Scored on the shared scoreboard, through `measure_agreement`:
 | Rule | Agreement with the recorded labels |
 |---|---|
 | `MechanicalIdentity` (element equality) | 169/261 = 64.8% |
-| `SubsetVerbIdentity` | **246/261 = 94.3%** |
+| `SubsetVerbIdentity` | **244/261 = 93.5%** |
 
 **This is an admission gate, not a quality statement.** It clears the 90% bar,
 and the bar exists to price a *candidate* rule — one nobody has measured, which
@@ -131,11 +131,13 @@ is the measurement #201's third bullet asks for: that the rule is not obviously
 worse than a model judge. It is not a claim about accuracy, and
 nothing downstream should quote it as one.
 
-**The nine merges the verb does not break** are in `verbs.UNSEPARATED`, as
-four entries, each with the reason. In case 08, one is a repudiation lane where
+**The eight merges the verb does not break** are in `verbs.UNSEPARATED`, as
+five entries, each with the reason. In case 08, one is a repudiation lane where
 no attacker acts so no verb applies, and one is a corpus wording gap. In cases
-17 and 18, seven pairs of `flood` findings share elements and exhaust different
-resources; the verb names the exhaustion, and no field names the resource.
+17 and 18, five pairs of `flood` findings share elements and exhaust different
+resources; the verb names the exhaustion, and no field names the resource. In
+case 17, two `read` findings reach the plan store, one directly and one through
+a tile-serving check that the source names no component for.
 Review 02 labels the disputed case-13 "writes"/"alters" pair `unclear` rather
 than forcing it to move either the rule or the score.
 
@@ -158,7 +160,7 @@ the single direction a comparison needs.
 **Neither reading of an absent direction is usable.** Both are priced over the
 labelled pairs the shipped rule merges today:
 
-| An absent direction read as | New false splits, of the 156 merged correctly | Candidate merges recovered, of 2 |
+| An absent direction read as | New false splits, of the 154 merged correctly | Candidate merges recovered, of 2 |
 |---|---:|---:|
 | a mismatch | 71 | 1 |
 | a wildcard | 0 | 0 |
@@ -409,7 +411,7 @@ no reviewer sees it go. So every package carries a collision rule, and
 
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
-| `stride` | 424 | 9 |
+| `stride` | 424 | 8 |
 | `asvs` | 100 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
@@ -436,8 +438,8 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
-model. The rule's known error costs are the record above: 13 of 169 labelled
-matches split, 2 of 92 candidate negatives merged, 9 of 424 reference pairs
+model. The rule's known error costs are the record above: 15 of 169 labelled
+matches split, 2 of 92 candidate negatives merged, 8 of 424 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.

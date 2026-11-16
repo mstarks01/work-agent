@@ -29,8 +29,8 @@ negatives, and the reference merges the frontier table in
 reference column, so this module does not state it.
 
 The verb takes the candidate merges from 69 to 2.
-It takes the false splits from 12 to 13 over 169 labelled pairs, which is the
-whole price. Scored against the recorded labels, the verb rule agrees on 246/261.
+It takes the false splits from 12 to 15 over 169 labelled pairs, which is the
+whole price. Scored against the recorded labels, the verb rule agrees on 244/261.
 Element agreement alone agrees on 169/261.
 
 Version 5 reads a catalog identifier instead of an action. A package whose
