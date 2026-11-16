@@ -285,7 +285,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - severity: low/low · verb: `alter-in-transit`
-- encryption_in_transit is unknown on a flow the transcript says crosses the internet. The impact is one member's loan or reservation.
+- encryption_in_transit and authentication are unknown on a flow the transcript says crosses the internet, and neither source states transport or message integrity protection. The impact is one member's loan or reservation.
 
 > mark:
 
@@ -430,7 +430,7 @@ your missing list, your notes and a digest of each file you read:
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
       "model.json": "36e77e5be6f65329a5ec73af880699c362dd140910c4163803f69f1ae508a0f7",
       "claims/asvs.json": "fca11a83b2576dc3b365da4924e21967e01c8c71cd55f1ac5ce6ebde6518e504",
-      "claims/stride.json": "228eee8d9e2230c68d2c9eed189d7fc40abdc4708d3e15ea2512de22e0ebaf1e"
+      "claims/stride.json": "42b100c0ca56d7dcda8907c53f9abccd58957d0eeede0fbc6bf7403955e0827b"
       }
     }
   }

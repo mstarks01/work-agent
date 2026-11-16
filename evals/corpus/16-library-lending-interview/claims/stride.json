@@ -55,7 +55,7 @@
       "likelihood": "low",
       "impact": "low"
     },
-    "notes": "encryption_in_transit is unknown on a flow the transcript says crosses the internet. The impact is one member's loan or reservation.",
+    "notes": "encryption_in_transit and authentication are unknown on a flow the transcript says crosses the internet, and neither source states transport or message integrity protection. The impact is one member's loan or reservation.",
     "verb": "alter-in-transit"
   },
   {
