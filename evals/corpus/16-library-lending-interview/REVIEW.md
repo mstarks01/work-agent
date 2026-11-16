@@ -281,11 +281,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**4.** If the connection between a member's phone and the lending API has no effective authenticated encryption, an attacker on the path alters a renewal or a reservation in flight.
+**4.** If the phone-to-API path lacks effective authenticated transport integrity and equivalent message-integrity protection, an on-path attacker can alter an accepted renewal or reservation.
 
 - `flow:process:library-app>process:lending-api>loan-and-reservation-requests`
 - severity: low/low · verb: `alter-in-transit`
-- encryption_in_transit is unknown on a flow the transcript says crosses the internet. The impact is one member's loan or reservation.
+- encryption_in_transit and authentication are unknown on a flow the transcript says crosses the internet, and neither source states transport or message integrity protection. The impact is one member's loan or reservation.
 
 > mark:
 
@@ -430,7 +430,7 @@ your missing list, your notes and a digest of each file you read:
       "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
       "model.json": "36e77e5be6f65329a5ec73af880699c362dd140910c4163803f69f1ae508a0f7",
       "claims/asvs.json": "fca11a83b2576dc3b365da4924e21967e01c8c71cd55f1ac5ce6ebde6518e504",
-      "claims/stride.json": "e87860eaa76b29fcd0ef18a25830074de2ec7b6c05e56733becce7af77eedcca"
+      "claims/stride.json": "42b100c0ca56d7dcda8907c53f9abccd58957d0eeede0fbc6bf7403955e0827b"
       }
     }
   }

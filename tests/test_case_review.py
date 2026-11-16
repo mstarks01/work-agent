@@ -60,9 +60,9 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: leaves unchecked, and an entry for a case a submission clears is obsolete.
 UNREVIEWED: dict[str, str] = {
     "16-library-lending-interview": (
-        "the member's flow to the lending API now runs through the library app"
-        " as a process; ten claims and two signed facts moved to the new flow ID,"
-        " their text unchanged, and no reader has read the moved model"
+        "the sitting of 2026-11-16 rejected the alter-in-transit claim as written,"
+        " and the claim now states the integrity condition the reader proposed;"
+        " no reader has marked the new text"
     ),
 }
 
