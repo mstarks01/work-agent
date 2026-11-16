@@ -54,40 +54,15 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
 #: acceptable.
 #:
-#: The sitting of 2026-09-21 read cases 01 to 13, and the sitting of
-#: 2026-09-22 cleared the marks acting on it had broken. The sitting of
-#: 2026-10-03 read the two holdout cases #744 added. The table is derived, never maintained —
+#: The set of unread cases is derived, never maintained —
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and an entry for a case a submission clears is obsolete.
 UNREVIEWED: dict[str, str] = {
-    "03-batch-data-pipeline": (
-        "the enormous-file claim takes the new verb `exhaust-resources` in place of"
-        " `flood`; no reader has marked its new fingerprint"
-    ),
-    "10-cookbook-generic-cms": (
-        "the costly-query claim takes the new verb `exhaust-resources` in place of"
-        " `flood`; no reader has marked its new fingerprint"
-    ),
-    "13-dispatch-control-plane": (
-        "the large-XML claim takes the new verb `exhaust-resources` in place of"
-        " `flood`; no reader has marked its new fingerprint"
-    ),
     "16-library-lending-interview": (
         "the member's flow to the lending API now runs through the library app"
         " as a process; ten claims and two signed facts moved to the new flow ID,"
         " their text unchanged, and no reader has read the moved model"
-    ),
-    "17-permit-portal-limits": (
-        "the confirming sitting asked for two verb changes: the costly-PDF claim"
-        " takes `exhaust-resources` and the tile claim takes `read`; no reader"
-        " has marked the two new fingerprints"
-    ),
-    "18-podcast-host-quotas": (
-        "the confirming sitting asked for four verb changes: the costly-audio"
-        " claim takes `exhaust-resources`, the password claim `use-credential`,"
-        " and the false-counts and metadata claims `alter`; no reader has marked"
-        " the four new fingerprints"
     ),
 }
 

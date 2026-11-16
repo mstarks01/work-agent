@@ -10,10 +10,13 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **Some cases wait for a sitting.** All 18 cases in
+> **One case waits for a sitting.** All 18 cases in
 > `evals/corpus/` were written by an agent. On 2026-09-21 a single **Case
 > Sitting** cleared the first 13, and sittings on 2026-10-03 and 2026-10-04
-> cleared the two holdout cases, and two on 2026-10-10 cleared case 16. The first sitting wrote 130 own-list threats blind, then
+> cleared the two holdout cases, and two on 2026-10-10 cleared case 16.
+> Sittings from 2026-11-14 to 2026-11-16 cleared cases 17 and 18. Case 16
+> waits for a sitting, because its model changed after those sittings. The
+> first sitting wrote 130 own-list threats blind, then
 > marked all 344 recorded claims: 233 `agree`, 61 `unsure`, 26 `reject`, 24 `duplicate`. Two
 > calibration reviews read the pairs step 5 produces:
 > [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md) on
