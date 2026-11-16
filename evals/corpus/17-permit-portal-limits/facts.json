@@ -211,7 +211,7 @@
         "exclusive": false
       },
       "rationale": "Stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -232,7 +232,7 @@
         "exclusive": false
       },
       "rationale": "Stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -253,7 +253,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -274,7 +274,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -295,7 +295,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -316,7 +316,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -337,7 +337,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -358,7 +358,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -374,7 +374,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -390,7 +390,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -411,28 +411,23 @@
         "exclusive": false
       },
       "rationale": "One login for every inspector in a district is shared.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "interaction",
         "subject": "flow:entity:inspector>process:permit-service>review-and-decide",
         "predicate": "authentication-mechanism",
-        "value": "one inspector login shared by all inspectors in a district",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
         "basis": "stated",
-        "quotes": [
-          {
-            "source_label": "System description",
-            "quote": "All inspectors in a district use one shared inspector login."
-          }
-        ],
+        "quotes": [],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The source names the login and that it is shared, and names no mechanism behind it.",
-      "reviewed_by": null
+      "rationale": "The source names a shared login and no mechanism behind it. The shared login is the credential-sharing row.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -448,7 +443,7 @@
         "exclusive": false
       },
       "rationale": "The source never says how an applicant signs in.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -464,7 +459,7 @@
         "exclusive": false
       },
       "rationale": "The source never says how the plan upload service knows who uploads.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -480,7 +475,7 @@
         "exclusive": false
       },
       "rationale": "The source says nothing about encryption in transit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -496,7 +491,7 @@
         "exclusive": false
       },
       "rationale": "The source says nothing about encryption in transit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],

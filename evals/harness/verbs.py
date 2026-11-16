@@ -7,15 +7,15 @@ measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
 
 The figures are measured rather than asserted, over the whole corpus, and
-all 305 reference claims carry a verb. ``tests/test_evals_identity.py``'s
+all 320 reference claims carry a verb. ``tests/test_evals_identity.py``'s
 ``FRONTIER`` prices the rule on every error at once, and the frontier table in
 ``docs/agents/claim-identity.md`` carries every row of it. That table also
 holds the reference-merge column, so this module does not state it.
 
 Against ``endpoint subset`` alone, the verb moves the two columns below.
 It takes the false merges from 69 to 2 over 92 candidate negatives.
-It takes the false splits from 12 to 13 over 169 labelled pairs.
-Scored against the recorded labels, the verb rule agrees on 246/261.
+It takes the false splits from 12 to 15 over 169 labelled pairs.
+Scored against the recorded labels, the verb rule agrees on 244/261.
 Element agreement alone agrees on 169/261.
 
 The candidate column is the one that argues for the vocabulary. Priced on
@@ -94,6 +94,37 @@ UNSEPARATED: tuple[tuple[str, str, str], ...] = (
             "The source never states the attacker's means for one side, so both"
             " take `disable` conservatively. A corpus wording gap, fixable in a"
             " blessing pass, not a gap in the vocabulary."
+        ),
+    ),
+    (
+        "17-permit-portal-limits",
+        "information-disclosure",
+        (
+            "Two `read` findings on the plan store. One reads the store"
+            " directly; the other retrieves tiles through a serving check that"
+            " can fail while the store's own check holds. The source names no"
+            " serving component, so the second path has no element to cite."
+        ),
+    ),
+    (
+        "17-permit-portal-limits",
+        "denial-of-service",
+        (
+            "One pair of `flood` findings on the gateway. The distributed flood"
+            " exhausts the permit service and the shared address exhausts one"
+            " address's allowance. The verb names the exhaustion, and the"
+            " resource is not a field."
+        ),
+    ),
+    (
+        "18-podcast-host-quotas",
+        "denial-of-service",
+        (
+            "Four pairs of `flood` findings on shared elements. Feed polling"
+            " and episode downloads share the podcast app; the shows that fill"
+            " storage, the quota race, the upload overload and the transcoding"
+            " backlog share the upload API. The verb names the exhaustion, and"
+            " the resource is not a field."
         ),
     ),
 )

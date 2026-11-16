@@ -345,7 +345,7 @@ from. A rule change is then arithmetic over the ledger's files.
    - **The split count must not rise without an argument.** A split costs a
      reviewer one unmatched finding, which is visible and recoverable, so a rule
      may trade splits for merges. The current `SubsetVerbIdentity` takes the
-     candidate merges from 69 to 2, and it takes the false splits from 12 to 13
+     candidate merges from 69 to 2, and it takes the false splits from 12 to 15
      over 169 labelled pairs. State any future trade.
    - **The bar must hold at 90%.** It admits a candidate rule that has no pinned
      counts of its own yet. Below it, fix the rule or the verb vocabulary

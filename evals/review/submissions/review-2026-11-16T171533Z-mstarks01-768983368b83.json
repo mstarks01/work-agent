@@ -1,0 +1,231 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-11-16T171533Z",
+  "cases": {
+    "03-batch-data-pipeline": {
+      "own_list": [
+        "An attacker who obtains a still-valid partner SFTP key can upload fraudulent extracts as that partner; schema-valid false claims can then reach the warehouse.",
+        "A partner able to write into another partner's folder can make its extract be attributed to that partner because the scheduler does not verify the depositor against the folder identity.",
+        "A malicious genuine partner can submit plausible, schema-valid but false member or claim values that are normalized into trusted warehouse records.",
+        "A partner can resubmit an old valid extract to duplicate claims or revert current records if the pipeline does not check extract freshness, unique batch identity, and repeated processing.",
+        "A malicious partner can upload excessive files so the scheduler launches excessive Spark jobs, exhausting pipeline capacity and delaying legitimate claim ingestion.",
+        "A malicious or compromised analyst account can bulk-extract member names, birth dates, and health claims using its dataset-wide grant.",
+        "An attacker reading insufficiently protected Airflow metadata can recover reusable connection secrets and use their grants to access pipeline resources outside the scheduler.",
+        "A person obtaining raw landing-store media or an unprotected extract copy can disclose members' names, birth dates, and health claims if copy protection is ineffective.",
+        "An attacker reaching the Spark trigger interface can request unauthorized processing of a selected landed file if workload authentication and permitted input selection are not enforced.",
+        "An attacker who can modify scheduler connection settings can redirect retrieval to attacker-chosen endpoints or resources, causing the pipeline to ingest substituted data or disclose credentials."
+      ],
+      "marks": {
+        "v6:346f50ab196225b8": "agree",
+        "v6:4cd65ee18b331434": "agree",
+        "v6:4a13265d673d26ef": "agree",
+        "v6:ba677d99444456c7": "agree",
+        "v6:cf8e7b85c7757052": "agree",
+        "v6:f233d5bc77563013": "agree",
+        "v6:7313a2f4d86ee66d": "agree",
+        "v6:c53bb063cf0419c3": "unsure",
+        "v6:fd74ff5fa5c756ec": "unsure",
+        "v6:fa7c55803069b6f5": "agree",
+        "v6:ef98de8bb6c68df9": "agree",
+        "v6:3503a9cb61c972f7": "agree",
+        "v6:d73140ae68c1086a": "unsure",
+        "v6:1e38e9675b8961ab": "agree",
+        "v6:ed62e54b7e82b66d": "agree",
+        "v6:6cc663e709542738": "agree",
+        "v6:2b60fd6973e0060b": "agree"
+      },
+      "missing": [],
+      "notes": "Verb sitting on the claims that #2258 re-verbed, ruled as CSV in conversation. Row numbers refer to the verb ballot.\nThe own list is the reader's own list of review-2026-09-22-mstarks01-1d8a3dea637f.json, reused unchanged.\n\nRow 1 (v6:346f50ab196225b8, exhaust-resources): agree.\n\nEvery other finding carries the reader's latest merged mark: v6:1e38e9675b8961ab, v6:2b60fd6973e0060b, v6:3503a9cb61c972f7, v6:4a13265d673d26ef, v6:4cd65ee18b331434, v6:6cc663e709542738, v6:7313a2f4d86ee66d, v6:ba677d99444456c7, v6:c53bb063cf0419c3, v6:cf8e7b85c7757052, v6:d73140ae68c1086a, v6:ed62e54b7e82b66d, v6:ef98de8bb6c68df9, v6:f233d5bc77563013, v6:fa7c55803069b6f5, v6:fd74ff5fa5c756ec.",
+      "opened_digests": {
+        "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+        "model.json": "3800082a9fa433aff29c46f4b0e170d578d64b05bde8186dff0d11b0252ce73d",
+        "claims/stride.json": "56b82a9dac716a4e2c9a88083931f4408edcb575377f0ab1706f72cb91163179"
+      }
+    },
+    "10-cookbook-generic-cms": {
+      "own_list": [
+        "An attacker on the reader-to-CDN path can substitute images, stylesheets, or downloads because the asset channel explicitly uses HTTP.",
+        "An observer on the administrator's MySQL connection can read private account data and maintenance results because that connection explicitly lacks TLS.",
+        "An on-path attacker can alter direct MySQL maintenance commands or results, corrupting CMS records or misleading the administrator.",
+        "A remote attacker reaching the direct MySQL interface can use a compromised valid admin credential to read or rewrite CMS data outside the web application's checks.",
+        "An unauthorized writer can replace CDN assets if the bucket's publication interface does not restrict writes to appropriately authorized publishers.",
+        "An attacker reaching the internal MySQL interface can change CMS pages, accounts, or comments if the application's database identity and write grants are ineffective.",
+        "An attacker obtaining an unprotected raw MySQL copy can disclose private account records without going through the CMS.",
+        "A reader can overload CMS page generation and associated database reads with high-rate or expensive requests if caching and per-client work limits are insufficient.",
+        "An attacker who acquires a valid signed-in reader session can act as that reader if the CMS accepts the stolen session without effective binding or revocation.",
+        "A commenter can persist executable browser content that runs for later page viewers if the CMS accepts attacker-supplied comments and renders them without context-appropriate encoding or sanitization."
+      ],
+      "marks": {
+        "v6:875e4b3ab43d4bcf": "agree",
+        "v5:d2a9bc8722eb51f9": "agree",
+        "v5:5fbeed9d9e543322": "agree",
+        "v5:039bd1a88f5a56e4": "agree",
+        "v5:10373c62c5bcb76a": "agree",
+        "v5:71f248a40aeae8bc": "unsure",
+        "v5:83ef5d689eff4bba": "unsure",
+        "v6:c6e062432d3f95d1": "agree",
+        "v6:98caff64339b453a": "agree",
+        "v6:47820dc8c8371969": "unsure",
+        "v6:c66a5e2106aaf096": "agree",
+        "v6:ac3b02fdf2524c60": "agree",
+        "v6:f5ee88b92c0abe45": "agree",
+        "v6:994344a4d3355013": "agree",
+        "v6:102bb45658f38fc1": "unsure",
+        "v6:ffe137dedaaf4968": "unsure",
+        "v6:bad3bb4fdd347a9e": "agree",
+        "v6:ed37b61489dec369": "agree",
+        "v6:81f7e97363f54057": "unsure",
+        "v6:3f1afcd784aa2a03": "agree",
+        "v6:8ff9aad7d7005940": "agree",
+        "v6:5796d1e5200f8d05": "unsure",
+        "v6:b8bde8870d8128aa": "agree",
+        "v6:575c1579be6d9e68": "agree"
+      },
+      "missing": [],
+      "notes": "Verb sitting on the claims that #2258 re-verbed, ruled as CSV in conversation. Row numbers refer to the verb ballot.\nThe own list is the reader's own list of review-2026-09-22-mstarks01-1d8a3dea637f.json, reused unchanged.\n\nRow 2 (v6:875e4b3ab43d4bcf, exhaust-resources): agree.\n\nEvery other finding carries the reader's latest merged mark: v5:039bd1a88f5a56e4, v5:10373c62c5bcb76a, v5:5fbeed9d9e543322, v5:71f248a40aeae8bc, v5:83ef5d689eff4bba, v5:d2a9bc8722eb51f9, v6:102bb45658f38fc1, v6:3f1afcd784aa2a03, v6:47820dc8c8371969, v6:575c1579be6d9e68, v6:5796d1e5200f8d05, v6:81f7e97363f54057, v6:8ff9aad7d7005940, v6:98caff64339b453a, v6:994344a4d3355013, v6:ac3b02fdf2524c60, v6:b8bde8870d8128aa, v6:bad3bb4fdd347a9e, v6:c66a5e2106aaf096, v6:c6e062432d3f95d1, v6:ed37b61489dec369, v6:f5ee88b92c0abe45, v6:ffe137dedaaf4968.",
+      "opened_digests": {
+        "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
+        "model.json": "b65455924d2682e8d7ffd3f60cc9c5a29d7b5ff3335fbba4e5ad9ade51c1c5d0",
+        "claims/asvs.json": "94a4b8bb0cc5e626225766a800eafa32eb85fe99ff00af49f5f8cc7e477ea19f",
+        "claims/stride.json": "fc616a1f4fedde30448b15e09cd98a12b4b5037dc41ffd8e7083ed0b5ff465d0"
+      }
+    },
+    "13-dispatch-control-plane": {
+      "own_list": [
+        "A corporate user without dispatch rights can invoke crew-move or depot-change operations if the API does not enforce authenticated server-side dispatch authorization on every request.",
+        "A malicious web origin can read privileged dispatch responses using an engineer's browser if the API trusts that origin, permits credentials, and the browser sends an authenticated session.",
+        "A malicious page can open a dispatch WebSocket in an engineer's browser and receive live status if cookies are sent and the handshake fails to check both authorized origin and session.",
+        "A former or revoked engineer session can continue receiving live job status over an existing WebSocket if the server never rechecks or terminates the socket when authorization expires.",
+        "A corporate-network observer can capture live crew/job status if the WebSocket lacks TLS or equivalent confidentiality.",
+        "An attacker can hold enough dispatch WebSockets open to exhaust shared API resources if connection quotas, timeouts, and isolation are insufficient, disrupting status and dispatch writes.",
+        "A holder of the importer's still-valid API token can submit fabricated work orders as the importer.",
+        "A malicious or compromised scheduling partner can return semantically false but well-formed work orders that reach live dispatch if the importer/API does not independently validate authorized scheduling constraints.",
+        "A malicious partner can return XML containing external entity references that make the importer read local files or contact internal services if external entity resolution is enabled.",
+        "A malicious partner can return oversized, deeply nested, or expansion-heavy XML to exhaust importer CPU, memory, or archive capacity if document and parser resource limits are insufficient."
+      ],
+      "marks": {
+        "v6:444020352cdb2b3e": "agree",
+        "v5:fddf9a2e4210c6ef": "agree",
+        "v5:4505f47008fdd1c9": "agree",
+        "v5:b8c8b1f595c0f40b": "agree",
+        "v5:dff6ea7cdc2022d6": "agree",
+        "v5:cb30d8ba2fa9d75e": "agree",
+        "v5:a3de9161d5d7e1cf": "agree",
+        "v6:7214cd95407ede95": "agree",
+        "v6:3b9e809c166f5681": "agree",
+        "v6:2cf2ee6494b70de4": "unsure",
+        "v6:5d48efef79c9e6ab": "agree",
+        "v6:031a6ef6d029ea80": "agree",
+        "v6:61f5cbde78263cf0": "agree",
+        "v6:c786078296a8f64e": "agree",
+        "v6:293569e81e8621c5": "agree",
+        "v6:f38c925f816c80df": "unsure",
+        "v6:2332485d7edb4080": "unsure",
+        "v6:b18309b8dca32862": "agree",
+        "v6:628af900bca0c64f": "agree",
+        "v6:10d259f558ba1561": "agree",
+        "v6:c4f2496111674398": "agree",
+        "v6:cabe776e411e1fb9": "agree",
+        "v6:bba43b9c210dfcb3": "reject",
+        "v6:60ab6a2c9357fa30": "agree",
+        "v6:74b792c5c3413dee": "agree",
+        "v6:c0c35ac27eb1bc8e": "agree"
+      },
+      "missing": [],
+      "notes": "Verb sitting on the claims that #2258 re-verbed, ruled as CSV in conversation. Row numbers refer to the verb ballot.\nThe own list is the reader's own list of review-2026-10-13T185903Z-mstarks01-d919eed50c52.json, reused unchanged.\n\nRow 3 (v6:444020352cdb2b3e, exhaust-resources): agree.\n\nEvery other finding carries the reader's latest merged mark: v5:4505f47008fdd1c9, v5:a3de9161d5d7e1cf, v5:b8c8b1f595c0f40b, v5:cb30d8ba2fa9d75e, v5:dff6ea7cdc2022d6, v5:fddf9a2e4210c6ef, v6:031a6ef6d029ea80, v6:10d259f558ba1561, v6:2332485d7edb4080, v6:293569e81e8621c5, v6:2cf2ee6494b70de4, v6:3b9e809c166f5681, v6:5d48efef79c9e6ab, v6:60ab6a2c9357fa30, v6:61f5cbde78263cf0, v6:628af900bca0c64f, v6:7214cd95407ede95, v6:74b792c5c3413dee, v6:b18309b8dca32862, v6:bba43b9c210dfcb3, v6:c0c35ac27eb1bc8e, v6:c4f2496111674398, v6:c786078296a8f64e, v6:cabe776e411e1fb9, v6:f38c925f816c80df.",
+      "opened_digests": {
+        "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+        "model.json": "7d6b0954ab6043050bb4f3a726aa40e7da3b02494e0430ff942375f10c4b14da",
+        "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
+        "claims/stride.json": "24806d2756d8ce73b4179f703cf467d09097a8a4c466838e7272f44d4f7b5785"
+      }
+    },
+    "17-permit-portal-limits": {
+      "own_list": [
+        "Unlimited direct plan uploads bypass both gateway controls. Large files or rapid repeated uploads can exhaust ingress bandwidth, upload-service resources and plan-store capacity, or drive cloud costs.",
+        "Four simultaneous conversions limit concurrency, not backlog. Uploads can arrive faster than rendering completes; the waiting queue can grow and delay legitimate permit reviews. No queue bound or backpressure is stated.",
+        "A complex or malicious PDF can consume excessive CPU, memory or time, or produce huge numbers of tiles. Four such jobs can occupy every renderer slot; no per-job time, memory, page or output-size limit is stated.",
+        "The gateway limit is per IP. Requests spread across many IP addresses can overload the permit service or database despite each address staying below 60 requests per minute; no aggregate limit is stated.",
+        "Legitimate applicants sharing a public IP can collectively exceed 60 requests per minute and be blocked. One abusive user on that IP can consume the allowance for everyone behind it.",
+        "The 5 MB body cap does not bound total stored applications or processing cost. Repeated accepted submissions can fill the permit database and review workload; the claimed per-account open-application limit is unverified.",
+        "The district-wide shared inspector login prevents reliable individual attribution of decisions. Credential sharing or compromise can enable impersonation, and revoking one inspector without affecting colleagues is difficult.",
+        "Applicant authentication and object-level authorization are unspecified. If inadequate, a user could read or alter another applicant's application or plans, or submit decisions without inspector authority.",
+        "Untrusted PDFs reach the renderer. If parsing, isolation or cloud permissions are weak, a crafted file could exploit the renderer and expose or corrupt plans or other resources in the city cloud account.",
+        "Authentication and transport protection between components are unknown. If absent or misconfigured, requests, plans or inspector decisions could be intercepted, forged or altered; being on the city network is not proof of protection.",
+        "How inspectors retrieve tiles is missing from the model. That unmodeled path may expose plans or permit unauthorized tile access, and its availability and authorization cannot be assessed until the serving component and flow are identified.",
+        "Plan-store and permit-database access controls, encryption, recovery and cross-service isolation are unspecified. Misconfiguration or a compromised service could disclose drawings, alter decisions or destroy records and interrupt reviews."
+      ],
+      "marks": {
+        "v6:3dbaccc58ef250c2": "agree",
+        "v6:cc1f34ea523eb061": "agree",
+        "v6:3eaeadf56b53340b": "agree",
+        "v6:e388b92464f9208e": "agree",
+        "v6:4254c1454e8ef0b0": "agree",
+        "v6:e51bece73d4618df": "agree",
+        "v6:02a55e0a2b386dce": "agree",
+        "v6:bf6034832507be77": "agree",
+        "v6:19c24fcafa9af1b7": "agree",
+        "v6:3204cf7386e1dadb": "agree",
+        "v6:5bf53afa0abe031f": "agree",
+        "v6:c66fb15b22699c37": "agree",
+        "v6:2dabafd659899e9f": "agree",
+        "v6:9ece0cd32d6a823a": "agree",
+        "v6:68b6883ba0dc33af": "agree",
+        "v6:045ee1369f18f8b7": "agree",
+        "v6:3b8b7166751e5ad2": "agree"
+      },
+      "missing": [],
+      "notes": "Verb sitting on the claims that #2258 re-verbed, ruled as CSV in conversation. Row numbers refer to the verb ballot.\nThe own list is the reader's own list of review-2026-11-15T232151Z-mstarks01-0c010348c438.json, reused unchanged.\n\nRow 4 (v6:3dbaccc58ef250c2, exhaust-resources): agree.\nRow 5 (v6:cc1f34ea523eb061, read): agree.\n\nEvery other finding carries the reader's latest merged mark: v6:02a55e0a2b386dce, v6:045ee1369f18f8b7, v6:19c24fcafa9af1b7, v6:2dabafd659899e9f, v6:3204cf7386e1dadb, v6:3b8b7166751e5ad2, v6:3eaeadf56b53340b, v6:4254c1454e8ef0b0, v6:5bf53afa0abe031f, v6:68b6883ba0dc33af, v6:9ece0cd32d6a823a, v6:bf6034832507be77, v6:c66fb15b22699c37, v6:e388b92464f9208e, v6:e51bece73d4618df.",
+      "opened_digests": {
+        "source.md": "8cddb3f778550ca2d33274d4a588eb18f966200eb5a903a07fda93446c2288f5",
+        "model.json": "02caa9d1c92306d0bf58cd0017d1c1d9c87cce2d7a490b2c2bf21bcc4b3100c1",
+        "claims/stride.json": "da262e95dc4b60071fa458dfb461b13500c0a5f5badbec17e95aba3b17693fb0"
+      }
+    },
+    "18-podcast-host-quotas": {
+      "own_list": [
+        "The public feed service has no rate limit. Aggressive polling or deliberate floods can exhaust service capacity and make feeds unavailable to legitimate listeners.",
+        "Feed requests trigger show-database reads. Repeated requests can overload that database and interfere with publishing as well as feed delivery; caching and aggregate resource controls are not stated.",
+        "The 50 GB per-show quota limits stored bytes, not upload bandwidth, concurrent uploads or parsing cost. Large or repeated uploads can overload the upload API; the suggested per-file limit is unverified.",
+        "A per-show quota does not bound account-wide storage. If show creation or the number of shows is unrestricted, many shows can multiply storage consumption and costs.",
+        "If quota checking and storage reservation are not atomic, concurrent uploads can each pass the same remaining-space check and collectively exceed 50 GB. The enforcement mechanism is unspecified.",
+        "Two jobs per transcoder cap local concurrency, not queue size, total workers or total work. Upload bursts can build a backlog, delay episode publication and potentially drive fleet costs; no global bound is stated.",
+        "Malformed or computationally expensive audio can exhaust a transcoder's CPU, memory or job time, or exploit its decoder. Two stuck jobs can occupy a worker; per-job limits and isolation are unspecified.",
+        "The stats importer starts a job for every arriving file with no concurrency cap. A large nightly batch or a compromised partner can exhaust compute, connections or stats-database write capacity.",
+        "Partner-file authentication, validation and replay handling are unspecified. Spoofed, malformed, duplicate or conflicting files could corrupt download totals, double-count activity or cause repeated processing failures.",
+        "Podcasters use email and password sign-in. If guessing protection, secure credential handling and show-level authorization are inadequate, stolen or guessed credentials could enable unauthorized publishing or access to another show.",
+        "The storage and delivery path for transcoded episodes is missing. Download authorization, integrity, bandwidth limits and egress costs are therefore unassessed; neither direct media-store access nor delivery by the feed service can be assumed.",
+        "Transport encryption, store protection and service isolation are unknown. If weak, uploaded audio or episode details could be exposed or altered, and compromise or resource exhaustion in the shared hosting account could affect multiple services."
+      ],
+      "marks": {
+        "v6:5ddf1957970c1f6b": "agree",
+        "v6:5eb0ae0a24024dd0": "agree",
+        "v6:6aaaaec15f65e11f": "agree",
+        "v6:dc7a6868eab836b8": "agree",
+        "v6:b2863927ccf29dbf": "agree",
+        "v6:52dcbd91ea9ceaca": "agree",
+        "v6:d690a071782fe127": "agree",
+        "v6:cd29342ce34eac48": "agree",
+        "v6:5eb835a01db4f3c6": "agree",
+        "v6:5d73fe65c996a391": "agree",
+        "v6:43e912186e1de7d7": "agree",
+        "v6:9c0120c101510621": "agree",
+        "v6:8174155683e5f2e2": "agree",
+        "v6:830f36b0d0f9d974": "agree",
+        "v6:bf69a35d48ac5787": "agree",
+        "v6:affc86bc0619b549": "agree",
+        "v6:fbafa6241c1d9ece": "agree",
+        "v6:316c0abdc70a46c2": "agree"
+      },
+      "missing": [],
+      "notes": "Verb sitting on the claims that #2258 re-verbed, ruled as CSV in conversation. Row numbers refer to the verb ballot.\nThe own list is the reader's own list of review-2026-11-15T232151Z-mstarks01-0c010348c438.json, reused unchanged.\n\nRow 6 (v6:5ddf1957970c1f6b, use-credential): agree.\nRow 7 (v6:5eb0ae0a24024dd0, exhaust-resources): agree.\nRow 8 (v6:6aaaaec15f65e11f, alter): agree.\nRow 9 (v6:dc7a6868eab836b8, alter): agree.\n\nEvery other finding carries the reader's latest merged mark: v6:316c0abdc70a46c2, v6:43e912186e1de7d7, v6:52dcbd91ea9ceaca, v6:5d73fe65c996a391, v6:5eb835a01db4f3c6, v6:8174155683e5f2e2, v6:830f36b0d0f9d974, v6:9c0120c101510621, v6:affc86bc0619b549, v6:b2863927ccf29dbf, v6:bf69a35d48ac5787, v6:cd29342ce34eac48, v6:d690a071782fe127, v6:fbafa6241c1d9ece.",
+      "opened_digests": {
+        "source.md": "0187d56cd7a475ff3ad1285deb15b085f448a2fcc82392accdef6b9bda8fe1ee",
+        "model.json": "82bdd429f176fc7405c8c1f26fcba581c267c8ac298fd77eb78c1bcbe075cc7b",
+        "claims/stride.json": "1bbc93662c0ec798a69b7e3da025be0d87d42d52aa4e0ba5d77abd675df78254"
+      }
+    }
+  }
+}

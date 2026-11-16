@@ -20,7 +20,7 @@
       "flow:entity:inspector>process:permit-service>review-and-decide",
       "entity:inspector"
     ],
-    "claim": "An attacker who learns a district's shared inspector login records permit decisions as any inspector in that district.",
+    "claim": "An attacker who obtains a district's shared inspector login can record decisions as that district's inspector account, without the login identifying the individual actor.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
@@ -35,7 +35,7 @@
       "flow:entity:applicant>process:plan-upload-service>upload-plan-drawings",
       "store:plan-store"
     ],
-    "claim": "If the plan upload service does not check who owns an application, an attacker uploads drawings that replace another applicant's plans in the plan store.",
+    "claim": "If ownership checks are inadequate and uploads can overwrite or be associated with an existing application, an attacker can substitute drawings for another applicant's plans.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
@@ -49,7 +49,7 @@
     "affected_element_ids": [
       "flow:entity:applicant>process:permit-gateway>submit-applications"
     ],
-    "claim": "If application requests are not encrypted in transit, an attacker on the network path changes an application on its way to the gateway.",
+    "claim": "If application requests lack authenticated transport integrity and equivalent message-integrity protection, an on-path attacker can alter an application before it reaches the gateway.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -64,7 +64,7 @@
       "flow:entity:inspector>process:permit-service>review-and-decide",
       "entity:inspector"
     ],
-    "claim": "An inspector approves or refuses a permit under the district's shared login, and nothing shows which inspector made the decision.",
+    "claim": "An inspector can dispute a decision made under the district's shared login; the login alone cannot reliably identify which inspector acted, unless independent evidence supplies individual attribution.",
     "tier": "must-find",
     "severity": {
       "likelihood": "high",
@@ -154,7 +154,7 @@
       "process:plan-renderer",
       "flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files"
     ],
-    "claim": "An attacker uploads a crafted PDF that exploits the plan renderer's conversion and runs code with the renderer's access to the plan store and the city's cloud account.",
+    "claim": "An attacker able to upload a PDF could exploit a vulnerable conversion component to execute code with the renderer's actual permissions, potentially altering tiles or plan-store data accessible to it.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -162,5 +162,97 @@
     },
     "notes": "The renderer parses files that anyone on the internet uploads. The source states nothing about how the conversion is isolated.",
     "verb": "escalate"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:permit-gateway",
+      "entity:applicant"
+    ],
+    "claim": "An attacker sharing a public IP with legitimate applicants can consume the gateway's 60-requests-per-minute allowance and cause their application requests to be rejected.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "Stated: the gateway allows 60 requests a minute from one IP address. Everyone behind one address shares that allowance, so this exhausts the allowance and not the permit service, which is what the distributed flood exhausts.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:permit-gateway",
+      "process:permit-service",
+      "store:permit-database"
+    ],
+    "claim": "If the unverified open-application quota is absent or ineffective, an applicant can repeatedly submit accepted applications within gateway limits and accumulate enough records or review work to exhaust storage or delay legitimate processing.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The quota on open applications is hedged: \"nobody has checked that.\" Stored applications and review work grow inside the gateway's rate and size limits. Confirm the quota per account and the controls on retention and workload.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:plan-upload-service",
+      "process:plan-renderer",
+      "store:plan-store"
+    ],
+    "claim": "If per-conversion resource and output limits are inadequate, an attacker able to upload expensive PDFs can monopolize the four renderer slots or generate excessive tiles, exhausting processing or plan-store capacity without exploiting a code-execution vulnerability.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The renderer runs four conversions at a time, and the source states no limit on time, memory, pages or output for one conversion. A few costly files hold every slot. This differs from the backlog of many uploads and from code execution in the renderer.",
+    "verb": "exhaust-resources"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:permit-service",
+      "store:permit-database"
+    ],
+    "claim": "If permit-service object or role authorization is inadequate, an authenticated user can read applications or change decisions outside that user's permitted scope.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source states nothing about authorization inside the permit service, so nothing in it says what an authenticated user may read or change. The model holds no direct flow from applicants to the service, and the claim assumes none.",
+    "verb": "escalate"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "entity:inspector",
+      "store:plan-store"
+    ],
+    "claim": "If the service that delivers tiles to inspectors fails to enforce application-level authorization, an inspector can retrieve tiles outside their permitted scope even when direct plan-store reads are restricted.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source says inspectors zoom into tiles, and not which component serves them or how it checks access. Identify the tile-serving component, the inspectors' request path and its authorization scope before a flow is added.",
+    "verb": "read"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:entity:inspector>process:permit-service>review-and-decide",
+      "flow:process:permit-service>store:permit-database>keep-applications-and-decisions"
+    ],
+    "claim": "If inspector decision traffic or permit-service database writes lack effective peer authentication and integrity protection, an attacker able to access those paths can forge or alter decisions or application records.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The source names a shared login on the inspectors' flow and no mechanism behind it, and says nothing about integrity protection on that flow or on the permit service's path to its database. The tampering claim on applicants' requests does not cover these paths. The attacker must reach the path, and its protection must be inadequate.",
+    "verb": "alter-in-transit"
   }
 ]

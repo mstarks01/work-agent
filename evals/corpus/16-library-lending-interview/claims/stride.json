@@ -49,13 +49,13 @@
     "affected_element_ids": [
       "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
     ],
-    "claim": "If the connection between a member's phone and the lending API has no effective authenticated encryption, an attacker on the path alters a renewal or a reservation in flight.",
+    "claim": "If the phone-to-API path lacks effective authenticated transport integrity and equivalent message-integrity protection, an on-path attacker can alter an accepted renewal or reservation.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "low"
     },
-    "notes": "encryption_in_transit is unknown on a flow the transcript says crosses the internet. The impact is one member's loan or reservation.",
+    "notes": "encryption_in_transit and authentication are unknown on a flow the transcript says crosses the internet, and neither source states transport or message integrity protection. The impact is one member's loan or reservation.",
     "verb": "alter-in-transit"
   },
   {

@@ -152,8 +152,8 @@ python -m evals.harness.run calibrate --out agreement.json
 ```
 
 **Read the error directions first; they are the measurement.** The shipped
-rule has 13 false splits of 169 equivalent candidate pairs, 2 false merges of
-92 candidate negatives and 2 false merges of 375 distinct reference pairs. A
+rule has 15 false splits of 169 equivalent candidate pairs, 2 false merges of
+92 candidate negatives and 8 false merges of 424 distinct reference pairs. A
 split hands a reviewer one unmatched finding. A merge destroys a finding and
 inflates recall, and nobody sees it happen — which is the expensive way to be
 wrong, and why a lenient rule is never the fix. Watch the candidate column

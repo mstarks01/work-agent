@@ -809,6 +809,7 @@ VERB_RULES = (
     "Between the two authorization verbs",
     "Between the integrity verbs",
     "Between the disclosure verbs",
+    "Between the availability verbs",
 )
 _RULE_COUNT = re.compile(r"^(\w+) rules hold in every lane", re.MULTILINE)
 _NUMBER_WORDS = ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight")

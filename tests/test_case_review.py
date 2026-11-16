@@ -54,27 +54,11 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
 #: acceptable.
 #:
-#: The sitting of 2026-09-21 read cases 01 to 13, and the sitting of
-#: 2026-09-22 cleared the marks acting on it had broken. The sitting of
-#: 2026-10-03 read the two holdout cases #744 added. The table is derived, never maintained —
+#: The set of unread cases is derived, never maintained —
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and an entry for a case a submission clears is obsolete.
-UNREVIEWED: dict[str, str] = {
-    "16-library-lending-interview": (
-        "the member's flow to the lending API now runs through the library app"
-        " as a process; ten claims and two signed facts moved to the new flow ID,"
-        " their text unchanged, and no reader has read the moved model"
-    ),
-    "17-permit-portal-limits": (
-        "written for #2054 by an agent; no reader has read the source, the model or"
-        " the reference set, and every reference fact is unsigned"
-    ),
-    "18-podcast-host-quotas": (
-        "written for #2054 by an agent; no reader has read the source, the model or"
-        " the reference set, and every reference fact is unsigned"
-    ),
-}
+UNREVIEWED: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")
