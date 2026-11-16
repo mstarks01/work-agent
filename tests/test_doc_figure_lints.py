@@ -423,18 +423,28 @@ FIGURES: tuple[Figure, ...] = (
                 "{cand_merges} false merges over {cand_of} candidate",
                 1,
             ),
-            ("evals/README.md", "{merges} false merges over {merge_of}", 1),
+            (
+                "evals/README.md",
+                "{merges} false merges over {merge_of}\ndistinct reference pairs.",
+                1,
+            ),
             (
                 "evals/README.md",
                 (
-                    "{splits} false splits of {split_of}, {cand_merges} false"
+                    "**{splits} false splits of {split_of}, {cand_merges} false"
                     " merges of {cand_of} and {merges} false merges of"
-                    " {merge_of}"
+                    " {merge_of}.**"
                 ),
-                # Two: the headline sentence and the harness table's row. A
-                # template that does not span the wrap cannot see the headline,
-                # because the wrap splits the rendered string across two lines.
-                2,
+                1,
+            ),
+            (
+                "evals/README.md",
+                (
+                    "has {splits} false splits of {split_of}, {cand_merges} false"
+                    " merges of {cand_of} and {merges} false merges of"
+                    " {merge_of} with no model call."
+                ),
+                1,
             ),
             (
                 "evals/TUNING.md",
@@ -550,8 +560,8 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "docs/agents/claim-identity.md",
                 (
-                    "The verb takes that to {cand_merges}, and it costs three"
-                    " splits to do it \u2014 {floor_splits} becomes {splits}"
+                    "The verb takes that to {cand_merges}, and the splits it adds"
+                    " are its cost \u2014 {floor_splits} becomes {splits}"
                 ),
                 1,
             ),
@@ -594,6 +604,7 @@ FIGURES: tuple[Figure, ...] = (
         compute=_calibration,
         claims=(
             ("evals/README.md", "A rule at {percent}%", 1),
+            ("evals/README.md", "agrees with {agreed}\nof them.", 1),
             (
                 "docs/agents/claim-identity.md",
                 "| `SubsetVerbIdentity` | **{agreed}/{total} = {percent}%** |",

@@ -82,7 +82,7 @@ destroys 207 findings. **The verb row is the first one that is.**
 **Read the candidate column, not the reference one.** On reference pairs alone
 `endpoint subset` merges 50 of 424 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
-rule. The verb takes that to 2, and it costs three splits to do it — 12 becomes 15,
+rule. The verb takes that to 2, and the splits it adds are its cost — 12 becomes 15,
 which is the whole price in the first column. The candidate column rests on
 the element and verb assignments that
 [#511](https://github.com/mstarks01/work-agent/issues/511) gives the negative

@@ -47,14 +47,13 @@ the case (ADR 24).
 `UNREVIEWED` table names the case, and fails a read file that changes under its
 recorded digest.
 
-**Sixteen cases carry signed reference facts.** Cases 01 to 13, 16 and 18 carry a
+**Sixteen cases carry signed reference facts.** Cases 01 to 13 and 16 to 18 carry a
 `facts.json`, one row per fact the sources state, in the shape the assertion
 node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it: cases 01, 04, 09, 11 and 13 on 2026-09-16,
 the other eight on 2026-09-18 (#1048), and case 16 on 2026-10-10. The maintainer signed case 16's
 `network-membership` row for `process:library-app` on 2026-10-15, and case 18's
-rows on 2026-11-14. Case 17 carries a `facts.json` too, with one row the
-maintainer has not signed. The rulings and the model
+rows on 2026-11-14, and case 17's rows on 2026-11-14 and 2026-11-16. The rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
 placement is not graded as a fact. A file may carry signed alias rulings for
@@ -86,7 +85,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call:
-**15 false splits of 169, 2 false merges of 92 and 8 false merges of 42424.**
+**15 false splits of 169, 2 false merges of 92 and 8 false merges of 424.**
 The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
@@ -105,7 +104,7 @@ The candidate merge column arrived with
 negative half the elements and verbs the rule reads. Before it every candidate
 merge count was structurally zero. A further 27 fixtures are set aside before
 identity scoring: 24 `unsupported`, 2 `unclear`, and 1 `invalid-claim`. The
-matcher therefore answers 261 fixtures, refuses none, and agrees with 246
+matcher therefore answers 261 fixtures, refuses none, and agrees with 244
 of them. Diagnostic `mixed` and `misclassified-lane` annotations preserve
 secondary observations without moving that denominator.
 
@@ -261,7 +260,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 169, 2 false merges of 92 and 8 false merges of 42424 with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 169, 2 false merges of 92 and 8 false merges of 424 with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | Which **Data Flow** identity version a graph spells, and the table that lifts an archived artifact's old flow IDs to the version the corpus spells. The table comes from the graph's endpoints, because a version 1 ID omits the endpoint types. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
