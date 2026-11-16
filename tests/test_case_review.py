@@ -54,9 +54,7 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
 #: acceptable.
 #:
-#: The sitting of 2026-09-21 read cases 01 to 13, and the sitting of
-#: 2026-09-22 cleared the marks acting on it had broken. The sitting of
-#: 2026-10-03 read the two holdout cases #744 added. The table is derived, never maintained —
+#: The set of unread cases is derived, never maintained —
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
 #: leaves unchecked, and an entry for a case a submission clears is obsolete.
