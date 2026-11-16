@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "A stated quota per show.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "A hedge: the speaker would have to check, so the row states no value.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -58,7 +58,7 @@
         "exclusive": false
       },
       "rationale": "The source states no limit on how often a podcaster uploads.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -74,7 +74,7 @@
         "exclusive": false
       },
       "rationale": "The source states nothing about how many uploads run at once.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -95,7 +95,7 @@
         "exclusive": false
       },
       "rationale": "A stated absence of a rate limit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -111,7 +111,7 @@
         "exclusive": false
       },
       "rationale": "The source states nothing about how much work the feed service runs at once.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -132,7 +132,7 @@
         "exclusive": false
       },
       "rationale": "A stated limit on how much work runs at once.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -153,7 +153,7 @@
         "exclusive": false
       },
       "rationale": "A stated absence of a concurrency limit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {

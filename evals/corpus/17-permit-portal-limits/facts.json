@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "A stated limit on the rate of requests, per IP address.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "A stated limit on the size of a request body.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -58,7 +58,7 @@
         "exclusive": false
       },
       "rationale": "The source states no limit on how much work the gateway runs at once.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -74,7 +74,7 @@
         "exclusive": false
       },
       "rationale": "The source states no quota per applicant at the gateway.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -95,7 +95,7 @@
         "exclusive": false
       },
       "rationale": "A stated absence: the service has no size limit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -116,7 +116,7 @@
         "exclusive": false
       },
       "rationale": "A stated absence: the service has no rate limit.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -132,7 +132,7 @@
         "exclusive": false
       },
       "rationale": "The source states nothing about how many uploads the service takes at once.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -148,7 +148,7 @@
         "exclusive": false
       },
       "rationale": "The source states no quota per applicant on uploads.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -169,7 +169,7 @@
         "exclusive": false
       },
       "rationale": "A stated limit on how much work runs at once.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -190,7 +190,7 @@
         "exclusive": false
       },
       "rationale": "A hedge: the speaker thinks there is a limit and says nobody checked, so the row states no value.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
