@@ -61,7 +61,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Literal, NamedTuple, Self, get_args
 
@@ -584,14 +584,21 @@ def _same(terms: Sequence[str]) -> Mapping[str, str]:
     return {term: term for term in terms}
 
 
-def _facet(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
+def _facet(
+    question: str,
+    statement: str,
+    *,
+    protects: ProtectiveAnswer,
+    extracted: bool = False,
+) -> Predicate:
     """A part of a ``facets`` kind: yes, no or not applicable.
 
     ``question`` says "it", so the predicate's question names the subject
     before it.
     """
     asked = OwnerQuestion(question, statement, protects, _same(FACET_ANSWERS))
-    return _owner_only(f"{{subject}}: {question}", asked)
+    predicate = _owner_only(f"{{subject}}: {question}", asked)
+    return replace(predicate, extracted=extracted)
 
 
 def _yes_no(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
@@ -871,21 +878,25 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             "Does it limit the rate of requests?",
             "Limits the rate of requests.",
             protects="yes",
+            extracted=True,
         ),
         "capacity-limits-size": _facet(
             "Does it limit the size of a request or message?",
             "Limits the size of a request or message.",
             protects="yes",
+            extracted=True,
         ),
         "capacity-limits-concurrency": _facet(
             "Does it limit how much work runs at once?",
             "Limits how much work runs at once.",
             protects="yes",
+            extracted=True,
         ),
         "capacity-limits-quota": _facet(
             "Does it set a quota per user or tenant?",
             "Sets a quota per user or tenant.",
             protects="yes",
+            extracted=True,
         ),
         "audit-evidence-record-protected": _facet(
             "Is that record kept where the people it records cannot"

@@ -73,6 +73,16 @@ PRE_0117 = frozenset(
     }
 )
 
+#: The part predicates whose group ADR 0117's phase 2 turned extraction on for.
+EXTRACTED_PARTS = frozenset(
+    {
+        "capacity-limits-rate",
+        "capacity-limits-size",
+        "capacity-limits-concurrency",
+        "capacity-limits-quota",
+    }
+)
+
 
 @pytest.fixture
 def model():
@@ -147,9 +157,9 @@ class TestTheRegistryHoldsEachPart:
         assert set(get_args(PredicateName)) == set(REGISTRY)
 
 
-class TestTheAssertionPassSeesNoNewPart:
-    def test_the_pass_extracts_what_it_extracted_before(self):
-        assert set(EXTRACTED) == PRE_0117
+class TestTheAssertionPassSeesOnlyTheExtractedParts:
+    def test_the_pass_extracts_the_old_predicates_and_the_extracted_parts(self):
+        assert set(EXTRACTED) == PRE_0117 | EXTRACTED_PARTS
 
     def test_the_prompt_table_and_the_schema_name_only_extracted_ones(self):
         table = render_predicates("catalog")
@@ -157,7 +167,7 @@ class TestTheAssertionPassSeesNoNewPart:
             assert (f"| `{name}` |" in table) == (name in EXTRACTED), name
         schema = CatalogProposal.model_json_schema()
         enum = schema["$defs"]["AssertionProposal"]["properties"]["predicate"]["enum"]
-        assert set(enum) == PRE_0117
+        assert set(enum) == PRE_0117 | EXTRACTED_PARTS
 
     def test_the_resolver_refuses_a_part_the_pass_does_not_extract(self, model):
         proposal = CatalogProposal(
@@ -165,7 +175,7 @@ class TestTheAssertionPassSeesNoNewPart:
                 AssertionProposal(
                     subject_type="component",
                     subject=PROCESS,
-                    predicate="capacity-limits-rate",
+                    predicate="authorization-scope-checks-each-request",
                     value="yes",
                     basis="inferred",
                     explanation="it says so",
