@@ -485,5 +485,5 @@ generated. A submission covers the frameworks whose reference sets it carries
 a matching digest for, and it stops covering one the moment that file changes.
 CI checks that every finding of every set you read carries a mark, that the
 digests match the tree, and that the pull request adds this one file and
-nothing else. `tests/test_case_review.py` names the cases still waiting, and
-derives that list from the merged submissions.
+nothing else. `uv run python webapp/sitting.py --list` names the cases still
+waiting, and derives that list from the merged submissions.

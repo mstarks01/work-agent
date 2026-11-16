@@ -37,12 +37,13 @@ reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under
 `evals/review/submissions/` — who read it, what they wrote before the sets
-opened, and the digest of each file they read. One case waits for one, and
-`uv run python webapp/sitting.py --list` names them. Case `01-payments-checkout` carries a filled reading document dated
+opened, and the digest of each file they read.
+`uv run python webapp/sitting.py --list` names each case that waits for one.
+Case `01-payments-checkout` carries a filled reading document dated
 2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
 reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
-reader's own words and the template for the method, and no submission clears
-the case (ADR 24).
+reader's own words and the template for the method. The document is not a
+submission, so it does not clear the case (ADR 24).
 `tests/test_case_review.py` fails a case that no sitting clears unless its
 `UNREVIEWED` table names the case, and fails a read file that changes under its
 recorded digest.
