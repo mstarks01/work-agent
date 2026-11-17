@@ -48,13 +48,14 @@ submission, so it does not clear the case (ADR 24).
 `UNREVIEWED` table names the case, and fails a read file that changes under its
 recorded digest.
 
-**Sixteen cases carry signed reference facts.** Cases 01 to 13 and 16 to 18 carry a
+**18 cases carry signed reference facts.** Cases 01 to 13 and 16 to 20 carry a
 `facts.json`, one row per fact the sources state, in the shape the assertion
 node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it: cases 01, 04, 09, 11 and 13 on 2026-09-16,
 the other eight on 2026-09-18 (#1048), and case 16 on 2026-10-10. The maintainer signed case 16's
 `network-membership` row for `process:library-app` on 2026-10-15, and case 18's
-rows on 2026-11-14, and case 17's rows on 2026-11-14 and 2026-11-16. The rulings and the model
+rows on 2026-11-14, and case 17's rows on 2026-11-14 and 2026-11-16, and the rows of cases 19
+and 20 on 2026-11-17. The rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
 placement is not graded as a fact. A file may carry signed alias rulings for
@@ -153,7 +154,7 @@ evals/
     model.json                  the blessed System Model (passes the shipped validator)
     claims/<framework>.json     that framework's reference set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
-    facts.json                  the reference facts, per predicate; a draft until signed (16 cases signed)
+    facts.json                  the reference facts, per predicate; a draft until signed (18 cases signed)
     rulings.json                other readings a person ruled answer a STRIDE claim (optional)
     case.json                   metadata, provenance, and the declared sources
   build_diagrams.py             writes diagrams/ from each case's model.json

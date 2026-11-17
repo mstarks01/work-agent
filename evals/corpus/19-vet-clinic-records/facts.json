@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "Stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "Stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,7 +63,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -84,7 +84,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -105,7 +105,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -126,7 +126,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -147,7 +147,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -168,7 +168,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -184,7 +184,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -200,7 +200,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -221,7 +221,7 @@
         "exclusive": false
       },
       "rationale": "Stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -237,7 +237,7 @@
         "exclusive": false
       },
       "rationale": "A signed-in staff account is stated; the way it signs in is not.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -253,7 +253,7 @@
         "exclusive": false
       },
       "rationale": "The source names the database's admin account and no mechanism behind it, as the maintainer ruled for a named login on case 17.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -269,7 +269,7 @@
         "exclusive": false
       },
       "rationale": "The source names the database's admin account and no mechanism behind it, as the maintainer ruled for a named login on case 17.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -285,7 +285,7 @@
         "exclusive": false
       },
       "rationale": "No sentence names how the importer verifies who sent a result.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -301,7 +301,7 @@
         "exclusive": false
       },
       "rationale": "No sentence names how the importer connects to the records database.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -317,7 +317,7 @@
         "exclusive": false
       },
       "rationale": "No sentence names how receptionists sign in to the billing service.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -333,7 +333,7 @@
         "exclusive": false
       },
       "rationale": "No sentence names how an owner can tell that an invoice email came from the clinic.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -363,7 +363,7 @@
         "exclusive": false
       },
       "rationale": "A stated grant: every staff account can do everything in the clinic API.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -393,7 +393,7 @@
         "exclusive": false
       },
       "rationale": "A stated grant, held to the owner's own pets by the ownership check.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -423,7 +423,7 @@
         "exclusive": false
       },
       "rationale": "A stated use of the billing service by receptionists.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -453,7 +453,7 @@
         "exclusive": false
       },
       "rationale": "A stated grant: both APIs use the database's admin account.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -469,7 +469,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -485,7 +485,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -501,7 +501,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -517,7 +517,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],
