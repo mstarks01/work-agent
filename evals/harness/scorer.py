@@ -469,14 +469,19 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
     return answered, eligible
 
 
-#: The word :func:`percent` prints for a share with no value: a gap, never a
-#: zero.
+#: The word :func:`shown_share` prints for a share with no value: a gap, never
+#: a zero.
 UNAVAILABLE = "unavailable"
 
 
+def shown_share(value: float | None, spec: str) -> str:
+    """A share in the format ``spec``, or :data:`UNAVAILABLE` where it has no value."""
+    return UNAVAILABLE if value is None else format(value, spec)
+
+
 def percent(value: float | None) -> str:
-    """A share as a percentage, or :data:`UNAVAILABLE` where it has no value."""
-    return UNAVAILABLE if value is None else f"{value:.0%}"
+    """A share as a whole percentage, as :func:`shown_share` prints it."""
+    return shown_share(value, ".0%")
 
 
 def ratio(numerator: float, denominator: float) -> float:

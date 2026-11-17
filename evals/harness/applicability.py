@@ -1152,13 +1152,13 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         return
     print("\nASVS applicability (mechanical, catalog match)")
     print(
-        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
+        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>11}"
         f" {'miss':>5} {'defr':>5} {'unlst':>5} {'neg!':>5} {'rej':>5} {'off':>4}"
     )
     for score in scores:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
-            f" {score.must_find_recall:>6.0%} {percent(score.precision):>6}"
+            f" {score.must_find_recall:>6.0%} {percent(score.precision):>11}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"

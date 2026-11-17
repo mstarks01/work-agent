@@ -1473,7 +1473,7 @@ def scorecard_of(
 
     Shares :func:`_score_runs` with ``score``, so the matches and loss causes
     are the ones ``score`` prints. Matching and the loss causes read no vote
-    standing. The ``drafted`` stage is the same matcher over the drafts the
+    status. The ``drafted`` stage is the same matcher over the drafts the
     critic was handed. The critic audit reads ``votes``, for the labels its
     populations rest on.
 

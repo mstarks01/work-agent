@@ -119,11 +119,8 @@ YieldRate = Literal[
     "kill_rate", "rejected_kill_rate", "matched_kill_rate", "kill_precision"
 ]
 
-#: Why the not-real population is empty. ``stale-votes``: some draft carries a
-#: vote, but a vote judges a reported claim with its verdict (ADR 0029) and a
-#: draft carries no verdict, so the vote reads ``stale`` on the draft.
-#: ``no-down-vote``: no draft carries a current down-vote, and none reads
-#: ``stale``.
+#: Why the not-real population is empty: some draft reads ``stale``, or none
+#: does. :data:`GAP_WORDS` says what each one means.
 NotRealGap = Literal["stale-votes", "no-down-vote"]
 
 #: What a report prints for each :data:`NotRealGap`.
@@ -495,7 +492,7 @@ def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
     }
 
 
-def fates(block: FrameworkAnalysis) -> dict[str, CriticFate]:
+def fate_by_claim(block: FrameworkAnalysis) -> dict[str, CriticFate]:
     """Each claim ID the block carries, and the list it carries it in.
 
     A draft the block does not carry has the fate :data:`UNRULED`. Raises
@@ -523,7 +520,7 @@ def _yield(
     block: FrameworkAnalysis,
 ) -> CriticYield:
     steps = rejection_steps(block)
-    fate_of = fates(block)
+    fate_of = fate_by_claim(block)
     surviving = set(post.produced_ids)
     outcomes = _scored_outcomes(pre)
     killed = tuple(
@@ -563,7 +560,7 @@ def _yield(
 
 
 def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | None]]:
-    """Every produced threat's fate in one scoring pass, keyed by threat ID.
+    """Every produced threat's scored outcome in one pass, keyed by threat ID.
 
     Threat IDs are unique within a run — :func:`~analysis_service.critic.
     join_drafts` fails closed if two category agents reuse one — so a dict is a safe

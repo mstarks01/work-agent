@@ -20,12 +20,14 @@ from analysis_service.claims import Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
 from evals.harness.critic_yield import (
+    GAP_WORDS,
     LABEL_OF,
     CriticAudit,
     CriticPopulations,
+    NotRealGap,
     ScoredOutcome,
     aggregate_yield,
-    fates,
+    fate_by_claim,
     score_case_with_yield,
 )
 from evals.harness.fingerprint import components_for, version_for
@@ -606,6 +608,10 @@ def test_each_scored_outcome_joins_one_population():
     assert set(LABEL_OF) == outcomes
 
 
+def test_each_not_real_gap_has_its_words():
+    assert set(GAP_WORDS) == set(get_args(NotRealGap))
+
+
 def test_the_populations_split_each_label_by_what_the_critic_did(case):
     """Rejection, qualification and retention each read their own denominator."""
     must_find = _draft_for(case, _must_find(case), 1)
@@ -719,4 +725,4 @@ def test_a_block_that_lists_one_claim_twice_gives_no_fate(case):
     )
 
     with pytest.raises(ValueError, match="more than once"):
-        fates(block)
+        fate_by_claim(block)
