@@ -264,13 +264,13 @@
       "flow:entity:partner-lab>process:lab-results-importer>send-test-results",
       "entity:partner-lab"
     ],
-    "claim": "The partner lab can write a result into the record of any pet, because the importer does not check whether the lab may send it; a lab that sends results it should not changes records beyond its job.",
+    "claim": "If the partner lab's results should cover only the pets it tests, the lab may write results into the records of other pets, because the importer writes every result the lab sends.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The missing check is stated. The source does not say which pets the lab's results may cover, so the reach beyond the lab's job is a condition.",
+    "notes": "The missing check is stated; which pets the lab tests is not, so the claim is conditional. The change to the record is the tampering must-find's; the reach of the lab's grant is this lane's.",
     "verb": "abuse-grant"
   },
   {

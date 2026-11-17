@@ -255,8 +255,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The role check is stated; the source says nothing about classes in that check, so the claim is conditional.",
-    "verb": "escalate"
+    "notes": "The role check is stated; the source says nothing about classes in that check, so the claim is conditional. The teacher holds the marking grant, so the verb is abuse-grant.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",

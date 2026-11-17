@@ -283,8 +283,8 @@ on either of them. That is the finding this sitting exists for.
 **17.** If the coursework service checks only the teacher role, a teacher may mark the work of students outside their own classes.
 
 - `process:coursework-service`, `flow:entity:teacher>process:coursework-service>mark-work`, `entity:teacher`
-- severity: low/medium · verb: `escalate`
-- The role check is stated; the source says nothing about classes in that check, so the claim is conditional.
+- severity: low/medium · verb: `abuse-grant`
+- The role check is stated; the source says nothing about classes in that check, so the claim is conditional. The teacher holds the marking grant, so the verb is abuse-grant.
 
 > mark:
 
@@ -342,7 +342,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "f03361ae94b47c0bba5d322cdf69fd0f9a59f1a6c80890f502e901d47656d1f5",
       "model.json": "0107d4a7d3a4e8d5118c294f3ca03c58f4f270d063bbe2e7ceea908c67b80a4b",
-      "claims/stride.json": "ed04839948dabaaa6e1b0dd9e3010ec37ac0cac650797a51a457f473c9117538"
+      "claims/stride.json": "4248627a626133a97981cb14181a9534d2b1a4f60f3dc4ea1fccbaefb453dc10"
       }
     }
   }

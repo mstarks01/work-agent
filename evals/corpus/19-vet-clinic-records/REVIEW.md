@@ -287,11 +287,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**18.** The partner lab can write a result into the record of any pet, because the importer does not check whether the lab may send it; a lab that sends results it should not changes records beyond its job.
+**18.** If the partner lab's results should cover only the pets it tests, the lab may write results into the records of other pets, because the importer writes every result the lab sends.
 
 - `process:lab-results-importer`, `flow:entity:partner-lab>process:lab-results-importer>send-test-results`, `entity:partner-lab`
 - severity: low/medium · verb: `abuse-grant`
-- The missing check is stated. The source does not say which pets the lab's results may cover, so the reach beyond the lab's job is a condition.
+- The missing check is stated; which pets the lab tests is not, so the claim is conditional. The change to the record is the tampering must-find's; the reach of the lab's grant is this lane's.
 
 > mark:
 
@@ -365,7 +365,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "c3b1dc97272657e10e019c71ea817ea5a6f46f572ea5947d4cb471835969417b",
       "model.json": "4cddecd65193934202f18f7a0d34b8bf0e35ff10efa48af35248c5ca17d1c9d1",
-      "claims/stride.json": "0f709ed8272075828e661ad43bd4a08ad2d02e76b4ab9d25da90db819c42dbe3"
+      "claims/stride.json": "c9f877bf1d7dbfc5360e5dec78712dac3e853fb50d4afbd95046d34a15765e6b"
       }
     }
   }
