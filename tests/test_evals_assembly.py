@@ -133,6 +133,7 @@ def test_a_finished_case_missing_a_capture_is_named_and_the_rest_replay(
     assert line.startswith(f"{case.id}: ") and f"no {kind} file" in line
     assert [row.case for row in sweep.rows] == [other]
     assert sweep.rows[0].accounted == sweep.rows[0].drafts
+    assert main(["assembly", str(archive)]) == 1
 
 
 def test_a_sweep_that_writes_no_report_gives_no_row(archive, case, capsys):  # noqa: F811
@@ -476,3 +477,20 @@ def test_a_claim_returned_twice_is_filed_differently(
 
     assert row.unexplained == row.misfiled == (returned.id,)
     assert row.accounted == (neighbour.id,)
+
+
+def test_an_omitted_draft_held_twice_is_counted_once(archive, case):  # noqa: F811
+    """Each draft falls in one count, so the counts add up to the drafts read."""
+    path = _report_path(archive, case)
+    report, gone = _without_claim(Report.model_validate_json(path.read_text()))
+    path.write_text(report.model_dump_json())
+    drafts_path = reports_dir(archive) / f"{case.id}.drafts.json"
+    held = json.loads(drafts_path.read_text(encoding="utf-8"))
+    held["stride"].extend(d for d in list(held["stride"]) if d["id"] == gone)
+    drafts_path.write_text(json.dumps(held), encoding="utf-8")
+
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert (row.omitted, row.repeated, row.unavailable) == ((gone,), (gone,), ())
+    counted = row.accounted + row.omitted + row.misfiled + row.unavailable
+    assert sorted(counted) == sorted(row.drafts)

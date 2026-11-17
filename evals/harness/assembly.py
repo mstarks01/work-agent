@@ -39,7 +39,9 @@ rulings, so a claim filed against its own verdict is the report's check to
 refuse, and one whose verdict moved with it reads as the critic's ruling. The
 report's check also owns each block's summary, so a summary that miscounts its
 block fails the load and is named as an unreadable report. No ruled severity
-has an oracle: the replay compares no severity.
+has an oracle: the replay compares no severity. The report does not hold the
+units a Control row kept from the deferred set, only those it sent back, so a
+kept claim that assembly failed to send back reads as the critic's ruling.
 
 **What it counts.** Each draft of a replayed block is accounted, omitted,
 filed differently or unavailable, where its block was refused or its ID
@@ -171,17 +173,12 @@ class AssemblyReplay:
         """
         if self.refused:
             return ()
-        returned_twice = {
-            claim_id
-            for claim_id, count in Counter(self.returned_reported).items()
-            if count > 1
-        }
         return tuple(
             sorted(
                 (set(self.reported) ^ set(self.replayed))
                 | (set(self.rejected_reported) ^ set(self.rejected_replayed))
                 | (set(self.returned_reported) ^ set(self.returned_replayed))
-                | returned_twice
+                | set(_repeated(self.returned_reported))
             )
         )
 
@@ -209,10 +206,17 @@ class AssemblyReplay:
 
     @property
     def unavailable(self) -> tuple[str, ...]:
-        """Drafts the replay cannot file: a refused block's, or a repeated ID."""
-        if self.refused:
-            return tuple(draft for draft in self.drafts if draft not in self.omitted)
-        return self.repeated
+        """Drafts the replay cannot file: a refused block's, or a repeated ID.
+
+        An omitted draft is counted as omitted only.
+        """
+        cannot_file = self.drafts if self.refused else self.repeated
+        return tuple(draft for draft in cannot_file if draft not in self.omitted)
+
+
+def _repeated(ids: Sequence[str]) -> tuple[str, ...]:
+    """Each ID ``ids`` holds more than once, sorted."""
+    return tuple(sorted(i for i, count in Counter(ids).items() if count > 1))
 
 
 def replay_case(
@@ -245,13 +249,7 @@ def replay_case(
         returned_reported=tuple(entry.claim_id for entry in block.returned_claims),
         returned_replayed=(),
         omitted=tuple(sorted(by_id.keys() - ruled)),
-        repeated=tuple(
-            sorted(
-                draft_id
-                for draft_id, count in Counter(d.id for d in drafts).items()
-                if count > 1
-            )
-        ),
+        repeated=_repeated([draft.id for draft in drafts]),
     )
     # A ruled claim with no draft stays reported and is never replayed, so it
     # is named while its neighbours replay.
@@ -365,19 +363,17 @@ def command_assembly(args: argparse.Namespace) -> int:
             for case in development_cases(load_corpus(args.corpus))
             if case.id in artifact.cases and (not args.case or case.id in args.case)
         ]
-        rows, unreadable, capture_faults, writes_reports = replay_artifact(
-            artifact, cases
-        )
+        sweep = replay_artifact(artifact, cases)
     except (EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
-    if not writes_reports:
+    if not sweep.writes_reports:
         print(f"{artifact.path}: the {artifact.mode} mode writes no report")
         return 0
-    for line in (*capture_faults, *unreadable):
+    for line in (*sweep.capture_faults, *sweep.unreadable):
         print(line)
     moved = 0
-    for row in rows:
+    for row in sweep.rows:
         for claim_id in row.omitted:
             print(f"  {row.case}: ruled on and omitted from the report: {claim_id}")
         for claim_id in row.repeated:
@@ -396,19 +392,19 @@ def command_assembly(args: argparse.Namespace) -> int:
         )
         for claim_id in row.unexplained:
             print(f"  filed differently from its ruling: {claim_id}")
-    refused = sum(bool(row.refused) for row in rows)
+    refused = sum(bool(row.refused) for row in sweep.rows)
     print(
-        f"{len(rows)} block(s), {moved} differ, {refused} refused by today's check;"
-        f" {len(unreadable)} report(s) refused by today's Report;"
-        f" {len(capture_faults)} case(s) with a missing or stray capture"
+        f"{len(sweep.rows)} block(s), {moved} differ, {refused} refused by today's check;"
+        f" {len(sweep.unreadable)} report(s) refused by today's Report;"
+        f" {len(sweep.capture_faults)} case(s) with a missing or stray capture"
     )
     print(
-        f"drafts: {sum(len(row.drafts) for row in rows)} inspected,"
-        f" {sum(len(row.accounted) for row in rows)} accounted,"
-        f" {sum(len(row.omitted) for row in rows)} omitted,"
-        f" {sum(len(row.misfiled) for row in rows)} filed differently,"
-        f" {sum(len(row.unavailable) for row in rows)} unavailable;"
-        f" {sum(len(row.undrafted) for row in rows)} ruled claim(s) with no draft"
+        f"drafts: {sum(len(row.drafts) for row in sweep.rows)} inspected,"
+        f" {sum(len(row.accounted) for row in sweep.rows)} accounted,"
+        f" {sum(len(row.omitted) for row in sweep.rows)} omitted,"
+        f" {sum(len(row.misfiled) for row in sweep.rows)} filed differently,"
+        f" {sum(len(row.unavailable) for row in sweep.rows)} unavailable;"
+        f" {sum(len(row.undrafted) for row in sweep.rows)} ruled claim(s) with no draft"
     )
     print("ruled severity: no oracle")
-    return 1 if moved else 0
+    return 1 if moved or sweep.capture_faults else 0
