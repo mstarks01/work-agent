@@ -1460,21 +1460,21 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_scorecard(args: argparse.Namespace) -> int:
-    """The must-find scorecard of one finished sweep, by lane and stage.
+def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
+    """The must-find scorecard of one finished sweep, scored on ``corpus``.
 
-    Shares :func:`_score_runs` with ``score``, so the scorecard's matches and
-    loss causes are the ones ``score`` prints. Matching reads no vote, so it
-    reads an empty ledger. The ``drafted`` stage is the same matcher over the
-    drafts the critic was handed.
+    The one builder of a scorecard: ``run.py scorecard`` and any instrument
+    that reads the rows in process call it. Shares :func:`_score_runs` with
+    ``score``, so the matches and loss causes are the ones ``score`` prints.
+    Matching reads no vote, so it reads an empty ledger. The ``drafted``
+    stage is the same matcher over the drafts the critic was handed. Raises
+    :class:`~evals.harness.modes.EvalRunError` where no case of the sweep is
+    in ``corpus``.
     """
-    loaded = load_artifact(Path(args.artifact))
-    cases = [case for case in load_corpus(args.corpus) if case.id in loaded.cases]
+    loaded = load_artifact(artifact)
+    cases = [case for case in load_corpus(corpus) if case.id in loaded.cases]
     if not cases:
-        print(
-            f"{args.artifact}: none of its cases are in {args.corpus}", file=sys.stderr
-        )
-        return 1
+        raise modes.EvalRunError(f"{artifact}: none of its cases are in {corpus}")
     runs = runs_from_reports(loaded, cases)
     flow_maps = flows_by_case(
         cases, {case: run.report.system_model for case, run in runs.items()}
@@ -1489,9 +1489,7 @@ def command_scorecard(args: argparse.Namespace) -> int:
     charged_by_case = {entry.case: entry for entry in charged}
     identity = scorecard.run_identity(
         loaded,
-        ScoredAgainst(
-            corpus_digest=corpus_digest(Path(args.corpus)), repo_commit=repo_commit()
-        ),
+        ScoredAgainst(corpus_digest=corpus_digest(corpus), repo_commit=repo_commit()),
     )
     rows: list[scorecard.ReferenceRow] = []
     for case in cases:
@@ -1510,13 +1508,19 @@ def command_scorecard(args: argparse.Namespace) -> int:
             scorecard.case_rows(identity, case, held, charged_by_case.get(case.id))
         )
     replayed = assembly.replay_artifact(loaded, cases)
-    card = scorecard.summarize(
+    return scorecard.summarize(
         rows, scorecard.assembly_check(replayed.rows, len(replayed.unreadable))
     )
+
+
+def command_scorecard(args: argparse.Namespace) -> int:
+    """Print the scorecard of one finished sweep, and write it with ``--out``."""
+    artifact = Path(args.artifact)
+    card = scorecard_of(artifact, Path(args.corpus))
     scorecard.render(card)
     if args.out:
         record = run_record(
-            "scorecard", {"corpus": str(args.corpus)}, sweep_inputs([loaded.path])
+            "scorecard", {"corpus": str(args.corpus)}, sweep_inputs([artifact])
         )
         written = {"record": record, **card.to_json()}
         Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")

@@ -30,7 +30,7 @@ from evals.harness.scorecard import (
     charged_misses,
     summarize,
 )
-from evals.harness.scorer import score_case
+from evals.harness.scorer import none_stated, score_case
 from tests.source_tree import REPO_ROOT
 
 BASELINE = (
@@ -172,8 +172,8 @@ def test_an_empty_denominator_is_undefined_and_never_zero():
     every = summarize(rows, NO_ASSEMBLY).lanes[-1]
 
     assert Rate(0, 0).value is None
-    assert every.compatible_coverage == Rate(0, 0)
-    assert every.cumulative["reported"] is None
+    assert every.compatible_matched == Rate(0, 0)
+    assert every.represented["reported"] is None
     assert all(change.loss is None and change.net is None for change in every.changes)
 
 
@@ -185,7 +185,7 @@ def test_an_uncaptured_stage_is_unavailable_and_never_a_loss(archived):
 
     assert {row.status for row in rows} == {"unavailable"}
     assert all(set(row.stages.values()) == {None} for row in rows)
-    assert every.cumulative == {"proposed": None, "drafted": None, "reported": None}
+    assert every.represented == {"proposed": None, "drafted": None, "reported": None}
     assert all(change.observed == 0 for change in every.changes)
 
 
@@ -283,8 +283,20 @@ def test_compatible_and_incompatible_rows_report_both_populations():
         "unavailable": 1,
     }
     assert every.total == len(rows)
-    assert every.compatible_coverage == Rate(1, 2)
-    assert every.population_coverage == Rate(1, 5)
+    assert every.compatible_matched == Rate(1, 2)
+    assert every.population_matched == Rate(1, 5)
+
+
+def test_no_rows_are_refused_as_no_run():
+    with pytest.raises(ValueError, match="at least one row"):
+        summarize([], NO_ASSEMBLY)
+
+
+def test_none_stated_reads_only_items_that_state_no_position():
+    assert none_stated("outside", [None, None])
+    assert not none_stated("outside", [None, "on-path"])
+    assert not none_stated(None, [None])
+    assert not none_stated("outside", [])
 
 
 def test_rows_of_two_runs_are_refused():
@@ -306,6 +318,24 @@ def test_charged_misses_leave_out_unstated_and_uncharged_rows():
     ]
 
     assert [row.reference_index for row in charged_misses(rows)] == [0, 3]
+
+
+def test_charged_misses_leave_out_a_re_keyed_row():
+    rows = [
+        _synthetic(False, False, reference_index=0, cause="place"),
+        _synthetic(
+            False, False, reference_index=1, cause="place", compatibility="re-keyed"
+        ),
+        _synthetic(
+            False,
+            False,
+            reference_index=2,
+            cause="verb",
+            compatibility="position-unstated",
+        ),
+    ]
+
+    assert [row.reference_index for row in charged_misses(rows)] == [0, 2]
 
 
 def test_the_command_reconciles_with_score(tmp_path: Path):
@@ -332,6 +362,32 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
         assert sum(lane["by_status"][status] for status in STATUSES) == lane["total"]
     assert len({json.dumps(row["run"], sort_keys=True) for row in card["rows"]}) == 1
     assert {row["stages"]["proposed"] for row in card["rows"]} == {None}
+    # Each must-find the critic yield calls lost for good is a reference the
+    # scorecard reads as drafted and not reported.
+    reported_by_case = {
+        score["case"]: {pair["reference_index"] for pair in score["matched"]}
+        for score in scored["scores"]
+    }
+    lost_for_good = {
+        (entry["case"], killed["reference_index"])
+        for entry in scored["critic_yield"]
+        for killed in entry["killed"]
+        if killed["disposition"] == "matched-must-find"
+        and killed["reference_index"] not in reported_by_case[entry["case"]]
+    }
+    lost_rows = {
+        (row["case"], row["reference_index"])
+        for row in card["rows"]
+        if row["stages"]["drafted"] and not row["stages"]["reported"]
+    }
+    assert lost_for_good and lost_for_good <= lost_rows
+    # The loss attribution reads the position rule through the same scorer
+    # helper: no row read as position-unstated is a lane's other position.
+    assert all(
+        row["cause"] != "position"
+        for row in card["rows"]
+        if row["compatibility"] == "position-unstated"
+    )
     check = card["assembly"]
     replayed = check["reproduced"] + len(check["differ"]) + len(check["refused"])
     assert replayed == len(scored["scores"])

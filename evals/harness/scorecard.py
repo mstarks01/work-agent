@@ -16,7 +16,7 @@ run's answer to it. The other values say why it cannot:
   resolves it. A reference the matcher matched at a stage is never
   ``re-keyed``, because the scorer read it.
 * ``position-unstated``: a person ruled the reference an attacker position,
-  and :func:`~evals.harness.scorer.position_fate` reads every draft of the
+  and :func:`~evals.harness.scorer.none_stated` reads every draft of the
   run as ``unstated`` against it. The archive holds no ``attacker_position``,
   so the row is not a lane's choice of attacker. A missing position is never
   inferred from prose.
@@ -24,12 +24,15 @@ run's answer to it. The other values say why it cannot:
 **Stages.** A reference is *represented* at a stage when the structural
 matcher matches it to a claim of that stage. ``drafted`` reads the drafts the
 critic was handed and ``reported`` reads the report's claims, through one
-matcher and :func:`~evals.harness.scorer.score_case`. ``proposed`` reads the
-lanes' proposals before the fan-in, and no reader of that stage exists, so it
-is uncaptured on every row. An uncaptured stage is never a zero.
+matcher and :func:`~evals.harness.scorer.score_case`. ``proposed`` is the
+lanes' proposals before the fan-in. The structural matcher does not read a
+proposal, so that stage is uncaptured on every row. An uncaptured stage is
+never a zero.
 
 **Rates.** Each rate is a :class:`Rate` with its numerator and denominator.
-An empty denominator gives ``None``, never 0.0.
+An empty denominator gives ``None``, where :func:`~evals.harness.scorer.ratio`
+gives 0.0. A rate here is a share of matched must-finds, not the per-lane
+**Coverage** of ``GLOSSARY.md``.
 
 **One run.** :func:`summarize` refuses rows of more than one
 :class:`RunIdentity`, so two sweeps, two corpus revisions or two scorer trees
@@ -50,6 +53,7 @@ from analysis_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
     AttackerPosition,
     DraftThreat,
+    StrideCategory,
 )
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, RepoCommit, ScoredAgainst
@@ -58,7 +62,7 @@ from evals.harness.audit import Phase, phase_of
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import CaseLosses, Cause
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import position_fate
+from evals.harness.scorer import none_stated
 from evals.harness.triggers import case_trigger_recall
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]
@@ -114,11 +118,11 @@ class ReferenceRow:
 
     run: RunIdentity
     case: str
-    lane: str
+    lane: StrideCategory
     reference_index: int
     verb: str | None
     elements: tuple[str, ...]
-    ruled_position: str | None
+    ruled_position: AttackerPosition | None
     compatibility: Compatibility
     #: Whether the matcher matches the reference at each stage. ``None`` where
     #: the stage is uncaptured.
@@ -192,7 +196,10 @@ def capture(
 
 
 def _compatibility(
-    held: CaseCapture | None, index: int, elements: Sequence[str], position: str | None
+    held: CaseCapture | None,
+    index: int,
+    elements: Sequence[str],
+    position: AttackerPosition | None,
 ) -> Compatibility:
     if held is None:
         return "uncaptured"
@@ -204,8 +211,7 @@ def _compatibility(
     matched = index in held.drafted or index in held.reported
     if not matched and not endpoint_form(elements, held.flows) <= present:
         return "re-keyed"
-    fates = {position_fate(position, stated) for stated in held.stated_positions}
-    if fates == {"unstated"}:
+    if none_stated(position, held.stated_positions):
         return "position-unstated"
     return "compatible"
 
@@ -319,15 +325,16 @@ class StageChange:
 class LaneSummary:
     """One lane's rows, or every lane's under the lane ``all``."""
 
-    lane: str
+    lane: StrideCategory | Literal["all"]
     by_status: Mapping[Status, int]
     #: Matched over the compatible rows: the comparable subset.
-    compatible_coverage: Rate
+    compatible_matched: Rate
     #: Matched over every row: the full population, beside the subset.
-    population_coverage: Rate
-    #: Per stage, represented compatible rows over the compatible rows that
-    #: captured the stage. ``None`` where no compatible row captured it.
-    cumulative: Mapping[Stage, Rate | None]
+    population_matched: Rate
+    #: Per stage, the compatible rows represented there over the compatible
+    #: rows that captured the stage: the cumulative share at that stage.
+    #: ``None`` where no compatible row captured it.
+    represented: Mapping[Stage, Rate | None]
     changes: tuple[StageChange, ...]
 
     @property
@@ -339,11 +346,11 @@ class LaneSummary:
             "lane": self.lane,
             "total": self.total,
             "by_status": dict(self.by_status),
-            "compatible_coverage": self.compatible_coverage.to_json(),
-            "population_coverage": self.population_coverage.to_json(),
-            "cumulative": {
+            "compatible_matched": self.compatible_matched.to_json(),
+            "population_matched": self.population_matched.to_json(),
+            "represented": {
                 stage: rate.to_json() if rate else None
-                for stage, rate in self.cumulative.items()
+                for stage, rate in self.represented.items()
             },
             "changes": [change.to_json() for change in self.changes],
         }
@@ -375,23 +382,25 @@ def _change(
     )
 
 
-def _cumulative(rows: Sequence[ReferenceRow], stage: Stage) -> Rate | None:
+def _represented(rows: Sequence[ReferenceRow], stage: Stage) -> Rate | None:
     captured = [row.stages[stage] for row in rows if row.stages[stage] is not None]
     return (
         Rate(sum(1 for here in captured if here), len(captured)) if captured else None
     )
 
 
-def _lane(lane: str, rows: Sequence[ReferenceRow]) -> LaneSummary:
+def _lane(
+    lane: StrideCategory | Literal["all"], rows: Sequence[ReferenceRow]
+) -> LaneSummary:
     counts = Counter(row.status for row in rows)
     compatible = [row for row in rows if row.compatibility == "compatible"]
     matched = counts["matched"]
     return LaneSummary(
         lane=lane,
         by_status={status: counts[status] for status in STATUSES},
-        compatible_coverage=Rate(matched, len(compatible)),
-        population_coverage=Rate(matched, len(rows)),
-        cumulative={stage: _cumulative(compatible, stage) for stage in STAGES},
+        compatible_matched=Rate(matched, len(compatible)),
+        population_matched=Rate(matched, len(rows)),
+        represented={stage: _represented(compatible, stage) for stage in STAGES},
         changes=tuple(
             _change(compatible, before, after, node) for before, after, node in CHANGES
         ),
@@ -454,10 +463,12 @@ class Scorecard:
 def summarize(rows: Sequence[ReferenceRow], assembly: AssemblyCheck) -> Scorecard:
     """The scorecard of one run's rows. Raises :class:`MixedRunsError` on two runs."""
     runs = {row.run for row in rows}
-    if len(runs) != 1:
+    if len(runs) > 1:
         raise MixedRunsError(
             f"a scorecard reads one run, and these rows carry {len(runs)}"
         )
+    if not runs:
+        raise ValueError("a scorecard needs at least one row")
     (run,) = runs
     lanes = [
         _lane(lane, [row for row in rows if row.lane == lane])
@@ -472,13 +483,19 @@ def summarize(rows: Sequence[ReferenceRow], assembly: AssemblyCheck) -> Scorecar
 
 
 def charged_misses(rows: Iterable[ReferenceRow]) -> tuple[ReferenceRow, ...]:
-    """The rows whose miss a stage of the run caused.
+    """The misses :mod:`evals.harness.losses` charged to a cause the run can read.
 
-    Every row :mod:`evals.harness.losses` charged to a cause other than
-    ``unstated``. An ``unstated`` row is the archive's missing position, not
-    a lane's miss. Each row carries its run identity and ``lead_rules``.
+    Every row with a cause other than ``unstated``, except a ``re-keyed`` row, whose cause rests on an element the run's model
+    did not hold. An ``unstated`` row is the archive's missing position, not a
+    lane's miss. A ``position-unstated`` row stays: its action and place were
+    read, and only its position was not. Each row carries its run identity
+    and ``lead_rules``.
     """
-    return tuple(row for row in rows if row.cause not in (None, "unstated"))
+    return tuple(
+        row
+        for row in rows
+        if row.cause not in (None, "unstated") and row.compatibility != "re-keyed"
+    )
 
 
 def _rate(rate: Rate | None) -> str:
@@ -499,18 +516,18 @@ def render(card: Scorecard) -> None:
     )
     print(
         f"{'lane':<24}{'total':>6}{'match':>6}{'miss':>6}{'incomp':>7}{'unavail':>8}"
-        "  compatible coverage   population coverage"
+        "  matched of compatible matched of all"
     )
     for lane in card.lanes:
         status = lane.by_status
         print(
             f"{lane.lane:<24}{lane.total:>6}{status['matched']:>6}{status['missed']:>6}"
             f"{status['incompatible']:>7}{status['unavailable']:>8}"
-            f"  {_rate(lane.compatible_coverage):<21} {_rate(lane.population_coverage)}"
+            f"  {_rate(lane.compatible_matched):<21} {_rate(lane.population_matched)}"
         )
     every = card.lanes[-1]
-    print("cumulative coverage of the compatible rows, by stage:")
-    for stage, rate in every.cumulative.items():
+    print("compatible rows represented at each stage:")
+    for stage, rate in every.represented.items():
         print(f"  {stage:<10} {_rate(rate)}")
     print("stage changes over the compatible rows:")
     for change in every.changes:
@@ -533,9 +550,9 @@ def render(card: Scorecard) -> None:
     led = sum(1 for row in charged if row.lead_rules)
     by_cause = Counter(row.cause for row in charged)
     print(
-        f"misses a stage caused: {len(charged)} ({led} led, {len(charged) - led}"
+        f"charged misses: {len(charged)} ({led} led, {len(charged) - led}"
         f" unled), by cause {dict(sorted(by_cause.items()))}"
     )
-    print("fan-in dispositions: unavailable (no reader of the proposed stage)")
+    print("fan-in dispositions: unavailable (the matcher reads no proposal)")
     print("critic input populations: unavailable (no labelled population defined)")
     print("repeats: 1; run-to-run variation unmeasured")
