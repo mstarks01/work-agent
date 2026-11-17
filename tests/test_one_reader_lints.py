@@ -418,12 +418,12 @@ def test_a_reports_rows_have_one_reader():
     """Only ``report_rows`` reads the row controls of a **Report**.
 
     ``row_controls`` takes a catalog, and a caller that holds a Report reads
-    its rows through ``report_rows``. ``absent_rows`` is the one other caller,
+    its rows through ``report_rows``. ``missing_rows`` is the one other caller,
     because it holds a catalog and no Report.
     """
     assert _sites(lambda node: _calls(node, "row_controls")) == [
         ("src/analysis_service/claim_identity.py", "report_rows"),
-        ("src/analysis_service/fixes.py", "absent_rows"),
+        ("src/analysis_service/fixes.py", "missing_rows"),
     ]
 
 
@@ -2103,6 +2103,37 @@ def _compares_an_origin(node: ast.AST) -> bool:
     )
 
 
+def _compares_a_value_with_absent(node: ast.AST) -> bool:
+    """A comparison of a row's ``value`` with ``ABSENT`` or ``"absent"``, also
+    as a member of a tuple or a set."""
+    if not isinstance(node, ast.Compare):
+        return False
+    parts = [node.left, *node.comparators]
+    members = [
+        member
+        for part in parts
+        if isinstance(part, ast.Tuple | ast.Set)
+        for member in part.elts
+    ]
+    return any(
+        _loads(part, "ABSENT") or _is_constant(part, "absent")
+        for part in parts + members
+    ) and any(_loads_attribute(part, "value") for part in parts)
+
+
+def _reads_a_no_answer(node: ast.AST) -> bool:
+    """A read of the value that an answer of "no" writes."""
+    if isinstance(node, ast.Subscript):
+        return _loads_attribute(node.value, "values") and _is_constant(node.slice, "no")
+    return (
+        _calls(node, "get")
+        and isinstance(node.func, ast.Attribute)
+        and _loads_attribute(node.func.value, "values")
+        and bool(node.args)
+        and _is_constant(node.args[0], "no")
+    )
+
+
 def _ends_a_job(node: ast.AST) -> bool:
     """A boolean expression that asks both halves of an ended job."""
     return _joins(node, "readable") and any(
@@ -2656,6 +2687,29 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "",
     ),
+    "which value says a control is not there": _OneReader(
+        _reads_a_no_answer,
+        ("src/analysis_service/assertions.py", "missing_value"),
+        {},
+        "",
+    ),
+    "is this control missing": _OneReader(
+        _compares_a_value_with_absent,
+        ("src/analysis_service/assertions.py", "states_missing"),
+        {
+            ("src/analysis_service/assertions.py", "_compatible"): (
+                "it asks whether two values can hold at once, and decides no"
+                " missing control"
+            ),
+            ("src/analysis_service/evidence.py", "_open_question_gloss"): (
+                "it spells the value a lane reads, and decides no missing control"
+            ),
+            ("src/analysis_service/evidence.py", "_assertion_gloss"): (
+                "it spells the value a lane reads, and decides no missing control"
+            ),
+        },
+        "",
+    ),
     "which settled rows the Evidence Catalog carries": _OneReader(
         lambda node: _loads(node, "SETTLING_REASONS"),
         ("src/analysis_service/assertions.py", "offered"),
@@ -2849,7 +2903,7 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _calls(node, "row_controls"),
         ("src/analysis_service/claim_identity.py", "report_rows"),
         {
-            ("src/analysis_service/fixes.py", "absent_rows"): (
+            ("src/analysis_service/fixes.py", "missing_rows"): (
                 "it holds a catalog and no Report, so it reads the row controls"
                 " of the catalog itself"
             ),

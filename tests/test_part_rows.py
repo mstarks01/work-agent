@@ -28,6 +28,8 @@ from analysis_service.assertions import (
     answer,
     assertion_id,
     catalog_issues,
+    missing_value,
+    states_missing,
 )
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer, part_answers
@@ -73,6 +75,16 @@ PRE_0117 = frozenset(
     }
 )
 
+#: The part predicates the assertion pass extracts (ADR 0117).
+EXTRACTED_PARTS = frozenset(
+    {
+        "capacity-limits-rate",
+        "capacity-limits-size",
+        "capacity-limits-concurrency",
+        "capacity-limits-quota",
+    }
+)
+
 
 @pytest.fixture
 def model():
@@ -96,6 +108,23 @@ def written(model, facts, held=None, controls=()):
     texts = {source.label: source.text for source in sources}
     assert catalog_issues(linked, model=model, sources=texts) == []
     return linked
+
+
+def extracted(model, predicate, value):
+    """The record of one row the assertion pass proposed about the process."""
+    proposal = CatalogProposal(
+        assertions=[
+            AssertionProposal(
+                subject_type="component",
+                subject=PROCESS,
+                predicate=predicate,
+                value=value,
+                basis="inferred",
+                explanation="it has none",
+            )
+        ]
+    )
+    return AssertionRecord.of(proposal, model, {"Notes": "text"})
 
 
 def row(catalog, subject, predicate):
@@ -147,9 +176,9 @@ class TestTheRegistryHoldsEachPart:
         assert set(get_args(PredicateName)) == set(REGISTRY)
 
 
-class TestTheAssertionPassSeesNoNewPart:
-    def test_the_pass_extracts_what_it_extracted_before(self):
-        assert set(EXTRACTED) == PRE_0117
+class TestTheAssertionPassSeesOnlyTheExtractedParts:
+    def test_the_pass_extracts_the_old_predicates_and_the_extracted_parts(self):
+        assert set(EXTRACTED) == PRE_0117 | EXTRACTED_PARTS
 
     def test_the_prompt_table_and_the_schema_name_only_extracted_ones(self):
         table = render_predicates("catalog")
@@ -157,15 +186,18 @@ class TestTheAssertionPassSeesNoNewPart:
             assert (f"| `{name}` |" in table) == (name in EXTRACTED), name
         schema = CatalogProposal.model_json_schema()
         enum = schema["$defs"]["AssertionProposal"]["properties"]["predicate"]["enum"]
-        assert set(enum) == PRE_0117
+        assert set(enum) == PRE_0117 | EXTRACTED_PARTS
 
     def test_the_resolver_refuses_a_part_the_pass_does_not_extract(self, model):
+        unextracted = next(
+            name for name, part in REGISTRY.items() if part.asked and not part.extracted
+        )
         proposal = CatalogProposal(
             assertions=[
                 AssertionProposal(
                     subject_type="component",
                     subject=PROCESS,
-                    predicate="capacity-limits-rate",
+                    predicate=unextracted,
                     value="yes",
                     basis="inferred",
                     explanation="it says so",
@@ -175,6 +207,60 @@ class TestTheAssertionPassSeesNoNewPart:
         record = AssertionRecord.of(proposal, model, {"Notes": "text"})
         assert record.catalog.entries == []
         assert [issue.code for issue in record.issues] == ["unknown-predicate"]
+
+    @pytest.mark.parametrize("name", sorted(EXTRACTED_PARTS))
+    def test_an_absence_of_an_extracted_part_is_its_no(self, model, name):
+        record = extracted(model, name, ABSENT)
+        assert [entry.value for entry in record.catalog.entries] == ["no"]
+        assert record.issues == []
+
+    def test_an_absence_of_a_predicate_with_no_no_term_stays_absent(self, model):
+        record = extracted(model, "record-attribution", ABSENT)
+        assert [entry.value for entry in record.catalog.entries] == [ABSENT]
+
+    @pytest.mark.parametrize("name", ["record-attribution", *sorted(EXTRACTED_PARTS)])
+    def test_the_resolver_writes_the_value_that_states_missing_reads(self, model, name):
+        (entry,) = extracted(model, name, ABSENT).catalog.entries
+        assert entry.value == missing_value(REGISTRY[name])
+        assert states_missing(entry)
+
+    def test_an_extracted_absence_agrees_with_an_owners_no(self, model):
+        held = extracted(model, "capacity-limits-rate", ABSENT).catalog
+        fact = kind_answer(PROCESS, "capacity-limits", rate="no")
+        found = answer(written(model, [fact], held), PROCESS, "capacity-limits-rate")
+        assert found.conflicts == ()
+        assert {entry.value for entry in found.settled} == {"no"}
+
+
+@pytest.mark.parametrize(
+    ("predicate", "value", "missing"),
+    [
+        ("capacity-limits-rate", "no", True),
+        ("capacity-limits-rate", ABSENT, True),
+        ("capacity-limits-rate", "yes", False),
+        ("capacity-limits-rate", "not applicable", False),
+        ("capacity-limits-rate", UNKNOWN, False),
+        ("stored-copy-integrity", "no", True),
+        ("record-attribution", ABSENT, True),
+        ("internet-exposure", "internet-facing", False),
+        ("internet-exposure", "internal", False),
+        ("code-execution", "no", False),
+        ("mfa-requirement", "required", False),
+    ],
+)
+def test_a_row_states_a_control_missing_by_absent_or_a_protective_parts_no(
+    predicate, value, missing
+):
+    entry = Assertion(
+        subject=PROCESS,
+        predicate=predicate,
+        value=value,
+        reason="silent" if value == UNKNOWN else None,
+        basis="inferred",
+        origin="assertion-pass",
+        explanation="it says so",
+    )
+    assert states_missing(entry) is missing
 
 
 class TestTheRowsAnAnswerWrites:

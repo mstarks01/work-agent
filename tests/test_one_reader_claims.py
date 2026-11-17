@@ -703,7 +703,7 @@ def test_a_site_among_several_in_an_assert_guards_nothing():
     """Negative control: a site that an assert lists beside other sites is no
     one reader, so it guards nothing."""
     assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
-    assert ("src/analysis_service/fixes.py", "absent_rows") not in guarded_sites()
+    assert ("src/analysis_service/fixes.py", "missing_rows") not in guarded_sites()
     assert ("src/analysis_service/claim_identity.py", "report_rows") in guarded_sites()
 
 

@@ -8,7 +8,8 @@ each missing control once, with the confirmed findings that rest on it.
 
 **Deterministic, and derived from the report alone.** No model is asked. A
 control is missing where a finding cites an ``absent-attribute`` ground, or an
-``assertion`` ground whose row states :data:`~analysis_service.assertions.ABSENT`.
+``assertion`` ground whose row states the control missing
+(:func:`~analysis_service.assertions.states_missing`).
 A row's control is read through :func:`~analysis_service.claim_identity.row_controls`,
 the one reader of which control a row is about. A finding that rests only on a
 quote names no control, so it stays outside every group.
@@ -25,7 +26,13 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from analysis_service.assertions import ABSENT, AssertionCatalog, assertion_id
+from analysis_service.assertions import (
+    REGISTRY,
+    AssertionCatalog,
+    assertion_id,
+    parse_predicate,
+    states_missing,
+)
 from analysis_service.claim_identity import row_controls
 from analysis_service.claims import Claim, FrameworkAnalysis
 from analysis_service.open_facts import attribute_words, element_names, flow_words
@@ -56,15 +63,15 @@ class Fix:
         }
 
 
-def absent_rows(assertions: AssertionCatalog | None) -> Mapping[str, ControlKey]:
-    """Each row that states a control absent, by its ID: its subject and control."""
+def missing_rows(assertions: AssertionCatalog | None) -> Mapping[str, ControlKey]:
+    """Each row that states a control missing, by its ID: its subject and control."""
     if assertions is None:
         return {}
     controls = row_controls(assertions)
     return {
         row_id: (entry.subject, controls[row_id])
         for entry in assertions.entries
-        if entry.value == ABSENT and (row_id := assertion_id(entry)) in controls
+        if states_missing(entry) and (row_id := assertion_id(entry)) in controls
     }
 
 
@@ -84,13 +91,21 @@ def missing_controls(
 
 
 def label_of(key: ControlKey, names: Mapping[str, str], model: SystemModel) -> str:
-    """The control to add, and where: a flow reads through :func:`flow_words`."""
+    """The control to add, and where: a flow reads through :func:`flow_words`.
+
+    A part of a question kind is named by the protection it asks for, because
+    its predicate name is no phrase.
+    """
     subject, control = key
     element = model.get(subject)
     if isinstance(element, DataFlow):
         where = flow_words(element, names)
     else:
         where = names.get(subject, subject)
+    name = parse_predicate(control)
+    asked = None if name is None else REGISTRY[name].asked
+    if asked is not None:
+        return f"{where}: {asked.statement}"
     return f"Add {attribute_words(control)} to {where}"
 
 
@@ -100,7 +115,7 @@ def fixes(
     assertions: AssertionCatalog | None,
 ) -> tuple[Fix, ...]:
     """Every missing control two or more confirmed findings rest on, most first."""
-    rows = absent_rows(assertions)
+    rows = missing_rows(assertions)
     rests: dict[ControlKey, list[str]] = defaultdict(list)
     needs: dict[str, frozenset[ControlKey]] = {}
     for claim in block.claims:

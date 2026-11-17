@@ -60,6 +60,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.assertions import EXTRACTED, REGISTRY
 from analysis_service.frameworks import widest_fan_out
 from evals import verify_corpus
 from evals.harness.calibration import (
@@ -343,6 +344,16 @@ def _collisions() -> Mapping[str, object]:
     }
 
 
+def _unprojected() -> Mapping[str, object]:
+    """How many predicates project into no graph field, of all and of extracted."""
+    return {
+        "registered": len(REGISTRY),
+        "unprojected": sum(not p.projects_into for p in REGISTRY.values()),
+        "extracted": len(EXTRACTED),
+        "extracted_unprojected": sum(not p.projects_into for p in EXTRACTED.values()),
+    }
+
+
 def _signed_facts() -> Mapping[str, object]:
     """How many cases carry a facts file with every row signed."""
     corpus_dir = verify_corpus.CORPUS_DIR
@@ -385,6 +396,22 @@ FIGURES: tuple[Figure, ...] = (
                 (
                     "first: {asvs_within_case} within-case pairs of reference"
                     " requirements, of which {asvs_pairs} share a"
+                ),
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="the predicates with no graph field",
+        compute=_unprojected,
+        claims=(
+            (
+                "GLOSSARY.md",
+                (
+                    "{unprojected} of the {registered} registered predicates project"
+                    " into no graph field at all. Of the {extracted} that the"
+                    " assertion pass extracts, {extracted_unprojected} project into no"
+                    " graph field"
                 ),
                 1,
             ),

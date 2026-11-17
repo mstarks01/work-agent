@@ -170,6 +170,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "graph_subject_type",
+    "missing_value",
     "offered",
     "parse_predicate",
     "parse_subject_type",
@@ -183,6 +184,7 @@ __all__ = [
     "snap_subject",
     "span_source",
     "spans_for",
+    "states_missing",
     "subject_id",
     "support_span",
 ]
@@ -563,11 +565,14 @@ class Predicate:
 _ASKED_SUBJECTS: frozenset[SubjectType] = frozenset({"component", "interaction"})
 
 
-def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
-    """A predicate only an owner or a Control answers, with extraction off.
+def _owner_only(
+    question: str, asked: OwnerQuestion, *, extracted: bool = False
+) -> Predicate:
+    """A predicate an owner or a Control answers.
 
     Its value is the answer itself, so its meaning is its question with "it"
-    for the subject, and its terms are the values its answers write.
+    for the subject, and its terms are the values its answers write. The
+    assertion pass also extracts it when ``extracted`` is true.
     """
     return Predicate(
         meaning=asked.question or question.format(subject="it"),
@@ -576,6 +581,7 @@ def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
         value="term",
         terms=frozenset(asked.values.values()),
         asked=asked,
+        extracted=extracted,
     )
 
 
@@ -584,14 +590,20 @@ def _same(terms: Sequence[str]) -> Mapping[str, str]:
     return {term: term for term in terms}
 
 
-def _facet(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
+def _facet(
+    question: str,
+    statement: str,
+    *,
+    protects: ProtectiveAnswer,
+    extracted: bool = False,
+) -> Predicate:
     """A part of a ``facets`` kind: yes, no or not applicable.
 
     ``question`` says "it", so the predicate's question names the subject
-    before it.
+    before it. ``extracted`` turns the assertion pass on for the part.
     """
     asked = OwnerQuestion(question, statement, protects, _same(FACET_ANSWERS))
-    return _owner_only(f"{{subject}}: {question}", asked)
+    return _owner_only(f"{{subject}}: {question}", asked, extracted=extracted)
 
 
 def _yes_no(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
@@ -863,29 +875,33 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             refers_to=frozenset({"component"}),
             stated_only=True,
         ),
-        # The parts of the question kinds that only an owner or a Control
-        # answers (ADR 0117), in the wording of the kinds. A yes-no kind's
+        # The parts of the question kinds that an owner or a Control answers
+        # (ADR 0117), in the wording of the kinds. A yes-no kind's
         # question names its subject; a facet's says "it", because its page
         # names the element above it.
         "capacity-limits-rate": _facet(
             "Does it limit the rate of requests?",
             "Limits the rate of requests.",
             protects="yes",
+            extracted=True,
         ),
         "capacity-limits-size": _facet(
             "Does it limit the size of a request or message?",
             "Limits the size of a request or message.",
             protects="yes",
+            extracted=True,
         ),
         "capacity-limits-concurrency": _facet(
             "Does it limit how much work runs at once?",
             "Limits how much work runs at once.",
             protects="yes",
+            extracted=True,
         ),
         "capacity-limits-quota": _facet(
             "Does it set a quota per user or tenant?",
             "Sets a quota per user or tenant.",
             protects="yes",
+            extracted=True,
         ),
         "audit-evidence-record-protected": _facet(
             "Is that record kept where the people it records cannot"
@@ -2075,6 +2091,32 @@ def answered(entry: Assertion) -> bool:
     return entry.origin == "answer"
 
 
+def missing_value(predicate: Predicate) -> str:
+    """The value a row of ``predicate`` writes to state its control missing.
+
+    **The one reader of which value says a control is not there.** For a part
+    that protects on "yes", it is the value its "no" writes: a capacity part's
+    ``no`` says there is no limit. For every other predicate it is
+    :data:`ABSENT`. A part that protects on "no" asks whether a harm can
+    happen, and names no control.
+    """
+    asked = predicate.asked
+    if asked is None or asked.protects != "yes":
+        return ABSENT
+    return asked.values.get("no", ABSENT)
+
+
+def states_missing(entry: Assertion) -> bool:
+    """Whether this row states that its control is not there.
+
+    **The one reader of "is this control missing".** The value is
+    :data:`ABSENT` or the predicate's :func:`missing_value`.
+    """
+    name = parse_predicate(entry.predicate)
+    missing = ABSENT if name is None else missing_value(REGISTRY[name])
+    return entry.value in (ABSENT, missing)
+
+
 def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
     """What ``catalog`` holds about ``subject`` under ``predicate``.
 
@@ -2743,6 +2785,9 @@ def _resolve_row(
     have to resolve for the row to name them. Everything else is the gate's
     call, made on the built row, so no rule is written twice.
 
+    One value is rewritten: an ``absent`` is written as the predicate's
+    :func:`missing_value`.
+
     A subject is declared only for a row that is kept, so a dropped row leaves
     no subject behind that no row names.
     """
@@ -2769,6 +2814,9 @@ def _resolve_row(
         return None
 
     value = row.value
+    if value == ABSENT:
+        # One shape for "not there", so the row matches an owner's answer.
+        value = missing_value(predicate)
     referent = None
     if predicate.value == "reference" and value not in UNIVERSAL_TERMS:
         wanted = referent_type(predicate)

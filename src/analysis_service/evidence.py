@@ -94,6 +94,7 @@ from analysis_service.assertions import (
     disputed,
     offered,
     projected_attribute,
+    states_missing,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
@@ -355,7 +356,7 @@ def lead_topics(
             found.add(f"{ground.element_id}.{ground.attribute}")
         elif ref in rows and (
             ground.kind == "unknown-assertion"
-            or (ground.kind == "assertion" and rows[ref].value == ABSENT)
+            or (ground.kind == "assertion" and states_missing(rows[ref]))
         ):
             row = rows[ref]
             found.add(f"{row.subject}.{row.predicate}")
