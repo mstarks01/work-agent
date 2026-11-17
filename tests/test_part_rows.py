@@ -170,12 +170,15 @@ class TestTheAssertionPassSeesOnlyTheExtractedParts:
         assert set(enum) == PRE_0117 | EXTRACTED_PARTS
 
     def test_the_resolver_refuses_a_part_the_pass_does_not_extract(self, model):
+        unextracted = next(
+            name for name, part in REGISTRY.items() if part.asked and not part.extracted
+        )
         proposal = CatalogProposal(
             assertions=[
                 AssertionProposal(
                     subject_type="component",
                     subject=PROCESS,
-                    predicate="authorization-scope-checks-each-request",
+                    predicate=unextracted,
                     value="yes",
                     basis="inferred",
                     explanation="it says so",

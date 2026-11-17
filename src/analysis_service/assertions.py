@@ -61,7 +61,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, NamedTuple, Self, get_args
 
@@ -563,11 +563,14 @@ class Predicate:
 _ASKED_SUBJECTS: frozenset[SubjectType] = frozenset({"component", "interaction"})
 
 
-def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
-    """A predicate only an owner or a Control answers, with extraction off.
+def _owner_only(
+    question: str, asked: OwnerQuestion, *, extracted: bool = False
+) -> Predicate:
+    """A predicate an owner or a Control answers.
 
     Its value is the answer itself, so its meaning is its question with "it"
-    for the subject, and its terms are the values its answers write.
+    for the subject, and its terms are the values its answers write. The
+    assertion pass also extracts it when ``extracted`` is true.
     """
     return Predicate(
         meaning=asked.question or question.format(subject="it"),
@@ -576,6 +579,7 @@ def _owner_only(question: str, asked: OwnerQuestion) -> Predicate:
         value="term",
         terms=frozenset(asked.values.values()),
         asked=asked,
+        extracted=extracted,
     )
 
 
@@ -594,11 +598,10 @@ def _facet(
     """A part of a ``facets`` kind: yes, no or not applicable.
 
     ``question`` says "it", so the predicate's question names the subject
-    before it.
+    before it. ``extracted`` turns the assertion pass on for the part.
     """
     asked = OwnerQuestion(question, statement, protects, _same(FACET_ANSWERS))
-    predicate = _owner_only(f"{{subject}}: {question}", asked)
-    return replace(predicate, extracted=extracted)
+    return _owner_only(f"{{subject}}: {question}", asked, extracted=extracted)
 
 
 def _yes_no(question: str, statement: str, *, protects: ProtectiveAnswer) -> Predicate:
@@ -870,8 +873,8 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             refers_to=frozenset({"component"}),
             stated_only=True,
         ),
-        # The parts of the question kinds that only an owner or a Control
-        # answers (ADR 0117), in the wording of the kinds. A yes-no kind's
+        # The parts of the question kinds that an owner or a Control answers
+        # (ADR 0117), in the wording of the kinds. A yes-no kind's
         # question names its subject; a facet's says "it", because its page
         # names the element above it.
         "capacity-limits-rate": _facet(

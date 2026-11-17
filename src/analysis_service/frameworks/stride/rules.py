@@ -1062,14 +1062,14 @@ INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
 RULES: tuple[Rule, ...] = with_rule_tables(_RULES, EFFECTS, INFORMED_BY)
 
 
-#: Why no rule here fires on a part of a question kind (ADR 0117). Only an
-#: owner's answer or a Control writes such a row, and the lane reads it as
-#: evidence. Each rule that the answer informs names the part in
-#: :data:`INFORMED_BY`.
-_OWNER_ANSWERED = NoRule(
-    "only an owner's answer or a Control writes the row, and the lane reads it"
-    " as evidence beside the answer's line; each rule the answer informs names"
-    " it in INFORMED_BY"
+#: Why no rule here fires on a part of a question kind (ADR 0117). An owner's
+#: answer, a Control or, for a part it extracts, the assertion pass writes such
+#: a row, and the lane reads it as evidence. Each rule that the fact informs
+#: names the part in :data:`INFORMED_BY`.
+_QUESTION_KIND_PART = NoRule(
+    "an owner's answer, a Control or, for a part it extracts, the assertion"
+    " pass writes the row, and the lane reads it as evidence; each rule the"
+    " fact informs names it in INFORMED_BY"
 )
 
 
@@ -1116,37 +1116,37 @@ PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
             "it identifies the element a principal is, and the rules read it"
             " to place every other fact about that principal"
         ),
-        "capacity-limits-rate": _OWNER_ANSWERED,
-        "capacity-limits-size": _OWNER_ANSWERED,
-        "capacity-limits-concurrency": _OWNER_ANSWERED,
-        "capacity-limits-quota": _OWNER_ANSWERED,
-        "audit-evidence-record-protected": _OWNER_ANSWERED,
-        "authorization-scope-checks-each-request": _OWNER_ANSWERED,
-        "authorization-scope-least-privilege": _OWNER_ANSWERED,
-        "authorization-scope-checks-ownership": _OWNER_ANSWERED,
-        "stored-copy-integrity": _OWNER_ANSWERED,
-        "stored-copy-access-encrypted": _OWNER_ANSWERED,
-        "stored-copy-access-restricted": _OWNER_ANSWERED,
-        "reachability-named-callers": _OWNER_ANSWERED,
-        "provenance-sender": _OWNER_ANSWERED,
-        "provenance-integrity": _OWNER_ANSWERED,
-        "code-execution": _OWNER_ANSWERED,
-        "physical-access": _OWNER_ANSWERED,
-        "content-validation-validates": _OWNER_ANSWERED,
-        "content-validation-encodes": _OWNER_ANSWERED,
-        "destination": _OWNER_ANSWERED,
-        "security-configuration-cookies": _OWNER_ANSWERED,
-        "security-configuration-headers": _OWNER_ANSWERED,
-        "security-configuration-cross-origin": _OWNER_ANSWERED,
-        "security-configuration-secret-store": _OWNER_ANSWERED,
-        "failure-handling-fails-closed": _OWNER_ANSWERED,
-        "failure-handling-alerts": _OWNER_ANSWERED,
-        "failure-handling-recovers": _OWNER_ANSWERED,
-        "update-process-scheduled": _OWNER_ANSWERED,
-        "update-process-vulnerability-alerts": _OWNER_ANSWERED,
-        "update-process-tested": _OWNER_ANSWERED,
-        "data-exposure-minimal-fields": _OWNER_ANSWERED,
-        "data-exposure-clean-logs": _OWNER_ANSWERED,
-        "data-exposure-restricted-readers": _OWNER_ANSWERED,
+        "capacity-limits-rate": _QUESTION_KIND_PART,
+        "capacity-limits-size": _QUESTION_KIND_PART,
+        "capacity-limits-concurrency": _QUESTION_KIND_PART,
+        "capacity-limits-quota": _QUESTION_KIND_PART,
+        "audit-evidence-record-protected": _QUESTION_KIND_PART,
+        "authorization-scope-checks-each-request": _QUESTION_KIND_PART,
+        "authorization-scope-least-privilege": _QUESTION_KIND_PART,
+        "authorization-scope-checks-ownership": _QUESTION_KIND_PART,
+        "stored-copy-integrity": _QUESTION_KIND_PART,
+        "stored-copy-access-encrypted": _QUESTION_KIND_PART,
+        "stored-copy-access-restricted": _QUESTION_KIND_PART,
+        "reachability-named-callers": _QUESTION_KIND_PART,
+        "provenance-sender": _QUESTION_KIND_PART,
+        "provenance-integrity": _QUESTION_KIND_PART,
+        "code-execution": _QUESTION_KIND_PART,
+        "physical-access": _QUESTION_KIND_PART,
+        "content-validation-validates": _QUESTION_KIND_PART,
+        "content-validation-encodes": _QUESTION_KIND_PART,
+        "destination": _QUESTION_KIND_PART,
+        "security-configuration-cookies": _QUESTION_KIND_PART,
+        "security-configuration-headers": _QUESTION_KIND_PART,
+        "security-configuration-cross-origin": _QUESTION_KIND_PART,
+        "security-configuration-secret-store": _QUESTION_KIND_PART,
+        "failure-handling-fails-closed": _QUESTION_KIND_PART,
+        "failure-handling-alerts": _QUESTION_KIND_PART,
+        "failure-handling-recovers": _QUESTION_KIND_PART,
+        "update-process-scheduled": _QUESTION_KIND_PART,
+        "update-process-vulnerability-alerts": _QUESTION_KIND_PART,
+        "update-process-tested": _QUESTION_KIND_PART,
+        "data-exposure-minimal-fields": _QUESTION_KIND_PART,
+        "data-exposure-clean-logs": _QUESTION_KIND_PART,
+        "data-exposure-restricted-readers": _QUESTION_KIND_PART,
     }
 )
