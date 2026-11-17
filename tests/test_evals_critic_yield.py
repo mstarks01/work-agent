@@ -22,7 +22,6 @@ from evals.harness.critic_yield import (
     CriticAudit,
     CriticPopulations,
     aggregate_yield,
-    fate_by_claim,
     score_case_with_yield,
 )
 from evals.harness.fingerprint import components_for, version_for
@@ -682,31 +681,3 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     for current in ("pooled", "open", "unvoted"):
         empty = CriticPopulations({(current, "confirmed"): 1})
         assert empty.not_real_gap == "no-down-vote"
-
-
-def test_a_block_that_lists_one_claim_twice_gives_no_fate(case):
-    """A draft in two lists has no single fate, so it joins no population."""
-    draft = draft_threat(
-        9, "tampering", "An attacker edits a table that does not exist."
-    )
-    block = (
-        _report_with(case, [promote(draft)])
-        .analyses[0]
-        .model_copy(
-            update={
-                "rejected_claims": [
-                    promote(
-                        draft,
-                        verdict=Verdict(
-                            status="rejected",
-                            reason="does not follow",
-                            rejected_because="reasoning",
-                        ),
-                    )
-                ]
-            }
-        )
-    )
-
-    with pytest.raises(ValueError, match="more than once"):
-        fate_by_claim(block)

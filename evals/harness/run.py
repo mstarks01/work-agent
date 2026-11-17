@@ -780,15 +780,7 @@ def _scored_sweep(
     primary series — maintainer votes only — and the others come back beside
     it, so no flag exists that could quietly move a published number.
     """
-    # Named, never dropped in silence. CI refuses a ledger naming somebody the
-    # roster does not (#320), so this is a mid-edit tree or a hand-written
-    # row — and a vote that moves nothing should say so rather than look cast.
-    unrostered = sorted({vote.voter for vote in votes if vote.voter not in table})
-    if unrostered:
-        print(
-            f"{len(unrostered)} voter(s) have no roster line and no series"
-            f" reads them: {', '.join(unrostered)}"
-        )
+    _name_unrostered(votes, table)
     # The analysed model per case, so a citation this sweep wrote resolves to
     # its endpoints like the reference's does. In an injected mode it is the
     # blessed model and the map is unchanged; in an end-to-end run it is the
@@ -811,6 +803,21 @@ def _scored_sweep(
             writing=writing.measure(cases, reports, read),
         )
     return by_series
+
+
+def _name_unrostered(votes: ledger.Ledger, table: roster.Roster) -> None:
+    """Print each voter the roster has no line for, whose votes no series reads.
+
+    Named, never dropped in silence. CI refuses a ledger naming somebody the
+    roster does not (#320), so this is a mid-edit tree or a hand-written row —
+    and a vote that moves nothing should say so rather than look cast.
+    """
+    unrostered = sorted({vote.voter for vote in votes if vote.voter not in table})
+    if unrostered:
+        print(
+            f"{len(unrostered)} voter(s) have no roster line and no series"
+            f" reads them: {', '.join(unrostered)}"
+        )
 
 
 def _standings_inputs(args: argparse.Namespace) -> tuple[ledger.Ledger, roster.Roster]:
@@ -1551,6 +1558,7 @@ def command_scorecard(args: argparse.Namespace) -> int:
         return 1
     # The series ``score`` writes first, so the two commands count one set of
     # votes.
+    _name_unrostered(votes, table)
     read = standings.narrow(votes, table, standings.SERIES[standings.PRIMARY])
     card = scorecard_of(artifact, Path(args.corpus), read)
     scorecard.render(card)
@@ -2523,7 +2531,7 @@ def _score_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _delivery_arguments(parser: argparse.ArgumentParser) -> None:
+def _sweep_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
     parser.add_argument(
         "--corpus",
@@ -2534,7 +2542,7 @@ def _delivery_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
-    _delivery_arguments(parser)
+    _sweep_arguments(parser)
     parser.add_argument(
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
@@ -2800,7 +2808,7 @@ COMMANDS: dict[str, Command] = {
         help="each charged must-find miss of a finished sweep, traced through"
         " the candidates its lane was sent (no credentials)",
         run=command_delivery,
-        arguments=_delivery_arguments,
+        arguments=_sweep_arguments,
     ),
     "scorecard": Command(
         help="one row per STRIDE must-find of a finished sweep, with its"

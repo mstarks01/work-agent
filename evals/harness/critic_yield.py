@@ -497,22 +497,16 @@ def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
 def fate_by_claim(block: FrameworkAnalysis) -> dict[str, CriticFate]:
     """Each claim ID the block carries, and the list it carries it in.
 
-    A draft the block does not carry has the fate :data:`UNRULED`. Raises
-    :class:`ValueError` where one ID sits in two lists, because then the
-    block gives the draft no single fate.
+    A draft the block does not carry has the fate :data:`UNRULED`. The block's
+    validation refuses one ID in both ``claims`` and ``rejected_claims``. It
+    does not check ``returned_claims`` against them, and here a later list
+    wins over ``returned``.
     """
-    listed: list[tuple[str, CriticFate]] = [
-        *((entry.claim_id, "returned") for entry in block.returned_claims),
-        *((claim.id, "rejected") for claim in block.rejected_claims),
-        *((claim.id, claim.verdict.status) for claim in block.claims),
-    ]
-    held = dict(listed)
-    if len(held) != len(listed):
-        twice = sorted(
-            claim_id for claim_id, n in Counter(i for i, _ in listed).items() if n > 1
-        )
-        raise ValueError(f"the block lists claim(s) {twice} more than once")
-    return held
+    return {
+        **{entry.claim_id: "returned" for entry in block.returned_claims},
+        **{claim.id: "rejected" for claim in block.rejected_claims},
+        **{claim.id: claim.verdict.status for claim in block.claims},
+    }
 
 
 def _yield(
