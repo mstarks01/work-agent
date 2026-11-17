@@ -469,6 +469,15 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
     return answered, eligible
 
 
+#: How a report prints a share with no value: a gap, never a zero.
+UNAVAILABLE = "unavailable"
+
+
+def percent(value: float | None) -> str:
+    """A share as a percentage, or :data:`UNAVAILABLE` where it has no value."""
+    return UNAVAILABLE if value is None else f"{value:.0%}"
+
+
 def ratio(numerator: float, denominator: float) -> float:
     """Zero denominators are 0.0, never a crash and never a silent 100%."""
     return numerator / denominator if denominator else 0.0
@@ -489,6 +498,10 @@ class Rate:
     @property
     def value(self) -> float | None:
         return self.numerator / self.denominator if self.denominator else None
+
+    def shown(self) -> str:
+        """The rate as a report prints it: its counts, then its share."""
+        return f"{self.numerator}/{self.denominator} ({percent(self.value)})"
 
     def rounded(self) -> float | None:
         """:attr:`value` to three places, as an artifact records it."""

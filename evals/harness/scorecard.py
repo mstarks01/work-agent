@@ -33,7 +33,7 @@ never a zero.
 
 **Rates.** Each rate is a :class:`Rate` with its numerator and denominator.
 An empty denominator gives ``None``, where :func:`~evals.harness.scorer.ratio`
-gives 0.0. A rate here is a share of matched must-finds, not the per-lane
+gives 0.0, and prints as unavailable. A rate here is a share of matched must-finds, not the per-lane
 **Coverage** of ``GLOSSARY.md``.
 
 **One run.** :func:`summarize` refuses rows of more than one
@@ -508,11 +508,7 @@ def charged_misses(rows: Iterable[ReferenceRow]) -> tuple[ReferenceRow, ...]:
 
 
 def _rate(rate: Rate | None) -> str:
-    if rate is None:
-        return "uncaptured"
-    value = rate.value
-    shown = "undefined" if value is None else f"{value:.2f}"
-    return f"{rate.numerator}/{rate.denominator} ({shown})"
+    return "uncaptured" if rate is None else rate.shown()
 
 
 def render(card: Scorecard) -> None:

@@ -655,7 +655,7 @@ def test_the_populations_split_each_label_by_what_the_critic_did(case):
     }
     assert populations.supported_rejected == Rate(1, 2)
     assert populations.rate("supported", "needs-info") == Rate(1, 2)
-    assert populations.unsupported_retained == Rate(1, 1)
+    assert populations.unsupported_confirmed == Rate(1, 1)
     assert populations.rate("unsupported", "needs-info") == Rate(0, 1)
 
 
@@ -679,10 +679,14 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     populations = CriticPopulations.pooled([result])
 
     assert populations.counts == {("stale", "confirmed"): 1}
-    assert populations.unsupported_retained == Rate(0, 0)
-    assert populations.unsupported_retained.value is None
-    assert populations.to_json()["unsupported_retained"]["value"] is None
+    assert populations.unsupported_confirmed == Rate(0, 0)
+    assert populations.unsupported_confirmed.value is None
+    assert populations.to_json()["unsupported_confirmed"]["value"] is None
     CriticAudit.of([result]).render()
     shown = capsys.readouterr().out
-    assert "unsupported retained   0/0 (unavailable)" in shown
-    assert "unsupported population empty (1 stale drafts)" in shown
+    assert "unsupported_confirmed    0/0 (unavailable)" in shown
+    assert "(1 stale drafts)" in shown
+    assert populations.unsupported_gap.endswith("(1 stale drafts)")
+    assert CriticPopulations({("unvoted", "confirmed"): 1}).unsupported_gap == (
+        "no draft carries a vote"
+    )

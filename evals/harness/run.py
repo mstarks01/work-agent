@@ -1554,8 +1554,14 @@ def command_scorecard(args: argparse.Namespace) -> int:
     card = scorecard_of(artifact, Path(args.corpus), ledger.load(Path(args.ledger)))
     scorecard.render(card)
     if args.out:
+        ledger_dir = Path(args.ledger)
         record = run_record(
-            "scorecard", {"corpus": str(args.corpus)}, sweep_inputs([artifact])
+            "scorecard",
+            {"corpus": str(args.corpus), "ledger": str(ledger_dir)},
+            {
+                **sweep_inputs([artifact]),
+                **{path: {} for path in ledger.files(ledger_dir)},
+            },
         )
         written = {"record": record, **card.to_json()}
         Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")

@@ -58,7 +58,7 @@ from evals.harness.reference import (
     ReferenceRequirement,
     diagnosable,
 )
-from evals.harness.scorer import Rate
+from evals.harness.scorer import Rate, percent
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases
@@ -869,16 +869,6 @@ def routing_rates(
     }
 
 
-def _rate(value: float | None) -> str:
-    """One rate for a table cell, or ``n/a`` where the figure is undefined.
-
-    Printed rather than defaulted to zero: a rate nobody can compute and a rate
-    that came out at zero are different facts, and a column that spells them the
-    same way reads the second as the first.
-    """
-    return "n/a" if value is None else f"{value:.0%}"
-
-
 def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
     """The corpus-wide figures, pooled over claims rather than averaged per case.
 
@@ -1043,10 +1033,7 @@ class ApplicabilityYield:
     @property
     def rates(self) -> dict[str, Rate]:
         """Both rates below with their counts, keyed by the rate's name."""
-        return {
-            "rejection_rate": Rate(len(self.rejected), self.drafts),
-            "destroyed_rate": Rate(len(self.destroyed), len(self.rejected)),
-        }
+        return _yield_rates(self.drafts, len(self.rejected), len(self.destroyed))
 
     @property
     def rejection_rate(self) -> float | None:
@@ -1073,6 +1060,14 @@ class ApplicabilityYield:
             "unlisted": list(self.unlisted),
             **{name: rate.rounded() for name, rate in self.rates.items()},
         }
+
+
+def _yield_rates(drafts: int, rejected: int, destroyed: int) -> dict[str, Rate]:
+    """The yield's two rates, from one case's counts or from pooled ones."""
+    return {
+        "rejection_rate": Rate(rejected, drafts),
+        "destroyed_rate": Rate(destroyed, rejected),
+    }
 
 
 def score_yield(
@@ -1132,8 +1127,10 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
         "destroyed": destroyed,
         "earned": sum(len(entry.earned) for entry in yields),
         "unlisted": sum(len(entry.unlisted) for entry in yields),
-        "rejection_rate": Rate(rejected, drafts).rounded(),
-        "destroyed_rate": Rate(destroyed, rejected).rounded(),
+        **{
+            name: rate.rounded()
+            for name, rate in _yield_rates(drafts, rejected, destroyed).items()
+        },
     }
 
 
@@ -1160,7 +1157,7 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     for score in scores:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
-            f" {score.must_find_recall:>6.0%} {_rate(score.precision):>6}"
+            f" {score.must_find_recall:>6.0%} {percent(score.precision):>6}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
@@ -1170,7 +1167,7 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
         f" ({totals['matched']}/{totals['expected']}),"
         f" must-find {totals['must_find_recall']:.0%},"
-        f" precision {_rate(totals['precision'])}"
+        f" precision {percent(totals['precision'])}"
         f" (over {totals['precision_cases']} of {totals['cases']} cases read"
         " as exhaustive),"
         f" negatives applied {totals['negatives_applied']}/{totals['negatives']},"
@@ -1248,9 +1245,9 @@ def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
     totals = aggregate_yield(yields)
     print(
         f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
-        f" ({_rate(totals['rejection_rate'])}),"
+        f" ({percent(totals['rejection_rate'])}),"
         f" earned {totals['earned']}, destroyed {totals['destroyed']}"
-        f" ({_rate(totals['destroyed_rate'])} of rejections),"
+        f" ({percent(totals['destroyed_rate'])} of rejections),"
         f" unlisted {totals['unlisted']}"
         " (instrument, non-gating)"
     )
