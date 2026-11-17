@@ -59,7 +59,7 @@ from analysis_service.frameworks.stride.record import (
 )
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, RepoCommit, ScoredAgainst
-from evals.harness.assembly import AssemblyReplay
+from evals.harness.assembly import AssemblySweep
 from evals.harness.audit import Phase, phase_of
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import CaseLosses, Cause
@@ -419,7 +419,10 @@ class AssemblyCheck:
     reproduced: int
     differ: tuple[str, ...]
     refused: tuple[str, ...]
+    #: Reports today's ``Report`` refuses, and cases whose report or drafts
+    #: file the archive lacks, each counted over every framework.
     unreadable: int
+    capture_faults: int
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -427,12 +430,13 @@ class AssemblyCheck:
             "differ": list(self.differ),
             "refused": list(self.refused),
             "unreadable": self.unreadable,
+            "capture_faults": self.capture_faults,
         }
 
 
-def assembly_check(replays: Sequence[AssemblyReplay], unreadable: int) -> AssemblyCheck:
+def assembly_check(sweep: AssemblySweep) -> AssemblyCheck:
     """The STRIDE half of an :func:`~evals.harness.assembly.replay_artifact` sweep."""
-    stride = [replay for replay in replays if replay.framework == "stride"]
+    stride = [replay for replay in sweep.rows if replay.framework == "stride"]
     return AssemblyCheck(
         reproduced=sum(
             1 for replay in stride if not replay.refused and not replay.unexplained
@@ -443,7 +447,8 @@ def assembly_check(replays: Sequence[AssemblyReplay], unreadable: int) -> Assemb
             if not replay.refused and replay.unexplained
         ),
         refused=tuple(replay.case for replay in stride if replay.refused),
-        unreadable=unreadable,
+        unreadable=len(sweep.unreadable),
+        capture_faults=len(sweep.capture_faults),
     )
 
 
@@ -559,7 +564,8 @@ def render(card: Scorecard) -> None:
     print(
         f"assembly run again: {check.reproduced} block(s) reproduced,"
         f" {len(check.differ)} differ, {len(check.refused)} refused,"
-        f" {check.unreadable} report(s) unreadable"
+        f" {check.unreadable} report(s) unreadable,"
+        f" {check.capture_faults} case(s) missing a capture"
     )
     charged = charged_misses(card.rows)
     led = sum(1 for row in charged if row.lead_rules)

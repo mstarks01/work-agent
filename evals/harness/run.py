@@ -1470,9 +1470,9 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
 
     Reads an ``analysis`` sweep only: its analysed model is the corpus
     ``model.json`` of the run's day, so an element it lacks is a re-key and
-    not an extraction loss. Reads the development cases only, and names the others in
-    ``left_out``. Raises :class:`~evals.harness.modes.EvalRunError` on
-    another mode, and where no development case of the sweep is in
+    not an extraction loss. Reads the development cases only, and names the
+    others in ``left_out``. Raises :class:`~evals.harness.modes.EvalRunError`
+    on another mode, and where no development case of the sweep is in
     ``corpus``.
     """
     loaded = load_artifact(artifact)
@@ -1526,7 +1526,7 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
     replayed = assembly.replay_artifact(loaded, cases)
     return scorecard.summarize(
         rows,
-        scorecard.assembly_check(replayed.rows, len(replayed.unreadable)),
+        scorecard.assembly_check(replayed),
         left_out,
     )
 

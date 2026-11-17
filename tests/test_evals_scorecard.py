@@ -40,7 +40,7 @@ BASELINE = (
     REPO_ROOT / "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json"
 )
 CASE = "02-iot-fleet-telemetry"
-NO_ASSEMBLY = scorecard.AssemblyCheck(0, (), (), 0)
+NO_ASSEMBLY = scorecard.AssemblyCheck(0, (), (), 0, 0)
 
 
 def _identity(artifact: str = "a.json") -> RunIdentity:
@@ -410,4 +410,5 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     )
     check = card["assembly"]
     replayed = check["reproduced"] + len(check["differ"]) + len(check["refused"])
+    assert (check["unreadable"], check["capture_faults"]) == (0, 0)
     assert replayed == len(scored["scores"])
