@@ -32,7 +32,8 @@ from typing import Any, Literal, get_args
 
 from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
-from evals.harness.delivery import TRACED, Delivery
+from evals.harness.delivery import Delivery
+from evals.harness.losses import SILENT
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.replay import (
     FATES,
@@ -306,7 +307,8 @@ def capability_panel(ballot: Path, row: Experiment | None) -> Panel:
 def preparation_panel(result: Delivery) -> Panel:
     """The preparation panel of one sweep's delivery trace.
 
-    One unit is a charged must-find miss of a cause :mod:`evals.harness.delivery`
+    One unit is a charged must-find miss of a cause in
+    :data:`~evals.harness.losses.SILENT`, which :mod:`evals.harness.delivery`
     traces. ``delivered`` reads the candidates the archived lane was sent, and
     ``rebuilt`` the candidates today's rules write for the archived model. A
     shared element is a structural overlap and not mechanism relevance.
@@ -332,7 +334,7 @@ def preparation_panel(result: Delivery) -> Panel:
     return Panel(
         node="prepare",
         source=result.run.artifact,
-        unit=f"charged must-find miss of cause {' or '.join(sorted(TRACED))}",
+        unit=f"charged must-find miss of cause {' or '.join(sorted(SILENT))}",
         counts={
             **{f"capture {key}": count for key, count in sorted(capture.items())},
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
