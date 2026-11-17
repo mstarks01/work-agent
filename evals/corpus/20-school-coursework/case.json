@@ -1,0 +1,25 @@
+{
+  "id": "20-school-coursework",
+  "title": "A school coursework platform whose parts state different access checks",
+  "domain": "school coursework",
+  "provenance": "Synthetic system authored for this corpus (issue #2054, phase 2). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "holdout": false,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "dff7ec2640470f43ebde447fc26709a8a006407d447525eac0c8ee180e171c2e"
+    }
+  ],
+  "source_sha256": "a6f59d9cd016ea24de9bd5aec876c158f93f70b6edbf5958a7d8d5afbda00623",
+  "frameworks": [
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "The case exists for issue #2054. It measures the assertion pass on the authorization-scope predicates. The source states each part on its own element: the coursework service checks each request against the user's role (each request yes) and does not check that a submission belongs to the student (ownership no), its database account is limited to the coursework tables (least privilege yes), the admin console does not check that a teacher is an administrator (each request no), and the grade export's read-only access is a hedge that must stay unknown. The tampering and the information-disclosure must-finds rest on the missing ownership check. The elevation-of-privilege must-find rests on the admin console's missing check across the office network, a privilege zone. The domain is a school, which no other case covers."
+}

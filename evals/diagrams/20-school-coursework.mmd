@@ -1,0 +1,31 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: internet"]
+        n0["student"]
+        n3["district records system"]
+    end
+    subgraph z1["Trust zone: school network"]
+        n1["teacher"]
+    end
+    subgraph z2["Trust zone: school office network"]
+        n2["office staff"]
+        n5("admin console")
+    end
+    subgraph z3["Trust zone: school cloud account"]
+        n4("coursework service")
+        n6("grade export")
+        n7[("coursework database")]
+    end
+    n0 -->|"hand in work"| n4
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"mark work"| n4
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n4 -->|"keep coursework"| n7
+    n2 -->|"manage classes and grades"| n5
+    n1 -->|"open admin console"| n5
+    linkStyle 4 stroke:#c0392b,stroke-width:2px
+    n5 -->|"write classes and grades"| n7
+    linkStyle 5 stroke:#c0392b,stroke-width:2px
+    n6 -->|"read final grades"| n7
+    n6 -->|"send final grades"| n3
+    linkStyle 7 stroke:#c0392b,stroke-width:2px

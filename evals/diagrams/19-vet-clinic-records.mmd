@@ -1,0 +1,31 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: internet"]
+        n0["pet owner"]
+        n2["partner lab"]
+    end
+    subgraph z1["Trust zone: clinic network"]
+        n1["clinic staff"]
+    end
+    subgraph z2["Trust zone: group cloud account"]
+        n3("clinic API")
+        n4("lab results importer")
+        n5("billing service")
+    end
+    subgraph z3["Trust zone: private database network"]
+        n6[("records database")]
+    end
+    n0 -->|"book appointments and read records"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"manage records"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"keep records"| n6
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n2 -->|"send test results"| n4
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n4 -->|"write lab results"| n6
+    linkStyle 4 stroke:#c0392b,stroke-width:2px
+    n5 -->|"read appointments"| n6
+    linkStyle 5 stroke:#c0392b,stroke-width:2px
+    n5 -->|"send invoices"| n0
+    linkStyle 6 stroke:#c0392b,stroke-width:2px

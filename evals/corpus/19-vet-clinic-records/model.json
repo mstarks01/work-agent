@@ -1,0 +1,285 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:pet-owner",
+      "name": "pet owner",
+      "description": "A pet owner who books appointments and reads their pets' records in the owner app, and gets invoices by email.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Pet owners book appointments and read their pets' records in the owner app.",
+      "source_label": "System description",
+      "kind": "human",
+      "trust_zone": "boundary:internet"
+    },
+    {
+      "id": "entity:clinic-staff",
+      "name": "clinic staff",
+      "description": "A vet, nurse or receptionist who uses the clinic desktop app on the clinic network.",
+      "assets": [],
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API.",
+      "source_label": "System description",
+      "kind": "human",
+      "trust_zone": "boundary:clinic-network"
+    },
+    {
+      "id": "entity:partner-lab",
+      "name": "partner lab",
+      "description": "The partner lab that sends test results over the internet.",
+      "assets": [],
+      "source_excerpt": "The partner lab sends test results over the internet to the lab results importer.",
+      "source_label": "System description",
+      "kind": "external-system",
+      "trust_zone": "boundary:internet"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:clinic-api",
+      "name": "clinic API",
+      "description": "The API that the owner app and the clinic desktop app call. It checks that a pet belongs to the signed-in owner's account, and keeps owners, pets, appointments and medical notes in the records database.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The owner app calls the clinic API, which is on the internet.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:group-cloud-account",
+      "exposure": "internet-facing",
+      "interface_kind": "unknown",
+      "notes": "Stated in the source: \"When an owner opens a record, the clinic API checks that the pet belongs to that owner's account.\" and \"Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.\""
+    },
+    {
+      "id": "process:lab-results-importer",
+      "name": "lab results importer",
+      "description": "Receives test results from the partner lab over the internet and writes each one into the pet's record in the records database.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "The importer writes each result into the pet's record in the records database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:group-cloud-account",
+      "exposure": "internet-facing",
+      "interface_kind": "unknown",
+      "notes": "Stated in the source: \"It does not check which clinic the result is for, or whether the lab may send results for that pet: it writes every result it receives.\""
+    },
+    {
+      "id": "process:billing-service",
+      "name": "billing service",
+      "description": "Reads appointments from the records database and sends invoices to owners by email.",
+      "assets": [
+        "pii",
+        "financial"
+      ],
+      "source_excerpt": "The billing service reads appointments from the records database and sends invoices to owners by email.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:group-cloud-account",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "A hedge in the source: \"Priya thinks the billing service checks each request against the caller's role, but nobody has confirmed it.\""
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:records-database",
+      "name": "records database",
+      "description": "Holds owners, pets, appointments, medical notes and lab results.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The clinic API keeps owners, pets, appointments and medical notes in the records database.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:private-database-network",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records",
+      "name": "book appointments and read records",
+      "description": "A pet owner books appointments and reads their pets' records through the owner app.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Owners sign in with an email address and a password.",
+      "source_label": "System description",
+      "source": "entity:pet-owner",
+      "destination": "process:clinic-api",
+      "protocol": "unknown",
+      "authentication": "password sign-in with an email address",
+      "data_description": "appointments and pet records",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
+    },
+    {
+      "id": "flow:entity:clinic-staff>process:clinic-api>manage-records",
+      "name": "manage records",
+      "description": "Clinic staff read and change owners, pets, appointments and medical notes through the clinic desktop app.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API.",
+      "source_label": "System description",
+      "source": "entity:clinic-staff",
+      "destination": "process:clinic-api",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "owners, pets, appointments and medical notes",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
+    },
+    {
+      "id": "flow:process:clinic-api>store:records-database>keep-records",
+      "name": "keep records",
+      "description": "The clinic API reads and writes owners, pets, appointments and medical notes.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "It connects to the records database with the database's admin account.",
+      "source_label": "System description",
+      "source": "process:clinic-api",
+      "destination": "store:records-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "owners, pets, appointments and medical notes",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write",
+      "notes": "The source states the account, \"the database's admin account\", and names no mechanism behind it, so authentication reads unknown."
+    },
+    {
+      "id": "flow:entity:partner-lab>process:lab-results-importer>send-test-results",
+      "name": "send test results",
+      "description": "The partner lab sends test results over the internet.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "The partner lab sends test results over the internet to the lab results importer.",
+      "source_label": "System description",
+      "source": "entity:partner-lab",
+      "destination": "process:lab-results-importer",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "test results",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:lab-results-importer>store:records-database>write-lab-results",
+      "name": "write lab results",
+      "description": "The importer writes each test result into the pet's record.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "The importer writes each result into the pet's record in the records database.",
+      "source_label": "System description",
+      "source": "process:lab-results-importer",
+      "destination": "store:records-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "test results",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:billing-service>store:records-database>read-appointments",
+      "name": "read appointments",
+      "description": "The billing service reads appointments to build invoices.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "The billing service reads appointments from the records database and sends invoices to owners by email.",
+      "source_label": "System description",
+      "source": "process:billing-service",
+      "destination": "store:records-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "appointments",
+      "encryption_in_transit": "unknown",
+      "operations": "read"
+    },
+    {
+      "id": "flow:process:billing-service>entity:pet-owner>send-invoices",
+      "name": "send invoices",
+      "description": "The billing service sends invoices to owners by email.",
+      "assets": [
+        "pii",
+        "financial"
+      ],
+      "source_excerpt": "The billing service reads appointments from the records database and sends invoices to owners by email.",
+      "source_label": "System description",
+      "source": "process:billing-service",
+      "destination": "entity:pet-owner",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "invoices",
+      "encryption_in_transit": "unknown",
+      "operations": "write"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:internet",
+      "name": "internet",
+      "description": "Where pet owners and the partner lab reach the clinic API and the importer from.",
+      "assets": [],
+      "source_excerpt": "The owner app calls the clinic API, which is on the internet.",
+      "source_label": "System description",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:clinic-network",
+      "name": "clinic network",
+      "description": "The network the clinic desktop app runs on.",
+      "assets": [],
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API.",
+      "source_label": "System description",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:group-cloud-account",
+      "name": "group cloud account",
+      "description": "The clinic group's cloud account, where the clinic API, the lab results importer and the billing service run.",
+      "assets": [],
+      "source_excerpt": "The clinic API, the lab results importer and the billing service run in the group's cloud account.",
+      "source_label": "System description",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:private-database-network",
+      "name": "private database network",
+      "description": "The group's private database network. Only the clinic API, the importer and the billing service can reach it.",
+      "assets": [],
+      "source_excerpt": "The records database is on the group's private database network, and only those three services can reach it.",
+      "source_label": "System description",
+      "kind": "network"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "Pet owners are placed on the internet because the schema requires a zone.",
+      "element_id": "entity:pet-owner",
+      "attribute": "trust_zone",
+      "basis": "The owner app calls the clinic API on the internet; the source does not state where owners are."
+    },
+    {
+      "assumption": "The partner lab is placed on the internet because the schema requires a zone.",
+      "element_id": "entity:partner-lab",
+      "attribute": "trust_zone",
+      "basis": "The lab sends results over the internet; the source does not state where the lab runs."
+    },
+    {
+      "assumption": "The lab results importer is internet-facing.",
+      "element_id": "process:lab-results-importer",
+      "attribute": "exposure",
+      "basis": "The partner lab sends test results to it over the internet."
+    }
+  ]
+}

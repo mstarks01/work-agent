@@ -89,10 +89,10 @@ MEASURED = {
 #: survives the verb runs two ways.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 320,
-    "one_flow_cited": 216,
+    "claims": 344,
+    "one_flow_cited": 238,
     "several_flows_cited": 10,
-    "no_flow_cited": 94,
+    "no_flow_cited": 96,
     # Over the 8 reference merges the shipped rule makes.
     "merges_with_a_direction_on_both_sides": 1,
     "merges_that_run_opposite_ways": 0,
@@ -130,16 +130,16 @@ FRONTIER = {
         "reference_merges": 8,
     },
     "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
-    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 22},
-    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 50},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 71},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 24},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 52},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 75},
     # Case 02's calibration pair about disabling the Pub/Sub topic names
     # ``store:pub-sub`` (#925), which is one candidate that does not merge
     # under the loosest rung.
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 207,
+        "reference_merges": 212,
     },
 }
 
@@ -406,9 +406,9 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
 #: is what survives the verb. The gap between them is what the verb adds.
 VERB_MEASURED = {
-    "cases": 18,
-    "within_lane_pairs": 424,
-    "subset": 50,
+    "cases": 20,
+    "within_lane_pairs": 439,
+    "subset": 52,
     "subset_verb": 8,
 }
 

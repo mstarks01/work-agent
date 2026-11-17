@@ -1,0 +1,325 @@
+{
+  "case": "20-school-coursework",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:coursework-service",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Students hand in their coursework through the coursework service, which is on the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:coursework-service",
+        "predicate": "network-membership",
+        "value": "boundary:school-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service, the grade export and the coursework database run in the school's cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:grade-export",
+        "predicate": "network-membership",
+        "value": "boundary:school-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service, the grade export and the coursework database run in the school's cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:coursework-database",
+        "predicate": "network-membership",
+        "value": "boundary:school-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service, the grade export and the coursework database run in the school's cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:admin-console",
+        "predicate": "network-membership",
+        "value": "boundary:school-office-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The admin console runs on the school office network, which is kept apart for administration."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:teacher",
+        "predicate": "network-membership",
+        "value": "boundary:school-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:student",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:office-staff",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:district-records-system",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:student>process:coursework-service>hand-in-work",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names school accounts and no mechanism behind them, as the maintainer ruled for a named login on case 17.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:teacher>process:coursework-service>mark-work",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names school accounts and no mechanism behind them, as the maintainer ruled for a named login on case 17.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:teacher>process:admin-console>open-admin-console",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names a teacher's school account and no mechanism behind it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:coursework-service>store:coursework-database>keep-coursework",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names a database account and no mechanism behind it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "students",
+        "predicate": "authorization-grant",
+        "value": "hand in and read work",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "coursework"
+          },
+          {
+            "kind": "operation",
+            "value": "hand in and read"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service checks each request against the user's role: a student can hand in and read work, and only a teacher can mark it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated grant by role.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "teachers",
+        "predicate": "authorization-grant",
+        "value": "mark work",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "coursework"
+          },
+          {
+            "kind": "operation",
+            "value": "mark"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service checks each request against the user's role: a student can hand in and read work, and only a teacher can mark it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated grant by role.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:grade-export>entity:district-records-system>send-final-grades",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence of the source names a protection on the wire.",
+      "reviewed_by": null
+    }
+  ],
+  "disputed": [],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": []
+  }
+}
