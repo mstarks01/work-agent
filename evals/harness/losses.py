@@ -439,12 +439,14 @@ def _answered_reading(
     """The reading one stage charges a miss through, or ``None``.
 
     The surviving-claim, critic and fan-in stages of :func:`attribute_case`
-    charge through this choice. ``answers`` gives the stage's items at a reading's place under that
-    reading's action. A reading whose items state the ruled position wins,
-    because the scorer's gate takes only those, and a ``position`` charge
-    beside one names the wrong fix, for the reason :func:`_charged_to` gives.
-    ``min`` keeps the first of equal readings, so the reference's own reading
-    wins a tie.
+    charge through this choice. ``answers`` gives the stage's items at a
+    reading's place under that reading's action, so a reading with no such
+    item is skipped: a reference answered by an item under its own action is
+    the stage's cause, and a ``verb`` charge beside it names the wrong fix.
+    A reading whose items state the ruled position wins over one whose items
+    do not, because the scorer's gate takes only those, so a ``position``
+    charge beside one names the wrong fix too. ``min`` keeps the first of
+    equal readings, so the reference's own reading wins a tie.
     """
     answered = []
     for read_verb, place in readings:
@@ -457,28 +459,17 @@ def _answered_reading(
     return min(answered, key=lambda reading: not reading.held, default=None)
 
 
-def _charged_to(claims: Sequence[DraftThreat], verb: str) -> DraftThreat:
+def _charged_to(claims: Sequence[DraftThreat]) -> DraftThreat:
     """Which of several claims at one place a miss is charged to.
 
     **The rule decides, never the input order.** ``_at_place`` returns the
-    claims in whatever order the report happens to list them, and reading
-    ``[0]`` made the cause a fact about that order: reversing the report's
-    claims moved case 05's reference 9 from ``merged`` to ``verb`` in two
-    archived Baselines, with no finding and no match changed. An instrument
-    that priced three prompt edits must not answer differently when its input
-    is shuffled.
-
-    Two keys, in order:
-
-    * **An action match wins.** A reference answered by a claim carrying its
-      own action is a merge — the lane wrote the threat and folded this
-      reference into it. A claim at the same place under a *different* action
-      is the weaker reading, and charging the miss to the verb while a merge
-      sits beside it names the wrong fix.
-    * **Then the claim ID**, which is arbitrary but stable, so the row a reader
-      sees does not move between two runs over one report.
+    claims in whatever order the report lists them, so the lowest claim ID
+    decides: it is arbitrary but stable, and the row a reader sees does not
+    move between two runs over one report. :func:`_answered_reading` has
+    already kept only the claims that carry the reading's action and, where
+    one states it, the ruled position.
     """
-    return min(claims, key=lambda claim: (not same_action(claim.verb, verb), claim.id))
+    return min(claims, key=lambda claim: claim.id)
 
 
 def _relation(
@@ -602,14 +593,14 @@ def attribute_case(
             charge = (
                 answered.refused or "merged",
                 answered.place,
-                _charged_to(answered.held or answered.with_action, answered.read_verb),
+                _charged_to(answered.held or answered.with_action),
             )
         else:
             # With no claim under a reading's action, the first reading with
             # any claim at its place charges the verb.
             charge = next(
                 (
-                    ("verb", place, _charged_to(here, read_verb))
+                    ("verb", place, _charged_to(here))
                     for read_verb, place in readings
                     if (here := _at_place(place, in_lane, flows))
                 ),
@@ -663,10 +654,7 @@ def attribute_case(
             _draft_position,
         )
         if killed_answer is not None:
-            draft = _charged_to(
-                killed_answer.held or killed_answer.with_action,
-                killed_answer.read_verb,
-            )
+            draft = _charged_to(killed_answer.held or killed_answer.with_action)
             losses.append(
                 Loss(
                     index,
