@@ -10,10 +10,10 @@
       "kind": "description",
       "label": "System description",
       "file": "source.md",
-      "sha256": "dff7ec2640470f43ebde447fc26709a8a006407d447525eac0c8ee180e171c2e"
+      "sha256": "f03361ae94b47c0bba5d322cdf69fd0f9a59f1a6c80890f502e901d47656d1f5"
     }
   ],
-  "source_sha256": "a6f59d9cd016ea24de9bd5aec876c158f93f70b6edbf5958a7d8d5afbda00623",
+  "source_sha256": "cb51c4707771a6397ada972423e218d008655e8ba0dee2af164d9da94740c329",
   "frameworks": [
     {
       "name": "stride",
@@ -21,5 +21,5 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "The case exists for issue #2054. It measures the assertion pass on the authorization-scope predicates. The source states each part on its own element: the coursework service checks each request against the user's role (each request yes) and does not check that a submission belongs to the student (ownership no), its database account is limited to the coursework tables (least privilege yes), the admin console does not check that a teacher is an administrator (each request no), and the grade export's read-only access is a hedge that must stay unknown. The tampering and the information-disclosure must-finds rest on the missing ownership check. The elevation-of-privilege must-find rests on the admin console's missing check across the office network, a privilege zone. The domain is a school, which no other case covers."
+  "notes": "The case exists for issue #2054. It measures the assertion pass on the authorization-scope predicates. The source states each part on its own element: the coursework service checks each request against the user's role (each request yes, least privilege yes) and does not check that a submission belongs to the student (ownership no), its database account is limited to three tables (least privilege yes, on that connection), the admin console checks the administrator role only on its start page (each request no), and the grade export's read-only access is a hedge that must stay unknown. The tampering and the information-disclosure must-finds rest on the missing ownership check. The elevation-of-privilege must-find rests on the admin console's start-page-only check across the office network, a privilege zone. The domain is a school, which no other case covers."
 }

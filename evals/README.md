@@ -86,7 +86,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call:
-**15 false splits of 169, 2 false merges of 92 and 8 false merges of 439.**
+**15 false splits of 169, 2 false merges of 92 and 8 false merges of 465.**
 The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
@@ -96,7 +96,7 @@ denominators are different populations and none is a rate over what a live run
 emits.
 
 Equivalently by population: 15 false splits over 169 equivalent candidate pairs,
-2 false merges over 92 candidate negatives, and 8 false merges over 439
+2 false merges over 92 candidate negatives, and 8 false merges over 465
 distinct reference pairs.
 
 The 288 calibration fixtures retain their original order and reference claims.
@@ -261,7 +261,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 169, 2 false merges of 92 and 8 false merges of 439 with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 169, 2 false merges of 92 and 8 false merges of 465 with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | Which **Data Flow** identity version a graph spells, and the table that lifts an archived artifact's old flow IDs to the version the corpus spells. The table comes from the graph's endpoints, because a version 1 ID omits the endpoint types. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |

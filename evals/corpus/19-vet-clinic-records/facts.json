@@ -35,13 +35,13 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The partner lab sends test results over the internet to the lab results importer."
+            "quote": "The lab results importer is on the internet, and the partner lab sends test results to it over the internet."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Stated: the partner lab reaches the importer over the internet.",
+      "rationale": "Stated.",
       "reviewed_by": null
     },
     {
@@ -215,7 +215,7 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The source never says how staff sign in.",
+      "rationale": "The source says the API checks that a staff account signed in, and never says how staff sign in.",
       "reviewed_by": null
     },
     {
@@ -263,13 +263,29 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The source never says how the importer connects to the records database.",
+      "rationale": "No sentence names how the importer connects to the records database.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:clinic-staff>process:billing-service>open-invoices",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence names how receptionists sign in to the billing service.",
       "reviewed_by": null
     },
     {
       "assertion": {
         "subject_type": "principal",
-        "subject": "staff accounts",
+        "subject": "clinic staff",
         "predicate": "authorization-grant",
         "value": "do everything in the clinic API",
         "reason": null,
@@ -294,6 +310,66 @@
         "exclusive": false
       },
       "rationale": "A stated grant: every staff account can do everything in the clinic API.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "pet owners",
+        "predicate": "authorization-grant",
+        "value": "book appointments and read their pets' records",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "their pets' records and appointments"
+          },
+          {
+            "kind": "operation",
+            "value": "book and read"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Pet owners book appointments and read their pets' records in the owner app."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated grant, held to the owner's own pets by the ownership check.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "the clinic API's database account",
+        "predicate": "authorization-grant",
+        "value": "the database's admin account",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "records database"
+          },
+          {
+            "kind": "operation",
+            "value": "admin"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It connects to the records database with the database's admin account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated grant: the clinic API uses the admin account.",
       "reviewed_by": null
     },
     {

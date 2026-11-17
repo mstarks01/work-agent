@@ -6,13 +6,29 @@
       "entity:student",
       "process:coursework-service"
     ],
-    "claim": "If an attacker obtains a student's school account, they can hand in, change or read that student's work as the student.",
+    "claim": "An attacker who obtains a student's school account can hand in, change or read that student's work as the student.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Students sign in with their school accounts. The source names no mechanism and no second factor, so the claim is conditional.",
+    "notes": "Students sign in with their school accounts. The source names no mechanism and no second factor.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:teacher>process:coursework-service>mark-work",
+      "entity:teacher",
+      "process:coursework-service"
+    ],
+    "claim": "An attacker who obtains a teacher's school account can change students' marks as that teacher.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Teachers sign in with their school accounts. The source names no mechanism and no second factor.",
     "verb": "use-credential"
   },
   {
@@ -36,28 +52,43 @@
     "affected_element_ids": [
       "flow:process:grade-export>entity:district-records-system>send-final-grades"
     ],
-    "claim": "If the grade export sends final grades to the district records system without integrity protection, an attacker on the path can change grades before they arrive.",
+    "claim": "If the grade export sends final grades over the internet without integrity protection, an attacker on the path may change grades before they arrive.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The source says nothing about how the grades travel or how they are protected.",
+    "notes": "Stated: the grades travel over the internet. The source says nothing about their protection.",
     "verb": "alter-in-transit"
   },
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:entity:teacher>process:admin-console>open-admin-console",
-      "process:admin-console"
+      "flow:entity:student>process:coursework-service>hand-in-work",
+      "process:coursework-service"
     ],
-    "claim": "If the admin console does not record which account changed a final grade, a teacher who changed grades through it can deny it, and the school cannot show who did it.",
+    "claim": "If the coursework service does not record which account changed a submission, a student who changed another student's work may deny it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Any teacher can open the admin console, as stated. The source says nothing about a record of changes.",
+    "notes": "The missing ownership check is stated. The source says nothing about a record of changes.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:teacher>process:admin-console>open-admin-pages",
+      "process:admin-console"
+    ],
+    "claim": "If the admin console does not record which account changed a final grade, a teacher who changed grades through an admin page may deny it, and the school cannot show who did it.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "A teacher can use an admin page, as stated. The source says nothing about a record of changes.",
     "verb": "unattributable"
   },
   {
@@ -67,7 +98,7 @@
       "flow:entity:student>process:coursework-service>hand-in-work",
       "store:coursework-database"
     ],
-    "claim": "A student can change the submission number in the address and read another student's work and its marks and comments, because the coursework service does not check that the submission is theirs.",
+    "claim": "A student can change the submission number in the address and read another student's work, because the coursework service does not check that the submission is theirs.",
     "tier": "must-find",
     "severity": {
       "likelihood": "high",
@@ -79,9 +110,53 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
+      "flow:entity:teacher>process:admin-console>open-admin-pages",
+      "process:admin-console",
+      "entity:teacher"
+    ],
+    "claim": "A teacher who opens an admin page's address directly can read students' accounts and final grades that only office staff should see.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated: the admin console checks the administrator role only on its start page. The read harm of that gap is this lane's.",
+    "verb": "elicit"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:student>process:coursework-service>hand-in-work"
+    ],
+    "claim": "If students' requests are not encrypted in transit, an attacker on the network path may read the work students hand in.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The coursework service is on the internet. The source says nothing about encryption in transit.",
+    "verb": "intercept"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:grade-export>entity:district-records-system>send-final-grades"
+    ],
+    "claim": "If the final grades are not encrypted in transit, an attacker on the path between the grade export and the district records system may read every student's final grades.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Stated: the grades travel over the internet. The source says nothing about encryption in transit.",
+    "verb": "intercept"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
       "store:coursework-database"
     ],
-    "claim": "If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage reads every student's work, marks and accounts.",
+    "claim": "If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every student's work, marks and accounts.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -91,26 +166,12 @@
     "verb": "read"
   },
   {
-    "category": "information-disclosure",
-    "affected_element_ids": [
-      "flow:process:grade-export>entity:district-records-system>send-final-grades"
-    ],
-    "claim": "If the final grades are not encrypted in transit, an attacker on the path between the grade export and the district records system reads every student's final grades.",
-    "tier": "expected",
-    "severity": {
-      "likelihood": "low",
-      "impact": "medium"
-    },
-    "notes": "The source says nothing about encryption in transit.",
-    "verb": "intercept"
-  },
-  {
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:coursework-service",
       "flow:entity:student>process:coursework-service>hand-in-work"
     ],
-    "claim": "If the internet-facing coursework service does not limit the requests it accepts, an attacker floods it near a deadline so that students cannot hand in their work.",
+    "claim": "If the internet-facing coursework service does not limit the requests it accepts, an attacker may flood it near a deadline so that students cannot hand in their work.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
@@ -123,16 +184,32 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:admin-console",
-      "flow:entity:teacher>process:admin-console>open-admin-console",
+      "flow:entity:teacher>process:admin-console>open-admin-pages",
       "entity:teacher"
     ],
-    "claim": "A teacher can reach the admin console from the school network and change classes, accounts and final grades, because the admin console accepts a teacher's school account without checking whether the teacher is an administrator.",
+    "claim": "A teacher can open an admin page's address directly and change classes, accounts and final grades, because the admin console checks for the administrator role only on its start page.",
     "tier": "must-find",
     "severity": {
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "Stated outright: \"Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator.\" The office network is kept apart for administration, and a teacher holds no administrator access, so the verb is escalate.",
+    "notes": "Stated outright: \"It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page.\" Only office staff are meant to work in the office network, and a teacher holds no administrator role, so the verb is escalate.",
+    "verb": "escalate"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:coursework-service",
+      "flow:entity:student>process:coursework-service>hand-in-work",
+      "entity:student"
+    ],
+    "claim": "A student can act on another student's submission by its number, because the coursework service checks the student role but not the ownership of the object the request names.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "Stated: \"The coursework service checks that the user is a student, but not that the submission is theirs.\" The broken check is this lane's; the change and the read are the tampering and disclosure findings.",
     "verb": "escalate"
   },
   {
@@ -142,13 +219,13 @@
       "flow:process:grade-export>store:coursework-database>read-final-grades",
       "store:coursework-database"
     ],
-    "claim": "If the grade export can write the coursework database, an attacker who compromises it can change grades and other records, which is more than the export's job needs.",
+    "claim": "An attacker who compromises the grade export can act with its actual database permissions, potentially changing grades or other records those permissions reach.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "A hedge in the source: Dana thinks the export has read-only access, and she has not looked. The claim stays conditional.",
+    "notes": "A hedge in the source: Dana thinks the export has read-only access, and she has not looked.",
     "verb": "abuse-grant"
   }
 ]

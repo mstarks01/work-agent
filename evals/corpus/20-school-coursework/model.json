@@ -17,7 +17,7 @@
       "name": "teacher",
       "description": "A teacher who marks coursework, and who can also reach the admin console from the school network.",
       "assets": [],
-      "source_excerpt": "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator.",
+      "source_excerpt": "Teachers can also reach the admin console from the school network.",
       "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:school-network"
@@ -27,7 +27,7 @@
       "name": "office staff",
       "description": "Office staff who manage classes, accounts and final grades in the admin console.",
       "assets": [],
-      "source_excerpt": "Office staff manage classes, accounts and final grades in the admin console.",
+      "source_excerpt": "Office staff manage classes, accounts and final grades in the admin console, which writes them to the coursework database.",
       "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:school-office-network"
@@ -35,9 +35,9 @@
     {
       "id": "entity:district-records-system",
       "name": "district records system",
-      "description": "The district's records system, which receives final grades every Friday.",
+      "description": "The district's records system, which receives final grades over the internet every Friday.",
       "assets": [],
-      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database to the district records system.",
+      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database over the internet to the district records system.",
       "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:internet"
@@ -47,7 +47,7 @@
     {
       "id": "process:coursework-service",
       "name": "coursework service",
-      "description": "The internet-facing service through which students hand in work and teachers mark it. It checks each request against the user's role, and it does not check that a submission belongs to the student who asks for it.",
+      "description": "The internet-facing service through which students hand in work and teachers mark it.",
       "assets": [
         "pii",
         "business-critical-data"
@@ -63,27 +63,27 @@
     {
       "id": "process:admin-console",
       "name": "admin console",
-      "description": "Where office staff manage classes, accounts and final grades. Only office staff are meant to use it, but it accepts a teacher's school account without checking whether the teacher is an administrator.",
+      "description": "Where office staff manage classes, accounts and final grades. It checks for the administrator role only on its start page.",
       "assets": [
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "The admin console runs on the school office network, which is kept apart for administration.",
+      "source_excerpt": "Office staff manage classes, accounts and final grades in the admin console, which writes them to the coursework database.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:school-office-network",
       "exposure": "unknown",
       "interface_kind": "unknown",
-      "notes": "Stated in the source: \"Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator.\""
+      "notes": "Stated in the source: \"Teachers can also reach the admin console from the school network.\" and \"It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page.\""
     },
     {
       "id": "process:grade-export",
       "name": "grade export",
-      "description": "Sends final grades from the coursework database to the district records system every Friday.",
+      "description": "Sends final grades from the coursework database to the district records system over the internet every Friday.",
       "assets": [
         "pii"
       ],
-      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database to the district records system.",
+      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database over the internet to the district records system.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:school-cloud-account",
@@ -153,7 +153,7 @@
       "assets": [
         "pii"
       ],
-      "source_excerpt": "Its database account can only read and write the coursework tables.",
+      "source_excerpt": "Its database account can only read and write the submissions, marks and comments tables.",
       "source_label": "System description",
       "source": "process:coursework-service",
       "destination": "store:coursework-database",
@@ -162,7 +162,7 @@
       "data_description": "submissions, marks and comments",
       "encryption_in_transit": "unknown",
       "operations": "read-write",
-      "notes": "The source states a database account limited to the coursework tables and names no mechanism behind it, so authentication reads unknown."
+      "notes": "The source states a database account limited to the submissions, marks and comments tables, and names no mechanism behind it, so authentication reads unknown."
     },
     {
       "id": "flow:entity:office-staff>process:admin-console>manage-classes-and-grades",
@@ -172,7 +172,7 @@
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "Office staff manage classes, accounts and final grades in the admin console.",
+      "source_excerpt": "Office staff manage classes, accounts and final grades in the admin console, which writes them to the coursework database.",
       "source_label": "System description",
       "source": "entity:office-staff",
       "destination": "process:admin-console",
@@ -183,14 +183,14 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:entity:teacher>process:admin-console>open-admin-console",
-      "name": "open admin console",
-      "description": "A teacher reaches the admin console from the school network, which accepts the teacher's school account.",
+      "id": "flow:entity:teacher>process:admin-console>open-admin-pages",
+      "name": "open admin pages",
+      "description": "A teacher reaches the admin console from the school network and opens an admin page's address directly.",
       "assets": [
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator.",
+      "source_excerpt": "It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page.",
       "source_label": "System description",
       "source": "entity:teacher",
       "destination": "process:admin-console",
@@ -208,7 +208,7 @@
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "The admin console writes classes, accounts and final grades to the coursework database.",
+      "source_excerpt": "Office staff manage classes, accounts and final grades in the admin console, which writes them to the coursework database.",
       "source_label": "System description",
       "source": "process:admin-console",
       "destination": "store:coursework-database",
@@ -225,7 +225,7 @@
       "assets": [
         "pii"
       ],
-      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database to the district records system.",
+      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database over the internet to the district records system.",
       "source_label": "System description",
       "source": "process:grade-export",
       "destination": "store:coursework-database",
@@ -238,11 +238,11 @@
     {
       "id": "flow:process:grade-export>entity:district-records-system>send-final-grades",
       "name": "send final grades",
-      "description": "The grade export sends final grades to the district records system.",
+      "description": "The grade export sends final grades over the internet to the district records system.",
       "assets": [
         "pii"
       ],
-      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database to the district records system.",
+      "source_excerpt": "Every Friday the grade export sends final grades from the coursework database over the internet to the district records system.",
       "source_label": "System description",
       "source": "process:grade-export",
       "destination": "entity:district-records-system",
@@ -257,7 +257,7 @@
     {
       "id": "boundary:internet",
       "name": "internet",
-      "description": "Where students reach the coursework service from, and where the district records system is reached.",
+      "description": "Where students reach the coursework service from, and where final grades travel to the district records system.",
       "assets": [],
       "source_excerpt": "Students hand in their coursework through the coursework service, which is on the internet.",
       "source_label": "System description",
@@ -266,18 +266,18 @@
     {
       "id": "boundary:school-network",
       "name": "school network",
-      "description": "The network teachers open the admin console from.",
+      "description": "The network teachers reach the admin console from.",
       "assets": [],
-      "source_excerpt": "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator.",
+      "source_excerpt": "Teachers can also reach the admin console from the school network.",
       "source_label": "System description",
       "kind": "network"
     },
     {
       "id": "boundary:school-office-network",
       "name": "school office network",
-      "description": "The office network, kept apart for administration, where the admin console runs.",
+      "description": "The office network, kept apart so that only office staff work in it, where the admin console runs.",
       "assets": [],
-      "source_excerpt": "The admin console runs on the school office network, which is kept apart for administration.",
+      "source_excerpt": "The admin console runs on the school office network, which is kept apart so that only office staff work in it.",
       "source_label": "System description",
       "kind": "privilege"
     },
@@ -302,19 +302,25 @@
       "assumption": "Office staff are placed on the school office network because the schema requires a zone.",
       "element_id": "entity:office-staff",
       "attribute": "trust_zone",
-      "basis": "They manage the admin console, which runs on the office network; the source does not state where office staff sit."
+      "basis": "The source says the office network is kept apart so that only office staff work in it, and does not say where office staff sit when they use the admin console."
     },
     {
       "assumption": "The district records system is placed on the internet because the schema requires a zone.",
       "element_id": "entity:district-records-system",
       "attribute": "trust_zone",
-      "basis": "The source does not state where the district records system runs, and it is outside the school's cloud account."
+      "basis": "The grade export sends final grades to it over the internet; the source does not state where the district records system runs."
     },
     {
       "assumption": "The coursework service presents a web interface.",
       "element_id": "process:coursework-service",
       "attribute": "interface_kind",
       "basis": "A student opens work at an address that holds the submission's number, which is a web address."
+    },
+    {
+      "assumption": "The school office network is a privilege zone.",
+      "element_id": "boundary:school-office-network",
+      "attribute": "kind",
+      "basis": "The source says the network is kept apart so that only office staff work in it, which is a zone set apart for administrative authority."
     }
   ]
 }

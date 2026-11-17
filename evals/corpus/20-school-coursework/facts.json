@@ -98,7 +98,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The admin console runs on the school office network, which is kept apart for administration."
+            "quote": "The admin console runs on the school office network, which is kept apart so that only office staff work in it."
           }
         ],
         "explanation": "",
@@ -119,7 +119,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator."
+            "quote": "Teachers can also reach the admin console from the school network."
           }
         ],
         "explanation": "",
@@ -211,7 +211,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:teacher>process:admin-console>open-admin-console",
+        "subject": "flow:entity:teacher>process:admin-console>open-admin-pages",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "silent",
@@ -221,7 +221,7 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The source names a teacher's school account and no mechanism behind it.",
+      "rationale": "The source says a teacher signs in to the admin console and names no mechanism.",
       "reviewed_by": null
     },
     {
@@ -298,6 +298,112 @@
         "exclusive": false
       },
       "rationale": "A stated grant by role.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "office staff",
+        "predicate": "authorization-grant",
+        "value": "manage classes, accounts and final grades",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "admin console"
+          },
+          {
+            "kind": "operation",
+            "value": "manage"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Office staff manage classes, accounts and final grades in the admin console, which writes them to the coursework database."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated grant in the admin console.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "the coursework service's database account",
+        "predicate": "authorization-grant",
+        "value": "read and write the submissions, marks and comments tables",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "coursework database"
+          },
+          {
+            "kind": "operation",
+            "value": "read and write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Its database account can only read and write the submissions, marks and comments tables."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated, narrow database grant.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "the grade export's database account",
+        "predicate": "authorization-grant",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "coursework database"
+          },
+          {
+            "kind": "operation",
+            "value": "read"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Dana thinks the grade export has read-only access to the database, but she has not looked."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A hedge: the speaker thinks the access is read-only and has not looked, so the row states no value.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:student>process:coursework-service>hand-in-work",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence of the source names a protection on the wire.",
       "reviewed_by": null
     },
     {

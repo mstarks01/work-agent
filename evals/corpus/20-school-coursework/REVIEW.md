@@ -31,11 +31,11 @@ Roughly an hour.
 >
 > A student opens, changes and hands in a piece of work again at an address that holds the submission's number. The coursework service checks that the user is a student, but not that the submission is theirs.
 >
-> The coursework service keeps submissions, marks and comments in the coursework database. Its database account can only read and write the coursework tables.
+> The coursework service keeps submissions, marks and comments in the coursework database. Its database account can only read and write the submissions, marks and comments tables.
 >
-> Office staff manage classes, accounts and final grades in the admin console. The admin console runs on the school office network, which is kept apart for administration. Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator. The admin console writes classes, accounts and final grades to the coursework database.
+> Office staff manage classes, accounts and final grades in the admin console, which writes them to the coursework database. The admin console runs on the school office network, which is kept apart so that only office staff work in it. Teachers can also reach the admin console from the school network. It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page.
 >
-> Every Friday the grade export sends final grades from the coursework database to the district records system. Dana thinks the grade export has read-only access to the database, but she has not looked.
+> Every Friday the grade export sends final grades from the coursework database over the internet to the district records system. Dana thinks the grade export has read-only access to the database, but she has not looked.
 >
 > The coursework service, the grade export and the coursework database run in the school's cloud account.
 
@@ -74,7 +74,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:entity:teacher>process:coursework-service>mark-work | entity:teacher | process:coursework-service | unknown | unknown | unknown |
 | flow:process:coursework-service>store:coursework-database>keep-coursework | process:coursework-service | store:coursework-database | unknown | unknown | unknown |
 | flow:entity:office-staff>process:admin-console>manage-classes-and-grades | entity:office-staff | process:admin-console | unknown | unknown | unknown |
-| flow:entity:teacher>process:admin-console>open-admin-console | entity:teacher | process:admin-console | unknown | unknown | unknown |
+| flow:entity:teacher>process:admin-console>open-admin-pages | entity:teacher | process:admin-console | unknown | unknown | unknown |
 | flow:process:admin-console>store:coursework-database>write-classes-and-grades | process:admin-console | store:coursework-database | unknown | unknown | unknown |
 | flow:process:grade-export>store:coursework-database>read-final-grades | process:grade-export | store:coursework-database | unknown | unknown | unknown |
 | flow:process:grade-export>entity:district-records-system>send-final-grades | process:grade-export | entity:district-records-system | unknown | unknown | unknown |
@@ -91,18 +91,19 @@ Not part of the question, but the records cite these names, so you need them.
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
 - `process:coursework-service` — Stated in the source: "The coursework service checks each request against the user's role: a student can hand in and read work, and only a teacher can mark it." and "The coursework service checks that the user is a student, but not that the submission is theirs."
-- `process:admin-console` — Stated in the source: "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator."
+- `process:admin-console` — Stated in the source: "Teachers can also reach the admin console from the school network." and "It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page."
 - `process:grade-export` — A hedge in the source: "Dana thinks the grade export has read-only access to the database, but she has not looked."
 - `flow:entity:student>process:coursework-service>hand-in-work` — The source says students sign in with their school accounts and names no mechanism, so authentication reads unknown.
 - `flow:entity:teacher>process:coursework-service>mark-work` — The source says teachers sign in with their school accounts and names no mechanism, so authentication reads unknown.
-- `flow:process:coursework-service>store:coursework-database>keep-coursework` — The source states a database account limited to the coursework tables and names no mechanism behind it, so authentication reads unknown.
+- `flow:process:coursework-service>store:coursework-database>keep-coursework` — The source states a database account limited to the submissions, marks and comments tables, and names no mechanism behind it, so authentication reads unknown.
 
 **Assumptions**
 
 - `entity:student` — Students are placed on the internet because the schema requires a zone. (basis: Students reach the coursework service on the internet; the source does not state where students are.)
-- `entity:office-staff` — Office staff are placed on the school office network because the schema requires a zone. (basis: They manage the admin console, which runs on the office network; the source does not state where office staff sit.)
-- `entity:district-records-system` — The district records system is placed on the internet because the schema requires a zone. (basis: The source does not state where the district records system runs, and it is outside the school's cloud account.)
+- `entity:office-staff` — Office staff are placed on the school office network because the schema requires a zone. (basis: The source says the office network is kept apart so that only office staff work in it, and does not say where office staff sit when they use the admin console.)
+- `entity:district-records-system` — The district records system is placed on the internet because the schema requires a zone. (basis: The grade export sends final grades to it over the internet; the source does not state where the district records system runs.)
 - `process:coursework-service` — The coursework service presents a web interface. (basis: A student opens work at an address that holds the submission's number, which is a web address.)
+- `boundary:school-office-network` — The school office network is a privilege zone. (basis: The source says the network is kept apart so that only office staff work in it, which is a zone set apart for administrative authority.)
 
 ### Your list
 
@@ -118,7 +119,7 @@ category.
 
 ---
 
-## Part 2 — the 10 recorded STRIDE threats
+## Part 2 — the 15 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -136,18 +137,26 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** If an attacker obtains a student's school account, they can hand in, change or read that student's work as the student.
+**1.** An attacker who obtains a student's school account can hand in, change or read that student's work as the student.
 
 - `flow:entity:student>process:coursework-service>hand-in-work`, `entity:student`, `process:coursework-service`
 - severity: medium/medium · verb: `use-credential`
-- Students sign in with their school accounts. The source names no mechanism and no second factor, so the claim is conditional.
+- Students sign in with their school accounts. The source names no mechanism and no second factor.
+
+> mark:
+
+**2.** An attacker who obtains a teacher's school account can change students' marks as that teacher.
+
+- `flow:entity:teacher>process:coursework-service>mark-work`, `entity:teacher`, `process:coursework-service`
+- severity: medium/high · verb: `use-credential`
+- Teachers sign in with their school accounts. The source names no mechanism and no second factor.
 
 > mark:
 
 
 ### tampering
 
-**2.** A student can change the submission number in the address and change or replace another student's work, because the coursework service checks that the user is a student but not that the submission is theirs.
+**3.** A student can change the submission number in the address and change or replace another student's work, because the coursework service checks that the user is a student but not that the submission is theirs.
 
 - `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`, `store:coursework-database`
 - severity: high/high · verb: `alter`
@@ -155,29 +164,37 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**3.** If the grade export sends final grades to the district records system without integrity protection, an attacker on the path can change grades before they arrive.
+**4.** If the grade export sends final grades over the internet without integrity protection, an attacker on the path may change grades before they arrive.
 
 - `flow:process:grade-export>entity:district-records-system>send-final-grades`
 - severity: low/high · verb: `alter-in-transit`
-- The source says nothing about how the grades travel or how they are protected.
+- Stated: the grades travel over the internet. The source says nothing about their protection.
 
 > mark:
 
 
 ### repudiation
 
-**4.** If the admin console does not record which account changed a final grade, a teacher who changed grades through it can deny it, and the school cannot show who did it.
+**5.** If the coursework service does not record which account changed a submission, a student who changed another student's work may deny it.
 
-- `flow:entity:teacher>process:admin-console>open-admin-console`, `process:admin-console`
+- `flow:entity:student>process:coursework-service>hand-in-work`, `process:coursework-service`
 - severity: medium/medium · verb: `unattributable`
-- Any teacher can open the admin console, as stated. The source says nothing about a record of changes.
+- The missing ownership check is stated. The source says nothing about a record of changes.
+
+> mark:
+
+**6.** If the admin console does not record which account changed a final grade, a teacher who changed grades through an admin page may deny it, and the school cannot show who did it.
+
+- `flow:entity:teacher>process:admin-console>open-admin-pages`, `process:admin-console`
+- severity: medium/medium · verb: `unattributable`
+- A teacher can use an admin page, as stated. The source says nothing about a record of changes.
 
 > mark:
 
 
 ### information-disclosure
 
-**5.** A student can change the submission number in the address and read another student's work and its marks and comments, because the coursework service does not check that the submission is theirs.
+**7.** A student can change the submission number in the address and read another student's work, because the coursework service does not check that the submission is theirs.
 
 - `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`, `store:coursework-database`
 - severity: high/medium · verb: `elicit`
@@ -185,7 +202,31 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**6.** If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage reads every student's work, marks and accounts.
+**8.** A teacher who opens an admin page's address directly can read students' accounts and final grades that only office staff should see.
+
+- `flow:entity:teacher>process:admin-console>open-admin-pages`, `process:admin-console`, `entity:teacher`
+- severity: medium/medium · verb: `elicit`
+- Stated: the admin console checks the administrator role only on its start page. The read harm of that gap is this lane's.
+
+> mark:
+
+**9.** If students' requests are not encrypted in transit, an attacker on the network path may read the work students hand in.
+
+- `flow:entity:student>process:coursework-service>hand-in-work`
+- severity: low/medium · verb: `intercept`
+- The coursework service is on the internet. The source says nothing about encryption in transit.
+
+> mark:
+
+**10.** If the final grades are not encrypted in transit, an attacker on the path between the grade export and the district records system may read every student's final grades.
+
+- `flow:process:grade-export>entity:district-records-system>send-final-grades`
+- severity: low/medium · verb: `intercept`
+- Stated: the grades travel over the internet. The source says nothing about encryption in transit.
+
+> mark:
+
+**11.** If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every student's work, marks and accounts.
 
 - `store:coursework-database`
 - severity: low/high · verb: `read`
@@ -193,18 +234,10 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**7.** If the final grades are not encrypted in transit, an attacker on the path between the grade export and the district records system reads every student's final grades.
-
-- `flow:process:grade-export>entity:district-records-system>send-final-grades`
-- severity: low/medium · verb: `intercept`
-- The source says nothing about encryption in transit.
-
-> mark:
-
 
 ### denial-of-service
 
-**8.** If the internet-facing coursework service does not limit the requests it accepts, an attacker floods it near a deadline so that students cannot hand in their work.
+**12.** If the internet-facing coursework service does not limit the requests it accepts, an attacker may flood it near a deadline so that students cannot hand in their work.
 
 - `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`
 - severity: medium/medium · verb: `flood`
@@ -215,19 +248,27 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**9.** A teacher can reach the admin console from the school network and change classes, accounts and final grades, because the admin console accepts a teacher's school account without checking whether the teacher is an administrator.
+**13.** A teacher can open an admin page's address directly and change classes, accounts and final grades, because the admin console checks for the administrator role only on its start page.
 
-- `process:admin-console`, `flow:entity:teacher>process:admin-console>open-admin-console`, `entity:teacher`
+- `process:admin-console`, `flow:entity:teacher>process:admin-console>open-admin-pages`, `entity:teacher`
 - severity: high/high · verb: `escalate`
-- Stated outright: "Only office staff are meant to use it, but teachers can also reach it from the school network, and it accepts a teacher's school account without checking whether the teacher is an administrator." The office network is kept apart for administration, and a teacher holds no administrator access, so the verb is escalate.
+- Stated outright: "It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page." Only office staff are meant to work in the office network, and a teacher holds no administrator role, so the verb is escalate.
 
 > mark:
 
-**10.** If the grade export can write the coursework database, an attacker who compromises it can change grades and other records, which is more than the export's job needs.
+**14.** A student can act on another student's submission by its number, because the coursework service checks the student role but not the ownership of the object the request names.
+
+- `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`, `entity:student`
+- severity: high/medium · verb: `escalate`
+- Stated: "The coursework service checks that the user is a student, but not that the submission is theirs." The broken check is this lane's; the change and the read are the tampering and disclosure findings.
+
+> mark:
+
+**15.** An attacker who compromises the grade export can act with its actual database permissions, potentially changing grades or other records those permissions reach.
 
 - `process:grade-export`, `flow:process:grade-export>store:coursework-database>read-final-grades`, `store:coursework-database`
 - severity: low/high · verb: `abuse-grant`
-- A hedge in the source: Dana thinks the export has read-only access, and she has not looked. The claim stays conditional.
+- A hedge in the source: Dana thinks the export has read-only access, and she has not looked.
 
 > mark:
 
@@ -275,9 +316,9 @@ your missing list, your notes and a digest of each file you read:
       "missing": ["<what the recorded sets do not name>"],
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
-      "source.md": "dff7ec2640470f43ebde447fc26709a8a006407d447525eac0c8ee180e171c2e",
-      "model.json": "0083d36849f290026dab4e8fc090f2c6197dd7e7ed735e5e1d7afda14bbafcfb",
-      "claims/stride.json": "8dc58cdc02ab6addc95cab0d4684ffe6fabb24f91fc0dcd83518e92a45070eb2"
+      "source.md": "f03361ae94b47c0bba5d322cdf69fd0f9a59f1a6c80890f502e901d47656d1f5",
+      "model.json": "0107d4a7d3a4e8d5118c294f3ca03c58f4f270d063bbe2e7ceea908c67b80a4b",
+      "claims/stride.json": "9f72b767b454cc05b0992757f5cad0378ac7db5442419e172e7641cf32cfd74e"
       }
     }
   }

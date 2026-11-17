@@ -25,9 +25,9 @@
     {
       "id": "entity:partner-lab",
       "name": "partner lab",
-      "description": "The partner lab that sends test results over the internet.",
+      "description": "The partner lab that sends test results to the importer over the internet.",
       "assets": [],
-      "source_excerpt": "The partner lab sends test results over the internet to the lab results importer.",
+      "source_excerpt": "The lab results importer is on the internet, and the partner lab sends test results to it over the internet.",
       "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:internet"
@@ -37,7 +37,7 @@
     {
       "id": "process:clinic-api",
       "name": "clinic API",
-      "description": "The API that the owner app and the clinic desktop app call. It checks that a pet belongs to the signed-in owner's account, and keeps owners, pets, appointments and medical notes in the records database.",
+      "description": "The API that the owner app and the clinic desktop app call. It keeps owners, pets, appointments and medical notes in the records database.",
       "assets": [
         "pii",
         "business-critical-data"
@@ -48,7 +48,7 @@
       "trust_zone": "boundary:group-cloud-account",
       "exposure": "internet-facing",
       "interface_kind": "unknown",
-      "notes": "Stated in the source: \"When an owner opens a record, the clinic API checks that the pet belongs to that owner's account.\" and \"Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.\""
+      "notes": "Stated in the source: \"Whenever an owner opens a record or books an appointment, the clinic API checks that the pet belongs to that owner's account.\", \"For staff requests, the clinic API checks only that the account has signed in.\" and \"Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.\""
     },
     {
       "id": "process:lab-results-importer",
@@ -57,18 +57,18 @@
       "assets": [
         "pii"
       ],
-      "source_excerpt": "The importer writes each result into the pet's record in the records database.",
+      "source_excerpt": "The lab results importer is on the internet, and the partner lab sends test results to it over the internet.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:group-cloud-account",
       "exposure": "internet-facing",
       "interface_kind": "unknown",
-      "notes": "Stated in the source: \"It does not check which clinic the result is for, or whether the lab may send results for that pet: it writes every result it receives.\""
+      "notes": "Stated in the source: \"It does not check which clinic a result is for, or whether the lab may send it: it writes every result the partner lab sends.\""
     },
     {
       "id": "process:billing-service",
       "name": "billing service",
-      "description": "Reads appointments from the records database and sends invoices to owners by email.",
+      "description": "Reads appointments from the records database and sends invoices to owners by email. Receptionists open owners' invoices in it.",
       "assets": [
         "pii",
         "financial"
@@ -133,7 +133,8 @@
       "authentication": "unknown",
       "data_description": "owners, pets, appointments and medical notes",
       "encryption_in_transit": "unknown",
-      "operations": "read-write"
+      "operations": "read-write",
+      "notes": "The source says the clinic API checks that a staff account has signed in, and names no sign-in mechanism, so authentication reads unknown."
     },
     {
       "id": "flow:process:clinic-api>store:records-database>keep-records",
@@ -161,7 +162,7 @@
       "assets": [
         "pii"
       ],
-      "source_excerpt": "The partner lab sends test results over the internet to the lab results importer.",
+      "source_excerpt": "The lab results importer is on the internet, and the partner lab sends test results to it over the internet.",
       "source_label": "System description",
       "source": "entity:partner-lab",
       "destination": "process:lab-results-importer",
@@ -217,11 +218,29 @@
       "source_label": "System description",
       "source": "process:billing-service",
       "destination": "entity:pet-owner",
-      "protocol": "unknown",
+      "protocol": "email",
       "authentication": "unknown",
       "data_description": "invoices",
       "encryption_in_transit": "unknown",
       "operations": "write"
+    },
+    {
+      "id": "flow:entity:clinic-staff>process:billing-service>open-invoices",
+      "name": "open invoices",
+      "description": "A receptionist opens owners' invoices in the billing service from the clinic desktop app.",
+      "assets": [
+        "pii",
+        "financial"
+      ],
+      "source_excerpt": "Receptionists open owners' invoices in the billing service from the clinic desktop app.",
+      "source_label": "System description",
+      "source": "entity:clinic-staff",
+      "destination": "process:billing-service",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "owners' invoices",
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [
@@ -274,12 +293,6 @@
       "element_id": "entity:partner-lab",
       "attribute": "trust_zone",
       "basis": "The lab sends results over the internet; the source does not state where the lab runs."
-    },
-    {
-      "assumption": "The lab results importer is internet-facing.",
-      "element_id": "process:lab-results-importer",
-      "attribute": "exposure",
-      "basis": "The partner lab sends test results to it over the internet."
     }
   ]
 }

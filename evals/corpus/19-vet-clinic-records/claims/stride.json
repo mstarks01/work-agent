@@ -6,14 +6,30 @@
       "entity:pet-owner",
       "process:clinic-api"
     ],
-    "claim": "If the clinic API does not limit or slow failed sign-ins, an attacker can guess an owner's password and then read that owner's pet records and book appointments as the owner.",
+    "claim": "An attacker who successfully authenticates with a guessed or reused owner password, defeating any additional sign-in controls, can read that owner's pet records and book appointments as the owner.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Owners sign in with an email address and a password, as stated. The source says nothing about failed sign-ins, so the claim is conditional.",
-    "verb": "guess-credential"
+    "notes": "Stated: owners sign in with an email address and a password. The source states nothing that slows guesses at sign-in.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:clinic-staff>process:clinic-api>manage-records",
+      "entity:clinic-staff",
+      "process:clinic-api"
+    ],
+    "claim": "An attacker who obtains a staff account's credentials can act in the clinic API with that account's full access, including deleting medical notes.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated: the clinic API checks only that a staff account has signed in, and every staff account can do everything. The source never says how staff sign in.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
@@ -22,13 +38,29 @@
       "entity:partner-lab",
       "process:lab-results-importer"
     ],
-    "claim": "If the lab results importer does not authenticate the partner lab, an attacker on the internet can send test results that the importer accepts as the lab's.",
+    "claim": "If the lab results importer does not authenticate the partner lab, an attacker on the internet may send test results that the importer accepts as the lab's.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The source never says how the importer knows a result came from the partner lab.",
+    "notes": "The source never says how the importer knows that a result came from the partner lab.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:process:billing-service>entity:pet-owner>send-invoices",
+      "process:billing-service",
+      "entity:pet-owner"
+    ],
+    "claim": "If owners cannot tell a real invoice email from a fake one, an attacker may send owners invoices that appear to come from the clinic.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The billing service sends invoices by email, as stated. The source says nothing about how an owner can tell that an email came from the clinic.",
     "verb": "impersonate"
   },
   {
@@ -38,13 +70,13 @@
       "flow:process:lab-results-importer>store:records-database>write-lab-results",
       "store:records-database"
     ],
-    "claim": "Whoever can send results to the lab results importer can write a test result into any pet's record, because the importer does not check which clinic the result is for or whether the lab may send results for that pet.",
+    "claim": "The partner lab, or any sender the importer accepts, can change any pet's record at any clinic by sending a result for it, because the importer does not check which clinic a result is for or whether the lab may send it.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Stated outright: \"It does not check which clinic the result is for, or whether the lab may send results for that pet: it writes every result it receives.\" A wrong result in a pet's record can lead a vet to a wrong treatment.",
+    "notes": "Stated outright: \"It does not check which clinic a result is for, or whether the lab may send it: it writes every result the partner lab sends.\"",
     "verb": "alter"
   },
   {
@@ -52,13 +84,13 @@
     "affected_element_ids": [
       "flow:entity:partner-lab>process:lab-results-importer>send-test-results"
     ],
-    "claim": "If test results travel over the internet without integrity protection, an attacker on the path between the partner lab and the importer can change a result before the importer writes it.",
+    "claim": "If test results travel over the internet without integrity protection, an attacker on the path between the partner lab and the importer may change a result before the importer writes it.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The source says the results travel over the internet and says nothing about their protection.",
+    "notes": "Stated: the results travel over the internet. The source says nothing about their protection.",
     "verb": "alter-in-transit"
   },
   {
@@ -67,13 +99,13 @@
       "flow:entity:clinic-staff>process:clinic-api>manage-records",
       "process:clinic-api"
     ],
-    "claim": "If the clinic API does not record which staff account deleted or changed a medical note, a staff member can deny a change, and the clinic cannot show who made it.",
+    "claim": "If the clinic API does not record which staff account deleted or changed a medical note, a staff member may deny a change, and the clinic cannot show who made it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Every staff account can delete medical notes. The source says nothing about a record of changes.",
+    "notes": "Every staff account can delete medical notes, as stated. The source says nothing about a record of changes.",
     "verb": "unattributable"
   },
   {
@@ -96,23 +128,51 @@
     "affected_element_ids": [
       "flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records"
     ],
-    "claim": "If the owner app's requests are not encrypted in transit, an attacker on the network path reads owners' details and their pets' records.",
+    "claim": "If the owner app's requests are not encrypted in transit, an attacker on the network path may read owners' details and their pets' records.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The source says nothing about encryption in transit.",
+    "notes": "The owner app reaches the clinic API on the internet. The source says nothing about encryption in transit.",
+    "verb": "intercept"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:partner-lab>process:lab-results-importer>send-test-results"
+    ],
+    "claim": "If test results are not encrypted in transit, an attacker on the path between the partner lab and the importer may read pets' test results.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Stated: the results travel over the internet. The source says nothing about encryption in transit.",
+    "verb": "intercept"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:process:billing-service>entity:pet-owner>send-invoices"
+    ],
+    "claim": "If invoice emails are not protected in transit, an attacker on the mail path may read owners' invoices.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "The billing service sends invoices by email, as stated. The source says nothing about how the emails are protected.",
     "verb": "intercept"
   },
   {
     "category": "information-disclosure",
     "affected_element_ids": [
       "process:billing-service",
-      "flow:process:billing-service>store:records-database>read-appointments",
+      "flow:entity:clinic-staff>process:billing-service>open-invoices",
       "store:records-database"
     ],
-    "claim": "If the billing service does not check each request against the caller's role, a caller who reaches it can get other owners' appointments and invoices.",
+    "claim": "If the billing service does not check each request against the caller's role, any staff account may open every owner's invoices from the clinic desktop app.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -126,7 +186,7 @@
     "affected_element_ids": [
       "store:records-database"
     ],
-    "claim": "If the records database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage reads every owner's details and every pet's medical notes.",
+    "claim": "If the records database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every owner's details and every pet's medical notes.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -141,7 +201,7 @@
       "process:clinic-api",
       "flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records"
     ],
-    "claim": "If the internet-facing clinic API does not limit the requests it accepts, an attacker floods it until owners and clinic staff cannot use it, which stops the clinics' own work.",
+    "claim": "If the internet-facing clinic API does not limit the requests it accepts, an attacker may flood it until owners and clinic staff cannot use it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
@@ -157,13 +217,13 @@
       "flow:entity:partner-lab>process:lab-results-importer>send-test-results",
       "store:records-database"
     ],
-    "claim": "If the importer does not limit what it accepts, an attacker sends very many results to the internet-facing importer, and it writes all of them into the records database.",
+    "claim": "If the importer does not limit what it accepts, an attacker may send very many results to the internet-facing importer, and it writes all of them into the records database.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The importer writes every result it receives, as stated. The source states no limit.",
+    "notes": "The importer writes every result the partner lab sends, as stated. The source states no limit.",
     "verb": "flood"
   },
   {
@@ -185,11 +245,27 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
+      "process:lab-results-importer",
+      "flow:entity:partner-lab>process:lab-results-importer>send-test-results",
+      "entity:partner-lab"
+    ],
+    "claim": "The partner lab can write results into the records of pets at clinics it does not serve, because the importer does not check which clinic a result is for or whether the lab may send it.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The missing checks are stated. The source does not say which clinics the lab serves, so the reach beyond the lab's job is a condition.",
+    "verb": "abuse-grant"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
       "process:clinic-api",
       "flow:process:clinic-api>store:records-database>keep-records",
       "store:records-database"
     ],
-    "claim": "If an attacker compromises the internet-facing clinic API, they act with the database's admin account, and so can read, change or delete everything in the records database, and change the database itself.",
+    "claim": "An attacker who compromises the internet-facing clinic API can act with the database's admin account, and so can read, change or delete everything in the records database.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
@@ -205,13 +281,13 @@
       "flow:process:lab-results-importer>store:records-database>write-lab-results",
       "store:records-database"
     ],
-    "claim": "If an attacker compromises the internet-facing lab results importer, they act with its access to the records database, which can reach more than the lab results the importer needs to write.",
+    "claim": "An attacker who compromises the internet-facing lab results importer can act with its actual database permissions, potentially changing any records those permissions reach.",
     "tier": "expected",
     "severity": {
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The source states nothing about the importer's database access.",
+    "notes": "The source states nothing about the importer's database permissions.",
     "verb": "abuse-grant"
   }
 ]

@@ -27,5 +27,7 @@ flowchart LR
     linkStyle 4 stroke:#c0392b,stroke-width:2px
     n5 -->|"read appointments"| n6
     linkStyle 5 stroke:#c0392b,stroke-width:2px
-    n5 -->|"send invoices"| n0
+    n5 -->|"send invoices (email)"| n0
     linkStyle 6 stroke:#c0392b,stroke-width:2px
+    n1 -->|"open invoices"| n5
+    linkStyle 7 stroke:#c0392b,stroke-width:2px

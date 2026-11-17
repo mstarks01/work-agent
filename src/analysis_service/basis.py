@@ -112,7 +112,7 @@ eval corpus; this one needs only the job's own sources and so runs on every job.
 It is carried on :class:`~evals.harness.modes.ExtractionScore` beside that
 score, so a sweep reports the pair.
 
-**Read the rate for what it is.** 40 values is a small sample beside the 206
+**Read the rate for what it is.** 41 values is a small sample beside the 206
 element excerpts that calibrated the grounding ladder, and the corpus is
 agent-authored (#226). A 0% flag rate may mean a blessed model reuses its
 source's wording, which is exactly what an agent writing one would do. So the
