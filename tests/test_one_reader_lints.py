@@ -2244,6 +2244,21 @@ class _OneReader:
     within: str
 
 
+def _spells_the_silent_causes(node: ast.AST) -> bool:
+    """Whether ``node`` is a literal collection of exactly ``place`` and ``unled``."""
+    return isinstance(node, (ast.Tuple, ast.List, ast.Set)) and {
+        element.value for element in node.elts if isinstance(element, ast.Constant)
+    } == {"place", "unled"}
+
+
+def test_the_silent_causes_are_spelled_once():
+    """Only ``losses.SILENT`` spells the causes that name nothing at the place;
+    every other site reads that constant."""
+    assert _sites(_spells_the_silent_causes) == [
+        ("evals/harness/losses.py", MODULE_OWNER)
+    ]
+
+
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
     "the join of a page's scripts": _OneReader(

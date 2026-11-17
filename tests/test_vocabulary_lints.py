@@ -130,7 +130,7 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("evals.experiments.QA-2026-11-02-05.control_ballot", "CONTROL_CHECKS"): (
         "the checks of the item 4 control arm, which has no spoofing runs"
     ),
-    ("evals.harness.delivery", "TRACED"): (
+    ("evals.harness.losses", "SILENT"): (
         "the causes that name no draft and no proposal at the reference's"
         " place, which leaves out each cause that names one"
     ),
