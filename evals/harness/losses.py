@@ -22,7 +22,7 @@ order, and the first that finds the finding charges it; ``position`` and
   whether one nests inside the other: containment is how a draft answering
   another question lands on this cause, and a ceiling is priced on the equal
   rows.
-* ``position``: claims cite the place with the reference's own action, and a
+* ``position``: claims cite the place with a reading's action, and a
   person ruled the reference an attacker position that none of them states.
   The lane wrote the action against another attacker, which the scorer's
   position gate refuses. Each later stage reads the same rule: a draft the
@@ -33,8 +33,7 @@ order, and the first that finds the finding charges it; ``position`` and
   position. The archive holds them with no ``attacker_position``, so it
   cannot read the position rule there, and the row is not a lane's
   choice of attacker.
-* ``merged``: a surviving claim cites the place with the reference's own
-  action, read through the equivalence table the identity rule reads, and the
+* ``merged``: a surviving claim cites the place with a reading's action, read through the equivalence table the identity rule reads, and the
   scorer assigned it to a sibling reference. Two references at
   one place under one action are the merges ``verbs.UNSEPARATED`` records,
   and the loss is the corpus's to rule on rather than the lane's.
@@ -43,9 +42,9 @@ order, and the first that finds the finding charges it; ``position`` and
   filed under the wrong category, which is a routing fix and neither a lead nor
   a verb; charging it to ``place`` hid it behind the lane's silence.
 * ``critic``: no surviving claim cites the place, but a draft the critic
-  rejected did, with the reference's action. The finding was written and killed.
+  rejected did, with a reading's action. The finding was written and killed.
 * ``fan-in``: no draft cites the place, but the lane *proposed* a claim there
-  with the reference's action. The finding was written and lost before the
+  with a reading's action. The finding was written and lost before the
   critic saw it, in one of two ways, which :data:`FanInEffect` names. The fan-in
   **removed** the proposal — a reference outside the catalog, a quote the
   source does not carry, a claim left citing nothing — or it kept a draft and
@@ -524,7 +523,7 @@ def _nearby(
         for draft in drafts
         if place & endpoint_form(draft.affected_element_ids, flows)
     ]
-    return min(overlapping, key=lambda draft: draft.id) if overlapping else None
+    return _charged_to(overlapping) if overlapping else None
 
 
 def attribute_case(
@@ -698,19 +697,17 @@ def attribute_case(
             title = str(proposal.get("title", ""))
             # The draft the fan-in made of this proposal, if it kept one: the
             # fan-in keeps a proposal's title and action, and assigns the ID.
-            kept = sorted(
-                (
-                    draft
-                    for draft in drafts
-                    if draft.category == lane
-                    and draft.title == title
-                    and same_action(draft.verb, read_verb)
-                ),
-                key=lambda draft: draft.id,
-            )
-            if kept:
+            kept = [
+                draft
+                for draft in drafts
+                if draft.category == lane
+                and draft.title == title
+                and same_action(draft.verb, read_verb)
+            ]
+            kept_draft = _charged_to(kept) if kept else None
+            if kept_draft is not None:
                 effect: FanInEffect = "narrowed"
-                reasons = tuple(cut_from.get(kept[0].id, ()))
+                reasons = tuple(cut_from.get(kept_draft.id, ()))
             else:
                 effect = "removed"
                 cut = DroppedClaim.of(claim_id="-", title=title, reason="-").title
@@ -722,7 +719,7 @@ def attribute_case(
                     index in must_find,
                     offered.refused or "fan-in",
                     verb,
-                    draft_id=kept[0].id if kept else None,
+                    draft_id=kept_draft.id if kept_draft is not None else None,
                     draft_verb=proposal["verb"],
                     place_relation=_relation(
                         place, proposal["affected_element_ids"], flows
