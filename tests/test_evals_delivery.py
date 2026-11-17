@@ -70,7 +70,7 @@ def tampering(report):
 def test_the_lead_is_the_strongest_relation_of_a_candidate(
     tampering, flows, reference, expected
 ):
-    assert delivery.lead(reference, tampering, flows) == expected
+    assert delivery.closest_relation(reference, tampering, flows) == expected
 
 
 def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
@@ -84,7 +84,7 @@ def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
         }
     }
 
-    assert delivery.captured(material, "tampering") == tampering
+    assert delivery.sent_candidates(material, "tampering") == tampering
 
 
 def test_a_capture_the_rebuild_reproduces_agrees(report, tampering, flows, options):
@@ -234,3 +234,13 @@ def test_the_command_writes_the_trace_with_its_record(tmp_path):
     written = json.loads(out.read_text())
     assert written["record"]["command"] == "delivery"
     assert len(written["rows"]) == len(_trace(BASELINE).rows)
+
+
+def test_a_shared_endpoint_is_a_relation_and_no_lead_rule(report, flows, options):
+    """The worker is an endpoint of a candidate's flow, and no candidate names it."""
+    traced = delivery.trace_lane(
+        ("process:background-worker",), "tampering", report, None, flows, options
+    )
+
+    assert traced.rebuilt == "draft-contains"
+    assert traced.archived_lead_rules == ()

@@ -20,7 +20,12 @@ For each such row it gives four readings:
 * ``archived_lead_rules``: the rebuilt rules with a candidate on the
   reference's elements that the archived block also lists in ``fired_rules``.
   The block lists rule IDs only, so today's rule code says which elements
-  each rule fired on.
+  each rule fired on. A rule leads when one of its candidates names an
+  element ID the reference names, as :func:`~evals.harness.triggers.lead_rules`
+  reads it for ``losses``. The relation resolves a cited flow to its two
+  endpoints first, so a row can read ``overlap`` with no lead rule: a
+  candidate on a flow's endpoint shares a place with a reference that cites
+  the flow, and names none of its element IDs.
 
 The relation reads the candidate as the second side of
 :func:`~evals.harness.losses._relation`, so ``draft-contains`` is a candidate
@@ -62,7 +67,7 @@ from evals.harness.triggers import lead_rules
 
 #: How the closest candidate stands to the reference's place, or ``absent``
 #: where no candidate in the lane shares an element with it.
-Lead = Relation | Literal["absent"]
+PlaceRelation = Relation | Literal["absent"]
 
 #: Whether the rebuilt candidates of a lane are the captured ones.
 Capture = Literal["agrees", "differs", "uncaptured"]
@@ -76,8 +81,8 @@ TRACED: frozenset[Cause] = frozenset({"place", "unled"})
 class LaneTrace:
     """One reference's lane, as the archive holds it and as today's rules rebuild it."""
 
-    delivered: Lead | None
-    rebuilt: Lead
+    delivered: PlaceRelation | None
+    rebuilt: PlaceRelation
     capture: Capture
     archived_lead_rules: tuple[str, ...]
 
@@ -90,16 +95,18 @@ class LaneTrace:
         }
 
 
-def lead(reference_ids: Sequence[str], fired: CandidateSet, flows: CaseFlows) -> Lead:
-    """The strongest relation of a candidate in ``fired`` to the reference's place."""
+def closest_relation(
+    reference_ids: Sequence[str], candidates: CandidateSet, flows: CaseFlows
+) -> PlaceRelation:
+    """The strongest relation of one of ``candidates`` to the reference's place."""
     found = {
         _relation(reference_ids, candidate.element_ids, flows)
-        for candidate in fired.candidates
+        for candidate in candidates.candidates
     }
     return next((relation for relation in RELATIONS if relation in found), "absent")
 
 
-def captured(material: Mapping[str, Any], lane: str) -> CandidateSet:
+def sent_candidates(material: Mapping[str, Any], lane: str) -> CandidateSet:
     """The STRIDE lane's candidates as the sweep sent them, from ``<case>.lanes.json``."""
     rendered = material["lanes"]["stride"][lane]["candidates"]
     return CandidateSet.model_validate_json(unfence(rendered))
@@ -132,8 +139,10 @@ def trace_lane(
     if sent is not None:
         capture = "agrees" if _keys(sent) == _keys(rebuilt) else "differs"
     return LaneTrace(
-        delivered=None if sent is None else lead(reference_ids, sent, flows),
-        rebuilt=lead(reference_ids, rebuilt, flows),
+        delivered=None
+        if sent is None
+        else closest_relation(reference_ids, sent, flows),
+        rebuilt=closest_relation(reference_ids, rebuilt, flows),
         capture=capture,
         archived_lead_rules=tuple(
             rule for rule in lead_rules(rebuilt, reference_ids) if rule in fired
@@ -141,9 +150,10 @@ def trace_lane(
     )
 
 
-def _keys(fired: CandidateSet) -> frozenset[tuple[str, tuple[str, ...]]]:
+def _keys(candidates: CandidateSet) -> frozenset[tuple[str, tuple[str, ...]]]:
     return frozenset(
-        (candidate.rule_id, candidate.element_ids) for candidate in fired.candidates
+        (candidate.rule_id, candidate.element_ids)
+        for candidate in candidates.candidates
     )
 
 
@@ -214,7 +224,7 @@ def trace(
                 row.elements,
                 row.lane,
                 reports[row.case],
-                captured(material[row.case], row.lane)
+                sent_candidates(material[row.case], row.lane)
                 if row.case in material
                 else None,
                 flows[row.case],
