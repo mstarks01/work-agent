@@ -32,16 +32,17 @@ proposal, so that stage is uncaptured on every row. An uncaptured stage is
 never a zero.
 
 **Rates.** Each rate is a :class:`Rate` with its numerator and denominator.
-An empty denominator gives ``None``, where :func:`~evals.harness.scorer.ratio`
-gives 0.0. A rate here is a share of matched must-finds, not the per-lane
-**Coverage** of ``GLOSSARY.md``.
+An empty denominator gives ``None``, which prints as unavailable, where
+:func:`~evals.harness.scorer.ratio` gives 0.0. A rate here is a share of matched
+must-finds, not the per-lane **Coverage** of ``GLOSSARY.md``.
 
 **One run.** :func:`summarize` refuses rows of more than one
 :class:`RunIdentity`, so two sweeps, two corpus revisions or two scorer trees
 never render as one funnel.
 
-Scored by the STRIDE scorer only, with an empty vote ledger: matching reads
-no vote.
+Scored by the STRIDE scorer only. The rows read no vote status. The critic
+audit reads the vote ledger, because a vote is one of the labels its
+populations rest on.
 """
 
 from __future__ import annotations
@@ -61,10 +62,11 @@ from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, RepoCommit, ScoredAgainst
 from evals.harness.assembly import AssemblySweep
 from evals.harness.audit import Phase, phase_of
+from evals.harness.critic_yield import CriticAudit
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE, CaseLosses, Cause
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import none_stated
+from evals.harness.scorer import Rate, none_stated
 from evals.harness.triggers import case_trigger_recall
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]
@@ -264,25 +266,6 @@ def case_rows(
 
 
 @dataclass(frozen=True)
-class Rate:
-    """A share with its counts. ``value`` is ``None`` on an empty denominator."""
-
-    numerator: int
-    denominator: int
-
-    @property
-    def value(self) -> float | None:
-        return self.numerator / self.denominator if self.denominator else None
-
-    def to_json(self) -> dict[str, Any]:
-        return {
-            "numerator": self.numerator,
-            "denominator": self.denominator,
-            "value": self.value,
-        }
-
-
-@dataclass(frozen=True)
 class StageChange:
     """What one stage change did to the compatible references it can observe.
 
@@ -465,6 +448,7 @@ class Scorecard:
     #: The sweep's cases that have no row: holdout cases, which no diagnosis
     #: reads, and cases the corpus no longer holds.
     left_out: tuple[str, ...]
+    critic: CriticAudit
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -472,12 +456,16 @@ class Scorecard:
             "left_out": list(self.left_out),
             "lanes": [lane.to_json() for lane in self.lanes],
             "assembly": self.assembly.to_json(),
+            "critic": self.critic.to_json(),
             "rows": [row.to_json() for row in self.rows],
         }
 
 
 def summarize(
-    rows: Sequence[ReferenceRow], assembly: AssemblyCheck, left_out: Sequence[str]
+    rows: Sequence[ReferenceRow],
+    assembly: AssemblyCheck,
+    left_out: Sequence[str],
+    critic: CriticAudit,
 ) -> Scorecard:
     """The scorecard of one run's rows. Raises :class:`MixedRunsError` on two runs."""
     runs = {row.run for row in rows}
@@ -498,6 +486,7 @@ def summarize(
         lanes=(*lanes, _lane("all", rows)),
         assembly=assembly,
         left_out=tuple(left_out),
+        critic=critic,
     )
 
 
@@ -520,11 +509,7 @@ def charged_misses(rows: Iterable[ReferenceRow]) -> tuple[ReferenceRow, ...]:
 
 
 def _rate(rate: Rate | None) -> str:
-    if rate is None:
-        return "uncaptured"
-    value = rate.value
-    shown = "undefined" if value is None else f"{value:.2f}"
-    return f"{rate.numerator}/{rate.denominator} ({shown})"
+    return "uncaptured" if rate is None else rate.shown()
 
 
 def render(card: Scorecard) -> None:
@@ -577,5 +562,5 @@ def render(card: Scorecard) -> None:
         f" {len(charged) - led} with none), by cause {dict(sorted(by_cause.items()))}"
     )
     print("fan-in dispositions: uncaptured (the matcher reads no proposal)")
-    print("critic input populations: not defined (no labelled population)")
+    card.critic.render()
     print("repeats: 1; run-to-run variation unmeasured")

@@ -16,6 +16,7 @@ from analysis_service.prompts import EXTRACTION_DELTAS, PROMPT_BODY_NAMES
 from evals.harness import audit, delivery, panels
 from evals.harness.artifact import load_artifact
 from evals.harness.delivery import Capture, Delivery, DeliveryRow, LaneTrace
+from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, load_corpus
 from evals.harness.replay import pooled_assertions, pooled_extraction
 from evals.harness.run import main, panels_of, replay_artifact, scorecard_of
@@ -167,7 +168,7 @@ def test_an_analysis_sweep_feeds_only_the_preparation_panel():
 
 def test_the_preparation_panel_counts_the_delivery_trace():
     result = delivery.trace(
-        scorecard_of(BASELINE, CORPUS),
+        scorecard_of(BASELINE, CORPUS, Ledger()),
         load_artifact(BASELINE),
         development_cases(load_corpus(CORPUS)),
     )
@@ -190,7 +191,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
 
 def _delivery(*captures: Capture) -> Delivery:
     """A delivery trace of one row for each capture."""
-    reference = scorecard_of(BASELINE, CORPUS).rows[0]
+    reference = scorecard_of(BASELINE, CORPUS, Ledger()).rows[0]
     rows = tuple(
         DeliveryRow(
             reference=reference,
