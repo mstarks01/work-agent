@@ -861,9 +861,9 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         # actions. A containment says the two claims are written at different
         # grain, and that is where a draft answering another question lands.
         # Price an exemplar edit on the ``equal`` rows and read the rest.
-        "verb_by_relation": {relation: relations[relation] for relation in RELATIONS},
+        "verb_by_relation": {kind: relations[kind] for kind in RELATIONS},
         "verb_must_find_by_relation": {
-            relation: relations_must_find[relation] for relation in RELATIONS
+            kind: relations_must_find[kind] for kind in RELATIONS
         },
         # Reference verb first, then what the lane wrote, most frequent first.
         "verb_pairs": [
@@ -945,9 +945,9 @@ def render(rows: Sequence[CaseLosses]) -> None:
         print(
             "  of the verb rows, "
             + ", ".join(
-                f"{totals['verb_by_relation'][relation]} {relation}"
-                f" (must-find {totals['verb_must_find_by_relation'][relation]})"
-                for relation in RELATIONS
+                f"{totals['verb_by_relation'][kind]} {kind}"
+                f" (must-find {totals['verb_must_find_by_relation'][kind]})"
+                for kind in RELATIONS
             )
             + " — an equal place is the strongest verb claim, and a"
             " containment is where a draft about something else lands"
