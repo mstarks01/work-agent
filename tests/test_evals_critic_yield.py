@@ -676,8 +676,8 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     CriticAudit.of([result]).render()
     shown = capsys.readouterr().out
     assert "not_real_confirmed       0/0 (unavailable)" in shown
-    assert "not-real population empty (stale-votes, stale drafts: 1)" in shown
-    assert populations.not_real_gap == "stale-votes"
+    assert "not-real population empty (stale-drafts, stale drafts: 1)" in shown
+    assert populations.not_real_gap == "stale-drafts"
     assert populations.to_json()["stale_drafts"] == 1
     for current in ("pooled", "open", "unvoted"):
         empty = CriticPopulations({(current, "confirmed"): 1})

@@ -121,13 +121,14 @@ YieldRate = Literal[
 
 #: Why the not-real population is empty: some draft reads ``stale``, or none
 #: does. :data:`GAP_WORDS` says what each one means.
-NotRealGap = Literal["stale-votes", "no-down-vote"]
+NotRealGap = Literal["stale-drafts", "no-down-vote"]
 
 #: What a report prints for each :data:`NotRealGap`.
 GAP_WORDS: Mapping[NotRealGap, str] = MappingProxyType(
     {
-        "stale-votes": "a vote judges a reported claim with its verdict (ADR"
-        " 0029), and a draft has no verdict, so the vote reads stale on the draft",
+        "stale-drafts": "no draft carries a current down-vote, and some carry"
+        " only a vote on another argument: a vote judges a reported claim with"
+        " its verdict (ADR 0029), and a draft has no verdict",
         "no-down-vote": "no draft carries a current down-vote",
     }
 )
@@ -186,7 +187,7 @@ class CriticPopulations:
         """Why the not-real population is empty, or ``None`` where it is not."""
         if self.count("not-real"):
             return None
-        return "stale-votes" if self.stale_drafts else "no-down-vote"
+        return "stale-drafts" if self.stale_drafts else "no-down-vote"
 
     def to_json(self) -> dict[str, Any]:
         return {

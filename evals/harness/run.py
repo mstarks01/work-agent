@@ -1544,16 +1544,29 @@ def scorecard_of(
 def command_scorecard(args: argparse.Namespace) -> int:
     """Print the scorecard of one finished sweep, and write it with ``--out``."""
     artifact = Path(args.artifact)
-    ledger_dir = Path(args.ledger)
-    card = scorecard_of(artifact, Path(args.corpus), ledger.load(ledger_dir))
+    try:
+        votes, table = _standings_inputs(args)
+    except (ledger.LedgerError, roster.RosterError) as refusal:
+        print(refusal, file=sys.stderr)
+        return 1
+    # The series ``score`` writes first, so the two commands count one set of
+    # votes.
+    read = standings.narrow(votes, table, standings.SERIES[standings.PRIMARY])
+    card = scorecard_of(artifact, Path(args.corpus), read)
     scorecard.render(card)
     if args.out:
         record = run_record(
             "scorecard",
-            {"corpus": str(args.corpus), "ledger": str(ledger_dir)},
+            {
+                "corpus": str(args.corpus),
+                "ledger": args.ledger,
+                "roster": args.roster,
+                "series": standings.PRIMARY,
+            },
             {
                 **sweep_inputs([artifact]),
-                **{path: {} for path in ledger.voter_files(ledger_dir)},
+                **{path: {} for path in ledger.voter_files(Path(args.ledger))},
+                Path(args.roster): {},
             },
         )
         written = {"record": record, **card.to_json()}
@@ -2521,6 +2534,11 @@ def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
         help="the vote ledger the critic audit reads labels from",
+    )
+    parser.add_argument(
+        "--roster",
+        default=str(roster.DEFAULT_ROSTER_PATH),
+        help="the standing roster; the critic audit reads the first series",
     )
     parser.add_argument("--out", help="where to write the scorecard as JSON")
 

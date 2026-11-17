@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import run, scorecard
+from evals.harness import roster, run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
 from evals.harness.assembly import AssemblySweep
 from evals.harness.bundle import runs_from_reports
@@ -425,8 +425,8 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     replayed = check["reproduced"] + len(check["differ"]) + len(check["refused"])
     assert (check["unreadable"], check["capture_faults"]) == (0, 0)
     assert replayed == len(scored["scores"])
-    # The critic panel pools the same yields that ``score`` writes, read with
-    # the same ledger: every draft sits in one population cell.
+    # The critic panel pools the same yields that ``score`` writes: every
+    # draft sits in one population cell.
     totals = scored["critic_yield_aggregate"]
     critic = card["critic"]
     assert critic["reference_loss"] == {
@@ -440,3 +440,36 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
         sum(cell["drafts"] for cell in cells if cell["fate"] == "rejected")
         <= totals["killed"]
     )
+
+
+def test_the_critic_panel_reads_only_the_first_series_votes(tmp_path: Path):
+    """A voter outside the maintainer series labels no draft, as in ``score``."""
+    roster_path = tmp_path / "voters.toml"
+    roster_path.write_text(
+        f'version = {roster.VERSION}\n[voters.mstarks01]\nstanding = "contributor"\n',
+        "utf-8",
+    )
+    narrowed = tmp_path / "narrowed.json"
+    full = tmp_path / "full.json"
+
+    assert main(["scorecard", str(BASELINE), "--out", str(full)]) == 0
+    assert (
+        main(
+            [
+                "scorecard",
+                str(BASELINE),
+                "--roster",
+                str(roster_path),
+                "--out",
+                str(narrowed),
+            ]
+        )
+        == 0
+    )
+
+    populations = json.loads(full.read_text())["critic"]["populations"]
+    assert populations["stale_drafts"] > 0
+    read = json.loads(narrowed.read_text())
+    assert read["critic"]["populations"]["stale_drafts"] == 0
+    assert read["critic"]["populations"]["not_real_gap"] == "no-down-vote"
+    assert read["record"]["table"]["series"] == "maintainer"

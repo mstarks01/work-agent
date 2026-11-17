@@ -110,10 +110,10 @@ pytestmark = pytest.mark.lint
 #: is included because a table keyed by the vocabulary answers for it exactly as
 #: a tuple of its members does -- ``EXIT_CODES`` is one, and a verdict with no
 #: exit code raises in the command that reports it.
+_CONTAINERS = frozenset({"tuple", "frozenset", "set", "list", "dict", "Mapping"})
+
 #: The origins ``get_origin`` gives a union, written with ``|`` or with ``Union``.
 UNIONS = (UnionType, Union)
-
-_CONTAINERS = frozenset({"tuple", "frozenset", "set", "list", "dict", "Mapping"})
 
 #: A constant that names part of its vocabulary on purpose, and why.
 #:
