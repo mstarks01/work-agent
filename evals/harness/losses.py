@@ -22,7 +22,7 @@ order, and the first that finds the finding charges it; ``position`` and
   whether one nests inside the other: containment is how a draft answering
   another question lands on this cause, and a ceiling is priced on the equal
   rows.
-* ``position``: claims cite the place with the reference's own action, and a
+* ``position``: claims cite the place with a reading's action, and a
   person ruled the reference an attacker position that none of them states.
   The lane wrote the action against another attacker, which the scorer's
   position gate refuses. Each later stage reads the same rule: a draft the
@@ -33,19 +33,19 @@ order, and the first that finds the finding charges it; ``position`` and
   position. The archive holds them with no ``attacker_position``, so it
   cannot read the position rule there, and the row is not a lane's
   choice of attacker.
-* ``merged``: a surviving claim cites the place with the reference's own
-  action, read through the equivalence table the identity rule reads, and the
-  scorer assigned it to a sibling reference. Two references at
-  one place under one action are the merges ``verbs.UNSEPARATED`` records,
+* ``merged``: a surviving claim cites the place with a reading's action,
+  read through the equivalence table the identity rule reads, and the scorer
+  assigned it to a sibling reference. Two references at one place under one
+  action are the merges ``verbs.UNSEPARATED`` records,
   and the loss is the corpus's to rule on rather than the lane's.
 * ``misfiled``: a surviving claim in another lane cites the place with the
   reference's action — the scorer's own lane error. The finding was written and
   filed under the wrong category, which is a routing fix and neither a lead nor
   a verb; charging it to ``place`` hid it behind the lane's silence.
 * ``critic``: no surviving claim cites the place, but a draft the critic
-  rejected did, with the reference's action. The finding was written and killed.
+  rejected did, with a reading's action. The finding was written and killed.
 * ``fan-in``: no draft cites the place, but the lane *proposed* a claim there
-  with the reference's action. The finding was written and lost before the
+  with a reading's action. The finding was written and lost before the
   critic saw it, in one of two ways, which :data:`FanInEffect` names. The fan-in
   **removed** the proposal — a reference outside the catalog, a quote the
   source does not carry, a claim left citing nothing — or it kept a draft and
@@ -85,7 +85,8 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeVar, get_args
+from functools import partial
+from typing import Any, Generic, Literal, TypeVar, get_args
 
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -110,6 +111,10 @@ Cause = Literal[
     "place",
     "unled",
 ]
+#: The causes the scorer's position gate gives a stage whose items all fail
+#: the ruled position.
+PositionRefusal = Literal["position", "unstated"]
+
 CAUSES: tuple[Cause, ...] = (
     "verb",
     "position",
@@ -334,6 +339,20 @@ def _at_place(
 _Item = TypeVar("_Item")
 
 
+def _drafted_at(
+    drafts: Sequence[DraftThreat],
+    flows: CaseFlows,
+    verb: str,
+    reference_ids: Sequence[str],
+) -> list[DraftThreat]:
+    """The drafts at one reading's place under that reading's action."""
+    return [
+        draft
+        for draft in _at_place(reference_ids, drafts, flows)
+        if same_action(draft.verb, verb)
+    ]
+
+
 def _draft_position(draft: DraftThreat) -> str | None:
     return draft.attacker_position
 
@@ -362,7 +381,7 @@ def _refused(
     position: str | None,
     items: Sequence[_Item],
     position_of: Callable[[_Item], object],
-) -> Cause:
+) -> PositionRefusal:
     """The cause of a stage whose items all fail the reference's ruled position.
 
     ``unstated`` where no item states any position, because then the archive
@@ -373,12 +392,12 @@ def _refused(
 
 
 def _proposed_at(
-    reference_ids: Sequence[str],
     lane_batch: object,
-    verb: str,
     flows: CaseFlows,
+    verb: str,
+    reference_ids: Sequence[str],
 ) -> list[Mapping[str, Any]]:
-    """The lane's proposals at the reference's place with the reference's action.
+    """The lane's proposals at one reading's place under that reading's action.
 
     A proposal is the lane's output before any check, so every shape it can
     take is read: a batch that is not an object, a ``claims`` entry that is not
@@ -400,28 +419,68 @@ def _proposed_at(
     ]
 
 
-def _charged_to(claims: Sequence[DraftThreat], verb: str) -> DraftThreat:
-    """Which of several claims at one place a miss is charged to.
+@dataclass(frozen=True)
+class _AnsweredReading(Generic[_Item]):
+    """One reading of a reference, and the items at its place that carry its action."""
 
-    **The rule decides, never the input order.** ``_at_place`` returns the
-    claims in whatever order the report happens to list them, and reading
-    ``[0]`` made the cause a fact about that order: reversing the report's
-    claims moved case 05's reference 9 from ``merged`` to ``verb`` in two
-    archived Baselines, with no finding and no match changed. An instrument
-    that priced three prompt edits must not answer differently when its input
-    is shuffled.
+    read_verb: str
+    place: Sequence[str]
+    #: The items at the reading's place under the reading's action.
+    with_action: list[_Item]
+    #: Of those, the items the position gate takes: the ones that state the
+    #: reference's ruled position, or all of them where none is ruled.
+    held: list[_Item]
+    #: ``None`` where an item holds the position; otherwise the cause the
+    #: scorer's position gate gives.
+    refused: PositionRefusal | None
 
-    Two keys, in order:
+    @property
+    def charged_items(self) -> list[_Item]:
+        """The items a miss is charged among: the holding ones, if any."""
+        return self.held or self.with_action
 
-    * **An action match wins.** A reference answered by a claim carrying its
-      own action is a merge — the lane wrote the threat and folded this
-      reference into it. A claim at the same place under a *different* action
-      is the weaker reading, and charging the miss to the verb while a merge
-      sits beside it names the wrong fix.
-    * **Then the claim ID**, which is arbitrary but stable, so the row a reader
-      sees does not move between two runs over one report.
+
+def _answered_reading(
+    readings: Sequence[tuple[str, Sequence[str]]],
+    answers: Callable[[str, Sequence[str]], list[_Item]],
+    position: str | None,
+    position_of: Callable[[_Item], object],
+) -> _AnsweredReading[_Item] | None:
+    """The reading one stage charges a miss through, or ``None``.
+
+    **The one reader of which reading a loss stage charges.** The
+    surviving-claim, critic and fan-in stages of :func:`attribute_case` charge
+    through this choice wherever an item carries a reading's action; only the
+    surviving-claim stage's ``verb`` charge, where none does, reads the places
+    alone. ``answers`` gives the stage's items at a
+    reading's place under that reading's action, so a reading with no such
+    item is skipped: a reference answered by an item under its own action is
+    the stage's cause, and a ``verb`` charge beside it names the wrong fix.
+    A reading whose items state the ruled position wins over one whose items
+    do not, because the scorer's gate takes only those, so a ``position``
+    charge beside one names the wrong fix too. ``min`` keeps the first of
+    equal readings, so the reference's own reading wins a tie.
     """
-    return min(claims, key=lambda claim: (not same_action(claim.verb, verb), claim.id))
+    answered = []
+    for read_verb, place in readings:
+        items = answers(read_verb, place)
+        if not items:
+            continue
+        held = _holding(position, items, position_of)
+        refused = None if held else _refused(position, items, position_of)
+        answered.append(_AnsweredReading(read_verb, place, items, held, refused))
+    return min(answered, key=lambda reading: not reading.held, default=None)
+
+
+def _charged_to(claims: Sequence[DraftThreat]) -> DraftThreat:
+    """Which of several drafts a loss row names.
+
+    **The rule decides, never the input order.** Each caller passes drafts in
+    whatever order the report lists them, so the lowest draft ID decides: it
+    is arbitrary but stable, and the row a reader sees does not move between
+    two runs over one report.
+    """
+    return min(claims, key=lambda claim: claim.id)
 
 
 def _relation(
@@ -465,7 +524,7 @@ def _nearby(
         for draft in drafts
         if place & endpoint_form(draft.affected_element_ids, flows)
     ]
-    return min(overlapping, key=lambda draft: draft.id) if overlapping else None
+    return _charged_to(overlapping) if overlapping else None
 
 
 def attribute_case(
@@ -534,29 +593,32 @@ def attribute_case(
             for read_verb, place in case.stride_readings(index)
         ]
         in_lane = [claim for claim in produced if claim.category == lane]
-        found = next(
-            (
-                (read_verb, place, here)
-                for read_verb, place in readings
-                if (here := _at_place(place, in_lane, flows))
-            ),
-            None,
+        answered = _answered_reading(
+            readings,
+            partial(_drafted_at, in_lane, flows),
+            position,
+            _draft_position,
         )
-        if found is not None:
-            read_verb, place, at_place = found
-            claim = _charged_to(at_place, read_verb)
-            charged: Cause = "verb"
-            if same_action(claim.verb, read_verb):
-                with_action = [
-                    one for one in at_place if same_action(one.verb, read_verb)
-                ]
-                held = _holding(position, with_action, _draft_position)
-                charged = (
-                    "merged"
-                    if held
-                    else _refused(position, with_action, _draft_position)
-                )
-                claim = _charged_to(held or with_action, read_verb)
+        charge: tuple[Cause, Sequence[str], DraftThreat] | None
+        if answered is not None:
+            charge = (
+                answered.refused or "merged",
+                answered.place,
+                _charged_to(answered.charged_items),
+            )
+        else:
+            # With no claim under a reading's action, the first reading with
+            # any claim at its place charges the verb.
+            charge = next(
+                (
+                    ("verb", place, _charged_to(here))
+                    for _, place in readings
+                    if (here := _at_place(place, in_lane, flows))
+                ),
+                None,
+            )
+        if charge is not None:
+            charged, place, claim = charge
             losses.append(
                 Loss(
                     index,
@@ -596,75 +658,57 @@ def attribute_case(
             for draft in drafts
             if draft.category == lane and draft.id not in surviving
         ]
-        found = next(
-            (
-                (read_verb, place, here)
-                for read_verb, place in readings
-                if (
-                    here := _at_place(
-                        place,
-                        [d for d in killed if same_action(d.verb, read_verb)],
-                        flows,
-                    )
-                )
-            ),
-            None,
+        killed_answer = _answered_reading(
+            readings,
+            partial(_drafted_at, killed, flows),
+            position,
+            _draft_position,
         )
-        if found is not None:
-            # Every one of these already shares the reading's action, so the
-            # ID is the whole of the choice — and it is still a choice, so the
-            # same reader makes it.
-            read_verb, place, killed_here = found
-            held = _holding(position, killed_here, _draft_position)
-            draft = _charged_to(held or killed_here, read_verb)
+        if killed_answer is not None:
+            draft = _charged_to(killed_answer.charged_items)
             losses.append(
                 Loss(
                     index,
                     lane,
                     index in must_find,
-                    "critic"
-                    if held
-                    else _refused(position, killed_here, _draft_position),
+                    killed_answer.refused or "critic",
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
-                    place_relation=_relation(place, draft.affected_element_ids, flows),
+                    place_relation=_relation(
+                        killed_answer.place, draft.affected_element_ids, flows
+                    ),
                     re_ask=block.re_ask_kinds(draft.id),
                 )
             )
             continue
         batch = proposed.get(lane)
-        offered = next(
-            (
-                (read_verb, place, offers)
-                for read_verb, place in readings
-                if (offers := _proposed_at(place, batch, read_verb, flows))
-            ),
-            None,
+        offered = _answered_reading(
+            readings,
+            partial(_proposed_at, batch, flows),
+            position,
+            _proposal_position,
         )
         if offered is not None:
-            read_verb, place, proposed_here = offered
-            held_proposals = _holding(position, proposed_here, _proposal_position)
+            read_verb, place = offered.read_verb, offered.place
             proposal = min(
-                held_proposals or proposed_here,
+                offered.charged_items,
                 key=lambda claim: str(claim.get("title", "")),
             )
             title = str(proposal.get("title", ""))
             # The draft the fan-in made of this proposal, if it kept one: the
             # fan-in keeps a proposal's title and action, and assigns the ID.
-            kept = sorted(
-                (
-                    draft
-                    for draft in drafts
-                    if draft.category == lane
-                    and draft.title == title
-                    and same_action(draft.verb, read_verb)
-                ),
-                key=lambda draft: draft.id,
-            )
-            if kept:
+            kept = [
+                draft
+                for draft in drafts
+                if draft.category == lane
+                and draft.title == title
+                and same_action(draft.verb, read_verb)
+            ]
+            kept_draft = _charged_to(kept) if kept else None
+            if kept_draft is not None:
                 effect: FanInEffect = "narrowed"
-                reasons = tuple(cut_from.get(kept[0].id, ()))
+                reasons = tuple(cut_from.get(kept_draft.id, ()))
             else:
                 effect = "removed"
                 cut = DroppedClaim.of(claim_id="-", title=title, reason="-").title
@@ -674,11 +718,9 @@ def attribute_case(
                     index,
                     lane,
                     index in must_find,
-                    "fan-in"
-                    if held_proposals
-                    else _refused(position, proposed_here, _proposal_position),
+                    offered.refused or "fan-in",
                     verb,
-                    draft_id=kept[0].id if kept else None,
+                    draft_id=kept_draft.id if kept_draft is not None else None,
                     draft_verb=proposal["verb"],
                     place_relation=_relation(
                         place, proposal["affected_element_ids"], flows
