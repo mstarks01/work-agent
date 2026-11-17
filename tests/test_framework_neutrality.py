@@ -376,6 +376,14 @@ DECLARED: dict[str, str] = {
         " reading, instead. `INSTRUMENTS` already declares the instrument"
         ' `frameworks=("stride",)`; this is the module behind it.'
     ),
+    "evals/harness/scorecard.py": (
+        "This code is STRIDE's, through `DraftThreat`, its lane set and an"
+        " attacker position. A row's stages and loss cause read a structural"
+        " match of an action and a place, and a position-unstated row reads a"
+        " ruled attacker position, which only a package whose claims compose an"
+        " identity from an action and a place has; a package whose claims carry"
+        " a catalog identifier has `attribution.py`, the stage reading, instead."
+    ),
     "evals/harness/near_misses.py": (
         "This code is STRIDE's, through `DraftThreat` and the `losses` rows it"
         " reads. A near miss is a draft at another verb or place than its"

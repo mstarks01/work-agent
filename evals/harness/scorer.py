@@ -615,6 +615,14 @@ def position_fate(ruled_position: str | None, stated_position: object) -> Positi
     return "unstated" if stated_position is None else "other"
 
 
+def none_stated(ruled_position: str | None, stated_positions: Iterable[object]) -> bool:
+    """Whether :func:`position_fate` reads every one of ``stated_positions`` as
+    ``unstated`` against ``ruled_position``: the items state no position at
+    all, so the position rule cannot be read on them. False for no items."""
+    fates = {position_fate(ruled_position, stated) for stated in stated_positions}
+    return fates == {"unstated"}
+
+
 def holds_position(ruled_position: str | None, stated_position: object) -> bool:
     """Whether a draft that states one position can answer a reference ruled one."""
     return position_fate(ruled_position, stated_position) == "holds"
