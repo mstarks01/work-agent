@@ -30,8 +30,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from evals.harness.audit import Phase, changed_since, phase_of
+from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
+from evals.harness.audit import Experiment, Phase, changed_since, phase_of
 from evals.harness.delivery import TRACED, Delivery
+from evals.harness.provenance import REPO_ROOT
 from evals.harness.replay import (
     FATES,
     PRODUCED_FATES,
@@ -44,15 +46,13 @@ from evals.harness.scorecard import Rate
 
 Fidelity = Literal["equivalent", "known-different", "unverified"]
 
+#: The node each panel reads.
+PanelNode = Literal["extract", "capabilities", "assert", "prepare"]
+PANEL_NODES: tuple[PanelNode, ...] = get_args(PanelNode)
+
 #: A verdict the capability ballot records, as its ``verdict`` column spells it.
 BallotVerdict = Literal["right", "wrong"]
 BALLOT_VERDICTS: tuple[BallotVerdict, ...] = get_args(BallotVerdict)
-
-#: Where the capability ballot's gate run is shown to differ from a job.
-ADR_0087_DIFFERENCES = (
-    "docs/adr/0087-the-capability-reader-runs-by-default.md names three ways"
-    " the gate run differs from a job"
-)
 
 
 @dataclass(frozen=True)
@@ -72,18 +72,19 @@ class Panel:
 
     ``counts`` holds the counts the panel reads, and ``rates`` the shares it
     states, each with its numerator and denominator. ``means`` holds a mean
-    with the number of values it is over. ``unknown`` counts the
-    units the source holds no reading for. A panel the source cannot fill
+    with the number of values it is over. ``unread`` counts the units the
+    source holds no reading for, such as a produced row nothing signed rules
+    on. A panel the source cannot fill
     holds no count and says why in ``uncaptured``.
     """
 
-    node: str
+    node: PanelNode
     source: str
     unit: str
     counts: Mapping[str, int]
     rates: Mapping[str, Rate]
     means: Mapping[str, tuple[float, int]]
-    unknown: int | None
+    unread: int | None
     path: ProductionPath | None
     uncaptured: str = ""
 
@@ -103,13 +104,13 @@ class Panel:
                 name: {"mean": mean, "over": over}
                 for name, (mean, over) in self.means.items()
             },
-            "unknown": self.unknown,
+            "unread": self.unread,
             "path": None if self.path is None else self.path.to_json(),
             "uncaptured": self.uncaptured,
         }
 
 
-def uncaptured(node: str, source: str, reason: str) -> Panel:
+def uncaptured(node: PanelNode, source: str, reason: str) -> Panel:
     """The panel of a node that ``source`` holds no output of."""
     return Panel(node, source, "", {}, {}, {}, None, None, reason)
 
@@ -128,7 +129,9 @@ def route_path(
         return ProductionPath(
             "unverified", (f"git cannot compare {commit[:8]} with the tree",)
         )
-    prompts = sorted(set(changed) & {f"prompts/{node}.md" for node in nodes})
+    prompts = sorted(
+        set(changed) & {path for node in nodes for path in prompt_files(node)}
+    )
     if prompts:
         return ProductionPath(
             "known-different",
@@ -143,8 +146,22 @@ def route_path(
     )
 
 
+def prompt_files(node: str) -> frozenset[str]:
+    """The prompt files ``node`` reads: its body, and for ``extract`` each delta."""
+    deltas = (
+        [delta for names in EXTRACTION_DELTAS.values() for delta in names]
+        if node == EXTRACT_PROMPT_NAME
+        else []
+    )
+    return frozenset(f"prompts/{name}.md" for name in (node, *deltas))
+
+
 def _source(sweep: SweepReplay) -> str:
     return f"{sweep.artifact} ({sweep.arm.label})"
+
+
+def _sweep_path(sweep: SweepReplay) -> ProductionPath:
+    return route_path(sweep.commit, sweep.arm.nodes, changed_since(sweep.commit, None))
 
 
 def extraction_panel(sweep: SweepReplay) -> Panel:
@@ -163,7 +180,7 @@ def extraction_panel(sweep: SweepReplay) -> Panel:
         for key, row in agreement["by_attribute"].items()
     }
     return Panel(
-        node=sweep.arm.nodes[0],
+        node="extract",
         source=_source(sweep),
         unit="signed-model element, once per emission",
         counts={
@@ -176,10 +193,8 @@ def extraction_panel(sweep: SweepReplay) -> Panel:
         },
         rates=rates,
         means={},
-        unknown=None,
-        path=route_path(
-            sweep.commit, sweep.arm.nodes, changed_since(sweep.commit, None)
-        ),
+        unread=None,
+        path=_sweep_path(sweep),
     )
 
 
@@ -188,7 +203,7 @@ def assertion_panel(sweep: SweepReplay) -> Panel:
 
     Required-fact recall pooled over every emission, and beside it the mean of
     each emission's own recall: two figures, and neither replaces the other.
-    A produced row nothing signed rules on is ``unknown``: it is not an error.
+    A produced row nothing signed rules on is ``unread``: it is not an error.
     """
     if not sweep.assertions:
         return uncaptured(
@@ -220,24 +235,44 @@ def assertion_panel(sweep: SweepReplay) -> Panel:
                 len(sweep.assertions),
             )
         },
-        unknown=pool["produced"]["unreviewed"],
-        path=route_path(
-            sweep.commit, sweep.arm.nodes, changed_since(sweep.commit, None)
-        ),
+        unread=pool["produced"]["unreviewed"],
+        path=_sweep_path(sweep),
     )
 
 
-def capability_panel(ballot: Path) -> Panel:
+def ballot_row(ballot: Path, ledger: Sequence[Experiment]) -> Experiment | None:
+    """The ledger row that lists ``ballot`` among its artifacts, if one does."""
+    try:
+        named = str(ballot.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return None
+    return next((row for row in ledger if named in row.artifacts), None)
+
+
+def capability_panel(ballot: Path, row: Experiment | None) -> Panel:
     """The capability panel of one returned ballot of the reader's statements.
 
     Each row is one statement a person ruled. A verdict other than
-    :data:`BALLOT_VERDICTS` is ``unknown``. The ballot carries no reference
-    of every capability a source states, so the panel states no recall.
+    :data:`BALLOT_VERDICTS` is ``unread``. The ballot carries no reference of
+    every capability a source states, so the panel states no recall. ``row``
+    is the ledger row that records the ballot; its revision is the tree the
+    statements were read on.
     """
     with ballot.open(encoding="utf-8", newline="") as handle:
         verdicts = Counter(row["verdict"] for row in csv.DictReader(handle))
     right = verdicts["right"]
     ruled = sum(verdicts[verdict] for verdict in BALLOT_VERDICTS)
+    path = (
+        ProductionPath("unverified", ("no ledger row lists the ballot",))
+        if row is None
+        else route_path(
+            row.revision, ("capabilities",), changed_since(row.revision, None)
+        )
+    )
+    if row is not None:
+        path = ProductionPath(
+            path.fidelity, (f"ledger row {row.experiment_id}", *path.evidence)
+        )
     return Panel(
         node="capabilities",
         source=str(ballot),
@@ -245,11 +280,8 @@ def capability_panel(ballot: Path) -> Panel:
         counts={verdict: verdicts[verdict] for verdict in BALLOT_VERDICTS},
         rates={"precision": Rate(right, ruled)},
         means={},
-        unknown=sum(verdicts.values()) - ruled,
-        path=ProductionPath(
-            "known-different",
-            (ADR_0087_DIFFERENCES,),
-        ),
+        unread=sum(verdicts.values()) - ruled,
+        path=path,
     )
 
 
@@ -260,39 +292,46 @@ def preparation_panel(result: Delivery) -> Panel:
     traces. ``delivered`` reads the candidates the archived lane was sent, and
     ``rebuilt`` the candidates today's rules write for the archived model. A
     shared element is a structural overlap and not mechanism relevance.
+
+    The path is ``equivalent`` only where every traced lane was captured and
+    today's rules rebuild the same leads, ``known-different`` where a rebuild
+    differs, and ``unverified`` where a lane was not captured.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
-    delivered = Counter(lane.delivered or "uncaptured" for lane in lanes)
-    rebuilt = Counter(lane.rebuilt for lane in lanes)
     capture = Counter(lane.capture for lane in lanes)
-    captured = len(lanes) - delivered["uncaptured"]
+    delivered = Counter(lane.delivered for lane in lanes if lane.delivered is not None)
+    rebuilt = Counter(lane.rebuilt for lane in lanes)
+    fidelity: Fidelity = "unverified"
+    if capture["differs"]:
+        fidelity = "known-different"
+    elif lanes and capture["agrees"] == len(lanes):
+        fidelity = "equivalent"
     evidence = [
         "the delivered candidates are the lane input the archived run sent",
         "the rebuilt candidates read today's corpus options",
+        *(f"{case}: lane material uncaptured" for case in sorted(result.uncaptured)),
     ]
-    evidence.extend(
-        f"{case}: lane material uncaptured" for case in sorted(result.uncaptured)
-    )
     return Panel(
         node="prepare",
         source=result.run.artifact,
         unit=f"charged must-find miss of cause {' or '.join(sorted(TRACED))}",
         counts={
+            **{f"capture {key}": count for key, count in sorted(capture.items())},
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
             **{f"rebuilt {key}": count for key, count in sorted(rebuilt.items())},
-            **{f"capture {key}": count for key, count in sorted(capture.items())},
             "with an archived lead rule": sum(
                 1 for lane in lanes if lane.archived_lead_rules
             ),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
-        rates={"delivered captured": Rate(captured, len(lanes))},
+        rates={
+            "lane material captured": Rate(
+                len(lanes) - capture["uncaptured"], len(lanes)
+            )
+        },
         means={},
-        unknown=delivered["uncaptured"],
-        path=ProductionPath(
-            "equivalent" if lanes and not delivered["uncaptured"] else "unverified",
-            tuple(evidence),
-        ),
+        unread=capture["uncaptured"],
+        path=ProductionPath(fidelity, tuple(evidence)),
     )
 
 
@@ -312,7 +351,7 @@ def render(panels: Sequence[Panel]) -> None:
             print(f"  {name}: {rate.numerator}/{rate.denominator} ({shown})")
         for name, (mean, over) in panel.means.items():
             print(f"  {name}: {mean:.3f} over {over}")
-        print(f"  unknown: {panel.unknown}")
+        print(f"  unread: {panel.unread}")
         if panel.path is not None:
             print(f"  production path: {panel.path.fidelity}")
             for line in panel.path.evidence:

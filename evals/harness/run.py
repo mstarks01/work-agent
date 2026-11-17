@@ -1600,20 +1600,20 @@ def panels_of(artifact: Path, corpus: Path, ballot: Path | None) -> list[panels.
             f"{artifact}: the panels read an analysis sweep or a sweep in one of"
             f" {sorted(replay.ROUTES_OF)}"
         )
+    found.append(
+        panels.capability_panel(ballot, panels.ballot_row(ballot, audit.load()))
+        if ballot is not None
+        else panels.uncaptured(
+            "capabilities", name, "no ruled ballot of capability statements given"
+        )
+    )
     held = {panel.node for panel in found}
     found.extend(
         panels.uncaptured(
             node, name, f"no reader grades the {node} output of a {mode!r} sweep"
         )
-        for node in ("extract", "assert", "prepare")
+        for node in panels.PANEL_NODES
         if node not in held
-    )
-    found.append(
-        panels.capability_panel(ballot)
-        if ballot is not None
-        else panels.uncaptured(
-            "capabilities", name, "no ruled ballot of capability statements given"
-        )
     )
     return sorted(found, key=lambda panel: (panel.phase, panel.node))
 

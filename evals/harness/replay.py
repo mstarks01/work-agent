@@ -1229,7 +1229,10 @@ ROUTES_OF: Mapping[SweepMode, tuple[tuple[str, ...], ...]] = {
 #: question — which nodes' instructions place the sweep on an arm. The head-only
 #: mode reads through ``extract`` and keeps a catalog, so the two tables answer
 #: apart.
-KEEPS: Mapping[SweepMode, str] = {
+#: What a replayable mode keeps beside its artifact.
+Kept = Literal["extraction", "catalog"]
+
+KEEPS: Mapping[SweepMode, Kept] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
     "assertions": "catalog",
