@@ -76,6 +76,34 @@ def test_an_element_the_raw_block_lacks_is_uncaptured(golden):
     assert {fact.stage for fact in graded.facts} == {"uncaptured"}
 
 
+def test_a_raw_entry_pairs_by_position_and_not_by_its_emitted_id(golden):
+    """The parse derives IDs again, so a raw entry that carries another
+    element's ID is still read for the element at its own position."""
+    raw = _emitted(golden.model)
+    processes = raw["processes"]
+    target = next(i for i, p in enumerate(processes) if p["id"] == PROCESS)
+    other = next(i for i, p in enumerate(processes) if p["id"] != PROCESS)
+    assert other < target, "the decoy entry must come first in the walk"
+    processes[other] = {**processes[other], "id": PROCESS, "exposure": "dmz"}
+
+    graded = replay.replay_extraction(
+        golden, ExtractionResult(golden.id, golden.model, (), raw=raw)
+    )
+
+    assert _exposure(graded).stage == "agrees"
+
+
+def test_a_group_whose_lengths_differ_pairs_nothing(golden):
+    raw = _emitted(golden.model)
+    raw["processes"] = raw["processes"][:-1]
+
+    graded = replay.replay_extraction(
+        golden, ExtractionResult(golden.id, golden.model, (), raw=raw)
+    )
+
+    assert _exposure(graded).stage == "uncaptured"
+
+
 @pytest.mark.parametrize(
     ("blessed", "extracted", "raw", "stage"),
     [

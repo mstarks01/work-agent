@@ -6,8 +6,16 @@ the signed (blessed) model, after
 into a model. That parse is deterministic code. So a wrong fact can come from
 two places: ``extract`` emitted it, or the parse changed a value that arrived
 right. This module reads the raw value of each check from the emission's
-``raw`` block, by the produced element's ID, and reduces it with
-:func:`~evals.harness.modes.reduce_attribute`, the scorer's own reduction.
+``raw`` block and reduces it with :func:`~evals.harness.modes.reduce_attribute`,
+the scorer's own reduction.
+
+**A raw entry is paired with its parsed element by position, never by ID.**
+:func:`~analysis_service.validation.parse_and_validate` derives each ID again
+from the element's name, so an emitted ID is only a link, and two entries can
+carry one ID. The parse keeps the walk order, so the entry at one position of
+one :data:`~analysis_service.system_model.ELEMENT_GROUPS` list is the element at
+that position of the parsed model's list, which is how the parse pairs its own
+two walks. A group whose two lists differ in length pairs nothing.
 
 Each check takes one :data:`Stage`:
 
@@ -19,8 +27,8 @@ Each check takes one :data:`Stage`:
   reproduction proves one.
 * ``changed-and-wrong``: the raw value is wrong, and the parse changed it to
   another wrong value.
-* ``uncaptured``: the raw block holds no element under the produced ID, so the
-  parse renamed it and the raw value cannot be read here.
+* ``uncaptured``: no raw value is read: the group pairs nothing, or the raw
+  entry holds no value for the attribute.
 
 A state-reduced control attribute that is wrong also takes one
 :data:`Certainty`, which says how the two states differ. The extraction mode
@@ -34,6 +42,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
 
+from analysis_service.system_model import ELEMENT_GROUPS, SystemModel
 from evals.harness.alignment import Alignment
 from evals.harness.modes import AttributeCheck, reduce_attribute
 
@@ -64,9 +73,13 @@ Certainty = Literal[
 ]
 CERTAINTIES: tuple[Certainty, ...] = get_args(Certainty)
 
+#: The states the scorer reduces a control attribute or a protocol to:
+#: :func:`~analysis_service.analysis.control_state`'s three, and ``silent``,
+#: which is :func:`~evals.harness.alignment.protocol_state`'s ``unverified``.
+State = Literal["stated", "absent", "unverified", "silent"]
+
 #: Each pair of differing states, signed first, and the certainty it shows.
-#: ``silent`` is a protocol's reading of ``unverified``.
-_CERTAINTY: Mapping[tuple[str, str], Certainty] = {
+_CERTAINTY: Mapping[tuple[State, State], Certainty] = {
     ("unverified", "stated"): "unjustified-certainty",
     ("unverified", "absent"): "unjustified-certainty",
     ("silent", "stated"): "unjustified-certainty",
@@ -77,23 +90,15 @@ _CERTAINTY: Mapping[tuple[str, str], Certainty] = {
     ("absent", "stated"): "contradicts",
 }
 
-#: The collections of an emission's ``raw`` block that hold elements.
-_COLLECTIONS = (
-    "external_entities",
-    "processes",
-    "data_stores",
-    "data_flows",
-    "trust_boundaries",
-)
-
 
 @dataclass(frozen=True)
 class FactTrace:
     """One scored attribute of one paired element, raw and parsed."""
 
     check: AttributeCheck
-    #: The raw value, reduced as the scorer reduces it. ``None`` where the raw
-    #: block holds no element under the produced ID.
+    #: The raw value, reduced as the scorer reduces it, as
+    #: :attr:`~evals.harness.modes.AttributeCheck.blessed` and ``extracted``
+    #: are. ``None`` where no raw value is read.
     raw: str | None
 
     @property
@@ -112,7 +117,8 @@ class FactTrace:
     @property
     def certainty(self) -> Certainty | None:
         """How the two states differ, for a wrong state-reduced attribute."""
-        return _CERTAINTY.get((self.check.blessed, self.check.extracted))
+        pair = (self.check.blessed, self.check.extracted)
+        return next((name for key, name in _CERTAINTY.items() if key == pair), None)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -123,44 +129,45 @@ class FactTrace:
         }
 
 
-def raw_elements(raw: Mapping[str, Any]) -> dict[str, list[Mapping[str, Any]]]:
-    """Each element of a raw emission, by its ID, in emission order.
+def emitted_entries(
+    raw: Mapping[str, Any], parsed: SystemModel
+) -> dict[str, Mapping[str, Any]]:
+    """Each parsed element's raw entry, by the parsed element's ID.
 
-    A list, because an emission can name one ID twice. Every shape the
-    emission can take is read: a collection that is not a list and an entry
-    that is not an object with a string ID hold no element.
+    Paired by position within each group, as the module docstring says. A
+    group whose raw value is not a list, or whose list is not as long as the
+    parsed one, pairs nothing, and an entry that is not an object pairs
+    nothing.
     """
-    found: dict[str, list[Mapping[str, Any]]] = {}
-    for name in _COLLECTIONS:
-        entries = raw.get(name)
-        if not isinstance(entries, list):
+    paired: dict[str, Mapping[str, Any]] = {}
+    for group in ELEMENT_GROUPS:
+        entries = raw.get(group)
+        elements = getattr(parsed, group)
+        if not isinstance(entries, list) or len(entries) != len(elements):
             continue
-        for entry in entries:
-            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
-                found.setdefault(entry["id"], []).append(entry)
-    return found
+        for entry, element in zip(entries, elements, strict=True):
+            if isinstance(entry, dict):
+                paired[element.id] = entry
+    return paired
 
 
 def trace(
-    raw: Mapping[str, Any], alignment: Alignment, checks: Sequence[AttributeCheck]
+    raw: Mapping[str, Any],
+    parsed: SystemModel | None,
+    alignment: Alignment,
+    checks: Sequence[AttributeCheck],
 ) -> tuple[FactTrace, ...]:
-    """Each of ``checks`` with the raw value of the element the alignment paired.
-
-    Where the raw block names the produced ID more than once, the first entry
-    is read, and :func:`conflicting_ids` names the ID.
-    """
-    elements = raw_elements(raw)
+    """Each of ``checks`` with the raw value of the element the alignment paired."""
+    entries = emitted_entries(raw, parsed) if parsed is not None else {}
     produced_of = alignment.produced_of
     traced = []
     for check in checks:
-        entries = elements.get(produced_of.get(check.element_id, ""), [])
-        value = entries[0].get(check.attribute) if entries else None
+        entry = entries.get(produced_of.get(check.element_id, ""), {})
+        value = entry.get(check.attribute)
         traced.append(
             FactTrace(
                 check,
-                None
-                if not entries or value is None
-                else reduce_attribute(check.attribute, value),
+                None if value is None else reduce_attribute(check.attribute, value),
             )
         )
     return tuple(traced)
@@ -169,18 +176,23 @@ def trace(
 def conflicting_ids(
     raw: Mapping[str, Any], attributes: Iterable[str]
 ) -> tuple[str, ...]:
-    """The IDs the raw block names more than once with different ``attributes`` values."""
+    """The IDs the raw block gives more than one entry with different ``attributes`` values.
+
+    Read over every group, as the parse reads them, and over each entry that
+    is an object with a string ID.
+    """
     names = tuple(attributes)
-    return tuple(
-        sorted(
-            element_id
-            for element_id, entries in raw_elements(raw).items()
-            if len(
-                {tuple(repr(entry.get(name)) for name in names) for entry in entries}
-            )
-            > 1
-        )
-    )
+    values: dict[str, set[tuple[str, ...]]] = {}
+    for group in ELEMENT_GROUPS:
+        entries = raw.get(group)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                values.setdefault(entry["id"], set()).add(
+                    tuple(repr(entry.get(name)) for name in names)
+                )
+    return tuple(sorted(element for element, seen in values.items() if len(seen) > 1))
 
 
 def pooled(traces: Iterable[FactTrace]) -> dict[str, Any]:

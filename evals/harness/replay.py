@@ -305,12 +305,13 @@ class ExtractionReplay:
         return differing(self.attributes)
 
     def to_json(self) -> dict[str, Any]:
+        wrong = set(self.wrong_facts)
         return {
             "case": self.case_id,
             "parsed": self.parsed,
             "counts": {fate: self.counts[fate] for fate in FATES},
             "wrong_facts": [
-                fact.to_json() for fact in self.facts if not fact.check.agrees
+                fact.to_json() for fact in self.facts if fact.check in wrong
             ],
             "conflicting_ids": list(self.conflicting_ids),
             "extra": list(self.extra),
@@ -327,7 +328,9 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         case_id=case.id,
         parsed=result.extracted is not None,
         fates=classify_elements(case.model, result.extracted, score.alignment),
-        facts=fact_trace.trace(result.raw, score.alignment, score.attributes),
+        facts=fact_trace.trace(
+            result.raw, result.extracted, score.alignment, score.attributes
+        ),
         conflicting_ids=fact_trace.conflicting_ids(
             result.raw, get_args(ScoredAttribute)
         ),
