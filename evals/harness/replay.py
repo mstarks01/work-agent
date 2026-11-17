@@ -131,6 +131,7 @@ from evals.harness.modes import (
     AttributeCheck,
     ExtractionResult,
     SweepMode,
+    attribute_agreement,
     score_extraction,
 )
 from evals.harness.reference import GoldenCase
@@ -266,13 +267,19 @@ class ExtractionReplay:
     #: also one to read beside this flag.
     parsed: bool
     fates: tuple[ElementFate, ...]
-    wrong_facts: tuple[AttributeCheck, ...]
+    #: Every scored attribute of every paired element, agreeing or not, so a
+    #: count of wrong facts carries the count it is taken over.
+    attributes: tuple[AttributeCheck, ...]
     extra: tuple[str, ...]
     issues: tuple[str, ...] = ()
 
     @property
     def counts(self) -> Counter[str]:
         return Counter(row.fate for row in self.fates)
+
+    @property
+    def wrong_facts(self) -> tuple[AttributeCheck, ...]:
+        return tuple(check for check in self.attributes if not check.agrees)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -294,7 +301,7 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         case_id=case.id,
         parsed=result.extracted is not None,
         fates=classify_elements(case.model, result.extracted, score.alignment),
-        wrong_facts=score.differing,
+        attributes=score.attributes,
         extra=score.alignment.unaligned_produced,
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues)
         + tuple(f"malformed-flow-id: {one}" for one in malformed),
@@ -1359,7 +1366,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     counts: Counter[str] = Counter()
     by_type: dict[str, Counter[str]] = defaultdict(Counter)
     per_element: dict[str, Counter[str]] = defaultdict(Counter)
-    wrong_facts: Counter[str] = Counter()
+    attributes: list[AttributeCheck] = []
     renamed_by: Counter[str] = Counter()
     emissions = 0
     unparsed = 0
@@ -1376,7 +1383,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
                     renamed_by[row.evidence] += 1
                 if row.fate in LOSSES:
                     per_element[f"{replay.case_id}/{row.reference}"][row.fate] += 1
-            wrong_facts.update(check.key for check in replay.wrong_facts)
+            attributes.extend(replay.attributes)
     targets = sorted(
         per_element.items(), key=lambda item: (-sum(item[1].values()), item[0])
     )
@@ -1397,7 +1404,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             kind: {fate: fates[fate] for fate in FATES}
             for kind, fates in sorted(by_type.items())
         },
-        "wrong_facts": dict(sorted(wrong_facts.items())),
+        "attributes": attribute_agreement(attributes),
         "targets": [
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
@@ -1672,11 +1679,13 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
             f"{_sd(spread['by_type'].get(kind, {}).get(fate)):>8}" for kind in kinds
         )
         print(f"  {fate:<20} {'':>5} {_sd(spread['sd'][fate]):>9}  {per_kind}")
-    if pool["wrong_facts"]:
+    by_attribute = pool["attributes"]["by_attribute"]
+    if by_attribute:
         listed = ", ".join(
-            f"{key} {count}" for key, count in pool["wrong_facts"].items()
+            f"{key} {row['compared'] - row['agreed']}/{row['compared']}"
+            for key, row in by_attribute.items()
         )
-        print(f"  wrong facts on paired elements: {listed}")
+        print(f"  wrong facts on paired elements, of the checks compared: {listed}")
     if pool["targets"]:
         print(f"  targets (top {targets} of {len(pool['targets'])}):")
         for target in pool["targets"][:targets]:

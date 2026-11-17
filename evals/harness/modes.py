@@ -1233,7 +1233,18 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     the question [#184](https://github.com/mstarks01/work-agent/issues/184)
     needed a hand-run count of candidates by lane to answer.
     """
-    checks = [check for score in scores for check in score.attributes]
+    return attribute_agreement(
+        [check for score in scores for check in score.attributes]
+    )
+
+
+def attribute_agreement(checks: Sequence[AttributeCheck]) -> dict[str, Any]:
+    """Agreement over ``checks``, in total and per ``<element type>.<attribute>``.
+
+    Each attribute's ``compared`` is the denominator of its disagreements: the
+    scored checks on the elements the alignment paired, including the checks
+    where both models read ``unknown``.
+    """
     compared = Counter(check.key for check in checks)
     agreed = Counter(check.key for check in checks if check.agrees)
     order: list[str] = list(_SCORED_ATTRIBUTES)
