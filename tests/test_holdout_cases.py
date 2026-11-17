@@ -47,6 +47,10 @@ HOLDOUT_READERS = {
     "evals/harness/run.py:command_calibrate": (
         "calibration pairs measure the identity rule, not a case's losses"
     ),
+    "evals/harness/run.py:scorecard_of": (
+        "a scorecard accounts for every case of a sweep; a holdout case's rows"
+        " carry no loss cause, because the loss attribution reads none"
+    ),
     "evals/harness/promotion.py": "a promotion gate is what the holdout serves",
     "evals/harness/sitting.py": "a person holds a sitting on a holdout case too",
     "evals/harness/envelope.py": "the offline sitting reads every case",
