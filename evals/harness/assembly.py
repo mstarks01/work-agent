@@ -48,8 +48,8 @@ filed differently or unavailable, where its block was refused or its ID
 repeats. A ruled claim with no draft is counted on its own. A case whose
 report or drafts file the archive lacks is named, and a sweep whose mode
 writes no report gives no row. Every row comes from archived files and
-deterministic code, and nothing calls a model. One run of the command took
-about 5 s on 2026-11-17, most of it start-up.
+deterministic code, and nothing calls a model. A run of the command takes
+about 5 s, most of it start-up.
 """
 
 from __future__ import annotations
@@ -251,15 +251,19 @@ def replay_case(
         omitted=tuple(sorted(by_id.keys() - ruled)),
         repeated=tuple(sorted({mark.claim_id for mark in dropped})),
     )
-    # A ruled claim with no draft stays reported and is never replayed, so it
-    # is named while its neighbours replay.
+    # A ruled claim with no draft stays reported and is never rebuilt, so it
+    # is named while its neighbours replay, whatever its ruling holds.
     drafted = {draft.id for draft in ruled_drafts}
+    with_drafts = block.model_copy(
+        update={
+            "claims": [claim for claim in block.claims if claim.id in drafted],
+            "rejected_claims": [
+                claim for claim in block.rejected_claims if claim.id in drafted
+            ],
+        }
+    )
     try:
-        rulings = [
-            ruling
-            for ruling in rulings_from_report(block, ruled_drafts)
-            if ruling.id in drafted
-        ]
+        rulings = rulings_from_report(with_drafts, ruled_drafts)
     except ArchivedRulingError as error:
         return replace(row, refused=str(error))
     # The block carries no fan-in marks and no catalog a replay of assembly

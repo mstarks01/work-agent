@@ -494,3 +494,23 @@ def test_an_omitted_draft_held_twice_is_counted_once(archive, case):  # noqa: F8
     assert (row.omitted, row.repeated, row.unavailable) == ((gone,), (gone,), ())
     counted = row.accounted + row.omitted + row.filed_differently + row.unavailable
     assert sorted(counted) == sorted(row.draft_ids)
+
+
+def test_an_undrafted_claim_today_s_record_refuses_leaves_its_block_replayed(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+):
+    """A ruled claim with no draft is named, whatever its ruling holds."""
+
+    def add_stray(block):
+        first = block.claims[0]
+        verdict = Verdict(status="rejected", reason="r", rejected_because="duplicate")
+        stray = first.model_copy(update={"id": "S-99", "verdict": verdict})
+        return _filed(block, block.claims, [*block.rejected_claims, stray])
+
+    _rewritten(archive, case, add_stray)
+
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert (row.refused, row.undrafted) == ("", ("S-99",))
+    assert row.accounted == row.draft_ids
