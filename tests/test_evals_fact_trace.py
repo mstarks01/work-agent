@@ -142,7 +142,7 @@ def test_a_wrong_state_names_how_the_states_differ(blessed, extracted, certainty
     assert FactTrace(check, extracted).certainty == certainty
 
 
-def test_an_emitted_id_two_elements_carry_is_counted_from_the_parse(golden):
+def test_each_duplicate_id_issue_of_the_parse_is_counted(golden):
     raw = _emitted(golden.model)
     first, second = raw["processes"][:2]
     second["id"] = first["id"]
@@ -152,7 +152,19 @@ def test_an_emitted_id_two_elements_carry_is_counted_from_the_parse(golden):
         golden, ExtractionResult(golden.id, parsed, tuple(issues), raw=raw)
     )
 
-    assert len(graded.shared_ids) == 2
+    assert len(graded.duplicate_ids) == sum(
+        issue.code == "duplicate-id" for issue in issues
+    )
+    assert graded.duplicate_ids
+
+
+def test_a_parsed_id_two_elements_carry_pairs_nothing(golden):
+    raw = _emitted(golden.model)
+    parsed = golden.model.model_copy(deep=True)
+    first, second = parsed.processes[:2]
+    parsed.processes[1] = second.model_copy(update={"id": first.id})
+
+    assert first.id not in fact_trace.emitted_entries(raw, parsed)
 
 
 def test_the_pool_splits_each_attribute_by_stage_and_prints_it(golden, capsys):

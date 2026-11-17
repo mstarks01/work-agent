@@ -27,8 +27,9 @@ Each check takes one :data:`Stage`:
   reproduction proves one.
 * ``changed-and-wrong``: the raw value is wrong, and the parse changed it to
   another wrong value.
-* ``uncaptured``: no raw value is read: the group pairs nothing, or the raw
-  entry holds no value for the attribute.
+* ``uncaptured``: no raw value is read: the group pairs nothing, two parsed
+  elements carry the check's ID, or the raw entry holds no value for the
+  attribute.
 
 A state-reduced control attribute that is wrong also takes one
 :data:`Certainty`, which says how the two states differ. The extraction mode
@@ -140,8 +141,10 @@ def emitted_entries(
     Paired by position within each group, as the module docstring says. A
     group whose raw value is not a list, or whose list is not as long as the
     parsed one, pairs nothing, and an entry that is not an object pairs
-    nothing.
+    nothing. A parsed ID that two elements carry pairs nothing either, because
+    a check names its element by that ID and cannot say which one it means.
     """
+    carried = Counter(element.id for element in parsed.elements())
     paired: dict[str, Mapping[str, Any]] = {}
     for group in ELEMENT_GROUPS:
         entries = raw.get(group)
@@ -149,7 +152,7 @@ def emitted_entries(
         if not isinstance(entries, list) or len(entries) != len(elements):
             continue
         for entry, element in zip(entries, elements, strict=True):
-            if isinstance(entry, dict):
+            if isinstance(entry, dict) and carried[element.id] == 1:
                 paired[element.id] = entry
     return paired
 
