@@ -2523,13 +2523,18 @@ def _score_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
+def _delivery_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
     parser.add_argument(
         "--corpus",
         default=str(DEFAULT_CORPUS_DIR),
         help="corpus root, for the reference sets and flow maps",
     )
+    parser.add_argument("--out", help="where to write the result as JSON")
+
+
+def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
+    _delivery_arguments(parser)
     parser.add_argument(
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
@@ -2540,7 +2545,6 @@ def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
         default=str(roster.DEFAULT_ROSTER_PATH),
         help="the standing roster; the critic audit reads the first series",
     )
-    parser.add_argument("--out", help="where to write the scorecard as JSON")
 
 
 def _price_verbs_arguments(parser: argparse.ArgumentParser) -> None:
@@ -2796,7 +2800,7 @@ COMMANDS: dict[str, Command] = {
         help="each charged must-find miss of a finished sweep, traced through"
         " the candidates its lane was sent (no credentials)",
         run=command_delivery,
-        arguments=_scorecard_arguments,
+        arguments=_delivery_arguments,
     ),
     "scorecard": Command(
         help="one row per STRIDE must-find of a finished sweep, with its"
