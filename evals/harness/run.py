@@ -88,6 +88,7 @@ from evals.harness import (
     modes,
     near_misses,
     pairing,
+    panels,
     population,
     preflight,
     promotion,
@@ -1607,6 +1608,70 @@ def command_delivery(args: argparse.Namespace) -> int:
     return 0
 
 
+def panels_of(artifact: Path, corpus: Path, ballot: Path | None) -> list[panels.Panel]:
+    """The pre-generation panels of one finished sweep, and of one capability ballot.
+
+    An ``analysis`` sweep feeds the preparation panel through
+    :func:`delivery.trace`. A sweep that keeps an emission feeds the
+    extraction or the assertion panel through :func:`replay_artifact`. Each
+    panel the sweep cannot feed says why. ``ballot`` is a returned ballot of
+    the capability reader's statements, a source apart from the sweep.
+    """
+    loaded = load_artifact(artifact)
+    mode = loaded.mode
+    name = artifact.name
+    found: list[panels.Panel] = []
+    if mode == "analysis":
+        # The trace reads the scorecard's rows, which read no vote.
+        result = delivery.trace(
+            scorecard_of(artifact, corpus, ledger.Ledger()),
+            loaded,
+            development_cases(load_corpus(corpus)),
+        )
+        found.append(panels.preparation_panel(result))
+    elif mode in replay.ROUTES_OF:
+        sweep = replay_artifact(
+            artifact, development_cases(load_corpus(corpus)), corpus, None
+        )
+        found.append(panels.PANEL_OF_KEPT[replay.KEEPS[mode]](sweep))
+    else:
+        raise modes.EvalRunError(
+            f"{artifact}: the panels read an analysis sweep or a sweep in one of"
+            f" {sorted(replay.ROUTES_OF)}"
+        )
+    found.append(
+        panels.capability_panel(ballot, panels.ballot_row(ballot, audit.load()))
+        if ballot is not None
+        else panels.uncaptured(
+            "capabilities", name, "no ruled ballot of capability statements given"
+        )
+    )
+    held = {panel.node for panel in found}
+    found.extend(
+        panels.uncaptured(
+            node, name, f"no reader grades the {node} output of a {mode!r} sweep"
+        )
+        for node in panels.PANEL_NODES
+        if node not in held
+    )
+    return sorted(found, key=lambda panel: (panel.phase, panel.node))
+
+
+def command_panels(args: argparse.Namespace) -> int:
+    """Print the pre-generation panels of one sweep, and write them with ``--out``."""
+    artifact = Path(args.artifact)
+    ballot = Path(args.capability_ballot) if args.capability_ballot else None
+    found = panels_of(artifact, Path(args.corpus), ballot)
+    panels.render(found)
+    if args.out:
+        inputs = sweep_inputs([artifact]) | ({ballot: {}} if ballot else {})
+        record = run_record("panels", {"corpus": str(args.corpus)}, inputs)
+        written = {"record": record, "panels": [panel.to_json() for panel in found]}
+        Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")
+        print(f"panels written to {args.out}")
+    return 0
+
+
 def command_near_misses(args: argparse.Namespace) -> int:
     """Write the near-miss ballot for a finished sweep, scored as ``score`` scores it.
 
@@ -2558,6 +2623,14 @@ def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _panels_arguments(parser: argparse.ArgumentParser) -> None:
+    _sweep_arguments(parser)
+    parser.add_argument(
+        "--capability-ballot",
+        help="a returned ballot of the capability reader's statements, as CSV",
+    )
+
+
 def _price_verbs_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--equivalent",
@@ -2812,6 +2885,12 @@ COMMANDS: dict[str, Command] = {
         " the candidates its lane was sent (no credentials)",
         run=command_delivery,
         arguments=_sweep_arguments,
+    ),
+    "panels": Command(
+        help="the extraction, capability, assertion and preparation panels of a"
+        " finished sweep, each in its own unit (no credentials)",
+        run=command_panels,
+        arguments=_panels_arguments,
     ),
     "scorecard": Command(
         help="one row per STRIDE must-find of a finished sweep, with its"
