@@ -10,10 +10,10 @@
       "kind": "description",
       "label": "System description",
       "file": "source.md",
-      "sha256": "c05f832991aaa13a35997fe1d1555c50d1e7548abf7589229ff03a2d7fbd7006"
+      "sha256": "c3b1dc97272657e10e019c71ea817ea5a6f46f572ea5947d4cb471835969417b"
     }
   ],
-  "source_sha256": "b2b3bdae0014e637c6ee85d53e9a94de877e7dcfb6b2513177b40be0900e4392",
+  "source_sha256": "ed7dee011192824b50e15ef0927ab5b0b3fc35c237a91965c8e39c589e75a9f3",
   "frameworks": [
     {
       "name": "stride",
@@ -21,5 +21,5 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "The case exists for issue #2054. It measures the assertion pass on the authorization-scope predicates. The source states each part on its own element: the clinic API checks that a pet belongs to the owner (ownership yes), checks only the sign-in for staff requests (each request no, for staff) and gives every staff account every permission (least privilege no); it uses the database's admin account (least privilege no, on that connection). The lab results importer does not check which clinic a result is for or whether the lab may send it (each request no), and the billing service's role check is a hedge that must stay unknown. The tampering must-find rests on the importer's two stated missing checks. The elevation-of-privilege must-find rests on the staff accounts' stated full access. The domain is a vet clinic group, which no other case covers."
+  "notes": "The case exists for issue #2054. It measures the assertion pass on the authorization-scope predicates. The source states each part on its own element: the owner API checks that a pet belongs to the owner (each request yes, ownership yes); the clinic API checks only that a staff account signed in (each request no) and gives every staff account every permission (least privilege no); both APIs use the database's admin account (least privilege no, on each connection). The lab results importer does not check whether the lab may send a result (each request no), and the billing service's role check is a hedge that must stay unknown. The tampering must-find rests on the importer's stated missing check. The elevation-of-privilege must-find rests on the staff accounts' stated full access. The domain is a vet clinic group, which no other case covers."
 }

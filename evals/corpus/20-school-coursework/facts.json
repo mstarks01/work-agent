@@ -421,6 +421,22 @@
       },
       "rationale": "No sentence of the source names a protection on the wire.",
       "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:admin-console>store:coursework-database>write-classes-and-grades",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence of the source names a protection on the wire.",
+      "reviewed_by": null
     }
   ],
   "disputed": [],

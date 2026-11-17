@@ -119,7 +119,7 @@ category.
 
 ---
 
-## Part 2 — the 15 recorded STRIDE threats
+## Part 2 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -172,10 +172,18 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
+**5.** A teacher can open an admin page's address directly and change final grades or accounts in the coursework database, because the admin console checks for the administrator role only on its start page.
+
+- `process:admin-console`, `flow:entity:teacher>process:admin-console>open-admin-pages`, `store:coursework-database`
+- severity: high/high · verb: `alter`
+- Stated: the admin console checks the administrator role only on its start page, and it writes classes, accounts and final grades to the coursework database. The broken check is the elevation-of-privilege finding; the change to the data is this lane's.
+
+> mark:
+
 
 ### repudiation
 
-**5.** If the coursework service does not record which account changed a submission, a student who changed another student's work may deny it.
+**6.** If the coursework service does not record which account changed a submission, a student who changed another student's work may deny it.
 
 - `flow:entity:student>process:coursework-service>hand-in-work`, `process:coursework-service`
 - severity: medium/medium · verb: `unattributable`
@@ -183,7 +191,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**6.** If the admin console does not record which account changed a final grade, a teacher who changed grades through an admin page may deny it, and the school cannot show who did it.
+**7.** If the admin console does not record which account changed a final grade, a teacher who changed grades through an admin page may deny it, and the school may be unable to show who did it.
 
 - `flow:entity:teacher>process:admin-console>open-admin-pages`, `process:admin-console`
 - severity: medium/medium · verb: `unattributable`
@@ -194,7 +202,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### information-disclosure
 
-**7.** A student can change the submission number in the address and read another student's work, because the coursework service does not check that the submission is theirs.
+**8.** A student can change the submission number in the address and read another student's work, because the coursework service does not check that the submission is theirs.
 
 - `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`, `store:coursework-database`
 - severity: high/medium · verb: `elicit`
@@ -202,7 +210,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** A teacher who opens an admin page's address directly can read students' accounts and final grades that only office staff should see.
+**9.** A teacher who opens an admin page's address directly can read students' accounts and final grades that only office staff should see.
 
 - `flow:entity:teacher>process:admin-console>open-admin-pages`, `process:admin-console`, `entity:teacher`
 - severity: medium/medium · verb: `elicit`
@@ -210,7 +218,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**9.** If students' requests are not encrypted in transit, an attacker on the network path may read the work students hand in.
+**10.** If students' requests are not encrypted in transit, an attacker on the network path may read the work students hand in.
 
 - `flow:entity:student>process:coursework-service>hand-in-work`
 - severity: low/medium · verb: `intercept`
@@ -218,7 +226,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**10.** If the final grades are not encrypted in transit, an attacker on the path between the grade export and the district records system may read every student's final grades.
+**11.** If the final grades are not encrypted in transit, an attacker on the path between the grade export and the district records system may read every student's final grades.
 
 - `flow:process:grade-export>entity:district-records-system>send-final-grades`
 - severity: low/medium · verb: `intercept`
@@ -226,7 +234,15 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every student's work, marks and accounts.
+**12.** If the admin console's writes are not encrypted in transit, an attacker on the path between the office network and the cloud account may read accounts and final grades.
+
+- `flow:process:admin-console>store:coursework-database>write-classes-and-grades`
+- severity: low/medium · verb: `intercept`
+- The admin console on the office network writes to the coursework database in the cloud account. The source says nothing about encryption in transit.
+
+> mark:
+
+**13.** If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every student's work, marks and accounts.
 
 - `store:coursework-database`
 - severity: low/high · verb: `read`
@@ -237,7 +253,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**12.** If the internet-facing coursework service does not limit the requests it accepts, an attacker may flood it near a deadline so that students cannot hand in their work.
+**14.** If the internet-facing coursework service does not limit the requests it accepts, an attacker may flood it so that students cannot hand in their work.
 
 - `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`
 - severity: medium/medium · verb: `flood`
@@ -248,7 +264,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**13.** A teacher can open an admin page's address directly and change classes, accounts and final grades, because the admin console checks for the administrator role only on its start page.
+**15.** A teacher can open an admin page's address directly and change classes, accounts and final grades, because the admin console checks for the administrator role only on its start page.
 
 - `process:admin-console`, `flow:entity:teacher>process:admin-console>open-admin-pages`, `entity:teacher`
 - severity: high/high · verb: `escalate`
@@ -256,7 +272,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**14.** A student can act on another student's submission by its number, because the coursework service checks the student role but not the ownership of the object the request names.
+**16.** A student can act on another student's submission by its number, because the coursework service checks the student role but not the ownership of the object the request names.
 
 - `process:coursework-service`, `flow:entity:student>process:coursework-service>hand-in-work`, `entity:student`
 - severity: high/medium · verb: `escalate`
@@ -264,7 +280,15 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**15.** An attacker who compromises the grade export can act with its actual database permissions, potentially changing grades or other records those permissions reach.
+**17.** If the coursework service checks only the teacher role, a teacher may mark the work of students outside their own classes.
+
+- `process:coursework-service`, `flow:entity:teacher>process:coursework-service>mark-work`, `entity:teacher`
+- severity: low/medium · verb: `escalate`
+- The role check is stated; the source says nothing about classes in that check, so the claim is conditional.
+
+> mark:
+
+**18.** An attacker who compromises the grade export can act with its actual database permissions, potentially changing grades or other records those permissions reach.
 
 - `process:grade-export`, `flow:process:grade-export>store:coursework-database>read-final-grades`, `store:coursework-database`
 - severity: low/high · verb: `abuse-grant`
@@ -318,7 +342,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "f03361ae94b47c0bba5d322cdf69fd0f9a59f1a6c80890f502e901d47656d1f5",
       "model.json": "0107d4a7d3a4e8d5118c294f3ca03c58f4f270d063bbe2e7ceea908c67b80a4b",
-      "claims/stride.json": "9f72b767b454cc05b0992757f5cad0378ac7db5442419e172e7641cf32cfd74e"
+      "claims/stride.json": "ed04839948dabaaa6e1b0dd9e3010ec37ac0cac650797a51a457f473c9117538"
       }
     }
   }

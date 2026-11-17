@@ -62,6 +62,22 @@
     "verb": "alter-in-transit"
   },
   {
+    "category": "tampering",
+    "affected_element_ids": [
+      "process:admin-console",
+      "flow:entity:teacher>process:admin-console>open-admin-pages",
+      "store:coursework-database"
+    ],
+    "claim": "A teacher can open an admin page's address directly and change final grades or accounts in the coursework database, because the admin console checks for the administrator role only on its start page.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "Stated: the admin console checks the administrator role only on its start page, and it writes classes, accounts and final grades to the coursework database. The broken check is the elevation-of-privilege finding; the change to the data is this lane's.",
+    "verb": "alter"
+  },
+  {
     "category": "repudiation",
     "affected_element_ids": [
       "flow:entity:student>process:coursework-service>hand-in-work",
@@ -82,7 +98,7 @@
       "flow:entity:teacher>process:admin-console>open-admin-pages",
       "process:admin-console"
     ],
-    "claim": "If the admin console does not record which account changed a final grade, a teacher who changed grades through an admin page may deny it, and the school cannot show who did it.",
+    "claim": "If the admin console does not record which account changed a final grade, a teacher who changed grades through an admin page may deny it, and the school may be unable to show who did it.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
@@ -154,6 +170,20 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
+      "flow:process:admin-console>store:coursework-database>write-classes-and-grades"
+    ],
+    "claim": "If the admin console's writes are not encrypted in transit, an attacker on the path between the office network and the cloud account may read accounts and final grades.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The admin console on the office network writes to the coursework database in the cloud account. The source says nothing about encryption in transit.",
+    "verb": "intercept"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
       "store:coursework-database"
     ],
     "claim": "If the coursework database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every student's work, marks and accounts.",
@@ -171,7 +201,7 @@
       "process:coursework-service",
       "flow:entity:student>process:coursework-service>hand-in-work"
     ],
-    "claim": "If the internet-facing coursework service does not limit the requests it accepts, an attacker may flood it near a deadline so that students cannot hand in their work.",
+    "claim": "If the internet-facing coursework service does not limit the requests it accepts, an attacker may flood it so that students cannot hand in their work.",
     "tier": "expected",
     "severity": {
       "likelihood": "medium",
@@ -210,6 +240,22 @@
       "impact": "medium"
     },
     "notes": "Stated: \"The coursework service checks that the user is a student, but not that the submission is theirs.\" The broken check is this lane's; the change and the read are the tampering and disclosure findings.",
+    "verb": "escalate"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:coursework-service",
+      "flow:entity:teacher>process:coursework-service>mark-work",
+      "entity:teacher"
+    ],
+    "claim": "If the coursework service checks only the teacher role, a teacher may mark the work of students outside their own classes.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The role check is stated; the source says nothing about classes in that check, so the claim is conditional.",
     "verb": "escalate"
   },
   {

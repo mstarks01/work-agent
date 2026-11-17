@@ -5,7 +5,7 @@
     {
       "assertion": {
         "subject_type": "component",
-        "subject": "process:clinic-api",
+        "subject": "process:owner-api",
         "predicate": "internet-exposure",
         "value": "internet-facing",
         "reason": null,
@@ -14,7 +14,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The owner app calls the clinic API, which is on the internet."
+            "quote": "The owner app calls the owner API, which is on the internet."
           }
         ],
         "explanation": "",
@@ -47,6 +47,27 @@
     {
       "assertion": {
         "subject_type": "component",
+        "subject": "process:owner-api",
+        "predicate": "network-membership",
+        "value": "boundary:group-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The owner API, the clinic API, the lab results importer and the billing service run in the group's cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
         "subject": "process:clinic-api",
         "predicate": "network-membership",
         "value": "boundary:group-cloud-account",
@@ -56,7 +77,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The clinic API, the lab results importer and the billing service run in the group's cloud account."
+            "quote": "The owner API, the clinic API, the lab results importer and the billing service run in the group's cloud account."
           }
         ],
         "explanation": "",
@@ -77,7 +98,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The clinic API, the lab results importer and the billing service run in the group's cloud account."
+            "quote": "The owner API, the clinic API, the lab results importer and the billing service run in the group's cloud account."
           }
         ],
         "explanation": "",
@@ -98,7 +119,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The clinic API, the lab results importer and the billing service run in the group's cloud account."
+            "quote": "The owner API, the clinic API, the lab results importer and the billing service run in the group's cloud account."
           }
         ],
         "explanation": "",
@@ -119,7 +140,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The records database is on the group's private database network, and only those three services can reach it."
+            "quote": "The records database is on the group's private database network, and only those four services can reach it."
           }
         ],
         "explanation": "",
@@ -140,7 +161,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API."
+            "quote": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the clinic API."
           }
         ],
         "explanation": "",
@@ -184,7 +205,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records",
+        "subject": "flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records",
         "predicate": "authentication-mechanism",
         "value": "password sign-in with an email address",
         "reason": null,
@@ -215,7 +236,23 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The source says the API checks that a staff account signed in, and never says how staff sign in.",
+      "rationale": "A signed-in staff account is stated; the way it signs in is not.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:owner-api>store:records-database>keep-owner-records",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names the database's admin account and no mechanism behind it, as the maintainer ruled for a named login on case 17.",
       "reviewed_by": null
     },
     {
@@ -284,6 +321,22 @@
     },
     {
       "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:billing-service>entity:pet-owner>send-invoices",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence names how an owner can tell that an invoice email came from the clinic.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
         "subject_type": "principal",
         "subject": "clinic staff",
         "predicate": "authorization-grant",
@@ -345,9 +398,39 @@
     {
       "assertion": {
         "subject_type": "principal",
-        "subject": "the clinic API's database account",
+        "subject": "receptionists",
         "predicate": "authorization-grant",
-        "value": "the database's admin account",
+        "value": "open owners' invoices",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "billing service"
+          },
+          {
+            "kind": "operation",
+            "value": "open"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Receptionists open owners' invoices in the billing service from the clinic desktop app."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated use of the billing service by receptionists.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "the APIs' database account",
+        "predicate": "authorization-grant",
+        "value": "administer the records database",
         "reason": null,
         "scope": [
           {
@@ -356,26 +439,42 @@
           },
           {
             "kind": "operation",
-            "value": "admin"
+            "value": "administer"
           }
         ],
         "basis": "stated",
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "It connects to the records database with the database's admin account."
+            "quote": "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "A stated grant: the clinic API uses the admin account.",
+      "rationale": "A stated grant: both APIs use the database's admin account.",
       "reviewed_by": null
     },
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records",
+        "subject": "flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence of the source names a protection on the wire.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:clinic-staff>process:clinic-api>manage-records",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "silent",
@@ -392,6 +491,22 @@
       "assertion": {
         "subject_type": "interaction",
         "subject": "flow:entity:partner-lab>process:lab-results-importer>send-test-results",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "No sentence of the source names a protection on the wire.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:billing-service>entity:pet-owner>send-invoices",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "silent",

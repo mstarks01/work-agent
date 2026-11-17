@@ -17,7 +17,7 @@
       "name": "clinic staff",
       "description": "A vet, nurse or receptionist who uses the clinic desktop app on the clinic network.",
       "assets": [],
-      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API.",
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the clinic API.",
       "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:clinic-network"
@@ -35,20 +35,35 @@
   ],
   "processes": [
     {
-      "id": "process:clinic-api",
-      "name": "clinic API",
-      "description": "The API that the owner app and the clinic desktop app call. It keeps owners, pets, appointments and medical notes in the records database.",
+      "id": "process:owner-api",
+      "name": "owner API",
+      "description": "The internet-facing API that the owner app calls. It checks that a pet belongs to the signed-in owner's account.",
       "assets": [
-        "pii",
-        "business-critical-data"
+        "pii"
       ],
-      "source_excerpt": "The owner app calls the clinic API, which is on the internet.",
+      "source_excerpt": "The owner app calls the owner API, which is on the internet.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:group-cloud-account",
       "exposure": "internet-facing",
       "interface_kind": "unknown",
-      "notes": "Stated in the source: \"Whenever an owner opens a record or books an appointment, the clinic API checks that the pet belongs to that owner's account.\", \"For staff requests, the clinic API checks only that the account has signed in.\" and \"Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.\""
+      "notes": "Stated in the source: \"Whenever an owner opens a record or books an appointment, the owner API checks that the pet belongs to that owner's account.\""
+    },
+    {
+      "id": "process:clinic-api",
+      "name": "clinic API",
+      "description": "The API that the clinic desktop app calls. It checks only that a staff account has signed in, and every staff account can do everything in it.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the clinic API.",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:group-cloud-account",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "Stated in the source: \"The clinic API checks only that a staff account has signed in.\" and \"Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.\""
     },
     {
       "id": "process:lab-results-importer",
@@ -63,7 +78,7 @@
       "trust_zone": "boundary:group-cloud-account",
       "exposure": "internet-facing",
       "interface_kind": "unknown",
-      "notes": "Stated in the source: \"It does not check which clinic a result is for, or whether the lab may send it: it writes every result the partner lab sends.\""
+      "notes": "Stated in the source: \"It does not check whether the partner lab may send a result: it writes every result the lab sends.\""
     },
     {
       "id": "process:billing-service",
@@ -91,7 +106,7 @@
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "The clinic API keeps owners, pets, appointments and medical notes in the records database.",
+      "source_excerpt": "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:private-database-network",
@@ -101,7 +116,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records",
+      "id": "flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records",
       "name": "book appointments and read records",
       "description": "A pet owner books appointments and reads their pets' records through the owner app.",
       "assets": [
@@ -110,12 +125,30 @@
       "source_excerpt": "Owners sign in with an email address and a password.",
       "source_label": "System description",
       "source": "entity:pet-owner",
-      "destination": "process:clinic-api",
+      "destination": "process:owner-api",
       "protocol": "unknown",
       "authentication": "password sign-in with an email address",
       "data_description": "appointments and pet records",
       "encryption_in_transit": "unknown",
       "operations": "read-write"
+    },
+    {
+      "id": "flow:process:owner-api>store:records-database>keep-owner-records",
+      "name": "keep owner records",
+      "description": "The owner API reads and writes owners' appointments and pet records.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account.",
+      "source_label": "System description",
+      "source": "process:owner-api",
+      "destination": "store:records-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "appointments and pet records",
+      "encryption_in_transit": "unknown",
+      "operations": "read-write",
+      "notes": "The source states the account, \"the database's admin account\", and names no mechanism behind it, so authentication reads unknown."
     },
     {
       "id": "flow:entity:clinic-staff>process:clinic-api>manage-records",
@@ -125,7 +158,7 @@
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API.",
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the clinic API.",
       "source_label": "System description",
       "source": "entity:clinic-staff",
       "destination": "process:clinic-api",
@@ -144,7 +177,7 @@
         "pii",
         "business-critical-data"
       ],
-      "source_excerpt": "It connects to the records database with the database's admin account.",
+      "source_excerpt": "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account.",
       "source_label": "System description",
       "source": "process:clinic-api",
       "destination": "store:records-database",
@@ -247,9 +280,9 @@
     {
       "id": "boundary:internet",
       "name": "internet",
-      "description": "Where pet owners and the partner lab reach the clinic API and the importer from.",
+      "description": "Where pet owners and the partner lab reach the owner API and the importer from.",
       "assets": [],
-      "source_excerpt": "The owner app calls the clinic API, which is on the internet.",
+      "source_excerpt": "The owner app calls the owner API, which is on the internet.",
       "source_label": "System description",
       "kind": "network"
     },
@@ -258,25 +291,25 @@
       "name": "clinic network",
       "description": "The network the clinic desktop app runs on.",
       "assets": [],
-      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API.",
+      "source_excerpt": "Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the clinic API.",
       "source_label": "System description",
       "kind": "network"
     },
     {
       "id": "boundary:group-cloud-account",
       "name": "group cloud account",
-      "description": "The clinic group's cloud account, where the clinic API, the lab results importer and the billing service run.",
+      "description": "The clinic group's cloud account, where the owner API, the clinic API, the lab results importer and the billing service run.",
       "assets": [],
-      "source_excerpt": "The clinic API, the lab results importer and the billing service run in the group's cloud account.",
+      "source_excerpt": "The owner API, the clinic API, the lab results importer and the billing service run in the group's cloud account.",
       "source_label": "System description",
       "kind": "network"
     },
     {
       "id": "boundary:private-database-network",
       "name": "private database network",
-      "description": "The group's private database network. Only the clinic API, the importer and the billing service can reach it.",
+      "description": "The group's private database network. Only the group's four services can reach it.",
       "assets": [],
-      "source_excerpt": "The records database is on the group's private database network, and only those three services can reach it.",
+      "source_excerpt": "The records database is on the group's private database network, and only those four services can reach it.",
       "source_label": "System description",
       "kind": "network"
     }
@@ -286,7 +319,7 @@
       "assumption": "Pet owners are placed on the internet because the schema requires a zone.",
       "element_id": "entity:pet-owner",
       "attribute": "trust_zone",
-      "basis": "The owner app calls the clinic API on the internet; the source does not state where owners are."
+      "basis": "The owner app calls the owner API on the internet; the source does not state where owners are."
     },
     {
       "assumption": "The partner lab is placed on the internet because the schema requires a zone.",

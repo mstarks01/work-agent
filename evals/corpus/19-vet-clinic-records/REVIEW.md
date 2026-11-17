@@ -27,17 +27,17 @@ Roughly an hour.
 
 > Vet clinic records — notes for the security review, from the clinic group's IT lead.
 >
-> Pet owners book appointments and read their pets' records in the owner app. The owner app calls the clinic API, which is on the internet. Owners sign in with an email address and a password. Whenever an owner opens a record or books an appointment, the clinic API checks that the pet belongs to that owner's account.
+> Pet owners book appointments and read their pets' records in the owner app. The owner app calls the owner API, which is on the internet. Owners sign in with an email address and a password. Whenever an owner opens a record or books an appointment, the owner API checks that the pet belongs to that owner's account.
 >
-> Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the same clinic API. For staff requests, the clinic API checks only that the account has signed in. Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.
+> Vets, nurses and receptionists use the clinic desktop app on the clinic network, and it calls the clinic API. The clinic API checks only that a staff account has signed in. Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff.
 >
-> The clinic API keeps owners, pets, appointments and medical notes in the records database. It connects to the records database with the database's admin account.
+> Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account.
 >
-> The lab results importer is on the internet, and the partner lab sends test results to it over the internet. The importer writes each result into the pet's record in the records database. It does not check which clinic a result is for, or whether the lab may send it: it writes every result the partner lab sends.
+> The lab results importer is on the internet, and the partner lab sends test results to it over the internet. The importer writes each result into the pet's record in the records database. It does not check whether the partner lab may send a result: it writes every result the lab sends.
 >
 > The billing service reads appointments from the records database and sends invoices to owners by email. Receptionists open owners' invoices in the billing service from the clinic desktop app. Priya thinks the billing service checks each request against the caller's role, but nobody has confirmed it.
 >
-> The clinic API, the lab results importer and the billing service run in the group's cloud account. The records database is on the group's private database network, and only those three services can reach it.
+> The owner API, the clinic API, the lab results importer and the billing service run in the group's cloud account. The records database is on the group's private database network, and only those four services can reach it.
 
 ### What the model says is in it
 
@@ -55,7 +55,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:clinic-api | internet-facing | unknown | boundary:group-cloud-account | unknown |
+| process:owner-api | internet-facing | unknown | boundary:group-cloud-account | unknown |
+| process:clinic-api | unknown | unknown | boundary:group-cloud-account | unknown |
 | process:lab-results-importer | internet-facing | unknown | boundary:group-cloud-account | unknown |
 | process:billing-service | unknown | unknown | boundary:group-cloud-account | unknown |
 
@@ -69,7 +70,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records | entity:pet-owner | process:clinic-api | unknown | password sign-in with an email address | unknown |
+| flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records | entity:pet-owner | process:owner-api | unknown | password sign-in with an email address | unknown |
+| flow:process:owner-api>store:records-database>keep-owner-records | process:owner-api | store:records-database | unknown | unknown | unknown |
 | flow:entity:clinic-staff>process:clinic-api>manage-records | entity:clinic-staff | process:clinic-api | unknown | unknown | unknown |
 | flow:process:clinic-api>store:records-database>keep-records | process:clinic-api | store:records-database | unknown | unknown | unknown |
 | flow:entity:partner-lab>process:lab-results-importer>send-test-results | entity:partner-lab | process:lab-results-importer | unknown | unknown | unknown |
@@ -89,15 +91,17 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
-- `process:clinic-api` — Stated in the source: "Whenever an owner opens a record or books an appointment, the clinic API checks that the pet belongs to that owner's account.", "For staff requests, the clinic API checks only that the account has signed in." and "Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff."
-- `process:lab-results-importer` — Stated in the source: "It does not check which clinic a result is for, or whether the lab may send it: it writes every result the partner lab sends."
+- `process:owner-api` — Stated in the source: "Whenever an owner opens a record or books an appointment, the owner API checks that the pet belongs to that owner's account."
+- `process:clinic-api` — Stated in the source: "The clinic API checks only that a staff account has signed in." and "Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff."
+- `process:lab-results-importer` — Stated in the source: "It does not check whether the partner lab may send a result: it writes every result the lab sends."
 - `process:billing-service` — A hedge in the source: "Priya thinks the billing service checks each request against the caller's role, but nobody has confirmed it."
+- `flow:process:owner-api>store:records-database>keep-owner-records` — The source states the account, "the database's admin account", and names no mechanism behind it, so authentication reads unknown.
 - `flow:entity:clinic-staff>process:clinic-api>manage-records` — The source says the clinic API checks that a staff account has signed in, and names no sign-in mechanism, so authentication reads unknown.
 - `flow:process:clinic-api>store:records-database>keep-records` — The source states the account, "the database's admin account", and names no mechanism behind it, so authentication reads unknown.
 
 **Assumptions**
 
-- `entity:pet-owner` — Pet owners are placed on the internet because the schema requires a zone. (basis: The owner app calls the clinic API on the internet; the source does not state where owners are.)
+- `entity:pet-owner` — Pet owners are placed on the internet because the schema requires a zone. (basis: The owner app calls the owner API on the internet; the source does not state where owners are.)
 - `entity:partner-lab` — The partner lab is placed on the internet because the schema requires a zone. (basis: The lab sends results over the internet; the source does not state where the lab runs.)
 
 ### Your list
@@ -114,7 +118,7 @@ category.
 
 ---
 
-## Part 2 — the 19 recorded STRIDE threats
+## Part 2 — the 21 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -134,7 +138,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who successfully authenticates with a guessed or reused owner password, defeating any additional sign-in controls, can read that owner's pet records and book appointments as the owner.
 
-- `flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records`, `entity:pet-owner`, `process:clinic-api`
+- `flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records`, `entity:pet-owner`, `process:owner-api`
 - severity: medium/medium · verb: `use-credential`
 - Stated: owners sign in with an email address and a password. The source states nothing that slows guesses at sign-in.
 
@@ -144,7 +148,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `flow:entity:clinic-staff>process:clinic-api>manage-records`, `entity:clinic-staff`, `process:clinic-api`
 - severity: medium/high · verb: `use-credential`
-- Stated: the clinic API checks only that a staff account has signed in, and every staff account can do everything. The source never says how staff sign in.
+- Stated: the clinic API checks only that a staff account has signed in, and every staff account can do everything. No sentence names how staff sign in.
 
 > mark:
 
@@ -167,11 +171,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**5.** The partner lab, or any sender the importer accepts, can change any pet's record at any clinic by sending a result for it, because the importer does not check which clinic a result is for or whether the lab may send it.
+**5.** A compromised or mistaken partner lab can write a false result into any pet's record, because the importer does not check whether the lab may send a result.
 
-- `process:lab-results-importer`, `flow:process:lab-results-importer>store:records-database>write-lab-results`, `store:records-database`
+- `process:lab-results-importer`, `flow:entity:partner-lab>process:lab-results-importer>send-test-results`, `flow:process:lab-results-importer>store:records-database>write-lab-results`, `store:records-database`
 - severity: medium/high · verb: `alter`
-- Stated outright: "It does not check which clinic a result is for, or whether the lab may send it: it writes every result the partner lab sends."
+- Stated outright: "It does not check whether the partner lab may send a result: it writes every result the lab sends." The false result changes the pet's record, so the verb is alter.
 
 > mark:
 
@@ -186,7 +190,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**7.** If the clinic API does not record which staff account deleted or changed a medical note, a staff member may deny a change, and the clinic cannot show who made it.
+**7.** If the clinic API does not record which staff account deleted or changed a medical note, a staff member may deny a change, and the clinic may be unable to show who made it.
 
 - `flow:entity:clinic-staff>process:clinic-api>manage-records`, `process:clinic-api`
 - severity: medium/medium · verb: `unattributable`
@@ -194,7 +198,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**8.** If the importer keeps no record of who sent each result, nobody can show whether a wrong result in a pet's record came from the partner lab.
+**8.** If the importer keeps no record of who sent each result, the clinic may be unable to show whether a wrong result in a pet's record came from the partner lab.
 
 - `flow:entity:partner-lab>process:lab-results-importer>send-test-results`, `process:lab-results-importer`
 - severity: low/medium · verb: `unattributable`
@@ -207,13 +211,21 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** If the owner app's requests are not encrypted in transit, an attacker on the network path may read owners' details and their pets' records.
 
-- `flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records`
+- `flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records`
 - severity: low/medium · verb: `intercept`
-- The owner app reaches the clinic API on the internet. The source says nothing about encryption in transit.
+- The owner app reaches the owner API on the internet. The source says nothing about encryption in transit.
 
 > mark:
 
-**10.** If test results are not encrypted in transit, an attacker on the path between the partner lab and the importer may read pets' test results.
+**10.** If the clinic desktop app's requests are not encrypted in transit, an attacker on the path between the clinic network and the clinic API may read medical notes.
+
+- `flow:entity:clinic-staff>process:clinic-api>manage-records`
+- severity: low/medium · verb: `intercept`
+- The desktop app on the clinic network calls the clinic API in the cloud account. The source says nothing about encryption in transit.
+
+> mark:
+
+**11.** If test results are not encrypted in transit, an attacker on the path between the partner lab and the importer may read pets' test results.
 
 - `flow:entity:partner-lab>process:lab-results-importer>send-test-results`
 - severity: low/medium · verb: `intercept`
@@ -221,7 +233,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**11.** If invoice emails are not protected in transit, an attacker on the mail path may read owners' invoices.
+**12.** If invoice emails are not protected in transit, an attacker on the mail path may read owners' invoices.
 
 - `flow:process:billing-service>entity:pet-owner>send-invoices`
 - severity: low/low · verb: `intercept`
@@ -229,7 +241,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**12.** If the billing service does not check each request against the caller's role, any staff account may open every owner's invoices from the clinic desktop app.
+**13.** If the billing service does not check each request against the caller's role, a vet or nurse account may open owners' invoices that its job does not need.
 
 - `process:billing-service`, `flow:entity:clinic-staff>process:billing-service>open-invoices`, `store:records-database`
 - severity: low/medium · verb: `elicit`
@@ -237,7 +249,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**13.** If the records database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every owner's details and every pet's medical notes.
+**14.** If the records database is not encrypted at rest and access to its storage is not restricted, an attacker with access to a copy of its storage may read every owner's details and every pet's medical notes.
 
 - `store:records-database`
 - severity: low/high · verb: `read`
@@ -248,26 +260,26 @@ on either of them. That is the finding this sitting exists for.
 
 ### denial-of-service
 
-**14.** If the internet-facing clinic API does not limit the requests it accepts, an attacker may flood it until owners and clinic staff cannot use it.
+**15.** If the internet-facing owner API does not limit the requests it accepts, an attacker may flood it until owners cannot book appointments or read records.
 
-- `process:clinic-api`, `flow:entity:pet-owner>process:clinic-api>book-appointments-and-read-records`
-- severity: medium/high · verb: `flood`
-- The source states no limit on the clinic API. Staff use the same API, so an outage also stops the clinics.
+- `process:owner-api`, `flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records`
+- severity: medium/medium · verb: `flood`
+- The source states no limit on the owner API.
 
 > mark:
 
-**15.** If the importer does not limit what it accepts, an attacker may send very many results to the internet-facing importer, and it writes all of them into the records database.
+**16.** If the importer does not limit what it accepts, an attacker able to send results to the internet-facing importer may send very many, and the importer writes all of them into the records database.
 
 - `process:lab-results-importer`, `flow:entity:partner-lab>process:lab-results-importer>send-test-results`, `store:records-database`
 - severity: low/medium · verb: `flood`
-- The importer writes every result the partner lab sends, as stated. The source states no limit.
+- The importer writes every result the lab sends, as stated. The source states no limit.
 
 > mark:
 
 
 ### elevation-of-privilege
 
-**16.** Any staff account, a receptionist's included, can delete medical notes and change any record in the clinic API, because the clinic API has no roles; a staff member can use that access far beyond their job.
+**17.** Any staff account, a receptionist's included, can delete medical notes and change any record in the clinic API, because the clinic API has no roles; a staff member can use that access far beyond their job.
 
 - `process:clinic-api`, `flow:entity:clinic-staff>process:clinic-api>manage-records`, `entity:clinic-staff`
 - severity: medium/high · verb: `abuse-grant`
@@ -275,23 +287,31 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**17.** The partner lab can write results into the records of pets at clinics it does not serve, because the importer does not check which clinic a result is for or whether the lab may send it.
+**18.** The partner lab can write a result into the record of any pet, because the importer does not check whether the lab may send it; a lab that sends results it should not changes records beyond its job.
 
 - `process:lab-results-importer`, `flow:entity:partner-lab>process:lab-results-importer>send-test-results`, `entity:partner-lab`
 - severity: low/medium · verb: `abuse-grant`
-- The missing checks are stated. The source does not say which clinics the lab serves, so the reach beyond the lab's job is a condition.
+- The missing check is stated. The source does not say which pets the lab's results may cover, so the reach beyond the lab's job is a condition.
 
 > mark:
 
-**18.** An attacker who compromises the internet-facing clinic API can act with the database's admin account, and so can read, change or delete everything in the records database.
+**19.** If the billing service does not check each request against the caller's role, a staff account may act in the billing service beyond its role.
 
-- `process:clinic-api`, `flow:process:clinic-api>store:records-database>keep-records`, `store:records-database`
+- `process:billing-service`, `flow:entity:clinic-staff>process:billing-service>open-invoices`, `entity:clinic-staff`
+- severity: low/medium · verb: `escalate`
+- A hedge in the source: Priya thinks the role check is there, and nobody has confirmed it.
+
+> mark:
+
+**20.** An attacker who compromises the internet-facing owner API could act with the database's admin account, and so could potentially read, change or delete everything in the records database.
+
+- `process:owner-api`, `flow:process:owner-api>store:records-database>keep-owner-records`, `store:records-database`
 - severity: low/high · verb: `abuse-grant`
-- The admin account is stated: "It connects to the records database with the database's admin account." The compromise is not, so the claim is conditional.
+- The admin account is stated: "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account." The compromise is not, so the claim is conditional.
 
 > mark:
 
-**19.** An attacker who compromises the internet-facing lab results importer can act with its actual database permissions, potentially changing any records those permissions reach.
+**21.** An attacker who compromises the internet-facing lab results importer can act with its actual database permissions, potentially changing any records those permissions reach.
 
 - `process:lab-results-importer`, `flow:process:lab-results-importer>store:records-database>write-lab-results`, `store:records-database`
 - severity: low/medium · verb: `abuse-grant`
@@ -343,9 +363,9 @@ your missing list, your notes and a digest of each file you read:
       "missing": ["<what the recorded sets do not name>"],
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
-      "source.md": "c05f832991aaa13a35997fe1d1555c50d1e7548abf7589229ff03a2d7fbd7006",
-      "model.json": "c4fb29ab0877ac1ad227ab32f66f75425bc2a28f563c0d04e4b19200329305b4",
-      "claims/stride.json": "23aefa474f2bf3753758a51fa2d2d3079453739075ca48b88eb6cc02400df53e"
+      "source.md": "c3b1dc97272657e10e019c71ea817ea5a6f46f572ea5947d4cb471835969417b",
+      "model.json": "4cddecd65193934202f18f7a0d34b8bf0e35ff10efa48af35248c5ca17d1c9d1",
+      "claims/stride.json": "0f709ed8272075828e661ad43bd4a08ad2d02e76b4ab9d25da90db819c42dbe3"
       }
     }
   }
