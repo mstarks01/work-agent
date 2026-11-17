@@ -32,11 +32,21 @@ def report():
 
 
 @pytest.fixture(scope="module")
-def flows(report):
-    (case,) = [
+def case():
+    (held,) = [
         case for case in load_corpus(REPO_ROOT / "evals/corpus") if case.id == CASE
     ]
+    return held
+
+
+@pytest.fixture(scope="module")
+def flows(report, case):
     return flows_by_case([case], {CASE: report.system_model})[CASE]
+
+
+@pytest.fixture(scope="module")
+def options(case):
+    return case.declaration("stride").options
 
 
 @pytest.fixture(scope="module")
@@ -77,16 +87,18 @@ def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
     assert delivery.captured(material, "tampering") == tampering
 
 
-def test_a_capture_the_rebuild_reproduces_agrees(report, tampering, flows):
+def test_a_capture_the_rebuild_reproduces_agrees(report, tampering, flows, options):
     traced = delivery.trace_lane(
-        ("store:message-queue",), "tampering", report, tampering, flows
+        ("store:message-queue",), "tampering", report, tampering, flows, options
     )
 
     assert traced.capture == "agrees"
     assert traced.delivered == traced.rebuilt == "draft-contains"
 
 
-def test_a_capture_without_a_rebuilt_candidate_differs(report, tampering, flows):
+def test_a_capture_without_a_rebuilt_candidate_differs(
+    report, tampering, flows, options
+):
     sent = CandidateSet(lane="tampering", candidates=tampering.candidates[:1])
 
     traced = delivery.trace_lane(
@@ -95,6 +107,7 @@ def test_a_capture_without_a_rebuilt_candidate_differs(report, tampering, flows)
         report,
         sent,
         flows,
+        options,
     )
 
     assert traced.capture == "differs"
@@ -102,9 +115,9 @@ def test_a_capture_without_a_rebuilt_candidate_differs(report, tampering, flows)
     assert traced.rebuilt == "equal"
 
 
-def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows):
+def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows, options):
     traced = delivery.trace_lane(
-        ("store:message-queue",), "tampering", report, None, flows
+        ("store:message-queue",), "tampering", report, None, flows, options
     )
 
     assert traced.capture == "uncaptured"
@@ -112,7 +125,7 @@ def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows):
     assert traced.rebuilt == "draft-contains"
 
 
-def test_an_archived_lead_rule_is_one_the_archived_block_fired(report, flows):
+def test_an_archived_lead_rule_is_one_the_archived_block_fired(report, flows, options):
     references = ("store:message-queue",)
     block = stride_block(report)
     kept = [
@@ -131,8 +144,8 @@ def test_an_archived_lead_rule_is_one_the_archived_block_fired(report, flows):
         }
     )
 
-    before = delivery.trace_lane(references, "tampering", report, None, flows)
-    after = delivery.trace_lane(references, "tampering", trimmed, None, flows)
+    before = delivery.trace_lane(references, "tampering", report, None, flows, options)
+    after = delivery.trace_lane(references, "tampering", trimmed, None, flows, options)
 
     assert before.archived_lead_rules == (
         "tampering-unprotected-transit-crossing",
@@ -194,12 +207,13 @@ def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
         report.system_model, package.lanes, package.rules, catalog
     )
     material = {
+        "prepared": {"user": "the input prepare handed the lanes"},
         "lanes": {
             "stride": {
                 lane: {"candidates": render_fenced(held.model_dump(mode="json"))}
                 for lane, held in sent.items()
             }
-        }
+        },
     }
     (tmp_path / reports.name / f"{case}.lanes.json").write_text(json.dumps(material))
 

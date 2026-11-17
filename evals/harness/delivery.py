@@ -35,21 +35,22 @@ those rows.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from analysis_service.candidates import CandidateSet, generate_candidates
-from analysis_service.frameworks import package_for
-from analysis_service.graph import unfence
+from analysis_service.candidates import CandidateSet
+from analysis_service.graph import FrameworkNodes, framework_lane_inputs, unfence
+from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
+from evals.harness.lane_replay import lanes_file, material_at
 from evals.harness.losses import RELATIONS, Cause, Relation, _relation
 from evals.harness.modes import EvalRunError
+from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import GoldenCase, flows_by_case
 from evals.harness.scorecard import (
     ReferenceRow,
@@ -110,13 +111,22 @@ def trace_lane(
     report: Report,
     sent: CandidateSet | None,
     flows: CaseFlows,
+    options: Mapping[str, object],
 ) -> LaneTrace:
-    """Trace one reference through its lane: ``sent`` is ``None`` where uncaptured."""
-    package = package_for("stride")
-    catalog = report.assertions.catalog if report.assertions else None
-    rebuilt = generate_candidates(
-        report.system_model, package.lanes, package.rules, catalog
-    )[lane]
+    """Trace one reference through its lane: ``sent`` is ``None`` where uncaptured.
+
+    The rebuild goes through
+    :func:`~analysis_service.graph.framework_lane_inputs`, the reader of what
+    a lane is given, over the archived model and catalog with the case's
+    ``options``.
+    """
+    rebuilt = framework_lane_inputs(
+        FrameworkNodes("stride"),
+        report.system_model,
+        options,
+        report.assertions.catalog if report.assertions else None,
+        MarkdownLoader(REPO_ROOT / "frameworks" / "stride"),
+    ).candidates[lane]
     fired = set(stride_block(report).fired_rules)
     capture: Capture = "uncaptured"
     if sent is not None:
@@ -194,11 +204,9 @@ def trace(
     uncaptured: dict[str, str] = {}
     for case in traced_cases:
         try:
-            path = _required(finished_file(artifact, case, "lanes"), case)
+            material[case] = material_at(lanes_file(artifact, case))
         except EvalRunError as error:
             uncaptured[case] = str(error)
-            continue
-        material[case] = json.loads(path.read_text(encoding="utf-8"))
     rows = tuple(
         DeliveryRow(
             reference=row,
@@ -210,6 +218,7 @@ def trace(
                 if row.case in material
                 else None,
                 flows[row.case],
+                by_id[row.case].declaration("stride").options,
             )
             if row.cause in TRACED
             else None,
