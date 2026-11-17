@@ -52,7 +52,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from analysis_service.candidates import generate_candidates
+from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
 from analysis_service.system_model import SystemModel
@@ -64,6 +64,7 @@ __all__ = [
     "by_framework",
     "case_trigger_recall",
     "corpus_recall",
+    "lead_rules",
 ]
 
 
@@ -178,25 +179,33 @@ def _hit(
     # meaningful inside that package.
     package = package_for(framework)
     fired = generate_candidates(model, package.lanes, package.rules).get(reference.lane)
-    targets = set(reference.affected_element_ids)
-    rule_ids: tuple[str, ...] = ()
-    if fired is not None:
-        rule_ids = tuple(
-            sorted(
-                {
-                    candidate.rule_id
-                    for candidate in fired.candidates
-                    if targets & set(candidate.element_ids)
-                }
-            )
-        )
     return TriggerHit(
         claim=reference.claim,
         framework=framework,
         lane=reference.lane,
         tier=reference.tier,
         element_ids=reference.affected_element_ids,
-        rule_ids=rule_ids,
+        rule_ids=lead_rules(fired, reference.affected_element_ids),
+    )
+
+
+def lead_rules(fired: CandidateSet | None, targets: Iterable[str]) -> tuple[str, ...]:
+    """The rules of ``fired`` with a candidate on any element of ``targets``, sorted.
+
+    The lane plus element overlap that :func:`_hit` matches on. ``None`` is a
+    lane the package does not declare, which leads nowhere.
+    """
+    if fired is None:
+        return ()
+    held = set(targets)
+    return tuple(
+        sorted(
+            {
+                candidate.rule_id
+                for candidate in fired.candidates
+                if held & set(candidate.element_ids)
+            }
+        )
     )
 
 

@@ -130,6 +130,10 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("evals.experiments.QA-2026-11-02-05.control_ballot", "CONTROL_CHECKS"): (
         "the checks of the item 4 control arm, which has no spoofing runs"
     ),
+    ("evals.harness.delivery", "TRACED"): (
+        "the causes that name no draft and no proposal at the reference's"
+        " place, which leaves out each cause that names one"
+    ),
     ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
         "the control attributes answered in free text, so an attribute with a"
         " closed set of values is absent by construction"

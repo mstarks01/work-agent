@@ -69,6 +69,7 @@ from evals.harness import (
     comparison,
     consent,
     critic_replay,
+    delivery,
     descendants,
     early_answerers,
     early_policies,
@@ -1546,6 +1547,25 @@ def command_scorecard(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_delivery(args: argparse.Namespace) -> int:
+    """Print each charged miss of one sweep traced through its lane, and write it with ``--out``."""
+    artifact = Path(args.artifact)
+    result = delivery.trace(
+        scorecard_of(artifact, Path(args.corpus)),
+        load_artifact(artifact),
+        development_cases(load_corpus(args.corpus)),
+    )
+    delivery.render(result)
+    if args.out:
+        record = run_record(
+            "delivery", {"corpus": str(args.corpus)}, sweep_inputs([artifact])
+        )
+        written = {"record": record, **result.to_json()}
+        Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")
+        print(f"delivery trace written to {args.out}")
+    return 0
+
+
 def command_near_misses(args: argparse.Namespace) -> int:
     """Write the near-miss ballot for a finished sweep, scored as ``score`` scores it.
 
@@ -2731,6 +2751,12 @@ COMMANDS: dict[str, Command] = {
         help="re-score a finished sweep against the ledger (no credentials)",
         run=command_score,
         arguments=_score_arguments,
+    ),
+    "delivery": Command(
+        help="each charged must-find miss of a finished sweep, traced through"
+        " the candidates its lane was sent (no credentials)",
+        run=command_delivery,
+        arguments=_scorecard_arguments,
     ),
     "scorecard": Command(
         help="one row per STRIDE must-find of a finished sweep, with its"
