@@ -437,6 +437,217 @@
       },
       "rationale": "No sentence of the source names a protection on the wire.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:coursework-service",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service checks each request against the user's role: a student can hand in and read work, and only a teacher can mark it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated role check on each request.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:coursework-service",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service checks each request against the user's role: a student can hand in and read work, and only a teacher can mark it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated roles: a student can hand in and read work, and only a teacher can mark it.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:coursework-service",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The coursework service checks that the user is a student, but not that the submission is theirs."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence of an ownership check.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:coursework-service>store:coursework-database>keep-coursework",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Its database account can only read and write the submissions, marks and comments tables."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated narrow database grant.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:admin-console",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the console checks the administrator role only on its start page.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:admin-console",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It checks for the administrator role only on its start page, so a teacher who signs in and opens an admin page's address directly can use that page."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: a teacher who opens an admin page's address directly can use that page.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:admin-console",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about this check on this service.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:grade-export",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about this check on this service.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:grade-export",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The hedge about the export's access sits on its database connection.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:grade-export>store:coursework-database>read-final-grades",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Dana thinks the grade export has read-only access to the database, but she has not looked."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A hedge: the speaker thinks the access is read-only and has not looked, so the row states no value.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:grade-export",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about this check on this service.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],

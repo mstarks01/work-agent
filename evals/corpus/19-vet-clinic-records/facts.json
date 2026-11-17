@@ -518,6 +518,280 @@
       },
       "rationale": "No sentence of the source names a protection on the wire.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:owner-api",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Whenever an owner opens a record or books an appointment, the owner API checks that the pet belongs to that owner's account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated check on each owner request: the pet must belong to the owner.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:owner-api",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "yes",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Whenever an owner opens a record or books an appointment, the owner API checks that the pet belongs to that owner's account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated ownership check on owners' records and bookings.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:owner-api",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states the ownership check and no roles or scopes on the owner API.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:owner-api>store:records-database>keep-owner-records",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the owner API uses the database's admin account.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:clinic-api",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The clinic API checks only that a staff account has signed in."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the clinic API checks only that a staff account signed in.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:clinic-api",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every staff account can do everything in the clinic API, including deleting medical notes: we never set up roles, because each clinic has only a few staff."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: every staff account has every permission, and there are no roles.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:clinic-api",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The clinic API checks only that a staff account has signed in."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the clinic API checks only that a staff account has signed in.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:clinic-api>store:records-database>keep-records",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both APIs keep owners, pets, appointments and medical notes in the records database, and both connect to it with the database's admin account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the clinic API uses the database's admin account.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lab-results-importer",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "no",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It does not check whether the partner lab may send a result: it writes every result the lab sends."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence: the importer does not check whether the lab may send a result.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lab-results-importer",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about this check on this service.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lab-results-importer",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about this check on this service.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:billing-service",
+        "predicate": "authorization-scope-checks-each-request",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Priya thinks the billing service checks each request against the caller's role, but nobody has confirmed it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A hedge: the speaker thinks the check is there and says nobody confirmed it, so the row states no value.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:billing-service",
+        "predicate": "authorization-scope-least-privilege",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Priya thinks the billing service checks each request against the caller's role, but nobody has confirmed it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The same hedge implies roles that nobody has confirmed, so the row states no value.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:billing-service",
+        "predicate": "authorization-scope-checks-ownership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states nothing about this check on this service.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],
