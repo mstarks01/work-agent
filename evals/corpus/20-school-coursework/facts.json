@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "Stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,7 +63,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -84,7 +84,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -105,7 +105,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -126,7 +126,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -142,7 +142,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -158,7 +158,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -174,7 +174,7 @@
         "exclusive": false
       },
       "rationale": "The source does not state where this sits; the model places it because the schema requires a zone.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -190,7 +190,7 @@
         "exclusive": false
       },
       "rationale": "The source names school accounts and no mechanism behind them, as the maintainer ruled for a named login on case 17.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -206,7 +206,7 @@
         "exclusive": false
       },
       "rationale": "The source names school accounts and no mechanism behind them, as the maintainer ruled for a named login on case 17.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -222,7 +222,7 @@
         "exclusive": false
       },
       "rationale": "The source says a teacher signs in to the admin console and names no mechanism.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -238,7 +238,7 @@
         "exclusive": false
       },
       "rationale": "The source names a database account and no mechanism behind it.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -268,7 +268,7 @@
         "exclusive": false
       },
       "rationale": "A stated grant by role.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -298,7 +298,7 @@
         "exclusive": false
       },
       "rationale": "A stated grant by role.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -328,7 +328,7 @@
         "exclusive": false
       },
       "rationale": "A stated grant in the admin console.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -358,7 +358,7 @@
         "exclusive": false
       },
       "rationale": "A stated, narrow database grant.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -388,7 +388,7 @@
         "exclusive": false
       },
       "rationale": "A hedge: the speaker thinks the access is read-only and has not looked, so the row states no value.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -404,7 +404,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -420,7 +420,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -436,7 +436,7 @@
         "exclusive": false
       },
       "rationale": "No sentence of the source names a protection on the wire.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],
