@@ -13,7 +13,9 @@ For each such row it gives four readings:
   ``<case>.lanes.json``, or ``absent``. ``None`` where the sweep captured no
   lane material.
 * ``rebuilt``: the same reading over the candidates that today's rules write
-  for the archived model and the archived catalog.
+  for the archived model and the archived catalog, with the case's options
+  from today's corpus. The archive records no options, so a ``differs`` can
+  come from an options edit as well as from a rule edit.
 * ``capture``: whether the two candidate sets hold the same
   :func:`~analysis_service.candidates.leads`. A rule's question text is not
   part of a lead, because a question edit does not move one.
