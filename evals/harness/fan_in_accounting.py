@@ -8,12 +8,13 @@ as :func:`~analysis_service.execution.seed_state` renders them, and the
 assertion catalog its report holds. ``descendants`` replays through the same
 function.
 
-**What it answers.** Where each entry a lane emitted went. :func:`account`
-reads the fan-in's own output and gives each entry, by the ID the fan-in gives
-it, one fate: kept as a draft, dropped with the reason the fan-in recorded,
-dropped as an identity its framework does not have, or deferred on a unit the
-job carries no evidence for. An entry with none of these is unexplained, and so
-is an output that names an ID no entry carries.
+**What it answers.** Where each **Proposal** a lane emitted went, valid or
+not. :func:`account` reads the fan-in's own output and gives each proposal, by
+the ID the fan-in gives it, one fate: kept as a draft, dropped with the reason
+the fan-in recorded, dropped as an identity its framework does not have, or
+deferred because the job carries no evidence of the kind it needs. A proposal
+with none of these is unexplained. An output that names an ID no proposal
+carries, or names one ID more often than proposals carry it, is extra.
 
 **Quotes.** The drafts' quote grounds, counted three ways: verified as
 written, repaired to the source's own span, and refused. Only the drafts that
@@ -45,7 +46,7 @@ from typing import Any, NamedTuple
 from pydantic import ValidationError
 
 from analysis_service.claims import FrameworkName, ProposalBatch
-from analysis_service.evidence import invalid_proposal_marks
+from analysis_service.evidence import invalid_proposal_marks, known_proposals
 from analysis_service.execution import seed_state
 from analysis_service.fan_in import DraftJoinError, FanIn, fan_in
 from analysis_service.frameworks import PACKAGES, FrameworkPackage, schemas_for
@@ -53,10 +54,12 @@ from analysis_service.frameworks.asvs.record import RequirementProposals
 from analysis_service.frameworks.stride.record import ArchivedThreatProposals
 from analysis_service.graph import STATE_SOURCE_TEXTS
 from analysis_service.report import Report
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
     load_artifact,
+    recorded_sources,
     rendered_sources,
 )
 from evals.harness.bundle import UnreadableReport, finished_file, read_report
@@ -95,22 +98,23 @@ def replay_fan_in(
 
 @dataclass(frozen=True)
 class FanInAccount:
-    """Where each entry of one framework's lane batches went in one case."""
+    """Where each proposal of one framework's lane batches went in one case."""
 
     case: str
     framework: FrameworkName
-    #: Each entry the lanes emitted, valid or not, by the ID the fan-in gives it.
-    entries: tuple[str, ...]
+    #: Each proposal the lanes emitted, valid or not, by the ID the fan-in gives it.
+    proposals: tuple[str, ...]
     kept: tuple[str, ...]
-    #: Each dropped entry's ID against the reason the fan-in recorded.
+    #: Each dropped proposal's ID against the reason the fan-in recorded.
     dropped: tuple[tuple[str, str], ...]
-    #: Entries naming an identity their framework does not have.
+    #: Proposals naming an identity their framework does not have.
     unknown: tuple[str, ...]
-    #: Each deferred unit against the kind of evidence it needs.
-    deferred: tuple[tuple[str, str], ...]
-    #: IDs whose entries the fate lists above do not account for, once per
-    #: entry, and IDs the output names that no entry carries.
+    #: Proposals the package deferred for evidence the job does not carry.
+    deferred: tuple[str, ...]
+    #: Proposals no fate above accounts for, once per proposal.
     unexplained: tuple[str, ...]
+    #: IDs the output names once per name beyond the proposals that carry them.
+    extra: tuple[str, ...]
     quotes_verified: int
     quotes_repaired: int
     quotes_refused: int
@@ -119,10 +123,10 @@ class FanInAccount:
 
     @property
     def accounted(self) -> int:
-        """Entries the fan-in's output accounts for; none for an incompatible case."""
+        """Proposals the fan-in's output accounts for; none for an incompatible case."""
         if self.incompatible:
             return 0
-        return len(self.entries) - sum(1 for i in self.unexplained if i in self.entries)
+        return len(self.proposals) - len(self.unexplained)
 
 
 def account(
@@ -131,35 +135,46 @@ def account(
     package: FrameworkPackage,
     merged: FanIn,
 ) -> FanInAccount:
-    """Each entry of ``batches``, given its fate from the fan-in's ``merged``."""
+    """Each proposal of ``batches``, given its fate from the fan-in's ``merged``.
+
+    A deferred proposal is the one output the fan-in does not key by ID, so
+    each lane's known proposals go through the package's own split again, with
+    the empty set of covered units the replay passes the fan-in.
+    """
     key_field = schemas_for(package.name).key_field
-    entries: list[str] = []
+    proposals: list[str] = []
+    deferred: list[str] = []
     for lane, batch in batches.items():
-        entries += [
-            package.compose_id(lane, getattr(proposal, key_field))
+        ids = {
+            id(proposal): package.compose_id(lane, getattr(proposal, key_field))
             for proposal in batch.claims
-        ]
-        entries += [
+        }
+        proposals += ids.values()
+        proposals += [
             mark.claim_id
             for mark in invalid_proposal_marks(
                 batch.invalid, package, lane
             ).dropped_claims
         ]
+        known, _ = known_proposals(batch.claims, package, lane)
+        kept, _ = package.record.partition_proposals(
+            known, lane, CARRIED_EVIDENCE_KINDS, ()
+        )
+        held = {id(proposal) for proposal in kept}
+        deferred += [ids[id(p)] for p in known if id(p) not in held]
     marks = merged.marks
     dropped = [(mark.claim_id, mark.reason) for mark in marks.dropped_claims]
     unknown = [mark.claim_id for mark in marks.unknown_claim_identities]
-    left = Counter(entries)
-    left.subtract(draft.id for draft in merged.drafts)
-    left.subtract(claim_id for claim_id, _ in dropped)
-    left.subtract(unknown)
-    record = package.record
-    unexplained = [
-        claim_id
-        for claim_id, count in sorted(left.items())
-        if count < 0
-        or record.unit_of(record.model_construct(id=claim_id)) not in merged.deferred
-        for _ in range(abs(count))
-    ]
+    left = Counter(proposals)
+    for fate in (
+        [draft.id for draft in merged.drafts],
+        [claim_id for claim_id, _ in dropped],
+        unknown,
+        deferred,
+    ):
+        left.subtract(fate)
+    unexplained = [i for i, count in sorted(left.items()) for _ in range(count)]
+    extra = [i for i, count in sorted(left.items()) for _ in range(-count)]
     quotes = sum(
         ground.kind == "quote" for draft in merged.drafts for ground in draft.grounds
     )
@@ -168,31 +183,36 @@ def account(
     return FanInAccount(
         case=case_id,
         framework=package.name,
-        entries=tuple(entries),
+        proposals=tuple(proposals),
         kept=tuple(draft.id for draft in merged.drafts),
         dropped=tuple(dropped),
         unknown=tuple(unknown),
-        deferred=tuple(sorted(merged.deferred.items())),
+        deferred=tuple(deferred),
         unexplained=tuple(unexplained),
+        extra=tuple(extra),
         quotes_verified=quotes - repaired - refused,
         quotes_repaired=repaired,
         quotes_refused=refused,
     )
 
 
-def _differs(
+def _drift_reason(
     replayed: FanIn, archived: Sequence[Mapping[str, Any]], package: FrameworkPackage
 ) -> str:
     """How the replayed drafts differ from the archived ones, or ``""``.
 
     Each archived draft is read through today's record first, so a field the
-    record added since the run, at its default, is no difference.
+    record added since the run, at its default, is no difference. A draft
+    today's record refuses is a difference too.
     """
     ours = [draft.model_dump(mode="json") for draft in replayed.drafts]
-    theirs = [
-        package.record.model_validate(draft).model_dump(mode="json")
-        for draft in archived
-    ]
+    try:
+        theirs = [
+            package.record.model_validate(draft).model_dump(mode="json")
+            for draft in archived
+        ]
+    except ValidationError as error:
+        return f"today's record refuses an archived draft: {error}"
     if ours == theirs:
         return ""
     by_id = {draft["id"]: draft for draft in theirs}
@@ -211,7 +231,7 @@ def _differs(
 def replay_case(
     case: GoldenCase,
     report: Report,
-    proposals: Mapping[str, Any],
+    stored: Mapping[str, Any],
     drafts: Mapping[str, Any],
     sources_moved: str,
 ) -> list[FanInAccount]:
@@ -226,27 +246,30 @@ def replay_case(
         empty = FanInAccount(
             case=case.id,
             framework=framework,
-            entries=(),
+            proposals=(),
             kept=(),
             dropped=(),
             unknown=(),
             deferred=(),
             unexplained=(),
+            extra=(),
             quotes_verified=0,
             quotes_repaired=0,
             quotes_refused=0,
         )
-        stored = proposals.get(framework)
-        if stored is None:
+        lanes = stored.get(framework)
+        if lanes is None:
             rows.append(replace(empty, incompatible="the archive holds no proposals"))
             continue
         try:
-            batches, merged = replay_fan_in(case, report, stored, framework)
+            batches, merged = replay_fan_in(case, report, lanes, framework)
         except (DraftJoinError, ValidationError) as error:
             rows.append(replace(empty, incompatible=str(error)))
             continue
         row = account(case.id, batches, package, merged)
-        reason = sources_moved or _differs(merged, drafts.get(framework, []), package)
+        reason = sources_moved or _drift_reason(
+            merged, drafts.get(framework, []), package
+        )
         rows.append(replace(row, incompatible=reason))
     return rows
 
@@ -274,11 +297,7 @@ def replay_artifact(artifact: EvalArtifact, cases: Sequence[GoldenCase]) -> FanI
     )
     if not sweep.writes_reports:
         return sweep
-    recorded = (
-        artifact.block("rendered_sources")
-        if artifact.carries("rendered_sources")
-        else {}
-    )
+    recorded = recorded_sources(artifact) or {}
     for case in cases:
         try:
             paths = [
@@ -293,8 +312,13 @@ def replay_artifact(artifact: EvalArtifact, cases: Sequence[GoldenCase]) -> FanI
             continue
         try:
             report = read_report(report_path)
+            stored = json.loads(proposals_path.read_text(encoding="utf-8"))
+            drafts = json.loads(drafts_path.read_text(encoding="utf-8"))
         except UnreadableReport as error:
             sweep.unreadable.append(str(error))
+            continue
+        except json.JSONDecodeError as error:
+            sweep.capture_faults.append(f"{case.id}: a capture is not JSON: {error}")
             continue
         digest = recorded.get(case.id)
         moved = (
@@ -302,15 +326,7 @@ def replay_artifact(artifact: EvalArtifact, cases: Sequence[GoldenCase]) -> FanI
             if digest is not None and digest != rendered_sources([case])[case.id]
             else ""
         )
-        sweep.rows.extend(
-            replay_case(
-                case,
-                report,
-                json.loads(proposals_path.read_text(encoding="utf-8")),
-                json.loads(drafts_path.read_text(encoding="utf-8")),
-                moved,
-            )
-        )
+        sweep.rows.extend(replay_case(case, report, stored, drafts, moved))
     return sweep
 
 
@@ -321,7 +337,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def command_fan_in(args: argparse.Namespace) -> int:
-    """Run each archived fan-in again and account for every entry."""
+    """Run each archived fan-in again and account for every proposal."""
     try:
         artifact = load_artifact(args.artifact)
         cases = [
@@ -343,15 +359,17 @@ def command_fan_in(args: argparse.Namespace) -> int:
             print(f"{row.case:34} {row.framework:6} incompatible: {row.incompatible}")
             continue
         print(
-            f"{row.case:34} {row.framework:6} entries {len(row.entries):>3}"
+            f"{row.case:34} {row.framework:6} proposals {len(row.proposals):>3}"
             f" kept {len(row.kept):>3} dropped {len(row.dropped):>3}"
             f" unknown {len(row.unknown):>3} deferred {len(row.deferred):>3}"
-            f" unexplained {len(row.unexplained):>3}"
+            f" unexplained {len(row.unexplained):>3} extra {len(row.extra):>3}"
         )
         for claim_id, reason in row.dropped:
             print(f"  dropped {claim_id}: {reason[:160]}")
         for claim_id in row.unexplained:
             print(f"  unexplained: {claim_id}")
+        for claim_id in row.extra:
+            print(f"  extra in the output: {claim_id}")
     compatible = [row for row in sweep.rows if not row.incompatible]
     print(
         f"{len(sweep.rows)} block(s), {len(sweep.rows) - len(compatible)} incompatible;"
@@ -359,16 +377,16 @@ def command_fan_in(args: argparse.Namespace) -> int:
         f" {len(sweep.capture_faults)} case(s) with a missing or stray capture"
     )
     print(
-        f"entries: {sum(len(row.entries) for row in sweep.rows)} inspected,"
+        f"proposals: {sum(len(row.proposals) for row in sweep.rows)} inspected,"
         f" {sum(row.accounted for row in compatible)} accounted,"
         f" {sum(len(row.unexplained) for row in compatible)} unexplained,"
-        f" {sum(len(row.entries) for row in sweep.rows if row.incompatible)}"
-        " unavailable"
+        f" {sum(len(row.proposals) for row in sweep.rows if row.incompatible)}"
+        f" unavailable; {sum(len(row.extra) for row in compatible)} extra"
     )
     print(
         f"quotes on kept drafts: {sum(row.quotes_verified for row in compatible)}"
         f" verified, {sum(row.quotes_repaired for row in compatible)} repaired,"
         f" {sum(row.quotes_refused for row in compatible)} refused"
     )
-    unexplained = any(row.unexplained for row in compatible)
+    unexplained = any(row.unexplained or row.extra for row in compatible)
     return 1 if unexplained or sweep.capture_faults else 0

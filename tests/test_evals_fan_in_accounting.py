@@ -1,4 +1,4 @@
-"""The fan-in accounting: each entry a lane emitted, given its fate.
+"""The fan-in accounting: each proposal a lane emitted, given its fate.
 
 The fixtures run the shipped fan-in. Each negative fixture has a valid
 neighbour that stays accounted.
@@ -46,7 +46,7 @@ def test_a_repeated_id_is_one_draft_and_one_drop():
         )
     )
 
-    assert sorted(row.entries) == ["S-01", "S-01", "T-01"]
+    assert sorted(row.proposals) == ["S-01", "S-01", "T-01"]
     assert row.kept == ("S-01", "T-01")
     assert row.dropped == (
         ("S-01", "repeats the ID of an earlier draft in this framework"),
@@ -54,7 +54,7 @@ def test_a_repeated_id_is_one_draft_and_one_drop():
     assert (row.unexplained, row.accounted) == ((), 3)
 
 
-def test_an_invalid_entry_is_dropped_and_its_neighbour_kept():
+def test_an_invalid_proposal_is_dropped_and_its_neighbour_kept():
     valid = sample_proposal("S-01").model_dump(mode="json")
     stored = {"spoofing": {"claims": [valid, {**valid, "sequence": 2, "title": ""}]}}
     lanes = {
@@ -115,10 +115,10 @@ def test_quotes_are_counted_verified_repaired_and_refused():
 def test_an_empty_batch_has_nothing_to_account():
     row = _accounted(batches(spoofing=[]))
 
-    assert (row.entries, row.kept, row.dropped, row.unexplained) == ((), (), (), ())
+    assert (row.proposals, row.kept, row.dropped, row.unexplained) == ((), (), (), ())
 
 
-def test_a_deferred_entry_is_accounted_by_its_unit():
+def test_a_deferred_proposal_is_accounted():
     lane = "encoding-and-sanitization"
     proposal = RequirementProposal(
         title="t",
@@ -133,11 +133,11 @@ def test_a_deferred_entry_is_accounted_by_its_unit():
 
     row = fan_in_accounting.account("case", stored, ASVS, merged)
 
-    assert row.deferred == (("V1.2.4", "code"),)
+    assert row.deferred == ("v5.0.0-1.2.4",)
     assert (row.kept, row.unexplained, row.accounted) == ((), (), 1)
 
 
-def test_an_entry_the_output_loses_is_unexplained():
+def test_a_proposal_the_output_loses_is_unexplained():
     stored = batches(
         spoofing=[sample_proposal("S-01")],
         tampering=[sample_proposal("T-01", "tampering")],
@@ -151,7 +151,7 @@ def test_an_entry_the_output_loses_is_unexplained():
     assert row.kept == ("T-01",) and row.accounted == 1
 
 
-def test_an_output_no_entry_carries_is_unexplained():
+def test_an_output_no_proposal_carries_is_extra():
     stored = batches(spoofing=[sample_proposal("S-01")])
     merged = fan_in(stored, STRIDE, valid_model(), SOURCES)
     extra = merged.drafts[0].model_copy(update={"id": "S-07"})
@@ -159,16 +159,28 @@ def test_an_output_no_entry_carries_is_unexplained():
 
     row = fan_in_accounting.account("case", stored, STRIDE, grown)
 
-    assert row.unexplained == ("S-07",)
-    assert row.accounted == 1
+    assert (row.unexplained, row.extra, row.accounted) == ((), ("S-07",), 1)
 
 
-def test_an_archive_accounts_for_every_entry(archive, case):  # noqa: F811
+def test_a_second_copy_of_a_kept_id_is_extra_and_its_proposal_accounted():
+    stored = batches(
+        spoofing=[sample_proposal("S-01")],
+        tampering=[sample_proposal("T-01", "tampering")],
+    )
+    merged = fan_in(stored, STRIDE, valid_model(), SOURCES)
+    doubled = merged._replace(drafts=[*merged.drafts, merged.drafts[0]])
+
+    row = fan_in_accounting.account("case", stored, STRIDE, doubled)
+
+    assert (row.unexplained, row.extra, row.accounted) == ((), ("S-01",), 2)
+
+
+def test_an_archive_accounts_for_every_proposal(archive, case):  # noqa: F811
     sweep = fan_in_accounting.replay_artifact(load_artifact(archive), [case])
 
     (row,) = sweep.rows
-    assert row.incompatible == "" and row.entries
-    assert row.accounted == len(row.entries)
+    assert row.incompatible == "" and row.proposals
+    assert row.accounted == len(row.proposals)
     assert row.unexplained == ()
 
 
@@ -203,7 +215,7 @@ def test_a_missing_capture_is_named_and_fails_the_command(
     [line] = sweep.capture_faults
     assert f"no {kind} file" in line and sweep.rows == []
     assert code == 1
-    assert capsys.readouterr().out.splitlines()[-2].startswith("entries: 0 inspected")
+    assert capsys.readouterr().out.splitlines()[-2].startswith("proposals: 0 inspected")
 
 
 def test_the_command_prints_the_counts(archive, case, capsys):  # noqa: F811
@@ -212,5 +224,29 @@ def test_the_command_prints_the_counts(archive, case, capsys):  # noqa: F811
     lines = capsys.readouterr().out.splitlines()
     assert code == 0
     assert lines[-3].startswith("1 block(s), 0 incompatible;")
-    assert lines[-2].startswith("entries: ") and " 0 unexplained," in lines[-2]
+    assert lines[-2].startswith("proposals: ") and " 0 unexplained," in lines[-2]
     assert lines[-1].startswith("quotes on kept drafts: ")
+
+
+def test_an_archived_draft_today_s_record_refuses_is_incompatible(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+):
+    path = reports_dir(archive) / f"{case.id}.drafts.json"
+    held = json.loads(path.read_text(encoding="utf-8"))
+    del held["stride"][0]["title"]
+    path.write_text(json.dumps(held), encoding="utf-8")
+
+    (row,) = fan_in_accounting.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert row.incompatible.startswith("today's record refuses an archived draft")
+
+
+def test_a_capture_that_is_not_json_is_named(archive, case):  # noqa: F811
+    (reports_dir(archive) / f"{case.id}.proposals.json").write_text("{", "utf-8")
+
+    sweep = fan_in_accounting.replay_artifact(load_artifact(archive), [case])
+
+    [line] = sweep.capture_faults
+    assert line.startswith(f"{case.id}: a capture is not JSON")
+    assert sweep.rows == []
