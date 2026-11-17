@@ -189,6 +189,24 @@ class TestTheAssertionPassSeesOnlyTheExtractedParts:
         assert record.catalog.entries == []
         assert [issue.code for issue in record.issues] == ["unknown-predicate"]
 
+    @pytest.mark.parametrize("name", sorted(EXTRACTED_PARTS))
+    def test_a_stated_absence_of_an_extracted_part_is_its_no(self, model, name):
+        proposal = CatalogProposal(
+            assertions=[
+                AssertionProposal(
+                    subject_type="component",
+                    subject=PROCESS,
+                    predicate=name,
+                    value=ABSENT,
+                    basis="inferred",
+                    explanation="it has none",
+                )
+            ]
+        )
+        record = AssertionRecord.of(proposal, model, {"Notes": "text"})
+        assert [entry.value for entry in record.catalog.entries] == ["no"]
+        assert record.issues == []
+
 
 class TestTheRowsAnAnswerWrites:
     def test_each_answered_facet_writes_a_stated_row_quoting_its_line(self, model):

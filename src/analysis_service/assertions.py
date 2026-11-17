@@ -2754,8 +2754,9 @@ def _resolve_row(
 
     Only what construction needs is decided here: the predicate has to be
     registered for an identity to exist, and the subject and a referent value
-    have to resolve for the row to name them. Everything else is the gate's
-    call, made on the built row, so no rule is written twice.
+    have to resolve for the row to name them, and a stated ``absent`` of a
+    predicate with a ``no`` term is written as that ``no``. Everything else is
+    the gate's call, made on the built row, so no rule is written twice.
 
     A subject is declared only for a row that is kept, so a dropped row leaves
     no subject behind that no row names.
@@ -2783,6 +2784,11 @@ def _resolve_row(
         return None
 
     value = row.value
+    if value == ABSENT and "no" in predicate.terms:
+        # A predicate with its own "no" keeps one shape for "not there", so the
+        # row matches an owner's answer. Record attribution writes an owner's
+        # "no" as absent instead, because it has no "no" term.
+        value = "no"
     referent = None
     if predicate.value == "reference" and value not in UNIVERSAL_TERMS:
         wanted = referent_type(predicate)
