@@ -269,35 +269,50 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
     assert loss.draft_id == draft.id
 
 
-@pytest.mark.parametrize(
-    ("stated", "cause"),
-    [("storage-copy", "position"), (None, "unstated"), ("ruled", None)],
-    ids=["another", "unstated", "same"],
-)
-def test_a_claim_with_a_ruled_readings_action_is_charged_through_that_reading(
-    case, flows, stated, cause
-):
-    """The reference's own reading finds the claim at the place first, but a
-    ruled reading carries the claim's action. The scorer accepts that reading,
-    so the row names the gate the scorer applies to it, never a verb the scorer
-    forgives. Case 01's reference 0 carries one such reading, at a place that
-    contains its own."""
+def _at_ruled_reading(case, attacker_position):
+    """A draft at reference 0's ruled reading of case 01, under that reading's verb.
+
+    Case 01's reference 0 carries one ruled reading, with another verb than
+    its own, at a place that contains its own. So the reference's own reading
+    finds the draft at its place first.
+    """
     reference = case.stride_claims()[0]
     (_, (read_verb, read_place)) = case.stride_readings(0)
     assert read_verb != reference.verb
-    if stated == "ruled":
-        stated = ruled_position(case, reference)
-    draft = draft_threat(
+    return draft_threat(
         1,
         reference.category,
         "draft 1",
         element_ids=read_place,
         verb=read_verb,
-        attacker_position=stated,
+        attacker_position=attacker_position,
     )
+
+
+@pytest.mark.parametrize(
+    ("stated", "cause"),
+    [("storage-copy", "position"), (None, "unstated")],
+    ids=["another", "unstated"],
+)
+def test_a_claim_with_a_ruled_readings_action_is_charged_through_that_reading(
+    case, flows, stated, cause
+):
+    """A ruled reading carries the claim's action, and the scorer accepts that
+    reading, so the row names the gate the scorer applies to it, never a verb
+    the scorer forgives."""
+    draft = _at_ruled_reading(case, stated)
+
     charged = by_index(charge(case, flows, [draft], [promote(draft)]))
 
-    assert (charged[0].cause if 0 in charged else None) == cause
+    assert charged[0].cause == cause
+
+
+def test_a_claim_at_a_ruled_reading_with_the_ruled_position_is_no_loss(case, flows):
+    draft = _at_ruled_reading(case, ruled_position(case, case.stride_claims()[0]))
+
+    charged = by_index(charge(case, flows, [draft], [promote(draft)]))
+
+    assert 0 not in charged, "the scorer matched it through the ruled reading"
 
 
 def _ruled_at_zero(case):

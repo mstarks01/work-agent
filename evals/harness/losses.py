@@ -557,8 +557,7 @@ def attribute_case(
         )
         if charged_reading is not None:
             read_verb, place, at_place, with_action = charged_reading
-            claim = _charged_to(at_place, read_verb)
-            charged: Cause = "verb"
+            charged: Cause
             if with_action:
                 held = _holding(position, with_action, _draft_position)
                 charged = (
@@ -567,6 +566,9 @@ def attribute_case(
                     else _refused(position, with_action, _draft_position)
                 )
                 claim = _charged_to(held or with_action, read_verb)
+            else:
+                charged = "verb"
+                claim = _charged_to(at_place, read_verb)
             losses.append(
                 Loss(
                     index,
