@@ -538,26 +538,28 @@ def attribute_case(
         # first reading with any claim there, for the reason ``_charged_to``
         # gives: a verb charge beside an action match names the wrong fix.
         reached = [
-            (read_verb, place, here)
+            (
+                read_verb,
+                place,
+                here,
+                [one for one in here if same_action(one.verb, read_verb)],
+            )
             for read_verb, place in readings
             if (here := _at_place(place, in_lane, flows))
         ]
-        found = next(
+        charged_reading = next(
             (
-                (read_verb, place, here)
-                for read_verb, place, here in reached
-                if any(same_action(claim.verb, read_verb) for claim in here)
+                (read_verb, place, here, with_action)
+                for read_verb, place, here, with_action in reached
+                if with_action
             ),
             reached[0] if reached else None,
         )
-        if found is not None:
-            read_verb, place, at_place = found
+        if charged_reading is not None:
+            read_verb, place, at_place, with_action = charged_reading
             claim = _charged_to(at_place, read_verb)
             charged: Cause = "verb"
-            if same_action(claim.verb, read_verb):
-                with_action = [
-                    one for one in at_place if same_action(one.verb, read_verb)
-                ]
+            if with_action:
                 held = _holding(position, with_action, _draft_position)
                 charged = (
                     "merged"
