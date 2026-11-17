@@ -37,6 +37,7 @@ from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall
+from evals.harness.verbs import same_action
 from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
 
@@ -278,7 +279,7 @@ def _at_ruled_reading(case, attacker_position):
     """
     reference = case.stride_claims()[0]
     (_, (read_verb, read_place)) = case.stride_readings(0)
-    assert read_verb != reference.verb
+    assert not same_action(read_verb, reference.verb)
     return draft_threat(
         1,
         reference.category,
@@ -313,6 +314,51 @@ def test_a_claim_at_a_ruled_reading_with_the_ruled_position_is_no_loss(case, flo
     charged = by_index(charge(case, flows, [draft], [promote(draft)]))
 
     assert 0 not in charged, "the scorer matched it through the ruled reading"
+
+
+def test_a_reading_whose_claim_holds_the_position_wins_over_one_that_fails_it(
+    case, flows
+):
+    """Two readings each carry a claim with their action. Only the second
+    reading's claim states the ruled position, and the scorer gave that claim
+    to another reference at the same place, so the reference is a merge, not a
+    position loss."""
+    reference = case.stride_claims()[0]
+    other = next(
+        index
+        for index, claim in enumerate(case.stride_claims())
+        if index != 0
+        and claim.category == reference.category
+        and claim.affected_element_ids == reference.affected_element_ids
+        and not same_action(claim.verb, reference.verb)
+    )
+    other_verb = case.stride_claims()[other].verb
+    position = ruled_position(case, reference)
+    assert position is not None and position != "storage-copy"
+    ruled = replace(
+        case,
+        ruled_readings={
+            0: (
+                Reading(
+                    verb=other_verb,
+                    affected_element_ids=reference.affected_element_ids,
+                ),
+            )
+        },
+    )
+    failing = at(case, reference, 1, reference.verb).model_copy(
+        update={"attacker_position": "storage-copy"}
+    )
+    holding = at(case, reference, 2, other_verb).model_copy(
+        update={"attacker_position": position}
+    )
+
+    charged = by_index(
+        charge(ruled, flows, [failing, holding], [promote(failing), promote(holding)])
+    )
+
+    assert other not in charged
+    assert (charged[0].cause, charged[0].draft_id) == ("merged", holding.id)
 
 
 def _ruled_at_zero(case):

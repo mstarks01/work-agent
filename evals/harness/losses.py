@@ -85,7 +85,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeVar, get_args
+from typing import Any, Literal, NamedTuple, TypeVar, get_args
 
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -400,6 +400,36 @@ def _proposed_at(
     ]
 
 
+class _Reached(NamedTuple):
+    """One reading with a surviving claim at its place, and the claims that answer it."""
+
+    read_verb: str
+    place: Sequence[str]
+    at_place: list[DraftThreat]
+    #: The claims at the place that carry the reading's action.
+    with_action: list[DraftThreat]
+    #: Of those, the claims that state the reference's ruled position.
+    held: list[DraftThreat]
+
+
+def _reached(
+    readings: Sequence[tuple[str, Sequence[str]]],
+    in_lane: Sequence[DraftThreat],
+    flows: CaseFlows,
+    position: str | None,
+) -> list[_Reached]:
+    """Each reading with a claim at its place, in the order of ``readings``."""
+    reached = []
+    for read_verb, place in readings:
+        at_place = _at_place(place, in_lane, flows)
+        if not at_place:
+            continue
+        with_action = [one for one in at_place if same_action(one.verb, read_verb)]
+        held = _holding(position, with_action, _draft_position)
+        reached.append(_Reached(read_verb, place, at_place, with_action, held))
+    return reached
+
+
 def _charged_to(claims: Sequence[DraftThreat], verb: str) -> DraftThreat:
     """Which of several claims at one place a miss is charged to.
 
@@ -534,32 +564,20 @@ def attribute_case(
             for read_verb, place in case.stride_readings(index)
         ]
         in_lane = [claim for claim in produced if claim.category == lane]
-        # A reading whose action a claim at its place carries wins over the
-        # first reading with any claim there, for the reason ``_charged_to``
-        # gives: a verb charge beside an action match names the wrong fix.
-        reached = [
-            (
-                read_verb,
-                place,
-                here,
-                [one for one in here if same_action(one.verb, read_verb)],
-            )
-            for read_verb, place in readings
-            if (here := _at_place(place, in_lane, flows))
-        ]
-        charged_reading = next(
-            (
-                (read_verb, place, here, with_action)
-                for read_verb, place, here, with_action in reached
-                if with_action
-            ),
-            reached[0] if reached else None,
+        # The reading the miss is charged through: one whose claim states the
+        # ruled position first, then one whose claim carries its action, then
+        # the first with any claim at its place, for the reason ``_charged_to``
+        # gives. ``min`` keeps the first of equal readings, so the scorer's own
+        # reading wins a tie.
+        charged_reading = min(
+            _reached(readings, in_lane, flows, position),
+            key=lambda reading: (not reading.held, not reading.with_action),
+            default=None,
         )
         if charged_reading is not None:
-            read_verb, place, at_place, with_action = charged_reading
+            read_verb, place, at_place, with_action, held = charged_reading
             charged: Cause
             if with_action:
-                held = _holding(position, with_action, _draft_position)
                 charged = (
                     "merged"
                     if held
