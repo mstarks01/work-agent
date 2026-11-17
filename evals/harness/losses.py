@@ -534,13 +534,21 @@ def attribute_case(
             for read_verb, place in case.stride_readings(index)
         ]
         in_lane = [claim for claim in produced if claim.category == lane]
+        # A reading whose action a claim at its place carries wins over the
+        # first reading with any claim there, for the reason ``_charged_to``
+        # gives: a verb charge beside an action match names the wrong fix.
+        reached = [
+            (read_verb, place, here)
+            for read_verb, place in readings
+            if (here := _at_place(place, in_lane, flows))
+        ]
         found = next(
             (
-                (read_verb, place, here)
-                for read_verb, place in readings
-                if (here := _at_place(place, in_lane, flows))
+                hit
+                for hit in reached
+                if any(same_action(claim.verb, hit[0]) for claim in hit[2])
             ),
-            None,
+            reached[0] if reached else None,
         )
         if found is not None:
             read_verb, place, at_place = found
