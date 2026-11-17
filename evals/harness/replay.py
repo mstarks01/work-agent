@@ -1224,14 +1224,14 @@ ROUTES_OF: Mapping[SweepMode, tuple[tuple[str, ...], ...]] = {
 }
 
 
+#: What a replayable mode keeps beside its artifact.
+Kept = Literal["extraction", "catalog"]
+
 #: What each replayable mode keeps beside its artifact, and so which emission a
 #: replay grades. **Apart from** :data:`ROUTES_OF`, which answers a different
 #: question — which nodes' instructions place the sweep on an arm. The head-only
 #: mode reads through ``extract`` and keeps a catalog, so the two tables answer
 #: apart.
-#: What a replayable mode keeps beside its artifact.
-Kept = Literal["extraction", "catalog"]
-
 KEEPS: Mapping[SweepMode, Kept] = {
     "extraction": "extraction",
     "end-to-end": "extraction",

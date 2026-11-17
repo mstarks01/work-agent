@@ -3,7 +3,7 @@
 Extraction, capability reading, assertions and preparation produce no finding,
 so the scorecard's must-find rows cannot measure them. Each panel here reads
 one node's output in that node's own unit, over one source, and keeps its own
-counts, denominators and unknown counts. No code path adds two panels together
+counts, denominators and unread counts. No code path adds two panels together
 or averages them.
 
 **Phases.** A panel's phase is :func:`~evals.harness.audit.phase_of` its node,
@@ -25,7 +25,7 @@ from __future__ import annotations
 import csv
 import statistics
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, get_args
@@ -38,6 +38,7 @@ from evals.harness.replay import (
     FATES,
     PRODUCED_FATES,
     ROW_FATES,
+    Kept,
     SweepReplay,
     pooled_assertions,
     pooled_extraction,
@@ -72,9 +73,9 @@ class Panel:
 
     ``counts`` holds the counts the panel reads, and ``rates`` the shares it
     states, each with its numerator and denominator. ``means`` holds a mean
-    with the number of values it is over. ``unread`` counts the units the
-    source holds no reading for, such as a produced row nothing signed rules
-    on. A panel the source cannot fill
+    with the number of values it is over. ``unread`` counts what the source
+    holds no reading for, in the panel's own terms: for the assertion panel,
+    the produced rows nothing signed rules on. A panel the source cannot fill
     holds no count and says why in ``uncaptured``.
     """
 
@@ -121,27 +122,36 @@ def route_path(
     """The production path of an archived reading route, from the paths changed since.
 
     ``changed`` is :func:`~evals.harness.audit.changed_since` the archive's
-    commit. A route whose own prompt changed is ``known-different``. One whose
-    prompt is the same is still ``unverified``: the model, the settings and the
-    message placement of the archived call are not compared.
+    commit. A route whose prompt body changed is ``known-different``. A
+    change to a delta alone is ``unverified``, because the archive does not
+    record which transport the route used. A route whose files are the same is
+    still ``unverified``: the tables a prompt renders, the model, the settings
+    and the message placement of the archived call are not compared.
     """
     if changed is None:
         return ProductionPath(
             "unverified", (f"git cannot compare {commit[:8]} with the tree",)
         )
-    prompts = sorted(
-        set(changed) & {path for node in nodes for path in prompt_files(node)}
-    )
-    if prompts:
+    bodies = sorted(set(changed) & {_file(node) for node in nodes})
+    if bodies:
         return ProductionPath(
             "known-different",
-            tuple(f"{path} changed since {commit[:8]}" for path in prompts),
+            tuple(f"{path} changed since {commit[:8]}" for path in bodies),
         )
+    deltas = sorted(
+        set(changed) & {path for node in nodes for path in prompt_files(node)}
+    )
     return ProductionPath(
         "unverified",
         (
-            f"the route's prompt is unchanged since {commit[:8]}",
-            "the model, settings and message placement are not compared",
+            *(
+                f"{path} changed since {commit[:8]}, and the archive does not"
+                " record the transport that reads it"
+                for path in deltas
+            ),
+            f"the route's prompt bodies are unchanged since {commit[:8]}",
+            "the rendered tables, model, settings and message placement are"
+            + " not compared",
         ),
     )
 
@@ -153,7 +163,11 @@ def prompt_files(node: str) -> frozenset[str]:
         if node == EXTRACT_PROMPT_NAME
         else []
     )
-    return frozenset(f"prompts/{name}.md" for name in (node, *deltas))
+    return frozenset(_file(name) for name in (node, *deltas))
+
+
+def _file(name: str) -> str:
+    return f"prompts/{name}.md"
 
 
 def _source(sweep: SweepReplay) -> str:
@@ -333,6 +347,13 @@ def preparation_panel(result: Delivery) -> Panel:
         unread=capture["uncaptured"],
         path=ProductionPath(fidelity, tuple(evidence)),
     )
+
+
+#: The panel each kind of kept emission feeds.
+PANEL_OF_KEPT: Mapping[Kept, Callable[[SweepReplay], Panel]] = {
+    "extraction": extraction_panel,
+    "catalog": assertion_panel,
+}
 
 
 def render(panels: Sequence[Panel]) -> None:

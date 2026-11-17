@@ -1591,10 +1591,7 @@ def panels_of(artifact: Path, corpus: Path, ballot: Path | None) -> list[panels.
         sweep = replay_artifact(
             artifact, development_cases(load_corpus(corpus)), corpus, None
         )
-        if replay.KEEPS[mode] == "extraction":
-            found.append(panels.extraction_panel(sweep))
-        else:
-            found.append(panels.assertion_panel(sweep))
+        found.append(panels.PANEL_OF_KEPT[replay.KEEPS[mode]](sweep))
     else:
         raise modes.EvalRunError(
             f"{artifact}: the panels read an analysis sweep or a sweep in one of"

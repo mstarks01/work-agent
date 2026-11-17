@@ -121,7 +121,7 @@ def test_a_ballot_no_ledger_row_lists_is_unverified(tmp_path: Path):
         (None, "unverified"),
         (("prompts/extract.md", "README.md"), "known-different"),
         (("prompts/critic.md",), "unverified"),
-        (("prompts/extract-compact.md",), "known-different"),
+        (("prompts/extract-compact.md",), "unverified"),
         ((), "unverified"),
     ],
 )
