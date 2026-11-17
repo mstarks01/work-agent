@@ -97,6 +97,7 @@ from evals.harness import (
     roster,
     rule_applicability,
     schema_paths,
+    scorecard,
     shared_answers,
     standings,
     submit,
@@ -177,7 +178,7 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.run_record import run_record, sweep_inputs
-from evals.harness.scorer import CaseScore, review_coverage
+from evals.harness.scorer import CaseScore, review_coverage, score_case
 from evals.harness.stability import (
     Band,
     CaseStability,
@@ -1459,6 +1460,70 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_scorecard(args: argparse.Namespace) -> int:
+    """The must-find scorecard of one finished sweep, by lane and stage.
+
+    Shares :func:`_score_runs` with ``score``, so the scorecard's matches and
+    loss causes are the ones ``score`` prints. Matching reads no vote, so it
+    reads an empty ledger. The ``drafted`` stage is the same matcher over the
+    drafts the critic was handed.
+    """
+    loaded = load_artifact(Path(args.artifact))
+    cases = [case for case in load_corpus(args.corpus) if case.id in loaded.cases]
+    if not cases:
+        print(
+            f"{args.artifact}: none of its cases are in {args.corpus}", file=sys.stderr
+        )
+        return 1
+    runs = runs_from_reports(loaded, cases)
+    flow_maps = flows_by_case(
+        cases, {case: run.report.system_model for case, run in runs.items()}
+    )
+    matcher = SubsetVerbIdentity(flow_maps)
+    no_votes = ledger.Ledger()
+    scores, _, charged = _score_runs(cases, runs, matcher, no_votes, flow_maps)
+    reported = {
+        score.case_id: [pair.reference_index for pair in score.matched]
+        for score in scores
+    }
+    charged_by_case = {entry.case: entry for entry in charged}
+    identity = scorecard.run_identity(
+        loaded,
+        ScoredAgainst(
+            corpus_digest=corpus_digest(Path(args.corpus)), repo_commit=repo_commit()
+        ),
+    )
+    rows: list[scorecard.ReferenceRow] = []
+    for case in cases:
+        held = None
+        if case.id in reported:
+            run = runs[case.id]
+            drafted = score_case(case, run.merged_drafts, matcher, no_votes)
+            held = scorecard.capture(
+                run.report.system_model,
+                flow_maps[case.id],
+                run.merged_drafts,
+                (pair.reference_index for pair in drafted.matched),
+                reported[case.id],
+            )
+        rows.extend(
+            scorecard.case_rows(identity, case, held, charged_by_case.get(case.id))
+        )
+    replayed = assembly.replay_artifact(loaded, cases)
+    card = scorecard.summarize(
+        rows, scorecard.assembly_check(replayed.rows, len(replayed.unreadable))
+    )
+    scorecard.render(card)
+    if args.out:
+        record = run_record(
+            "scorecard", {"corpus": str(args.corpus)}, sweep_inputs([loaded.path])
+        )
+        written = {"record": record, **card.to_json()}
+        Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")
+        print(f"scorecard written to {args.out}")
+    return 0
+
+
 def command_near_misses(args: argparse.Namespace) -> int:
     """Write the near-miss ballot for a finished sweep, scored as ``score`` scores it.
 
@@ -2386,6 +2451,16 @@ def _score_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root, for the reference sets and flow maps",
+    )
+    parser.add_argument("--out", help="where to write the scorecard as JSON")
+
+
 def _price_verbs_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--equivalent",
@@ -2611,7 +2686,7 @@ def _agreement_arguments(parser: argparse.ArgumentParser) -> None:
 #: Each ``run`` lives in the module that owns its subject, as ``submit`` and
 #: ``verify-contribution`` do. What stays here is the
 #: sweep and the readings taken over one: ``run`` *is* this module, and
-#: ``score``, ``promote``, ``pairing``, ``stability`` and ``calibrate`` each
+#: ``score``, ``scorecard``, ``promote``, ``pairing``, ``stability`` and ``calibrate`` each
 #: share a private helper with it, so moving one would split a pair rather than
 #: place it.
 COMMANDS: dict[str, Command] = {
@@ -2634,6 +2709,12 @@ COMMANDS: dict[str, Command] = {
         help="re-score a finished sweep against the ledger (no credentials)",
         run=command_score,
         arguments=_score_arguments,
+    ),
+    "scorecard": Command(
+        help="one row per STRIDE must-find of a finished sweep, with its"
+        " compatibility, stages and loss cause, by lane (no credentials)",
+        run=command_scorecard,
+        arguments=_scorecard_arguments,
     ),
     "price-verbs": Command(
         help="price a verb equivalence on the frontier before adopting it"
