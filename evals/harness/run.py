@@ -124,6 +124,7 @@ from evals.harness.bundle import (
     listed_extractions,
     optional_block,
     runs_from_reports,
+    stride_block,
     stride_threats,
     write_assertions,
     write_extractions,
@@ -140,7 +141,7 @@ from evals.harness.calibration import (
 )
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
-from evals.harness.critic_yield import CriticYield, score_case_with_yield
+from evals.harness.critic_yield import CriticAudit, CriticYield, score_case_with_yield
 from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.grounds import (
     CAUGHT,
@@ -1460,13 +1461,16 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
-def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
+def scorecard_of(
+    artifact: Path, corpus: Path, votes: ledger.Ledger
+) -> scorecard.Scorecard:
     """The must-find scorecard of one finished sweep, scored on ``corpus``.
 
     Shares :func:`_score_runs` with ``score``, so the matches and loss causes
     are the ones ``score`` prints. Matching reads no vote, so it reads an
     empty ledger. The ``drafted`` stage is the same matcher over the drafts
-    the critic was handed.
+    the critic was handed. The critic audit reads ``votes``, for the labels
+    its populations rest on.
 
     Reads an ``analysis`` sweep only: its analysed model is the corpus
     ``model.json`` of the run's day, so an element it lacks is a re-key and
@@ -1508,10 +1512,22 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
         ScoredAgainst(corpus_digest=corpus_digest(corpus), repo_commit=repo_commit()),
     )
     rows: list[scorecard.ReferenceRow] = []
+    yields: list[CriticYield] = []
     for case in cases:
         held = None
         if case.id in reported:
             run = runs[case.id]
+            yields.append(
+                score_case_with_yield(
+                    case,
+                    run.merged_drafts,
+                    stride_threats(run.report),
+                    matcher,
+                    votes,
+                    stride_block(run.report),
+                    report_rows(run.report),
+                ).critic_yield
+            )
             drafted = score_case(case, run.merged_drafts, matcher, no_votes)
             held = scorecard.capture(
                 run.report.system_model,
@@ -1528,13 +1544,14 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
         rows,
         scorecard.assembly_check(replayed),
         left_out,
+        CriticAudit.of(yields),
     )
 
 
 def command_scorecard(args: argparse.Namespace) -> int:
     """Print the scorecard of one finished sweep, and write it with ``--out``."""
     artifact = Path(args.artifact)
-    card = scorecard_of(artifact, Path(args.corpus))
+    card = scorecard_of(artifact, Path(args.corpus), ledger.load(Path(args.ledger)))
     scorecard.render(card)
     if args.out:
         record = run_record(
@@ -2479,6 +2496,11 @@ def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
         "--corpus",
         default=str(DEFAULT_CORPUS_DIR),
         help="corpus root, for the reference sets and flow maps",
+    )
+    parser.add_argument(
+        "--ledger",
+        default=str(ledger.DEFAULT_LEDGER_PATH),
+        help="the vote ledger the critic audit reads labels from",
     )
     parser.add_argument("--out", help="where to write the scorecard as JSON")
 

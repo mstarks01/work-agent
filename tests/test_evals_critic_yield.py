@@ -11,6 +11,7 @@ what the scorer alone would have said.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -18,12 +19,19 @@ from analysis_service.claim_identity import NO_ROWS
 from analysis_service.claims import Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
-from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
+from evals.harness.critic_yield import (
+    LABEL_OF,
+    CriticAudit,
+    CriticPopulations,
+    ScoredOutcome,
+    aggregate_yield,
+    score_case_with_yield,
+)
 from evals.harness.fingerprint import components_for, version_for
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
-from evals.harness.scorer import score_case
+from evals.harness.scorer import Rate, score_case
 from tests.eval_factories import (
     ScriptedMatcher,
     cast,
@@ -461,8 +469,15 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
 
     assert result.killed == ()
     assert result.kill_rate == 0.0
-    assert result.rejected_kill_rate == 0.0
     assert result.matched_kill_rate == 0.0
+    # No draft carried a substance down-vote and nothing was killed: the two
+    # rates over those inputs are unavailable, never a zero.
+    assert result.rejected_kill_rate is None
+    assert result.kill_precision is None
+    totals = aggregate_yield([result])
+    assert totals["rejected_kill_rate"] is None
+    assert totals["kill_precision"] is None
+    assert result.to_json()["metrics"]["kill_precision"] is None
     assert result.to_json()["counts"]["drafts_in"] == 1
 
 
@@ -581,3 +596,93 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         1 for loss in critic_rows if loss.must_find
     )
     assert scored.critic_yield.matched_lost == len(critic_rows)
+
+
+def test_each_scored_outcome_joins_one_population():
+    """The label table is keyed by every outcome the scorer can give a draft."""
+    outcomes = {value for part in get_args(ScoredOutcome) for value in get_args(part)}
+
+    assert set(LABEL_OF) == outcomes
+
+
+def test_the_populations_split_each_label_by_what_the_critic_did(case):
+    """Rejection, qualification and retention each read their own denominator."""
+    must_find = _draft_for(case, _must_find(case), 1)
+    expected = _draft_for(case, _expected(case), 2)
+    junk = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    asked = promote(
+        expected,
+        verdict=Verdict(
+            status="needs-info",
+            reason="authentication on this flow is unknown",
+            related_unknowns=[
+                {
+                    "element_id": expected.affected_element_ids[0],
+                    "attribute": "authentication",
+                }
+            ],
+        ),
+    )
+    killed = promote(
+        must_find,
+        verdict=Verdict(
+            status="rejected", reason="does not follow", rejected_because="reasoning"
+        ),
+    )
+    block = (
+        _report_with(case, [asked, promote(junk)])
+        .analyses[0]
+        .model_copy(update={"rejected_claims": [killed]})
+    )
+
+    result = score_case_with_yield(
+        case,
+        [must_find, expected, junk],
+        [asked, promote(junk)],
+        _identity_matcher([must_find, expected]),
+        _rejecting(case, junk),
+        block,
+        rows=NO_ROWS,
+    ).critic_yield
+    populations = CriticPopulations.pooled([result])
+
+    assert populations.counts == {
+        ("matched-must-find", "rejected"): 1,
+        ("matched-expected", "needs-info"): 1,
+        ("rejected", "confirmed"): 1,
+    }
+    assert populations.supported_rejected == Rate(1, 2)
+    assert populations.rate("supported", "needs-info") == Rate(1, 2)
+    assert populations.unsupported_retained == Rate(1, 1)
+    assert populations.rate("unsupported", "needs-info") == Rate(0, 1)
+
+
+def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, capsys):
+    """A vote cast on a reported claim reads stale on its draft (ADR 0029)."""
+    draft = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    reported = promote(draft)
+    votes = _rejecting(case, reported)
+
+    result = score_case_with_yield(
+        case,
+        [draft],
+        [reported],
+        ScriptedMatcher(),
+        votes,
+        _report_with(case, [reported]).analyses[0],
+        rows=NO_ROWS,
+    ).critic_yield
+    populations = CriticPopulations.pooled([result])
+
+    assert populations.counts == {("stale", "confirmed"): 1}
+    assert populations.unsupported_retained == Rate(0, 0)
+    assert populations.unsupported_retained.value is None
+    assert populations.to_json()["unsupported_retained"]["value"] is None
+    CriticAudit.of([result]).render()
+    shown = capsys.readouterr().out
+    assert "unsupported retained   0/0 (unavailable)" in shown
+    assert "unsupported population empty (1 stale drafts)" in shown

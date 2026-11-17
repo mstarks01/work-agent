@@ -58,6 +58,7 @@ from evals.harness.reference import (
     ReferenceRequirement,
     diagnosable,
 )
+from evals.harness.scorer import Rate
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases
@@ -1040,14 +1041,25 @@ class ApplicabilityYield:
     unlisted: tuple[str, ...]
 
     @property
-    def rejection_rate(self) -> float:
-        """Of what the critic was handed, the share it ruled inapplicable."""
-        return len(self.rejected) / self.drafts if self.drafts else 0.0
+    def rates(self) -> dict[str, Rate]:
+        """Both rates below with their counts, keyed by the rate's name."""
+        return {
+            "rejection_rate": Rate(len(self.rejected), self.drafts),
+            "destroyed_rate": Rate(len(self.destroyed), len(self.rejected)),
+        }
 
     @property
-    def destroyed_rate(self) -> float:
-        """Of what it rejected, the share the case expected a ruling on."""
-        return len(self.destroyed) / len(self.rejected) if self.rejected else 0.0
+    def rejection_rate(self) -> float | None:
+        """Of what the critic was handed, the share it ruled inapplicable."""
+        return self.rates["rejection_rate"].value
+
+    @property
+    def destroyed_rate(self) -> float | None:
+        """Of what it rejected, the share the case expected a ruling on.
+
+        ``None`` where it rejected nothing.
+        """
+        return self.rates["destroyed_rate"].value
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -1059,8 +1071,7 @@ class ApplicabilityYield:
             "destroyed": list(self.destroyed),
             "earned": list(self.earned),
             "unlisted": list(self.unlisted),
-            "rejection_rate": round(self.rejection_rate, 3),
-            "destroyed_rate": round(self.destroyed_rate, 3),
+            **{name: rate.rounded() for name, rate in self.rates.items()},
         }
 
 
@@ -1121,8 +1132,8 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
         "destroyed": destroyed,
         "earned": sum(len(entry.earned) for entry in yields),
         "unlisted": sum(len(entry.unlisted) for entry in yields),
-        "rejection_rate": round(rejected / drafts, 3) if drafts else 0.0,
-        "destroyed_rate": round(destroyed / rejected, 3) if rejected else 0.0,
+        "rejection_rate": Rate(rejected, drafts).rounded(),
+        "destroyed_rate": Rate(destroyed, rejected).rounded(),
     }
 
 
@@ -1237,9 +1248,9 @@ def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
     totals = aggregate_yield(yields)
     print(
         f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
-        f" ({totals['rejection_rate']:.0%}),"
+        f" ({_rate(totals['rejection_rate'])}),"
         f" earned {totals['earned']}, destroyed {totals['destroyed']}"
-        f" ({totals['destroyed_rate']:.0%} of rejections),"
+        f" ({_rate(totals['destroyed_rate'])} of rejections),"
         f" unlisted {totals['unlisted']}"
         " (instrument, non-gating)"
     )

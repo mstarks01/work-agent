@@ -474,6 +474,35 @@ def ratio(numerator: float, denominator: float) -> float:
     return numerator / denominator if denominator else 0.0
 
 
+@dataclass(frozen=True)
+class Rate:
+    """A share with its counts. ``value`` is ``None`` on an empty denominator.
+
+    The form for a rate whose empty denominator is a gap in what was measured:
+    :func:`ratio` reads that gap as 0.0, and a reader cannot tell it from a
+    measured zero.
+    """
+
+    numerator: int
+    denominator: int
+
+    @property
+    def value(self) -> float | None:
+        return self.numerator / self.denominator if self.denominator else None
+
+    def rounded(self) -> float | None:
+        """:attr:`value` to three places, as an artifact records it."""
+        value = self.value
+        return None if value is None else round(value, 3)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "numerator": self.numerator,
+            "denominator": self.denominator,
+            "value": self.value,
+        }
+
+
 def score_case(
     case: GoldenCase,
     produced: Sequence[DraftThreat],
