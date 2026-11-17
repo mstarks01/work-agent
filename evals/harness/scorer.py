@@ -469,7 +469,8 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
     return answered, eligible
 
 
-#: How a report prints a share with no value: a gap, never a zero.
+#: The word :func:`percent` prints for a share with no value: a gap, never a
+#: zero.
 UNAVAILABLE = "unavailable"
 
 

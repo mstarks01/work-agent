@@ -76,14 +76,14 @@ ScoredOutcome = (
 #: ``needs-info`` is a qualification: it is neither a confirmation nor a
 #: rejection. ``unruled`` is a draft the block carries in none of its three
 #: lists.
-Fate = VerdictStatus | Literal["returned", "unruled"]
-UNRULED: Fate = "unruled"
-FATES: tuple[Fate, ...] = tuple(
-    value for part in get_args(Fate) for value in get_args(part)
+CriticFate = VerdictStatus | Literal["returned", "unruled"]
+UNRULED: CriticFate = "unruled"
+FATES: tuple[CriticFate, ...] = tuple(
+    value for part in get_args(CriticFate) for value in get_args(part)
 )
 
 #: Which input population a draft joins.
-Label = Literal["real", "not-real", "unlabelled"]
+Population = Literal["real", "not-real", "unlabelled"]
 
 #: The population each scored outcome puts a draft in.
 #:
@@ -95,7 +95,7 @@ Label = Literal["real", "not-real", "unlabelled"]
 #: vote, ``lane-error`` a reference in another lane, and ``unscored`` a draft
 #: the scorer did not key, such as one that names an element the corpus model
 #: does not hold.
-LABEL_OF: Mapping[ScoredOutcome, Label] = MappingProxyType(
+LABEL_OF: Mapping[ScoredOutcome, Population] = MappingProxyType(
     {
         "matched-must-find": "real",
         "matched-expected": "real",
@@ -119,17 +119,21 @@ YieldRate = Literal[
     "kill_rate", "rejected_kill_rate", "matched_kill_rate", "kill_precision"
 ]
 
-#: Why the not-real population is empty where some draft reads ``stale``. A
-#: vote judges a reported claim, verdict included (ADR 0029), and a draft
-#: carries no verdict, so a vote cast on the claim reads ``stale`` on its draft.
-STALE_GAP = (
-    "no draft carries a current down-vote: a vote judges a reported claim with"
-    " its verdict (ADR 0029), and a draft has no verdict, so the vote reads"
-    " stale on the draft"
-)
+#: Why the not-real population is empty. ``stale-votes``: some draft carries a
+#: vote, but a vote judges a reported claim with its verdict (ADR 0029) and a
+#: draft carries no verdict, so the vote reads ``stale`` on the draft.
+#: ``no-down-vote``: no draft carries a current down-vote, and none reads
+#: ``stale``.
+NotRealGap = Literal["stale-votes", "no-down-vote"]
 
-#: Why the not-real population is empty where no draft reads ``stale``.
-NO_DOWN_VOTE_GAP = "no draft carries a current down-vote"
+#: What a report prints for each :data:`NotRealGap`.
+GAP_WORDS: Mapping[NotRealGap, str] = MappingProxyType(
+    {
+        "stale-votes": "a vote judges a reported claim with its verdict (ADR"
+        " 0029), and a draft has no verdict, so the vote reads stale on the draft",
+        "no-down-vote": "no draft carries a current down-vote",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -143,17 +147,17 @@ class CriticPopulations:
     is ``None``, which is a gap in the labels and not a zero.
     """
 
-    counts: Mapping[tuple[ScoredOutcome, Fate], int]
+    counts: Mapping[tuple[ScoredOutcome, CriticFate], int]
 
     @classmethod
     def pooled(cls, yields: Sequence[CriticYield]) -> CriticPopulations:
         """The populations of several cases, summed."""
-        total: Counter[tuple[ScoredOutcome, Fate]] = Counter()
+        total: Counter[tuple[ScoredOutcome, CriticFate]] = Counter()
         for entry in yields:
             total.update(entry.populations.counts)
         return cls(dict(total))
 
-    def count(self, label: Label, among: Sequence[Fate] = FATES) -> int:
+    def count(self, label: Population, among: Sequence[CriticFate] = FATES) -> int:
         """The drafts of one population, met by any fate in ``among``."""
         return sum(
             n
@@ -161,7 +165,7 @@ class CriticPopulations:
             if LABEL_OF[outcome] == label and fate in among
         )
 
-    def rate(self, label: Label, fate: Fate) -> Rate:
+    def rate(self, label: Population, fate: CriticFate) -> Rate:
         """The share of one population that met one fate."""
         return Rate(self.count(label, (fate,)), self.count(label))
 
@@ -176,12 +180,15 @@ class CriticPopulations:
         }
 
     @property
-    def not_real_gap(self) -> str | None:
+    def stale_drafts(self) -> int:
+        return sum(n for (outcome, _), n in self.counts.items() if outcome == "stale")
+
+    @property
+    def not_real_gap(self) -> NotRealGap | None:
         """Why the not-real population is empty, or ``None`` where it is not."""
         if self.count("not-real"):
             return None
-        stale = sum(n for (outcome, _), n in self.counts.items() if outcome == "stale")
-        return f"{STALE_GAP} ({stale} stale drafts)" if stale else NO_DOWN_VOTE_GAP
+        return "stale-votes" if self.stale_drafts else "no-down-vote"
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -191,6 +198,7 @@ class CriticPopulations:
             ],
             **{name: rate.to_json() for name, rate in self.rates.items()},
             "not_real_gap": self.not_real_gap,
+            "stale_drafts": self.stale_drafts,
         }
 
 
@@ -214,6 +222,7 @@ class CriticAudit:
 
     @classmethod
     def of(cls, yields: Sequence[CriticYield]) -> CriticAudit:
+        """The audit of several cases' yields, pooled."""
         return cls(
             populations=CriticPopulations.pooled(yields),
             reference_loss=Rate(
@@ -229,6 +238,7 @@ class CriticAudit:
         }
 
     def render(self) -> None:
+        """The population table, its four rates, its gap and the loss line."""
         populations = self.populations
         print(
             "critic input populations, in drafts (labels are relative to the"
@@ -247,7 +257,10 @@ class CriticAudit:
             print(f"  {name:<24} {rate.shown()}")
         gap = populations.not_real_gap
         if gap is not None:
-            print(f"  not-real population empty: {gap}")
+            print(
+                f"  not-real population empty ({gap}, stale drafts:"
+                f" {populations.stale_drafts}): {GAP_WORDS[gap]}"
+            )
         loss = self.reference_loss
         print(
             f"  gross: {loss.denominator} reference-matched drafts killed;"
@@ -482,16 +495,24 @@ def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
     }
 
 
-def fates(block: FrameworkAnalysis) -> dict[str, Fate]:
+def fates(block: FrameworkAnalysis) -> dict[str, CriticFate]:
     """Each claim ID the block carries, and the list it carries it in.
 
-    A draft the block does not carry has the fate :data:`UNRULED`.
+    A draft the block does not carry has the fate :data:`UNRULED`. Raises
+    :class:`ValueError` where one ID sits in two lists, because then the
+    block gives the draft no single fate.
     """
-    held: dict[str, Fate] = {
-        entry.claim_id: "returned" for entry in block.returned_claims
-    }
-    held |= {claim.id: "rejected" for claim in block.rejected_claims}
-    held |= {claim.id: claim.verdict.status for claim in block.claims}
+    listed: list[tuple[str, CriticFate]] = [
+        *((entry.claim_id, "returned") for entry in block.returned_claims),
+        *((claim.id, "rejected") for claim in block.rejected_claims),
+        *((claim.id, claim.verdict.status) for claim in block.claims),
+    ]
+    held = dict(listed)
+    if len(held) != len(listed):
+        twice = sorted(
+            claim_id for claim_id, n in Counter(i for i, _ in listed).items() if n > 1
+        )
+        raise ValueError(f"the block lists claim(s) {twice} more than once")
     return held
 
 

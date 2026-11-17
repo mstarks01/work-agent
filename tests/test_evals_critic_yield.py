@@ -25,6 +25,7 @@ from evals.harness.critic_yield import (
     CriticPopulations,
     ScoredOutcome,
     aggregate_yield,
+    fates,
     score_case_with_yield,
 )
 from evals.harness.fingerprint import components_for, version_for
@@ -685,9 +686,37 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     CriticAudit.of([result]).render()
     shown = capsys.readouterr().out
     assert "not_real_confirmed       0/0 (unavailable)" in shown
-    assert "(1 stale drafts)" in shown
-    assert populations.not_real_gap.endswith("(1 stale drafts)")
+    assert "not-real population empty (stale-votes, stale drafts: 1)" in shown
+    assert populations.not_real_gap == "stale-votes"
+    assert populations.to_json()["stale_drafts"] == 1
     for current in ("pooled", "open", "unvoted"):
-        assert CriticPopulations({(current, "confirmed"): 1}).not_real_gap == (
-            "no draft carries a current down-vote"
+        empty = CriticPopulations({(current, "confirmed"): 1})
+        assert empty.not_real_gap == "no-down-vote"
+
+
+def test_a_block_that_lists_one_claim_twice_gives_no_fate(case):
+    """A draft in two lists has no single fate, so it joins no population."""
+    draft = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    block = (
+        _report_with(case, [promote(draft)])
+        .analyses[0]
+        .model_copy(
+            update={
+                "rejected_claims": [
+                    promote(
+                        draft,
+                        verdict=Verdict(
+                            status="rejected",
+                            reason="does not follow",
+                            rejected_because="reasoning",
+                        ),
+                    )
+                ]
+            }
         )
+    )
+
+    with pytest.raises(ValueError, match="more than once"):
+        fates(block)

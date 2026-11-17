@@ -432,7 +432,7 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     assert critic["reference_loss"] == {
         "numerator": totals["matched_lost"],
         "denominator": totals["matched_killed"],
-        "value": critic["reference_loss"]["value"],
+        "value": Rate(totals["matched_lost"], totals["matched_killed"]).value,
     }
     cells = critic["populations"]["counts"]
     assert sum(cell["drafts"] for cell in cells) == totals["drafts_in"]
