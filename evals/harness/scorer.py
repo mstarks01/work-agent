@@ -469,9 +469,57 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
     return answered, eligible
 
 
+#: The word :func:`shown_share` prints for a share with no value: a gap, never
+#: a zero.
+UNAVAILABLE = "unavailable"
+
+
+def shown_share(value: float | None, spec: str) -> str:
+    """A share in the format ``spec``, or :data:`UNAVAILABLE` where it has no value."""
+    return UNAVAILABLE if value is None else format(value, spec)
+
+
+def percent(value: float | None) -> str:
+    """A share as a whole percentage, as :func:`shown_share` prints it."""
+    return shown_share(value, ".0%")
+
+
 def ratio(numerator: float, denominator: float) -> float:
     """Zero denominators are 0.0, never a crash and never a silent 100%."""
     return numerator / denominator if denominator else 0.0
+
+
+@dataclass(frozen=True)
+class Rate:
+    """A share with its counts. ``value`` is ``None`` on an empty denominator.
+
+    The form for a rate whose empty denominator is a gap in what was measured:
+    :func:`ratio` reads that gap as 0.0, and a reader cannot tell it from a
+    measured zero.
+    """
+
+    numerator: int
+    denominator: int
+
+    @property
+    def value(self) -> float | None:
+        return self.numerator / self.denominator if self.denominator else None
+
+    def shown(self) -> str:
+        """The rate as a report prints it: its counts, then its share."""
+        return f"{self.numerator}/{self.denominator} ({percent(self.value)})"
+
+    def rounded(self) -> float | None:
+        """:attr:`value` to three places, as an artifact records it."""
+        value = self.value
+        return None if value is None else round(value, 3)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "numerator": self.numerator,
+            "denominator": self.denominator,
+            "value": self.value,
+        }
 
 
 def score_case(

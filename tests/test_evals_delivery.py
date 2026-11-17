@@ -14,6 +14,7 @@ from analysis_service.sources import render_fenced
 from evals.harness import delivery, losses, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
+from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.scorecard import charged_misses
 
@@ -162,14 +163,14 @@ BASELINE = (
 def _trace(artifact: Path) -> delivery.Delivery:
     corpus = REPO_ROOT / "evals/corpus"
     return delivery.trace(
-        run.scorecard_of(artifact, corpus),
+        run.scorecard_of(artifact, corpus, Ledger()),
         load_artifact(artifact),
         development_cases(load_corpus(corpus)),
     )
 
 
 def test_each_charged_miss_is_a_row_and_only_place_and_unled_are_traced():
-    card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus")
+    card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
 
     traced = _trace(BASELINE)
 

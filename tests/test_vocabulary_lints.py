@@ -87,8 +87,8 @@ import importlib.util
 import re
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from pathlib import Path
-from types import ModuleType
-from typing import Literal, get_args, get_origin
+from types import ModuleType, UnionType
+from typing import Literal, Union, get_args, get_origin
 
 import pytest
 
@@ -111,6 +111,9 @@ pytestmark = pytest.mark.lint
 #: a tuple of its members does -- ``EXIT_CODES`` is one, and a verdict with no
 #: exit code raises in the command that reports it.
 _CONTAINERS = frozenset({"tuple", "frozenset", "set", "list", "dict", "Mapping"})
+
+#: The origins ``get_origin`` gives a union, written with ``|`` or with ``Union``.
+UNIONS = (UnionType, Union)
 
 #: A constant that names part of its vocabulary on purpose, and why.
 #:
@@ -426,12 +429,26 @@ def _module(path: Path) -> ModuleType:
     return module
 
 
+def _literal_members(vocabulary: object) -> tuple[object, ...] | None:
+    """The members a ``Literal``, or a union of ``Literal`` types, declares.
+
+    None for any other type.
+    """
+    if get_origin(vocabulary) is Literal:
+        return get_args(vocabulary)
+    parts = get_args(vocabulary) if get_origin(vocabulary) in UNIONS else ()
+    if not parts or any(get_origin(part) is not Literal for part in parts):
+        return None
+    return tuple(member for part in parts for member in get_args(part))
+
+
 def _pairs() -> list[tuple[str, str, str, frozenset[object], frozenset[object]]]:
     """Each annotated constant beside the members its type declares.
 
     Resolved by importing, because the type may be declared in another module
-    and an alias is still the same vocabulary. A pair whose type is not a
-    ``Literal`` is not one of these and is dropped here.
+    and an alias is still the same vocabulary. A union of ``Literal`` types,
+    such as one vocabulary composed from two, declares the members of all of
+    them. A pair whose type is neither is not one of these and is dropped here.
     """
     resolved = []
     for path, constant, type_name in _annotated_vocabularies():
@@ -440,9 +457,9 @@ def _pairs() -> list[tuple[str, str, str, frozenset[object], frozenset[object]]]
         vocabulary = _resolved(module, type_name)
         if not hasattr(module, constant) or vocabulary is None:
             continue
-        if get_origin(vocabulary) is not Literal:
+        members = _literal_members(vocabulary)
+        if members is None:
             continue
-        members = get_args(vocabulary)
         resolved.append(
             (
                 dotted,

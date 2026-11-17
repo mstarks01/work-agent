@@ -18,12 +18,17 @@ from analysis_service.claim_identity import NO_ROWS
 from analysis_service.claims import Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
-from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
+from evals.harness.critic_yield import (
+    CriticAudit,
+    CriticPopulations,
+    aggregate_yield,
+    score_case_with_yield,
+)
 from evals.harness.fingerprint import components_for, version_for
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
-from evals.harness.scorer import score_case
+from evals.harness.scorer import Rate, score_case
 from evals.harness.triggers import rebuilt_candidates
 from tests.eval_factories import (
     ScriptedMatcher,
@@ -157,8 +162,8 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
     assert result.killed[0].outcome == "rejected"
     assert result.rejected_killed == 1
     assert result.matched_killed == 0
-    assert result.kill_precision == 1.0
-    assert result.rejected_kill_rate == 1.0
+    assert result.rates["kill_precision"].value == 1.0
+    assert result.rates["rejected_kill_rate"].value == 1.0
 
 
 def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
@@ -181,7 +186,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     assert result.rejected_killed == 0
     assert result.matched_killed == 1
     assert result.must_find_killed == 1
-    assert result.matched_kill_rate == 1.0
+    assert result.rates["matched_kill_rate"].value == 1.0
     assert result.killed[0].outcome == "matched-must-find"
     assert result.must_find_before == 1 and result.must_find_after == 0
 
@@ -461,9 +466,16 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
     ).critic_yield
 
     assert result.killed == ()
-    assert result.kill_rate == 0.0
-    assert result.rejected_kill_rate == 0.0
-    assert result.matched_kill_rate == 0.0
+    assert result.rates["kill_rate"].value == 0.0
+    assert result.rates["matched_kill_rate"].value == 0.0
+    # No draft carried a substance down-vote and nothing was killed: the two
+    # rates over those inputs are unavailable, never a zero.
+    assert result.rates["rejected_kill_rate"].value is None
+    assert result.rates["kill_precision"].value is None
+    totals = aggregate_yield([result])
+    assert totals["rejected_kill_rate"] is None
+    assert totals["kill_precision"] is None
+    assert result.to_json()["metrics"]["kill_precision"] is None
     assert result.to_json()["counts"]["drafts_in"] == 1
 
 
@@ -585,3 +597,91 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         1 for loss in critic_rows if loss.must_find
     )
     assert scored.critic_yield.matched_lost == len(critic_rows)
+
+
+def test_the_populations_split_each_label_by_what_the_critic_did(case):
+    """Rejection, qualification and retention each read their own denominator."""
+    must_find = _draft_for(case, _must_find(case), 1)
+    expected = _draft_for(case, _expected(case), 2)
+    junk = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    asked = promote(
+        expected,
+        verdict=Verdict(
+            status="needs-info",
+            reason="authentication on this flow is unknown",
+            related_unknowns=[
+                {
+                    "element_id": expected.affected_element_ids[0],
+                    "attribute": "authentication",
+                }
+            ],
+        ),
+    )
+    killed = promote(
+        must_find,
+        verdict=Verdict(
+            status="rejected", reason="does not follow", rejected_because="reasoning"
+        ),
+    )
+    block = (
+        _report_with(case, [asked, promote(junk)])
+        .analyses[0]
+        .model_copy(update={"rejected_claims": [killed]})
+    )
+
+    result = score_case_with_yield(
+        case,
+        [must_find, expected, junk],
+        [asked, promote(junk)],
+        _identity_matcher([must_find, expected]),
+        _rejecting(case, junk),
+        block,
+        rows=NO_ROWS,
+    ).critic_yield
+    populations = CriticPopulations.pooled([result])
+
+    assert populations.counts == {
+        ("matched-must-find", "rejected"): 1,
+        ("matched-expected", "needs-info"): 1,
+        ("rejected", "confirmed"): 1,
+    }
+    assert populations.rates["real_rejected"] == Rate(1, 2)
+    assert populations.rates["real_needs_info"] == Rate(1, 2)
+    assert populations.rates["not_real_confirmed"] == Rate(1, 1)
+    assert populations.rates["not_real_needs_info"] == Rate(0, 1)
+
+
+def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, capsys):
+    """A vote cast on a reported claim reads stale on its draft (ADR 0029)."""
+    draft = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    reported = promote(draft)
+    votes = _rejecting(case, reported)
+
+    result = score_case_with_yield(
+        case,
+        [draft],
+        [reported],
+        ScriptedMatcher(),
+        votes,
+        _report_with(case, [reported]).analyses[0],
+        rows=NO_ROWS,
+    ).critic_yield
+    populations = CriticPopulations.pooled([result])
+
+    assert populations.counts == {("stale", "confirmed"): 1}
+    assert populations.rates["not_real_confirmed"] == Rate(0, 0)
+    assert populations.rates["not_real_confirmed"].value is None
+    assert populations.to_json()["not_real_confirmed"]["value"] is None
+    CriticAudit.of([result]).render()
+    shown = capsys.readouterr().out
+    assert "not_real_confirmed       0/0 (unavailable)" in shown
+    assert "not-real population empty (stale-drafts, stale drafts: 1)" in shown
+    assert populations.not_real_gap == "stale-drafts"
+    assert populations.to_json()["stale_drafts"] == 1
+    for current in ("pooled", "open", "unvoted"):
+        empty = CriticPopulations({(current, "confirmed"): 1})
+        assert empty.not_real_gap == "no-down-vote"

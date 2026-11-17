@@ -141,7 +141,7 @@ from evals.harness.calibration import (
 )
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
-from evals.harness.critic_yield import CriticYield, score_case_with_yield
+from evals.harness.critic_yield import CriticAudit, CriticYield, score_case_with_yield
 from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.grounds import (
     CAUGHT,
@@ -179,7 +179,12 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.run_record import run_record, sweep_inputs
-from evals.harness.scorer import CaseScore, review_coverage, score_case
+from evals.harness.scorer import (
+    CaseScore,
+    Rate,
+    review_coverage,
+    score_case,
+)
 from evals.harness.stability import (
     Band,
     CaseStability,
@@ -778,15 +783,7 @@ def _scored_sweep(
     primary series — maintainer votes only — and the others come back beside
     it, so no flag exists that could quietly move a published number.
     """
-    # Named, never dropped in silence. CI refuses a ledger naming somebody the
-    # roster does not (#320), so this is a mid-edit tree or a hand-written
-    # row — and a vote that moves nothing should say so rather than look cast.
-    unrostered = sorted({vote.voter for vote in votes if vote.voter not in table})
-    if unrostered:
-        print(
-            f"{len(unrostered)} voter(s) have no roster line and no series"
-            f" reads them: {', '.join(unrostered)}"
-        )
+    _name_unrostered(votes, table)
     # The analysed model per case, so a citation this sweep wrote resolves to
     # its endpoints like the reference's does. In an injected mode it is the
     # blessed model and the map is unchanged; in an end-to-end run it is the
@@ -809,6 +806,21 @@ def _scored_sweep(
             writing=writing.measure(cases, reports, read),
         )
     return by_series
+
+
+def _name_unrostered(votes: ledger.Ledger, table: roster.Roster) -> None:
+    """Print each voter the roster has no line for, whose votes no series reads.
+
+    Named, never dropped in silence. CI refuses a ledger naming somebody the
+    roster does not (#320), so this is a mid-edit tree or a hand-written row —
+    and a vote that moves nothing should say so rather than look cast.
+    """
+    unrostered = sorted({vote.voter for vote in votes if vote.voter not in table})
+    if unrostered:
+        print(
+            f"{len(unrostered)} voter(s) have no roster line and no series"
+            f" reads them: {', '.join(unrostered)}"
+        )
 
 
 def _standings_inputs(args: argparse.Namespace) -> tuple[ledger.Ledger, roster.Roster]:
@@ -1395,7 +1407,7 @@ def _print_question_fallback(runs: Mapping[str, Any]) -> None:
     typed = sum(count.typed for count in counts)
     free = sum(count.free_text for count in counts)
     total = typed + free
-    rate = f"{free / total:.0%}" if total else "n/a"
+    rate = Rate(free, total).shown()
     print(
         f"\nQuestion kinds: {typed} typed, {free} free text; fallback {rate}"
         " (instrument, non-gating)"
@@ -1465,13 +1477,16 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
-def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
+def scorecard_of(
+    artifact: Path, corpus: Path, votes: ledger.Ledger
+) -> scorecard.Scorecard:
     """The must-find scorecard of one finished sweep, scored on ``corpus``.
 
     Shares :func:`_score_runs` with ``score``, so the matches and loss causes
-    are the ones ``score`` prints. Matching reads no vote, so it reads an
-    empty ledger. The ``drafted`` stage is the same matcher over the drafts
-    the critic was handed.
+    are the ones ``score`` prints. Matching and the loss causes read no vote
+    status. The ``drafted`` stage is the same matcher over the drafts the
+    critic was handed. The critic audit reads ``votes``, for the labels its
+    populations rest on.
 
     Reads an ``analysis`` sweep only: its analysed model is the corpus
     ``model.json`` of the run's day, so an element it lacks is a re-key and
@@ -1501,8 +1516,7 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
         cases, {case: run.report.system_model for case, run in runs.items()}
     )
     matcher = SubsetVerbIdentity(flow_maps)
-    no_votes = ledger.Ledger()
-    scores, _, charged = _score_runs(cases, runs, matcher, no_votes, flow_maps)
+    scores, yields, charged = _score_runs(cases, runs, matcher, votes, flow_maps)
     reported = {
         score.case_id: [pair.reference_index for pair in score.matched]
         for score in scores
@@ -1517,7 +1531,7 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
         held = None
         if case.id in reported:
             run = runs[case.id]
-            drafted = score_case(case, run.merged_drafts, matcher, no_votes)
+            drafted = score_case(case, run.merged_drafts, matcher, votes)
             held = scorecard.capture(
                 run.report.system_model,
                 flow_maps[case.id],
@@ -1533,17 +1547,38 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
         rows,
         scorecard.assembly_check(replayed),
         left_out,
+        CriticAudit.of(yields),
     )
 
 
 def command_scorecard(args: argparse.Namespace) -> int:
     """Print the scorecard of one finished sweep, and write it with ``--out``."""
     artifact = Path(args.artifact)
-    card = scorecard_of(artifact, Path(args.corpus))
+    try:
+        votes, table = _standings_inputs(args)
+    except (ledger.LedgerError, roster.RosterError) as refusal:
+        print(refusal, file=sys.stderr)
+        return 1
+    # The series ``score`` writes first, so the two commands count one set of
+    # votes.
+    _name_unrostered(votes, table)
+    read = standings.narrow(votes, table, standings.SERIES[standings.PRIMARY])
+    card = scorecard_of(artifact, Path(args.corpus), read)
     scorecard.render(card)
     if args.out:
         record = run_record(
-            "scorecard", {"corpus": str(args.corpus)}, sweep_inputs([artifact])
+            "scorecard",
+            {
+                "corpus": str(args.corpus),
+                "ledger": args.ledger,
+                "roster": args.roster,
+                "series": standings.PRIMARY,
+            },
+            {
+                **sweep_inputs([artifact]),
+                **{path: {} for path in ledger.voter_files(Path(args.ledger))},
+                Path(args.roster): {},
+            },
         )
         written = {"record": record, **card.to_json()}
         Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")
@@ -1554,8 +1589,10 @@ def command_scorecard(args: argparse.Namespace) -> int:
 def command_delivery(args: argparse.Namespace) -> int:
     """Print each charged miss of one sweep traced through its lane, and write it with ``--out``."""
     artifact = Path(args.artifact)
+    # The trace reads the scorecard's rows, which read no vote, so it hands the
+    # critic panel an empty ledger.
     result = delivery.trace(
-        scorecard_of(artifact, Path(args.corpus)),
+        scorecard_of(artifact, Path(args.corpus), ledger.Ledger()),
         load_artifact(artifact),
         development_cases(load_corpus(args.corpus)),
     )
@@ -2497,14 +2534,28 @@ def _score_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
+def _sweep_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
     parser.add_argument(
         "--corpus",
         default=str(DEFAULT_CORPUS_DIR),
         help="corpus root, for the reference sets and flow maps",
     )
-    parser.add_argument("--out", help="where to write the scorecard as JSON")
+    parser.add_argument("--out", help="where to write the result as JSON")
+
+
+def _scorecard_arguments(parser: argparse.ArgumentParser) -> None:
+    _sweep_arguments(parser)
+    parser.add_argument(
+        "--ledger",
+        default=str(ledger.DEFAULT_LEDGER_PATH),
+        help="the vote ledger the critic audit reads labels from",
+    )
+    parser.add_argument(
+        "--roster",
+        default=str(roster.DEFAULT_ROSTER_PATH),
+        help="the standing roster; the critic audit reads the first series",
+    )
 
 
 def _price_verbs_arguments(parser: argparse.ArgumentParser) -> None:
@@ -2760,7 +2811,7 @@ COMMANDS: dict[str, Command] = {
         help="each charged must-find miss of a finished sweep, traced through"
         " the candidates its lane was sent (no credentials)",
         run=command_delivery,
-        arguments=_scorecard_arguments,
+        arguments=_sweep_arguments,
     ),
     "scorecard": Command(
         help="one row per STRIDE must-find of a finished sweep, with its"
