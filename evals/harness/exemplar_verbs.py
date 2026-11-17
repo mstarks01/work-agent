@@ -9,18 +9,18 @@ over-report at once.
 
 ## The measurement
 
-STRIDE ships 21 exemplars, and the corpus holds 320 reference claims. No
+STRIDE ships 21 exemplars, and the corpus holds 359 reference claims. No
 exemplar is read from a holdout case (#744), and no case is still held out, so
-this reads all 320.
-56 of those claims name a verb no exemplar in their lane demonstrates.
-22 of the 56 are ``must-find``, and 17 of the 18 development cases carry at least one.
+this reads all 359.
+59 of those claims name a verb no exemplar in their lane demonstrates.
+23 of the 59 are ``must-find``, and 19 of the 20 development cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
-* 42 near misses. The lane demonstrates the verb's family but not the member,
+* 45 near misses. The lane demonstrates the verb's family but not the member,
   so the agent has a wrong neighbour to reach for.
-  ``disable`` accounts for 9 of them, ``plant`` for 8, ``replay`` and
-  ``elicit`` for 7 each, and ``exhaust-resources`` for 5.
+  ``disable`` accounts for 10 of them, ``plant`` for 9, ``replay`` and
+  ``elicit`` for 8 each, and ``exhaust-resources`` for 5.
 * 14 with no neighbour. The lane never demonstrates that family at all.
   ``denial-of-service`` holds the largest share, 5 of 14: its three exemplars
   all demonstrate ``flood``, and the corpus asks for ``delete`` and ``inject``

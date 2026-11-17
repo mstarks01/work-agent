@@ -991,6 +991,9 @@ PENDING_REFERENCE_SETS: dict[str, frozenset[FrameworkName]] = {
     # still needs an ASVS reference set at level 1 and a sitting that reads it.
     "17-permit-portal-limits": frozenset({"asvs"}),
     "18-podcast-host-quotas": frozenset({"asvs"}),
+    # Written for #2054 to measure the STRIDE lanes on authorization facts. It
+    # still needs an ASVS reference set at level 1 and a sitting that reads it.
+    "20-school-coursework": frozenset({"asvs"}),
 }
 
 

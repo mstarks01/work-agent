@@ -1,0 +1,25 @@
+{
+  "id": "19-vet-clinic-records",
+  "title": "A vet clinic group whose services state different access checks",
+  "domain": "veterinary records",
+  "provenance": "Synthetic system authored for this corpus (issue #2054, phase 2). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "holdout": false,
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "c3b1dc97272657e10e019c71ea817ea5a6f46f572ea5947d4cb471835969417b"
+    }
+  ],
+  "source_sha256": "ed7dee011192824b50e15ef0927ab5b0b3fc35c237a91965c8e39c589e75a9f3",
+  "frameworks": [
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "The case exists for issue #2054. It measures the assertion pass on the authorization-scope predicates. The source states each part on its own element: the owner API checks that a pet belongs to the owner (each request yes, ownership yes); the clinic API checks only that a staff account signed in (each request no) and gives every staff account every permission (least privilege no); both APIs use the database's admin account (least privilege no, on each connection). The lab results importer does not check whether the lab may send a result (each request no), and the billing service's role check is a hedge that must stay unknown. The tampering must-find rests on the importer's stated missing check. The elevation-of-privilege must-find rests on the staff accounts' stated full access. The domain is a vet clinic group, which no other case covers."
+}
