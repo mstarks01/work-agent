@@ -15,13 +15,13 @@ import pytest
 
 from evals.harness import roster, run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
-from evals.harness.assembly import AssemblySweep
-from evals.harness.bundle import runs_from_reports
-from evals.harness.critic_yield import CriticAudit
+from evals.harness.assembly import AssemblySweep, replay_artifact
+from evals.harness.bundle import runs_from_reports, stride_block
+from evals.harness.critic_yield import OMITTED, CriticAudit, fate_by_claim
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
-from evals.harness.reference import flows_by_case, load_corpus
+from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.run import main
 from evals.harness.scorecard import (
     STAGES,
@@ -473,3 +473,27 @@ def test_the_critic_panel_reads_only_the_first_series_votes(tmp_path: Path):
     assert read["critic"]["populations"]["stale_drafts"] == 0
     assert read["critic"]["populations"]["not_real_gap"] == "no-down-vote"
     assert read["record"]["table"]["series"] == "maintainer"
+
+
+def test_the_omitted_fate_agrees_with_the_assembly_replay():
+    """Two readers of "the block carries this draft in no list", held equal."""
+    loaded = load_artifact(BASELINE)
+    cases = [
+        case
+        for case in development_cases(load_corpus(REPO_ROOT / "evals/corpus"))
+        if case.id in loaded.cases
+    ]
+    runs = runs_from_reports(loaded, cases)
+    rows = [
+        row for row in replay_artifact(loaded, cases).rows if row.framework == "stride"
+    ]
+
+    assert rows
+    for row in rows:
+        fate_of = fate_by_claim(stride_block(runs[row.case].report))
+        omitted = {
+            draft_id
+            for draft_id in row.draft_ids
+            if fate_of.get(draft_id, OMITTED) == OMITTED
+        }
+        assert omitted == set(row.omitted), row.case
