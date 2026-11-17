@@ -419,9 +419,10 @@ class AssemblyCheck:
     reproduced: int
     differ: tuple[str, ...]
     refused: tuple[str, ...]
-    #: Reports today's ``Report`` refuses, and cases whose report or drafts
-    #: file the archive lacks, each counted over every framework.
+    #: Finished cases whose report today's ``Report`` refuses.
     unreadable: int
+    #: Cases whose report or drafts file the archive lacks, or holds for a
+    #: case it records as failed: a missing or a stray capture.
     capture_faults: int
 
     def to_json(self) -> dict[str, Any]:
@@ -565,7 +566,7 @@ def render(card: Scorecard) -> None:
         f"assembly run again: {check.reproduced} block(s) reproduced,"
         f" {len(check.differ)} differ, {len(check.refused)} refused,"
         f" {check.unreadable} report(s) unreadable,"
-        f" {check.capture_faults} case(s) missing a capture"
+        f" {check.capture_faults} case(s) with a missing or stray capture"
     )
     charged = charged_misses(card.rows)
     led = sum(1 for row in charged if row.lead_rules)

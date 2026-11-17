@@ -15,6 +15,7 @@ import pytest
 
 from evals.harness import run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
+from evals.harness.assembly import AssemblySweep
 from evals.harness.bundle import runs_from_reports
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
@@ -294,6 +295,17 @@ def test_the_stage_changes_are_every_pair_of_adjacent_stages():
     pairs = [(before, after) for before, after, _ in scorecard.CHANGES]
 
     assert pairs == list(pairwise(STAGES))
+
+
+def test_the_assembly_check_counts_unreadable_reports_and_capture_faults():
+    sweep = AssemblySweep(
+        rows=[], unreadable=["a"], capture_faults=["b", "c"], writes_reports=True
+    )
+
+    check = scorecard.assembly_check(sweep)
+
+    assert (check.unreadable, check.capture_faults) == (1, 2)
+    assert (check.reproduced, check.differ, check.refused) == (0, (), ())
 
 
 def test_no_rows_are_refused_as_no_run():
