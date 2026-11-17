@@ -379,6 +379,15 @@ def test_a_killed_draft_that_holds_the_position_wins_over_one_that_fails_it(
     assert (charged[0].cause, charged[0].draft_id) == ("critic", holding.id)
 
 
+def test_the_references_own_reading_wins_a_tie_between_two_that_hold(case, flows):
+    ruled, failing, holding = _two_readings(case)
+    own = failing.model_copy(update={"attacker_position": holding.attacker_position})
+
+    charged = by_index(charge(ruled, flows, [holding, own], []))
+
+    assert (charged[0].cause, charged[0].draft_id) == ("critic", own.id)
+
+
 def test_a_proposal_that_holds_the_position_wins_over_one_that_fails_it(case, flows):
     ruled, failing, holding = _two_readings(case)
     proposed = {

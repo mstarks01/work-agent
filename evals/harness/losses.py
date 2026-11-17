@@ -425,6 +425,9 @@ class _AnsweredReading(Generic[_Item]):
     with_action: list[_Item]
     #: Of those, the items that state the reference's ruled position.
     held: list[_Item]
+    #: ``None`` where an item holds the position; otherwise the cause the
+    #: scorer's position gate gives (``position`` or ``unstated``).
+    refused: Cause | None
 
 
 def _answered_reading(
@@ -435,21 +438,22 @@ def _answered_reading(
 ) -> _AnsweredReading[_Item] | None:
     """The reading one stage charges a miss through, or ``None``.
 
-    Each stage of :func:`attribute_case` charges through this choice.
-    ``answers`` gives the stage's items at a reading's place under that
+    The surviving-claim, critic and fan-in stages of :func:`attribute_case`
+    charge through this choice. ``answers`` gives the stage's items at a reading's place under that
     reading's action. A reading whose items state the ruled position wins,
     because the scorer's gate takes only those, and a ``position`` charge
     beside one names the wrong fix, for the reason :func:`_charged_to` gives.
     ``min`` keeps the first of equal readings, so the reference's own reading
     wins a tie.
     """
-    answered = [
-        _AnsweredReading(
-            read_verb, place, items, _holding(position, items, position_of)
-        )
-        for read_verb, place in readings
-        if (items := answers(read_verb, place))
-    ]
+    answered = []
+    for read_verb, place in readings:
+        items = answers(read_verb, place)
+        if not items:
+            continue
+        held = _holding(position, items, position_of)
+        refused = None if held else _refused(position, items, position_of)
+        answered.append(_AnsweredReading(read_verb, place, items, held, refused))
     return min(answered, key=lambda reading: not reading.held, default=None)
 
 
@@ -596,9 +600,7 @@ def attribute_case(
         charge: tuple[Cause, Sequence[str], DraftThreat] | None
         if answered is not None:
             charge = (
-                "merged"
-                if answered.held
-                else _refused(position, answered.with_action, _draft_position),
+                answered.refused or "merged",
                 answered.place,
                 _charged_to(answered.held or answered.with_action, answered.read_verb),
             )
@@ -670,9 +672,7 @@ def attribute_case(
                     index,
                     lane,
                     index in must_find,
-                    "critic"
-                    if killed_answer.held
-                    else _refused(position, killed_answer.with_action, _draft_position),
+                    killed_answer.refused or "critic",
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
@@ -721,9 +721,7 @@ def attribute_case(
                     index,
                     lane,
                     index in must_find,
-                    "fan-in"
-                    if offered.held
-                    else _refused(position, offered.with_action, _proposal_position),
+                    offered.refused or "fan-in",
                     verb,
                     draft_id=kept[0].id if kept else None,
                     draft_verb=proposal["verb"],
