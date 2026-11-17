@@ -34,8 +34,10 @@ Read off :mod:`evals.harness.alignment`, never off names:
   cannot say which, and says so rather than guessing.
 
 A **wrong fact** is not a fate. It is a scored attribute that differs on a
-paired element, read off :attr:`~evals.harness.modes.ExtractionScore.differing`,
-and one element can carry several. An **extra** is an unpaired produced
+paired element, read off :func:`~evals.harness.modes.differing`, and one
+element can carry several. Each attribute's count of wrong facts is printed
+over the checks compared for it, from
+:func:`~evals.harness.modes.attribute_agreement`. An **extra** is an unpaired produced
 element, carried as a count: what it is waits on a ruling (#961 step 3).
 
 ## Assertion fates, one per signed reference row
@@ -132,6 +134,7 @@ from evals.harness.modes import (
     ExtractionResult,
     SweepMode,
     attribute_agreement,
+    differing,
     score_extraction,
 )
 from evals.harness.reference import GoldenCase
@@ -279,7 +282,7 @@ class ExtractionReplay:
 
     @property
     def wrong_facts(self) -> tuple[AttributeCheck, ...]:
-        return tuple(check for check in self.attributes if not check.agrees)
+        return differing(self.attributes)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -1404,7 +1407,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             kind: {fate: fates[fate] for fate in FATES}
             for kind, fates in sorted(by_type.items())
         },
-        "attributes": attribute_agreement(attributes),
+        "attribute_aggregate": attribute_agreement(attributes),
         "targets": [
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
@@ -1679,7 +1682,7 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
             f"{_sd(spread['by_type'].get(kind, {}).get(fate)):>8}" for kind in kinds
         )
         print(f"  {fate:<20} {'':>5} {_sd(spread['sd'][fate]):>9}  {per_kind}")
-    by_attribute = pool["attributes"]["by_attribute"]
+    by_attribute = pool["attribute_aggregate"]["by_attribute"]
     if by_attribute:
         listed = ", ".join(
             f"{key} {row['compared'] - row['agreed']}/{row['compared']}"

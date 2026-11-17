@@ -1051,7 +1051,7 @@ class ExtractionScore:
     @property
     def differing(self) -> tuple[AttributeCheck, ...]:
         """The checks the two models answered differently, in model order."""
-        return tuple(check for check in self.attributes if not check.agrees)
+        return differing(self.attributes)
 
     @property
     def scored_field_agreement(self) -> float:
@@ -1223,6 +1223,11 @@ class ExtractionScore:
             "basis_coverage": self.basis_coverage.to_json(),
             "uncited": [issue.model_dump(mode="json") for issue in self.uncited],
         }
+
+
+def differing(checks: Sequence[AttributeCheck]) -> tuple[AttributeCheck, ...]:
+    """The checks in ``checks`` that the two models answered differently, in order."""
+    return tuple(check for check in checks if not check.agrees)
 
 
 def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
