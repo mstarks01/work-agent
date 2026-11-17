@@ -308,6 +308,42 @@ class TestEveryBlessedElementTakesOneFate:
         assert [c.key for c in graded.wrong_facts] == ["process.exposure"]
         assert graded.counts["found"] == len(list(golden.model.elements()))
 
+    def test_a_wrong_fact_count_carries_the_checks_it_is_taken_over(
+        self, golden, capsys
+    ):
+        copy = golden.model.model_copy(deep=True)
+        next(
+            p for p in copy.processes if p.id == "process:order-service"
+        ).exposure = "internet-facing"
+        graded = replay.replay_extraction(golden, ExtractionResult(golden.id, copy, ()))
+        arm = replay.Arm(
+            nodes=("extract",),
+            instructions=("digest",),
+            models=("model",),
+            treatment="treatment",
+            treatment_by=get_args(replay.TreatmentBy)[0],
+        )
+        sweep = replay.SweepReplay(
+            artifact="a.json",
+            arm=arm,
+            commit="c",
+            clean=True,
+            corpus_digest="d",
+            extractions=(graded, graded),
+        )
+
+        pool = replay.pooled_extraction([sweep])
+        replay._render_extraction(pool, targets=0)
+        exposure = pool["attribute_aggregate"]["by_attribute"]["process.exposure"]
+
+        assert exposure == {
+            "compared": 2 * len(golden.model.processes),
+            "agreed": 2 * len(golden.model.processes) - 2,
+            "agreement": round(1 - 1 / len(golden.model.processes), 3),
+        }
+        printed = f"process.exposure 2/{2 * len(golden.model.processes)}"
+        assert printed in capsys.readouterr().out
+
 
 def fact(
     subject: str = "store:queue",
