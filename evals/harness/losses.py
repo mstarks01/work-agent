@@ -113,7 +113,7 @@ Cause = Literal[
 ]
 #: The causes the scorer's position gate gives a stage whose items all fail
 #: the ruled position.
-Refusal = Literal["position", "unstated"]
+PositionRefusal = Literal["position", "unstated"]
 
 CAUSES: tuple[Cause, ...] = (
     "verb",
@@ -381,7 +381,7 @@ def _refused(
     position: str | None,
     items: Sequence[_Item],
     position_of: Callable[[_Item], object],
-) -> Refusal:
+) -> PositionRefusal:
     """The cause of a stage whose items all fail the reference's ruled position.
 
     ``unstated`` where no item states any position, because then the archive
@@ -432,7 +432,7 @@ class _AnsweredReading(Generic[_Item]):
     held: list[_Item]
     #: ``None`` where an item holds the position; otherwise the cause the
     #: scorer's position gate gives.
-    refused: Refusal | None
+    refused: PositionRefusal | None
 
     @property
     def charged_items(self) -> list[_Item]:
