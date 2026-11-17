@@ -36,10 +36,11 @@ from evals.harness.ledger import Ledger, cast
 from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
-from evals.harness.triggers import case_trigger_recall
+from evals.harness.triggers import case_trigger_recall, rebuilt_candidates
 from evals.harness.verbs import same_action
 from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
+from tests.test_evals_critic_yield import _report_with
 
 CASE_DIR = (
     Path(__file__).resolve().parents[1] / "evals" / "corpus" / "01-payments-checkout"
@@ -83,6 +84,7 @@ def charge(
     proposed=None,
     dropped=(),
     cut=(),
+    fired=None,
 ):
     score = score_case(
         case, produced, SubsetVerbIdentity({case.id: flows}), votes or Ledger()
@@ -92,9 +94,29 @@ def charge(
         unreconciled_rulings=unreconciled,
         dropped_claims=dropped,
         unresolved_references=cut,
+        fired_rules=(
+            sorted(
+                {
+                    rule
+                    for hit in case_trigger_recall(case, "stride").hits
+                    for rule in hit.rule_ids
+                }
+            )
+            if fired is None
+            else fired
+        ),
     )
     return attribute_case(
-        case, score, drafts, produced, flows, block, proposed=proposed or {}
+        case,
+        score,
+        drafts,
+        produced,
+        flows,
+        block,
+        proposed=proposed or {},
+        candidates=rebuilt_candidates(
+            "stride", _report_with(case, []), case.declaration("stride").options
+        ),
     )
 
 
@@ -551,6 +573,17 @@ def test_nothing_at_the_place_charges_the_lead_or_its_absence(case, flows):
     assert charged[led].cause == "place"
     assert charged[unled].cause == "unled"
     assert charged[led].draft_id is None
+
+
+def test_a_rule_the_archived_run_did_not_fire_leads_nowhere(case, flows):
+    """A rule today's code fires on the reference's elements is a lead only
+    where the archived block lists it as fired."""
+    hits = case_trigger_recall(case, "stride").hits
+    led = next(i for i, hit in enumerate(hits) if hit.rule_ids)
+
+    charged = by_index(charge(case, flows, [], [], fired=()))
+
+    assert charged[led].cause == "unled"
 
 
 def test_every_miss_is_charged_once_and_a_match_is_not(case, flows):

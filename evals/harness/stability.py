@@ -59,7 +59,7 @@ from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import CaseFlows, endpoint_form
-from evals.harness.losses import Cause
+from evals.harness.losses import UNREAD_CAUSE
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import MUST_FIND
@@ -658,10 +658,6 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
             )
         )
     return stability
-
-
-#: The cause that says an archive holds no position to read.
-UNREAD_CAUSE: Cause = "unstated"
 
 
 def _cause_stability(

@@ -11,7 +11,7 @@ import pytest
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.frameworks import package_for
 from analysis_service.sources import render_fenced
-from evals.harness import delivery, run
+from evals.harness import delivery, losses, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
@@ -175,12 +175,12 @@ def test_each_charged_miss_is_a_row_and_only_place_and_unled_are_traced():
 
     assert [row.reference for row in traced.rows] == list(charged_misses(card.rows))
     assert {row.reference.cause for row in traced.rows if row.lane is None}.isdisjoint(
-        delivery.TRACED
+        losses.SILENT
     )
     assert all(
         row.lane is not None
         for row in traced.rows
-        if row.reference.cause in delivery.TRACED
+        if row.reference.cause in losses.SILENT
     )
 
 
