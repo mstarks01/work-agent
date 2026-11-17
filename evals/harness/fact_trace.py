@@ -44,13 +44,8 @@ from typing import Any, Literal, get_args
 
 from analysis_service.analysis import ControlState
 from analysis_service.system_model import ELEMENT_GROUPS, SystemModel
-from evals.harness.alignment import Alignment
-from evals.harness.modes import (
-    STATE_REDUCED,
-    AttributeCheck,
-    ScoredAttribute,
-    reduce_attribute,
-)
+from evals.harness.alignment import Alignment, ProtocolState
+from evals.harness.modes import STATE_REDUCED, AttributeCheck, reduce_attribute
 
 #: Where a check's value went wrong, if it did. The module docstring defines
 #: each stage.
@@ -79,11 +74,10 @@ Certainty = Literal[
 ]
 CERTAINTIES: tuple[Certainty, ...] = get_args(Certainty)
 
-#: The states the scorer reduces a control attribute or a protocol to:
-#: :func:`~analysis_service.analysis.control_state`'s three, and the ``silent``
-#: that :func:`~evals.harness.alignment.protocol_state` returns beside its
-#: ``stated``.
-State = Literal[ControlState, "silent"]
+#: The states the scorer reduces a control attribute or a protocol to, as
+#: :func:`~analysis_service.analysis.control_state` and
+#: :func:`~evals.harness.alignment.protocol_state` return them.
+State = Literal[ControlState, ProtocolState]
 
 #: Each pair of differing states, signed first, and the certainty it shows.
 _CERTAINTY: Mapping[tuple[State, State], Certainty] = {
@@ -180,35 +174,6 @@ def trace(
             )
         )
     return tuple(traced)
-
-
-def conflicting_ids(
-    raw: Mapping[str, Any], attributes: Iterable[ScoredAttribute]
-) -> tuple[str, ...]:
-    """The IDs the raw block gives more than one entry with different scored values.
-
-    Each value is reduced as the scorer reduces it, so two wordings of one
-    scored fact are no conflict. Read over every group, as the parse reads
-    them, and over each entry that is an object with a string ID. The caller
-    passes only an emission that parsed, so every value has its schema type.
-    """
-    names = tuple(attributes)
-    values: dict[str, set[tuple[str, ...]]] = {}
-    for group in ELEMENT_GROUPS:
-        entries = raw.get(group)
-        if not isinstance(entries, list):
-            continue
-        for entry in entries:
-            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
-                values.setdefault(entry["id"], set()).add(
-                    tuple(
-                        ""
-                        if entry.get(name) is None
-                        else reduce_attribute(name, entry[name])
-                        for name in names
-                    )
-                )
-    return tuple(sorted(element for element, seen in values.items() if len(seen) > 1))
 
 
 def pooled(traces: Iterable[FactTrace]) -> dict[str, Any]:

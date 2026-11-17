@@ -135,7 +135,6 @@ from evals.harness.modes import (
     AssertionResult,
     AttributeCheck,
     ExtractionResult,
-    ScoredAttribute,
     SweepMode,
     attribute_agreement,
     differing,
@@ -288,8 +287,9 @@ class ExtractionReplay:
     #: taken over and the stage each one went wrong at.
     facts: tuple[FactTrace, ...]
     extra: tuple[str, ...]
-    #: The IDs the raw emission names twice with different scored values.
-    conflicting_ids: tuple[str, ...]
+    #: The elements the parse reports as ``duplicate-id``: each arrived with
+    #: an emitted ID that another element also carried.
+    shared_ids: tuple[str, ...]
     issues: tuple[str, ...] = ()
 
     @property
@@ -313,7 +313,7 @@ class ExtractionReplay:
             "wrong_facts": [
                 fact.to_json() for fact in self.facts if fact.check in wrong
             ],
-            "conflicting_ids": list(self.conflicting_ids),
+            "shared_ids": list(self.shared_ids),
             "extra": list(self.extra),
             "issues": list(self.issues),
             "fates": [row.to_json() for row in self.fates],
@@ -331,9 +331,11 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         facts=fact_trace.trace(
             result.raw, result.extracted, score.alignment, score.attributes
         ),
-        conflicting_ids=()
-        if result.extracted is None
-        else fact_trace.conflicting_ids(result.raw, get_args(ScoredAttribute)),
+        shared_ids=tuple(
+            issue.element_id
+            for issue in result.issues
+            if issue.code == "duplicate-id" and issue.element_id is not None
+        ),
         extra=score.alignment.unaligned_produced,
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues)
         + tuple(f"malformed-flow-id: {one}" for one in malformed),
@@ -1399,7 +1401,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     by_type: dict[str, Counter[str]] = defaultdict(Counter)
     per_element: dict[str, Counter[str]] = defaultdict(Counter)
     facts: list[FactTrace] = []
-    conflicting: Counter[str] = Counter()
+    shared: Counter[str] = Counter()
     renamed_by: Counter[str] = Counter()
     emissions = 0
     unparsed = 0
@@ -1417,9 +1419,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
                 if row.fate in LOSSES:
                     per_element[f"{replay.case_id}/{row.reference}"][row.fate] += 1
             facts.extend(replay.facts)
-            conflicting.update(
-                f"{replay.case_id}/{element}" for element in replay.conflicting_ids
-            )
+            shared[replay.case_id] += len(replay.shared_ids)
     targets = sorted(
         per_element.items(), key=lambda item: (-sum(item[1].values()), item[0])
     )
@@ -1442,7 +1442,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         },
         "attribute_aggregate": attribute_agreement([fact.check for fact in facts]),
         "facts": fact_trace.pooled(facts),
-        "conflicting_ids": dict(sorted(conflicting.items())),
+        "shared_ids": {case: n for case, n in sorted(shared.items()) if n},
         "targets": [
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
@@ -1738,10 +1738,11 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
         for key, counts in pool["facts"]["by_certainty"].items():
             listed = ", ".join(f"{name} {n}" for name, n in counts.items() if n)
             print(f"    certainty {key}: {listed}")
-        conflicts = sum(pool["conflicting_ids"].values())
+        shared = sum(pool["shared_ids"].values())
         print(
-            f"  {conflicts} emission(s) name one ID twice with different scored"
-            f" values, over {len(pool['conflicting_ids'])} case ID(s)"
+            f"  {shared} element(s) arrived with an emitted ID another element"
+            f" carried (the parse's duplicate-id), in {len(pool['shared_ids'])}"
+            " case(s)"
         )
     if pool["targets"]:
         print(f"  targets (top {targets} of {len(pool['targets'])}):")

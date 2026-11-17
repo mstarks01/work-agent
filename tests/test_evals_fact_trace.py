@@ -9,6 +9,7 @@ import pytest
 from analysis_service.analysis import ControlState
 from analysis_service.compact import FULL_FORMAT, parse_extraction
 from evals.harness import fact_trace, replay
+from evals.harness.alignment import ProtocolState
 from evals.harness.fact_trace import FactTrace
 from evals.harness.modes import AttributeCheck, ExtractionResult
 from tests.test_evals_alignment import case
@@ -141,18 +142,17 @@ def test_a_wrong_state_names_how_the_states_differ(blessed, extracted, certainty
     assert FactTrace(check, extracted).certainty == certainty
 
 
-def test_an_id_named_twice_with_different_values_is_a_conflict():
-    raw = {
-        "processes": [
-            {"id": PROCESS, "exposure": "internal"},
-            {"id": PROCESS, "exposure": "internet-facing"},
-            {"id": "process:same", "exposure": "internal"},
-            {"id": "process:same", "exposure": "internal"},
-        ],
-        "data_flows": "not a list",
-    }
+def test_an_emitted_id_two_elements_carry_is_counted_from_the_parse(golden):
+    raw = _emitted(golden.model)
+    first, second = raw["processes"][:2]
+    second["id"] = first["id"]
+    parsed, issues = parse_extraction(raw, FULL_FORMAT, sources={}, diagrams={})
 
-    assert fact_trace.conflicting_ids(raw, ["exposure"]) == (PROCESS,)
+    graded = replay.replay_extraction(
+        golden, ExtractionResult(golden.id, parsed, tuple(issues), raw=raw)
+    )
+
+    assert len(graded.shared_ids) == 2
 
 
 def test_the_pool_splits_each_attribute_by_stage_and_prints_it(golden, capsys):
@@ -183,21 +183,14 @@ def test_the_pool_splits_each_attribute_by_stage_and_prints_it(golden, capsys):
     assert "process.exposure" in capsys.readouterr().out
 
 
-def test_two_wordings_of_one_protocol_state_are_no_conflict():
-    raw = {
-        "data_flows": [
-            {"id": "flow:a>b>c", "protocol": "TLS 1.2"},
-            {"id": "flow:a>b>c", "protocol": "TLS 1.3"},
-        ]
-    }
-
-    assert fact_trace.conflicting_ids(raw, ["protocol"]) == ()
-
-
 def test_every_differing_pair_of_one_reducers_states_has_a_certainty():
-    control = get_args(ControlState)
-    pairs = {(a, b) for a in control for b in control if a != b}
-    pairs |= {("stated", "silent"), ("silent", "stated")}
+    pairs = {
+        (a, b)
+        for states in (get_args(ControlState), get_args(ProtocolState))
+        for a in states
+        for b in states
+        if a != b
+    }
 
     assert set(fact_trace._CERTAINTY) == pairs
 
