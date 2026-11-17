@@ -90,7 +90,7 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Final, Generic, Literal, TypeVar, get_args
+from typing import Any, Generic, Literal, TypeVar, get_args
 
 from analysis_service.candidates import CandidateSet
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
@@ -121,7 +121,7 @@ Cause = Literal[
 PositionRefusal = Literal["position", "unstated"]
 
 #: The cause that says an archive holds no position to read.
-UNREAD_CAUSE: Final = "unstated"
+UNREAD_CAUSE: PositionRefusal = "unstated"
 
 #: The causes that name no draft and no proposal at the reference's place:
 #: the lane was led there and wrote nothing, or nothing led it there.
@@ -553,15 +553,17 @@ def attribute_case(
     block: FrameworkAnalysis,
     *,
     proposed: Mapping[str, Any],
-    leads: Mapping[str, CandidateSet],
+    candidates: Mapping[str, CandidateSet],
 ) -> CaseLosses:
     """Charge each of one case's misses to its cause.
 
     ``proposed`` is the lanes' archived STRIDE proposals, keyed by lane. An
     empty mapping means that the lanes proposed nothing.
 
-    ``leads`` is each lane's candidates as today's rules write them for the
-    run's own model, from :func:`~evals.harness.triggers.archived_candidates`.
+    ``candidates`` is each lane's candidates as today's rules write them for
+    the run's own model, from
+    :func:`~evals.harness.triggers.archived_candidates`. A lane it lacks raises
+    ``KeyError``: every STRIDE lane has an entry, so a missing one is a defect.
     Beside the block's ``fired_rules``, they decide ``place`` against
     ``unled``.
 
@@ -754,7 +756,7 @@ def attribute_case(
             )
             continue
         led = archived_lead_rules(
-            leads.get(lane), reference.affected_element_ids, block.fired_rules
+            candidates[lane], reference.affected_element_ids, block.fired_rules
         )
         cause: Cause = "place" if led else "unled"
         nearby = _nearby(reference.affected_element_ids, in_lane, flows)

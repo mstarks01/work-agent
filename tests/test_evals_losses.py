@@ -40,6 +40,7 @@ from evals.harness.triggers import archived_candidates, case_trigger_recall
 from evals.harness.verbs import same_action
 from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
+from tests.test_evals_critic_yield import _report_with
 
 CASE_DIR = (
     Path(__file__).resolve().parents[1] / "evals" / "corpus" / "01-payments-checkout"
@@ -113,8 +114,8 @@ def charge(
         flows,
         block,
         proposed=proposed or {},
-        leads=archived_candidates(
-            "stride", case.model, None, case.declaration("stride").options
+        candidates=archived_candidates(
+            "stride", _report_with(case, []), case.declaration("stride").options
         ),
     )
 

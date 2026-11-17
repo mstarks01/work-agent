@@ -120,12 +120,7 @@ def trace_lane(
     The rebuild is :func:`~evals.harness.triggers.archived_candidates` over the
     archived model and catalog with the case's ``options``.
     """
-    rebuilt = archived_candidates(
-        "stride",
-        report.system_model,
-        report.assertions.catalog if report.assertions else None,
-        options,
-    )[lane]
+    rebuilt = archived_candidates("stride", report, options)[lane]
     capture: Capture = "uncaptured"
     if sent is not None:
         same = leads({lane: sent}) == leads({lane: rebuilt})

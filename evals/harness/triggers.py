@@ -52,12 +52,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
 from analysis_service.graph import FrameworkNodes, framework_lane_inputs
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
@@ -196,23 +196,21 @@ def _hit(
 
 
 def archived_candidates(
-    framework: FrameworkName,
-    model: SystemModel,
-    catalog: AssertionCatalog | None,
-    options: Mapping[str, object],
+    framework: FrameworkName, report: Report, options: Mapping[str, object]
 ) -> Mapping[str, CandidateSet]:
     """Each lane's candidates as today's rules write them for an archived run.
 
-    ``model`` and ``catalog`` are the run's own, from its report, and
+    The model and the catalog are the run's own, from ``report``, and
     ``options`` are the case's. The candidates come from
     :func:`~analysis_service.graph.framework_lane_inputs`, the reader of what a
-    lane is given.
+    lane is given. A report with no assertion record passes no catalog, as a
+    job with no assertion pass does.
     """
     return framework_lane_inputs(
         FrameworkNodes(framework),
-        model,
+        report.system_model,
         options,
-        catalog,
+        report.assertions.catalog if report.assertions else None,
         MarkdownLoader(REPO_ROOT / "frameworks" / framework),
     ).candidates
 

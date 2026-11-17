@@ -736,11 +736,8 @@ def _score_runs(
                 flows_by_case[case.id],
                 block,
                 proposed=runs[case.id].proposals.get("stride", {}),
-                leads=archived_candidates(
-                    "stride",
-                    report.system_model,
-                    report.assertions.catalog if report.assertions else None,
-                    case.declaration("stride").options,
+                candidates=archived_candidates(
+                    "stride", report, case.declaration("stride").options
                 ),
             )
         )

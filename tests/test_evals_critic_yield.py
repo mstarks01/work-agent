@@ -575,8 +575,8 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         flows,
         Block(produced),
         proposed={},
-        leads=archived_candidates(
-            "stride", case.model, None, case.declaration("stride").options
+        candidates=archived_candidates(
+            "stride", _report_with(case, []), case.declaration("stride").options
         ),
     )
 
