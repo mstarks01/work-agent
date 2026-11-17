@@ -65,12 +65,12 @@ from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
 __all__ = [
     "CaseTriggerRecall",
     "TriggerHit",
-    "archived_candidates",
     "archived_lead_rules",
     "by_framework",
     "case_trigger_recall",
     "corpus_recall",
     "lead_rules",
+    "rebuilt_candidates",
 ]
 
 
@@ -195,7 +195,7 @@ def _hit(
     )
 
 
-def archived_candidates(
+def rebuilt_candidates(
     framework: FrameworkName, report: Report, options: Mapping[str, object]
 ) -> Mapping[str, CandidateSet]:
     """Each lane's candidates as today's rules write them for an archived run.

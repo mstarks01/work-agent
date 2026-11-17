@@ -1,10 +1,10 @@
 """What a missed must-find's lane was given, read from the archive (#2271).
 
 :mod:`evals.harness.losses` charges a miss to ``place`` or ``unled`` when no
-draft and no proposal sits at the reference's place. Those two causes read
-today's rules on today's corpus model. This module reads what the archived lane
-was sent instead, and states how the closest candidate stands to the
-reference's place.
+draft and no proposal sits at the reference's place, and
+:func:`~evals.harness.triggers.archived_lead_rules` decides which of the two.
+This module also reads what the archived lane was sent, and states how the
+closest candidate stands to the reference's place.
 
 For each such row it gives four readings:
 
@@ -62,7 +62,7 @@ from evals.harness.scorecard import (
     Scorecard,
     charged_misses,
 )
-from evals.harness.triggers import archived_candidates, archived_lead_rules
+from evals.harness.triggers import archived_lead_rules, rebuilt_candidates
 
 #: How the closest candidate stands to the reference's place, or ``absent``
 #: where no candidate in the lane shares an element with it.
@@ -98,7 +98,7 @@ def closest_relation(
         relation(reference_ids, candidate.element_ids, flows)
         for candidate in candidates.candidates
     }
-    return next((relation for relation in RELATIONS if relation in found), "absent")
+    return next((strength for strength in RELATIONS if strength in found), "absent")
 
 
 def sent_candidates(material: Mapping[str, Any], lane: str) -> CandidateSet:
@@ -117,10 +117,10 @@ def trace_lane(
 ) -> LaneTrace:
     """Trace one reference through its lane: ``sent`` is ``None`` where uncaptured.
 
-    The rebuild is :func:`~evals.harness.triggers.archived_candidates` over the
+    The rebuild is :func:`~evals.harness.triggers.rebuilt_candidates` over the
     archived model and catalog with the case's ``options``.
     """
-    rebuilt = archived_candidates("stride", report, options)[lane]
+    rebuilt = rebuilt_candidates("stride", report, options)[lane]
     capture: Capture = "uncaptured"
     if sent is not None:
         same = leads({lane: sent}) == leads({lane: rebuilt})

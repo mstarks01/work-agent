@@ -562,7 +562,7 @@ def attribute_case(
 
     ``candidates`` is each lane's candidates as today's rules write them for
     the run's own model, from
-    :func:`~evals.harness.triggers.archived_candidates`. A lane it lacks raises
+    :func:`~evals.harness.triggers.rebuilt_candidates`. A lane it lacks raises
     ``KeyError``: every STRIDE lane has an entry, so a missing one is a defect.
     Beside the block's ``fired_rules``, they decide ``place`` against
     ``unled``.
