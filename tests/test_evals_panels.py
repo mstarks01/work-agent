@@ -125,13 +125,16 @@ def test_a_ballot_no_ledger_row_lists_is_unverified(tmp_path: Path):
         ((), "unverified"),
     ],
 )
-def test_a_route_is_known_different_only_where_its_own_prompt_changed(
+def test_a_route_is_known_different_only_where_its_prompt_body_changed(
     changed, fidelity
 ):
     path = panels.route_path("abcdef1234", ("extract",), changed)
 
     assert path.fidelity == fidelity
     assert path.evidence
+    for changed_path in changed or ():
+        if changed_path.startswith("prompts/extract"):
+            assert any(line.startswith(changed_path) for line in path.evidence)
 
 
 @pytest.mark.parametrize("name", PROMPT_BODY_NAMES)

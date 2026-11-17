@@ -74,8 +74,10 @@ class Panel:
     ``counts`` holds the counts the panel reads, and ``rates`` the shares it
     states, each with its numerator and denominator. ``means`` holds a mean
     with the number of values it is over. ``unread`` counts what the source
-    holds no reading for, in the panel's own terms: for the assertion panel,
-    the produced rows nothing signed rules on. A panel the source cannot fill
+    holds no reading for, in the panel's own terms: the produced rows nothing
+    signed rules on (assertions), the verdicts outside :data:`BALLOT_VERDICTS`
+    (capabilities) and the lanes with no capture (preparation). It is ``None``
+    for extraction, where every signed element takes a fate. A panel the source cannot fill
     holds no count and says why in ``uncaptured``.
     """
 
@@ -150,8 +152,10 @@ def route_path(
                 for path in deltas
             ),
             f"the route's prompt bodies are unchanged since {commit[:8]}",
-            "the rendered tables, model, settings and message placement are"
-            + " not compared",
+            (
+                "the rendered tables, model, settings and message placement are"
+                " not compared"
+            ),
         ),
     )
 
