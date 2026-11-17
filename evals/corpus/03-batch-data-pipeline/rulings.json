@@ -64,6 +64,29 @@
       "ruling": "The reference concerns an analyst reading unnecessary personal data through an overly broad grant; the draft concerns storage-copy exposure with unverified encryption at rest.",
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 3: 03-batch-data-pipeline I-05"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "exhaust-resources",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:ingest-scheduler"
+        ]
+      },
+      "reading": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "entity:insurance-partner",
+          "process:ingest-scheduler",
+          "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe attacker-supplied oversized input in the landing bucket exhausting the shared nightly ingestion window and delaying legitimate extracts. The draft explicitly includes an outsized file, so its flood label does not make it a different threat from ref 12. Its many-file variant and downstream stale-data consequences add detail; a separate volume-flood claim could be split out if needed. This is a semantic match, not independent confirmation of every factual assertion in the draft.",
+      "reviewed_by": "mstarks01",
+      "source": "03-batch-data-pipeline row 1: 03-batch-data-pipeline D-01"
     }
   ],
   "positions": [
