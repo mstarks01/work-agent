@@ -73,12 +73,12 @@ def test_a_wrong_raw_value_the_parse_righted_is_corrected_by_code(golden):
     assert _exposure(graded).stage == "corrected-by-code"
 
 
-def test_an_element_the_raw_block_lacks_is_uncaptured(golden):
+def test_an_element_the_raw_block_lacks_is_raw_unread(golden):
     graded = replay.replay_extraction(
         golden, ExtractionResult(golden.id, golden.model, ())
     )
 
-    assert {fact.stage for fact in graded.facts} == {"uncaptured"}
+    assert {fact.stage for fact in graded.facts} == {"raw-unread"}
 
 
 def test_a_raw_entry_pairs_by_position_and_not_by_its_emitted_id(golden):
@@ -106,7 +106,7 @@ def test_a_group_whose_lengths_differ_pairs_nothing(golden):
         golden, ExtractionResult(golden.id, golden.model, (), raw=raw)
     )
 
-    assert _exposure(graded).stage == "uncaptured"
+    assert _exposure(graded).stage == "raw-unread"
 
 
 @pytest.mark.parametrize(
@@ -152,10 +152,10 @@ def test_each_duplicate_id_issue_of_the_parse_is_counted(golden):
         golden, ExtractionResult(golden.id, parsed, tuple(issues), raw=raw)
     )
 
-    assert len(graded.duplicate_ids) == sum(
+    assert len(graded.duplicate_id_issues) == sum(
         issue.code == "duplicate-id" for issue in issues
     )
-    assert graded.duplicate_ids
+    assert graded.duplicate_id_issues
 
 
 def test_a_parsed_id_two_elements_carry_pairs_nothing(golden):

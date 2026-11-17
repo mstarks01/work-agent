@@ -290,7 +290,7 @@ class ExtractionReplay:
     #: The element ID of each ``duplicate-id`` issue the parse raised. The parse
     #: raises one for each element whose emitted ID another element carried,
     #: and one for each derived ID that two elements of one name share.
-    duplicate_ids: tuple[str, ...]
+    duplicate_id_issues: tuple[str, ...]
     issues: tuple[str, ...] = ()
 
     @property
@@ -314,7 +314,7 @@ class ExtractionReplay:
             "wrong_facts": [
                 fact.to_json() for fact in self.facts if fact.check in wrong
             ],
-            "duplicate_ids": list(self.duplicate_ids),
+            "duplicate_id_issues": list(self.duplicate_id_issues),
             "extra": list(self.extra),
             "issues": list(self.issues),
             "fates": [row.to_json() for row in self.fates],
@@ -332,7 +332,7 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         facts=fact_trace.trace(
             result.raw, result.extracted, score.alignment, score.attributes
         ),
-        duplicate_ids=tuple(
+        duplicate_id_issues=tuple(
             issue.element_id
             for issue in result.issues
             if issue.code == "duplicate-id" and issue.element_id is not None
@@ -1420,7 +1420,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
                 if row.fate in LOSSES:
                     per_element[f"{replay.case_id}/{row.reference}"][row.fate] += 1
             facts.extend(replay.facts)
-            duplicates[replay.case_id] += len(replay.duplicate_ids)
+            duplicates[replay.case_id] += len(replay.duplicate_id_issues)
     targets = sorted(
         per_element.items(), key=lambda item: (-sum(item[1].values()), item[0])
     )
@@ -1443,7 +1443,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         },
         "attribute_aggregate": attribute_agreement([fact.check for fact in facts]),
         "facts": fact_trace.pooled(facts),
-        "duplicate_ids": {case: n for case, n in sorted(duplicates.items()) if n},
+        "duplicate_id_issues": {case: n for case, n in sorted(duplicates.items()) if n},
         "targets": [
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
@@ -1734,15 +1734,15 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
             wrong = " ".join(f"{counts[stage]:>4}" for stage in WRONG_STAGES)
             print(
                 f"    {key:<32} {wrong}   corrected by code"
-                f" {counts['corrected-by-code']}, raw unread {counts['uncaptured']}"
+                f" {counts['corrected-by-code']}, raw unread {counts['raw-unread']}"
             )
         for key, counts in pool["facts"]["by_certainty"].items():
             listed = ", ".join(f"{name} {n}" for name, n in counts.items() if n)
             print(f"    certainty {key}: {listed}")
-        duplicates = sum(pool["duplicate_ids"].values())
+        duplicates = sum(pool["duplicate_id_issues"].values())
         print(
             f"  {duplicates} duplicate-id issue(s) the parse raised, in"
-            f" {len(pool['duplicate_ids'])} case(s)"
+            f" {len(pool['duplicate_id_issues'])} case(s)"
         )
     if pool["targets"]:
         print(f"  targets (top {targets} of {len(pool['targets'])}):")

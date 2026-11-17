@@ -27,7 +27,7 @@ Each check takes one :data:`Stage`:
   reproduction proves one.
 * ``changed-and-wrong``: the raw value is wrong, and the parse changed it to
   another wrong value.
-* ``uncaptured``: no raw value is read: the group pairs nothing, two parsed
+* ``raw-unread``: no raw value is read: the group pairs nothing, two parsed
   elements carry the check's ID, or the raw entry holds no value for the
   attribute.
 
@@ -41,10 +41,10 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, get_args
+from typing import Any, Literal, cast, get_args
 
 from analysis_service.analysis import ControlState
-from analysis_service.system_model import ELEMENT_GROUPS, SystemModel
+from analysis_service.system_model import ELEMENT_GROUPS, SystemModel, duplicate_ids
 from evals.harness.alignment import Alignment, ProtocolState
 from evals.harness.modes import STATE_REDUCED, AttributeCheck, reduce_attribute
 
@@ -56,7 +56,7 @@ Stage = Literal[
     "wrong-in-raw",
     "changed-by-code",
     "changed-and-wrong",
-    "uncaptured",
+    "raw-unread",
 ]
 STAGES: tuple[Stage, ...] = get_args(Stage)
 
@@ -106,7 +106,7 @@ class FactTrace:
     @property
     def stage(self) -> Stage:
         if self.raw is None:
-            return "uncaptured"
+            return "raw-unread"
         raw_right = self.raw == self.check.blessed
         if self.check.agrees:
             return "agrees" if raw_right else "corrected-by-code"
@@ -121,8 +121,8 @@ class FactTrace:
         """How the two states differ, for a wrong state-reduced attribute."""
         if self.check.attribute not in STATE_REDUCED:
             return None
-        pair = (self.check.blessed, self.check.extracted)
-        return next((name for key, name in _CERTAINTY.items() if key == pair), None)
+        pair = cast(tuple[State, State], (self.check.blessed, self.check.extracted))
+        return _CERTAINTY.get(pair)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -144,7 +144,7 @@ def emitted_entries(
     nothing. A parsed ID that two elements carry pairs nothing either, because
     a check names its element by that ID and cannot say which one it means.
     """
-    carried = Counter(element.id for element in parsed.elements())
+    shared = duplicate_ids(parsed.elements())
     paired: dict[str, Mapping[str, Any]] = {}
     for group in ELEMENT_GROUPS:
         entries = raw.get(group)
@@ -152,7 +152,7 @@ def emitted_entries(
         if not isinstance(entries, list) or len(entries) != len(elements):
             continue
         for entry, element in zip(entries, elements, strict=True):
-            if isinstance(entry, dict) and carried[element.id] == 1:
+            if isinstance(entry, dict) and element.id not in shared:
                 paired[element.id] = entry
     return paired
 
