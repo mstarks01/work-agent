@@ -42,9 +42,15 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
 
+from analysis_service.analysis import ControlState
 from analysis_service.system_model import ELEMENT_GROUPS, SystemModel
 from evals.harness.alignment import Alignment
-from evals.harness.modes import AttributeCheck, reduce_attribute
+from evals.harness.modes import (
+    STATE_REDUCED,
+    AttributeCheck,
+    ScoredAttribute,
+    reduce_attribute,
+)
 
 #: Where a check's value went wrong, if it did. The module docstring defines
 #: each stage.
@@ -74,9 +80,10 @@ Certainty = Literal[
 CERTAINTIES: tuple[Certainty, ...] = get_args(Certainty)
 
 #: The states the scorer reduces a control attribute or a protocol to:
-#: :func:`~analysis_service.analysis.control_state`'s three, and ``silent``,
-#: which is :func:`~evals.harness.alignment.protocol_state`'s ``unverified``.
-State = Literal["stated", "absent", "unverified", "silent"]
+#: :func:`~analysis_service.analysis.control_state`'s three, and the ``silent``
+#: that :func:`~evals.harness.alignment.protocol_state` returns beside its
+#: ``stated``.
+State = Literal[ControlState, "silent"]
 
 #: Each pair of differing states, signed first, and the certainty it shows.
 _CERTAINTY: Mapping[tuple[State, State], Certainty] = {
@@ -117,6 +124,8 @@ class FactTrace:
     @property
     def certainty(self) -> Certainty | None:
         """How the two states differ, for a wrong state-reduced attribute."""
+        if self.check.attribute not in STATE_REDUCED:
+            return None
         pair = (self.check.blessed, self.check.extracted)
         return next((name for key, name in _CERTAINTY.items() if key == pair), None)
 
@@ -174,12 +183,14 @@ def trace(
 
 
 def conflicting_ids(
-    raw: Mapping[str, Any], attributes: Iterable[str]
+    raw: Mapping[str, Any], attributes: Iterable[ScoredAttribute]
 ) -> tuple[str, ...]:
-    """The IDs the raw block gives more than one entry with different ``attributes`` values.
+    """The IDs the raw block gives more than one entry with different scored values.
 
-    Read over every group, as the parse reads them, and over each entry that
-    is an object with a string ID.
+    Each value is reduced as the scorer reduces it, so two wordings of one
+    scored fact are no conflict. Read over every group, as the parse reads
+    them, and over each entry that is an object with a string ID. The caller
+    passes only an emission that parsed, so every value has its schema type.
     """
     names = tuple(attributes)
     values: dict[str, set[tuple[str, ...]]] = {}
@@ -190,7 +201,12 @@ def conflicting_ids(
         for entry in entries:
             if isinstance(entry, dict) and isinstance(entry.get("id"), str):
                 values.setdefault(entry["id"], set()).add(
-                    tuple(repr(entry.get(name)) for name in names)
+                    tuple(
+                        ""
+                        if entry.get(name) is None
+                        else reduce_attribute(name, entry[name])
+                        for name in names
+                    )
                 )
     return tuple(sorted(element for element, seen in values.items() if len(seen) > 1))
 

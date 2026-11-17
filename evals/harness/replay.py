@@ -331,9 +331,9 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         facts=fact_trace.trace(
             result.raw, result.extracted, score.alignment, score.attributes
         ),
-        conflicting_ids=fact_trace.conflicting_ids(
-            result.raw, get_args(ScoredAttribute)
-        ),
+        conflicting_ids=()
+        if result.extracted is None
+        else fact_trace.conflicting_ids(result.raw, get_args(ScoredAttribute)),
         extra=score.alignment.unaligned_produced,
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues)
         + tuple(f"malformed-flow-id: {one}" for one in malformed),
@@ -1740,8 +1740,8 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
             print(f"    certainty {key}: {listed}")
         conflicts = sum(pool["conflicting_ids"].values())
         print(
-            f"  {conflicts} raw element(s) named twice with different values,"
-            f" over {len(pool['conflicting_ids'])} ID(s)"
+            f"  {conflicts} emission(s) name one ID twice with different scored"
+            f" values, over {len(pool['conflicting_ids'])} case ID(s)"
         )
     if pool["targets"]:
         print(f"  targets (top {targets} of {len(pool['targets'])}):")

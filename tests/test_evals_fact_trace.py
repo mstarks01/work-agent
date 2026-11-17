@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
+from analysis_service.analysis import ControlState
+from analysis_service.compact import FULL_FORMAT, parse_extraction
 from evals.harness import fact_trace, replay
 from evals.harness.fact_trace import FactTrace
 from evals.harness.modes import AttributeCheck, ExtractionResult
@@ -177,3 +181,37 @@ def test_the_pool_splits_each_attribute_by_stage_and_prints_it(golden, capsys):
 
     assert pool["facts"]["by_stage"]["process.exposure"]["changed-by-code"] == 1
     assert "process.exposure" in capsys.readouterr().out
+
+
+def test_two_wordings_of_one_protocol_state_are_no_conflict():
+    raw = {
+        "data_flows": [
+            {"id": "flow:a>b>c", "protocol": "TLS 1.2"},
+            {"id": "flow:a>b>c", "protocol": "TLS 1.3"},
+        ]
+    }
+
+    assert fact_trace.conflicting_ids(raw, ["protocol"]) == ()
+
+
+def test_every_differing_pair_of_one_reducers_states_has_a_certainty():
+    control = get_args(ControlState)
+    pairs = {(a, b) for a in control for b in control if a != b}
+    pairs |= {("stated", "silent"), ("silent", "stated")}
+
+    assert set(fact_trace._CERTAINTY) == pairs
+
+
+def test_the_position_pairing_is_the_parses_own(golden):
+    """The processes' emitted IDs swapped: the parse derives IDs from names,
+    and each parsed element pairs with the raw entry that carries its name."""
+    raw = _emitted(golden.model)
+    first, second = raw["processes"][:2]
+    first["id"], second["id"] = second["id"], first["id"]
+    parsed, _ = parse_extraction(raw, FULL_FORMAT, sources={}, diagrams={})
+
+    assert parsed is not None
+    paired = fact_trace.emitted_entries(raw, parsed)
+    assert len(paired) == len(list(parsed.elements()))
+    for element in parsed.elements():
+        assert paired[element.id]["name"] == element.name
