@@ -78,8 +78,8 @@ class Panel:
     holds no reading for, in the panel's own terms: the produced rows nothing
     signed rules on (assertions), the verdicts outside :data:`BALLOT_VERDICTS`
     (capabilities) and the lanes with no capture (preparation). It is ``None``
-    for extraction, where every signed element takes a fate. A panel the source cannot fill
-    holds no count and says why in ``uncaptured``.
+    for extraction, where every signed element takes a fate. A panel the
+    source cannot fill holds no count and says why in ``uncaptured``.
     """
 
     node: PanelNode
