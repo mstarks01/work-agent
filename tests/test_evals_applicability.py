@@ -141,6 +141,7 @@ class Block:
         unreconciled_rulings=(),
         dropped_claims=(),
         unresolved_references=(),
+        fired_rules=(),
     ):
         self.claims = list(claims)
         self.scope = list(scope)
@@ -148,6 +149,7 @@ class Block:
         self.unreconciled_rulings = list(unreconciled_rulings)
         self.dropped_claims = list(dropped_claims)
         self.unresolved_references = list(unresolved_references)
+        self.fired_rules = list(fired_rules)
 
     #: The real readers, bound onto the fake rather than reimplemented here. A
     #: second copy of "which problems name this claim" is exactly the shape

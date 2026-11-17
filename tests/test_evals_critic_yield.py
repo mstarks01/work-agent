@@ -29,6 +29,7 @@ from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
 from evals.harness.scorer import Rate, score_case
+from evals.harness.triggers import rebuilt_candidates
 from tests.eval_factories import (
     ScriptedMatcher,
     cast,
@@ -586,6 +587,9 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         flows,
         Block(produced),
         proposed={},
+        candidates=rebuilt_candidates(
+            "stride", _report_with(case, []), case.declaration("stride").options
+        ),
     )
 
     critic_rows = [loss for loss in charged.losses if loss.cause == "critic"]

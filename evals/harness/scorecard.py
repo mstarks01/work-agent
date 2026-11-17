@@ -64,10 +64,9 @@ from evals.harness.assembly import AssemblySweep
 from evals.harness.audit import Phase, phase_of
 from evals.harness.critic_yield import CriticAudit
 from evals.harness.identity import CaseFlows, endpoint_form
-from evals.harness.losses import CaseLosses, Cause
+from evals.harness.losses import UNREAD_CAUSE, CaseLosses, Cause
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import Rate, none_stated
-from evals.harness.stability import UNREAD_CAUSE
 from evals.harness.triggers import case_trigger_recall
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]
@@ -138,7 +137,9 @@ class ReferenceRow:
     #: The STRIDE rules that fire on the reference's elements in today's
     #: corpus ``model.json``, read through
     #: :func:`~evals.harness.triggers.case_trigger_recall`. Empty means no rule
-    #: led the lane there.
+    #: leads there today. Whether a rule led the run's lane there is the
+    #: ``place`` against ``unled`` split of :attr:`cause`, which reads the
+    #: run's own model and its archived ``fired_rules``.
     lead_rules: tuple[str, ...]
 
     @property
@@ -493,7 +494,7 @@ def charged_misses(rows: Iterable[ReferenceRow]) -> tuple[ReferenceRow, ...]:
     """The misses :mod:`evals.harness.losses` charged to a cause the run can read.
 
     Every row with a cause other than
-    :data:`~evals.harness.stability.UNREAD_CAUSE`, except a ``re-keyed`` row,
+    :data:`~evals.harness.losses.UNREAD_CAUSE`, except a ``re-keyed`` row,
     whose cause rests on an element the run's model did not hold. An
     ``unstated`` row is the archive's missing position, not a
     lane's miss. A ``position-unstated`` row stays: its action and place were
@@ -557,7 +558,7 @@ def render(card: Scorecard) -> None:
     led = sum(1 for row in charged if row.lead_rules)
     by_cause = Counter(row.cause for row in charged)
     print(
-        f"charged misses: {len(charged)} ({led} with a rule fired,"
+        f"charged misses: {len(charged)} ({led} with a rule today's code fires,"
         f" {len(charged) - led} with none), by cause {dict(sorted(by_cause.items()))}"
     )
     print("fan-in dispositions: uncaptured (the matcher reads no proposal)")
