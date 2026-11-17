@@ -56,7 +56,11 @@ order, and the first that finds the finding charges it; ``position`` and
   carries. A case whose lanes proposed nothing has no ``fan-in`` row, and
   :attr:`CaseLosses.proposed_nothing` says so.
 * ``place``: a candidate rule led the lane to the reference's elements and no
-  draft cites them. The lead did not take.
+  draft cites them. The lead did not take. A rule leads when today's rule
+  code fires it on the reference's elements of the run's own model, and the
+  run's archived ``fired_rules`` lists it
+  (:func:`~evals.harness.triggers.archived_lead_rules`), so a rule added after
+  the run leads nowhere in it.
 * ``unled``: no rule fired on the reference's elements and no draft cites
   them. Nothing sent the lane there.
 
@@ -86,15 +90,16 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Generic, Literal, TypeVar, get_args
+from typing import Any, Final, Generic, Literal, TypeVar, get_args
 
+from analysis_service.candidates import CandidateSet
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.parsing import strings
 from evals.harness.identity import CaseFlows, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import CaseScore, VoteStatus, holds_position, position_fate
-from evals.harness.triggers import case_trigger_recall
+from evals.harness.scorer import CaseScore, VoteStatus, holds_position, none_stated
+from evals.harness.triggers import archived_lead_rules
 from evals.harness.verbs import same_action
 
 #: The causes a miss is charged to, in the order of the stages that decide
@@ -114,6 +119,13 @@ Cause = Literal[
 #: The causes the scorer's position gate gives a stage whose items all fail
 #: the ruled position.
 PositionRefusal = Literal["position", "unstated"]
+
+#: The cause that says an archive holds no position to read.
+UNREAD_CAUSE: Final = "unstated"
+
+#: The causes that name no draft and no proposal at the reference's place:
+#: the lane was led there and wrote nothing, or nothing led it there.
+SILENT: frozenset[Cause] = frozenset({"place", "unled"})
 
 CAUSES: tuple[Cause, ...] = (
     "verb",
@@ -384,11 +396,13 @@ def _refused(
 ) -> PositionRefusal:
     """The cause of a stage whose items all fail the reference's ruled position.
 
-    ``unstated`` where no item states any position, because then the archive
-    cannot read the rule; ``position`` where one states another.
+    :data:`UNREAD_CAUSE` where :func:`~evals.harness.scorer.none_stated` reads
+    no item as stating any position, because then the archive cannot read the
+    rule; ``position`` where one states another.
     """
-    fates = {position_fate(position, position_of(item)) for item in items}
-    return "unstated" if fates == {"unstated"} else "position"
+    if none_stated(position, (position_of(item) for item in items)):
+        return UNREAD_CAUSE
+    return "position"
 
 
 def _proposed_at(
@@ -483,17 +497,20 @@ def _charged_to(claims: Sequence[DraftThreat]) -> DraftThreat:
     return min(claims, key=lambda claim: claim.id)
 
 
-def _relation(
-    reference_ids: Sequence[str], draft_ids: Sequence[str], flows: CaseFlows
+def relation(
+    reference_ids: Sequence[str], cited_ids: Sequence[str], flows: CaseFlows
 ) -> Relation | None:
-    """How two cited places stand to each other, once endpoint-resolved.
+    """How a place cited by a draft or a candidate stands to the reference's.
 
-    One reader for every row that names a draft, so the four causes cannot
-    disagree about what "the same place" was. ``None`` where the two share no
-    element: not a relation, and the row says so rather than picking one.
+    Both places are endpoint-resolved first. One reader for every row that
+    names a draft, so the four causes cannot disagree about what "the same
+    place" was, and for :mod:`evals.harness.delivery`, which reads a
+    candidate's place the same way. In each :data:`Relation`, the "draft" side
+    is ``cited_ids``. ``None`` where the two share no element: not a relation,
+    and the row says so rather than picking one.
     """
     place = endpoint_form(reference_ids, flows)
-    drafted = endpoint_form(draft_ids, flows)
+    drafted = endpoint_form(cited_ids, flows)
     if place == drafted and place:
         return "equal"
     if place > drafted and drafted:
@@ -536,11 +553,17 @@ def attribute_case(
     block: FrameworkAnalysis,
     *,
     proposed: Mapping[str, Any],
+    leads: Mapping[str, CandidateSet],
 ) -> CaseLosses:
     """Charge each of one case's misses to its cause.
 
     ``proposed`` is the lanes' archived STRIDE proposals, keyed by lane. An
     empty mapping means that the lanes proposed nothing.
+
+    ``leads`` is each lane's candidates as today's rules write them for the
+    run's own model, from :func:`~evals.harness.triggers.archived_candidates`.
+    Beside the block's ``fired_rules``, they decide ``place`` against
+    ``unled``.
 
     ``drafts`` are the pre-critic drafts and ``produced`` the report's claims,
     the two sides :mod:`evals.harness.critic_yield` already scores; a draft in
@@ -556,7 +579,6 @@ def attribute_case(
     must_find = {
         index for index, reference in enumerate(references) if reference.must_find
     }
-    hits = case_trigger_recall(case, "stride").hits
     surviving = {claim.id for claim in produced}
     # The scorer's own record of a finding filed in the wrong lane, keyed by
     # the reference it answers; read here rather than re-derived, so this and
@@ -628,7 +650,7 @@ def attribute_case(
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,
-                    place_relation=_relation(place, claim.affected_element_ids, flows),
+                    place_relation=relation(place, claim.affected_element_ids, flows),
                     re_ask=block.re_ask_kinds(claim.id),
                 )
             )
@@ -644,7 +666,7 @@ def attribute_case(
                     verb,
                     draft_id=error.threat_id,
                     draft_verb=by_id[error.threat_id].verb,
-                    place_relation=_relation(
+                    place_relation=relation(
                         reference.affected_element_ids,
                         by_id[error.threat_id].affected_element_ids,
                         flows,
@@ -675,7 +697,7 @@ def attribute_case(
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
-                    place_relation=_relation(
+                    place_relation=relation(
                         killed_answer.place, draft.affected_element_ids, flows
                     ),
                     re_ask=block.re_ask_kinds(draft.id),
@@ -722,7 +744,7 @@ def attribute_case(
                     verb,
                     draft_id=kept_draft.id if kept_draft is not None else None,
                     draft_verb=proposal["verb"],
-                    place_relation=_relation(
+                    place_relation=relation(
                         place, proposal["affected_element_ids"], flows
                     ),
                     proposal_title=title,
@@ -731,7 +753,10 @@ def attribute_case(
                 )
             )
             continue
-        cause: Cause = "place" if hits[index].rule_ids else "unled"
+        led = archived_lead_rules(
+            leads.get(lane), reference.affected_element_ids, block.fired_rules
+        )
+        cause: Cause = "place" if led else "unled"
         nearby = _nearby(reference.affected_element_ids, in_lane, flows)
         losses.append(
             Loss(
@@ -887,13 +912,13 @@ def render(rows: Sequence[CaseLosses]) -> None:
             )
         )
     if totals["displaced"]:
-        silent = sum(totals["by_cause"][cause] for cause in ("place", "unled"))
+        silent = sum(totals["by_cause"][cause] for cause in sorted(SILENT))
         print(
             f"  of the place and unled rows, {totals['displaced']} have a"
             " surviving draft one element over ("
             + ", ".join(
                 f"{cause} {totals['displaced_by_cause'][cause]}"
-                for cause in ("place", "unled")
+                for cause in sorted(SILENT)
             )
             + f") and {silent - totals['displaced']} have none in the lane nearby"
         )

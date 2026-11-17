@@ -34,7 +34,7 @@ from typing import Any, Literal, get_args
 
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import CaseFlows, endpoint_subset
-from evals.harness.losses import CaseLosses, Loss
+from evals.harness.losses import SILENT, CaseLosses, Loss
 from evals.harness.reference import (
     RULINGS_FILE,
     GoldenCase,
@@ -180,7 +180,7 @@ def _near(loss: Loss) -> str | None:
     """The draft a loss row names beside the miss, where one may be asked about."""
     if loss.cause == "verb":
         return loss.draft_id
-    if loss.cause in ("place", "unled") and loss.displaced_status in ASKABLE:
+    if loss.cause in SILENT and loss.displaced_status in ASKABLE:
         return loss.displaced_draft_id
     return None
 

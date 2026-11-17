@@ -191,6 +191,7 @@ from evals.harness.stability import (
     load_runs,
 )
 from evals.harness.structural import report_issues
+from evals.harness.triggers import archived_candidates
 from evals.harness.withheld import (
     AnswerFile,
     answers_within_saves,
@@ -735,6 +736,12 @@ def _score_runs(
                 flows_by_case[case.id],
                 block,
                 proposed=runs[case.id].proposals.get("stride", {}),
+                leads=archived_candidates(
+                    "stride",
+                    report.system_model,
+                    report.assertions.catalog if report.assertions else None,
+                    case.declaration("stride").options,
+                ),
             )
         )
     return (

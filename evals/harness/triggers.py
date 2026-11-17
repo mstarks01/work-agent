@@ -49,18 +49,24 @@ which is why it can gate on every pull request while the LLM metrics cannot.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
+from analysis_service.graph import FrameworkNodes, framework_lane_inputs
+from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.system_model import SystemModel
+from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
 
 __all__ = [
     "CaseTriggerRecall",
     "TriggerHit",
+    "archived_candidates",
+    "archived_lead_rules",
     "by_framework",
     "case_trigger_recall",
     "corpus_recall",
@@ -187,6 +193,41 @@ def _hit(
         element_ids=reference.affected_element_ids,
         rule_ids=lead_rules(fired, reference.affected_element_ids),
     )
+
+
+def archived_candidates(
+    framework: FrameworkName,
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    options: Mapping[str, object],
+) -> Mapping[str, CandidateSet]:
+    """Each lane's candidates as today's rules write them for an archived run.
+
+    ``model`` and ``catalog`` are the run's own, from its report, and
+    ``options`` are the case's. The candidates come from
+    :func:`~analysis_service.graph.framework_lane_inputs`, the reader of what a
+    lane is given.
+    """
+    return framework_lane_inputs(
+        FrameworkNodes(framework),
+        model,
+        options,
+        catalog,
+        MarkdownLoader(REPO_ROOT / "frameworks" / framework),
+    ).candidates
+
+
+def archived_lead_rules(
+    fired: CandidateSet | None, targets: Iterable[str], archived: Iterable[str]
+) -> tuple[str, ...]:
+    """The :func:`lead_rules` of ``fired`` that the archived run also fired.
+
+    ``archived`` is the run's ``fired_rules``. That record holds rule IDs only,
+    so today's rule code over the run's own model says which elements each
+    rule fired on, and the record says whether the run fired it at all.
+    """
+    held = set(archived)
+    return tuple(rule for rule in lead_rules(fired, targets) if rule in held)
 
 
 def lead_rules(fired: CandidateSet | None, targets: Iterable[str]) -> tuple[str, ...]:
