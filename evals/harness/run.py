@@ -1543,10 +1543,10 @@ def scorecard_of(
 def command_scorecard(args: argparse.Namespace) -> int:
     """Print the scorecard of one finished sweep, and write it with ``--out``."""
     artifact = Path(args.artifact)
-    card = scorecard_of(artifact, Path(args.corpus), ledger.load(Path(args.ledger)))
+    ledger_dir = Path(args.ledger)
+    card = scorecard_of(artifact, Path(args.corpus), ledger.load(ledger_dir))
     scorecard.render(card)
     if args.out:
-        ledger_dir = Path(args.ledger)
         record = run_record(
             "scorecard",
             {"corpus": str(args.corpus), "ledger": str(ledger_dir)},

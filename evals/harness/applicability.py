@@ -1039,7 +1039,9 @@ class ApplicabilityYield:
         that the case expected a ruling on, and has no value where it rejected
         nothing.
         """
-        return _yield_rates(self.drafts, len(self.rejected), len(self.destroyed))
+        return _applicability_rates(
+            self.drafts, len(self.rejected), len(self.destroyed)
+        )
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -1059,7 +1061,7 @@ class ApplicabilityYield:
 ApplicabilityRate = Literal["rejection_rate", "destroyed_rate"]
 
 
-def _yield_rates(
+def _applicability_rates(
     drafts: int, rejected: int, destroyed: int
 ) -> dict[ApplicabilityRate, Rate]:
     """The yield's two rates, from one case's counts or from pooled ones."""
@@ -1128,7 +1130,7 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
         "unlisted": sum(len(entry.unlisted) for entry in yields),
         **{
             name: rate.rounded()
-            for name, rate in _yield_rates(drafts, rejected, destroyed).items()
+            for name, rate in _applicability_rates(drafts, rejected, destroyed).items()
         },
     }
 

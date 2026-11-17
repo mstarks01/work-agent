@@ -66,7 +66,6 @@ from evals.harness.artifact import (
     repo_commit,
 )
 from evals.harness.bundle import check_out, finished_file, read_report
-from evals.harness.critic_yield import fates
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call, spent_line
@@ -231,7 +230,11 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     The replayed rulings are completed first, as the graph completes them, so
     the status read is the one that would have reached the report.
     """
-    before = {} if archived.block is None else fates(archived.block)
+    before = {}
+    if archived.block is not None:
+        before = {
+            claim.id: claim.verdict.status for claim in archived.block.all_claims()
+        }
     after = {
         ruling.id: ruling.verdict.status
         for ruling in complete_rulings(archived.drafts, rulings)

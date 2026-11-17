@@ -429,8 +429,11 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     # the same ledger: every draft sits in one population cell.
     totals = scored["critic_yield_aggregate"]
     critic = card["critic"]
-    assert critic == totals["audit"]
-    assert critic["reference_loss"]["numerator"] == totals["matched_lost"]
+    assert critic["reference_loss"] == {
+        "numerator": totals["matched_lost"],
+        "denominator": totals["matched_killed"],
+        "value": critic["reference_loss"]["value"],
+    }
     cells = critic["populations"]["counts"]
     assert sum(cell["drafts"] for cell in cells) == totals["drafts_in"]
     assert (

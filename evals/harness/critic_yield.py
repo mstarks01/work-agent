@@ -77,6 +77,7 @@ ScoredOutcome = (
 #: rejection. ``unruled`` is a draft the block carries in none of its three
 #: lists.
 Fate = VerdictStatus | Literal["returned", "unruled"]
+UNRULED: Fate = "unruled"
 FATES: tuple[Fate, ...] = tuple(
     value for part in get_args(Fate) for value in get_args(part)
 )
@@ -88,7 +89,8 @@ Label = Literal["real", "not-real", "unlabelled"]
 #:
 #: ``real`` rests on a reference the draft matched, or on a current vote that
 #: pools it: both are relative to the reference set and the ledger, not proof
-#: that the draft is true. ``not-real`` rests on a current substance down-vote. Everything else is unlabelled: ``open`` is a reviewer who was
+#: that the draft is true. ``not-real`` rests on a current substance
+#: down-vote. Everything else is unlabelled: ``open`` is a reviewer who was
 #: unsure, ``stale`` a vote on another argument (ADR 0029), ``unvoted`` no
 #: vote, ``lane-error`` a reference in another lane, and ``unscored`` a draft
 #: the scorer did not key, such as one that names an element the corpus model
@@ -127,7 +129,7 @@ STALE_GAP = (
 )
 
 #: Why the not-real population is empty where no draft reads ``stale``.
-NO_VOTE_GAP = "no draft carries a vote"
+NO_DOWN_VOTE_GAP = "no draft carries a current down-vote"
 
 
 @dataclass(frozen=True)
@@ -179,7 +181,7 @@ class CriticPopulations:
         if self.count("not-real"):
             return None
         stale = sum(n for (outcome, _), n in self.counts.items() if outcome == "stale")
-        return f"{STALE_GAP} ({stale} stale drafts)" if stale else NO_VOTE_GAP
+        return f"{STALE_GAP} ({stale} stale drafts)" if stale else NO_DOWN_VOTE_GAP
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -392,7 +394,7 @@ class CriticYield:
         non-exhaustive by construction. A rate over an empty population has no
         value.
         """
-        return _yield_rates(
+        return _critic_rates(
             drafts_in=self.drafts_in,
             killed=self.kill_count,
             rejected_before=self.rejected_before,
@@ -483,8 +485,7 @@ def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
 def fates(block: FrameworkAnalysis) -> dict[str, Fate]:
     """Each claim ID the block carries, and the list it carries it in.
 
-    The one reader of a draft's fate. A draft the block does not carry is
-    ``unruled``, which a reader spells with ``.get(draft_id, "unruled")``.
+    A draft the block does not carry has the fate :data:`UNRULED`.
     """
     held: dict[str, Fate] = {
         entry.claim_id: "returned" for entry in block.returned_claims
@@ -531,7 +532,7 @@ def _yield(
         populations=CriticPopulations(
             dict(
                 Counter(
-                    (outcomes[draft.id][0], fate_of.get(draft.id, "unruled"))
+                    (outcomes[draft.id][0], fate_of.get(draft.id, UNRULED))
                     for draft in drafts
                 )
             )
@@ -566,7 +567,7 @@ def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | N
     return records
 
 
-def _yield_rates(
+def _critic_rates(
     *,
     drafts_in: int,
     killed: int,
@@ -596,10 +597,9 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     rejected_before = sum(entry.rejected_before for entry in yields)
     rejected_killed = sum(entry.rejected_killed for entry in yields)
     matched_before = sum(entry.matched_before for entry in yields)
-    audit = CriticAudit.of(yields)
-    matched_killed = audit.reference_loss.denominator
+    matched_killed = sum(entry.matched_killed for entry in yields)
     must_find_killed = sum(entry.must_find_killed for entry in yields)
-    matched_lost = audit.reference_loss.numerator
+    matched_lost = sum(entry.matched_lost for entry in yields)
     must_find_lost = sum(entry.must_find_lost for entry in yields)
     by_cause: dict[str, Counter[str]] = {}
     for entry in yields:
@@ -617,7 +617,7 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "must_find_lost": must_find_lost,
         **{
             name: rate.rounded()
-            for name, rate in _yield_rates(
+            for name, rate in _critic_rates(
                 drafts_in=drafts_in,
                 killed=killed,
                 rejected_before=rejected_before,
@@ -626,7 +626,6 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
                 matched_killed=matched_killed,
             ).items()
         },
-        "audit": audit.to_json(),
         # Every kill by the step the critic named, pooled; the per-step
         # ``matched`` and ``must_find`` are what a step removed.
         "killed_by_cause": {

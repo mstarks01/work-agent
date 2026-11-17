@@ -687,6 +687,7 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     assert "not_real_confirmed       0/0 (unavailable)" in shown
     assert "(1 stale drafts)" in shown
     assert populations.not_real_gap.endswith("(1 stale drafts)")
-    assert CriticPopulations({("unvoted", "confirmed"): 1}).not_real_gap == (
-        "no draft carries a vote"
-    )
+    for current in ("pooled", "open", "unvoted"):
+        assert CriticPopulations({(current, "confirmed"): 1}).not_real_gap == (
+            "no draft carries a current down-vote"
+        )

@@ -40,9 +40,9 @@ must-finds, not the per-lane **Coverage** of ``GLOSSARY.md``.
 :class:`RunIdentity`, so two sweeps, two corpus revisions or two scorer trees
 never render as one funnel.
 
-Scored by the STRIDE scorer only. Matching reads no vote, so the rows read an
-empty vote ledger. The critic audit reads the vote ledger, because a vote is
-one of the labels its populations rest on.
+Scored by the STRIDE scorer only. The rows read no vote standing. The critic
+audit reads the vote ledger, because a vote is one of the labels its
+populations rest on.
 """
 
 from __future__ import annotations
