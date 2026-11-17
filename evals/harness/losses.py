@@ -111,6 +111,10 @@ Cause = Literal[
     "place",
     "unled",
 ]
+#: The causes the scorer's position gate gives a stage whose items all fail
+#: the ruled position.
+Refusal = Literal["position", "unstated"]
+
 CAUSES: tuple[Cause, ...] = (
     "verb",
     "position",
@@ -377,7 +381,7 @@ def _refused(
     position: str | None,
     items: Sequence[_Item],
     position_of: Callable[[_Item], object],
-) -> Cause:
+) -> Refusal:
     """The cause of a stage whose items all fail the reference's ruled position.
 
     ``unstated`` where no item states any position, because then the archive
@@ -426,8 +430,13 @@ class _AnsweredReading(Generic[_Item]):
     #: Of those, the items that state the reference's ruled position.
     held: list[_Item]
     #: ``None`` where an item holds the position; otherwise the cause the
-    #: scorer's position gate gives (``position`` or ``unstated``).
-    refused: Cause | None
+    #: scorer's position gate gives.
+    refused: Refusal | None
+
+    @property
+    def charged_items(self) -> list[_Item]:
+        """The items a miss is charged among: the holding ones, if any."""
+        return self.held or self.with_action
 
 
 def _answered_reading(
@@ -465,9 +474,7 @@ def _charged_to(claims: Sequence[DraftThreat]) -> DraftThreat:
     **The rule decides, never the input order.** ``_at_place`` returns the
     claims in whatever order the report lists them, so the lowest claim ID
     decides: it is arbitrary but stable, and the row a reader sees does not
-    move between two runs over one report. :func:`_answered_reading` has
-    already kept only the claims that carry the reading's action and, where
-    one states it, the ruled position.
+    move between two runs over one report.
     """
     return min(claims, key=lambda claim: claim.id)
 
@@ -593,7 +600,7 @@ def attribute_case(
             charge = (
                 answered.refused or "merged",
                 answered.place,
-                _charged_to(answered.held or answered.with_action),
+                _charged_to(answered.charged_items),
             )
         else:
             # With no claim under a reading's action, the first reading with
@@ -654,7 +661,7 @@ def attribute_case(
             _draft_position,
         )
         if killed_answer is not None:
-            draft = _charged_to(killed_answer.held or killed_answer.with_action)
+            draft = _charged_to(killed_answer.charged_items)
             losses.append(
                 Loss(
                     index,
@@ -681,7 +688,7 @@ def attribute_case(
         if offered is not None:
             read_verb, place = offered.read_verb, offered.place
             proposal = min(
-                offered.held or offered.with_action,
+                offered.charged_items,
                 key=lambda claim: str(claim.get("title", "")),
             )
             title = str(proposal.get("title", ""))
