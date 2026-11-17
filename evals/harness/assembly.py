@@ -58,7 +58,7 @@ import argparse
 import json
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, NamedTuple, get_args
@@ -74,7 +74,7 @@ from analysis_service.claims import (
 )
 from analysis_service.critic_round import CriticRound, Failed
 from analysis_service.errors import error_place
-from analysis_service.fan_in import returned_to_deferred
+from analysis_service.fan_in import _drop_duplicate_ids, returned_to_deferred
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
@@ -179,7 +179,11 @@ class AssemblyReplay:
                 (set(self.reported) ^ set(self.replayed))
                 | (set(self.rejected_reported) ^ set(self.rejected_replayed))
                 | (set(self.returned_reported) ^ set(self.returned_replayed))
-                | set(_repeated(self.returned_reported))
+                | {
+                    claim_id
+                    for claim_id, count in Counter(self.returned_reported).items()
+                    if count > 1
+                }
             )
         )
 
@@ -215,11 +219,6 @@ class AssemblyReplay:
         return tuple(draft for draft in cannot_file if draft not in self.omitted)
 
 
-def _repeated(ids: Sequence[str]) -> tuple[str, ...]:
-    """Each ID ``ids`` holds more than once, sorted."""
-    return tuple(sorted(i for i, count in Counter(ids).items() if count > 1))
-
-
 def replay_case(
     case: GoldenCase,
     block: FrameworkAnalysis,
@@ -229,9 +228,9 @@ def replay_case(
     """Assembly run again over ``drafts`` and the rulings ``block`` carries."""
     framework = block.framework
     record = PACKAGES[framework].record
-    by_id: dict[str, Claim] = {}
-    for draft in drafts:
-        by_id.setdefault(draft.id, draft)
+    # The fan-in's own rule picks the copy of a repeated ID that replays.
+    kept, dropped = _drop_duplicate_ids(drafts)
+    by_id = {draft.id: draft for draft in kept}
     returned = {entry.claim_id: entry.unit for entry in block.returned_claims}
     ruled = {claim.id for claim in block.all_claims()} | returned.keys()
     accounted = [
@@ -250,7 +249,7 @@ def replay_case(
         returned_reported=tuple(entry.claim_id for entry in block.returned_claims),
         returned_replayed=(),
         omitted=tuple(sorted(by_id.keys() - ruled)),
-        repeated=_repeated([draft.id for draft in drafts]),
+        repeated=tuple(sorted({mark.claim_id for mark in dropped})),
     )
     # A ruled claim with no draft stays reported and is never replayed, so it
     # is named while its neighbours replay.
@@ -401,23 +400,17 @@ def command_assembly(args: argparse.Namespace) -> int:
         f" {len(sweep.unreadable)} report(s) refused by today's Report;"
         f" {len(sweep.capture_faults)} case(s) with a missing or stray capture"
     )
-    totals = {
-        name: sum(len(getattr(row, name)) for row in sweep.rows)
-        for name in (
-            "drafts",
-            "accounted",
-            "omitted",
-            "filed_differently",
-            "unavailable",
-            "undrafted",
-        )
-    }
+
+    def total(part: Callable[[AssemblyReplay], tuple[str, ...]]) -> int:
+        return sum(len(part(row)) for row in sweep.rows)
+
     print(
-        f"drafts: {totals['drafts']} inspected, {totals['accounted']} accounted,"
-        f" {totals['omitted']} omitted,"
-        f" {totals['filed_differently']} filed differently,"
-        f" {totals['unavailable']} unavailable;"
-        f" {totals['undrafted']} ruled claim(s) with no draft"
+        f"drafts: {total(lambda row: row.drafts)} inspected,"
+        f" {total(lambda row: row.accounted)} accounted,"
+        f" {total(lambda row: row.omitted)} omitted,"
+        f" {total(lambda row: row.filed_differently)} filed differently,"
+        f" {total(lambda row: row.unavailable)} unavailable;"
+        f" {total(lambda row: row.undrafted)} ruled claim(s) with no draft"
     )
     print("ruled severity: no oracle")
     return 1 if moved or sweep.capture_faults else 0
