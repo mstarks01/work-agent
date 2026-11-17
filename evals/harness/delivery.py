@@ -14,9 +14,9 @@ For each such row it gives four readings:
   lane material.
 * ``rebuilt``: the same reading over the candidates that today's rules write
   for the archived model and the archived catalog.
-* ``capture``: whether the two candidate sets agree, compared by rule and
-  elements. A rule's question text is not compared, because a question edit
-  does not move a lead.
+* ``capture``: whether the two candidate sets hold the same
+  :func:`~analysis_service.candidates.leads`. A rule's question text is not
+  part of a lead, because a question edit does not move one.
 * ``archived_lead_rules``: the rebuilt rules with a candidate on the
   reference's elements that the archived block also lists in ``fired_rules``.
   The block lists rule IDs only, so today's rule code says which elements
@@ -45,7 +45,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from analysis_service.candidates import CandidateSet
+from analysis_service.candidates import CandidateSet, leads
 from analysis_service.graph import FrameworkNodes, framework_lane_inputs, unfence
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
@@ -137,7 +137,8 @@ def trace_lane(
     fired = set(stride_block(report).fired_rules)
     capture: Capture = "uncaptured"
     if sent is not None:
-        capture = "agrees" if _keys(sent) == _keys(rebuilt) else "differs"
+        same = leads({lane: sent}) == leads({lane: rebuilt})
+        capture = "agrees" if same else "differs"
     return LaneTrace(
         delivered=None
         if sent is None
@@ -147,13 +148,6 @@ def trace_lane(
         archived_lead_rules=tuple(
             rule for rule in lead_rules(rebuilt, reference_ids) if rule in fired
         ),
-    )
-
-
-def _keys(candidates: CandidateSet) -> frozenset[tuple[str, tuple[str, ...]]]:
-    return frozenset(
-        (candidate.rule_id, candidate.element_ids)
-        for candidate in candidates.candidates
     )
 
 

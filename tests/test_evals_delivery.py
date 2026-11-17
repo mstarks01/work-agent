@@ -180,7 +180,6 @@ def test_each_charged_miss_is_a_row_and_only_place_and_unled_are_traced():
         for row in traced.rows
         if row.reference.cause in delivery.TRACED
     )
-    assert traced.re_keyed == sum(row.compatibility == "re-keyed" for row in card.rows)
 
 
 def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
@@ -244,3 +243,13 @@ def test_a_shared_endpoint_is_a_relation_and_no_lead_rule(report, flows, options
 
     assert traced.rebuilt == "draft-contains"
     assert traced.archived_lead_rules == ()
+
+
+def test_the_re_keyed_must_finds_are_counted_beside_the_rows():
+    """The 2198870 Baseline cites 12 must-finds by element IDs the corpus re-keyed."""
+    artifact = (
+        REPO_ROOT
+        / "evals/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.json"
+    )
+
+    assert _trace(artifact).re_keyed == 12
