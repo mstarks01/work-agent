@@ -450,7 +450,9 @@ def _answered_reading(
 
     **The one reader of which reading a loss stage charges.** The
     surviving-claim, critic and fan-in stages of :func:`attribute_case` charge
-    through this choice. ``answers`` gives the stage's items at a
+    through this choice wherever an item carries a reading's action; only the
+    surviving-claim stage's ``verb`` charge, where none does, reads the places
+    alone. ``answers`` gives the stage's items at a
     reading's place under that reading's action, so a reading with no such
     item is skipped: a reference answered by an item under its own action is
     the stage's cause, and a ``verb`` charge beside it names the wrong fix.
