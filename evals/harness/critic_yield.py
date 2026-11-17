@@ -74,10 +74,10 @@ ScoredOutcome = (
 
 #: What the critic's pass did with one draft, read off the block it returned.
 #: ``needs-info`` is a qualification: it is neither a confirmation nor a
-#: rejection. ``unruled`` is a draft the block carries in none of its three
+#: rejection. ``omitted`` is a draft the block carries in none of its three
 #: lists.
-CriticFate = VerdictStatus | Literal["returned", "unruled"]
-UNRULED: CriticFate = "unruled"
+CriticFate = VerdictStatus | Literal["returned", "omitted"]
+OMITTED: CriticFate = "omitted"
 FATES: tuple[CriticFate, ...] = tuple(
     value for part in get_args(CriticFate) for value in get_args(part)
 )
@@ -241,7 +241,9 @@ class CriticAudit:
         populations = self.populations
         print(
             "critic input populations, in drafts (labels are relative to the"
-            " reference set and the ledger; columns are the critic's fates):"
+            " reference set and the ledger). Rows are scored outcomes, where"
+            " 'rejected' is a person's down-vote; columns are the critic's"
+            " fates, where 'rejected' is the critic's verdict:"
         )
         print(
             f"  {'scored outcome':<18} {'label':<12}"
@@ -497,15 +499,16 @@ def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
 def fate_by_claim(block: FrameworkAnalysis) -> dict[str, CriticFate]:
     """Each claim ID the block carries, and the list it carries it in.
 
-    A draft the block does not carry has the fate :data:`UNRULED`. The block's
-    validation refuses one ID in both ``claims`` and ``rejected_claims``. It
-    does not check ``returned_claims`` against them, and here a later list
-    wins over ``returned``.
+    A draft the block does not carry has the fate :data:`OMITTED`, the
+    report omission of :mod:`evals.harness.assembly`. The block's validation
+    refuses one ID in both ``claims`` and ``rejected_claims``. It does not
+    check ``returned_claims`` against them, and ``returned`` wins here, as it
+    does in the assembly replay.
     """
     return {
-        **{entry.claim_id: "returned" for entry in block.returned_claims},
         **{claim.id: "rejected" for claim in block.rejected_claims},
         **{claim.id: claim.verdict.status for claim in block.claims},
+        **{entry.claim_id: "returned" for entry in block.returned_claims},
     }
 
 
@@ -546,7 +549,7 @@ def _yield(
         populations=CriticPopulations(
             dict(
                 Counter(
-                    (outcomes[draft.id][0], fate_of.get(draft.id, UNRULED))
+                    (outcomes[draft.id][0], fate_of.get(draft.id, OMITTED))
                     for draft in drafts
                 )
             )

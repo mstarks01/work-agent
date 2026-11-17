@@ -182,7 +182,6 @@ from evals.harness.run_record import run_record, sweep_inputs
 from evals.harness.scorer import (
     CaseScore,
     Rate,
-    percent,
     review_coverage,
     score_case,
 )
@@ -1404,7 +1403,7 @@ def _print_question_fallback(runs: Mapping[str, Any]) -> None:
     typed = sum(count.typed for count in counts)
     free = sum(count.free_text for count in counts)
     total = typed + free
-    rate = percent(Rate(free, total).value)
+    rate = Rate(free, total).shown()
     print(
         f"\nQuestion kinds: {typed} typed, {free} free text; fallback {rate}"
         " (instrument, non-gating)"
