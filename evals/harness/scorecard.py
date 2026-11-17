@@ -2,9 +2,11 @@
 
 A re-score of an archived sweep on today's corpus mixes two facts. Some
 references the run could not answer under today's contract, and some it
-answered or missed. This module keeps them apart. Each must-find of each case
-the sweep lists gets one row with one exclusive :data:`Status`, so the counts
-reconcile to the reference population and no incompatible row is dropped.
+answered or missed. This module keeps them apart. Each must-find of each
+development case the sweep lists gets one row with one exclusive
+:data:`Status`, so the counts reconcile to the reference population and no
+incompatible row is dropped. :attr:`Scorecard.left_out` names the sweep's
+other cases.
 
 **Compatibility.** A row is ``compatible`` when today's scorer can read the
 run's answer to it. The other values say why it cannot:
@@ -131,8 +133,8 @@ class ReferenceRow:
     #: The cause :mod:`evals.harness.losses` charged a miss to. ``None`` for a
     #: match and an uncaptured case.
     cause: Cause | None
-    #: The STRIDE rules that fire on the reference's elements in the signed
-    #: model, read through :func:`~evals.harness.triggers.case_trigger_recall`.
+    #: The STRIDE rules that fire on the reference's elements in today's
+    #: corpus ``model.json``, read through :func:`~evals.harness.triggers.case_trigger_recall`.
     #: Empty means no rule led the lane there.
     lead_rules: tuple[str, ...]
 
@@ -284,7 +286,8 @@ class StageChange:
 
     ``observed`` counts the compatible rows that captured both stages.
     ``lost`` are represented before and not after, ``gained`` the reverse.
-    ``None`` throughout where no row captured both stages.
+    Where no row captured both stages, ``observed`` is 0 and
+    ``represented_before``, ``lost`` and ``gained`` are ``None``.
     """
 
     before: Stage
@@ -333,7 +336,7 @@ class LaneSummary:
     #: Matched over every row: the full population, beside the subset.
     population_matched: Rate
     #: Per stage, the compatible rows represented there over the compatible
-    #: rows that captured the stage: the cumulative share at that stage.
+    #: rows that captured the stage.
     #: ``None`` where no compatible row captured it.
     represented: Mapping[Stage, Rate | None]
     changes: tuple[StageChange, ...]
