@@ -510,14 +510,14 @@ def relation(
     and the row says so rather than picking one.
     """
     place = endpoint_form(reference_ids, flows)
-    drafted = endpoint_form(cited_ids, flows)
-    if place == drafted and place:
+    cited = endpoint_form(cited_ids, flows)
+    if place == cited and place:
         return "equal"
-    if place > drafted and drafted:
+    if place > cited and cited:
         return "reference-contains"
-    if drafted > place and place:
+    if cited > place and place:
         return "draft-contains"
-    return "overlap" if place & drafted else None
+    return "overlap" if place & cited else None
 
 
 def _nearby(
