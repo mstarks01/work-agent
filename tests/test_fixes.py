@@ -126,6 +126,26 @@ def test_a_row_stating_a_control_absent_is_a_missing_control():
     assert missing_controls(by_row, rows) == missing_controls(by_attribute, rows)
 
 
+def test_a_capacity_parts_no_is_a_missing_control():
+    """A part's "no" says the limit is not there, as ``absent`` would."""
+    process = "process:web-app"
+    row = Assertion(
+        subject=process,
+        predicate="capacity-limits-rate",
+        value="no",
+        basis="inferred",
+        origin="assertion-pass",
+        explanation="the description says nothing limits the request rate",
+    )
+    catalog = AssertionCatalog(
+        subjects=[Subject(id=process, type="component", label="web app")],
+        entries=[row],
+    )
+    assert absent_rows(catalog) == {
+        assertion_id(row): (process, "capacity-limits-rate")
+    }
+
+
 def test_an_unknown_control_is_not_a_missing_one():
     """An unstated control is a question, not a fix."""
     unstated = sample_threat(

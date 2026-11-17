@@ -1360,6 +1360,17 @@ def test_lead_topics_without_a_catalog_skips_an_assertion_ground():
     assert lead_topics(evidence, assertions=None) == frozenset()
 
 
+def test_a_capacity_parts_no_is_a_lead():
+    """A part's "no" states the limit missing, so the lane can still raise it."""
+    entry = row(subject="process:web-app", predicate="capacity-limits-rate", value="no")
+    ref = assertion_id(entry)
+    evidence = {ref: Ground(kind="assertion", assertion=ref)}
+
+    assert lead_topics(evidence, assertions(entry)) == frozenset(
+        {"process:web-app.capacity-limits-rate"}
+    )
+
+
 class TestWhichElementsAGroundIsAbout:
     """``ground_places`` and ``evidence_ref``: the readers the scope rule uses."""
 

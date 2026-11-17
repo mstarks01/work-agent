@@ -2103,6 +2103,14 @@ def _compares_an_origin(node: ast.AST) -> bool:
     )
 
 
+def _compares_a_value_with_absent(node: ast.AST) -> bool:
+    """A comparison of a row's ``value`` with ``ABSENT``."""
+    parts = (node.left, *node.comparators) if isinstance(node, ast.Compare) else ()
+    return any(_loads(part, "ABSENT") for part in parts) and any(
+        _loads_attribute(part, "value") for part in parts
+    )
+
+
 def _ends_a_job(node: ast.AST) -> bool:
     """A boolean expression that asks both halves of an ended job."""
     return _joins(node, "readable") and any(
@@ -2652,6 +2660,23 @@ ONE_READERS: dict[str, _OneReader] = {
             ("src/analysis_service/validation.py", "_citation_issues"): (
                 "it reads whether an answer stated a capability statement, and"
                 " reads no catalog row"
+            ),
+        },
+        "",
+    ),
+    "is this control missing": _OneReader(
+        _compares_a_value_with_absent,
+        ("src/analysis_service/assertions.py", "states_missing"),
+        {
+            ("src/analysis_service/assertions.py", "_compatible"): (
+                "it asks whether two values can hold at once, and decides no"
+                " missing control"
+            ),
+            ("src/analysis_service/evidence.py", "_open_question_gloss"): (
+                "it spells the value a lane reads, and decides no missing control"
+            ),
+            ("src/analysis_service/evidence.py", "_assertion_gloss"): (
+                "it spells the value a lane reads, and decides no missing control"
             ),
         },
         "",

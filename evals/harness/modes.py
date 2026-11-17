@@ -45,7 +45,6 @@ from analysis_service.analysis import (
     control_state,
 )
 from analysis_service.assertions import (
-    ABSENT,
     REGISTRY,
     AssertionCatalog,
     AssertionRecord,
@@ -56,6 +55,7 @@ from analysis_service.assertions import (
     conflicts,
     project,
     projection_fields,
+    states_missing,
 )
 from analysis_service.basis import (
     IN_SCOPE,
@@ -1542,8 +1542,8 @@ class AssertionScore:
     a reviewer signed.
 
     ``absences`` is the one number that answers the audit directly. It counts
-    rows whose value is ``absent`` — a control the sources say is **not there**
-    — which is the fact the graph's own attributes read as a stated control in
+    rows that state a control **not there**
+    (:func:`~analysis_service.assertions.states_missing`), which is the fact the graph's own attributes read as a stated control in
     ten of the corpus's 21 stated mechanism values.
 
     Four outcomes are kept apart (#961). ``rejected`` is rows the run lost,
@@ -1752,7 +1752,7 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
             for assessment in get_args(Assessment)
         },
         spans=sum(len(entry.support) for entry in entries),
-        absences=sum(1 for entry in entries if entry.value == ABSENT),
+        absences=sum(1 for entry in entries if states_missing(entry)),
         unknowns=sum(1 for entry in entries if entry.value == UNKNOWN),
         inferred=sum(1 for entry in entries if entry.basis == "inferred"),
         conflicts=len(conflicts(catalog)),

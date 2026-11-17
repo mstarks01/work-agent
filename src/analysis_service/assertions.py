@@ -183,6 +183,7 @@ __all__ = [
     "snap_subject",
     "span_source",
     "spans_for",
+    "states_missing",
     "subject_id",
     "support_span",
 ]
@@ -2089,6 +2090,24 @@ def answered(entry: Assertion) -> bool:
     return entry.origin == "answer"
 
 
+def states_missing(entry: Assertion) -> bool:
+    """Whether this row states that its control is not there.
+
+    **The one reader of "is this control missing".** The row says so with
+    :data:`ABSENT`, or with the value that a "no" writes for a part that
+    protects on "yes": a capacity part's ``no`` says there is no limit. A part
+    that protects on "no" asks whether a harm can happen, and names no
+    control.
+    """
+    if entry.value == ABSENT:
+        return True
+    name = parse_predicate(entry.predicate)
+    asked = None if name is None else REGISTRY[name].asked
+    if asked is None or asked.protects != "yes":
+        return False
+    return entry.value == asked.values.get("no")
+
+
 def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
     """What ``catalog`` holds about ``subject`` under ``predicate``.
 
@@ -2754,9 +2773,11 @@ def _resolve_row(
 
     Only what construction needs is decided here: the predicate has to be
     registered for an identity to exist, and the subject and a referent value
-    have to resolve for the row to name them, and a stated ``absent`` of a
-    predicate with a ``no`` term is written as that ``no``. Everything else is
-    the gate's call, made on the built row, so no rule is written twice.
+    have to resolve for the row to name them. Everything else is the gate's
+    call, made on the built row, so no rule is written twice.
+
+    One value is rewritten: an ``absent`` of a predicate with a ``no`` term is
+    written as that ``no``.
 
     A subject is declared only for a row that is kept, so a dropped row leaves
     no subject behind that no row names.

@@ -8,7 +8,8 @@ each missing control once, with the confirmed findings that rest on it.
 
 **Deterministic, and derived from the report alone.** No model is asked. A
 control is missing where a finding cites an ``absent-attribute`` ground, or an
-``assertion`` ground whose row states :data:`~analysis_service.assertions.ABSENT`.
+``assertion`` ground whose row states the control missing
+(:func:`~analysis_service.assertions.states_missing`).
 A row's control is read through :func:`~analysis_service.claim_identity.row_controls`,
 the one reader of which control a row is about. A finding that rests only on a
 quote names no control, so it stays outside every group.
@@ -25,7 +26,11 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from analysis_service.assertions import ABSENT, AssertionCatalog, assertion_id
+from analysis_service.assertions import (
+    AssertionCatalog,
+    assertion_id,
+    states_missing,
+)
 from analysis_service.claim_identity import row_controls
 from analysis_service.claims import Claim, FrameworkAnalysis
 from analysis_service.open_facts import attribute_words, element_names, flow_words
@@ -64,7 +69,7 @@ def absent_rows(assertions: AssertionCatalog | None) -> Mapping[str, ControlKey]
     return {
         row_id: (entry.subject, controls[row_id])
         for entry in assertions.entries
-        if entry.value == ABSENT and (row_id := assertion_id(entry)) in controls
+        if states_missing(entry) and (row_id := assertion_id(entry)) in controls
     }
 
 
