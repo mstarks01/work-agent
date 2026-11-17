@@ -157,7 +157,8 @@ class AssemblyReplay:
     #: Drafts the critic ruled on that the report carries in no array.
     omitted: tuple[str, ...]
     #: Draft IDs the drafts file holds more than once. The fan-in keeps one
-    #: draft under each ID, so the capture is broken; the first copy replays.
+    #: draft under each ID, so the capture is broken; the first copy replays,
+    #: and the counts leave the ID out.
     repeated: tuple[str, ...]
     #: Why today's ruling record or review check refused the archived rulings,
     #: where one did. Assembly fails closed on a ruling either refuses, so an
@@ -183,7 +184,7 @@ class AssemblyReplay:
         )
 
     @property
-    def misfiled(self) -> tuple[str, ...]:
+    def filed_differently(self) -> tuple[str, ...]:
         """Drafts whose array differs from what assembly makes of the rulings."""
         return tuple(
             draft
@@ -206,7 +207,7 @@ class AssemblyReplay:
 
     @property
     def unavailable(self) -> tuple[str, ...]:
-        """Drafts the replay cannot file: a refused block's, or a repeated ID.
+        """Drafts left out of the counts: a refused block's, or a repeated ID.
 
         An omitted draft is counted as omitted only.
         """
@@ -390,21 +391,33 @@ def command_assembly(args: argparse.Namespace) -> int:
             f" rejected {len(row.rejected_reported):>3}"
             f" returned {len(row.returned_reported):>3}  {status}"
         )
-        for claim_id in row.unexplained:
+        for claim_id in row.filed_differently:
             print(f"  filed differently from its ruling: {claim_id}")
+        for claim_id in row.undrafted:
+            print(f"  ruled on with no draft: {claim_id}")
     refused = sum(bool(row.refused) for row in sweep.rows)
     print(
         f"{len(sweep.rows)} block(s), {moved} differ, {refused} refused by today's check;"
         f" {len(sweep.unreadable)} report(s) refused by today's Report;"
         f" {len(sweep.capture_faults)} case(s) with a missing or stray capture"
     )
+    totals = {
+        name: sum(len(getattr(row, name)) for row in sweep.rows)
+        for name in (
+            "drafts",
+            "accounted",
+            "omitted",
+            "filed_differently",
+            "unavailable",
+            "undrafted",
+        )
+    }
     print(
-        f"drafts: {sum(len(row.drafts) for row in sweep.rows)} inspected,"
-        f" {sum(len(row.accounted) for row in sweep.rows)} accounted,"
-        f" {sum(len(row.omitted) for row in sweep.rows)} omitted,"
-        f" {sum(len(row.misfiled) for row in sweep.rows)} filed differently,"
-        f" {sum(len(row.unavailable) for row in sweep.rows)} unavailable;"
-        f" {sum(len(row.undrafted) for row in sweep.rows)} ruled claim(s) with no draft"
+        f"drafts: {totals['drafts']} inspected, {totals['accounted']} accounted,"
+        f" {totals['omitted']} omitted,"
+        f" {totals['filed_differently']} filed differently,"
+        f" {totals['unavailable']} unavailable;"
+        f" {totals['undrafted']} ruled claim(s) with no draft"
     )
     print("ruled severity: no oracle")
     return 1 if moved or sweep.capture_faults else 0

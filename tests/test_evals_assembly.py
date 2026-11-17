@@ -369,7 +369,7 @@ def test_a_changed_claim_id_cannot_hide_its_draft(archive, case):  # noqa: F811
 
     assert row.omitted == tuple(renamed)
     assert row.unexplained == row.undrafted == tuple(renamed.values())
-    assert row.misfiled == ()
+    assert row.filed_differently == ()
     assert len(row.accounted) + len(row.omitted) == len(row.drafts)
     assert (row.replayed, row.refused) == (row.reported[:-1], "")
 
@@ -475,7 +475,7 @@ def test_a_claim_returned_twice_is_filed_differently(
 
     row = assembly.replay_case(case, block, [returned, neighbour], model)
 
-    assert row.unexplained == row.misfiled == (returned.id,)
+    assert row.unexplained == row.filed_differently == (returned.id,)
     assert row.accounted == (neighbour.id,)
 
 
@@ -492,5 +492,5 @@ def test_an_omitted_draft_held_twice_is_counted_once(archive, case):  # noqa: F8
     (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
 
     assert (row.omitted, row.repeated, row.unavailable) == ((gone,), (gone,), ())
-    counted = row.accounted + row.omitted + row.misfiled + row.unavailable
+    counted = row.accounted + row.omitted + row.filed_differently + row.unavailable
     assert sorted(counted) == sorted(row.drafts)
