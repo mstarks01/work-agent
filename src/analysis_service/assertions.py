@@ -170,6 +170,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "graph_subject_type",
+    "missing_value",
     "offered",
     "parse_predicate",
     "parse_subject_type",
@@ -2090,22 +2091,30 @@ def answered(entry: Assertion) -> bool:
     return entry.origin == "answer"
 
 
+def missing_value(predicate: Predicate) -> str:
+    """The value a row of ``predicate`` writes to state its control missing.
+
+    **The one reader of which value says a control is not there.** For a part
+    that protects on "yes", it is the value its "no" writes: a capacity part's
+    ``no`` says there is no limit. For every other predicate it is
+    :data:`ABSENT`. A part that protects on "no" asks whether a harm can
+    happen, and names no control.
+    """
+    asked = predicate.asked
+    if asked is None or asked.protects != "yes":
+        return ABSENT
+    return asked.values.get("no", ABSENT)
+
+
 def states_missing(entry: Assertion) -> bool:
     """Whether this row states that its control is not there.
 
-    **The one reader of "is this control missing".** The row says so with
-    :data:`ABSENT`, or with the value that a "no" writes for a part that
-    protects on "yes": a capacity part's ``no`` says there is no limit. A part
-    that protects on "no" asks whether a harm can happen, and names no
-    control.
+    **The one reader of "is this control missing".** The value is
+    :data:`ABSENT` or the predicate's :func:`missing_value`.
     """
-    if entry.value == ABSENT:
-        return True
     name = parse_predicate(entry.predicate)
-    asked = None if name is None else REGISTRY[name].asked
-    if asked is None or asked.protects != "yes":
-        return False
-    return entry.value == asked.values.get("no")
+    missing = ABSENT if name is None else missing_value(REGISTRY[name])
+    return entry.value in (ABSENT, missing)
 
 
 def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
@@ -2776,8 +2785,8 @@ def _resolve_row(
     have to resolve for the row to name them. Everything else is the gate's
     call, made on the built row, so no rule is written twice.
 
-    One value is rewritten: an ``absent`` of a predicate with a ``no`` term is
-    written as that ``no``.
+    One value is rewritten: an ``absent`` is written as the predicate's
+    :func:`missing_value`.
 
     A subject is declared only for a row that is kept, so a dropped row leaves
     no subject behind that no row names.
@@ -2805,11 +2814,9 @@ def _resolve_row(
         return None
 
     value = row.value
-    if value == ABSENT and "no" in predicate.terms:
-        # A predicate with its own "no" keeps one shape for "not there", so the
-        # row matches an owner's answer. Record attribution writes an owner's
-        # "no" as absent instead, because it has no "no" term.
-        value = "no"
+    if value == ABSENT:
+        # One shape for "not there", so the row matches an owner's answer.
+        value = missing_value(predicate)
     referent = None
     if predicate.value == "reference" and value not in UNIVERSAL_TERMS:
         wanted = referent_type(predicate)

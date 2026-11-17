@@ -28,6 +28,7 @@ from analysis_service.assertions import (
     answer,
     assertion_id,
     catalog_issues,
+    missing_value,
     states_missing,
 )
 from analysis_service.claims import UnknownRef
@@ -217,6 +218,12 @@ class TestTheAssertionPassSeesOnlyTheExtractedParts:
         record = extracted(model, "record-attribution", ABSENT)
         assert [entry.value for entry in record.catalog.entries] == [ABSENT]
 
+    @pytest.mark.parametrize("name", ["record-attribution", *sorted(EXTRACTED_PARTS)])
+    def test_the_resolver_writes_the_value_that_states_missing_reads(self, model, name):
+        (entry,) = extracted(model, name, ABSENT).catalog.entries
+        assert entry.value == missing_value(REGISTRY[name])
+        assert states_missing(entry)
+
     def test_an_extracted_absence_agrees_with_an_owners_no(self, model):
         held = extracted(model, "capacity-limits-rate", ABSENT).catalog
         fact = kind_answer(PROCESS, "capacity-limits", rate="no")
@@ -236,6 +243,8 @@ class TestTheAssertionPassSeesOnlyTheExtractedParts:
         ("stored-copy-integrity", "no", True),
         ("record-attribution", ABSENT, True),
         ("internet-exposure", "internet-facing", False),
+        ("internet-exposure", "internal", False),
+        ("code-execution", "no", False),
         ("mfa-requirement", "required", False),
     ],
 )

@@ -20,13 +20,14 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import Ground
 from analysis_service.fixes import (
-    absent_rows,
     fixes,
     fixes_by_framework,
+    label_of,
     missing_controls,
+    missing_rows,
 )
 from analysis_service.report import Report
-from tests.factories import sample_threat
+from tests.factories import sample_threat, valid_model
 
 REPORTS = sorted(
     Path(__file__)
@@ -113,7 +114,7 @@ def test_a_row_stating_a_control_absent_is_a_missing_control():
         subjects=[Subject(id=flow, type="interaction", label="login")],
         entries=[row],
     )
-    rows = absent_rows(catalog)
+    rows = missing_rows(catalog)
     assert rows == {assertion_id(row): (flow, "authentication")}
     by_row = sample_threat(
         grounds=[Ground(kind="assertion", assertion=assertion_id(row))]
@@ -127,8 +128,10 @@ def test_a_row_stating_a_control_absent_is_a_missing_control():
 
 
 def test_a_capacity_parts_no_is_a_missing_control():
-    """A part's "no" says the limit is not there, as ``absent`` would."""
-    process = "process:web-app"
+    """A part's "no" says the limit is not there, as ``absent`` would, and the
+    Fix names the protection the part asks for."""
+    model = valid_model()
+    process = model.processes[0].id
     row = Assertion(
         subject=process,
         predicate="capacity-limits-rate",
@@ -141,9 +144,11 @@ def test_a_capacity_parts_no_is_a_missing_control():
         subjects=[Subject(id=process, type="component", label="web app")],
         entries=[row],
     )
-    assert absent_rows(catalog) == {
+    assert missing_rows(catalog) == {
         assertion_id(row): (process, "capacity-limits-rate")
     }
+    label = label_of((process, "capacity-limits-rate"), {process: "web app"}, model)
+    assert label == "web app: Limits the rate of requests."
 
 
 def test_an_unknown_control_is_not_a_missing_one():

@@ -1543,8 +1543,9 @@ class AssertionScore:
 
     ``absences`` is the one number that answers the audit directly. It counts
     rows that state a control **not there**
-    (:func:`~analysis_service.assertions.states_missing`), which is the fact the graph's own attributes read as a stated control in
-    ten of the corpus's 21 stated mechanism values.
+    (:func:`~analysis_service.assertions.states_missing`), which is the fact
+    the graph's own attributes read as a stated control in ten of the corpus's
+    21 stated mechanism values.
 
     Four outcomes are kept apart (#961). ``rejected`` is rows the run lost,
     by the resolver or the gate, as :meth:`~AssertionRecord.refused_rows`

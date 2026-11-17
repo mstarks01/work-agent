@@ -27,8 +27,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from analysis_service.assertions import (
+    REGISTRY,
     AssertionCatalog,
     assertion_id,
+    parse_predicate,
     states_missing,
 )
 from analysis_service.claim_identity import row_controls
@@ -61,8 +63,8 @@ class Fix:
         }
 
 
-def absent_rows(assertions: AssertionCatalog | None) -> Mapping[str, ControlKey]:
-    """Each row that states a control absent, by its ID: its subject and control."""
+def missing_rows(assertions: AssertionCatalog | None) -> Mapping[str, ControlKey]:
+    """Each row that states a control missing, by its ID: its subject and control."""
     if assertions is None:
         return {}
     controls = row_controls(assertions)
@@ -89,13 +91,21 @@ def missing_controls(
 
 
 def label_of(key: ControlKey, names: Mapping[str, str], model: SystemModel) -> str:
-    """The control to add, and where: a flow reads through :func:`flow_words`."""
+    """The control to add, and where: a flow reads through :func:`flow_words`.
+
+    A part of a question kind is named by the protection it asks for, because
+    its predicate name is no phrase.
+    """
     subject, control = key
     element = model.get(subject)
     if isinstance(element, DataFlow):
         where = flow_words(element, names)
     else:
         where = names.get(subject, subject)
+    name = parse_predicate(control)
+    asked = None if name is None else REGISTRY[name].asked
+    if asked is not None:
+        return f"{where}: {asked.statement}"
     return f"Add {attribute_words(control)} to {where}"
 
 
@@ -105,7 +115,7 @@ def fixes(
     assertions: AssertionCatalog | None,
 ) -> tuple[Fix, ...]:
     """Every missing control two or more confirmed findings rest on, most first."""
-    rows = absent_rows(assertions)
+    rows = missing_rows(assertions)
     rests: dict[ControlKey, list[str]] = defaultdict(list)
     needs: dict[str, frozenset[ControlKey]] = {}
     for claim in block.claims:
