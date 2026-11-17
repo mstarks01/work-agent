@@ -316,23 +316,23 @@ def test_a_claim_at_a_ruled_reading_with_the_ruled_position_is_no_loss(case, flo
     assert 0 not in charged, "the scorer matched it through the ruled reading"
 
 
-def test_a_reading_whose_claim_holds_the_position_wins_over_one_that_fails_it(
-    case, flows
-):
-    """Two readings each carry a claim with their action. Only the second
-    reading's claim states the ruled position, and the scorer gave that claim
-    to another reference at the same place, so the reference is a merge, not a
-    position loss."""
+def _two_readings(case):
+    """Case 01's reference 0 with a second reading, and a draft answering each.
+
+    The second reading carries the action of another reference at the same
+    place. The draft under the reference's own action states a position other
+    than the ruled one; the draft under the second reading's action states the
+    ruled one.
+    """
     reference = case.stride_claims()[0]
     other = next(
-        index
+        claim
         for index, claim in enumerate(case.stride_claims())
         if index != 0
         and claim.category == reference.category
         and claim.affected_element_ids == reference.affected_element_ids
         and not same_action(claim.verb, reference.verb)
     )
-    other_verb = case.stride_claims()[other].verb
     position = ruled_position(case, reference)
     assert position is not None and position != "storage-copy"
     ruled = replace(
@@ -340,7 +340,7 @@ def test_a_reading_whose_claim_holds_the_position_wins_over_one_that_fails_it(
         ruled_readings={
             0: (
                 Reading(
-                    verb=other_verb,
+                    verb=other.verb,
                     affected_element_ids=reference.affected_element_ids,
                 ),
             )
@@ -349,16 +349,55 @@ def test_a_reading_whose_claim_holds_the_position_wins_over_one_that_fails_it(
     failing = at(case, reference, 1, reference.verb).model_copy(
         update={"attacker_position": "storage-copy"}
     )
-    holding = at(case, reference, 2, other_verb).model_copy(
+    holding = at(case, reference, 2, other.verb).model_copy(
         update={"attacker_position": position}
     )
+    return ruled, failing, holding
+
+
+def test_a_surviving_claim_that_holds_the_position_wins_over_one_that_fails_it(
+    case, flows
+):
+    """The scorer gave the holding claim to the other reference at the place,
+    so the reference is a merge, not a position loss."""
+    ruled, failing, holding = _two_readings(case)
 
     charged = by_index(
         charge(ruled, flows, [failing, holding], [promote(failing), promote(holding)])
     )
 
-    assert other not in charged
     assert (charged[0].cause, charged[0].draft_id) == ("merged", holding.id)
+
+
+def test_a_killed_draft_that_holds_the_position_wins_over_one_that_fails_it(
+    case, flows
+):
+    ruled, failing, holding = _two_readings(case)
+
+    charged = by_index(charge(ruled, flows, [failing, holding], []))
+
+    assert (charged[0].cause, charged[0].draft_id) == ("critic", holding.id)
+
+
+def test_a_proposal_that_holds_the_position_wins_over_one_that_fails_it(case, flows):
+    ruled, failing, holding = _two_readings(case)
+    proposed = {
+        failing.category: {
+            "claims": [
+                {
+                    "title": draft.title,
+                    "verb": draft.verb,
+                    "affected_element_ids": list(draft.affected_element_ids),
+                    "attacker_position": draft.attacker_position,
+                }
+                for draft in (failing, holding)
+            ]
+        }
+    }
+
+    charged = by_index(charge(ruled, flows, [], [], proposed=proposed))
+
+    assert (charged[0].cause, charged[0].draft_verb) == ("fan-in", holding.verb)
 
 
 def _ruled_at_zero(case):
