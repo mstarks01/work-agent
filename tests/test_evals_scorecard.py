@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from evals.harness.modes import EvalRunError
 from evals.harness.reference import flows_by_case, load_corpus
 from evals.harness.run import main
 from evals.harness.scorecard import (
+    STAGES,
     STATUSES,
     MixedRunsError,
     Rate,
@@ -286,6 +288,12 @@ def test_compatible_and_incompatible_rows_report_both_populations():
     assert every.total == len(rows)
     assert every.compatible_matched == Rate(1, 2)
     assert every.population_matched == Rate(1, 5)
+
+
+def test_the_stage_changes_are_every_pair_of_adjacent_stages():
+    pairs = [(before, after) for before, after, _ in scorecard.CHANGES]
+
+    assert pairs == list(pairwise(STAGES))
 
 
 def test_no_rows_are_refused_as_no_run():

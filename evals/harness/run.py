@@ -1463,14 +1463,14 @@ def command_score(args: argparse.Namespace) -> int:
 def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
     """The must-find scorecard of one finished sweep, scored on ``corpus``.
 
-    Shares :func:`_score_runs` with
-    ``score``, so the matches and loss causes are the ones ``score`` prints.
-    Matching reads no vote, so it reads an empty ledger. The ``drafted``
-    stage is the same matcher over the drafts the critic was handed.
+    Shares :func:`_score_runs` with ``score``, so the matches and loss causes
+    are the ones ``score`` prints. Matching reads no vote, so it reads an
+    empty ledger. The ``drafted`` stage is the same matcher over the drafts
+    the critic was handed.
 
     Reads an ``analysis`` sweep only: its analysed model is the corpus
-    ``model.json`` of the run's day, so an element it lacks is a re-key and not an extraction
-    loss. Reads the development cases only, and names the others in
+    ``model.json`` of the run's day, so an element it lacks is a re-key and
+    not an extraction loss. Reads the development cases only, and names the others in
     ``left_out``. Raises :class:`~evals.harness.modes.EvalRunError` on
     another mode, and where no development case of the sweep is in
     ``corpus``.

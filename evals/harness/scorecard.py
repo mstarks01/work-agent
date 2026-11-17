@@ -19,7 +19,7 @@ run's answer to it. The other values say why it cannot:
   ``re-keyed``, because the scorer read it.
 * ``position-unstated``: a person ruled the reference an attacker position,
   and :func:`~evals.harness.scorer.none_stated` reads every draft of the
-  run as ``unstated`` against it. The archive holds no ``attacker_position``,
+  case as ``unstated`` against it. The archive holds no ``attacker_position``,
   so the row is not a lane's choice of attacker. A missing position is never
   inferred from prose.
 
@@ -79,8 +79,8 @@ Stage = Literal["proposed", "drafted", "reported"]
 STAGES: tuple[Stage, ...] = get_args(Stage)
 
 #: Each stage change, as (before, after, the graph node between them). Its
-#: phase is :func:`~evals.harness.audit.phase_of` that node, so the scorecard
-#: reads the audit's one phase table.
+#: phase is :func:`~evals.harness.audit.phase_of` that node, which reads
+#: :data:`~evals.harness.audit.PHASES`.
 CHANGES: tuple[tuple[Stage, Stage, str], ...] = (
     ("proposed", "drafted", "merge"),
     ("drafted", "reported", "critic"),
@@ -134,8 +134,9 @@ class ReferenceRow:
     #: match and an uncaptured case.
     cause: Cause | None
     #: The STRIDE rules that fire on the reference's elements in today's
-    #: corpus ``model.json``, read through :func:`~evals.harness.triggers.case_trigger_recall`.
-    #: Empty means no rule led the lane there.
+    #: corpus ``model.json``, read through
+    #: :func:`~evals.harness.triggers.case_trigger_recall`. Empty means no rule
+    #: led the lane there.
     lead_rules: tuple[str, ...]
 
     @property
