@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -9,9 +11,11 @@ import pytest
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.frameworks import package_for
 from analysis_service.sources import render_fenced
-from evals.harness import delivery
+from evals.harness import delivery, run
+from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
 from evals.harness.reference import flows_by_case, load_corpus
+from evals.harness.scorecard import charged_misses
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CASE = "05-cookbook-queue-webapp"
@@ -135,3 +139,84 @@ def test_an_archived_lead_rule_is_one_the_archived_block_fired(report, flows):
         "tampering-unverified-write-to-store",
     )
     assert after.archived_lead_rules == ("tampering-unverified-write-to-store",)
+
+
+BASELINE = (
+    REPO_ROOT / "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json"
+)
+
+
+def _trace(artifact: Path) -> delivery.Delivery:
+    corpus = REPO_ROOT / "evals/corpus"
+    return delivery.trace(
+        run.scorecard_of(artifact, corpus), load_artifact(artifact), load_corpus(corpus)
+    )
+
+
+def test_each_charged_miss_is_a_row_and_only_place_and_unled_are_traced():
+    card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus")
+
+    traced = _trace(BASELINE)
+
+    assert [row.reference for row in traced.rows] == list(charged_misses(card.rows))
+    assert {row.reference.cause for row in traced.rows if row.lane is None}.isdisjoint(
+        delivery.TRACED
+    )
+    assert all(
+        row.lane is not None
+        for row in traced.rows
+        if row.reference.cause in delivery.TRACED
+    )
+    assert traced.re_keyed == sum(row.compatibility == "re-keyed" for row in card.rows)
+
+
+def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
+    traced = _trace(BASELINE)
+
+    lanes = [row.lane for row in traced.rows if row.lane is not None]
+    assert lanes
+    assert {lane.capture for lane in lanes} == {"uncaptured"}
+    assert {lane.delivered for lane in lanes} == {None}
+    assert set(traced.uncaptured) == {
+        row.reference.case for row in traced.rows if row.lane is not None
+    }
+
+
+def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
+    shutil.copy(BASELINE, tmp_path / BASELINE.name)
+    reports = BASELINE.with_suffix(".reports")
+    shutil.copytree(reports, tmp_path / reports.name)
+    case = "02-iot-fleet-telemetry"
+    report = read_report(reports / f"{case}.report.json")
+    package = package_for("stride")
+    catalog = report.assertions.catalog if report.assertions else None
+    sent = generate_candidates(
+        report.system_model, package.lanes, package.rules, catalog
+    )
+    material = {
+        "lanes": {
+            "stride": {
+                lane: {"candidates": render_fenced(held.model_dump(mode="json"))}
+                for lane, held in sent.items()
+            }
+        }
+    }
+    (tmp_path / reports.name / f"{case}.lanes.json").write_text(json.dumps(material))
+
+    traced = _trace(tmp_path / BASELINE.name)
+
+    (row,) = [row for row in traced.rows if row.reference.case == case and row.lane]
+    assert row.lane is not None
+    assert row.lane.capture == "agrees"
+    assert row.lane.delivered == row.lane.rebuilt == "equal"
+    assert case not in traced.uncaptured
+
+
+def test_the_command_writes_the_trace_with_its_record(tmp_path):
+    out = tmp_path / "delivery.json"
+
+    assert run.main(["delivery", str(BASELINE), "--out", str(out)]) == 0
+
+    written = json.loads(out.read_text())
+    assert written["record"]["command"] == "delivery"
+    assert len(written["rows"]) == len(_trace(BASELINE).rows)

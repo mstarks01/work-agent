@@ -35,17 +35,28 @@ those rows.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.frameworks import package_for
 from analysis_service.graph import unfence
 from analysis_service.report import Report
-from evals.harness.bundle import stride_block
+from evals.harness.artifact import EvalArtifact
+from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
-from evals.harness.losses import RELATIONS, Relation, _relation
+from evals.harness.losses import RELATIONS, Cause, Relation, _relation
+from evals.harness.modes import EvalRunError
+from evals.harness.reference import GoldenCase, flows_by_case
+from evals.harness.scorecard import (
+    ReferenceRow,
+    RunIdentity,
+    Scorecard,
+    charged_misses,
+)
 from evals.harness.triggers import lead_rules
 
 #: How the closest candidate stands to the reference's place, or ``absent``
@@ -54,6 +65,10 @@ Lead = Relation | Literal["absent"]
 
 #: Whether the rebuilt candidates of a lane are the captured ones.
 Capture = Literal["agrees", "differs", "uncaptured"]
+
+#: The causes that name no draft and no proposal at the reference's place,
+#: and so the only rows this module traces.
+TRACED: frozenset[Cause] = frozenset({"place", "unled"})
 
 
 @dataclass(frozen=True)
@@ -120,3 +135,121 @@ def _keys(fired: CandidateSet) -> frozenset[tuple[str, tuple[str, ...]]]:
     return frozenset(
         (candidate.rule_id, candidate.element_ids) for candidate in fired.candidates
     )
+
+
+@dataclass(frozen=True)
+class DeliveryRow:
+    """One charged miss, and its lane's trace where its cause has one."""
+
+    reference: ReferenceRow
+    #: ``None`` for a cause outside :data:`TRACED`: the lane wrote at the
+    #: place, so its material reached it.
+    lane: LaneTrace | None
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "reference": self.reference.to_json(),
+            "lane": None if self.lane is None else self.lane.to_json(),
+        }
+
+
+@dataclass(frozen=True)
+class Delivery:
+    """One run's charged misses, each traced through its lane where it can be."""
+
+    run: RunIdentity
+    rows: tuple[DeliveryRow, ...]
+    #: The must-finds the scorecard reads as ``re-keyed``. They are outside
+    #: :func:`~evals.harness.scorecard.charged_misses`, and are counted here so
+    #: the traced population is read beside them.
+    re_keyed: int
+    #: Each case whose lane material the sweep did not capture, and why.
+    uncaptured: Mapping[str, str]
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "run": self.run.to_json(),
+            "re_keyed": self.re_keyed,
+            "uncaptured": dict(self.uncaptured),
+            "rows": [row.to_json() for row in self.rows],
+        }
+
+
+def trace(
+    card: Scorecard, artifact: EvalArtifact, cases: Sequence[GoldenCase]
+) -> Delivery:
+    """Trace each charged miss of ``card`` through the lane material ``artifact`` holds."""
+    by_id = {case.id: case for case in cases}
+    misses = charged_misses(card.rows)
+    traced_cases = sorted({row.case for row in misses if row.cause in TRACED})
+    reports = {
+        case: read_report(_required(finished_file(artifact, case, "report"), case))
+        for case in traced_cases
+    }
+    flows = flows_by_case(
+        [by_id[case] for case in traced_cases],
+        {case: report.system_model for case, report in reports.items()},
+    )
+    material: dict[str, Mapping[str, Any]] = {}
+    uncaptured: dict[str, str] = {}
+    for case in traced_cases:
+        try:
+            path = _required(finished_file(artifact, case, "lanes"), case)
+        except EvalRunError as error:
+            uncaptured[case] = str(error)
+            continue
+        material[case] = json.loads(path.read_text(encoding="utf-8"))
+    rows = tuple(
+        DeliveryRow(
+            reference=row,
+            lane=trace_lane(
+                row.elements,
+                row.lane,
+                reports[row.case],
+                captured(material[row.case], row.lane)
+                if row.case in material
+                else None,
+                flows[row.case],
+            )
+            if row.cause in TRACED
+            else None,
+        )
+        for row in misses
+    )
+    return Delivery(
+        run=card.run,
+        rows=rows,
+        re_keyed=sum(row.compatibility == "re-keyed" for row in card.rows),
+        uncaptured=uncaptured,
+    )
+
+
+def _required(path: Path | None, case: str) -> Path:
+    """``path``, which a charged miss's case always has: a failed case has no row."""
+    if path is None:
+        raise EvalRunError(f"{case}: the sweep records the case as failed")
+    return path
+
+
+def render(result: Delivery) -> None:
+    """Print each charged miss, its lane's trace, and the populations beside them."""
+    traced = [row for row in result.rows if row.lane is not None]
+    print(
+        f"{len(result.rows)} charged miss(es): {len(traced)} traced"
+        f" ({', '.join(sorted(TRACED))}), {len(result.rows) - len(traced)} where"
+        f" the lane wrote at the place; {result.re_keyed} re-keyed must-find(s)"
+        " outside the population"
+    )
+    for case, reason in sorted(result.uncaptured.items()):
+        print(f"  lane material uncaptured: {case}: {reason}")
+    for row in traced:
+        reference, lane = row.reference, row.lane
+        assert lane is not None
+        print(
+            f"  {reference.case} #{reference.reference_index} {reference.lane}"
+            f" {reference.cause} [{reference.compatibility}]: delivered"
+            f" {lane.delivered or '-'}, rebuilt {lane.rebuilt}, capture"
+            f" {lane.capture}; lead rules today"
+            f" {', '.join(reference.lead_rules) or '-'}, archived"
+            f" {', '.join(lane.archived_lead_rules) or '-'}"
+        )
