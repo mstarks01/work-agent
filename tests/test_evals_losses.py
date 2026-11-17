@@ -37,6 +37,7 @@ from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall
+from evals.harness.verbs import same_action
 from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
 
@@ -267,6 +268,148 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
     loss = by_index(charged)[0]
     assert loss.cause == "critic"
     assert loss.draft_id == draft.id
+
+
+def _at_ruled_reading(case, attacker_position):
+    """A draft at reference 0's ruled reading of case 01, under that reading's verb.
+
+    Case 01's reference 0 carries one ruled reading, with another verb than
+    its own, at a place that contains its own. So the reference's own reading
+    finds the draft at its place first.
+    """
+    reference = case.stride_claims()[0]
+    (_, (read_verb, read_place)) = case.stride_readings(0)
+    assert not same_action(read_verb, reference.verb)
+    return draft_threat(
+        1,
+        reference.category,
+        "draft 1",
+        element_ids=read_place,
+        verb=read_verb,
+        attacker_position=attacker_position,
+    )
+
+
+@pytest.mark.parametrize(
+    ("stated", "cause"),
+    [("storage-copy", "position"), (None, "unstated")],
+    ids=["another", "unstated"],
+)
+def test_a_claim_with_a_ruled_readings_action_is_charged_through_that_reading(
+    case, flows, stated, cause
+):
+    """A ruled reading carries the claim's action, and the scorer accepts that
+    reading, so the row names the gate the scorer applies to it, never a verb
+    the scorer forgives."""
+    draft = _at_ruled_reading(case, stated)
+
+    charged = by_index(charge(case, flows, [draft], [promote(draft)]))
+
+    assert charged[0].cause == cause
+
+
+def test_a_claim_at_a_ruled_reading_with_the_ruled_position_is_no_loss(case, flows):
+    draft = _at_ruled_reading(case, ruled_position(case, case.stride_claims()[0]))
+
+    charged = by_index(charge(case, flows, [draft], [promote(draft)]))
+
+    assert 0 not in charged, "the scorer matched it through the ruled reading"
+
+
+def _two_readings(case):
+    """Case 01's reference 0 with a second reading, and a draft answering each.
+
+    The second reading carries the action of another reference at the same
+    place. The draft under the reference's own action states a position other
+    than the ruled one; the draft under the second reading's action states the
+    ruled one.
+    """
+    reference = case.stride_claims()[0]
+    other = next(
+        claim
+        for index, claim in enumerate(case.stride_claims())
+        if index != 0
+        and claim.category == reference.category
+        and claim.affected_element_ids == reference.affected_element_ids
+        and not same_action(claim.verb, reference.verb)
+    )
+    position = ruled_position(case, reference)
+    assert position is not None and position != "storage-copy"
+    ruled = replace(
+        case,
+        ruled_readings={
+            0: (
+                Reading(
+                    verb=other.verb,
+                    affected_element_ids=reference.affected_element_ids,
+                ),
+            )
+        },
+    )
+    failing = at(case, reference, 1, reference.verb).model_copy(
+        update={"attacker_position": "storage-copy"}
+    )
+    holding = at(case, reference, 2, other.verb).model_copy(
+        update={"attacker_position": position}
+    )
+    return ruled, failing, holding
+
+
+def test_a_surviving_claim_that_holds_the_position_wins_over_one_that_fails_it(
+    case, flows
+):
+    """The scorer gave the holding claim to the other reference at the place,
+    so the reference is a merge, not a position loss."""
+    ruled, failing, holding = _two_readings(case)
+
+    charged = by_index(
+        charge(ruled, flows, [failing, holding], [promote(failing), promote(holding)])
+    )
+
+    assert (charged[0].cause, charged[0].draft_id) == ("merged", holding.id)
+
+
+def test_a_killed_draft_that_holds_the_position_wins_over_one_that_fails_it(
+    case, flows
+):
+    ruled, failing, holding = _two_readings(case)
+
+    charged = by_index(charge(ruled, flows, [failing, holding], []))
+
+    assert (charged[0].cause, charged[0].draft_id) == ("critic", holding.id)
+
+
+def test_the_references_own_reading_wins_a_tie_between_two_that_hold(case, flows):
+    ruled, failing, holding = _two_readings(case)
+    own = failing.model_copy(
+        update={"id": "S-03", "attacker_position": holding.attacker_position}
+    )
+    assert own.id > holding.id
+
+    charged = by_index(charge(ruled, flows, [holding, own], []))
+
+    assert (charged[0].cause, charged[0].draft_id) == ("critic", own.id)
+
+
+def test_a_proposal_that_holds_the_position_wins_over_one_that_fails_it(case, flows):
+    ruled, failing, holding = _two_readings(case)
+    proposed = {
+        failing.category: {
+            "claims": [
+                {
+                    "title": draft.title,
+                    "verb": draft.verb,
+                    "affected_element_ids": list(draft.affected_element_ids),
+                    "attacker_position": draft.attacker_position,
+                }
+                for draft in (failing, holding)
+            ]
+        }
+    }
+
+    charged = by_index(charge(ruled, flows, [], [], proposed=proposed))
+
+    assert (charged[0].cause, charged[0].draft_verb) == ("fan-in", holding.verb)
 
 
 def _ruled_at_zero(case):
