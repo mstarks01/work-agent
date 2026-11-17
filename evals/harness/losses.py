@@ -345,7 +345,7 @@ def _drafted_at(
     verb: str,
     reference_ids: Sequence[str],
 ) -> list[DraftThreat]:
-    """The drafts at the reference's place with the reference's action."""
+    """The drafts at one reading's place under that reading's action."""
     return [
         draft
         for draft in _at_place(reference_ids, drafts, flows)
@@ -397,7 +397,7 @@ def _proposed_at(
     verb: str,
     reference_ids: Sequence[str],
 ) -> list[Mapping[str, Any]]:
-    """The lane's proposals at the reference's place with the reference's action.
+    """The lane's proposals at one reading's place under that reading's action.
 
     A proposal is the lane's output before any check, so every shape it can
     take is read: a batch that is not an object, a ``claims`` entry that is not
@@ -427,7 +427,8 @@ class _AnsweredReading(Generic[_Item]):
     place: Sequence[str]
     #: The items at the reading's place under the reading's action.
     with_action: list[_Item]
-    #: Of those, the items that state the reference's ruled position.
+    #: Of those, the items the position gate takes: the ones that state the
+    #: reference's ruled position, or all of them where none is ruled.
     held: list[_Item]
     #: ``None`` where an item holds the position; otherwise the cause the
     #: scorer's position gate gives.
@@ -447,8 +448,9 @@ def _answered_reading(
 ) -> _AnsweredReading[_Item] | None:
     """The reading one stage charges a miss through, or ``None``.
 
-    The surviving-claim, critic and fan-in stages of :func:`attribute_case`
-    charge through this choice. ``answers`` gives the stage's items at a
+    **The one reader of which reading a loss stage charges.** The
+    surviving-claim, critic and fan-in stages of :func:`attribute_case` charge
+    through this choice. ``answers`` gives the stage's items at a
     reading's place under that reading's action, so a reading with no such
     item is skipped: a reference answered by an item under its own action is
     the stage's cause, and a ``verb`` charge beside it names the wrong fix.
@@ -608,7 +610,7 @@ def attribute_case(
             charge = next(
                 (
                     ("verb", place, _charged_to(here))
-                    for read_verb, place in readings
+                    for _, place in readings
                     if (here := _at_place(place, in_lane, flows))
                 ),
                 None,

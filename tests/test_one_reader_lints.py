@@ -2259,6 +2259,12 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "webapp/",
     ),
+    "which reading a loss stage charges": _OneReader(
+        lambda node: _calls(node, "_holding"),
+        ("evals/harness/losses.py", "_answered_reading"),
+        {},
+        "evals/",
+    ),
     "the position rule": _OneReader(
         _compares_a_position,
         ("evals/harness/scorer.py", "position_fate"),
