@@ -7,7 +7,8 @@ provider call, by running the stages after the lane again on the archive.
 
 **What runs, and what is carried.** The fan-in runs as it ships, over each
 case's archived ``<case>.proposals.json`` and any injected proposal added to
-its lane. The critic does not run. A draft it already ruled on keeps that
+its lane, through :func:`~evals.harness.fan_in_accounting.replay_fan_in`, the
+replay the fan-in accounting reads. The critic does not run. A draft it already ruled on keeps that
 ruling, matched by title, because the fan-in keeps a proposal's title and the
 critic judged the argument, not the element list. A draft it never saw — every
 injected one, and any a code change creates — has no ruling, so the result is
@@ -39,7 +40,6 @@ from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import (
-    ArchivedThreatProposals,
     DraftThreat,
 )
 from analysis_service.graph import (
@@ -53,6 +53,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.bundle import finished_file, read_report, stride_threats
+from evals.harness.fan_in_accounting import replay_fan_in
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -100,17 +101,12 @@ def replay_case(
 ) -> Replayed:
     """The fan-in run again over ``proposals`` plus ``injected``, then scored."""
     block = next(block for block in report.analyses if block.framework == FRAMEWORK)
-    batches = {}
+    stored = {}
     for lane in set(proposals) | set(injected):
         raw = dict(proposals.get(lane) or {"claims": []})
         raw["claims"] = [*raw.get("claims", []), *injected.get(lane, ())]
-        batches[lane] = ArchivedThreatProposals.model_validate(raw)
-    merged = fan_in(
-        batches,
-        PACKAGES[FRAMEWORK],
-        report.system_model,
-        {source.label: source.text for source in case.sources},
-    )
+        stored[lane] = raw
+    _, merged = replay_fan_in(case, report, stored, FRAMEWORK)
     accepted = {claim.title: claim for claim in stride_threats(report)}
     ruled = accepted.keys() | {claim.title for claim in block.rejected_claims}
     kept = [

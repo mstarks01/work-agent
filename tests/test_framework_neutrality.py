@@ -363,6 +363,14 @@ DECLARED: dict[str, str] = {
         " whose lane agents propose an open claim set has; a package whose"
         " claims carry a catalog identifier scores by applicability instead."
     ),
+    "evals/harness/fan_in_accounting.py": (
+        "A table keyed by framework: `ARCHIVED_BATCHES` holds each package's"
+        " type for a stored lane batch, and"
+        " `tests/test_evals_fan_in_accounting.py` holds it to PACKAGES. The two"
+        " package imports are the table's rows: a package whose archive can"
+        " hold a field its agent schema now requires reads it through its own"
+        " archived type."
+    ),
     "evals/harness/gain.py": (
         "A table keyed by framework: `READERS` holds each package's own reading"
         " of an unmatched finding and of its vote standing, and a package"

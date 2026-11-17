@@ -264,9 +264,7 @@ class FanInSweep(NamedTuple):
     writes_reports: bool
 
 
-def replay_artifact(
-    artifact: EvalArtifact, cases: Sequence[GoldenCase]
-) -> FanInSweep:
+def replay_artifact(artifact: EvalArtifact, cases: Sequence[GoldenCase]) -> FanInSweep:
     """Every framework block of every finished case, its fan-in accounted."""
     sweep = FanInSweep(
         rows=[],
