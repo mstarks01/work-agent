@@ -143,7 +143,7 @@ def test_a_sweep_that_writes_no_report_gives_no_row(archive, case, capsys):  # n
     sweep = assembly.replay_artifact(load_artifact(archive), [case])
     code = main(["assembly", str(archive)])
 
-    assert sweep == ([], [], [])
+    assert sweep == ([], [], [], False)
     assert code == 0
     assert capsys.readouterr().out.splitlines()[-1] == (
         f"{archive}: the extraction mode writes no report"
@@ -185,7 +185,7 @@ def test_the_command_names_the_refused_block_and_reads_the_rest(capsys):
         ),
         (
             "drafts: 32 inspected, 18 accounted, 0 omitted, 0 filed differently,"
-            " 14 unavailable"
+            " 14 unavailable; 0 ruled claim(s) with no draft"
         ),
         "ruled severity: no oracle",
     ]
@@ -367,11 +367,13 @@ def test_a_changed_claim_id_cannot_hide_its_draft(archive, case):  # noqa: F811
     (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
 
     assert row.omitted == tuple(renamed)
-    assert row.unexplained == tuple(renamed.values())
+    assert row.unexplained == row.undrafted == tuple(renamed.values())
+    assert row.misfiled == ()
+    assert len(row.accounted) + len(row.omitted) == len(row.drafts)
     assert (row.replayed, row.refused) == (row.reported[:-1], "")
 
 
-def test_a_draft_id_held_twice_is_filed_differently(archive, case):  # noqa: F811
+def test_a_draft_id_held_twice_is_unavailable(archive, case):  # noqa: F811
     """Fan-in keeps one draft under each ID, so a second copy is a broken capture."""
     path = reports_dir(archive) / f"{case.id}.drafts.json"
     held = json.loads(path.read_text(encoding="utf-8"))
@@ -460,3 +462,17 @@ def test_a_return_on_another_unit_than_its_draft_s_is_filed_differently(
 
     assert row.unexplained == (returned.id,)
     assert row.replayed == row.reported == (neighbour.id,)
+
+
+def test_a_claim_returned_twice_is_filed_differently(
+    case,  # noqa: F811
+    domain_loader,  # noqa: F811
+):
+    block, (returned, neighbour), model = _assembled_with_a_return(domain_loader)
+    [entry] = block.returned_claims
+    block = block.model_copy(update={"returned_claims": [entry, entry]})
+
+    row = assembly.replay_case(case, block, [returned, neighbour], model)
+
+    assert row.unexplained == row.misfiled == (returned.id,)
+    assert row.accounted == (neighbour.id,)

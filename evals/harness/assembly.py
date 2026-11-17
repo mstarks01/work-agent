@@ -43,12 +43,11 @@ has an oracle: the replay compares no severity.
 
 **What it counts.** Each draft of a replayed block is accounted, omitted,
 filed differently or unavailable, where its block was refused or its ID
-repeats. A case whose report or drafts file the archive lacks is named, and a
-sweep whose mode writes no report gives no row. Every row comes from archived
-files and deterministic code, and nothing calls a model. One run of the
-command takes about 5 s, most of it start-up; :func:`replay_artifact` over all
-373 artifacts of the main checkout's ``evals/runs`` takes about 2.3 s in one
-process.
+repeats. A ruled claim with no draft is counted on its own. A case whose
+report or drafts file the archive lacks is named, and a sweep whose mode
+writes no report gives no row. Every row comes from archived files and
+deterministic code, and nothing calls a model. One run of the command took
+about 5 s on 2026-11-17, most of it start-up.
 """
 
 from __future__ import annotations
@@ -167,17 +166,38 @@ class AssemblyReplay:
     def unexplained(self) -> tuple[str, ...]:
         """Claims whose array differs from what assembly makes of the rulings.
 
-        A refused block has no replay, so it names none.
+        A refused block has no replay, so it names none. A claim the report
+        returns twice is named too: no check of the report reads that list.
         """
         if self.refused:
             return ()
+        returned_twice = {
+            claim_id
+            for claim_id, count in Counter(self.returned_reported).items()
+            if count > 1
+        }
         return tuple(
             sorted(
                 (set(self.reported) ^ set(self.replayed))
                 | (set(self.rejected_reported) ^ set(self.rejected_replayed))
                 | (set(self.returned_reported) ^ set(self.returned_replayed))
+                | returned_twice
             )
         )
+
+    @property
+    def misfiled(self) -> tuple[str, ...]:
+        """Drafts whose array differs from what assembly makes of the rulings."""
+        return tuple(
+            draft
+            for draft in self.drafts
+            if draft in self.unexplained and draft not in self.repeated
+        )
+
+    @property
+    def undrafted(self) -> tuple[str, ...]:
+        """Claims the report rules on or returns that no draft names."""
+        return tuple(sorted(set(self.unexplained) - set(self.drafts)))
 
     @property
     def accounted(self) -> tuple[str, ...]:
@@ -204,27 +224,27 @@ def replay_case(
     """Assembly run again over ``drafts`` and the rulings ``block`` carries."""
     framework = block.framework
     record = PACKAGES[framework].record
-    held: dict[str, Claim] = {}
+    by_id: dict[str, Claim] = {}
     for draft in drafts:
-        held.setdefault(draft.id, draft)
+        by_id.setdefault(draft.id, draft)
     returned = {entry.claim_id: entry.unit for entry in block.returned_claims}
     ruled = {claim.id for claim in block.all_claims()} | returned.keys()
     accounted = [
         draft
-        for draft in held.values()
+        for draft in by_id.values()
         if draft.id in ruled and draft.id not in returned
     ]
     row = AssemblyReplay(
         case=case.id,
         framework=framework,
-        drafts=tuple(held),
+        drafts=tuple(by_id),
         reported=tuple(claim.id for claim in block.claims),
         replayed=(),
         rejected_reported=tuple(claim.id for claim in block.rejected_claims),
         rejected_replayed=(),
-        returned_reported=tuple(returned),
+        returned_reported=tuple(entry.claim_id for entry in block.returned_claims),
         returned_replayed=(),
-        omitted=tuple(sorted(held.keys() - ruled)),
+        omitted=tuple(sorted(by_id.keys() - ruled)),
         repeated=tuple(
             sorted(
                 draft_id
@@ -266,7 +286,7 @@ def replay_case(
     )
     on_unit = [
         draft.id
-        for draft in held.values()
+        for draft in by_id.values()
         if returned.get(draft.id) == record.unit_of(draft)
     ]
     return replace(
@@ -291,17 +311,22 @@ class AssemblySweep(NamedTuple):
     #: One line for each case whose report or drafts file the archive lacks,
     #: or holds for a case it records as failed. The other cases replay.
     capture_faults: list[str]
+    #: False for a sweep whose mode writes no report: it has no block to
+    #: replay, and gives no row.
+    writes_reports: bool
 
 
 def replay_artifact(
     artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> AssemblySweep:
-    """Every framework block of every finished case, assembled again.
-
-    A sweep whose mode writes no report has no block, and gives no row.
-    """
-    sweep = AssemblySweep(rows=[], unreadable=[], capture_faults=[])
-    if artifact.mode not in REPORTING_MODES:
+    """Every framework block of every finished case, assembled again."""
+    sweep = AssemblySweep(
+        rows=[],
+        unreadable=[],
+        capture_faults=[],
+        writes_reports=artifact.mode in REPORTING_MODES,
+    )
+    if not sweep.writes_reports:
         return sweep
     for case in cases:
         try:
@@ -340,11 +365,13 @@ def command_assembly(args: argparse.Namespace) -> int:
             for case in development_cases(load_corpus(args.corpus))
             if case.id in artifact.cases and (not args.case or case.id in args.case)
         ]
-        rows, unreadable, capture_faults = replay_artifact(artifact, cases)
+        rows, unreadable, capture_faults, writes_reports = replay_artifact(
+            artifact, cases
+        )
     except (EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
-    if artifact.mode not in REPORTING_MODES:
+    if not writes_reports:
         print(f"{artifact.path}: the {artifact.mode} mode writes no report")
         return 0
     for line in (*capture_faults, *unreadable):
@@ -379,8 +406,9 @@ def command_assembly(args: argparse.Namespace) -> int:
         f"drafts: {sum(len(row.drafts) for row in rows)} inspected,"
         f" {sum(len(row.accounted) for row in rows)} accounted,"
         f" {sum(len(row.omitted) for row in rows)} omitted,"
-        f" {sum(len(row.unexplained) for row in rows)} filed differently,"
-        f" {sum(len(row.unavailable) for row in rows)} unavailable"
+        f" {sum(len(row.misfiled) for row in rows)} filed differently,"
+        f" {sum(len(row.unavailable) for row in rows)} unavailable;"
+        f" {sum(len(row.undrafted) for row in rows)} ruled claim(s) with no draft"
     )
     print("ruled severity: no oracle")
     return 1 if moved else 0
