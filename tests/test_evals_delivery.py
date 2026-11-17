@@ -14,7 +14,7 @@ from analysis_service.sources import render_fenced
 from evals.harness import delivery, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
-from evals.harness.reference import flows_by_case, load_corpus
+from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.scorecard import charged_misses
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -162,7 +162,9 @@ BASELINE = (
 def _trace(artifact: Path) -> delivery.Delivery:
     corpus = REPO_ROOT / "evals/corpus"
     return delivery.trace(
-        run.scorecard_of(artifact, corpus), load_artifact(artifact), load_corpus(corpus)
+        run.scorecard_of(artifact, corpus),
+        load_artifact(artifact),
+        development_cases(load_corpus(corpus)),
     )
 
 

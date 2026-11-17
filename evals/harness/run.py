@@ -1553,7 +1553,7 @@ def command_delivery(args: argparse.Namespace) -> int:
     result = delivery.trace(
         scorecard_of(artifact, Path(args.corpus)),
         load_artifact(artifact),
-        load_corpus(args.corpus),
+        development_cases(load_corpus(args.corpus)),
     )
     delivery.render(result)
     if args.out:
