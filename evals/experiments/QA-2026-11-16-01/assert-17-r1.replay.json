@@ -1,0 +1,341 @@
+{
+  "record": {
+    "command": "replay",
+    "commit": "cf11746c8762b9364362ccbeb44a46b32ebfeb15",
+    "clean": true,
+    "table": {
+      "targets": 10,
+      "corpus_digest": "b535ac3d85f5e51798e1a9656294adaa85d25ce24db260d513645518d605ce78"
+    },
+    "inputs": [
+      {
+        "path": "evals/runs/2054/pre-assert-17.json",
+        "sha256": "cbdc4032fe1bf216bcba480f63c90a1d041f2a07a4e9f7683eac753c6a516eda",
+        "selections": {}
+      },
+      {
+        "path": "evals/runs/2054/pre-assert-17.reports/17-permit-portal-limits.assertions.json",
+        "sha256": "3a739cb21b3082f8c66379c23be5ffc65fcdd49a1d890e70296dd8876b6fd803",
+        "selections": {}
+      }
+    ]
+  },
+  "arms": [
+    {
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "fb4821b1605907c4aa8b4c1337816bfb901fc3eadccc3eabfb056ac3713faac1"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "39eae7bf4f128fb9815bb09f538f99dd71a56df8fe7280085d4e38318b3af0aa",
+        "treatment_by": "rendered_sources"
+      },
+      "extraction": null,
+      "assertions": {
+        "sweeps": 1,
+        "emissions": 1,
+        "fates": {
+          "found": 12,
+          "worded": 0,
+          "wrong_certainty": 0,
+          "wrong_value": 1,
+          "rescoped": 1,
+          "omitted": 2,
+          "silent": 10
+        },
+        "required": 14,
+        "recovered": 12,
+        "found": 12,
+        "relabelled": 0,
+        "basis_overstated": 0,
+        "produced": {
+          "found": 12,
+          "worded": 0,
+          "wrong_certainty": 0,
+          "wrong_value": 1,
+          "rescoped": 1,
+          "misattached": 1,
+          "unreviewed": 6
+        },
+        "rejected": 0,
+        "span_refusals": 0,
+        "rows": 21,
+        "assessed": 0,
+        "targets": [
+          {
+            "row": "17-permit-portal-limits/assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "wrong_value": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:capacity-limits-quota~process:permit-service~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "rescoped": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:credential-sharing~credential:the-district-inspector-login~any~shared",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~entity:inspector~any~boundary:city-network",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "sweeps": [
+    {
+      "artifact": "pre-assert-17.json",
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "fb4821b1605907c4aa8b4c1337816bfb901fc3eadccc3eabfb056ac3713faac1"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "39eae7bf4f128fb9815bb09f538f99dd71a56df8fe7280085d4e38318b3af0aa",
+        "treatment_by": "rendered_sources"
+      },
+      "repo_commit": {
+        "commit": "cf11746c8762b9364362ccbeb44a46b32ebfeb15",
+        "clean": true
+      },
+      "corpus_digest": "b535ac3d85f5e51798e1a9656294adaa85d25ce24db260d513645518d605ce78",
+      "extractions": [],
+      "assertions": [
+        {
+          "case": "17-permit-portal-limits",
+          "counts": {
+            "found": 12,
+            "worded": 0,
+            "wrong_certainty": 0,
+            "wrong_value": 1,
+            "rescoped": 1,
+            "omitted": 2,
+            "silent": 10
+          },
+          "basis_overstated": 0,
+          "produced_counts": {
+            "found": 12,
+            "worded": 0,
+            "wrong_certainty": 0,
+            "wrong_value": 1,
+            "rescoped": 1,
+            "misattached": 1,
+            "unreviewed": 6
+          },
+          "required": 14,
+          "recovered": 12,
+          "rejected": 0,
+          "refusals": {},
+          "span_refusals": 0,
+          "produced_rows": 21,
+          "assessed_rows": 0,
+          "issues": [],
+          "rows": [
+            {
+              "reference": "assertion:capacity-limits-rate~process:permit-gateway~any~yes",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-rate~process:permit-gateway~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-size~process:permit-gateway~any~yes",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-size~process:permit-gateway~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-concurrency~process:permit-gateway~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-quota~process:permit-gateway~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-size~process:plan-upload-service~any~no",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-size~process:plan-upload-service~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-rate~process:plan-upload-service~any~no",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-rate~process:plan-upload-service~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-concurrency~process:plan-upload-service~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-quota~process:plan-upload-service~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-concurrency~process:plan-renderer~any~yes",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-concurrency~process:plan-renderer~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-quota~process:permit-service~any~unknown",
+              "fate": "rescoped",
+              "produced": "assertion:capacity-limits-quota~process:permit-service~s.4d538d1cc998~unknown",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:internet-exposure~process:permit-gateway~any~internet-facing",
+              "fate": "found",
+              "produced": "assertion:internet-exposure~process:permit-gateway~any~internet-facing",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:internet-exposure~process:plan-upload-service~any~internet-facing",
+              "fate": "found",
+              "produced": "assertion:internet-exposure~process:plan-upload-service~any~internet-facing",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:permit-service~any~boundary:city-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:permit-service~any~boundary:city-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:plan-upload-service~any~boundary:city-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:plan-upload-service~any~boundary:city-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:plan-renderer~any~boundary:city-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:plan-renderer~any~boundary:city-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~store:permit-database~any~boundary:city-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~store:permit-database~any~boundary:city-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~store:plan-store~any~boundary:city-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~store:plan-store~any~boundary:city-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:inspector~any~boundary:city-network",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:applicant~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:permit-gateway~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:credential-sharing~credential:the-district-inspector-login~any~shared",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~unknown",
+              "fate": "wrong_value",
+              "produced": "assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~v.ed27cb153088",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:applicant>process:permit-gateway>submit-applications~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:applicant>process:plan-upload-service>upload-plan-drawings~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:applicant>process:permit-gateway>submit-applications~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:applicant>process:plan-upload-service>upload-plan-drawings~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            }
+          ],
+          "produced": {
+            "assertion:authorization-grant~principal:applicants~s.5f1fc402a50c~v.0120bf4983e9": "unreviewed",
+            "assertion:authorization-grant~principal:applicants~s.cfb0d52e8021~v.4edd454a1fe7": "unreviewed",
+            "assertion:authorization-grant~principal:inspectors~s.e6f17ff4270a~v.0bfa1cc228db": "unreviewed",
+            "assertion:credential-presented~principal:inspectors~any~credential:shared-inspector-login": "unreviewed",
+            "assertion:credential-sharing~credential:shared-inspector-login~any~shared": "misattached",
+            "assertion:data-classification~store:permit-database~any~confidential": "unreviewed",
+            "assertion:data-classification~store:plan-store~any~internal": "unreviewed",
+            "assertion:capacity-limits-rate~process:permit-gateway~any~yes": "found",
+            "assertion:capacity-limits-size~process:permit-gateway~any~yes": "found",
+            "assertion:capacity-limits-size~process:plan-upload-service~any~no": "found",
+            "assertion:capacity-limits-rate~process:plan-upload-service~any~no": "found",
+            "assertion:capacity-limits-concurrency~process:plan-renderer~any~yes": "found",
+            "assertion:capacity-limits-quota~process:permit-service~s.4d538d1cc998~unknown": "rescoped",
+            "assertion:internet-exposure~process:permit-gateway~any~internet-facing": "found",
+            "assertion:internet-exposure~process:plan-upload-service~any~internet-facing": "found",
+            "assertion:network-membership~process:permit-service~any~boundary:city-cloud-account": "found",
+            "assertion:network-membership~process:plan-upload-service~any~boundary:city-cloud-account": "found",
+            "assertion:network-membership~process:plan-renderer~any~boundary:city-cloud-account": "found",
+            "assertion:network-membership~store:permit-database~any~boundary:city-cloud-account": "found",
+            "assertion:network-membership~store:plan-store~any~boundary:city-cloud-account": "found",
+            "assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~v.ed27cb153088": "wrong_value"
+          },
+          "relabelled": []
+        }
+      ],
+      "skipped": {}
+    }
+  ]
+}
