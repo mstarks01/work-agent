@@ -1301,10 +1301,12 @@ def _block_of(payload: dict[str, Any]) -> FrameworkAnalysis:
 def unfence(rendered: str) -> str:
     """The body back out of :func:`render_fenced`.
 
-    One rendered key is also read back by Python: the parked rejection, which
-    the driver turns into the issues a caller is shown. It still ships fenced,
-    because the same string is interpolated into ``repair.md`` and a key that
-    shipped bare would be the one a body could close.
+    Two rendered keys are also read back by Python. The parked rejection is
+    turned by the driver into the issues a caller is shown. It still ships
+    fenced, because the same string is interpolated into ``repair.md`` and a
+    key that shipped bare would be the one a body could close. A lane's
+    ``candidates`` key is read from an archived ``<case>.lanes.json`` by the
+    eval harness, to trace what the lane was sent.
     """
     # Split on the delimiter `render_fenced` joined with, not on every line
     # boundary Python knows. `str.splitlines` also breaks on U+2028, U+2029 and

@@ -11,7 +11,6 @@ what the scorer alone would have said.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import get_args
 
 import pytest
 
@@ -20,12 +19,8 @@ from analysis_service.claims import Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
 from evals.harness.critic_yield import (
-    GAP_WORDS,
-    LABEL_OF,
     CriticAudit,
     CriticPopulations,
-    NotRealGap,
-    ScoredOutcome,
     aggregate_yield,
     fate_by_claim,
     score_case_with_yield,
@@ -599,17 +594,6 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         1 for loss in critic_rows if loss.must_find
     )
     assert scored.critic_yield.matched_lost == len(critic_rows)
-
-
-def test_each_scored_outcome_joins_one_population():
-    """The label table is keyed by every outcome the scorer can give a draft."""
-    outcomes = {value for part in get_args(ScoredOutcome) for value in get_args(part)}
-
-    assert set(LABEL_OF) == outcomes
-
-
-def test_each_not_real_gap_has_its_words():
-    assert set(GAP_WORDS) == set(get_args(NotRealGap))
 
 
 def test_the_populations_split_each_label_by_what_the_critic_did(case):

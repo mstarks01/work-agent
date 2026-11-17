@@ -178,6 +178,7 @@ class CriticPopulations:
 
     @property
     def stale_drafts(self) -> int:
+        """The drafts whose votes judged a different argument (ADR 0029)."""
         return sum(n for (outcome, _), n in self.counts.items() if outcome == "stale")
 
     @property

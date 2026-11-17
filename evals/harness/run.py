@@ -69,6 +69,7 @@ from evals.harness import (
     comparison,
     consent,
     critic_replay,
+    delivery,
     descendants,
     early_answerers,
     early_policies,
@@ -1552,12 +1553,33 @@ def command_scorecard(args: argparse.Namespace) -> int:
             {"corpus": str(args.corpus), "ledger": str(ledger_dir)},
             {
                 **sweep_inputs([artifact]),
-                **{path: {} for path in ledger.files(ledger_dir)},
+                **{path: {} for path in ledger.voter_files(ledger_dir)},
             },
         )
         written = {"record": record, **card.to_json()}
         Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")
         print(f"scorecard written to {args.out}")
+    return 0
+
+
+def command_delivery(args: argparse.Namespace) -> int:
+    """Print each charged miss of one sweep traced through its lane, and write it with ``--out``."""
+    artifact = Path(args.artifact)
+    # The trace reads the scorecard's rows, which read no vote, so it hands the
+    # critic panel an empty ledger.
+    result = delivery.trace(
+        scorecard_of(artifact, Path(args.corpus), ledger.Ledger()),
+        load_artifact(artifact),
+        development_cases(load_corpus(args.corpus)),
+    )
+    delivery.render(result)
+    if args.out:
+        record = run_record(
+            "delivery", {"corpus": str(args.corpus)}, sweep_inputs([artifact])
+        )
+        written = {"record": record, **result.to_json()}
+        Path(args.out).write_text(json.dumps(written, indent=2) + "\n", "utf-8")
+        print(f"delivery trace written to {args.out}")
     return 0
 
 
@@ -2751,6 +2773,12 @@ COMMANDS: dict[str, Command] = {
         help="re-score a finished sweep against the ledger (no credentials)",
         run=command_score,
         arguments=_score_arguments,
+    ),
+    "delivery": Command(
+        help="each charged must-find miss of a finished sweep, traced through"
+        " the candidates its lane was sent (no credentials)",
+        run=command_delivery,
+        arguments=_scorecard_arguments,
     ),
     "scorecard": Command(
         help="one row per STRIDE must-find of a finished sweep, with its"

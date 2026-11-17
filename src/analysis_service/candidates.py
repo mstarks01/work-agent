@@ -37,6 +37,7 @@ __all__ = [
     "Rule",
     "clip_fact",
     "generate_candidates",
+    "leads",
     "with_rule_tables",
 ]
 
@@ -199,24 +200,23 @@ def _candidate_set(
     )
 
 
+def leads(sets: Mapping[str, CandidateSet]) -> set[tuple[str, str, tuple[str, ...]]]:
+    """Each lead in ``sets``, as its lane, its rule and its elements.
+
+    A lead is a rule fired in a lane on a set of elements, so a rule that fires
+    on one more element counts once more. The facts a candidate carries are not
+    part of it: the same lead with a projected value in place of ``unknown`` is
+    the same attention. The questions a set carries are not part of it either.
+    """
+    return {
+        (candidate.lane, candidate.rule_id, candidate.element_ids)
+        for candidate_set in sets.values()
+        for candidate in candidate_set.candidates
+    }
+
+
 def catalog_leads(
     held: Mapping[str, CandidateSet], without: Mapping[str, CandidateSet]
 ) -> int:
-    """How many leads in ``held`` the rules give no lane in ``without``.
-
-    A lead is a rule fired in a lane on a set of elements, so a rule that fires
-    on one more element because of the catalog counts once more. The facts a
-    candidate carries are not part of it: the same lead with a projected value
-    in place of ``unknown`` is the same attention.
-    """
-
-    def leads(
-        sets: Mapping[str, CandidateSet],
-    ) -> set[tuple[str, str, tuple[str, ...]]]:
-        return {
-            (candidate.lane, candidate.rule_id, candidate.element_ids)
-            for candidate_set in sets.values()
-            for candidate in candidate_set.candidates
-        }
-
+    """How many :func:`leads` in ``held`` the rules give no lane in ``without``."""
     return len(leads(held) - leads(without))

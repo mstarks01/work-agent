@@ -643,12 +643,12 @@ def load(path: Path | str) -> Ledger:
         return Ledger(votes=[], path=path)
 
     votes: list[Vote] = []
-    for file in files(path):
+    for file in voter_files(path):
         votes.extend(_read_voter_file(file))
     return Ledger(votes=votes, path=path)
 
 
-def files(path: Path) -> tuple[Path, ...]:
+def voter_files(path: Path) -> tuple[Path, ...]:
     """Each voter's file in the ledger directory ``path``, in filename order."""
     return tuple(sorted(path.glob("*.jsonl")))
 

@@ -384,6 +384,14 @@ DECLARED: dict[str, str] = {
         " identity from an action and a place has; a package whose claims carry"
         " a catalog identifier has `attribution.py`, the stage reading, instead."
     ),
+    "evals/harness/delivery.py": (
+        "This code is STRIDE's, through the `losses` rows the scorecard charges"
+        " and the STRIDE block's fired rules. It traces a miss charged to"
+        " `place` or `unled`, and those causes compare a candidate's elements"
+        " with the place of a claim whose identity is an action and a place; a"
+        " package whose claims carry a catalog identifier has no place for a"
+        " candidate to lead to, and `attribution.py` reads its stages instead."
+    ),
     "evals/harness/near_misses.py": (
         "This code is STRIDE's, through `DraftThreat` and the `losses` rows it"
         " reads. A near miss is a draft at another verb or place than its"
