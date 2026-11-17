@@ -33,12 +33,13 @@ Read off :mod:`evals.harness.alignment`, never off names:
   rename nobody ruled on, or an omission beside an invention; this instrument
   cannot say which, and says so rather than guessing.
 
-A **wrong fact** is not a fate. It is a scored attribute that differs on a
-paired element, read off :func:`~evals.harness.modes.differing`, and one
-element can carry several. Each attribute's count of wrong facts is printed
-over the checks compared for it, from
-:func:`~evals.harness.modes.attribute_agreement`. An **extra** is an unpaired produced
-element, carried as a count: what it is waits on a ruling (#961 step 3).
+A **wrong fact** is not a fate. It is a scored attribute on a paired element
+whose :attr:`~evals.harness.modes.AttributeCheck.agrees` is false, and one
+element can carry several. :func:`~evals.harness.modes.differing` lists them
+for each emission, and :func:`~evals.harness.modes.attribute_agreement` counts
+them for each attribute over the checks compared for it, which is the printed
+figure. An **extra** is an unpaired produced element, carried as a count: what
+it is waits on a ruling (#961 step 3).
 
 ## Assertion fates, one per signed reference row
 
