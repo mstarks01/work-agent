@@ -661,7 +661,7 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
 
 
 #: The cause that says an archive holds no position to read.
-_UNREAD_CAUSE: Cause = "unstated"
+UNREAD_CAUSE: Cause = "unstated"
 
 
 def _cause_stability(
@@ -672,7 +672,7 @@ def _cause_stability(
 ) -> dict[str, int | None]:
     """Over the references every run missed: one cause, several, or unread.
 
-    A reference that any run charges :data:`_UNREAD_CAUSE` is unread, whatever
+    A reference that any run charges :data:`UNREAD_CAUSE` is unread, whatever
     the other runs charge.
     """
     if any(run.causes is None for run in runs):
@@ -691,7 +691,7 @@ def _cause_stability(
                     f" {reference} and its losses block charges it to nothing"
                 )
             causes.add(charged)
-        if _UNREAD_CAUSE in causes:
+        if UNREAD_CAUSE in causes:
             unread += 1
         else:
             stable += len(causes) == 1

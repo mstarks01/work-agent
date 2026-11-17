@@ -1467,14 +1467,31 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
     that reads the rows in process call it. Shares :func:`_score_runs` with
     ``score``, so the matches and loss causes are the ones ``score`` prints.
     Matching reads no vote, so it reads an empty ledger. The ``drafted``
-    stage is the same matcher over the drafts the critic was handed. Raises
-    :class:`~evals.harness.modes.EvalRunError` where no case of the sweep is
-    in ``corpus``.
+    stage is the same matcher over the drafts the critic was handed.
+
+    Reads an ``analysis`` sweep only: its analysed model is the blessed model
+    of its day, so an element it lacks is a re-key and not an extraction
+    loss. Reads the development cases only, and names the others in
+    ``left_out``. Raises :class:`~evals.harness.modes.EvalRunError` on
+    another mode, and where no development case of the sweep is in
+    ``corpus``.
     """
     loaded = load_artifact(artifact)
-    cases = [case for case in load_corpus(corpus) if case.id in loaded.cases]
+    if loaded.mode != "analysis":
+        raise modes.EvalRunError(
+            f"{artifact}: a {loaded.mode} sweep analyses its own model; the"
+            " scorecard reads an analysis sweep"
+        )
+    cases = [
+        case
+        for case in development_cases(load_corpus(corpus))
+        if case.id in loaded.cases
+    ]
     if not cases:
-        raise modes.EvalRunError(f"{artifact}: none of its cases are in {corpus}")
+        raise modes.EvalRunError(
+            f"{artifact}: none of its development cases are in {corpus}"
+        )
+    left_out = sorted(set(loaded.cases) - {case.id for case in cases})
     runs = runs_from_reports(loaded, cases)
     flow_maps = flows_by_case(
         cases, {case: run.report.system_model for case, run in runs.items()}
@@ -1509,7 +1526,9 @@ def scorecard_of(artifact: Path, corpus: Path) -> scorecard.Scorecard:
         )
     replayed = assembly.replay_artifact(loaded, cases)
     return scorecard.summarize(
-        rows, scorecard.assembly_check(replayed.rows, len(replayed.unreadable))
+        rows,
+        scorecard.assembly_check(replayed.rows, len(replayed.unreadable)),
+        left_out,
     )
 
 
@@ -2690,9 +2709,9 @@ def _agreement_arguments(parser: argparse.ArgumentParser) -> None:
 #: Each ``run`` lives in the module that owns its subject, as ``submit`` and
 #: ``verify-contribution`` do. What stays here is the
 #: sweep and the readings taken over one: ``run`` *is* this module, and
-#: ``score``, ``scorecard``, ``promote``, ``pairing``, ``stability`` and ``calibrate`` each
-#: share a private helper with it, so moving one would split a pair rather than
-#: place it.
+#: ``score``, ``scorecard``, ``promote``, ``pairing``, ``stability`` and
+#: ``calibrate`` each share a private helper with it, so moving one would split
+#: a pair rather than place it.
 COMMANDS: dict[str, Command] = {
     "run": Command(
         help="run one eval mode over the corpus",

@@ -9,7 +9,7 @@ reconcile to the reference population and no incompatible row is dropped.
 **Compatibility.** A row is ``compatible`` when today's scorer can read the
 run's answer to it. The other values say why it cannot:
 
-* ``uncaptured``: the sweep wrote no report for the case.
+* ``uncaptured``: the sweep wrote no STRIDE block for the case.
 * ``re-keyed``: the reference resolves to an element the run's analysed
   model does not hold, because the corpus renamed or re-keyed it after the
   run. A cited flow resolves to its two endpoints first, as the scorer
@@ -63,13 +63,14 @@ from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import CaseLosses, Cause
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import none_stated
+from evals.harness.stability import UNREAD_CAUSE
 from evals.harness.triggers import case_trigger_recall
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]
 
 #: One exclusive accounting status per row. ``incompatible`` is every
 #: compatibility other than ``compatible`` and ``uncaptured``.
-Status = Literal["matched", "missed", "incompatible", "unavailable"]
+Status = Literal["matched", "missed", "incompatible", "uncaptured"]
 STATUSES: tuple[Status, ...] = get_args(Status)
 
 Stage = Literal["proposed", "drafted", "reported"]
@@ -128,7 +129,7 @@ class ReferenceRow:
     #: the stage is uncaptured.
     stages: Mapping[Stage, bool | None]
     #: The cause :mod:`evals.harness.losses` charged a miss to. ``None`` for a
-    #: match, an uncaptured case and a holdout case, which losses never reads.
+    #: match and an uncaptured case.
     cause: Cause | None
     #: The STRIDE rules that fire on the reference's elements in the signed
     #: model, read through :func:`~evals.harness.triggers.case_trigger_recall`.
@@ -138,7 +139,7 @@ class ReferenceRow:
     @property
     def status(self) -> Status:
         if self.compatibility == "uncaptured":
-            return "unavailable"
+            return "uncaptured"
         if self.compatibility != "compatible":
             return "incompatible"
         return "matched" if self.stages["reported"] else "missed"
@@ -224,7 +225,7 @@ def case_rows(
 ) -> tuple[ReferenceRow, ...]:
     """One row for each STRIDE must-find of ``case``.
 
-    ``held`` is ``None`` where the sweep wrote no report for the case.
+    ``held`` is ``None`` where the sweep wrote no STRIDE block for the case.
     """
     cause_of = (
         {loss.reference_index: loss.cause for loss in losses.losses} if losses else {}
@@ -450,17 +451,23 @@ class Scorecard:
     rows: tuple[ReferenceRow, ...]
     lanes: tuple[LaneSummary, ...]
     assembly: AssemblyCheck
+    #: The sweep's cases that have no row: holdout cases, which no diagnosis
+    #: reads, and cases the corpus no longer holds.
+    left_out: tuple[str, ...]
 
     def to_json(self) -> dict[str, Any]:
         return {
             "run": self.run.to_json(),
+            "left_out": list(self.left_out),
             "lanes": [lane.to_json() for lane in self.lanes],
             "assembly": self.assembly.to_json(),
             "rows": [row.to_json() for row in self.rows],
         }
 
 
-def summarize(rows: Sequence[ReferenceRow], assembly: AssemblyCheck) -> Scorecard:
+def summarize(
+    rows: Sequence[ReferenceRow], assembly: AssemblyCheck, left_out: Sequence[str]
+) -> Scorecard:
     """The scorecard of one run's rows. Raises :class:`MixedRunsError` on two runs."""
     runs = {row.run for row in rows}
     if len(runs) > 1:
@@ -479,14 +486,17 @@ def summarize(rows: Sequence[ReferenceRow], assembly: AssemblyCheck) -> Scorecar
         rows=tuple(rows),
         lanes=(*lanes, _lane("all", rows)),
         assembly=assembly,
+        left_out=tuple(left_out),
     )
 
 
 def charged_misses(rows: Iterable[ReferenceRow]) -> tuple[ReferenceRow, ...]:
     """The misses :mod:`evals.harness.losses` charged to a cause the run can read.
 
-    Every row with a cause other than ``unstated``, except a ``re-keyed`` row, whose cause rests on an element the run's model
-    did not hold. An ``unstated`` row is the archive's missing position, not a
+    Every row with a cause other than
+    :data:`~evals.harness.stability.UNREAD_CAUSE`, except a ``re-keyed`` row,
+    whose cause rests on an element the run's model did not hold. An
+    ``unstated`` row is the archive's missing position, not a
     lane's miss. A ``position-unstated`` row stays: its action and place were
     read, and only its position was not. Each row carries its run identity
     and ``lead_rules``.
@@ -494,7 +504,7 @@ def charged_misses(rows: Iterable[ReferenceRow]) -> tuple[ReferenceRow, ...]:
     return tuple(
         row
         for row in rows
-        if row.cause not in (None, "unstated") and row.compatibility != "re-keyed"
+        if row.cause not in (None, UNREAD_CAUSE) and row.compatibility != "re-keyed"
     )
 
 
@@ -515,14 +525,14 @@ def render(card: Scorecard) -> None:
         f" at {run.scored.repo_commit.commit[:8]}"
     )
     print(
-        f"{'lane':<24}{'total':>6}{'match':>6}{'miss':>6}{'incomp':>7}{'unavail':>8}"
+        f"{'lane':<24}{'total':>6}{'match':>6}{'miss':>6}{'incomp':>7}{'uncapt':>8}"
         "  matched of compatible matched of all"
     )
     for lane in card.lanes:
         status = lane.by_status
         print(
             f"{lane.lane:<24}{lane.total:>6}{status['matched']:>6}{status['missed']:>6}"
-            f"{status['incompatible']:>7}{status['unavailable']:>8}"
+            f"{status['incompatible']:>7}{status['uncaptured']:>8}"
             f"  {_rate(lane.compatible_matched):<21} {_rate(lane.population_matched)}"
         )
     every = card.lanes[-1]
@@ -540,6 +550,7 @@ def render(card: Scorecard) -> None:
         row.compatibility for row in card.rows if row.status == "incompatible"
     )
     print(f"incompatible rows by reason: {dict(sorted(incompatible.items()))}")
+    print(f"cases with no row (holdout, or not in the corpus): {list(card.left_out)}")
     check = card.assembly
     print(
         f"assembly run again: {check.reproduced} block(s) reproduced,"
@@ -550,9 +561,9 @@ def render(card: Scorecard) -> None:
     led = sum(1 for row in charged if row.lead_rules)
     by_cause = Counter(row.cause for row in charged)
     print(
-        f"charged misses: {len(charged)} ({led} led, {len(charged) - led}"
-        f" unled), by cause {dict(sorted(by_cause.items()))}"
+        f"charged misses: {len(charged)} ({led} with a rule fired,"
+        f" {len(charged) - led} with none), by cause {dict(sorted(by_cause.items()))}"
     )
-    print("fan-in dispositions: unavailable (the matcher reads no proposal)")
-    print("critic input populations: unavailable (no labelled population defined)")
+    print("fan-in dispositions: uncaptured (the matcher reads no proposal)")
+    print("critic input populations: not defined (no labelled population)")
     print("repeats: 1; run-to-run variation unmeasured")

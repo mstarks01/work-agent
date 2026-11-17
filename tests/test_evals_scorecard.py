@@ -12,11 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import scorecard
+from evals.harness import run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
 from evals.harness.bundle import runs_from_reports
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
+from evals.harness.modes import EvalRunError
 from evals.harness.reference import flows_by_case, load_corpus
 from evals.harness.run import main
 from evals.harness.scorecard import (
@@ -102,7 +103,7 @@ def _row(rows, index):
 
 
 def _change(rows):
-    every = summarize(rows, NO_ASSEMBLY).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, ()).lanes[-1]
     return next(change for change in every.changes if change.after == "reported")
 
 
@@ -169,7 +170,7 @@ def test_an_empty_denominator_is_undefined_and_never_zero():
         _synthetic(None, None, compatibility="uncaptured"),
     ]
 
-    every = summarize(rows, NO_ASSEMBLY).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, ()).lanes[-1]
 
     assert Rate(0, 0).value is None
     assert every.compatible_matched == Rate(0, 0)
@@ -177,13 +178,13 @@ def test_an_empty_denominator_is_undefined_and_never_zero():
     assert all(change.loss is None and change.net is None for change in every.changes)
 
 
-def test_an_uncaptured_stage_is_unavailable_and_never_a_loss(archived):
+def test_an_uncaptured_case_is_never_a_loss(archived):
     case = archived[0]
 
     rows = case_rows(_identity(), case, None, None)
-    every = summarize(rows, NO_ASSEMBLY).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, ()).lanes[-1]
 
-    assert {row.status for row in rows} == {"unavailable"}
+    assert {row.status for row in rows} == {"uncaptured"}
     assert all(set(row.stages.values()) == {None} for row in rows)
     assert every.represented == {"proposed": None, "drafted": None, "reported": None}
     assert all(change.observed == 0 for change in every.changes)
@@ -274,13 +275,13 @@ def test_compatible_and_incompatible_rows_report_both_populations():
         _synthetic(False, False, reference_index=4, compatibility="position-unstated"),
     ]
 
-    every = summarize(rows, NO_ASSEMBLY).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, ()).lanes[-1]
 
     assert every.by_status == {
         "matched": 1,
         "missed": 1,
         "incompatible": 2,
-        "unavailable": 1,
+        "uncaptured": 1,
     }
     assert every.total == len(rows)
     assert every.compatible_matched == Rate(1, 2)
@@ -289,7 +290,7 @@ def test_compatible_and_incompatible_rows_report_both_populations():
 
 def test_no_rows_are_refused_as_no_run():
     with pytest.raises(ValueError, match="at least one row"):
-        summarize([], NO_ASSEMBLY)
+        summarize([], NO_ASSEMBLY, ())
 
 
 def test_none_stated_reads_only_items_that_state_no_position():
@@ -306,7 +307,7 @@ def test_rows_of_two_runs_are_refused():
     ]
 
     with pytest.raises(MixedRunsError):
-        summarize(rows, NO_ASSEMBLY)
+        summarize(rows, NO_ASSEMBLY, ())
 
 
 def test_charged_misses_leave_out_unstated_and_uncharged_rows():
@@ -338,6 +339,16 @@ def test_charged_misses_leave_out_a_re_keyed_row():
     assert [row.reference_index for row in charged_misses(rows)] == [0, 2]
 
 
+def test_a_sweep_in_another_mode_is_refused(monkeypatch):
+    held = load_artifact(BASELINE)
+    monkeypatch.setattr(
+        run, "load_artifact", lambda path: replace(held, mode="end-to-end")
+    )
+
+    with pytest.raises(EvalRunError, match="reads an analysis sweep"):
+        run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus")
+
+
 def test_the_command_reconciles_with_score(tmp_path: Path):
     card_path = tmp_path / "card.json"
     scored_path = tmp_path / "scored.json"
@@ -350,6 +361,7 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     lanes = {lane["lane"]: lane for lane in card["lanes"]}
     every = lanes.pop("all")
     assert len(lanes) == 6
+    assert card["left_out"] == []
     assert (
         every["total"]
         == len(card["rows"])
