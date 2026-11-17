@@ -132,7 +132,7 @@ def test_a_finished_case_missing_a_capture_is_named_and_the_rest_replay(
     [line] = sweep.capture_faults
     assert line.startswith(f"{case.id}: ") and f"no {kind} file" in line
     assert [row.case for row in sweep.rows] == [other]
-    assert sweep.rows[0].accounted == sweep.rows[0].drafts
+    assert sweep.rows[0].accounted == sweep.rows[0].draft_ids
     assert main(["assembly", str(archive)]) == 1
 
 
@@ -370,7 +370,7 @@ def test_a_changed_claim_id_cannot_hide_its_draft(archive, case):  # noqa: F811
     assert row.omitted == tuple(renamed)
     assert row.unexplained == row.undrafted == tuple(renamed.values())
     assert row.filed_differently == ()
-    assert len(row.accounted) + len(row.omitted) == len(row.drafts)
+    assert len(row.accounted) + len(row.omitted) == len(row.draft_ids)
     assert (row.replayed, row.refused) == (row.reported[:-1], "")
 
 
@@ -493,4 +493,4 @@ def test_an_omitted_draft_held_twice_is_counted_once(archive, case):  # noqa: F8
 
     assert (row.omitted, row.repeated, row.unavailable) == ((gone,), (gone,), ())
     counted = row.accounted + row.omitted + row.filed_differently + row.unavailable
-    assert sorted(counted) == sorted(row.drafts)
+    assert sorted(counted) == sorted(row.draft_ids)

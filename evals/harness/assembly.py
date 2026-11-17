@@ -19,7 +19,7 @@ and the report.
   in none was lost after the critic ruled on it, and no earlier instrument can
   see that.
 * **Whether the arrays are what assembly makes of the rulings.** The drafts the
-  report does account for are assembled again from the rulings it carries. A
+  report rules on are assembled again from the rulings it carries. A
   claim the replay files in another array, or does not rebuild, is a defect
   in assembly or in what follows it.
 
@@ -147,7 +147,7 @@ class AssemblyReplay:
     case: str
     framework: FrameworkName
     #: Each draft ID ``<case>.drafts.json`` holds, once, in its order.
-    drafts: tuple[str, ...]
+    draft_ids: tuple[str, ...]
     reported: tuple[str, ...]
     replayed: tuple[str, ...]
     rejected_reported: tuple[str, ...]
@@ -192,14 +192,14 @@ class AssemblyReplay:
         """Drafts whose array differs from what assembly makes of the rulings."""
         return tuple(
             draft
-            for draft in self.drafts
+            for draft in self.draft_ids
             if draft in self.unexplained and draft not in self.repeated
         )
 
     @property
     def undrafted(self) -> tuple[str, ...]:
         """Claims the report rules on or returns that no draft names."""
-        return tuple(sorted(set(self.unexplained) - set(self.drafts)))
+        return tuple(sorted(set(self.unexplained) - set(self.draft_ids)))
 
     @property
     def accounted(self) -> tuple[str, ...]:
@@ -207,7 +207,7 @@ class AssemblyReplay:
         if self.refused:
             return ()
         lost = {*self.omitted, *self.unexplained, *self.repeated}
-        return tuple(draft for draft in self.drafts if draft not in lost)
+        return tuple(draft for draft in self.draft_ids if draft not in lost)
 
     @property
     def unavailable(self) -> tuple[str, ...]:
@@ -215,7 +215,7 @@ class AssemblyReplay:
 
         An omitted draft is counted as omitted only.
         """
-        cannot_file = self.drafts if self.refused else self.repeated
+        cannot_file = self.draft_ids if self.refused else self.repeated
         return tuple(draft for draft in cannot_file if draft not in self.omitted)
 
 
@@ -233,7 +233,7 @@ def replay_case(
     by_id = {draft.id: draft for draft in kept}
     returned = {entry.claim_id: entry.unit for entry in block.returned_claims}
     ruled = {claim.id for claim in block.all_claims()} | returned.keys()
-    accounted = [
+    ruled_drafts = [
         draft
         for draft in by_id.values()
         if draft.id in ruled and draft.id not in returned
@@ -241,7 +241,7 @@ def replay_case(
     row = AssemblyReplay(
         case=case.id,
         framework=framework,
-        drafts=tuple(by_id),
+        draft_ids=tuple(by_id),
         reported=tuple(claim.id for claim in block.claims),
         replayed=(),
         rejected_reported=tuple(claim.id for claim in block.rejected_claims),
@@ -253,11 +253,11 @@ def replay_case(
     )
     # A ruled claim with no draft stays reported and is never replayed, so it
     # is named while its neighbours replay.
-    drafted = {draft.id for draft in accounted}
+    drafted = {draft.id for draft in ruled_drafts}
     try:
         rulings = [
             ruling
-            for ruling in rulings_from_report(block, accounted)
+            for ruling in rulings_from_report(block, ruled_drafts)
             if ruling.id in drafted
         ]
     except ArchivedRulingError as error:
@@ -265,7 +265,7 @@ def replay_case(
     # The block carries no fan-in marks and no catalog a replay of assembly
     # reads: the view is not built here, only the rulings are checked and merged.
     critic_round = CriticRound.of(
-        framework, model, accounted, AnalysisMarks(), None, ()
+        framework, model, ruled_drafts, AnalysisMarks(), None, ()
     )
     outcome = critic_round.outcome(
         [ruling.model_dump(mode="json") for ruling in rulings]
@@ -405,7 +405,7 @@ def command_assembly(args: argparse.Namespace) -> int:
         return sum(len(part(row)) for row in sweep.rows)
 
     print(
-        f"drafts: {total(lambda row: row.drafts)} inspected,"
+        f"drafts: {total(lambda row: row.draft_ids)} inspected,"
         f" {total(lambda row: row.accounted)} accounted,"
         f" {total(lambda row: row.omitted)} omitted,"
         f" {total(lambda row: row.filed_differently)} filed differently,"
