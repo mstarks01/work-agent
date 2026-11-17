@@ -544,9 +544,9 @@ def attribute_case(
         ]
         found = next(
             (
-                hit
-                for hit in reached
-                if any(same_action(claim.verb, hit[0]) for claim in hit[2])
+                (read_verb, place, here)
+                for read_verb, place, here in reached
+                if any(same_action(claim.verb, read_verb) for claim in here)
             ),
             reached[0] if reached else None,
         )
