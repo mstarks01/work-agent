@@ -220,3 +220,22 @@ def test_the_position_pairing_is_the_parses_own(golden):
     assert len(paired) == len(list(parsed.elements()))
     for element in parsed.elements():
         assert paired[element.id]["name"] == element.name
+
+
+def test_a_key_the_emission_left_out_reads_as_the_default_the_parse_fills(golden):
+    default = (
+        type(golden.model.processes[0])
+        .model_fields["exposure"]
+        .get_default(call_default_factory=True)
+    )
+    parsed = _exposed(golden, default)
+    raw = _emitted(golden.model)
+    entry = next(p for p in raw["processes"] if p["id"] == PROCESS)
+    del entry["exposure"]
+
+    graded = replay.replay_extraction(
+        golden, ExtractionResult(golden.id, parsed, (), raw=raw)
+    )
+
+    assert _exposure(graded).check.blessed != _exposure(graded).check.extracted
+    assert _exposure(graded).stage == "wrong-in-raw"

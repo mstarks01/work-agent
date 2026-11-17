@@ -27,11 +27,13 @@ Each check takes one :data:`Stage`:
   reproduction proves one.
 * ``changed-and-wrong``: the raw value is wrong, and the parse changed it to
   another wrong value.
-* ``raw-unread``: no raw value is read: the group pairs nothing, two parsed
-  elements carry the check's ID, or the raw entry holds no value for the
-  attribute.
+* ``raw-unread``: no raw value is read: the emission did not parse, the group
+  pairs nothing, or two parsed elements carry the check's ID. A paired entry
+  that leaves the attribute out reads as the default the parse fills, so an
+  omission is ``wrong-in-raw`` or ``agrees``.
 
-A state-reduced control attribute that is wrong also takes one
+A state-reduced attribute (a control attribute or the protocol) that is wrong
+also takes one
 :data:`Certainty`, which says how the two states differ. The extraction mode
 runs no lane, so whether a fact reached a lane is not read here.
 """
@@ -60,8 +62,8 @@ Stage = Literal[
 ]
 STAGES: tuple[Stage, ...] = get_args(Stage)
 
-#: How the extracted state of a control attribute differs from the signed
-#: state. ``unjustified-certainty``: the signed model states nothing and the
+#: How the extracted state of a state-reduced attribute differs from the
+#: signed state. ``unjustified-certainty``: the signed model states nothing and the
 #: extraction states a control or its absence. ``silence-for-absence``: the
 #: signed model states that the control is absent and the extraction states
 #: nothing. ``silence-for-statement``: the signed model states a control and
@@ -163,13 +165,26 @@ def trace(
     alignment: Alignment,
     checks: Sequence[AttributeCheck],
 ) -> tuple[FactTrace, ...]:
-    """Each of ``checks`` with the raw value of the element the alignment paired."""
-    entries = emitted_entries(raw, parsed) if parsed is not None else {}
+    """Each of ``checks`` with the raw value of the element the alignment paired.
+
+    A paired entry that leaves the attribute out, or holds ``null`` for it,
+    reads as the field's default, because that is the value the parse fills.
+    """
+    if parsed is None:
+        return tuple(FactTrace(check, None) for check in checks)
+    entries = emitted_entries(raw, parsed)
+    elements = {element.id: element for element in parsed.elements()}
     produced_of = alignment.produced_of
     traced = []
     for check in checks:
-        entry = entries.get(produced_of.get(check.element_id, ""), {})
-        value = entry.get(check.attribute)
+        produced = produced_of.get(check.element_id, "")
+        entry = entries.get(produced)
+        value = None
+        if entry is not None:
+            value = entry.get(check.attribute)
+            if value is None:
+                field = type(elements[produced]).model_fields[check.attribute]
+                value = field.get_default(call_default_factory=True)
         traced.append(
             FactTrace(
                 check,
