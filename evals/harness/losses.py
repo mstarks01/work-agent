@@ -33,9 +33,10 @@ order, and the first that finds the finding charges it; ``position`` and
   position. The archive holds them with no ``attacker_position``, so it
   cannot read the position rule there, and the row is not a lane's
   choice of attacker.
-* ``merged``: a surviving claim cites the place with a reading's action, read through the equivalence table the identity rule reads, and the
-  scorer assigned it to a sibling reference. Two references at
-  one place under one action are the merges ``verbs.UNSEPARATED`` records,
+* ``merged``: a surviving claim cites the place with a reading's action,
+  read through the equivalence table the identity rule reads, and the scorer
+  assigned it to a sibling reference. Two references at one place under one
+  action are the merges ``verbs.UNSEPARATED`` records,
   and the loss is the corpus's to rule on rather than the lane's.
 * ``misfiled``: a surviving claim in another lane cites the place with the
   reference's action — the scorer's own lane error. The finding was written and
