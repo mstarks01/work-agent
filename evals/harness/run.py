@@ -124,7 +124,6 @@ from evals.harness.bundle import (
     listed_extractions,
     optional_block,
     runs_from_reports,
-    stride_block,
     stride_threats,
     write_assertions,
     write_extractions,
@@ -179,7 +178,13 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.run_record import run_record, sweep_inputs
-from evals.harness.scorer import CaseScore, review_coverage, score_case
+from evals.harness.scorer import (
+    CaseScore,
+    Rate,
+    percent,
+    review_coverage,
+    score_case,
+)
 from evals.harness.stability import (
     Band,
     CaseStability,
@@ -1391,7 +1396,7 @@ def _print_question_fallback(runs: Mapping[str, Any]) -> None:
     typed = sum(count.typed for count in counts)
     free = sum(count.free_text for count in counts)
     total = typed + free
-    rate = f"{free / total:.0%}" if total else "n/a"
+    rate = percent(Rate(free, total).value)
     print(
         f"\nQuestion kinds: {typed} typed, {free} free text; fallback {rate}"
         " (instrument, non-gating)"
@@ -1467,10 +1472,10 @@ def scorecard_of(
     """The must-find scorecard of one finished sweep, scored on ``corpus``.
 
     Shares :func:`_score_runs` with ``score``, so the matches and loss causes
-    are the ones ``score`` prints. Matching reads no vote, so it reads an
-    empty ledger. The ``drafted`` stage is the same matcher over the drafts
-    the critic was handed. The critic audit reads ``votes``, for the labels
-    its populations rest on.
+    are the ones ``score`` prints. Matching and the loss causes read no vote
+    standing. The ``drafted`` stage is the same matcher over the drafts the
+    critic was handed. The critic audit reads ``votes``, for the labels its
+    populations rest on.
 
     Reads an ``analysis`` sweep only: its analysed model is the corpus
     ``model.json`` of the run's day, so an element it lacks is a re-key and
@@ -1500,8 +1505,7 @@ def scorecard_of(
         cases, {case: run.report.system_model for case, run in runs.items()}
     )
     matcher = SubsetVerbIdentity(flow_maps)
-    no_votes = ledger.Ledger()
-    scores, _, charged = _score_runs(cases, runs, matcher, no_votes, flow_maps)
+    scores, yields, charged = _score_runs(cases, runs, matcher, votes, flow_maps)
     reported = {
         score.case_id: [pair.reference_index for pair in score.matched]
         for score in scores
@@ -1512,23 +1516,11 @@ def scorecard_of(
         ScoredAgainst(corpus_digest=corpus_digest(corpus), repo_commit=repo_commit()),
     )
     rows: list[scorecard.ReferenceRow] = []
-    yields: list[CriticYield] = []
     for case in cases:
         held = None
         if case.id in reported:
             run = runs[case.id]
-            yields.append(
-                score_case_with_yield(
-                    case,
-                    run.merged_drafts,
-                    stride_threats(run.report),
-                    matcher,
-                    votes,
-                    stride_block(run.report),
-                    report_rows(run.report),
-                ).critic_yield
-            )
-            drafted = score_case(case, run.merged_drafts, matcher, no_votes)
+            drafted = score_case(case, run.merged_drafts, matcher, votes)
             held = scorecard.capture(
                 run.report.system_model,
                 flow_maps[case.id],

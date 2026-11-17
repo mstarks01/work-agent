@@ -139,6 +139,7 @@ from evals.harness.modes import (
     score_extraction,
 )
 from evals.harness.reference import GoldenCase
+from evals.harness.scorer import UNAVAILABLE
 from evals.reference_facts import facts_path, load_facts, reference_catalog
 
 Fate = Literal[
@@ -1591,7 +1592,7 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
             print(f"  {fate:<20} {pool['fates'][fate]:>5}")
         share = pool["bound_share"]
         print(
-            f"  bound share of graph-bound rows: {'n/a' if share is None else f'{share:.3f}'}"
+            f"  bound share of graph-bound rows: {UNAVAILABLE if share is None else f'{share:.3f}'}"
         )
         print(
             f"  rows a lane could cite: {pool['offered']} over the extracted graphs,"

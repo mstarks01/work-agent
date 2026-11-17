@@ -32,9 +32,9 @@ proposal, so that stage is uncaptured on every row. An uncaptured stage is
 never a zero.
 
 **Rates.** Each rate is a :class:`Rate` with its numerator and denominator.
-An empty denominator gives ``None``, where :func:`~evals.harness.scorer.ratio`
-gives 0.0, and prints as unavailable. A rate here is a share of matched must-finds, not the per-lane
-**Coverage** of ``GLOSSARY.md``.
+An empty denominator gives ``None``, which prints as unavailable, where
+:func:`~evals.harness.scorer.ratio` gives 0.0. A rate here is a share of matched
+must-finds, not the per-lane **Coverage** of ``GLOSSARY.md``.
 
 **One run.** :func:`summarize` refuses rows of more than one
 :class:`RunIdentity`, so two sweeps, two corpus revisions or two scorer trees

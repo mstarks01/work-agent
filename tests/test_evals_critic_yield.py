@@ -164,8 +164,8 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
     assert result.killed[0].outcome == "rejected"
     assert result.rejected_killed == 1
     assert result.matched_killed == 0
-    assert result.kill_precision == 1.0
-    assert result.rejected_kill_rate == 1.0
+    assert result.rates["kill_precision"].value == 1.0
+    assert result.rates["rejected_kill_rate"].value == 1.0
 
 
 def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
@@ -188,7 +188,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     assert result.rejected_killed == 0
     assert result.matched_killed == 1
     assert result.must_find_killed == 1
-    assert result.matched_kill_rate == 1.0
+    assert result.rates["matched_kill_rate"].value == 1.0
     assert result.killed[0].outcome == "matched-must-find"
     assert result.must_find_before == 1 and result.must_find_after == 0
 
@@ -468,12 +468,12 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
     ).critic_yield
 
     assert result.killed == ()
-    assert result.kill_rate == 0.0
-    assert result.matched_kill_rate == 0.0
+    assert result.rates["kill_rate"].value == 0.0
+    assert result.rates["matched_kill_rate"].value == 0.0
     # No draft carried a substance down-vote and nothing was killed: the two
     # rates over those inputs are unavailable, never a zero.
-    assert result.rejected_kill_rate is None
-    assert result.kill_precision is None
+    assert result.rates["rejected_kill_rate"].value is None
+    assert result.rates["kill_precision"].value is None
     totals = aggregate_yield([result])
     assert totals["rejected_kill_rate"] is None
     assert totals["kill_precision"] is None
@@ -653,10 +653,10 @@ def test_the_populations_split_each_label_by_what_the_critic_did(case):
         ("matched-expected", "needs-info"): 1,
         ("rejected", "confirmed"): 1,
     }
-    assert populations.supported_rejected == Rate(1, 2)
-    assert populations.rate("supported", "needs-info") == Rate(1, 2)
-    assert populations.unsupported_confirmed == Rate(1, 1)
-    assert populations.rate("unsupported", "needs-info") == Rate(0, 1)
+    assert populations.rates["real_rejected"] == Rate(1, 2)
+    assert populations.rates["real_needs_info"] == Rate(1, 2)
+    assert populations.rates["not_real_confirmed"] == Rate(1, 1)
+    assert populations.rates["not_real_needs_info"] == Rate(0, 1)
 
 
 def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, capsys):
@@ -679,14 +679,14 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     populations = CriticPopulations.pooled([result])
 
     assert populations.counts == {("stale", "confirmed"): 1}
-    assert populations.unsupported_confirmed == Rate(0, 0)
-    assert populations.unsupported_confirmed.value is None
-    assert populations.to_json()["unsupported_confirmed"]["value"] is None
+    assert populations.rates["not_real_confirmed"] == Rate(0, 0)
+    assert populations.rates["not_real_confirmed"].value is None
+    assert populations.to_json()["not_real_confirmed"]["value"] is None
     CriticAudit.of([result]).render()
     shown = capsys.readouterr().out
-    assert "unsupported_confirmed    0/0 (unavailable)" in shown
+    assert "not_real_confirmed       0/0 (unavailable)" in shown
     assert "(1 stale drafts)" in shown
-    assert populations.unsupported_gap.endswith("(1 stale drafts)")
-    assert CriticPopulations({("unvoted", "confirmed"): 1}).unsupported_gap == (
+    assert populations.not_real_gap.endswith("(1 stale drafts)")
+    assert CriticPopulations({("unvoted", "confirmed"): 1}).not_real_gap == (
         "no draft carries a vote"
     )

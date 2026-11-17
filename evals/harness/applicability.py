@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from analysis_service.claims import (
     Claim,
@@ -1031,22 +1031,15 @@ class ApplicabilityYield:
     unlisted: tuple[str, ...]
 
     @property
-    def rates(self) -> dict[str, Rate]:
-        """Both rates below with their counts, keyed by the rate's name."""
-        return _yield_rates(self.drafts, len(self.rejected), len(self.destroyed))
+    def rates(self) -> dict[ApplicabilityRate, Rate]:
+        """Both rates with their counts, keyed by the rate's name.
 
-    @property
-    def rejection_rate(self) -> float | None:
-        """Of what the critic was handed, the share it ruled inapplicable."""
-        return self.rates["rejection_rate"].value
-
-    @property
-    def destroyed_rate(self) -> float | None:
-        """Of what it rejected, the share the case expected a ruling on.
-
-        ``None`` where it rejected nothing.
+        ``rejection_rate`` is the share of what the critic was handed that it
+        ruled inapplicable. ``destroyed_rate`` is the share of its rejections
+        that the case expected a ruling on, and has no value where it rejected
+        nothing.
         """
-        return self.rates["destroyed_rate"].value
+        return _yield_rates(self.drafts, len(self.rejected), len(self.destroyed))
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -1062,7 +1055,13 @@ class ApplicabilityYield:
         }
 
 
-def _yield_rates(drafts: int, rejected: int, destroyed: int) -> dict[str, Rate]:
+#: The names of the rates :attr:`ApplicabilityYield.rates` gives.
+ApplicabilityRate = Literal["rejection_rate", "destroyed_rate"]
+
+
+def _yield_rates(
+    drafts: int, rejected: int, destroyed: int
+) -> dict[ApplicabilityRate, Rate]:
     """The yield's two rates, from one case's counts or from pooled ones."""
     return {
         "rejection_rate": Rate(rejected, drafts),

@@ -82,24 +82,23 @@ FATES: tuple[Fate, ...] = tuple(
 )
 
 #: Which input population a draft joins.
-Label = Literal["supported", "unsupported", "unlabelled"]
+Label = Literal["real", "not-real", "unlabelled"]
 
 #: The population each scored outcome puts a draft in.
 #:
-#: ``supported`` rests on a reference the draft matched, or on a current vote
-#: that pools it: both are relative to the reference set and the ledger, not
-#: proof that the draft is true. ``unsupported`` rests on a current substance
-#: down-vote. Everything else is unlabelled: ``open`` is a reviewer who was
+#: ``real`` rests on a reference the draft matched, or on a current vote that
+#: pools it: both are relative to the reference set and the ledger, not proof
+#: that the draft is true. ``not-real`` rests on a current substance down-vote. Everything else is unlabelled: ``open`` is a reviewer who was
 #: unsure, ``stale`` a vote on another argument (ADR 0029), ``unvoted`` no
 #: vote, ``lane-error`` a reference in another lane, and ``unscored`` a draft
 #: the scorer did not key, such as one that names an element the corpus model
 #: does not hold.
 LABEL_OF: Mapping[ScoredOutcome, Label] = MappingProxyType(
     {
-        "matched-must-find": "supported",
-        "matched-expected": "supported",
-        "pooled": "supported",
-        "rejected": "unsupported",
+        "matched-must-find": "real",
+        "matched-expected": "real",
+        "pooled": "real",
+        "rejected": "not-real",
         "open": "unlabelled",
         "stale": "unlabelled",
         "unvoted": "unlabelled",
@@ -108,7 +107,17 @@ LABEL_OF: Mapping[ScoredOutcome, Label] = MappingProxyType(
     }
 )
 
-#: Why the unsupported population is empty where some draft reads ``stale``. A
+#: The names of the rates :attr:`CriticPopulations.rates` gives.
+PopulationRate = Literal[
+    "real_rejected", "real_needs_info", "not_real_confirmed", "not_real_needs_info"
+]
+
+#: The names of the rates :attr:`CriticYield.rates` gives.
+YieldRate = Literal[
+    "kill_rate", "rejected_kill_rate", "matched_kill_rate", "kill_precision"
+]
+
+#: Why the not-real population is empty where some draft reads ``stale``. A
 #: vote judges a reported claim, verdict included (ADR 0029), and a draft
 #: carries no verdict, so a vote cast on the claim reads ``stale`` on its draft.
 STALE_GAP = (
@@ -117,7 +126,7 @@ STALE_GAP = (
     " stale on the draft"
 )
 
-#: Why the unsupported population is empty where no draft reads ``stale``.
+#: Why the not-real population is empty where no draft reads ``stale``.
 NO_VOTE_GAP = "no draft carries a vote"
 
 
@@ -125,9 +134,9 @@ NO_VOTE_GAP = "no draft carries a vote"
 class CriticPopulations:
     """The drafts the critic was handed, by scored outcome and by fate.
 
-    Each rate reads only its own population. ``supported_rejected`` divides by
-    the supported drafts, ``unsupported_confirmed`` by the unsupported ones, and
-    a ``needs-info`` fate counts in neither: it has a rate of its own.
+    Each rate reads only its own population. ``real_rejected`` divides by the
+    real drafts, ``not_real_confirmed`` by the not-real ones, and a
+    ``needs-info`` fate counts in neither: it has a rate of its own.
     An empty population gives a :class:`~evals.harness.scorer.Rate` whose value
     is ``None``, which is a gap in the labels and not a zero.
     """
@@ -155,27 +164,19 @@ class CriticPopulations:
         return Rate(self.count(label, (fate,)), self.count(label))
 
     @property
-    def supported_rejected(self) -> Rate:
-        return self.rate("supported", "rejected")
-
-    @property
-    def unsupported_confirmed(self) -> Rate:
-        return self.rate("unsupported", "confirmed")
-
-    @property
-    def rates(self) -> dict[str, Rate]:
+    def rates(self) -> dict[PopulationRate, Rate]:
         """The four rates a report prints, keyed by name."""
         return {
-            "supported_rejected": self.supported_rejected,
-            "supported_needs_info": self.rate("supported", "needs-info"),
-            "unsupported_confirmed": self.unsupported_confirmed,
-            "unsupported_needs_info": self.rate("unsupported", "needs-info"),
+            "real_rejected": self.rate("real", "rejected"),
+            "real_needs_info": self.rate("real", "needs-info"),
+            "not_real_confirmed": self.rate("not-real", "confirmed"),
+            "not_real_needs_info": self.rate("not-real", "needs-info"),
         }
 
     @property
-    def unsupported_gap(self) -> str | None:
-        """Why the unsupported population is empty, or ``None`` where it is not."""
-        if self.count("unsupported"):
+    def not_real_gap(self) -> str | None:
+        """Why the not-real population is empty, or ``None`` where it is not."""
+        if self.count("not-real"):
             return None
         stale = sum(n for (outcome, _), n in self.counts.items() if outcome == "stale")
         return f"{STALE_GAP} ({stale} stale drafts)" if stale else NO_VOTE_GAP
@@ -187,7 +188,7 @@ class CriticPopulations:
                 for (outcome, fate), n in sorted(self.counts.items())
             ],
             **{name: rate.to_json() for name, rate in self.rates.items()},
-            "unsupported_gap": self.unsupported_gap,
+            "not_real_gap": self.not_real_gap,
         }
 
 
@@ -242,9 +243,9 @@ class CriticAudit:
             print(f"  {outcome:<18} {LABEL_OF[outcome]:<12}{cells}")
         for name, rate in populations.rates.items():
             print(f"  {name:<24} {rate.shown()}")
-        gap = populations.unsupported_gap
+        gap = populations.not_real_gap
         if gap is not None:
-            print(f"  unsupported population empty: {gap}")
+            print(f"  not-real population empty: {gap}")
         loss = self.reference_loss
         print(
             f"  gross: {loss.denominator} reference-matched drafts killed;"
@@ -378,8 +379,19 @@ class CriticYield:
         return len(self.killed)
 
     @property
-    def rates(self) -> dict[str, Rate]:
-        """Each rate below with its counts, keyed by the rate's name."""
+    def rates(self) -> dict[YieldRate, Rate]:
+        """Each rate with its counts, keyed by the rate's name.
+
+        ``kill_rate`` is the share of drafts the critic rejected, the Semgrep
+        ~20% comparator. ``rejected_kill_rate`` is the share of the drafts a
+        person rejected that the critic killed, and ``matched_kill_rate`` the
+        share of reference-matched drafts it killed. ``kill_precision`` is the
+        share of the kills that a person rejected for substance. It is not the
+        inverse of ``matched_kill_rate``: a killed ``pooled`` or ``unvoted``
+        draft is neither a win nor a loss here, because the reference sets are
+        non-exhaustive by construction. A rate over an empty population has no
+        value.
+        """
         return _yield_rates(
             drafts_in=self.drafts_in,
             killed=self.kill_count,
@@ -388,33 +400,6 @@ class CriticYield:
             matched_before=self.matched_before,
             matched_killed=self.matched_killed,
         )
-
-    @property
-    def kill_rate(self) -> float | None:
-        """Share of drafts the critic rejected — the Semgrep ~20% comparator."""
-        return self.rates["kill_rate"].value
-
-    @property
-    def rejected_kill_rate(self) -> float | None:
-        """Of the human-rejected drafts it was handed, the share it caught."""
-        return self.rates["rejected_kill_rate"].value
-
-    @property
-    def matched_kill_rate(self) -> float | None:
-        """Of the drafts that had matched a reference, the share it killed."""
-        return self.rates["matched_kill_rate"].value
-
-    @property
-    def kill_precision(self) -> float | None:
-        """Of what it killed, the share a person had rejected for substance.
-
-        Deliberately *not* the inverse of :attr:`matched_kill_rate`: a killed
-        ``pooled`` or ``unvoted`` draft is neither a win nor a loss here,
-        because the reference sets are non-exhaustive by construction and the
-        corpus feedback loop, not this instrument, is what settles those.
-        ``None`` where the critic killed nothing.
-        """
-        return self.rates["kill_precision"].value
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -495,8 +480,12 @@ def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
     }
 
 
-def _fates(block: FrameworkAnalysis) -> dict[str, Fate]:
-    """Each claim ID the block carries, and the list it carries it in."""
+def fates(block: FrameworkAnalysis) -> dict[str, Fate]:
+    """Each claim ID the block carries, and the list it carries it in.
+
+    The one reader of a draft's fate. A draft the block does not carry is
+    ``unruled``, which a reader spells with ``.get(draft_id, "unruled")``.
+    """
     held: dict[str, Fate] = {
         entry.claim_id: "returned" for entry in block.returned_claims
     }
@@ -512,7 +501,7 @@ def _yield(
     block: FrameworkAnalysis,
 ) -> CriticYield:
     steps = rejection_steps(block)
-    held = _fates(block)
+    fate_of = fates(block)
     surviving = set(post.produced_ids)
     outcomes = _scored_outcomes(pre)
     killed = tuple(
@@ -542,7 +531,7 @@ def _yield(
         populations=CriticPopulations(
             dict(
                 Counter(
-                    (outcomes[draft.id][0], held.get(draft.id, "unruled"))
+                    (outcomes[draft.id][0], fate_of.get(draft.id, "unruled"))
                     for draft in drafts
                 )
             )
@@ -585,7 +574,7 @@ def _yield_rates(
     rejected_killed: int,
     matched_before: int,
     matched_killed: int,
-) -> dict[str, Rate]:
+) -> dict[YieldRate, Rate]:
     """The yield's four rates, from one case's counts or from pooled ones."""
     return {
         "kill_rate": Rate(killed, drafts_in),
@@ -607,9 +596,10 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     rejected_before = sum(entry.rejected_before for entry in yields)
     rejected_killed = sum(entry.rejected_killed for entry in yields)
     matched_before = sum(entry.matched_before for entry in yields)
-    matched_killed = sum(entry.matched_killed for entry in yields)
+    audit = CriticAudit.of(yields)
+    matched_killed = audit.reference_loss.denominator
     must_find_killed = sum(entry.must_find_killed for entry in yields)
-    matched_lost = sum(entry.matched_lost for entry in yields)
+    matched_lost = audit.reference_loss.numerator
     must_find_lost = sum(entry.must_find_lost for entry in yields)
     by_cause: dict[str, Counter[str]] = {}
     for entry in yields:
@@ -636,7 +626,7 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
                 matched_killed=matched_killed,
             ).items()
         },
-        "populations": CriticPopulations.pooled(yields).to_json(),
+        "audit": audit.to_json(),
         # Every kill by the step the critic named, pooled; the per-step
         # ``matched`` and ``must_find`` are what a step removed.
         "killed_by_cause": {
