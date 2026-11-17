@@ -473,12 +473,12 @@ def _answered_reading(
 
 
 def _charged_to(claims: Sequence[DraftThreat]) -> DraftThreat:
-    """Which of several claims at one place a miss is charged to.
+    """Which of several drafts a loss row names.
 
-    **The rule decides, never the input order.** ``_at_place`` returns the
-    claims in whatever order the report lists them, so the lowest claim ID
-    decides: it is arbitrary but stable, and the row a reader sees does not
-    move between two runs over one report.
+    **The rule decides, never the input order.** Each caller passes drafts in
+    whatever order the report lists them, so the lowest draft ID decides: it
+    is arbitrary but stable, and the row a reader sees does not move between
+    two runs over one report.
     """
     return min(claims, key=lambda claim: claim.id)
 
