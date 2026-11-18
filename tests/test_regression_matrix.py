@@ -4,7 +4,7 @@ Each test runs the real graph over scripted model replies and takes a
 ``fault`` flag: with the fault the graph meets the failure, and without it the
 same run is the valid control. So each test proves the fault is what the
 assertion detects, not a snapshot of what the run happens to emit.
-``docs/regression-matrix.md`` lists each row with its provenance and contract.
+``docs/agents/regression-matrix.md`` lists each row with its provenance and contract.
 """
 
 from __future__ import annotations
