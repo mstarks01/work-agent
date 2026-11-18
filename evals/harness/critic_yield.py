@@ -2,10 +2,10 @@
 
 The critic is the most expensive node in the graph, at one strong-tier pass over
 every category agent's output, and this module is the evidence that it earns
-that cost. It is deliberately two-sided. A critic that kills rejected threats is
-earning its cost, and the same critic killing threats that matched a reference
-is destroying real findings. Only the pair means anything, because a kill count
-alone can be read as either.
+that cost. It is deliberately two-sided. A critic that rejects down-voted drafts
+is earning its cost, and the same critic rejecting drafts that matched a
+reference is destroying real findings. Only the pair means anything, because a
+kill count alone can be read as either.
 
 Two comparators help in reading the numbers against something. Semgrep's
 assistant kills about 20% of findings at 92% to 96% agreement with human triage.
