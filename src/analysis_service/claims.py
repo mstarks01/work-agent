@@ -641,7 +641,12 @@ class Ground(BaseModel):
       A consumer that folded the two would report a control the input described
       as missing as a gap in the *description*. Both branches say only what the
       model carries; neither says the control is inadequate, which stays the
-      agent's argument and the critic's to rule on.
+      agent's argument and the critic's to rule on. An absence is not
+      catalogued where the job's unscoped assertion rows that state the
+      attribute's value (the answers alone, where a submitter's answer makes
+      it) all state the opposite
+      (:func:`~analysis_service.assertions.contradicted_attributes`); those
+      rows are open questions instead.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a
       thing, which no element's free text names. **The only branch whose
       referent is the whole model rather than an element of it**, and the one a
@@ -677,14 +682,13 @@ class Ground(BaseModel):
     * ``unknown-assertion`` — ``assertion`` alone, for an open row: its value
       is :data:`~analysis_service.system_model.UNKNOWN`, another row disputes
       it (:func:`~analysis_service.assertions.disputed`),
-      or the graph attribute states the opposite of the value the rows project
-      (:func:`~analysis_service.assertions.contradicted`). **The assertion layer's
+      or the graph attribute states the opposite of the rows that state its
+      value (:func:`~analysis_service.assertions.contradicted`). **The assertion layer's
       ``unknown-attribute``**, and it exists for the same reason that kind
       does. An element attribute nobody stated is offered as a fact an agent
       may raise a *conditional* claim on. This kind offers the same for a
       predicate with no graph field, such as a second factor the sources left
-      open, and for a row behind a value whose opposite its graph field
-      states.
+      open, and for a row whose opposite its graph field states.
       It is a separate kind rather than a flag on ``assertion`` because the two
       readings differ: a settled row is a fact in hand, and an open row is a
       question. The fields are identical and the fact is not, which is the

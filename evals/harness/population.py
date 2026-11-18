@@ -74,7 +74,12 @@ REACHES: frozenset[Route] = frozenset({"projected", "offered"})
 #: meaning, so a population frozen under one rule is never read under another.
 #: Version 2: a settled row the graph contradicts routes ``set-aside``, not
 #: ``projected``.
-POPULATION_VERSION = 2
+#: Version 3: two ``compatible`` rows beside an opposite graph attribute are
+#: contradicted, so they route ``set-aside``, not ``offered``. Where the
+#: validity gate refuses the projected model, an unscoped row beside a scoped
+#: one, and rows of ``several-predicates`` in one state, that the field
+#: opposes route ``set-aside`` too.
+POPULATION_VERSION = 3
 
 
 class PopulationError(ValueError):

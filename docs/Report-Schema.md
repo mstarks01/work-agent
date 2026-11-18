@@ -382,18 +382,21 @@ class Ground:
 | --- | --- | --- |
 | `quote` | `text` + `source_label` | the submitter's own words said this |
 | `unknown-attribute` | `element_id` + `attribute` | this fact was never stated, so the threat stands unrefuted |
-| `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
+| `absent-attribute` | `element_id` + `attribute` | the input states this control is not there, unless the unscoped assertion rows that state its value (the answers alone, where a submitter's answer makes it) all state the opposite |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
-| `assertion` | `assertion` | the sources state this fact, and the model does not carry it in a field: it has no field for it, or the row is scoped, one of two compatible values, or a row whose value the model does not hold, unless the model's attribute states the opposite of the value the rows project and no submitter's answer makes that value |
-| `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it; or the model's attribute states the opposite of the value the rows project, and no submitter's answer makes that value |
+| `assertion` | `assertion` | the sources state this fact, and the model does not carry it in a field: it has no field for it, or the row is scoped, one of two compatible values, or a row whose value the model does not hold, unless the model's attribute states the opposite of the rows that state its value and no submitter's answer makes that value |
+| `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it or where its projection qualifies the field and the field still states a value; or the model's attribute states the opposite of the rows that state its value, and no submitter's answer makes that value |
 
 **What the assertion pass reached.** A reader of `assertions` has no way to tell
 a system with few stated facts from a pass that asked few questions, and the two
 look identical. `Report.assertion_coverage` answers it, derived from the rows and
 the model rather than stored beside them: `reachable` is the element attributes
 some predicate could speak to on *this* model, `settled` is how many the catalog
-answers, `open` counts the questions the sources raised and left unanswered, and
+answers and the model does not contradict (a contradicted value that a
+submitter's answer makes still counts), `open` counts the questions the
+sources raised and left unanswered and the settled rows the model
+contradicts (a disputed row is in neither count), and
 `own_subjects` counts the facts about a principal or a credential that the graph
 has no place for at all. `None` on a job that ran no pass.
 
@@ -408,7 +411,7 @@ On load the report checks the row is one the catalog *settles* — it holds a
 value rather than `unknown`, its basis is support of some kind, no assessment
 set it aside, and no other row disagrees at its subject, predicate and scope —
 and that the embedded model's attribute does not state the opposite of the
-value the rows project, unless a submitter's answer makes that value, and
+rows that state its value, unless a submitter's answer makes that value, and
 refuses the report otherwise. A
 report whose `assertions` is `None` settles nothing, so a claim citing one is
 refused the way a claim citing a crossing the model does not derive is.
@@ -1276,14 +1279,15 @@ version before it. Read it when you load an archived report.
     reader of which kinds make a claim conditional, and both `unknown` kinds
     are in it.
   - `assertions[].projection_version` names the rules that turn the catalog's
-    rows into graph attributes. It has its own number, not the catalog's
+    rows into graph attributes, and which rows `contradictions` compares with
+    an attribute. It has its own number, not the catalog's
     `registry_version`, because the projection's loss rules live in `project`
     and can change with no registry change. It lets a loaded report be
     re-checked for contradictions against the rules that produced it; the
     issue re-check declines for a record from another version. The ground
     check on load reads every record's grounds against today's evidence
     catalog, whatever its version. `assertions.issues` can say
-    `graph-contradiction`: the one code that refuses no row. It reports that a
+    `graph-contradiction`, a code that refuses no row. It reports that a
     graph attribute and the rows authoritative for it state opposite things.
 
   **There is no version gate and none is needed.** `Report` forbids unknown

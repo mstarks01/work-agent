@@ -3274,7 +3274,26 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     ``settled``."""
     assert _sites(lambda node: _calls(node, "contradictions")) == [
         ("src/analysis_service/assertions.py", "_contradicted_ids"),
+        ("src/analysis_service/assertions.py", "contradicted_attributes"),
         ("src/analysis_service/assertions.py", "contradiction_issues"),
+    ]
+
+
+def test_a_row_value_has_one_graph_spelling():
+    """``_graph_spelling`` is the one reader of how a graph field spells a
+    row's value, so the projection, its qualification and the graph
+    comparison spell one value the same way."""
+    assert _sites(lambda node: _calls(node, "_written")) == [
+        ("src/analysis_service/assertions.py", "_graph_spelling"),
+    ]
+
+
+def test_the_rows_that_make_a_value_have_one_reader():
+    """``_value_rows`` names the rows that make an attribute's value, so the
+    projection and the graph comparison read the same rows."""
+    assert _sites(lambda node: _calls(node, "_value_rows")) == [
+        ("src/analysis_service/assertions.py", "_projected"),
+        ("src/analysis_service/assertions.py", "contradictions"),
     ]
 
 

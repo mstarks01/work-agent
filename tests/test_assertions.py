@@ -2017,7 +2017,7 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
     def test_a_graph_absence_under_a_stated_row_is_reported_too(self):
         """The mirror, because either side can be the wrong one."""
         found = contradictions(catalog([stated()]), self.model(authentication="none"))
-        assert len(found) == 1 and found[0].projected == "email and password"
+        assert len(found) == 1 and found[0].values == ("email and password",)
 
     def test_two_wordings_of_one_mechanism_are_not_a_contradiction(self):
         """Otherwise every run reports one, and the finding means nothing."""

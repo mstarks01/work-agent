@@ -17,13 +17,19 @@ from analysis_service.assertions import (
     Subject,
     apply_projection,
     assertion_id,
+    catalog_coverage,
     contradicted,
     contradictions,
+    project,
     support_span,
 )
 from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
 from analysis_service.critic import assemble_claims
-from analysis_service.evidence import absent_evidence_ref, evidence_catalog
+from analysis_service.evidence import (
+    absent_evidence_ref,
+    evidence_catalog,
+    ground_issues,
+)
 from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
@@ -428,3 +434,267 @@ def test_an_answer_of_unknown_does_not_lift_the_unchecked_guard():
 
     (flow,) = updated.data_flows
     assert flow.authentication.startswith("unknown")
+
+
+class TestTheGraphSideOfAContradiction:
+    """A graph absence the rows contradict is no fact a lane may cite.
+
+    The maintainer's ruling of 2026-11-18 on the #2302 open items: the
+    evidence catalog drops the ``absent-attribute`` entry of a contradicted
+    attribute, and the row's ``unknown-assertion`` entry carries the question.
+    """
+
+    ENCRYPTED = TestARowTheGraphContradicts.STORED.model_copy(
+        update={"value": "AES-256"}
+    )
+    STORE = TestARowTheGraphContradicts.STORE
+    ABSENT_REF = absent_evidence_ref(ORDERS, "encryption_at_rest")
+
+    def test_the_contradicted_absence_is_not_offered(self):
+        catalog = assertions(self.ENCRYPTED, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert self.ABSENT_REF not in offered
+        assert offered[assertion_id(self.ENCRYPTED)].kind == "unknown-assertion"
+
+    def test_an_absence_no_row_contradicts_is_still_offered(self):
+        """The neighbour: rows about another store leave this absence alone."""
+        offered = evidence_catalog(_with_encryption("none"), assertions())
+
+        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+
+    def test_an_answer_the_graph_contradicts_drops_the_absence_too(self):
+        """An answer settles the fact even against the sources (#1225), so the
+        graph's opposite value is no fact either."""
+        answer = _as_answer(self.ENCRYPTED, "Orders database: AES-256 at rest.")
+        catalog = assertions(answer, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert self.ABSENT_REF not in offered
+        assert offered[assertion_id(answer)].kind == "assertion"
+
+
+class TestCompatibleRowsBesideAGraphAbsence:
+    """Two rows that both hold, beside an extracted ``none``, in a normal job.
+
+    The ``compatible`` projection leaves the attribute as extraction wrote it,
+    so each row's own state is compared with the graph attribute (the
+    maintainer's ruling of 2026-11-18).
+    """
+
+    CREDENTIAL = Subject(id="credential:api-key", type="credential", label="api key")
+    FLOW_SUBJECT = Subject(id=FLOW, type="interaction", label="place order")
+
+    def rows(self):
+        return (
+            stated(),
+            stated(predicate="credential-presented", value="credential:api-key"),
+        )
+
+    def catalog(self):
+        return assertions(*self.rows(), subjects=(self.FLOW_SUBJECT, self.CREDENTIAL))
+
+    def model(self, authentication):
+        graph = test_assertions.TestAGraphAttributeAndItsRowsStatingOpposites()
+        return graph.model(authentication)
+
+    def test_the_rows_are_open_against_an_extracted_none(self):
+        catalog = self.catalog()
+        model, applied = apply_projection(self.model("none"), catalog)
+        offered = evidence_catalog(model, catalog)
+
+        assert applied == ()
+        assert [c.attribute for c in contradictions(catalog, model)] == [
+            "authentication"
+        ]
+        assert contradicted(catalog, model) == self.rows()
+        assert {offered[assertion_id(entry)].kind for entry in self.rows()} == {
+            "unknown-assertion"
+        }
+        assert absent_evidence_ref(FLOW, "authentication") not in offered
+
+    def test_the_rows_stay_settled_beside_a_stated_control(self):
+        """The neighbour: the graph states a control, which the rows agree with."""
+        catalog = self.catalog()
+        model = self.model("session cookie")
+        offered = evidence_catalog(model, catalog)
+
+        assert contradictions(catalog, model) == ()
+        assert {offered[assertion_id(entry)].kind for entry in self.rows()} == {
+            "assertion"
+        }
+
+
+class TestADisputedPairUnderARefusedProjection:
+    """Two rows that disagree over a field the gate left as extraction wrote it.
+
+    An applied projection shows the field as a qualified unknown, which the
+    attribute enumeration offers. Where the projection was not applied, the
+    field states a value, so each row of the pair is offered as an open
+    question (the maintainer's ruling of 2026-11-18).
+    """
+
+    STORE = TestARowTheGraphContradicts.STORE
+    ABSENCE = TestARowTheGraphContradicts.STORED
+    ENCRYPTED = ABSENCE.model_copy(update={"value": "AES-256", "explanation": "b"})
+
+    def catalog(self):
+        return assertions(self.ABSENCE, self.ENCRYPTED, subjects=(self.STORE,))
+
+    def test_each_row_is_open_where_the_projection_was_not_applied(self):
+        offered = evidence_catalog(_with_encryption("none"), self.catalog())
+
+        assert offered[assertion_id(self.ABSENCE)].kind == "unknown-assertion"
+        assert offered[assertion_id(self.ENCRYPTED)].kind == "unknown-assertion"
+
+    def test_the_field_carries_the_question_where_the_projection_applied(self):
+        """The neighbour: the qualified unknown is the question."""
+        catalog = self.catalog()
+        model, applied = apply_projection(_with_encryption("none"), catalog)
+        offered = evidence_catalog(model, catalog)
+
+        assert [projection.reason for projection in applied] == ["several-values"]
+        assert assertion_id(self.ABSENCE) not in offered
+        assert assertion_id(self.ENCRYPTED) not in offered
+        store = model.get(ORDERS)
+        assert isinstance(store, DataStore)
+        assert store.encryption_at_rest.startswith(UNKNOWN)
+
+
+class TestCoverageOfAContradictedAttribute:
+    """Coverage reads the rule the evidence catalog reads: a row the projected
+    graph contradicts is open, and its attribute is not settled (the
+    maintainer's ruling of 2026-11-18)."""
+
+    STORE = TestARowTheGraphContradicts.STORE
+    STORED = TestARowTheGraphContradicts.STORED
+
+    def test_a_contradicted_row_counts_as_open(self):
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+        coverage = catalog_coverage(catalog, _with_encryption("AES-256"))
+
+        assert (coverage.settled, coverage.open) == (0, 1)
+
+    def test_an_agreeing_row_counts_as_settled(self):
+        """The neighbour: the graph holds the absence the row states."""
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+        coverage = catalog_coverage(catalog, _with_encryption("none"))
+
+        assert (coverage.settled, coverage.open) == (1, 0)
+
+    def test_an_answer_the_graph_contradicts_counts_as_settled(self):
+        """An answer settles the fact even against the sources (#1225)."""
+        answer = _as_answer(self.STORED, "Orders database: not encrypted.")
+        catalog = assertions(answer, subjects=(self.STORE,))
+        coverage = catalog_coverage(catalog, _with_encryption("AES-256"))
+
+        assert (coverage.settled, coverage.open) == (1, 0)
+
+
+def test_a_claim_on_a_contradicted_absence_is_told_why():
+    """The ground check names the contradiction, not the field's state."""
+    catalog = assertions(
+        TestTheGraphSideOfAContradiction.ENCRYPTED,
+        subjects=(TestARowTheGraphContradicts.STORE,),
+    )
+    ground = Ground(
+        kind="absent-attribute", element_id=ORDERS, attribute="encryption_at_rest"
+    )
+    claim = sample_draft("S-01", grounds=[ground])
+
+    (issue,) = ground_issues([claim], _with_encryption("none"), catalog)
+    assert "the assertion rows contradict" in issue
+
+
+class TestRowsUnderARefusedProjection:
+    """Which open rows a refused projection offers, and which shapes the
+    per-row comparison reaches."""
+
+    STORE = TestARowTheGraphContradicts.STORE
+    ENCRYPTED = TestTheGraphSideOfAContradiction.ENCRYPTED
+
+    def test_a_silent_row_beside_a_stated_row_is_not_offered(self):
+        """A projection that writes settles the field from the stated row; a
+        silent row beside it is no question, whether or not the model holds
+        the value."""
+        silent = self.ENCRYPTED.model_copy(
+            update={"value": UNKNOWN, "reason": "silent", "explanation": "c"}
+        )
+        catalog = assertions(self.ENCRYPTED, silent, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("AES-128"), catalog)
+
+        assert offered[assertion_id(self.ENCRYPTED)].kind == "assertion"
+        assert assertion_id(silent) not in offered
+
+    def test_two_values_in_one_state_contradict_an_opposite_field(self):
+        """Two stated values that disagree with each other both state a
+        control, so a graph absence beside them is contradicted."""
+        other = self.ENCRYPTED.model_copy(
+            update={"value": "AES-128", "explanation": "d"}
+        )
+        catalog = assertions(self.ENCRYPTED, other, subjects=(self.STORE,))
+        model = _with_encryption("none")
+
+        (found,) = contradictions(catalog, model)
+        assert found.values == ("AES-256", "AES-128")
+        offered = evidence_catalog(model, catalog)
+        assert TestTheGraphSideOfAContradiction.ABSENT_REF not in offered
+        assert offered[assertion_id(other)].kind == "unknown-assertion"
+
+    def test_an_unscoped_row_beside_a_scoped_one_is_compared(self):
+        """The scoped row states a narrower fact and is not compared; the
+        unscoped absence states the opposite of the field."""
+        absence = TestARowTheGraphContradicts.STORED
+        backups = self.ENCRYPTED.model_copy(
+            update={"scope": [Qualifier(kind="resource", value="backups")]}
+        )
+        catalog = assertions(absence, backups, subjects=(self.STORE,))
+        model = _with_encryption("AES-256")
+
+        assert contradicted(catalog, model) == (absence,)
+        offered = evidence_catalog(model, catalog)
+        assert offered[assertion_id(absence)].kind == "unknown-assertion"
+        assert offered[assertion_id(backups)].kind == "assertion"
+
+
+def test_an_unknown_ground_on_a_contradicted_field_is_told_its_state():
+    """The contradiction message is for a cited absence; an unknown ground on
+    a field that states a value is told the field's state."""
+    catalog = assertions(
+        TestARowTheGraphContradicts.STORED,
+        subjects=(TestARowTheGraphContradicts.STORE,),
+    )
+    ground = Ground(
+        kind="unknown-attribute", element_id=ORDERS, attribute="encryption_at_rest"
+    )
+    claim = sample_draft("S-01", grounds=[ground])
+
+    (issue,) = ground_issues([claim], _with_encryption("AES-256"), catalog)
+    assert "reads as stated" in issue
+
+
+def test_a_disputed_pair_beside_an_unknown_field_is_asked_once():
+    """The field reads unknown, so the attribute enumeration carries the
+    question, and the pair is not offered a second time."""
+    absence = TestARowTheGraphContradicts.STORED
+    encrypted = TestADisputedPairUnderARefusedProjection.ENCRYPTED
+    catalog = assertions(
+        absence, encrypted, subjects=(TestARowTheGraphContradicts.STORE,)
+    )
+    offered = evidence_catalog(_with_encryption(UNKNOWN), catalog)
+
+    assert assertion_id(absence) not in offered
+    assert assertion_id(encrypted) not in offered
+
+
+def test_a_mechanism_written_none_is_a_stated_value():
+    """Only the registry's absence states a missing control
+    (``states_missing``); a free-text value that reads ``none`` is spelled
+    as written and projects as stated."""
+    written = stated(value="none")
+    catalog = assertions(
+        written, subjects=(Subject(id=FLOW, type="interaction", label="place order"),)
+    )
+
+    (projection,) = project(catalog)
+    assert (projection.value, projection.reason) == ("none", "stated")
