@@ -473,9 +473,9 @@ the reviewer named it (`critic`).
 - `kind` is `attribute` (a value the model left unknown, a trust zone the
   service inferred, or a value that the catalog's facts contradict or leave
   open), `assertion` (a fact that the sources left open or disagree about and
-  that no unscoped model field holds, such as one about a principal, a
-  credential, or a fact for one scope, such as one environment; the key names
-  the fact's place, so it stays the same after you answer),
+  such as one about a principal, a credential, a fact for one scope, such as
+  one environment, or a fact the sources left unknown; the key names the
+  fact's place, so it stays the same after you answer),
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), `subject` (a
   question the reviewer wrote in its own words because no listed question
@@ -571,7 +571,8 @@ element, unless the sources state that part. An assertion answer, or a part,
 removes each catalog fact at its place (the same subject, fact and scope) that
 is open, set aside (`unsupported` or `unresolved`) or disagrees with your
 answer, and a
-`superseded-by-answer` issue names each removed fact that holds a value. A fact
+`superseded-by-answer` issue names each removed fact that holds a value your
+answer overrules. A fact
 that can hold beside your answer, such as a second mechanism of one connection,
 stays. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said

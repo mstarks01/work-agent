@@ -393,8 +393,9 @@ def fact_rows(
     answer's identity or disagrees with it**, so the answer settles the fact.
     A row that can hold beside the answer stays, and so does a row of another
     scope. A ``superseded-by-answer`` issue names each removed row that holds
-    a value. An assertion answer at an attribute that an attribute answer
-    settles writes nothing.
+    a value the answer overrules. An assertion answer at an attribute that an
+    attribute answer settles writes nothing, and an ``unmatched-answer`` issue
+    names its place.
     """
     replaced: dict[str, Assertion] = {}
     placed: dict[str, Assertion] = {}
@@ -484,23 +485,34 @@ def fact_rows(
             origin="answer",
             support=[span],
         )
-    # An attribute answer settles every unscoped row at its attribute, as it
-    # removes a replaced row there, so a place answer there writes nothing.
-    attribute_answered = [
-        key
-        for key, row in placed.items()
-        if not row.scope and reached(row) in attributes
-    ]
+    # An attribute answer settles every unscoped row at its attribute, so an
+    # assertion answer there writes nothing, and an issue names its place.
+    places_at_answered_attributes = sorted(
+        {
+            place_identity(row)
+            for row in (*replaced.values(), *placed.values())
+            if not row.scope and reached(row) in attributes
+        }
+    )
     issues.extend(
         CatalogIssue(
             code="unmatched-answer",
-            message=f"an attribute answer settles the attribute of {key!r}, so"
+            message=f"an attribute answer settles the attribute of {place!r}, so"
             " the answer placed nothing",
         )
-        for key in attribute_answered
+        for place in places_at_answered_attributes
     )
-    placed = {key: row for key, row in placed.items() if key not in attribute_answered}
-    placed_ids = {assertion_id(row) for row in placed.values()}
+    replaced = {
+        key: row
+        for key, row in replaced.items()
+        if place_identity(row) not in places_at_answered_attributes
+    }
+    placed = {
+        key: row
+        for key, row in placed.items()
+        if place_identity(row) not in places_at_answered_attributes
+    }
+    answer_ids = {assertion_id(row) for row in (*replaced.values(), *placed.values())}
     answer_rows = (*replaced.values(), *placed.values())
     asked, parts = _part_rows(
         catalog, model, answers, spans, answer_rows, attributes.keys()
@@ -550,7 +562,7 @@ def fact_rows(
         if answered_over(entry)
         and not answered(entry)
         and entry.value != UNKNOWN
-        and assertion_id(entry) not in placed_ids
+        and assertion_id(entry) not in answer_ids
     )
 
     entries = [

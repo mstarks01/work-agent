@@ -28,7 +28,6 @@ from analysis_service.assertions import (
     answer,
     answered,
     assertion_id,
-    contradicted,
     disputed,
     held_open_attributes,
     identity_parts,
@@ -407,7 +406,7 @@ def fact_routes(
     prepared = prepared_model(model, catalog)
     routes: dict[str, UnknownRef] = {}
     fields = set(held_open_attributes(catalog, prepared))
-    for row in (*contradicted(catalog, prepared), *disputed(catalog)):
+    for row in disputed(catalog):
         attribute = projected_attribute(row.predicate, row.subject)
         if attribute and not row.scope:
             fields.add((row.subject, attribute))
