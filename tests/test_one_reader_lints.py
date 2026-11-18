@@ -3281,11 +3281,13 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
 
 def test_the_attributes_the_rows_hold_open_have_one_reader():
     """``held_open_attributes`` decides which absences the evidence catalog
-    drops, and ``open_attribute`` reads the same set as the attributes that
-    take an answer, so a field the catalog does not offer as a fact is one a
-    submitter may answer."""
+    drops, ``open_attribute`` reads the same set as the attributes that take
+    an answer, and ``fact_routes`` asks each row there as that attribute, so a
+    field the catalog does not offer as a fact is one question a submitter
+    may answer."""
     assert _sites(lambda node: _calls(node, "held_open_attributes")) == [
         ("src/analysis_service/evidence.py", "_held_open_attributes"),
+        ("src/analysis_service/open_facts.py", "fact_routes"),
         ("src/analysis_service/open_facts.py", "open_attribute"),
     ]
 

@@ -391,7 +391,9 @@ def fact_routes(
     over. Where an unscoped row reaches a graph field, the question is that
     attribute's, and the attribute path writes the answer; every other
     unscoped row that reaches the same attribute, an unknown row among them,
-    asks that one fact too. Where a row reaches no field, or states a narrower
+    asks that one fact too, and so does every unscoped row at an attribute
+    the rows hold open (:func:`~analysis_service.assertions.held_open_attributes`),
+    which takes an answer as an attribute (:func:`open_attribute`). Where a row reaches no field, or states a narrower
     scope than the attribute, the question is its place's
     (:func:`~analysis_service.assertions.place_identity`), which names the
     answer's row in every later run too (the maintainer's ruling of
@@ -402,7 +404,7 @@ def fact_routes(
         return {}
     prepared = prepared_model(model, catalog)
     routes: dict[str, UnknownRef] = {}
-    fields: set[tuple[str, str]] = set()
+    fields = set(held_open_attributes(catalog, prepared))
     for row in (*contradicted(catalog, prepared), *disputed(catalog)):
         attribute = projected_attribute(row.predicate, row.subject)
         if attribute and not row.scope:
@@ -437,11 +439,15 @@ def source_states(
     """True where the sources settle ``predicate`` about this element (ADR 0117).
 
     **The subject rule.** The writer of an answer's rows asks it, and so does
-    the tripwire that measures stated parts. Only a settled, unscoped row about the element itself counts, so a flow's
-    row never answers a question about an element, and a scoped row answers
-    nothing wider. A row an answer wrote is not the sources'. A predicate that
-    projects into an attribute is stated too where ``model`` states the
-    attribute and no answer wrote a row of it here. Any answer row counts
+    the tripwire that measures stated parts. Only a settled, unscoped row about
+    the element itself counts, and only one the graph does not contradict
+    (:func:`~analysis_service.assertions.uncontradicted`, against ``model`` as
+    the lanes read it, :func:`prepared_model`). So a flow's row never answers a
+    question about an element, a scoped row answers nothing wider, and a row
+    the graph contradicts is no statement. A row an answer wrote is not the
+    sources'. A predicate that projects into an attribute is stated too where
+    the attribute is not open (:func:`open_attribute`, which reads the rows
+    that hold it open) and no answer wrote a row of it here. Any answer row counts
     here, not only one that makes the projected value: the question is whether
     the submitter already spoke to this fact, so a later answer may replace
     theirs.
