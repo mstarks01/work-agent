@@ -3,9 +3,9 @@
 The instrument has one job: say what left the report across the critic pass
 *and* what losing it cost. These tests hold the two halves apart — a critic
 that rejects a down-voted draft and a critic that rejects a must-find draft
-must never produce the same number — and pin the two properties the whole measurement rests on: the scored
-claim is the same string on both sides, and the post-critic score is exactly
-what the scorer alone would have said.
+must never produce the same number — and pin the two properties the whole
+measurement rests on: the scored claim is the same string on both sides, and
+the post-critic score is exactly what the scorer alone would have said.
 """
 
 from __future__ import annotations
@@ -347,6 +347,7 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     printed = capsys.readouterr().out
     assert "killed-rejected 1/1" in printed
     assert "killed-real 0/1" in printed
+    assert "critic yield: rejected 1/2 (50%), down-voted caught 1/1 (100%)" in printed
 
 
 def test_a_case_with_no_stride_proposal_is_charged_as_proposing_nothing(case):

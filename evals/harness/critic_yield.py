@@ -790,7 +790,7 @@ def render(yields: Sequence[CriticYield]) -> None:
         pooled = {name: Rate.from_json(rate) for name, rate in totals["rates"].items()}
         print(
             f"critic yield: rejected {pooled['kill_rate'].shown()},"
-            f" rejected caught {pooled['rejected_kill_rate'].shown()},"
+            f" down-voted caught {pooled['rejected_kill_rate'].shown()},"
             f" real destroyed {pooled['matched_kill_rate'].shown()};"
             f" all kills lost for good {totals['matched_lost']}"
             f" (must-find {totals['must_find_lost']})"
