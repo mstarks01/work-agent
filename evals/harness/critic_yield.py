@@ -13,10 +13,11 @@ Unfiltered LLM threat enumeration runs at about 86% raw false positives.
 
 Here is how it works. A killed draft is a draft that is not in the
 post-critic output, so the two sides are a superset and its subset. Its fate
-says whether the critic rejected it or the block holds no verdict for it. The whole instrument is therefore a matter of scoring the same case
-twice through the shipped scorer, with no second metric implementation and no
-special-cased matching, and then reading the killed drafts' pre-critic
-scored outcomes, which is the state the critic faced.
+says whether the critic rejected it or the block holds no verdict for it. The
+whole instrument is therefore a matter of scoring the same case twice through
+the shipped scorer, with no second metric implementation and no special-cased
+matching, and then reading the killed drafts' pre-critic scored outcomes, which
+is the state the critic faced.
 
 One property holds this together: the scored task is identical on both sides.
 Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
@@ -43,7 +44,9 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Literal, get_args
 
-from analysis_service.claims import FrameworkAnalysis, VerdictStatus
+from typing_extensions import TypeIs
+
+from analysis_service.claims import FrameworkAnalysis, RejectionStep, VerdictStatus
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
@@ -82,7 +85,7 @@ VERDICT_STATUSES: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
 NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = get_args(NoVerdictFate)
 
 
-def has_verdict(fate: str) -> bool:
+def has_verdict(fate: str) -> TypeIs[VerdictStatus]:
     """Whether ``fate`` is a verdict status the block records.
 
     A draft with no verdict is in the denominator of no rate: each instrument
@@ -188,7 +191,7 @@ class CriticPopulations:
         """The share of one population's drafts with a verdict that met one fate."""
         return Rate(
             self.count(label, (fate,)),
-            self.ruled(lambda outcome: LABEL_OF[outcome] == label),
+            self.ruled_in(label),
         )
 
     def ruled(self, outcome_matches: Callable[[ScoredOutcome], bool]) -> int:
@@ -198,6 +201,10 @@ class CriticPopulations:
             for (outcome, fate), n in self.counts.items()
             if outcome_matches(outcome) and has_verdict(fate)
         )
+
+    def ruled_in(self, label: Population) -> int:
+        """The drafts with a verdict in one population."""
+        return self.ruled(lambda outcome: LABEL_OF[outcome] == label)
 
     @property
     def no_verdict(self) -> int:
@@ -222,7 +229,7 @@ class CriticPopulations:
     @property
     def not_real_gap(self) -> NotRealGap | None:
         """Why the not-real population is empty, or ``None`` where it is not."""
-        if self.ruled(lambda outcome: LABEL_OF[outcome] == "not-real"):
+        if self.ruled_in("not-real"):
             return None
         if self.count("not-real"):
             return "no-verdict"
@@ -339,7 +346,7 @@ class KilledDraft:
     #: draft. :attr:`CriticYield.killed_by_cause` counts the first under
     #: :data:`UNSTATED` and the second under its fate, so neither is folded
     #: into a step the critic never named.
-    cause: str | None
+    cause: RejectionStep | None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -404,9 +411,9 @@ class CriticYield:
         )
 
     @property
-    def ruled_kills(self) -> tuple[KilledDraft, ...]:
-        """The kills with a verdict: the drafts the critic rejected."""
-        return tuple(draft for draft in self.killed if has_verdict(draft.fate))
+    def rejected_kills(self) -> tuple[KilledDraft, ...]:
+        """The kills the critic rejected, which the yield rates count."""
+        return tuple(draft for draft in self.killed if draft.fate == "rejected")
 
     @property
     def must_find_lost(self) -> int:
@@ -427,7 +434,7 @@ class CriticYield:
     # --- rates, all rule-and-ledger-relative ------------------------------
 
     @property
-    def killed_by_cause(self) -> dict[str, dict[str, int]]:
+    def killed_by_cause(self) -> dict[KillCause, dict[str, int]]:
         """Every kill by the step the critic named, and what each step removed.
 
         The critic states why it rejected a draft, and nothing counted it: the
@@ -438,7 +445,7 @@ class CriticYield:
         not as a bare count. A rejection that names no step is keyed
         ``unstated``, and a kill with no verdict is keyed by its fate.
         """
-        by_cause: dict[str, dict[str, int]] = {}
+        by_cause: dict[KillCause, dict[str, int]] = {}
         for draft in self.killed:
             entry = by_cause.setdefault(
                 _cause_key(draft), {"killed": 0, "matched": 0, "must_find": 0}
@@ -467,7 +474,7 @@ class CriticYield:
         as a numerator or a denominator. A rate over an empty population has no
         value.
         """
-        return _critic_rates(self.populations, self.ruled_kills)
+        return _critic_rates(self.populations, self.rejected_kills)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -490,6 +497,7 @@ class CriticYield:
                 "must_find_lost": self.must_find_lost,
             },
             "metrics": {name: rate.rounded() for name, rate in self.rates.items()},
+            "rates": {name: rate.to_json() for name, rate in self.rates.items()},
             "populations": self.populations.to_json(),
             "killed_by_cause": self.killed_by_cause,
             "killed": [draft.to_json() for draft in self.killed],
@@ -531,10 +539,14 @@ def score_case_with_yield(
 #: The cause a kill reads where its verdict names no step. **The one spelling
 #: of a missing ``rejected_because``**: the critic yield and the loss
 #: attribution both read it, so neither invents a step the critic never wrote.
-UNSTATED = "unstated"
+UNSTATED: Literal["unstated"] = "unstated"
+
+#: What :attr:`CriticYield.killed_by_cause` counts a kill under: the step its
+#: verdict names, :data:`UNSTATED`, or the fate of a kill with no verdict.
+KillCause = RejectionStep | Literal["unstated"] | NoVerdictFate
 
 
-def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
+def rejection_steps(block: FrameworkAnalysis) -> dict[str, RejectionStep]:
     """Each rejected claim's stated step, keyed by claim ID, off the block's verdicts.
 
     The one reader of ``rejected_because`` for this instrument. A rejected
@@ -635,7 +647,7 @@ def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | N
     return records
 
 
-def _cause_key(draft: KilledDraft) -> str:
+def _cause_key(draft: KilledDraft) -> KillCause:
     """The step a kill is counted under: the stated step, :data:`UNSTATED`
     for a rejection that names none, or the fate of a kill with no verdict."""
     if not has_verdict(draft.fate):
@@ -648,29 +660,21 @@ def _matched(outcome: ScoredOutcome) -> bool:
 
 
 def _critic_rates(
-    populations: CriticPopulations, ruled_kills: Sequence[KilledDraft]
+    populations: CriticPopulations, rejected_kills: Sequence[KilledDraft]
 ) -> dict[YieldRate, Rate]:
     """The yield's four rates, over the drafts with a verdict, of one case or pooled."""
-    rejected_killed = sum(draft.outcome == "rejected" for draft in ruled_kills)
+    down_voted = sum(draft.outcome == "rejected" for draft in rejected_kills)
     return {
-        "kill_rate": Rate(len(ruled_kills), populations.ruled(lambda _: True)),
+        "kill_rate": Rate(len(rejected_kills), populations.ruled(lambda _: True)),
         "rejected_kill_rate": Rate(
-            rejected_killed, populations.ruled(lambda outcome: outcome == "rejected")
+            down_voted, populations.ruled(lambda outcome: outcome == "rejected")
         ),
         "matched_kill_rate": Rate(
-            sum(_matched(draft.outcome) for draft in ruled_kills),
+            sum(_matched(draft.outcome) for draft in rejected_kills),
             populations.ruled(_matched),
         ),
-        "kill_precision": Rate(rejected_killed, len(ruled_kills)),
+        "kill_precision": Rate(down_voted, len(rejected_kills)),
     }
-
-
-def _pooled_rates(
-    populations: CriticPopulations, yields: Sequence[CriticYield]
-) -> dict[YieldRate, Rate]:
-    return _critic_rates(
-        populations, [draft for entry in yields for draft in entry.ruled_kills]
-    )
 
 
 def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
@@ -680,15 +684,25 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     rates would let a case that drafted three threats outweigh one that drafted
     forty.
     """
+    return _aggregate(yields)[0]
+
+
+def _aggregate(
+    yields: Sequence[CriticYield],
+) -> tuple[dict[str, Any], dict[YieldRate, Rate]]:
+    """:func:`aggregate_yield`, and the pooled rates it rounds."""
     populations = CriticPopulations.pooled(yields)
+    rates = _critic_rates(
+        populations, [draft for entry in yields for draft in entry.rejected_kills]
+    )
     must_find_killed = sum(entry.must_find_killed for entry in yields)
     matched_lost = sum(entry.matched_lost for entry in yields)
     must_find_lost = sum(entry.must_find_lost for entry in yields)
-    by_cause: dict[str, Counter[str]] = {}
+    by_cause: dict[KillCause, Counter[str]] = {}
     for entry in yields:
         for cause, counts in entry.killed_by_cause.items():
             by_cause.setdefault(cause, Counter()).update(counts)
-    return {
+    totals: dict[str, Any] = {
         "cases": len(yields),
         "drafts_in": sum(entry.drafts_in for entry in yields),
         "threats_out": sum(entry.threats_out for entry in yields),
@@ -698,10 +712,10 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "must_find_killed": must_find_killed,
         "matched_lost": matched_lost,
         "must_find_lost": must_find_lost,
-        **{
-            name: rate.rounded()
-            for name, rate in _pooled_rates(populations, yields).items()
-        },
+        **{name: rate.rounded() for name, rate in rates.items()},
+        # Each rate's counts: the gross counts above include the drafts with
+        # no verdict, so they do not divide to a rate.
+        "rates": {name: rate.to_json() for name, rate in rates.items()},
         "no_verdict": populations.no_verdict,
         # Every kill by the step the critic named, pooled; the per-step
         # ``matched`` and ``must_find`` are what a step removed.
@@ -709,6 +723,7 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
             cause: dict(counts) for cause, counts in sorted(by_cause.items())
         },
     }
+    return totals, rates
 
 
 def render(yields: Sequence[CriticYield]) -> None:
@@ -720,17 +735,17 @@ def render(yields: Sequence[CriticYield]) -> None:
     """
     for entry in yields:
         rates = entry.rates
+        apart = entry.populations.no_verdict
         print(
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
             f"  killed-rejected {rates['rejected_kill_rate'].shown()}"
             f"  killed-real {rates['matched_kill_rate'].shown()}"
             f"  (gross kills: must-find {entry.must_find_killed}, lost for good"
             f" {entry.matched_lost})"
+            + (f"  no archived verdict {apart}" if apart else "")
         )
     if yields:
-        totals = aggregate_yield(yields)
-        populations = CriticPopulations.pooled(yields)
-        pooled = _pooled_rates(populations, yields)
+        totals, pooled = _aggregate(yields)
         print(
             f"critic yield: killed {pooled['kill_rate'].shown()},"
             f" rejected caught {pooled['rejected_kill_rate'].shown()},"
@@ -748,8 +763,8 @@ def render(yields: Sequence[CriticYield]) -> None:
                     for cause, counts in totals["killed_by_cause"].items()
                 )
             )
-        if populations.no_verdict:
-            print(f"  {no_verdict_line(populations.no_verdict, NO_VERDICT_FATES)}")
+        if totals["no_verdict"]:
+            print(f"  {no_verdict_line(totals['no_verdict'], NO_VERDICT_FATES)}")
 
 
 def artifact(yields: Sequence[CriticYield]) -> dict[str, Any]:
