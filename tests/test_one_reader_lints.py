@@ -2244,11 +2244,24 @@ class _OneReader:
     within: str
 
 
-def _divides_under_a_guard(node: ast.AST) -> bool:
-    """A conditional whose taken branch divides: ``a / b if b else ...``."""
-    return isinstance(node, ast.IfExp) and any(
+def _divides(node: ast.AST) -> bool:
+    return any(
         isinstance(inner, ast.BinOp) and isinstance(inner.op, ast.Div)
-        for inner in ast.walk(node.body)
+        for inner in ast.walk(node)
+    )
+
+
+def _divides_under_a_guard(node: ast.AST) -> bool:
+    """A guard on a division: ``a / b if b else ...``, either way round, or
+    ``if not b: return 0.0`` before the division."""
+    if isinstance(node, ast.IfExp):
+        return _divides(node.body) or _divides(node.orelse)
+    return (
+        isinstance(node, ast.If)
+        and len(node.body) == 1
+        and isinstance(node.body[0], ast.Return)
+        and isinstance(node.body[0].value, ast.Constant)
+        and isinstance(node.body[0].value.value, float)
     )
 
 
@@ -2281,6 +2294,10 @@ ONE_READERS: dict[str, _OneReader] = {
             ),
             ("evals/harness/submit.py", "_vote_rows"): (
                 "its `/` joins a directory and a file name into a path"
+            ),
+            ("evals/harness/stability.py", "_mean_jaccard"): (
+                "two runs that both found nothing agree completely, so their"
+                " Jaccard is 1.0 by definition and not a gap"
             ),
             ("evals/harness/transport_gate.py", "_primary"): (
                 "it counts standard deviations, and no spread is an infinite"

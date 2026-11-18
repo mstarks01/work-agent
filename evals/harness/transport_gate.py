@@ -169,7 +169,11 @@ def _veto(full: Arm, compact: Arm) -> tuple[bool, str]:
             case: None if None in runs else min(run for run in runs if run is not None)
             for case, runs in full.per_case(figure).items()
         }
+        full_runs = full.per_case(figure)
         for case, runs in compact.per_case(figure).items():
+            if all(run is None for run in (*runs, *full_runs[case])):
+                # Neither arm has this figure for the case: they are alike.
+                continue
             floor = floors[case]
             if floor is None or None in runs:
                 fallen.append(f"{case}/{figure} {UNAVAILABLE}")

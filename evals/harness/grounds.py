@@ -438,7 +438,8 @@ def render(
         counts = entry.kind_counts
         print(
             f"{entry.case_id:<26} grounds {entry.ground_count}"
-            f" on {entry.threat_count} threats ({shown_figure(entry.grounds_per_threat, '.2f')} ea)"
+            f" on {entry.threat_count} threats"
+            f" ({shown_figure(entry.grounds_per_threat, '.2f')} ea)"
             f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
             f"/{counts['absent-attribute']}/{counts['derived-fact']}"
             f"  quoteless {shown_figure(entry.quoteless_rate, '.0%')}"

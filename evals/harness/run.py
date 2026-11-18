@@ -2244,7 +2244,8 @@ def _print_stability(
         always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
         print(
             f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
-            f" {entry.recall_spread:8.2f} {always:>16} {shown_figure(entry.mean_jaccard, '.2f'):9}"
+            f" {shown_figure(entry.recall_spread, '.2f'):>8} {always:>16}"
+            f" {shown_figure(entry.mean_jaccard, '.2f'):>9}"
             f" {cause(entry):>10}"
             f" {held(entry.severity_held, entry.severity_moved):>10}"
             f" {held(entry.place_held, entry.place_moved):>10}"
@@ -2255,7 +2256,8 @@ def _print_stability(
         f" matched in every run ({shown_figure(totals['always_rate'], '.0%')}),"
         f" volatile {shown_figure(totals['volatile_rate'], '.0%')},"
         f" mean jaccard {shown_figure(totals['mean_jaccard'], '.2f')},"
-        f" worst case recall spread {totals['worst_case_recall_spread']:.2f}"
+        f" worst case recall spread"
+        f" {shown_figure(totals['worst_case_recall_spread'], '.2f')}"
         " (instrument, non-gating)"
     )
     print(

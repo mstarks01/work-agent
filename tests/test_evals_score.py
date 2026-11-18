@@ -598,3 +598,41 @@ def test_a_share_over_an_empty_denominator_is_unavailable():
     assert ratio(0, 0) is None
     assert ratio(1, 4) == 0.25
     assert Rate(0, 0).value is None
+
+
+class _AllCases:
+    """A selector that keeps every case, as a sweep with no filter does."""
+
+    def wanted(self, case: object) -> bool:
+        del case
+        return True
+
+    def rows(self, blocks, key):
+        return blocks[key]
+
+
+def test_a_published_mean_skips_a_case_with_no_value():
+    """A case whose figure has no value adds nothing to the mean."""
+    from evals.harness.scorer import published
+
+    blocks = {
+        "scores": [
+            {"case": "a", "metrics": {"reference_coverage": None}},
+            {"case": "b", "metrics": {"reference_coverage": 0.5}},
+        ]
+    }
+
+    assert published(blocks, "reference_coverage", _AllCases()) == 0.5
+
+
+def test_the_rejected_gain_skips_a_case_with_no_value():
+    from evals.harness.gain import _stride_rejected
+
+    blocks = {
+        "scores": [
+            {"case": "a", "metrics": {"rejected_rate": None}},
+            {"case": "b", "metrics": {"rejected_rate": 0.25}},
+        ]
+    }
+
+    assert _stride_rejected(blocks, _AllCases()) == 0.25

@@ -77,6 +77,6 @@ def mean(values: Iterable[float | None]) -> float | None:
     return ratio(sum(held), len(held))
 
 
-def difference(left: float | None, right: float | None) -> float | None:
+def rounded_difference(left: float | None, right: float | None) -> float | None:
     """``left - right`` to three places, or ``None`` where either has no value."""
     return None if left is None or right is None else round(left - right, 3)

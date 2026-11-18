@@ -142,3 +142,23 @@ def test_a_lost_extraction_is_refused_by_name(tmp_path):
     )
     with pytest.raises(modes.EvalRunError, match=CASES[2]):
         gate.load("full", [artifact])
+
+
+def test_a_figure_neither_arm_has_is_no_veto():
+    """A case with no value in both arms is alike in both, so it vetoes nothing."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in (*full.artifacts, *compact.artifacts):
+        artifact["mode_output"][0]["precision"] = None
+    passed, _ = gate._veto(full, compact)
+    assert passed
+
+
+def test_a_figure_only_one_arm_has_is_a_veto():
+    """A value in one arm and a gap in the other is not a match, so it fails closed."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in compact.artifacts:
+        artifact["mode_output"][0]["precision"] = None
+    passed, reading = gate._veto(full, compact)
+    assert not passed and "precision unavailable" in reading

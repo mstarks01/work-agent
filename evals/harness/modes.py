@@ -695,7 +695,7 @@ class ExtractionScore:
             )
         )
         total = found + len(comparable_elements(self.endpoint_missing))
-        return ratio((found + len(credited)), total)
+        return ratio(found + len(credited), total)
 
     @property
     def naming_departures(self) -> int:
@@ -938,7 +938,7 @@ class ExtractionScore:
         though the identity rule never reads one.
         """
         blessed, gone = self._zones()
-        return ratio((len(blessed) - len(gone)), len(blessed))
+        return ratio(len(blessed) - len(gone), len(blessed))
 
     @property
     def sourced_zone_recall(self) -> float | None:
@@ -2614,7 +2614,8 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     strict = mean(score.recall for score in scores)
     endpoint = mean(score.endpoint_recall for score in scores)
     print(
-        f"recall: {shown_figure(strict, '.2f')} strict, {shown_figure(endpoint, '.2f')} folding the flow label and"
+        f"recall: {shown_figure(strict, '.2f')} strict,"
+        f" {shown_figure(endpoint, '.2f')} folding the flow label and"
         f" dropping the zones a claim cannot cite"
         f" — the gap is naming, not extraction (instrument, non-gating)"
     )
@@ -2622,18 +2623,21 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         sourced = mean(score.sourced_recall for score in scores)
         departures = sum(score.naming_departures for score in scores)
         print(
-            f"  {shown_figure(sourced, '.2f')} crediting a name a reader ruled supported"
+            f"  {shown_figure(sourced, '.2f')} crediting a name a reader ruled"
+            " supported"
             f" — {departures} element(s) found and named another way, which is"
             f" naming policy rather than a component the extraction missed"
         )
     interactions = mean(score.interaction_recall for score in scores)
     print(
-        f"  {shown_figure(interactions, '.2f')} counting interactions rather than pairs — a second"
+        f"  {shown_figure(interactions, '.2f')} counting interactions rather than"
+        " pairs — a second"
         f" flow between one pair of endpoints is its own surface (#925)"
     )
     zones = mean(score.zone_recall for score in scores)
     print(
-        f"zones: {shown_figure(zones, '.2f')} recall — no claim cites one, so this scores the"
+        f"zones: {shown_figure(zones, '.2f')} recall — no claim cites one, so this"
+        " scores the"
         f" structure the crossings derive from rather than the identity rule"
     )
     partition = mean(score.zone_partition_agreement for score in scores)
@@ -2641,10 +2645,12 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     apart = mean(score.different_zone_agreement for score in scores)
     asked = mean(score.zone_pair_coverage for score in scores)
     print(
-        f"  {shown_figure(partition, '.2f')} of element pairs are placed alike in both models —"
+        f"  {shown_figure(partition, '.2f')} of element pairs are placed alike in"
+        " both models —"
         f" the one zone figure a naming difference cannot reach (#925);"
         f" {shown_figure(together, '.2f')} of the pairs the reference puts together,"
-        f" {shown_figure(apart, '.2f')} of the pairs it keeps apart, asked over {shown_figure(asked, '.2f')} of"
+        f" {shown_figure(apart, '.2f')} of the pairs it keeps apart, asked over"
+        f" {shown_figure(asked, '.2f')} of"
         f" its pairs (#961)"
     )
     zone_credits = sum(
@@ -2653,15 +2659,18 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     if zone_credits:
         sourced_zones = mean(score.sourced_zone_recall for score in scores)
         print(
-            f"  {shown_figure(sourced_zones, '.2f')} crediting a zone a reader ruled supported"
+            f"  {shown_figure(sourced_zones, '.2f')} crediting a zone a reader ruled"
+            " supported"
             f" — {zone_credits} credit(s), which no other figure reads"
         )
     aligned = mean(s.aligned_recall for s in scores)
     aligned_interactions = mean(s.aligned_interaction_recall for s in scores)
     ambiguous = sum(len(s.alignment.ambiguous) for s in scores)
     print(
-        f"aligned: {shown_figure(aligned, '.2f')} recall over one produced element per blessed"
-        f" one, {shown_figure(aligned_interactions, '.2f')} over interactions — an exact ID, a"
+        f"aligned: {shown_figure(aligned, '.2f')} recall over one produced element"
+        " per blessed"
+        f" one, {shown_figure(aligned_interactions, '.2f')} over interactions — an"
+        " exact ID, a"
         f" reader's alias, a flow's own label or its discriminators, and"
         f" nothing guessed; {ambiguous} ambiguity(ies) left unpaired (#961)"
     )
@@ -2670,7 +2679,8 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     dropped = sum(len(s.initiators_missing) for s in scores)
     print(
         f"actors: {shown_figure(actors, '.2f')} recall over external entities;"
-        f" initiators {shown_figure(initiator, '.2f')}, {dropped} dropped — an element the text"
+        f" initiators {shown_figure(initiator, '.2f')}, {dropped} dropped — an"
+        " element the text"
         f" describes by what it does rather than where it sits"
     )
     absent = sum(len(s.name_tokens_absent_from_source) for s in scores)

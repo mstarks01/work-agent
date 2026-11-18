@@ -68,7 +68,13 @@ from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import CaseFlows, ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
-from evals.harness.rates import difference, mean, ratio, rounded_share, shown_figure
+from evals.harness.rates import (
+    mean,
+    ratio,
+    rounded_difference,
+    rounded_share,
+    shown_figure,
+)
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
 from evals.harness.standings import SubstanceClass
 
@@ -913,7 +919,7 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float | None]:
     return {
         "near_coverage": rounded_share(near_coverage, 3),
         "far_coverage": rounded_share(far_coverage, 3),
-        "delta": difference(near_coverage, far_coverage),
+        "delta": rounded_difference(near_coverage, far_coverage),
     }
 
 
@@ -1008,9 +1014,11 @@ def render(scores: Sequence[CaseScore]) -> None:
         if split:
             print(
                 f"holdout: coverage {shown_figure(split['holdout_coverage'], '.2f')}"
-                f" vs development {shown_figure(split['development_coverage'], '.2f')}; must-find"
+                " vs development"
+                f" {shown_figure(split['development_coverage'], '.2f')}; must-find"
                 f" {shown_figure(split['holdout_must_find_coverage'], '.2f')}"
-                f" vs development {shown_figure(split['development_must_find_coverage'], '.2f')}"
+                " vs development"
+                f" {shown_figure(split['development_must_find_coverage'], '.2f')}"
             )
         line = audit.exhausted_line(score.case_id for score in scores if score.holdout)
         if line:
@@ -1039,7 +1047,7 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
         and metric in row.get("metrics", {})
         and cases.wanted(row.get("case"))
     ]
-    return ratio(sum(values), len(values))
+    return mean(values)
 
 
 def vote_coverage(blocks: Mapping[str, Any]) -> tuple[int, int]:

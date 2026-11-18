@@ -521,7 +521,7 @@ class AssertionReplay:
 
     @property
     def recall(self) -> float | None:
-        """Required-fact recall for one run, or ``None`` for a case with no required row."""
+        """Required-fact recall for one run, or ``None`` with no required row."""
         return ratio(self.recovered, len(self.required))
 
     @property
@@ -1660,7 +1660,8 @@ def render(sweeps: Sequence[SweepReplay], targets: int) -> None:
 def _render_extraction(pool: dict[str, Any], targets: int) -> None:
     per = pool["sweeps"] or 1
     print(
-        f"  {pool['emissions']} emission(s), {pool['unparsed']} refused by today's gate,"
+        f"  {pool['emissions']} emission(s), {pool['unparsed']} refused by today's"
+        " gate,"
         f" {pool['extra']} extra element(s) unreviewed"
     )
     kinds = list(pool["by_type"])

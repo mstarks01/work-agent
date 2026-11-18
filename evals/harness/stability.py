@@ -116,7 +116,7 @@ class ScoredRun:
     models: dict[str, Any]
     matched: dict[Scope, frozenset[str]]
     references: dict[Scope, int]
-    recall: dict[Scope, float]
+    recall: dict[Scope, float | None]
     #: Each missed reference's charged cause, per scope, off the ``losses``
     #: block. ``None`` where the artifact carries no such block: an absent record is
     #: not a run whose causes all agreed.
@@ -151,7 +151,7 @@ class CaseStability:
     case_id: str
     runs: int
     references: int
-    recalls: tuple[float, ...]
+    recalls: tuple[float | None, ...]
     always: int
     sometimes: int
     never: int
@@ -175,8 +175,12 @@ class CaseStability:
     place_moved: int | None = None
 
     @property
-    def recall_spread(self) -> float:
-        return max(self.recalls) - min(self.recalls)
+    def recall_spread(self) -> float | None:
+        """How far apart the runs' recalls lie, or ``None`` where a run has none."""
+        held = [recall for recall in self.recalls if recall is not None]
+        if len(held) < len(self.recalls):
+            return None
+        return max(held) - min(held)
 
     @property
     def volatile_rate(self) -> float | None:
@@ -188,8 +192,8 @@ class CaseStability:
             "case": self.case_id,
             "runs": self.runs,
             "references": self.references,
-            "recalls": [round(recall, 3) for recall in self.recalls],
-            "recall_spread": round(self.recall_spread, 3),
+            "recalls": [rounded_share(recall, 3) for recall in self.recalls],
+            "recall_spread": rounded_share(self.recall_spread, 3),
             "always_matched": self.always,
             "sometimes_matched": self.sometimes,
             "never_matched": self.never,
@@ -231,6 +235,11 @@ def _claim_scored_framework() -> FrameworkName:
     return composed[0]
 
 
+def _share(value: float | None) -> float | None:
+    """A recall read off an artifact: a number, or ``None`` where it has none."""
+    return None if value is None else float(value)
+
+
 def read_run(artifact: EvalArtifact) -> ScoredRun:
     """Reduce a loaded artifact to its per-``(framework, case)`` matched sets.
 
@@ -245,7 +254,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     """
     matched: dict[Scope, frozenset[str]] = {}
     references: dict[Scope, int] = {}
-    recall: dict[Scope, float] = {}
+    recall: dict[Scope, float | None] = {}
 
     # Refused by name rather than raised through: an artifact whose blocks are
     # the wrong shape is a file to re-produce, and a KeyError out of a
@@ -262,7 +271,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
                 str(pair["reference_index"]) for pair in score["matched"]
             )
             references[scope] = int(score["counts"]["references"])
-            recall[scope] = float(score["metrics"]["reference_coverage"])
+            recall[scope] = _share(score["metrics"]["reference_coverage"])
             # This package marks the tier on each matched row and names no
             # missed reference, so the missed half stays empty.
             must_find[scope] = MustFindFate(
@@ -276,7 +285,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
             scope = ("asvs", str(entry["case"]))
             matched[scope] = frozenset(str(item) for item in entry["matched"])
             references[scope] = int(entry["expected"])
-            recall[scope] = float(entry["recall"])
+            recall[scope] = _share(entry["recall"])
             # This one names the missed must-finds by catalog identifier, and
             # marks no tier on a matched row — so the matched half is the
             # matched set narrowed to identifiers some run named as a must-find,
@@ -812,8 +821,16 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
         "mean_jaccard": rounded_share(
             mean(entry.mean_jaccard for entry in stability), 3
         ),
-        "worst_case_recall_spread": round(
-            max((entry.recall_spread for entry in stability), default=0.0), 3
+        "worst_case_recall_spread": rounded_share(
+            max(
+                (
+                    entry.recall_spread
+                    for entry in stability
+                    if entry.recall_spread is not None
+                ),
+                default=None,
+            ),
+            3,
         ),
     }
 

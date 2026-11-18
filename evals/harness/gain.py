@@ -58,7 +58,7 @@ from evals.harness.promotion import (
     in_spreads,
     read_spread,
 )
-from evals.harness.rates import ratio, shown_figure
+from evals.harness.rates import mean, shown_figure
 from evals.harness.scorer import review_coverage
 
 #: One figure, read from one artifact over the cases a selector keeps, or
@@ -112,13 +112,9 @@ def refuse_incomparable(
         )
 
 
-def _mean(values: Sequence[float]) -> float | None:
-    return ratio(sum(values), len(values))
-
-
 def _stride_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     """Unmatched findings a person could review, per case."""
-    return _mean([row["counts"]["eligible"] for row in cases.rows(blocks, "scores")])
+    return mean([row["counts"]["eligible"] for row in cases.rows(blocks, "scores")])
 
 
 def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
@@ -131,14 +127,14 @@ def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
 
 def _stride_rejected(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     """The share of produced findings a person rejected, per case."""
-    return _mean(
+    return mean(
         [row["metrics"]["rejected_rate"] for row in cases.rows(blocks, "scores")]
     )
 
 
 def _asvs_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     """Requirements the run applied that the case did not list, per case."""
-    return _mean(
+    return mean(
         [
             len(row["over_applied"]) + len(row["off_catalog"])
             for row in cases.rows(blocks, "applicability")

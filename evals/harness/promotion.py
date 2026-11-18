@@ -70,7 +70,7 @@ from evals.harness import falsify
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, finished_file
 from evals.harness.modes import AssertionResult, EvalRunError
-from evals.harness.rates import shown_figure
+from evals.harness.rates import ratio, shown_figure
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import (
     replay_assertions,
@@ -609,10 +609,6 @@ class Reading:
     why: str = ""
 
 
-def _ratio(measured: float, baseline: float) -> float | None:
-    return None if not baseline else measured / baseline
-
-
 def in_spreads(difference: float, spread: float) -> float:
     """A difference in standard deviations of the repeat spread.
 
@@ -751,7 +747,7 @@ def read_gate(
         value: float | None = measured
     elif gate.unit == "ratio":
         assert baseline is not None
-        value = _ratio(measured, baseline)
+        value = ratio(measured, baseline)
     elif spread is not None:
         assert baseline is not None
         value = in_spreads(measured - baseline, spread)

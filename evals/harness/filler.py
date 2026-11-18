@@ -151,7 +151,8 @@ def render(measured: Sequence[FillerRow]) -> None:
     print("| --- | ---: | ---: | --- | ---: |")
     for row in measured:
         pointers = (
-            f"{row.ineligible}/{row.pointers} ({shown_figure(row.ineligible_share, '.0%')})"
+            f"{row.ineligible}/{row.pointers}"
+            f" ({shown_figure(row.ineligible_share, '.0%')})"
             if row.pointers
             else "0/0"
         )
