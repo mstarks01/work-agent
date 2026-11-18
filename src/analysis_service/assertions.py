@@ -272,10 +272,9 @@ REGISTRY_VERSION = 9
 #: beside an opposite attribute are a ``graph-contradiction`` issue: two
 #: ``compatible`` rows, in any job; and, where the validity gate refuses the
 #: projected model, rows of ``several-values`` or of ``several-predicates`` in
-#: one state, or an unscoped row beside a scoped one. An issue names a row that states the value, and a
-#: row value spelled ``none`` projects with the reason ``absent``. A record of
-#: version 7 keeps its own issues, and the issue re-check on load declines for
-#: it. The ground check on load is not versioned: a claim of such a record on
+#: one state, or an unscoped row beside a scoped one. An issue names a row
+#: that states the value. A record of version 7 keeps its own issues, and the
+#: issue re-check on load declines for it. The ground check on load is not versioned: a claim of such a record on
 #: an ``absent-attribute`` the rows now contradict, or on a row they now hold
 #: open, fails the load, as a hard cutover.
 PROJECTION_VERSION = 8
@@ -3179,7 +3178,7 @@ class Contradiction:
     """A graph attribute and the rows authoritative for it that state opposites.
 
     ``values`` is what the unscoped rows that state the attribute's value
-    say, each distinct value once and joined by ``"; "``; ``carried`` is what
+    say, each distinct value once; ``carried`` is what
     the **System Model** beside them actually holds. Both are quoted as
     written, because which of the two is wrong is not decidable here and a
     reader has to see the pair. ``rows`` names the unscoped rows that state the
@@ -3189,7 +3188,7 @@ class Contradiction:
 
     element_id: str
     attribute: str
-    values: str
+    values: tuple[str, ...]
     carried: str
     rows: tuple[str, ...]
 
@@ -3242,7 +3241,7 @@ def contradictions(
             if not entry.scope
         ]
         values = tuple(
-            dict.fromkeys(_graph_spelling(entry.value, subjects) for entry in stating)
+            dict.fromkeys(_graph_spelling(entry, subjects) for entry in stating)
         )
         states = {control_state(value) for value in values}
         if len(states) == 1 and states | {control_state(held)} == {"stated", "absent"}:
@@ -3250,7 +3249,7 @@ def contradictions(
                 Contradiction(
                     element_id=projection.element_id,
                     attribute=projection.attribute,
-                    values="; ".join(values),
+                    values=values,
                     carried=held,
                     rows=tuple(sorted(assertion_id(entry) for entry in stating)),
                 )
@@ -3405,7 +3404,7 @@ def contradiction_issues(
             code="graph-contradiction",
             message=f"{found.element_id}.{found.attribute} holds"
             f" {found.carried!r} and the rows behind it state"
-            f" {found.values!r}, which is the opposite state",
+            f" {'; '.join(found.values)!r}, which is the opposite state",
             assertion=found.rows[0],
         )
         for found in contradictions(catalog, model)
@@ -3710,7 +3709,7 @@ def qualified(
             if entry.reason == "hedged":
                 stated.extend(f'"{span.quote}"' for span in entry.support)
             continue
-        value = _graph_spelling(entry.value, subjects)
+        value = _graph_spelling(entry, subjects)
         scope = ", ".join(f"{q.kind} {q.value}" for q in entry.scope)
         stated.append(f"{value} ({scope})" if scope else value)
     said = "; ".join(dict.fromkeys(stated))
@@ -3822,8 +3821,8 @@ def _projected(
         if len({entry.predicate for entry in stated}) > 1:
             return projected(UNKNOWN, "several-predicates")
         return projected(UNKNOWN, "several-values")
-    value = _graph_spelling(stated[0].value, subjects)
-    if value == ABSENT_WORD:
+    value = _graph_spelling(stated[0], subjects)
+    if states_missing(stated[0]):
         return projected(value, "absent")
     return projected(value, "stated")
 
@@ -3844,13 +3843,16 @@ def _compatible(rows: Sequence[Assertion]) -> bool:
     )
 
 
-def _graph_spelling(value: str, subjects: Mapping[str, Subject]) -> str:
+def _graph_spelling(entry: Assertion, subjects: Mapping[str, Subject]) -> str:
     """One row's value as the graph attribute it reaches would hold it.
 
-    :data:`ABSENT` is the word the **System Model** reads as absent
-    (:data:`ABSENT_WORD`); every other value is :func:`_written`.
+    A row that states its control missing (:func:`states_missing`) is the
+    word the **System Model** reads as absent (:data:`ABSENT_WORD`); every
+    other value is :func:`_written`, as the row holds it.
     """
-    return ABSENT_WORD if value == ABSENT else _written(value, subjects)
+    if states_missing(entry):
+        return ABSENT_WORD
+    return _written(entry.value, subjects)
 
 
 def _written(value: str, subjects: Mapping[str, Subject]) -> str:

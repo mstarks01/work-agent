@@ -20,6 +20,7 @@ from analysis_service.assertions import (
     catalog_coverage,
     contradicted,
     contradictions,
+    project,
     support_span,
 )
 from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
@@ -635,7 +636,7 @@ class TestRowsUnderARefusedProjection:
         model = _with_encryption("none")
 
         (found,) = contradictions(catalog, model)
-        assert found.values == "AES-256; AES-128"
+        assert found.values == ("AES-256", "AES-128")
         offered = evidence_catalog(model, catalog)
         assert TestTheGraphSideOfAContradiction.ABSENT_REF not in offered
         assert offered[assertion_id(other)].kind == "unknown-assertion"
@@ -684,3 +685,16 @@ def test_a_disputed_pair_beside_an_unknown_field_is_asked_once():
 
     assert assertion_id(absence) not in offered
     assert assertion_id(encrypted) not in offered
+
+
+def test_a_mechanism_written_none_is_a_stated_value():
+    """Only the registry's absence states a missing control
+    (``states_missing``); a free-text value that reads ``none`` is spelled
+    as written and projects as stated."""
+    written = stated(value="none")
+    catalog = assertions(
+        written, subjects=(Subject(id=FLOW, type="interaction", label="place order"),)
+    )
+
+    (projection,) = project(catalog)
+    assert (projection.value, projection.reason) == ("none", "stated")

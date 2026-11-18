@@ -136,7 +136,8 @@ What code does with a row:
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
   says why, when the service can write the model. Where it cannot, the field
-  keeps what extraction wrote, and the rows are open questions.
+  keeps what extraction wrote, and two rows of one predicate that disagree
+  are open questions.
 - **Where the model's field states the opposite of the rows that state its
   value**, the rows are open questions, and a claim on one is conditional.
   This happens where the service could not write the value into the model,
