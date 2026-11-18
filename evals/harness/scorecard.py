@@ -31,6 +31,11 @@ lanes' proposals before the fan-in. The structural matcher does not read a
 proposal, so that stage is uncaptured on every row. An uncaptured stage is
 never a zero.
 
+**Replay checks.** Beside the rows, :class:`AssemblyCheck` and
+:class:`FanInCheck` run assembly and the fan-in again on the archive. The
+fan-in check counts proposals by the ID the fan-in gives them, not
+references, so it does not fill the ``proposed`` stage.
+
 **Rates.** Each rate is a :class:`Rate` with its numerator and denominator.
 An empty denominator gives ``None``, which prints as unavailable, where
 :func:`~evals.harness.scorer.ratio` gives 0.0. A rate here is a share of matched
@@ -63,6 +68,7 @@ from evals.harness.artifact import EvalArtifact, RepoCommit, ScoredAgainst
 from evals.harness.assembly import AssemblySweep
 from evals.harness.audit import Phase, phase_of
 from evals.harness.critic_yield import CriticAudit
+from evals.harness.fan_in_accounting import FanInSweep
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE, CaseLosses, Cause
 from evals.harness.reference import GoldenCase
@@ -438,13 +444,78 @@ def assembly_check(sweep: AssemblySweep) -> AssemblyCheck:
 
 
 @dataclass(frozen=True)
+class FanInCheck:
+    """Where the fan-in, run again, puts each proposal of each archived STRIDE block.
+
+    A block the replay cannot stand for is incompatible, with its reason, and
+    its proposals are ``unavailable``: they are counted apart and never as
+    accounted or unexplained. ``inspected`` counts the proposals of the
+    compatible blocks; ``accounted`` and ``unexplained`` divide them, and
+    ``extra`` counts the output IDs no proposal carries.
+    """
+
+    compatible_blocks: int
+    incompatible: tuple[tuple[str, str], ...]
+    inspected: int
+    accounted: int
+    unexplained: int
+    extra: int
+    unavailable: int
+    #: Finished cases whose report today's ``Report`` refuses.
+    unreadable: int
+    #: Cases whose report, drafts or proposals file the archive lacks, holds
+    #: for a case it records as failed, or holds unparsed.
+    capture_faults: int
+
+    @property
+    def accounted_rate(self) -> Rate:
+        return Rate(self.accounted, self.inspected)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "compatible_blocks": self.compatible_blocks,
+            "incompatible": [
+                {"case": case, "reason": reason} for case, reason in self.incompatible
+            ],
+            "inspected": self.inspected,
+            "accounted": self.accounted,
+            "accounted_rate": self.accounted_rate.to_json(),
+            "unexplained": self.unexplained,
+            "extra": self.extra,
+            "unavailable": self.unavailable,
+            "unreadable": self.unreadable,
+            "capture_faults": self.capture_faults,
+        }
+
+
+def fan_in_check(sweep: FanInSweep) -> FanInCheck:
+    """The STRIDE half of a :func:`~evals.harness.fan_in_accounting.replay_artifact` sweep."""
+    stride = [row for row in sweep.rows if row.framework == "stride"]
+    compatible = [row for row in stride if not row.incompatible]
+    return FanInCheck(
+        compatible_blocks=len(compatible),
+        incompatible=tuple(
+            (row.case, row.incompatible) for row in stride if row.incompatible
+        ),
+        inspected=sum(len(row.proposals) for row in compatible),
+        accounted=sum(row.accounted for row in compatible),
+        unexplained=sum(len(row.unexplained) for row in compatible),
+        extra=sum(len(row.extra) for row in compatible),
+        unavailable=sum(len(row.proposals) for row in stride if row.incompatible),
+        unreadable=len(sweep.unreadable),
+        capture_faults=len(sweep.capture_faults),
+    )
+
+
+@dataclass(frozen=True)
 class Scorecard:
-    """One run's rows, its six lanes and their total, and the assembly check."""
+    """One run's rows, its six lanes and their total, and the replay checks."""
 
     run: RunIdentity
     rows: tuple[ReferenceRow, ...]
     lanes: tuple[LaneSummary, ...]
     assembly: AssemblyCheck
+    fan_in: FanInCheck
     #: The sweep's cases that have no row: holdout cases, which no diagnosis
     #: reads, and cases the corpus no longer holds.
     left_out: tuple[str, ...]
@@ -456,6 +527,7 @@ class Scorecard:
             "left_out": list(self.left_out),
             "lanes": [lane.to_json() for lane in self.lanes],
             "assembly": self.assembly.to_json(),
+            "fan_in": self.fan_in.to_json(),
             "critic": self.critic.to_json(),
             "rows": [row.to_json() for row in self.rows],
         }
@@ -464,6 +536,7 @@ class Scorecard:
 def summarize(
     rows: Sequence[ReferenceRow],
     assembly: AssemblyCheck,
+    fan_in: FanInCheck,
     left_out: Sequence[str],
     critic: CriticAudit,
 ) -> Scorecard:
@@ -485,6 +558,7 @@ def summarize(
         rows=tuple(rows),
         lanes=(*lanes, _lane("all", rows)),
         assembly=assembly,
+        fan_in=fan_in,
         left_out=tuple(left_out),
         critic=critic,
     )
@@ -561,6 +635,16 @@ def render(card: Scorecard) -> None:
         f"charged misses: {len(charged)} ({led} with a rule today's code fires,"
         f" {len(charged) - led} with none), by cause {dict(sorted(by_cause.items()))}"
     )
-    print("fan-in dispositions: uncaptured (the matcher reads no proposal)")
+    fan = card.fan_in
+    print(
+        f"fan-in run again: {fan.compatible_blocks} block(s) compatible,"
+        f" {len(fan.incompatible)} incompatible; proposals {fan.inspected}"
+        f" inspected, {fan.accounted} accounted ({_rate(fan.accounted_rate)}),"
+        f" {fan.unexplained} unexplained, {fan.extra} extra output ID(s),"
+        f" {fan.unavailable} unavailable; {fan.unreadable} report(s) unreadable,"
+        f" {fan.capture_faults} case(s) with a capture fault"
+    )
+    for case, reason in fan.incompatible:
+        print(f"  fan-in incompatible: {case}: {reason}")
     card.critic.render()
     print("repeats: 1; run-to-run variation unmeasured")

@@ -1548,6 +1548,7 @@ def scorecard_of(
     return scorecard.summarize(
         rows,
         scorecard.assembly_check(replayed),
+        scorecard.fan_in_check(fan_in_accounting.replay_artifact(loaded, cases)),
         left_out,
         CriticAudit.of(yields),
     )

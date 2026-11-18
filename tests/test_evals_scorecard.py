@@ -13,11 +13,13 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import FrameworkName
 from evals.harness import roster, run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
 from evals.harness.assembly import AssemblySweep, replay_artifact
 from evals.harness.bundle import runs_from_reports, stride_block
 from evals.harness.critic_yield import OMITTED, CriticAudit, fate_by_claim
+from evals.harness.fan_in_accounting import FanInAccount, FanInSweep
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -42,6 +44,7 @@ BASELINE = (
 )
 CASE = "02-iot-fleet-telemetry"
 NO_ASSEMBLY = scorecard.AssemblyCheck(0, (), (), 0, 0)
+NO_FAN_IN = scorecard.FanInCheck(0, (), 0, 0, 0, 0, 0, 0, 0)
 NO_CRITIC = CriticAudit.of(())
 
 
@@ -107,7 +110,7 @@ def _row(rows, index):
 
 
 def _change(rows):
-    every = summarize(rows, NO_ASSEMBLY, (), NO_CRITIC).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, NO_FAN_IN, (), NO_CRITIC).lanes[-1]
     return next(change for change in every.changes if change.after == "reported")
 
 
@@ -174,7 +177,7 @@ def test_an_empty_denominator_is_undefined_and_never_zero():
         _synthetic(None, None, compatibility="uncaptured"),
     ]
 
-    every = summarize(rows, NO_ASSEMBLY, (), NO_CRITIC).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, NO_FAN_IN, (), NO_CRITIC).lanes[-1]
 
     assert Rate(0, 0).value is None
     assert every.compatible_matched == Rate(0, 0)
@@ -186,7 +189,7 @@ def test_an_uncaptured_case_is_never_a_loss(archived):
     case = archived[0]
 
     rows = case_rows(_identity(), case, None, None)
-    every = summarize(rows, NO_ASSEMBLY, (), NO_CRITIC).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, NO_FAN_IN, (), NO_CRITIC).lanes[-1]
 
     assert {row.status for row in rows} == {"uncaptured"}
     assert all(set(row.stages.values()) == {None} for row in rows)
@@ -279,7 +282,7 @@ def test_compatible_and_incompatible_rows_report_both_populations():
         _synthetic(False, False, reference_index=4, compatibility="position-unstated"),
     ]
 
-    every = summarize(rows, NO_ASSEMBLY, (), NO_CRITIC).lanes[-1]
+    every = summarize(rows, NO_ASSEMBLY, NO_FAN_IN, (), NO_CRITIC).lanes[-1]
 
     assert every.by_status == {
         "matched": 1,
@@ -298,6 +301,55 @@ def test_the_stage_changes_are_every_pair_of_adjacent_stages():
     assert pairs == list(pairwise(STAGES))
 
 
+def _account(case: str, framework: FrameworkName = "stride", **fields) -> FanInAccount:
+    row = FanInAccount(
+        case=case,
+        framework=framework,
+        proposals=("p1", "p2", "p3"),
+        kept=("p1",),
+        dropped=(("p2", "no quote"),),
+        unknown=(),
+        deferred=(),
+        unexplained=("p3",),
+        extra=("x1",),
+        quotes_verified=0,
+        quotes_repaired=0,
+        quotes_refused=0,
+    )
+    return replace(row, **fields)
+
+
+def test_the_fan_in_check_keeps_incompatible_blocks_apart():
+    sweep = FanInSweep(
+        rows=[
+            _account("a"),
+            _account("b", incompatible="the replayed drafts differ"),
+            _account("c", framework="asvs"),
+        ],
+        unreadable=["u"],
+        capture_faults=["f1", "f2"],
+        writes_reports=True,
+    )
+
+    check = scorecard.fan_in_check(sweep)
+
+    assert check.compatible_blocks == 1
+    assert check.incompatible == (("b", "the replayed drafts differ"),)
+    assert (check.inspected, check.accounted, check.unexplained) == (3, 2, 1)
+    assert (check.extra, check.unavailable) == (1, 3)
+    assert (check.unreadable, check.capture_faults) == (1, 2)
+    assert check.accounted_rate == Rate(2, 3)
+
+
+def test_an_empty_fan_in_check_reads_no_rate():
+    check = scorecard.fan_in_check(
+        FanInSweep(rows=[], unreadable=[], capture_faults=[], writes_reports=True)
+    )
+
+    assert check.accounted_rate == Rate(0, 0)
+    assert check.accounted_rate.value is None
+
+
 def test_the_assembly_check_counts_unreadable_reports_and_capture_faults():
     sweep = AssemblySweep(
         rows=[], unreadable=["a"], capture_faults=["b", "c"], writes_reports=True
@@ -311,7 +363,7 @@ def test_the_assembly_check_counts_unreadable_reports_and_capture_faults():
 
 def test_no_rows_are_refused_as_no_run():
     with pytest.raises(ValueError, match="at least one row"):
-        summarize([], NO_ASSEMBLY, (), NO_CRITIC)
+        summarize([], NO_ASSEMBLY, NO_FAN_IN, (), NO_CRITIC)
 
 
 def test_none_stated_reads_only_items_that_state_no_position():
@@ -328,7 +380,7 @@ def test_rows_of_two_runs_are_refused():
     ]
 
     with pytest.raises(MixedRunsError):
-        summarize(rows, NO_ASSEMBLY, (), NO_CRITIC)
+        summarize(rows, NO_ASSEMBLY, NO_FAN_IN, (), NO_CRITIC)
 
 
 def test_charged_misses_leave_out_unstated_and_uncharged_rows():
@@ -425,6 +477,10 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     replayed = check["reproduced"] + len(check["differ"]) + len(check["refused"])
     assert (check["unreadable"], check["capture_faults"]) == (0, 0)
     assert replayed == len(scored["scores"])
+    fan = card["fan_in"]
+    assert fan["compatible_blocks"] + len(fan["incompatible"]) == len(scored["scores"])
+    assert fan["inspected"] == fan["accounted"] + fan["unexplained"]
+    assert fan["accounted_rate"]["denominator"] == fan["inspected"]
     # The critic panel pools the same yields that ``score`` writes: every
     # draft sits in one population cell.
     totals = scored["critic_yield_aggregate"]
