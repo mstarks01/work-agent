@@ -59,10 +59,12 @@ def _card_lines(name: str, cards: list[dict]) -> list[str]:
     critic: Counter[str] = Counter()
     left_out: list[str] = []
     refused: list[str] = []
+    cases: set[str] = set()
     gaps: Counter[str] = Counter()
     for card in cards:
         left_out.extend(card["left_out"])
         for row in card["rows"]:
+            cases.add(row["case"][:2])
             status[row["status"]] += 1
             compatibility[row["compatibility"]] += 1
             lanes[row["lane"]][row["status"]] += 1
@@ -98,7 +100,7 @@ def _card_lines(name: str, cards: list[dict]) -> list[str]:
         lines.append(
             f"  {lane:<24}" + " ".join(f"{key} {counts[key]}" for key in STATUSES)
         )
-    lines.append(f"left out: {sorted(left_out)}")
+    lines.append(f"cases: {sorted(cases)}; left out: {sorted(left_out)}")
     lines.append(f"assembly: {dict(assembly)}, refused cases {sorted(refused)}")
     lines.append(f"fan-in: {dict(fan)}")
     lines.append(f"critic: {dict(critic)}, not-real gap by artifact {dict(gaps)}")
@@ -113,11 +115,12 @@ def _panel_lines(out: Path) -> list[str]:
             if panel["uncaptured"]:
                 skipped += 1
                 continue
-            path_fidelity = panel["path"]["fidelity"] if panel["path"] else None
+            path_record = panel["path"] or {"fidelity": None, "evidence": []}
             lines.append(
                 f"{path.stem} {panel['phase']}/{panel['node']}: {panel['counts']}"
                 f" rates {[(k, (r['numerator'], r['denominator'])) for k, r in panel['rates'].items()]}"
-                f" means {panel['means']} unread {panel['unread']} path {path_fidelity}"
+                f" means {panel['means']} unread {panel['unread']} path {path_record['fidelity']}"
+                f" because {path_record['evidence']}"
             )
     lines.append(f"uncaptured panels skipped: {skipped}")
     return lines
