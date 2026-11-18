@@ -291,3 +291,13 @@ def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # n
     status = {row.draft_id: row.archived for row in rows}
     assert status[first.id] == "omitted"
     assert all(status[claim.id] == claim.verdict.status for claim in rest)
+
+
+def test_a_case_with_no_block_reads_every_draft_as_unruled(recorded, case):  # noqa: F811
+    """A case that failed before assembly has no archived verdict to read."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+
+    rows = critic_replay.compare(replace(archived, block=None), [])
+
+    assert {row.archived for row in rows} == {"unruled"}
