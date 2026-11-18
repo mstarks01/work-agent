@@ -193,7 +193,7 @@ class CriticPopulations:
     def rate(self, label: Population, fate: VerdictStatus) -> Rate:
         """The share of one population's drafts with a verdict that met one fate."""
         return Rate(
-            self.met(fate, lambda outcome: LABEL_OF[outcome] == label),
+            self.met(fate, _in(label)),
             self.with_verdict_in(label),
         )
 
@@ -217,7 +217,7 @@ class CriticPopulations:
 
     def with_verdict_in(self, label: Population) -> int:
         """The drafts with a verdict in one population."""
-        return self.with_verdict(lambda outcome: LABEL_OF[outcome] == label)
+        return self.with_verdict(_in(label))
 
     @property
     def no_verdict(self) -> int:
@@ -299,8 +299,10 @@ class CriticAudit:
         }
 
     def render(self) -> None:
-        """The population table, its rates, its gap, its no-verdict line and the
-        loss line."""
+        """Print the population table, its rates and the loss line.
+
+        The gap line and the no-verdict line print where they apply.
+        """
         populations = self.populations
         print(
             "critic input populations, in drafts (labels are relative to the"
@@ -393,7 +395,7 @@ class CriticYield:
     populations: CriticPopulations
     #: The references the post-critic score matched, so a kill can be read as
     #: gross (the draft that had matched died) or net (nothing took its place).
-    matched_after_indices: frozenset[int] = frozenset()
+    matched_after_indices: frozenset[int]
 
     # --- the two numbers that matter -------------------------------------
 
@@ -402,7 +404,7 @@ class CriticYield:
         """The critic earning its cost: drafts that left the report, with a
         verdict or not (:attr:`KilledDraft.fate` tells which), that a person
         had already rejected for substance."""
-        return sum(1 for draft in self.killed if _down_voted(draft.outcome))
+        return sum(1 for draft in self.killed if _in("not-real")(draft.outcome))
 
     @property
     def matched_killed(self) -> int:
@@ -484,9 +486,9 @@ class CriticYield:
         is the share of its rejections that a person rejected for substance.
         It is not the inverse of ``matched_kill_rate``: a rejected ``pooled``
         or ``unvoted`` draft is neither a win nor a loss here, because the
-        reference sets are non-exhaustive by construction. A draft with no verdict is in no rate,
-        as a numerator or a denominator. A rate over an empty population has no
-        value.
+        reference sets are non-exhaustive by construction. A draft with no
+        verdict is in no rate, as a numerator or a denominator. A rate over an
+        empty population has no value.
         """
         return _critic_rates(self.populations)
 
@@ -658,8 +660,11 @@ def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | N
 
 
 def _cause_key(draft: KilledDraft) -> KillCause:
-    """The step a kill is counted under: the stated step, :data:`UNSTATED`
-    for a rejection that names none, or the fate of a kill with no verdict."""
+    """The key a kill is counted under in :attr:`CriticYield.killed_by_cause`.
+
+    It is the stated step, :data:`UNSTATED` for a rejection that names none,
+    or the fate of a kill with no verdict.
+    """
     if not has_verdict(draft.fate):
         return draft.fate
     return draft.cause or UNSTATED
@@ -673,8 +678,9 @@ def _every(_: ScoredOutcome) -> bool:
     return True
 
 
-def _down_voted(outcome: ScoredOutcome) -> bool:
-    return LABEL_OF[outcome] == "not-real"
+def _in(label: Population) -> Callable[[ScoredOutcome], bool]:
+    """Whether a scored outcome puts a draft in the population ``label``."""
+    return lambda outcome: LABEL_OF[outcome] == label
 
 
 def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
@@ -684,11 +690,11 @@ def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
     population counts as each denominator.
     """
     killed = populations.met("rejected", _every)
-    down_voted_killed = populations.met("rejected", _down_voted)
+    down_voted_killed = populations.met("rejected", _in("not-real"))
     return {
         "kill_rate": Rate(killed, populations.with_verdict(_every)),
         "rejected_kill_rate": Rate(
-            down_voted_killed, populations.with_verdict(_down_voted)
+            down_voted_killed, populations.with_verdict_in("not-real")
         ),
         "matched_kill_rate": Rate(
             populations.met("rejected", _matched), populations.with_verdict(_matched)

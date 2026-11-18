@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.claim_identity import NO_ROWS
-from analysis_service.claims import Verdict
+from analysis_service.claims import ReturnedClaim, Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
 from evals.harness.critic_yield import (
@@ -799,9 +799,8 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
 
 
 def test_a_returned_draft_is_a_kill_counted_under_its_fate(case):
-    """A claim assembly returned to the deferred set left the report unruled."""
-    from analysis_service.claims import ReturnedClaim
-
+    """A claim assembly returned to the deferred set left the report with no
+    archived verdict."""
     kept = _draft_for(case, _expected(case), 1)
     returned = _draft_for(case, _must_find(case), 2)
     block = _ruled_block(case, [promote(kept)], []).model_copy(

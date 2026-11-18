@@ -372,7 +372,7 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find coverage** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. It is coverage of a reference, not a measure of whether the argument is right (#890). |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average coverage while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
+| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. Both count the critic's rejections only; a draft that leaves the report with no verdict shows in "gross kills lost for good" and on the "no archived verdict" line. |
 
 All of these are *relative to the rule and the ledger*. Use them to compare
 configurations and track movement; never quote them as absolute scores or
@@ -704,8 +704,10 @@ compare to the baseline band:
   and the next sweep may not reproduce it.
 - **Near/far delta** — did the gap widen? If so, you may have traded far-domain
   coverage for a better-looking average.
-- **Critic yield** — did `killed-real` (real findings the critic threw out) go
-  up? That's a regression hiding inside a higher kill rate.
+- **Critic yield** — did `killed-real` (real findings the critic rejected) go
+  up? That's a regression hiding inside a higher kill rate. Also read "gross
+  kills lost for good" and the "no archived verdict" line: a real finding that
+  leaves the report with no verdict raises those and not `killed-real`.
 
 A change that lifts or holds per-case recall, without widening the delta or
 raising `killed-real`, is a keeper. Anything else is noise, or a trade you should

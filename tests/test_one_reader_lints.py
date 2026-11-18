@@ -1856,9 +1856,9 @@ def _reads_the_verdict_rule(node: ast.AST) -> bool:
         return True
     return isinstance(node, ast.Compare) and any(
         isinstance(op, (ast.In, ast.NotIn))
-        and (
-            _loads(right, "NO_VERDICT_FATES")
-            or _loads_attribute(right, "NO_VERDICT_FATES")
+        and any(
+            _loads(right, name) or _loads_attribute(right, name)
+            for name in ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
         )
         for op, right in zip(node.ops, node.comparators, strict=True)
     )
@@ -1905,6 +1905,25 @@ def _reads_an_answer_status(node: ast.AST) -> bool:
 def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bool):
     found = any(
         _reads_an_answer_status(node) for node in ast.walk(ast.parse(expression))
+    )
+    assert found is refused
+
+
+@pytest.mark.parametrize(
+    ("expression", "refused"),
+    [
+        ("fate in VERDICT_STATUSES", True),
+        ("fate in critic_yield.VERDICT_STATUSES", True),
+        ("fate not in NO_VERDICT_FATES", True),
+        ("row.archived not in NO_VERDICT_SIDES", True),
+        ("has_verdict(fate)", False),
+        ("{*NO_VERDICT_FATES, UNRULED}", False),
+        ("no_verdict_line(apart, NO_VERDICT_FATES)", False),
+    ],
+)
+def test_the_verdict_rule_lint_reads_each_spelling(expression: str, refused: bool):
+    found = any(
+        _reads_the_verdict_rule(node) for node in ast.walk(ast.parse(expression))
     )
     assert found is refused
 
