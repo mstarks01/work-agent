@@ -470,9 +470,11 @@ the reviewer named it (`critic`).
 ```
 
 - `key` names the fact. Send it back unchanged with your answer.
-- `kind` is `attribute` (a value the model left unknown, or a trust zone the
-  service inferred), `assertion` (a fact
-  about a principal, a credential or a component that the sources left open),
+- `kind` is `attribute` (a value the model left unknown, a trust zone the
+  service inferred, or a value that the catalog's facts contradict or leave
+  open), `assertion` (a fact about a principal, a credential or a component
+  that the sources left open or disagree about; the key names the fact's
+  place, so it stays the same after you answer),
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), `subject` (a
   question the reviewer wrote in its own words because no listed question
@@ -547,7 +549,8 @@ A fact answer is accepted only for a fact that this job asked: a question in
 it is finished. A fact that an earlier save answered may be answered again.
 
 An attribute answer is accepted only where the model leaves the attribute open,
-or where an earlier save answered it. The model is read with the
+where the catalog's facts contradict the attribute or leave it open, or where an
+earlier save answered it. The model is read with the
 assertion catalog applied, as the analysis reads it, so a fact the catalog
 states takes no answer even while the job waits at its pause. An answer to an attribute that
 the sources state is refused with `400`. An `unknown` answer to a fact that an
@@ -561,11 +564,12 @@ about that attribute, and a `superseded-by-answer` issue names each removed
 fact. A fact that the sources state only for a scope, such as one environment,
 stays in the catalog beside your answer, and your answer settles the attribute. An
 inferred trust zone that you answer is no longer marked as inferred. An
-assertion answer replaces the open fact with a stated one. An answer to a
+assertion answer replaces the open fact at its place with a stated one. An answer to a
 question kind writes a stated fact for each part it answers, about that
 element, unless the sources state that part. An assertion answer, or a part,
-removes each unscoped catalog fact at its place that is open, set aside
-(`unsupported` or `unresolved`) or disagrees with your answer, and a
+removes each catalog fact at its place (the same subject, fact and scope) that
+is open, set aside (`unsupported` or `unresolved`) or disagrees with your
+answer, and a
 `superseded-by-answer` issue names each removed fact that holds a value. A fact
 that can hold beside your answer, such as a second mechanism of one connection,
 stays. A subject answer reaches the analysis as your words in the

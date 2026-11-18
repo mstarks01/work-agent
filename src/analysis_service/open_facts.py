@@ -385,7 +385,6 @@ def fact_routes(
 ) -> Mapping[str, UnknownRef]:
     """The fact each open row a finding may name is asked as, by row identity.
 
-    **The one reader of "which fact does a reference to an open row ask".**
     A row the graph contradicts (:func:`~analysis_service.assertions.contradicted`)
     or another row disputes (:func:`~analysis_service.assertions.disputed`)
     states a value, so its own identity names no row an answer could write
