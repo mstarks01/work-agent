@@ -67,7 +67,8 @@ field it reaches shows what
 :data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
 under it. A row the graph attribute contradicts is open too, and it is in the
 table whatever field it reaches. The attribute it contradicts, or a field
-that hides its qualification, is not offered as an ``absent-attribute``
+that hides the qualification its projection writes, is not offered as an
+``absent-attribute``
 (:func:`~analysis_service.assertions.held_open_attributes`): the rows carry the
 question. An agent may raise a
 *conditional* claim on an open row exactly as it may on an element attribute
@@ -108,10 +109,10 @@ from analysis_service.assertions import (
     apply_projection,
     assertion_id,
     contradicted,
+    disputed,
     held_open_attributes,
     hidden_qualifications,
     offered,
-    open_rows,
     projected_attribute,
     states_missing,
 )
@@ -289,8 +290,7 @@ def evidence_catalog(
     described.
     """
     # A field the rows hold open is no stated absence: the rows behind it state
-    # the opposite or leave it open, and their open entries below carry the
-    # question.
+    # the opposite, or its qualification is hidden.
     held_open = _held_open_attributes(model, assertions)
     catalog: EvidenceCatalog = dict(
         entry
@@ -320,8 +320,8 @@ def evidence_catalog(
         # The open questions, after the settled rows and never merged with
         # them. An unknown row, or a row in a conflict, reaches here when it
         # reaches no graph field, or when its projection qualifies the field
-        # and the field still states a value. An applied projection shows a
-        # disputed attribute as a qualified unknown, which the attribute enumeration
+        # and the field still states a value. An applied projection shows a disputed
+        # attribute as a qualified unknown, which the attribute enumeration
         # above offers, but a principal's second factor has no attribute to
         # qualify. Where the validity gate refuses the projected model, the
         # field keeps what extraction wrote, so only this offer carries the
@@ -333,7 +333,10 @@ def evidence_catalog(
         }
         unprojected = [
             row
-            for row in open_rows(assertions)
+            for row in (
+                *(row for row in assertions.entries if row.value == UNKNOWN),
+                *disputed(assertions),
+            )
             if not projected_attribute(row.predicate, row.subject)
             or assertion_id(row) in hidden_question_rows
         ]

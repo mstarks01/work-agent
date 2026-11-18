@@ -738,25 +738,27 @@ class TestAnAbsenceUnderAHiddenQualification:
 
         assert offered[self.ABSENT_REF].kind == "absent-attribute"
 
-    def test_a_set_aside_row_keeps_the_absence(self):
-        """The neighbour: a row a reviewer set aside states nothing, and no
-        open row carries a question, so the field's absence stands."""
+    def test_a_set_aside_row_drops_the_absence_and_offers_no_question(self):
+        """A row a reviewer set aside qualifies the field too, and no row
+        carries a question, so the catalog offers nothing about it; this is
+        reported for a ruling."""
         rejected = self.ENCRYPTED.model_copy(update={"assessment": "unsupported"})
         catalog = assertions(rejected, subjects=(self.STORE,))
         offered = evidence_catalog(_with_encryption("none"), catalog)
 
-        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+        assert self.ABSENT_REF not in offered
+        assert assertion_id(rejected) not in offered
 
-    def test_a_scoped_row_keeps_the_absence(self):
-        """The neighbour: a scoped row is a settled fact about part of the
-        store, and no open row carries a question about the whole."""
+    def test_a_scoped_row_drops_the_absence_and_stays_a_fact(self):
+        """A scoped row qualifies the field and is a settled fact about part
+        of the store; no row carries a question about the whole."""
         backups = self.ENCRYPTED.model_copy(
             update={"scope": [Qualifier(kind="resource", value="backups")]}
         )
         catalog = assertions(backups, subjects=(self.STORE,))
         offered = evidence_catalog(_with_encryption("none"), catalog)
 
-        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+        assert self.ABSENT_REF not in offered
         assert offered[assertion_id(backups)].kind == "assertion"
 
     def test_a_claim_on_the_dropped_absence_is_told_why(self):
