@@ -3213,15 +3213,21 @@ def uncontradicted(
 
 
 def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]:
-    """The rows behind each contradiction, less the submitter's answers.
+    """The rows behind each contradiction no submitter's answer drives.
 
-    An answer settles the fact even against the sources (:func:`answered`), so
-    an opposite graph value does not hold it open.
+    An answer settles the fact even against the sources (:func:`answered`), and
+    an unscoped one alone makes the projected value (:func:`project`). So a
+    contradiction whose rows hold an answer holds none of its rows open: the
+    other rows grouped beside the answer did not make the value the graph
+    contradicts.
     """
     answers = {assertion_id(entry) for entry in catalog.entries if answered(entry)}
     return {
-        row for found in contradictions(catalog, model) for row in found.rows
-    } - answers
+        row
+        for found in contradictions(catalog, model)
+        if answers.isdisjoint(found.rows)
+        for row in found.rows
+    }
 
 
 @dataclass(frozen=True)

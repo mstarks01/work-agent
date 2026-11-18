@@ -84,7 +84,9 @@ offered as a settled row. Neither side settles the fact against that model, so
 the catalog offers the row as an open question, as it offers a row another row
 disputes, and a claim on it reads `needs-info`. `assertions.offered` starts
 from `assertions.uncontradicted`, and `assertions.contradicted` names the rows
-the catalog holds open.
+the catalog holds open. A submitter's answer is the exception: it settles
+the fact even against the sources (the decision of 2026-09-25 on #1225), so it
+stays a settled row whatever the graph attribute states.
 
 **3. The reference is the identity.** ADR 0034 rule 4 made an assertion's ID
 a pure function of its four identifying parts, recomputed by every reader.

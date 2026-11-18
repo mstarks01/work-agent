@@ -386,7 +386,7 @@ class Ground:
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
 | `assertion` | `assertion` | the sources state this fact, which the model has no field for |
-| `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it; or the model's attribute states the opposite of the row |
+| `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it; or the model's attribute states the opposite of a row that is not a submitter's answer |
 
 **What the assertion pass reached.** A reader of `assertions` has no way to tell
 a system with few stated facts from a pass that asked few questions, and the two
@@ -407,8 +407,8 @@ row's subject, predicate, value, basis, scope and support spans are read there.
 On load the report checks the row is one the catalog *settles* — it holds a
 value rather than `unknown`, its basis is support of some kind, no assessment
 set it aside, and no other row disagrees at its subject, predicate and scope —
-and that the embedded model's attribute does not state its opposite, and
-refuses the report otherwise. A report whose `assertions` is `None` settles
+and, unless the row is a submitter's answer, that the embedded model's
+attribute does not state its opposite, and refuses the report otherwise. A report whose `assertions` is `None` settles
 nothing, so a claim citing one is refused the way a claim citing a crossing the
 model does not derive is.
 

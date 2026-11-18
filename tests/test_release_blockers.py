@@ -49,7 +49,8 @@ KEYS = graph.GraphKeys.of(FRAMEWORKS)
 CASES = {case.id: case for case in load_corpus(CORPUS)}
 ROW = re.compile(r"^\| `([^`]+)` \| (.*) \|$", re.MULTILINE)
 #: The words an open row's gloss uses where another row disputes it or the
-#: graph contradicts it, which a lane reads as a question whatever value the row states.
+#: graph contradicts it, which a lane reads as a question whatever value the
+#: row states.
 DISAGREE = "the sources disagree"
 
 

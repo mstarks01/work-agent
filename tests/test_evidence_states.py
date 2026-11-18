@@ -12,8 +12,10 @@ import pytest
 
 from analysis_service.assertions import (
     ABSENT,
+    Qualifier,
     Subject,
     assertion_id,
+    contradicted,
     contradictions,
     support_span,
 )
@@ -254,7 +256,7 @@ class TestAConfirmationOnAnOpenFact:
 
 
 class TestARowTheGraphContradicts:
-    """A stated row against an opposite graph value is an open question.
+    """A source row against an opposite graph value is an open question.
 
     Where a projection is not written into the graph, a row stating an absence
     beside an attribute stating a control is a contradiction the report names.
@@ -324,6 +326,30 @@ class TestARowTheGraphContradicts:
             "encryption_at_rest"
         ]
         ground = evidence_catalog(model, catalog)[assertion_id(answer)]
+        assert ground.kind == "assertion"
+
+    def test_a_scoped_row_beside_an_answer_stays_settled(self):
+        """The answer alone makes the projected value, so the scoped row the
+        projection groups beside it is not what the graph contradicts."""
+        model = _with_encryption("AES-256")
+        said = "Orders database: not encrypted."
+        answer = self.STORED.model_copy(
+            update={
+                "origin": "answer",
+                "basis": "stated",
+                "support": [support_span(said, ANSWERS_LABEL, said)],
+            }
+        )
+        backups = self.STORED.model_copy(
+            update={
+                "value": "AES-256",
+                "scope": [Qualifier(kind="resource", value="backups")],
+            }
+        )
+        catalog = assertions(answer, backups, subjects=(self.STORE,))
+
+        assert contradicted(catalog, model) == ()
+        ground = evidence_catalog(model, catalog)[assertion_id(backups)]
         assert ground.kind == "assertion"
 
     def test_an_agreeing_graph_value_carries_the_row_and_names_nothing(self):

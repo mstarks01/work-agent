@@ -52,8 +52,7 @@ cited through that attribute: one fact, one reader (ADR 0036). Which rows those
 are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
 settle is :func:`~analysis_service.assertions.settled`'s, so a conflict or an
 unsupported row is never in the table as an ``assertion``, and a claim can
-never rest on one as a fact. A
-settled row the graph attribute contradicts
+never rest on one as a fact. A settled row the graph attribute contradicts
 (:func:`~analysis_service.assertions.contradicted`) is not offered as an
 ``assertion`` either.
 
@@ -65,9 +64,9 @@ field it reaches shows a qualified unknown instead. A row the graph attribute
 contradicts is open too, and it is in the table whatever field it reaches. An
 agent may raise a *conditional* claim on an open row exactly as it may on an
 element attribute nobody stated. Which of the two an entry is, is the entry's
-own ``Ground.kind``, so a claim that grounds
-a settled row on an open question — or the reverse — is refused by comparing
-its kind against the table rather than by a second reading of ``settled``.
+own ``Ground.kind``, so a claim that grounds a settled row on an open question
+— or the reverse — is refused by comparing its kind against the table rather
+than by a second reading of ``settled``.
 
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
 and never parsed, interpolated, or matched by a pattern compiled from it, so the

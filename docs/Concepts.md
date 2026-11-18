@@ -96,7 +96,8 @@ A ground has one of these kinds:
 - `assertion`: an assertion row that the sources settle and the model does not
   contradict (see below); or
 - `unknown-assertion`: an open assertion row: its value is unknown, another
-  row disputes it, or the model's attribute states the opposite.
+  row disputes it, or the model's attribute states the opposite and the row is
+  not a submitter's answer.
 
 Every carried claim has at least one ground. Quotes are checked against the
 source text. If a close source span can be found, code repairs the quote and
@@ -133,7 +134,8 @@ What code does with a row:
   says why.
 - **Where the model's field still states the opposite of a row**, because the
   service could not write the row's value into the model, the row is an open
-  question, and a claim on it is conditional.
+  question, and a claim on it is conditional. A submitter's answer stays a
+  fact.
 - **Each row states its basis.** `stated` means the source says it in words.
   `inferred` means the pass concluded it from what the source says, and the row
   gives the reasoning. `derived` means a rule in code wrote the value, and the
