@@ -35,11 +35,10 @@ from analysis_service.diagrams import DiagramReading, DiagramStructure, node_nam
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
-    meaning_moved,
+    faithful_repair,
     normalize,
     prepare_source,
     repair_deadline,
-    repair_prepared,
     verify_normalized,
 )
 from analysis_service.references import canonical
@@ -762,9 +761,8 @@ def repair_excerpts(model: SystemModel, sources: Mapping[str, str]) -> SystemMod
 
     The ADR 0018 rung, asked at the extraction gate (ADR 0100). An excerpt the
     ladder refuses against the source it cites is given to
-    :func:`~analysis_service.grounding.repair_prepared`. Where that finds a
-    window and :func:`~analysis_service.grounding.meaning_moved` names nothing,
-    the element carries the window, and an :class:`ExcerptRepair` records what
+    :func:`~analysis_service.grounding.faithful_repair`. Where that finds a
+    window, the element carries the window, and an :class:`ExcerptRepair` records what
     the model wrote. Anything else is left for the gate to refuse as
     ``unverifiable-excerpt``, so the repair pass still sees it.
 
@@ -790,8 +788,8 @@ def repair_excerpts(model: SystemModel, sources: Mapping[str, str]) -> SystemMod
             if deadline_spent(deadline):
                 continue
             prepared[label] = prepare_source(sources[label])
-        repair = repair_prepared(written, prepared[label], deadline)
-        if repair is None or meaning_moved(written, repair.span):
+        repair = faithful_repair(written, prepared[label], deadline)
+        if repair is None:
             continue
         element.source_excerpt = repair.span
         repaired.excerpt_repairs.append(

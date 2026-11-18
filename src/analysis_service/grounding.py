@@ -716,6 +716,23 @@ def repair_prepared(
     return best
 
 
+def faithful_repair(
+    written: str, source: PreparedSource, deadline: float
+) -> Repair | None:
+    """The span :func:`repair_prepared` finds, or ``None`` where it moves meaning.
+
+    **The one reader of "may a refused quote take the source's span".** A
+    span that changes a negation or a number (:func:`meaning_moved`) states a
+    different fact from the one the writer cited, so the quote stays refused.
+    A guard, not proof of meaning: it compares those two token classes only,
+    and a changed principal or control term passes it.
+    """
+    repair = repair_prepared(written, source, deadline)
+    if repair is None or meaning_moved(written, repair.span):
+        return None
+    return repair
+
+
 def _truncated(best: Repair | None) -> Repair | None:
     """The best span so far, marked as found by a scan that did not finish."""
     return None if best is None else best._replace(complete=False)
