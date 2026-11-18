@@ -458,16 +458,12 @@ class CriticYield:
     def killed_by_cause(self) -> dict[KillCause, dict[str, int]]:
         """Every kill by its step or fate, and what each removed.
 
-        A kill is keyed by the step its verdict names, or by its fate where it
-        has no verdict.
+        A kill is keyed by the step its verdict names, by ``unstated`` for a
+        rejection that names no step, or by its fate where it has no verdict.
 
-        The critic states why it rejected a draft, and nothing counted it: the
-        second Baseline's four must-find kills were three ``reasoning`` and one
-        ``lane``, read by hand. Per key (a step or a fate), the kills, the ones
-        that had matched a reference, and the ones that had answered a
-        must-find, so a prompt change that moves the critic's reasoning kills is
-        visible as that and not as a bare count. A rejection that names no step is keyed
-        ``unstated``, and a kill with no verdict is keyed by its fate.
+        Per key, it gives the kills, the ones that had matched a reference, and
+        the ones that had answered a must-find, so a prompt change that moves
+        the critic's reasoning kills is visible as that and not as a bare count.
         """
         by_cause: dict[KillCause, dict[str, int]] = {}
         for draft in self.killed:
