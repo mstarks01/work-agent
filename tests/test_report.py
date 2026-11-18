@@ -31,6 +31,7 @@ from analysis_service.claims import (
     MissingMitigation,
     ProposedVerdict,
     RepairedQuote,
+    ReturnedClaim,
     Severity,
     UnknownRef,
     UnresolvedEvidence,
@@ -632,6 +633,30 @@ class TestReportInvariants:
         duplicate = sample_threat(threat_id="S-01")
         with pytest.raises(ValidationError, match="more than once"):
             sample_report(threats=[sample_threat(threat_id="S-01"), duplicate])
+
+    def test_a_returned_claim_beside_its_neighbour_is_accepted(self):
+        returned = ReturnedClaim(claim_id="S-01", unit="u", needs="code")
+        report = sample_report(
+            threats=[sample_threat(threat_id="S-02")], returned_claims=[returned]
+        )
+        assert [entry.claim_id for entry in report.analyses[0].returned_claims] == [
+            "S-01"
+        ]
+
+    def test_a_claim_both_kept_and_returned_is_rejected(self):
+        returned = ReturnedClaim(claim_id="S-01", unit="u", needs="code")
+        with pytest.raises(ValidationError, match="'S-01' appears more than once"):
+            sample_report(
+                threats=[sample_threat(threat_id="S-01")], returned_claims=[returned]
+            )
+
+    def test_a_claim_returned_twice_is_rejected(self):
+        returned = ReturnedClaim(claim_id="S-01", unit="u", needs="code")
+        with pytest.raises(ValidationError, match="'S-01' appears more than once"):
+            sample_report(
+                threats=[sample_threat(threat_id="S-02")],
+                returned_claims=[returned, returned],
+            )
 
     def test_mismatched_boundary_crossings_are_rejected(self):
         report = sample_report()

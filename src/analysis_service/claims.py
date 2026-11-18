@@ -2968,12 +2968,18 @@ class FrameworkAnalysis(BaseModel):
         the envelope: a claim stamped with another framework's pair reached the
         wrong block, and the pair is exactly what a reader uses to interpret the
         ID beside it.
+
+        A returned claim left the block's two arrays (ADR 0126), so its ID is
+        counted with theirs: one claim sits in one list, once.
         """
         issues = [
             f"claim ID {claim_id!r} appears more than once in the"
             f" {self.framework} analysis"
             for claim_id, count in Counter(
-                claim.id for claim in self.all_claims()
+                [
+                    *(claim.id for claim in self.all_claims()),
+                    *(entry.claim_id for entry in self.returned_claims),
+                ]
             ).items()
             if count > 1
         ]
