@@ -970,8 +970,9 @@ class Report(BaseModel):
         projection with *this* service's rules, so a record written under
         another version would be re-read under rules it never ran, and every
         difference that caused would be reported as a contradiction the writer
-        hid. So a foreign record is left alone: its own issues stand as
-        written, and this check declines rather than guessing.
+        hid. So this check declines for a foreign record: its own issues
+        stand as written. The ground check on load is not version-gated; it
+        reads every record's grounds against today's evidence catalog.
         """
         if self.assertions is None:
             return []

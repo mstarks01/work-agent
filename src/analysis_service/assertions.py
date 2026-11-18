@@ -256,7 +256,12 @@ REGISTRY_VERSION = 9
 #: unscoped row that quotes the answers Source outranks every other row
 #: (:func:`answered`), and the scoped rows stay in the catalog as the scoped
 #: facts they state (#1289, F5).
-PROJECTION_VERSION = 6
+#:
+#: Version 7: only an answer that may state its value makes the projected value
+#: and lifts the unchecked guard (:func:`_drives_value`). An answer a reviewer
+#: set aside, or an answer of ``unknown``, leaves an unchecked row under the
+#: guard, which writes a qualified ``unknown`` over the lead (#2270).
+PROJECTION_VERSION = 7
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:

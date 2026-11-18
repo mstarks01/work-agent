@@ -3302,8 +3302,10 @@ SETTLED_CALLERS: dict[tuple[str, str], str] = {
 
 
 def test_each_caller_of_settled_has_a_reason():
-    """``settled`` reads the catalog alone, so a new caller beside a model
-    must state why it does not read ``uncontradicted``."""
+    """``settled`` reads the catalog alone, so a new direct caller must state
+    why it does not read ``uncontradicted``. The callers of ``answer(...)``
+    read ``Answer.settled`` through the ``answer`` row; this test does not
+    reach them."""
     assert _sites(_calls_settled) == sorted(SETTLED_CALLERS)
 
 

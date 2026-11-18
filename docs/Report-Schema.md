@@ -1279,8 +1279,10 @@ version before it. Read it when you load an archived report.
     rows into graph attributes. It has its own number, not the catalog's
     `registry_version`, because the projection's loss rules live in `project`
     and can change with no registry change. It lets a loaded report be
-    re-checked for contradictions against the rules that produced it, and a
-    record from another version is left alone. `assertions.issues` can say
+    re-checked for contradictions against the rules that produced it; the
+    issue re-check declines for a record from another version. The ground
+    check on load reads every record's grounds against today's evidence
+    catalog, whatever its version. `assertions.issues` can say
     `graph-contradiction`: the one code that refuses no row. It reports that a
     graph attribute and the rows authoritative for it state opposite things.
 
