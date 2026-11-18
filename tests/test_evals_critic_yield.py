@@ -522,7 +522,8 @@ def test_a_kill_nothing_made_good_is_lost(case):
 
 
 def test_the_critic_stated_cause_rides_on_the_kill(case):
-    """Read off the block's own verdict; every kill without one is ``unstated``."""
+    """Read off the block's own verdict; a rejection that names no step is
+    ``unstated``, and a kill with no verdict is counted under its fate."""
     reference = _must_find(case)
     killed = _draft_for(case, reference, 1)
     rejected = promote(
@@ -546,7 +547,23 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
     }
     assert aggregate_yield([result])["killed_by_cause"]["lane"]["must_find"] == 1
 
+    unstated = rejected.model_copy(
+        update={"verdict": Verdict(status="rejected", reason="not this lane")}
+    )
     without = score_case_with_yield(
+        case,
+        [killed],
+        [],
+        _identity_matcher([killed]),
+        Ledger(),
+        block.model_copy(update={"rejected_claims": [unstated]}),
+        rows=NO_ROWS,
+    ).critic_yield
+    assert without.killed_by_cause == {
+        "unstated": {"killed": 1, "matched": 1, "must_find": 1}
+    }
+
+    omitted = score_case_with_yield(
         case,
         [killed],
         [],
@@ -555,8 +572,8 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
         rows=NO_ROWS,
         block=_report_with(case, []).analyses[0],
     ).critic_yield
-    assert without.killed_by_cause == {
-        "unstated": {"killed": 1, "matched": 1, "must_find": 1}
+    assert omitted.killed_by_cause == {
+        "omitted": {"killed": 1, "matched": 1, "must_find": 1}
     }
 
 
@@ -763,7 +780,13 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
     assert {draft.fate for draft in result.killed} == {"omitted"}
     assert result.kill_count == 2
     assert result.populations.no_verdict == 2
-    assert CriticAudit.of([result]).reference_loss == Rate(0, 0)
+    # The gross kill counts keep each draft that left the report, as the loss
+    # instrument charges each one to the critic.
+    assert (result.matched_killed, result.matched_lost) == (1, 1)
+    assert CriticAudit.of([result]).reference_loss == Rate(1, 1)
+    assert result.killed_by_cause == {
+        "omitted": {"killed": 2, "matched": 1, "must_find": 1}
+    }
     totals = aggregate_yield([result])
     assert totals["no_verdict"] == 2
     assert totals["kill_rate"] == 0.0

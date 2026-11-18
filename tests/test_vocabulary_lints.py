@@ -133,10 +133,6 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("evals.experiments.QA-2026-11-02-05.control_ballot", "CONTROL_CHECKS"): (
         "the checks of the item 4 control arm, which has no spoofing runs"
     ),
-    ("evals.harness.critic_yield", "NO_VERDICT_FATES"): (
-        "the fates that hold no verdict status, which leaves out each status"
-        " a rate can count"
-    ),
     ("evals.harness.critic_replay", "NO_VERDICT_SIDES"): (
         "the archived sides that hold no verdict status, which leaves out each"
         " status a replay can agree with"
