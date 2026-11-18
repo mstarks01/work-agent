@@ -704,7 +704,7 @@ class TestAnAbsenceUnderAHiddenQualification:
     """A field that reads absent under a qualifying projection the gate
     refused is no stated absence: the applied projection would show it as an
     unknown, and the open rows carry the question (the maintainer's ruling of
-    2026-11-18 on N1)."""
+    2026-11-18 on #2270)."""
 
     STORE = TestARowTheGraphContradicts.STORE
     ABSENCE = TestARowTheGraphContradicts.STORED
@@ -737,6 +737,27 @@ class TestAnAbsenceUnderAHiddenQualification:
         offered = evidence_catalog(_with_encryption("none"), catalog)
 
         assert offered[self.ABSENT_REF].kind == "absent-attribute"
+
+    def test_a_set_aside_row_keeps_the_absence(self):
+        """The neighbour: a row a reviewer set aside states nothing, and no
+        open row carries a question, so the field's absence stands."""
+        rejected = self.ENCRYPTED.model_copy(update={"assessment": "unsupported"})
+        catalog = assertions(rejected, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+
+    def test_a_scoped_row_keeps_the_absence(self):
+        """The neighbour: a scoped row is a settled fact about part of the
+        store, and no open row carries a question about the whole."""
+        backups = self.ENCRYPTED.model_copy(
+            update={"scope": [Qualifier(kind="resource", value="backups")]}
+        )
+        catalog = assertions(backups, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+        assert offered[assertion_id(backups)].kind == "assertion"
 
     def test_a_claim_on_the_dropped_absence_is_told_why(self):
         catalog = assertions(self.ABSENCE, self.ENCRYPTED, subjects=(self.STORE,))

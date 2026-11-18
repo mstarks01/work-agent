@@ -176,6 +176,7 @@ __all__ = [
     "hidden_qualifications",
     "missing_value",
     "offered",
+    "open_rows",
     "parse_predicate",
     "parse_subject_type",
     "project",
@@ -3282,17 +3283,38 @@ def held_open_attributes(
     """Each ``(element_id, attribute)`` the rows hold open against ``model``.
 
     The rows contradict the attribute (:func:`contradicted_attributes`), or
-    the attribute's projection qualifies it and the model does not show that
-    (:func:`hidden_qualifications`), so the field's value is no fact and the
-    open rows carry the question. The evidence catalog offers no
+    the attribute's projection qualifies it, the model does not show that
+    (:func:`hidden_qualifications`), and an open row (:func:`open_rows`) sits
+    under it. The field's value is then no fact, and the rows carry the
+    question. A hidden qualification with no open row, such as a scoped row
+    or a row a reviewer set aside, leaves the field's value standing, because
+    no row carries a question. The evidence catalog offers no
     ``absent-attribute`` entry for these (the maintainer's rulings of
     2026-11-18 on #2270).
     """
+    opened = {assertion_id(entry) for entry in open_rows(catalog)}
     hidden = {
         (projection.element_id, projection.attribute)
         for projection in hidden_qualifications(catalog, model)
+        if not opened.isdisjoint(projection.rows)
     }
     return contradicted_attributes(catalog, model) | hidden
+
+
+def open_rows(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
+    """Every row the sources leave open, in catalog order.
+
+    A row that holds :data:`UNKNOWN`, and each side of a disagreement
+    (:func:`disputed`). The evidence catalog offers these as questions where
+    no graph field shows them; a row the graph contradicts is open against a
+    model too (:func:`contradicted`), which this rule does not read.
+    """
+    sides = {assertion_id(entry) for entry in disputed(catalog)}
+    return tuple(
+        entry
+        for entry in catalog.entries
+        if entry.value == UNKNOWN or assertion_id(entry) in sides
+    )
 
 
 def contradicted(
