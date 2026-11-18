@@ -447,15 +447,19 @@ def assembly_check(sweep: AssemblySweep) -> AssemblyCheck:
 class FanInCheck:
     """Where the fan-in, run again, puts each proposal of each archived STRIDE block.
 
-    A block the replay cannot stand for is incompatible, with its reason, and
-    its proposals are ``unavailable``: they are counted apart and never as
-    accounted or unexplained. ``inspected`` counts the proposals of the
-    compatible blocks; ``accounted`` and ``unexplained`` divide them, and
-    ``extra`` counts the output IDs no proposal carries.
+    ``inspected`` counts every proposal of every block, as
+    :func:`~evals.harness.fan_in_accounting.command_fan_in` does. A block the
+    replay cannot stand for is incompatible, with its reason, and its
+    proposals are ``unavailable``: never accounted or unexplained. The
+    compatible blocks' proposals are ``accounted`` or ``unexplained``, and
+    ``extra`` counts the output IDs no proposal carries. An incompatible block
+    whose proposals the replay could not read adds nothing to ``unavailable``,
+    and ``unread_blocks`` counts it, so its proposals never read as zero.
     """
 
     compatible_blocks: int
     incompatible: tuple[tuple[str, str], ...]
+    unread_blocks: int
     inspected: int
     accounted: int
     unexplained: int
@@ -463,13 +467,15 @@ class FanInCheck:
     unavailable: int
     #: Finished cases whose report today's ``Report`` refuses.
     unreadable: int
-    #: Cases whose report, drafts or proposals file the archive lacks, holds
-    #: for a case it records as failed, or holds unparsed.
+    #: Capture faults, one line each: a report, drafts or proposals file the
+    #: archive lacks, holds for a case it records as failed, or holds unparsed,
+    #: and a capture that holds a framework the report has no block for.
     capture_faults: int
 
     @property
     def accounted_rate(self) -> Rate:
-        return Rate(self.accounted, self.inspected)
+        """Accounted over the proposals of the compatible blocks."""
+        return Rate(self.accounted, self.inspected - self.unavailable)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -477,6 +483,7 @@ class FanInCheck:
             "incompatible": [
                 {"case": case, "reason": reason} for case, reason in self.incompatible
             ],
+            "unread_blocks": self.unread_blocks,
             "inspected": self.inspected,
             "accounted": self.accounted,
             "accounted_rate": self.accounted_rate.to_json(),
@@ -492,16 +499,16 @@ def fan_in_check(sweep: FanInSweep) -> FanInCheck:
     """The STRIDE half of a :func:`~evals.harness.fan_in_accounting.replay_artifact` sweep."""
     stride = [row for row in sweep.rows if row.framework == "stride"]
     compatible = [row for row in stride if not row.incompatible]
+    incompatible = [row for row in stride if row.incompatible]
     return FanInCheck(
         compatible_blocks=len(compatible),
-        incompatible=tuple(
-            (row.case, row.incompatible) for row in stride if row.incompatible
-        ),
-        inspected=sum(len(row.proposals) for row in compatible),
+        incompatible=tuple((row.case, row.incompatible) for row in incompatible),
+        unread_blocks=sum(1 for row in incompatible if not row.proposals),
+        inspected=sum(len(row.proposals) for row in stride),
         accounted=sum(row.accounted for row in compatible),
         unexplained=sum(len(row.unexplained) for row in compatible),
         extra=sum(len(row.extra) for row in compatible),
-        unavailable=sum(len(row.proposals) for row in stride if row.incompatible),
+        unavailable=sum(len(row.proposals) for row in incompatible),
         unreadable=len(sweep.unreadable),
         capture_faults=len(sweep.capture_faults),
     )
@@ -638,11 +645,12 @@ def render(card: Scorecard) -> None:
     fan = card.fan_in
     print(
         f"fan-in run again: {fan.compatible_blocks} block(s) compatible,"
-        f" {len(fan.incompatible)} incompatible; proposals {fan.inspected}"
+        f" {len(fan.incompatible)} incompatible ({fan.unread_blocks} with no"
+        f" proposal read); proposals {fan.inspected}"
         f" inspected, {fan.accounted} accounted ({_rate(fan.accounted_rate)}),"
         f" {fan.unexplained} unexplained, {fan.extra} extra output ID(s),"
         f" {fan.unavailable} unavailable; {fan.unreadable} report(s) unreadable,"
-        f" {fan.capture_faults} case(s) with a capture fault"
+        f" {fan.capture_faults} capture fault(s)"
     )
     for case, reason in fan.incompatible:
         print(f"  fan-in incompatible: {case}: {reason}")

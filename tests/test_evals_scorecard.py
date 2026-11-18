@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.claims import FrameworkName
-from evals.harness import roster, run, scorecard
+from evals.harness import fan_in_accounting, roster, run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
 from evals.harness.assembly import AssemblySweep, replay_artifact
 from evals.harness.bundle import runs_from_reports, stride_block
@@ -44,7 +44,7 @@ BASELINE = (
 )
 CASE = "02-iot-fleet-telemetry"
 NO_ASSEMBLY = scorecard.AssemblyCheck(0, (), (), 0, 0)
-NO_FAN_IN = scorecard.FanInCheck(0, (), 0, 0, 0, 0, 0, 0, 0)
+NO_FAN_IN = scorecard.FanInCheck(0, (), 0, 0, 0, 0, 0, 0, 0, 0)
 NO_CRITIC = CriticAudit.of(())
 
 
@@ -324,6 +324,7 @@ def test_the_fan_in_check_keeps_incompatible_blocks_apart():
         rows=[
             _account("a"),
             _account("b", incompatible="the replayed drafts differ"),
+            _account("d", proposals=(), incompatible="the archive holds no proposals"),
             _account("c", framework="asvs"),
         ],
         unreadable=["u"],
@@ -334,11 +335,63 @@ def test_the_fan_in_check_keeps_incompatible_blocks_apart():
     check = scorecard.fan_in_check(sweep)
 
     assert check.compatible_blocks == 1
-    assert check.incompatible == (("b", "the replayed drafts differ"),)
-    assert (check.inspected, check.accounted, check.unexplained) == (3, 2, 1)
+    assert check.incompatible == (
+        ("b", "the replayed drafts differ"),
+        ("d", "the archive holds no proposals"),
+    )
+    assert check.unread_blocks == 1
+    assert (check.inspected, check.accounted, check.unexplained) == (6, 2, 1)
     assert (check.extra, check.unavailable) == (1, 3)
     assert (check.unreadable, check.capture_faults) == (1, 2)
     assert check.accounted_rate == Rate(2, 3)
+
+
+def test_the_fan_in_check_agrees_with_the_fan_in_command(capsys):
+    """The check's totals are the ones ``run.py fan-in`` prints for the sweep."""
+    loaded = load_artifact(BASELINE)
+    cases = [
+        case
+        for case in development_cases(load_corpus(REPO_ROOT / "evals/corpus"))
+        if case.id in loaded.cases
+    ]
+    sweep = fan_in_accounting.replay_artifact(loaded, cases)
+    assert {row.framework for row in sweep.rows} == {"stride"}
+
+    check = scorecard.fan_in_check(sweep)
+    main(["fan-in", str(BASELINE)])
+    printed = capsys.readouterr().out
+
+    assert (
+        f"proposals: {check.inspected} inspected, {check.accounted} accounted,"
+        f" {check.unexplained} unexplained, {check.unavailable} unavailable;"
+        f" {check.extra} extra"
+    ) in printed
+
+
+def test_each_compatible_proposal_takes_one_fate():
+    loaded = load_artifact(BASELINE)
+    cases = [
+        case
+        for case in development_cases(load_corpus(REPO_ROOT / "evals/corpus"))
+        if case.id in loaded.cases
+    ]
+    rows = [
+        row
+        for row in fan_in_accounting.replay_artifact(loaded, cases).rows
+        if not row.incompatible
+    ]
+
+    assert rows
+    for row in rows:
+        fated = (
+            len(row.kept)
+            + len(row.dropped)
+            + len(row.unknown)
+            + len(row.deferred)
+            - len(row.extra)
+            + len(row.unexplained)
+        )
+        assert fated == len(row.proposals)
 
 
 def test_an_empty_fan_in_check_reads_no_rate():
@@ -479,8 +532,9 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     assert replayed == len(scored["scores"])
     fan = card["fan_in"]
     assert fan["compatible_blocks"] + len(fan["incompatible"]) == len(scored["scores"])
-    assert fan["inspected"] == fan["accounted"] + fan["unexplained"]
-    assert fan["accounted_rate"]["denominator"] == fan["inspected"]
+    assert fan["inspected"] == (
+        fan["accounted"] + fan["unexplained"] + fan["unavailable"]
+    )
     # The critic panel pools the same yields that ``score`` writes: every
     # draft sits in one population cell.
     totals = scored["critic_yield_aggregate"]
