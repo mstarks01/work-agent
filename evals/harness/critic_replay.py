@@ -29,7 +29,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from google.genai import types
 
@@ -40,6 +40,7 @@ from analysis_service.claims import (
     FrameworkAnalysis,
     FrameworkName,
     Ruling,
+    VerdictStatus,
 )
 from analysis_service.critic import complete_rulings, review_issues
 from analysis_service.critic_round import CriticRound, critic_request, rulings_of
@@ -66,6 +67,7 @@ from evals.harness.artifact import (
     repo_commit,
 )
 from evals.harness.bundle import check_out, finished_file, read_report
+from evals.harness.critic_yield import OMITTED, CriticFate, fate_by_claim
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call, spent_line
@@ -215,34 +217,41 @@ def parse(raw: str, framework: FrameworkName) -> list[Ruling]:
     return rulings_of(payload["claims"], schemas_for(framework))
 
 
+#: A draft no ruling covers: the replayed critic left it unruled, or the case
+#: failed before it wrote a block to read the archived verdict from.
+UNRULED: Literal["unruled"] = "unruled"
+
+
 @dataclass(frozen=True)
 class Agreement:
     """One draft's verdict, as the archived critic ruled and as the replay did."""
 
     draft_id: str
-    archived: str
-    replayed: str
+    archived: CriticFate | Literal["unruled"]
+    replayed: VerdictStatus | Literal["unruled"]
 
 
 def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     """Each draft's verdict status, archived against replayed.
 
     The replayed rulings are completed first, as the graph completes them, so
-    the status read is the one that would have reached the report.
+    the status read is the one that would have reached the report. The
+    archived side is :func:`~evals.harness.critic_yield.fate_by_claim`, so a
+    claim assembly returned to the deferred set (ADR 0126) reads ``returned``,
+    and a draft the block does not carry reads :data:`OMITTED`. A case that
+    failed before it wrote a block has no archived verdict, so each of its
+    drafts reads :data:`UNRULED`.
     """
-    before = {}
+    missing: CriticFate | Literal["unruled"] = UNRULED
+    before: dict[str, CriticFate] = {}
     if archived.block is not None:
-        before = {
-            claim.id: claim.verdict.status for claim in archived.block.all_claims()
-        }
+        before, missing = fate_by_claim(archived.block), OMITTED
     after = {
         ruling.id: ruling.verdict.status
         for ruling in complete_rulings(archived.drafts, rulings)
     }
     return [
-        Agreement(
-            draft.id, before.get(draft.id, "unruled"), after.get(draft.id, "unruled")
-        )
+        Agreement(draft.id, before.get(draft.id, missing), after.get(draft.id, UNRULED))
         for draft in archived.drafts
     ]
 

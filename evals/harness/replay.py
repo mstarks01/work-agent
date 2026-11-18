@@ -109,6 +109,8 @@ from analysis_service.assertions import (
     snap_subject,
 )
 from analysis_service.evidence import prepared_view
+from analysis_service.execution import seed_state
+from analysis_service.graph import STATE_SOURCE_TEXTS
 from analysis_service.grounding import normalize
 from analysis_service.parsing import table_entry
 from analysis_service.sources import text_digest
@@ -749,7 +751,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
     """The case's signed reference, or ``None`` where no signed file grades it."""
     if unsigned_rows(corpus_dir, case) != 0:
         return None
-    sources = {source.label: source.text for source in case.sources}
+    sources = seed_state(case.sources)[STATE_SOURCE_TEXTS]
     facts = load_facts(corpus_dir / case.id)
     return SignedReference(
         catalog=reference_catalog(facts, case.model, sources),
@@ -1124,7 +1126,7 @@ def bind_assertions(
     differently from the reviewed reading, which is #295's question rather
     than this layer's.
     """
-    sources = {source.label: source.text for source in case.sources}
+    sources = seed_state(case.sources)[STATE_SOURCE_TEXTS]
     proposed = CatalogProposal.model_validate(proposal.proposal)
     blessed, refused_blessed = AssertionRecord.resolved(proposed, case.model, sources)
     if extraction.extracted is None:

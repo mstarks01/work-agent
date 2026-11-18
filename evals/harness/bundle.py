@@ -47,7 +47,11 @@ from analysis_service.errors import refusal_text
 from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
-from analysis_service.graph import STATE_DIAGRAM_READINGS, diagram_readings
+from analysis_service.graph import (
+    STATE_DIAGRAM_READINGS,
+    STATE_SOURCE_TEXTS,
+    diagram_readings,
+)
 from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
@@ -547,7 +551,7 @@ def runs_from_reports(
 
 def _source_texts(case: GoldenCase) -> dict[str, str]:
     """Label to text, which is what both resolvers read."""
-    return {source.label: source.text for source in case.sources}
+    return seed_state(case.sources)[STATE_SOURCE_TEXTS]
 
 
 def _case_files(

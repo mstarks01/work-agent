@@ -47,6 +47,8 @@ from analysis_service.assertions import (
 )
 from analysis_service.assertions import without as retracted
 from analysis_service.evidence import lead_topics, prepared_view
+from analysis_service.execution import seed_state
+from analysis_service.graph import STATE_SOURCE_TEXTS
 from analysis_service.system_model import (
     SystemModel,
     flow_id_version,
@@ -556,7 +558,7 @@ def _changed_source(reference: SignedReference, case: GoldenCase) -> Corruption:
     moves afterwards is visible rather than silently re-read. The catalog is
     untouched: the corruption is entirely in what the submitter wrote.
     """
-    sources = {source.label: source.text for source in case.sources}
+    sources = seed_state(case.sources)[STATE_SOURCE_TEXTS]
     label = next(iter(sources))
     return Corruption(
         tuple(reference.entries),
@@ -739,7 +741,7 @@ def run_probe(name: ProbeName, case: GoldenCase, reference: SignedReference) -> 
     catalog = AssertionCatalog(subjects=subjects, entries=list(corrupted.entries))
     model = case.model if corrupted.model is None else corrupted.model
     sources = (
-        {source.label: source.text for source in case.sources}
+        seed_state(case.sources)[STATE_SOURCE_TEXTS]
         if corrupted.sources is None
         else dict(corrupted.sources)
     )
@@ -1010,7 +1012,7 @@ def reading(
         ),
         model=case.model if corrupted.model is None else corrupted.model,
         sources=(
-            {source.label: source.text for source in case.sources}
+            seed_state(case.sources)[STATE_SOURCE_TEXTS]
             if corrupted.sources is None
             else dict(corrupted.sources)
         ),
@@ -1026,7 +1028,7 @@ def consume_probe(
     _, perfect = consumer_view(
         AssertionCatalog(subjects=reference.subjects, entries=list(reference.entries)),
         case.model,
-        {source.label: source.text for source in case.sources},
+        seed_state(case.sources)[STATE_SOURCE_TEXTS],
     )
     _, without = consumer_view(built.without, built.model, built.sources)
     kept, leads = consumer_view(built.catalog, built.model, built.sources)

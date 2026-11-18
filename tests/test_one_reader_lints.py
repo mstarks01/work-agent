@@ -2251,6 +2251,23 @@ def _spells_the_silent_causes(node: ast.AST) -> bool:
     } == {"place", "unled"}
 
 
+def _maps_label_to_text(node: ast.AST) -> bool:
+    """Whether ``node`` builds a mapping of each source's label to its text."""
+    return (
+        isinstance(node, ast.DictComp)
+        and _is_attribute(node.key, "label")
+        and _is_attribute(node.value, "text")
+    )
+
+
+def test_a_job_s_source_texts_are_mapped_once():
+    """Only ``seed_state`` maps a job's sources to their texts; the service and
+    the harness read its ``STATE_SOURCE_TEXTS``."""
+    assert _sites(_maps_label_to_text) == [
+        ("src/analysis_service/execution.py", "seed_state")
+    ]
+
+
 def test_the_silent_causes_are_spelled_once():
     """Only ``losses.SILENT`` spells the causes that name nothing at the place;
     every other site reads that constant."""
