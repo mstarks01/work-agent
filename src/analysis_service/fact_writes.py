@@ -485,33 +485,30 @@ def fact_rows(
             origin="answer",
             support=[span],
         )
+
     # An attribute answer settles every unscoped row at its attribute, so an
     # assertion answer there writes nothing, and an issue names its place.
-    places_at_answered_attributes = sorted(
-        {
-            place_identity(row)
-            for row in (*replaced.values(), *placed.values())
-            if not row.scope and reached(row) in attributes
-        }
-    )
+    def at_answered_attribute(row: Assertion) -> bool:
+        return not row.scope and reached(row) in attributes
+
     issues.extend(
         CatalogIssue(
             code="unmatched-answer",
             message=f"an attribute answer settles the attribute of {place!r}, so"
             " the answer placed nothing",
         )
-        for place in places_at_answered_attributes
+        for place in sorted(
+            {
+                place_identity(row)
+                for row in (*replaced.values(), *placed.values())
+                if at_answered_attribute(row)
+            }
+        )
     )
     replaced = {
-        key: row
-        for key, row in replaced.items()
-        if place_identity(row) not in places_at_answered_attributes
+        key: row for key, row in replaced.items() if not at_answered_attribute(row)
     }
-    placed = {
-        key: row
-        for key, row in placed.items()
-        if place_identity(row) not in places_at_answered_attributes
-    }
+    placed = {key: row for key, row in placed.items() if not at_answered_attribute(row)}
     answer_ids = {assertion_id(row) for row in (*replaced.values(), *placed.values())}
     answer_rows = (*replaced.values(), *placed.values())
     asked, parts = _part_rows(
