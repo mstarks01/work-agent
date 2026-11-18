@@ -472,10 +472,10 @@ the reviewer named it (`critic`).
 - `key` names the fact. Send it back unchanged with your answer.
 - `kind` is `attribute` (a value the model left unknown, a trust zone the
   service inferred, or a value that the catalog's facts contradict or leave
-  open), `assertion` (a fact that the sources left open or disagree about and
-  such as one about a principal, a credential, a fact for one scope, such as
-  one environment, or a fact the sources left unknown; the key names the
-  fact's place, so it stays the same after you answer),
+  open), `assertion` (a fact that the sources left open or disagree about,
+  such as one about a principal or a credential, or a fact for one scope, such
+  as one environment; the key names the fact's place, so it stays the same
+  after you answer),
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), `subject` (a
   question the reviewer wrote in its own words because no listed question

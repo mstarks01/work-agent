@@ -474,8 +474,8 @@ def fact_rows(
             )
             continue
         # A side of a disagreement holds a source's value, so the answer is a
-        # new row at the place, and each side it overrules goes below with
-        # an issue that names it.
+        # new row at the place, and each side at the place goes below with an
+        # issue that names it.
         placed[assertion] = Assertion(
             subject=row.subject,
             predicate=row.predicate,

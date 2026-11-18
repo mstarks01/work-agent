@@ -365,7 +365,8 @@ def open_attribute(
     the service inferred, or an attribute the assertion rows hold open
     against ``model`` (:func:`~analysis_service.assertions.held_open_attributes`),
     whose value the evidence catalog does not offer as a fact. The early
-    list, the report list and the answer check all ask it.
+    list, the report list, the answer check, a Control's fact and
+    :func:`source_states` all ask it.
     """
     element = model.get(element_id)
     value = getattr(element, attribute, None)
