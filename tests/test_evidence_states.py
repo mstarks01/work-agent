@@ -703,8 +703,9 @@ def test_a_mechanism_written_none_is_a_stated_value():
 class TestAnAbsenceUnderAHiddenQualification:
     """A field that reads absent under a qualifying projection the gate
     refused is no stated absence: the applied projection would show it as an
-    unknown, and the open rows carry the question (the maintainer's ruling of
-    2026-11-18 on #2270)."""
+    unknown (the maintainer's ruling of 2026-11-18 on #2270). Open rows under
+    it carry the question; with none, the catalog offers no question about it,
+    and a settled row under it stays a fact."""
 
     STORE = TestARowTheGraphContradicts.STORE
     ABSENCE = TestARowTheGraphContradicts.STORED
@@ -761,6 +762,18 @@ class TestAnAbsenceUnderAHiddenQualification:
         assert self.ABSENT_REF not in offered
         assert offered[assertion_id(backups)].kind == "assertion"
 
+    def test_an_answer_of_none_beside_a_hedged_row_keeps_the_absence(self):
+        """The neighbour: the answer alone makes the value, so the projection
+        writes the absence and qualifies nothing."""
+        hedged = self.ABSENCE.model_copy(
+            update={"value": UNKNOWN, "reason": "hedged", "explanation": "e"}
+        )
+        answer = _as_answer(self.ABSENCE, "Orders database: not encrypted.")
+        catalog = assertions(hedged, answer, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+
     def test_a_claim_on_the_dropped_absence_is_told_why(self):
         catalog = assertions(self.ABSENCE, self.ENCRYPTED, subjects=(self.STORE,))
         ground = Ground(
@@ -769,4 +782,4 @@ class TestAnAbsenceUnderAHiddenQualification:
         claim = sample_draft("S-01", grounds=[ground])
 
         (issue,) = ground_issues([claim], _with_encryption("none"), catalog)
-        assert "contradict or leave open" in issue
+        assert "whose qualification the field hides" in issue

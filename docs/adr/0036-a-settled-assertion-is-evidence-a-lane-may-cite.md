@@ -93,7 +93,7 @@ an answer settles the fact even against the sources (the decision of
 state, so two compatible rows, which project `unknown` and leave the
 attribute standing (ADR 0034), are open questions beside an extracted
 `none`. The catalog does not offer a contradicted attribute as an
-`absent-attribute` (`assertions.contradicted_attributes`): the rows carry
+`absent-attribute` (`assertions.held_open_attributes`): the rows carry
 the question. An unknown or disputed row that reaches a graph field is
 offered as an open question where its projection qualifies the field and
 the field states a value (`assertions.hidden_qualifications`), because the
