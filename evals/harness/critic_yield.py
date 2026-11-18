@@ -412,7 +412,7 @@ class CriticYield:
 
     @property
     def matched_killed(self) -> int:
-        """The gross number that can veto the pattern: matched drafts that left.
+        """The gross veto number: reference-matched drafts that left the report.
 
         A draft that had matched a reference and left the report, with a
         verdict or not: the critic destroying real findings.
@@ -426,7 +426,7 @@ class CriticYield:
         This is the net destruction. A killed draft's reference can be matched
         again by another draft after the critic, so the gross count overstates
         the loss: such a kill reads as a destroyed finding while the report
-        still carries it. ``matched_killed`` stays the gross count.
+        still carries it. ``matched_killed`` is the gross count.
         """
         return sum(self._lost(draft) for draft in self.killed)
 
