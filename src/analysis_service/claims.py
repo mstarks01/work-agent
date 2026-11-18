@@ -1817,16 +1817,14 @@ class RepairedQuote(BaseModel):
     "this was repaired" on the ground itself would ride into the provider
     schemas as one the agent could set.
 
-    ``moved`` names what the substitution changed in the claim's own terms —
-    a negation, a number — as :func:`~analysis_service.grounding.meaning_moved`
-    computes it from ``written`` and the ground's text. The fan-in refuses a
-    span that moves either, so a repair it makes carries an empty list, and an
-    archived report can carry a non-empty one. Stored rather than left for a
-    reader to derive, because the critic reads it (empty on a new repair) and
-    the viewer shows it on an archived report, and
-    checked on load against those two texts so it cannot drift from them.
-    ``similarity`` says how near the span was; it never says whether the span
-    supports the claim.
+    ``moved`` names what the substitution changed in the claim's own terms — a negation,
+    a number — as :func:`~analysis_service.grounding.meaning_moved` computes it from
+    ``written`` and the ground's text. The fan-in refuses a span that moves either, so a
+    repair it makes carries an empty list, and an archived report can carry a non-empty
+    one. Stored rather than left for a reader to derive, because the critic reads it
+    (empty where the fan-in wrote it) and the viewer shows it on an archived report, and
+    checked on load against those two texts so it cannot drift from them. ``similarity``
+    says how near the span was; it never says whether the span supports the claim.
 
     ``scan_complete`` is whether the rung ranked every window before it
     answered. ``None`` is *not recorded*: the 18 repairs archived under

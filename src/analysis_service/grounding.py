@@ -603,7 +603,8 @@ def meaning_moved(written: str, span: str) -> tuple[MovedKind, ...]:
     A repair inside :data:`REPAIR_THRESHOLD` can still flip what a quote
     asserts: "does not encrypt" and "does encrypt" are three characters apart
     on a forty-character quote. :func:`faithful_repair` reads this to refuse
-    such a span, and the load check of a stored repair mark reads it too. This
+    such a span, the fan-in writes the ``moved`` mark from it, and the load
+    check of a stored repair mark reads it again. This
     is the minimum mechanical safeguard and not an entailment check: it
     compares the negation tokens and the number tokens of the two texts as
     multisets, folded through :func:`normalize`, and names each class that
