@@ -917,10 +917,9 @@ class ExcerptRepair(BaseModel):
     """An element excerpt the extraction gate replaced with the source's own span.
 
     The ladder refused what the model wrote, and
-    :func:`~analysis_service.grounding.repair_prepared` found a window of the
-    cited source near enough to hand back, with no negation or number changed
-    (:func:`~analysis_service.grounding.meaning_moved`). The element now carries
-    that window, and this record carries what the model wrote, so the
+    :func:`~analysis_service.grounding.faithful_repair` found a window of the cited
+    source near enough to hand back, with no negation or number changed. The element now
+    carries that window, and this record carries what the model wrote, so the
     substitution is on the record rather than silent (ADR 0100).
 
     Written by :func:`~analysis_service.validation.repair_excerpts` alone and

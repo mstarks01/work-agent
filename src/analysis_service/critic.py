@@ -1025,8 +1025,9 @@ def _ruling_view(
         # Computed, never drafted: which quote grounds the service rewrote to
         # the source's own span, what the agent wrote, and what the rewrite
         # moved. The critic reads the span as the ground's text already; this
-        # is what tells it the span is not the agent's evidence, and that a
-        # negation or a number changed between the two.
+        # is what tells it the span is not the agent's evidence. ``moved`` is
+        # empty on a repair the fan-in makes, which refuses a span that
+        # changes a negation or a number.
         if draft.id in repairs_by_claim:
             view["repaired_quotes"] = repairs_by_claim[draft.id]
         # Computed, never drafted: which quote grounds the service looked for

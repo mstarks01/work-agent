@@ -732,10 +732,43 @@ class TestQuoteVerification:
         assert joined.marks.unverified_grounds == []
         assert joined.marks.dropped_claims == []
 
-    def test_a_repair_that_flips_a_negation_is_marked_as_such(self, model):
-        """The span is substituted, as ADR 0018 decided, and the mark says
-        the substitution put a negation back — the safeguard #675 D15 asked
-        for, so a reader never takes a 0.95 similarity for support."""
+    def test_a_repair_that_flips_a_negation_is_refused(self, model):
+        """A window that changes a negation states the opposite fact, so the
+        quote stays unverified and the claim keeps its other ground. A guard,
+        not proof of meaning: it compares negation and number tokens only."""
+        sources = {
+            LABEL: "Customers log in to the web app, which does not store orders."
+        }
+        drafts = self.quoting(
+            "Customers log in to the web app, which does store orders.",
+            extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
+        )
+
+        joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
+
+        (draft,) = joined.drafts
+        assert draft.grounds[0].text == (
+            "Customers log in to the web app, which does store orders."
+        )
+        assert joined.marks.repaired_quotes == []
+        assert [(m.claim_id, m.index) for m in joined.marks.unverified_grounds] == [
+            ("S-01", 0)
+        ]
+
+    def test_a_repair_that_changes_a_number_is_refused(self, model):
+        sources = {LABEL: "Customers log in to the web app, which keeps 30 days."}
+        drafts = self.quoting(
+            "Customers log in to the web app, which keeps 90 days.",
+            extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
+        )
+
+        joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
+
+        assert joined.marks.repaired_quotes == []
+        assert [m.index for m in joined.marks.unverified_grounds] == [0]
+
+    def test_a_claim_whose_only_quote_flips_a_negation_is_dropped(self, model):
+        """No ground verifies, so the claim drops, as any groundless claim does."""
         sources = {
             LABEL: "Customers log in to the web app, which does not store orders."
         }
@@ -745,10 +778,18 @@ class TestQuoteVerification:
 
         joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
 
-        (draft,) = joined.drafts
-        assert draft.grounds[0].text == sources[LABEL]
+        assert joined.drafts == []
+        assert [mark.claim_id for mark in joined.marks.dropped_claims] == ["S-01"]
+
+    def test_a_repair_that_moves_no_negation_or_number_still_passes(self, model):
+        """The neighbour of the guard: case, spacing and a comma keep the repair."""
+        drafts = self.quoting("customers  log in to the WEB app which stores orders")
+
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
+
         (mark,) = joined.marks.repaired_quotes
-        assert mark.moved == ["negation"]
+        assert mark.moved == []
+        assert joined.marks.unverified_grounds == []
 
     def test_the_critic_is_shown_what_a_repair_moved(self, model):
         drafts = self.quoting("Customers log in to the web app which stores orders")
@@ -1151,7 +1192,7 @@ class TestAGroundIsAboutTheClaimsElements:
 class TestASpentBodyDeadlineFoldsNoSource:
     """The bound the fan-in actually runs under.
 
-    The fan-in prepares each source itself and calls ``repair_prepared``, so
+    The fan-in prepares each source itself and calls ``faithful_repair``, so
     the guard that holds the bound is the one at the call site, and this is what
     holds it there.
     """

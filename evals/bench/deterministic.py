@@ -218,7 +218,7 @@ def case_repair() -> None:
 def case_spent_deadline() -> None:
     """A body past its deadline, through the path the fan-in actually runs.
 
-    The fan-in prepares each source itself and calls ``repair_prepared``.
+    The fan-in prepares each source itself and calls ``faithful_repair``.
     Recorded in PR #628: 0.227 s on main, 0.228 s after the first commit — which
     is what said the guard was on the wrong entry point — and 0.069 s after the
     second. What is left is the exact-verification fold, which #627 puts out of

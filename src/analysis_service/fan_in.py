@@ -80,11 +80,11 @@ from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
+    faithful_repair,
     meaning_moved,
     normalize,
     prepare_source,
     repair_deadline,
-    repair_prepared,
     verify_normalized,
 )
 from analysis_service.references import canonical, snap
@@ -742,10 +742,11 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
 
     Three outcomes, at two different scopes, and the split is the whole policy.
     **Per entry**, a quote the ladder refused is offered to
-    :func:`~analysis_service.grounding.repair_prepared` first: where the source holds
-    a span near enough, the ground is rewritten to that span — the submitter's
-    words, never the model's — and a :class:`~analysis_service.claims.RepairedQuote`
-    keeps what the agent wrote. Otherwise the quote is *marked* and still renders: 0
+    :func:`~analysis_service.grounding.faithful_repair` first: where the source holds
+    a span near enough that moves no negation and no number, the ground is
+    rewritten to that span — the submitter's words, never the model's — and a
+    :class:`~analysis_service.claims.RepairedQuote` keeps what the agent wrote.
+    Otherwise the quote is *marked* and still renders: 0
     failures in 206 measured excerpts is not evidence of zero, and the Rule of
     Three puts the 95% bound at 1.46% per quote — which at the corpus mean of
     18.7 claims per job is a 24% chance that some job dies on a single
@@ -819,7 +820,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
                     unverified.append(index)
                     continue
                 prepared[label] = prepare_source(sources[label])
-            repair = repair_prepared(ground.text, prepared[label], deadline)
+            repair = faithful_repair(ground.text, prepared[label], deadline)
             if repair is None:
                 unverified.append(index)
                 continue

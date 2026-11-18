@@ -2300,6 +2300,12 @@ def test_the_silent_causes_are_spelled_once():
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "whether a refused quote may take the source's span": _OneReader(
+        lambda node: _calls(node, "repair_prepared"),
+        ("src/analysis_service/grounding.py", "faithful_repair"),
+        {},
+        "",
+    ),
     "a share over an empty denominator": _OneReader(
         _divides_under_a_guard,
         ("evals/harness/rates.py", "ratio"),
