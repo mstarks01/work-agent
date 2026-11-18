@@ -65,7 +65,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks import lane_of
-from evals.harness.rates import ratio, rounded_share, shown_figure
+from evals.harness.rates import ratio, rounded_figure, shown_figure
 
 # Why the fan-in killed a case. A claim that loses every ground loses its own
 # entry and not the case: it is dropped and marked, and
@@ -235,11 +235,11 @@ class CaseGrounds:
                 **self.kind_counts,
             },
             "metrics": {
-                "grounds_per_threat": rounded_share(self.grounds_per_threat, 3),
-                "quoteless_rate": rounded_share(self.quoteless_rate, 3),
-                "unverified_rate": rounded_share(self.unverified_rate, 3),
-                "repaired_rate": rounded_share(self.repaired_rate, 3),
-                "dropped_rate": rounded_share(self.dropped_rate, 3),
+                "grounds_per_threat": rounded_figure(self.grounds_per_threat, 3),
+                "quoteless_rate": rounded_figure(self.quoteless_rate, 3),
+                "unverified_rate": rounded_figure(self.unverified_rate, 3),
+                "repaired_rate": rounded_figure(self.repaired_rate, 3),
+                "dropped_rate": rounded_figure(self.dropped_rate, 3),
             },
             "threats": [entry.to_json() for entry in self.threats],
             "dropped": [mark.model_dump(mode="json") for mark in self.dropped],
@@ -415,11 +415,11 @@ def aggregate_grounds(
         "repaired_quotes": repaired,
         "dropped_claims": dropped,
         **{kind: kinds.get(kind, 0) for kind in _KINDS},
-        "grounds_per_threat": rounded_share(ratio(grounds, threats), 3),
-        "quoteless_rate": rounded_share(ratio(quoteless, threats), 3),
-        "unverified_rate": rounded_share(ratio(unverified, quotes), 3),
-        "repaired_rate": rounded_share(ratio(repaired, quotes), 3),
-        "dropped_rate": rounded_share(ratio(dropped, threats + dropped), 3),
+        "grounds_per_threat": rounded_figure(ratio(grounds, threats), 3),
+        "quoteless_rate": rounded_figure(ratio(quoteless, threats), 3),
+        "unverified_rate": rounded_figure(ratio(unverified, quotes), 3),
+        "repaired_rate": rounded_figure(ratio(repaired, quotes), 3),
+        "dropped_rate": rounded_figure(ratio(dropped, threats + dropped), 3),
         "failed_cases": len(failures),
     }
 

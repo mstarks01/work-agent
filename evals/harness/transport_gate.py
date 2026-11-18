@@ -138,10 +138,23 @@ def _primary(full: Arm, compact: Arm) -> tuple[bool, str]:
     return sigmas >= PRIMARY_SIGMAS, f"{saved:+.1f}%, {-sigmas:.2f} sd"
 
 
+def _valued_cases(arm: Arm, figure: str) -> frozenset[str]:
+    """The cases on which some sweep of ``arm`` holds a value for ``figure``."""
+    return frozenset(
+        case
+        for case, runs in arm.per_case(figure).items()
+        if any(run is not None for run in runs)
+    )
+
+
 def _margin(figure: str, margin: float) -> Callable[[Arm, Arm], tuple[bool, str]]:
     """One non-inferiority margin, one-sided: better by any amount gains nothing."""
 
     def verdict(full: Arm, compact: Arm) -> tuple[bool, str]:
+        # A case one arm has a value for and the other has not would move one
+        # mean and not the other, so the two means would not compare.
+        if _valued_cases(full, figure) != _valued_cases(compact, figure):
+            return False, f"{UNAVAILABLE}: the arms hold a value on different cases"
         compact_mean, full_mean = (
             mean(compact.figure(figure)),
             mean(full.figure(figure)),
@@ -165,11 +178,11 @@ def _veto(full: Arm, compact: Arm) -> tuple[bool, str]:
     """
     fallen: list[str] = []
     for figure in QUALITY_MARGINS:
+        full_runs = full.per_case(figure)
         floors = {
             case: None if None in runs else min(run for run in runs if run is not None)
-            for case, runs in full.per_case(figure).items()
+            for case, runs in full_runs.items()
         }
-        full_runs = full.per_case(figure)
         for case, runs in compact.per_case(figure).items():
             if all(run is None for run in (*runs, *full_runs[case])):
                 # Neither arm has this figure for the case: they are alike.

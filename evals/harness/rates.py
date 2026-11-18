@@ -36,8 +36,8 @@ def ratio(numerator: float, denominator: float) -> float | None:
     return numerator / denominator if denominator else None
 
 
-def rounded_share(value: float | None, places: int) -> float | None:
-    """A share rounded to ``places`` for an artifact, or ``None`` where it has none."""
+def rounded_figure(value: float | None, places: int) -> float | None:
+    """A figure rounded to ``places`` for an artifact, or ``None`` where it has none."""
     return None if value is None else round(value, places)
 
 
@@ -58,7 +58,7 @@ class Rate:
 
     def rounded(self) -> float | None:
         """:attr:`value` to three places, as an artifact records it."""
-        return rounded_share(self.value, 3)
+        return rounded_figure(self.value, 3)
 
     def to_json(self) -> dict[str, Any]:
         return {

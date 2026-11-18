@@ -162,3 +162,15 @@ def test_a_figure_only_one_arm_has_is_a_veto():
         artifact["mode_output"][0]["precision"] = None
     passed, reading = gate._veto(full, compact)
     assert not passed and "precision unavailable" in reading
+
+
+def test_a_margin_over_arms_valued_on_different_cases_fails():
+    """One arm's gap would drop a case from its mean alone, so the means differ."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in compact.artifacts:
+        artifact["mode_output"][0]["precision"] = None
+    passed, reading = gate._margin("precision", gate.QUALITY_MARGINS["precision"])(
+        full, compact
+    )
+    assert not passed and "different cases" in reading

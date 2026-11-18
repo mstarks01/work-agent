@@ -56,7 +56,7 @@ from evals.harness.rates import (
     percent,
     ratio,
     rounded_difference,
-    rounded_share,
+    rounded_figure,
     shown_figure,
 )
 from evals.harness.reference import (
@@ -214,9 +214,9 @@ class ApplicabilityScore:
             "rejected": list(self.rejected),
             "off_catalog": list(self.off_catalog),
             "excluded": self.excluded,
-            "recall": rounded_share(self.recall, 4),
-            "must_find_recall": rounded_share(self.must_find_recall, 4),
-            "precision": None if self.precision is None else round(self.precision, 4),
+            "recall": rounded_figure(self.recall, 4),
+            "must_find_recall": rounded_figure(self.must_find_recall, 4),
+            "precision": rounded_figure(self.precision, 4),
         }
 
 
@@ -647,8 +647,8 @@ class DispositionScore:
             "carried": list(self.carried),
             "judged": len(self.judged),
             "correct": len(self.correct),
-            "accuracy": rounded_share(self.accuracy, 4),
-            "coverage": rounded_share(self.coverage, 4),
+            "accuracy": rounded_figure(self.accuracy, 4),
+            "coverage": rounded_figure(self.coverage, 4),
             "unreached": list(self.unreached),
             "unjudged": self.unjudged,
             "needs_other_evidence": len(self.needs_other_evidence),
@@ -756,8 +756,8 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
         )["accuracy"],
         # Correct over every judged record, reached or not: the unconditional
         # figure a headline should carry, beside the conditional one above.
-        "correct_of_expected": rounded_share(ratio(correct, judged + unreached), 4),
-        "coverage": rounded_share(ratio(judged, judged + unreached), 4),
+        "correct_of_expected": rounded_figure(ratio(correct, judged + unreached), 4),
+        "coverage": rounded_figure(ratio(judged, judged + unreached), 4),
         "unreached": unreached,
         "unjudged": sum(score.unjudged for score in scores),
         "needs_other_evidence": reachable,
@@ -766,17 +766,17 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
             judged=judged, correct=correct, reachable=reachable, false_prose=false_prose
         )["false_prose_request_rate"],
         "false_confirmed": false_confirmed,
-        "false_confirmed_rate": rounded_share(ratio(false_confirmed, reachable), 4),
+        "false_confirmed_rate": rounded_figure(ratio(false_confirmed, reachable), 4),
         "wrong_kind": wrong_kind,
         # Counted from the records that were actually right, never from the
         # three named failures subtracted off the denominator. A record the run
         # ruled out entirely is none of those three and is still wrong, so
         # subtracting would report it as correctly routed.
-        "evidence_kind_accuracy": rounded_share(ratio(routed_right, reachable), 4),
+        "evidence_kind_accuracy": rounded_figure(ratio(routed_right, reachable), 4),
         "applicable_judged": applicable,
         "false_not_applicable": false_not_applicable,
         "false_not_applicable_rate": (
-            rounded_share(ratio(false_not_applicable, applicable), 4)
+            rounded_figure(ratio(false_not_applicable, applicable), 4)
         ),
     }
 
@@ -863,8 +863,8 @@ def routing_rates(
     both read.
     """
     return {
-        "accuracy": rounded_share(ratio(correct, judged), 4),
-        "false_prose_request_rate": rounded_share(ratio(false_prose, reachable), 4),
+        "accuracy": rounded_figure(ratio(correct, judged), 4),
+        "false_prose_request_rate": rounded_figure(ratio(false_prose, reachable), 4),
     }
 
 
@@ -902,14 +902,14 @@ def pooled_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "matched": matched,
         "missed": sum(len(row["missed"]) for row in rows),
         "matched_by_deferral": sum(len(row["matched_by_deferral"]) for row in rows),
-        "recall": rounded_share(ratio(matched, expected), 4),
+        "recall": rounded_figure(ratio(matched, expected), 4),
         "must_find": must_find,
         "must_find_recall": (
-            rounded_share(ratio(must_find - must_find_missed, must_find), 4)
+            rounded_figure(ratio(must_find - must_find_missed, must_find), 4)
         ),
         "negatives": sum(len(row["negatives"]) for row in rows),
         "negatives_applied": sum(len(row["negatives_applied"]) for row in rows),
-        "precision": rounded_share(ratio(read_matched, applied), 4),
+        "precision": rounded_figure(ratio(read_matched, applied), 4),
         "precision_cases": len(read),
         "off_catalog": sum(len(row["off_catalog"]) for row in rows),
     }
@@ -934,10 +934,10 @@ def holdout_split(
     if not held:
         return None
     return {
-        "development_recall": rounded_share(
+        "development_recall": rounded_figure(
             mean(score.recall for score in scores if score not in held), 3
         ),
-        "holdout_recall": rounded_share(mean(score.recall for score in held), 3),
+        "holdout_recall": rounded_figure(mean(score.recall for score in held), 3),
     }
 
 
@@ -956,8 +956,8 @@ def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float | No
     near_recall = mean(score.recall for score in near)
     far_recall = mean(score.recall for score in far)
     return {
-        "near_recall": rounded_share(near_recall, 3),
-        "far_recall": rounded_share(far_recall, 3),
+        "near_recall": rounded_figure(near_recall, 3),
+        "far_recall": rounded_figure(far_recall, 3),
         "delta": rounded_difference(near_recall, far_recall),
     }
 

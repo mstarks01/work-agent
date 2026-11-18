@@ -57,7 +57,7 @@ from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import STYLE_REASONS, Ledger
-from evals.harness.rates import ratio, rounded_share, shown_figure
+from evals.harness.rates import ratio, rounded_figure, shown_figure
 from evals.harness.reference import GoldenCase
 
 if TYPE_CHECKING:
@@ -92,7 +92,7 @@ class CaseWriting:
             "answered": self.answered,
             "objections": self.objections,
             "carried": self.carried,
-            "objection_rate": rounded_share(self.objection_rate, 3),
+            "objection_rate": rounded_figure(self.objection_rate, 3),
             "by_reason": dict(sorted(self.by_reason.items())),
         }
 
@@ -235,7 +235,7 @@ def aggregate(rows: Sequence[CaseWriting]) -> dict[str, Any]:
         "answered": answered,
         "objections": objections,
         "carried": sum(row.carried for row in rows),
-        "objection_rate": rounded_share(ratio(objections, answered), 3),
+        "objection_rate": rounded_figure(ratio(objections, answered), 3),
         "by_framework": dict(sorted(by_framework.items())),
         "by_reason": dict(sorted(reasons.items())),
     }

@@ -56,7 +56,7 @@ from typing import Any
 
 from analysis_service.report import Report
 from analysis_service.system_model import attribute_names
-from evals.harness.rates import ratio, rounded_share, shown_figure
+from evals.harness.rates import ratio, rounded_figure, shown_figure
 
 __all__ = ["FillerRow", "artifact", "render", "rows"]
 
@@ -170,9 +170,9 @@ def artifact(measured: Sequence[FillerRow]) -> dict[str, Any]:
                 "claims": row.claims,
                 "pointers": row.pointers,
                 "ineligible_pointers": row.ineligible,
-                "ineligible_share": rounded_share(row.ineligible_share, 4),
+                "ineligible_share": rounded_figure(row.ineligible_share, 4),
                 "modal_grounds": row.modal_grounds,
-                "modal_grounds_share": rounded_share(row.modal_share, 4),
+                "modal_grounds_share": rounded_figure(row.modal_share, 4),
             }
             for row in measured
         }

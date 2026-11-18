@@ -60,7 +60,7 @@ def test_pooling_sums_the_counts_rather_than_averaging_the_rates(two_cases):
     assert lane.cited_rate("candidates", "candidates_cited") == 0.5
 
 
-def test_a_lane_offered_nothing_rates_zero_rather_than_dividing_by_it():
+def test_a_lane_offered_nothing_rates_unavailable_rather_than_zero():
     # Cited moves with offered: a lane handed no candidates cannot have cited
     # one, and LaneCoverage refuses the pair that says otherwise.
     lane = lane_for(

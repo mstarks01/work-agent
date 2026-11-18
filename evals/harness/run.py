@@ -2259,6 +2259,7 @@ def _print_stability(
         f" mean jaccard {shown_figure(totals['mean_jaccard'], '.2f')},"
         f" worst case recall spread"
         f" {shown_figure(totals['worst_case_recall_spread'], '.2f')}"
+        f" ({totals['cases_without_recall_spread']} case(s) with no spread)"
         " (instrument, non-gating)"
     )
     print(

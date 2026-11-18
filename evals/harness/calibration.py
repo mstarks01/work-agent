@@ -99,7 +99,7 @@ from evals.harness.identity import (
     endpoint_subset,
     flow_directions,
 )
-from evals.harness.rates import ratio, rounded_share
+from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import GoldenCase
 from evals.harness.verbs import UNSEPARATED, same_action
 
@@ -287,7 +287,7 @@ class CalibrationResult:
         return {
             "total": self.total,
             "agreements": self.agreements,
-            "agreement": rounded_share(self.agreement, 4),
+            "agreement": rounded_figure(self.agreement, 4),
             "bar": AGREEMENT_BAR,
             "meets_bar": self.meets_bar,
             "refused": self.refused,

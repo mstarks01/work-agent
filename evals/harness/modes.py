@@ -144,7 +144,7 @@ from evals.harness.alignment import (
     singular,
 )
 from evals.harness.identity import comparable_elements
-from evals.harness.rates import mean, ratio, rounded_share, shown_figure
+from evals.harness.rates import mean, ratio, rounded_figure, shown_figure
 from evals.harness.reference import GoldenCase
 
 EVAL_APP_NAME = "analysis-evals"
@@ -1138,49 +1138,53 @@ class ExtractionScore:
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case_id,
-            "recall": rounded_share(self.recall, 3),
-            "precision": rounded_share(self.precision, 3),
-            "endpoint_recall": rounded_share(self.endpoint_recall, 3),
+            "recall": rounded_figure(self.recall, 3),
+            "precision": rounded_figure(self.precision, 3),
+            "endpoint_recall": rounded_figure(self.endpoint_recall, 3),
             # The same fold with multiplicity, so a second interaction between
             # one pair of endpoints is not free to drop (#925).
-            "interaction_recall": rounded_share(self.interaction_recall, 3),
-            "zone_recall": rounded_share(self.zone_recall, 3),
-            "sourced_zone_recall": rounded_share(self.sourced_zone_recall, 3),
+            "interaction_recall": rounded_figure(self.interaction_recall, 3),
+            "zone_recall": rounded_figure(self.zone_recall, 3),
+            "sourced_zone_recall": rounded_figure(self.sourced_zone_recall, 3),
             # The zone figure a naming difference cannot reach: do the same
             # elements sit together, whatever the zones are called (#925).
-            "zone_partition_agreement": rounded_share(self.zone_partition_agreement, 3),
+            "zone_partition_agreement": rounded_figure(
+                self.zone_partition_agreement, 3
+            ),
             # The partition figure's three readings: the co-memberships alone,
             # the separations alone, and how much of the reference either was
             # asked over (#961).
-            "same_zone_recall": rounded_share(self.same_zone_recall, 3),
-            "different_zone_agreement": rounded_share(self.different_zone_agreement, 3),
-            "zone_pair_coverage": rounded_share(self.zone_pair_coverage, 3),
+            "same_zone_recall": rounded_figure(self.same_zone_recall, 3),
+            "different_zone_agreement": rounded_figure(
+                self.different_zone_agreement, 3
+            ),
+            "zone_pair_coverage": rounded_figure(self.zone_pair_coverage, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "name_tokens_absent_from_source": list(self.name_tokens_absent_from_source),
-            "sourced_recall": rounded_share(self.sourced_recall, 3),
+            "sourced_recall": rounded_figure(self.sourced_recall, 3),
             "aliased": [credit.to_json() for credit in self.aliased],
             # The alignment's own reading, beside the strict and folded ones:
             # one produced element per blessed one, on recorded evidence, and
             # what it left unpaired (#961).
             "alignment": self.alignment.to_json(),
-            "aligned_recall": rounded_share(self.aligned_recall, 3),
-            "aligned_precision": rounded_share(self.aligned_precision, 3),
-            "aligned_interaction_recall": rounded_share(
+            "aligned_recall": rounded_figure(self.aligned_recall, 3),
+            "aligned_precision": rounded_figure(self.aligned_precision, 3),
+            "aligned_interaction_recall": rounded_figure(
                 self.aligned_interaction_recall, 3
             ),
-            "aligned_interaction_precision": rounded_share(
+            "aligned_interaction_precision": rounded_figure(
                 self.aligned_interaction_precision, 3
             ),
-            "actor_recall": rounded_share(self.actor_recall, 3),
+            "actor_recall": rounded_figure(self.actor_recall, 3),
             "same_type_unmatched_candidates": list(self.same_type_unmatched_candidates),
             "extra_status": dict(self.extra_status),
-            "initiator_recall": rounded_share(self.initiator_recall, 3),
+            "initiator_recall": rounded_figure(self.initiator_recall, 3),
             "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
-            "crossings_recall": rounded_share(self.crossings_recall, 3),
+            "crossings_recall": rounded_figure(self.crossings_recall, 3),
             # Beside recall, which never charges an invented crossing.
-            "crossings_precision": rounded_share(self.crossings_precision, 3),
+            "crossings_precision": rounded_figure(self.crossings_precision, 3),
             "crossings_derivable": self.crossings_derivable,
             # Beside recall and precision rather than inside either. A flow
             # here is one the extraction found and placed one endpoint of
@@ -1196,14 +1200,14 @@ class ExtractionScore:
             # Named for what it compares. Half these fields reach the check as
             # a state rather than as the fact they hold, so this is agreement
             # over scored fields and never an extraction accuracy (#891).
-            "scored_field_agreement": rounded_share(self.scored_field_agreement, 3),
+            "scored_field_agreement": rounded_figure(self.scored_field_agreement, 3),
             "state_agrees_unbased": self.state_agrees_unbased,
-            "control_state_agreement": rounded_share(self.control_state_agreement, 3),
+            "control_state_agreement": rounded_figure(self.control_state_agreement, 3),
             "attributes_compared": self.attributes_compared,
             # The denominator beside the count, so a figure taken over half the
             # reference cannot read like one taken over all of it (#925).
             "attributes_comparable": self.attributes_comparable,
-            "comparison_coverage": rounded_share(self.comparison_coverage, 3),
+            "comparison_coverage": rounded_figure(self.comparison_coverage, 3),
             # The disagreements alone. An agreeing check is a number, and the
             # count above carries it; writing all of them out would bury the
             # few lines a reader opens this file for.
@@ -1248,7 +1252,7 @@ def attribute_agreement(checks: Sequence[AttributeCheck]) -> dict[str, Any]:
     return {
         "compared": len(checks),
         "agreed": sum(agreed.values()),
-        "agreement": rounded_share(ratio(sum(agreed.values()), len(checks)), 3),
+        "agreement": rounded_figure(ratio(sum(agreed.values()), len(checks)), 3),
         "by_attribute": {
             key: {
                 "compared": compared[key],
@@ -1641,7 +1645,7 @@ class AssertionScore:
             "unknowns": self.unknowns,
             "inferred": self.inferred,
             "conflicts": self.conflicts,
-            "subjects_reached": rounded_share(self.subjects_reached, 3),
+            "subjects_reached": rounded_figure(self.subjects_reached, 3),
             "reachable": self.reachable,
             "reached": self.reached,
             "reachable_absent": self.reachable_absent,

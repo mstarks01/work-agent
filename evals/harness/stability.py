@@ -62,7 +62,7 @@ from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
-from evals.harness.rates import mean, ratio, rounded_share
+from evals.harness.rates import mean, ratio, rounded_figure
 from evals.harness.reference import MUST_FIND
 
 #: One case of one framework. Stability is per framework because the two
@@ -192,13 +192,13 @@ class CaseStability:
             "case": self.case_id,
             "runs": self.runs,
             "references": self.references,
-            "recalls": [rounded_share(recall, 3) for recall in self.recalls],
-            "recall_spread": rounded_share(self.recall_spread, 3),
+            "recalls": [rounded_figure(recall, 3) for recall in self.recalls],
+            "recall_spread": rounded_figure(self.recall_spread, 3),
             "always_matched": self.always,
             "sometimes_matched": self.sometimes,
             "never_matched": self.never,
-            "volatile_rate": rounded_share(self.volatile_rate, 3),
-            "mean_jaccard": rounded_share(self.mean_jaccard, 3),
+            "volatile_rate": rounded_figure(self.volatile_rate, 3),
+            "mean_jaccard": rounded_figure(self.mean_jaccard, 3),
             "cause_stable": self.cause_stable,
             "cause_moving": self.cause_moving,
             "cause_unread": self.cause_unread,
@@ -816,12 +816,12 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
         "always_matched": always,
         "sometimes_matched": sometimes,
         "never_matched": sum(entry.never for entry in stability),
-        "always_rate": rounded_share(ratio(always, references), 3),
-        "volatile_rate": rounded_share(ratio(sometimes, references), 3),
-        "mean_jaccard": rounded_share(
+        "always_rate": rounded_figure(ratio(always, references), 3),
+        "volatile_rate": rounded_figure(ratio(sometimes, references), 3),
+        "mean_jaccard": rounded_figure(
             mean(entry.mean_jaccard for entry in stability), 3
         ),
-        "worst_case_recall_spread": rounded_share(
+        "worst_case_recall_spread": rounded_figure(
             max(
                 (
                     entry.recall_spread
@@ -831,6 +831,9 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
                 default=None,
             ),
             3,
+        ),
+        "cases_without_recall_spread": sum(
+            entry.recall_spread is None for entry in stability
         ),
     }
 

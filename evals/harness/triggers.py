@@ -60,7 +60,7 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.provenance import REPO_ROOT
-from evals.harness.rates import ratio, rounded_share
+from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
 
 __all__ = [
@@ -268,10 +268,10 @@ def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int | N
         # `overlap`, never `recall`. The numerator counts claims whose lane
         # fired a rule on an element they name, which is not the same fact as
         # the claim being recognised -- see this module's opening.
-        "overlap": rounded_share(ratio(triggered, total), 4),
+        "overlap": rounded_figure(ratio(triggered, total), 4),
         "must_find_references": must_total,
         "must_find_triggered": must_triggered,
-        "must_find_overlap": rounded_share(ratio(must_triggered, must_total), 4),
+        "must_find_overlap": rounded_figure(ratio(must_triggered, must_total), 4),
     }
 
 

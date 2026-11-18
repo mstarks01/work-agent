@@ -72,7 +72,7 @@ from evals.harness.rates import (
     mean,
     ratio,
     rounded_difference,
-    rounded_share,
+    rounded_figure,
     shown_figure,
 )
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
@@ -150,7 +150,7 @@ class MatchedPair:
             "threat_id": self.threat_id,
             "tier": self.tier,
             "element_overlap": self.element_overlap,
-            "element_jaccard": rounded_share(self.element_jaccard, 3),
+            "element_jaccard": rounded_figure(self.element_jaccard, 3),
             "reference_level": self.reference_level,
             "produced_level": self.produced_level,
             "likelihood_agrees": self.likelihood_agrees,
@@ -427,17 +427,17 @@ class CaseScore:
                 **self.status_counts,
             },
             "metrics": {
-                "must_find_coverage": rounded_share(self.must_find_coverage, 3),
-                "expected_coverage": rounded_share(self.expected_coverage, 3),
-                "reference_coverage": rounded_share(self.reference_coverage, 3),
-                "lane_accuracy": rounded_share(self.lane_accuracy, 3),
-                "element_agreement": rounded_share(self.element_agreement, 3),
-                "element_jaccard": rounded_share(self.element_jaccard, 3),
-                "rejected_rate": rounded_share(self.rejected_rate, 3),
-                "rejected_rate_of_reviewed": rounded_share(
+                "must_find_coverage": rounded_figure(self.must_find_coverage, 3),
+                "expected_coverage": rounded_figure(self.expected_coverage, 3),
+                "reference_coverage": rounded_figure(self.reference_coverage, 3),
+                "lane_accuracy": rounded_figure(self.lane_accuracy, 3),
+                "element_agreement": rounded_figure(self.element_agreement, 3),
+                "element_jaccard": rounded_figure(self.element_jaccard, 3),
+                "rejected_rate": rounded_figure(self.rejected_rate, 3),
+                "rejected_rate_of_reviewed": rounded_figure(
                     self.rejected_rate_of_reviewed, 3
                 ),
-                "severity_exact_rate": rounded_share(self.severity_exact_rate, 3),
+                "severity_exact_rate": rounded_figure(self.severity_exact_rate, 3),
             },
             "severity_confusion": self.severity_confusion,
             "matched": [pair.to_json() for pair in self.matched],
@@ -917,8 +917,8 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float | None]:
     near_coverage = mean(score.reference_coverage for score in near)
     far_coverage = mean(score.reference_coverage for score in far)
     return {
-        "near_coverage": rounded_share(near_coverage, 3),
-        "far_coverage": rounded_share(far_coverage, 3),
+        "near_coverage": rounded_figure(near_coverage, 3),
+        "far_coverage": rounded_figure(far_coverage, 3),
         "delta": rounded_difference(near_coverage, far_coverage),
     }
 
@@ -941,16 +941,16 @@ def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float | None] | None
         return None
     development = [score for score in scores if score not in held]
     return {
-        "development_coverage": rounded_share(
+        "development_coverage": rounded_figure(
             mean(score.reference_coverage for score in development), 3
         ),
-        "holdout_coverage": rounded_share(
+        "holdout_coverage": rounded_figure(
             mean(score.reference_coverage for score in held), 3
         ),
-        "development_must_find_coverage": rounded_share(
+        "development_must_find_coverage": rounded_figure(
             mean(score.must_find_coverage for score in development), 3
         ),
-        "holdout_must_find_coverage": rounded_share(
+        "holdout_must_find_coverage": rounded_figure(
             mean(score.must_find_coverage for score in held), 3
         ),
     }
@@ -1035,9 +1035,10 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
     **Conditional on success, never end-to-end.** A case whose graph refused
     its model, or whose fan-in rejected every draft, produces no score and so
     contributes to neither half of this mean. A sweep that lost three cases
-    reads the same as one that lost none. The artifact's ``completion`` block
-    carries the ``attempted`` and ``scored`` counts this divides by, and they
-    are the numbers to quote beside any mean taken from here.
+    reads the same as one that lost none. A scored case whose figure has no
+    value adds nothing either (:func:`~evals.harness.rates.mean`). The
+    artifact's ``completion`` block carries the ``attempted`` and ``scored``
+    counts, which are the numbers to quote beside any mean taken from here.
     """
     rows = blocks.get("scores") or []
     values = [

@@ -251,7 +251,7 @@ def assertion_panel(sweep: SweepReplay) -> Panel:
         means={
             "mean of each emission's required-fact recall": (
                 mean(replay.recall for replay in sweep.assertions),
-                len(sweep.assertions),
+                sum(replay.recall is not None for replay in sweep.assertions),
             )
         },
         unread=pool["produced"]["unreviewed"],

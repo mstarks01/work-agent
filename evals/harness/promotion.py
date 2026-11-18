@@ -70,7 +70,7 @@ from evals.harness import falsify
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, finished_file
 from evals.harness.modes import AssertionResult, EvalRunError
-from evals.harness.rates import ratio, shown_figure
+from evals.harness.rates import UNAVAILABLE, ratio, shown_figure
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import (
     replay_assertions,
@@ -360,8 +360,8 @@ def _required_fact_recall(
     and re-seal every Baseline for a figure the report can answer. Graded by
     the signed reference's own matcher through
     :func:`~evals.harness.replay.replay_assertions`, whose ``recall`` is the
-    one reader of the endpoint. ``None`` for a job that ran no assertion pass
-    or a case nobody signed.
+    one reader of the endpoint. ``None`` for a job that ran no assertion pass,
+    a case nobody signed, or a case with no required row.
     """
     record = _record(report)
     case = _case_of(report)
@@ -741,7 +741,8 @@ def read_gate(
             None,
             baseline,
             None,
-            unreadable or "the artifact carries no such figure, which is not a zero",
+            unreadable
+            or "the artifact carries no value for this figure, which is not a zero",
         )
     if gate.unit == "count":
         value: float | None = measured
@@ -900,8 +901,10 @@ def command_gates(args: argparse.Namespace) -> int:
             "\nRequired-fact recall of this report's own catalog, end to end,"
             f" reported and not gated: {measured:.3f}"
         )
-    elif unreadable:
-        print(f"\n{unreadable}")
+    else:
+        print(
+            f"\n{unreadable or 'Required-fact recall of this report: ' + UNAVAILABLE}"
+        )
     shares = support_shares(report)
     if shares is not None:
         print(
