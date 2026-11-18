@@ -545,8 +545,11 @@ def test_a_kill_nothing_made_good_is_lost(case):
 
 
 def test_the_critic_stated_cause_rides_on_the_kill(case):
-    """Read off the block's own verdict; a rejection that names no step is
-    ``unstated``, and a kill with no verdict is counted under its fate."""
+    """The cause is read off the block's own verdict.
+
+    A rejection that names no step is ``unstated``, and a kill with no verdict
+    is counted under its fate.
+    """
     reference = _must_find(case)
     killed = _draft_for(case, reference, 1)
     rejected = promote(
@@ -780,7 +783,7 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
     assert {draft.fate for draft in result.killed} == {"omitted"}
     assert result.kill_count == 2
     assert result.populations.no_verdict == 2
-    # The gross kill counts keep each draft that left the report, as the loss
+    # The kill counts keep each draft that left the report, as the loss
     # instrument charges each one to the critic.
     assert (result.matched_killed, result.matched_lost) == (1, 1)
     assert CriticAudit.of([result]).reference_loss == Rate(1, 1)
@@ -799,8 +802,7 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
 
 
 def test_a_returned_draft_is_a_kill_counted_under_its_fate(case):
-    """A claim assembly returned to the deferred set left the report with no
-    archived verdict."""
+    """A returned claim left the report with no archived verdict."""
     kept = _draft_for(case, _expected(case), 1)
     returned = _draft_for(case, _must_find(case), 2)
     block = _ruled_block(case, [promote(kept)], []).model_copy(

@@ -33,7 +33,7 @@ It is credential-free, like the rest of the scorer. It takes plain data, a
 Nothing here gates. This is an instrument. Any threshold over these numbers
 comes from observed spread across the baseline sweeps rather than from a guess
 here, and the number that could veto the generator-critic pattern outright is
-``matched_killed``, a gross count of the reference-matched drafts that left the
+``matched_killed``, which counts every reference-matched draft that left the
 report, with a verdict or not.
 """
 
@@ -397,7 +397,7 @@ class CriticYield:
 
     @property
     def rejected_killed(self) -> int:
-        """A gross count of the down-voted drafts that left the report.
+        """The count of every down-voted draft that left the report.
 
         It holds drafts with a verdict or not (:attr:`KilledDraft.fate` tells
         which) that a person had already rejected for substance.
@@ -451,8 +451,10 @@ class CriticYield:
 
     @property
     def killed_by_cause(self) -> dict[KillCause, dict[str, int]]:
-        """Every kill by the step its verdict names, or by its fate where it has
-        no verdict, and what each removed.
+        """Every kill by its step or fate, and what each removed.
+
+        A kill is keyed by the step its verdict names, or by its fate where it
+        has no verdict.
 
         The critic states why it rejected a draft, and nothing counted it: the
         second Baseline's four must-find kills were three ``reasoning`` and one
@@ -480,7 +482,7 @@ class CriticYield:
     def rates(self) -> dict[YieldRate, Rate]:
         """Each rate with its counts, keyed by the rate's name.
 
-        Each numerator counts drafts the critic rejected, not the gross kills.
+        Each numerator counts drafts the critic rejected, not every kill.
         ``kill_rate`` is the share of drafts the critic rejected, the Semgrep
         ~20% comparator. ``rejected_kill_rate`` is the share of the drafts a
         person rejected that the critic rejected too, and ``matched_kill_rate``
@@ -554,14 +556,17 @@ def score_case_with_yield(
     return ScoredCase(score=post, critic_yield=_yield(pre, post, drafts, block))
 
 
+#: The cause of a kill whose verdict names no step.
+Unstated = Literal["unstated"]
+
 #: The cause a kill reads where its verdict names no step. **The one spelling
 #: of a missing ``rejected_because``**: the critic yield and the loss
 #: attribution both read it, so neither invents a step the critic never wrote.
-UNSTATED: Literal["unstated"] = "unstated"
+UNSTATED: Unstated = "unstated"
 
 #: What :attr:`CriticYield.killed_by_cause` counts a kill under: the step its
 #: verdict names, :data:`UNSTATED`, or the fate of a kill with no verdict.
-KillCause = RejectionStep | Literal["unstated"] | NoVerdictFate
+KillCause = RejectionStep | Unstated | NoVerdictFate
 
 
 def rejection_steps(block: FrameworkAnalysis) -> dict[str, RejectionStep]:
@@ -732,7 +737,7 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "matched_lost": matched_lost,
         "must_find_lost": must_find_lost,
         **{name: rate.rounded() for name, rate in rates.items()},
-        # Each rate's counts: the gross counts above include the drafts with
+        # Each rate's counts: the kill counts above include the drafts with
         # no verdict, so they do not divide to a rate.
         "rates": {name: rate.to_json() for name, rate in rates.items()},
         "no_verdict": populations.no_verdict,
@@ -759,7 +764,7 @@ def render(yields: Sequence[CriticYield]) -> None:
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
             f"  killed-rejected {rates['rejected_kill_rate'].shown()}"
             f"  killed-real {rates['matched_kill_rate'].shown()}"
-            f"  (gross kills: must-find {entry.must_find_killed}, lost for good"
+            f"  (all kills: must-find {entry.must_find_killed}, lost for good"
             f" {entry.matched_lost})"
         )
         if apart:
@@ -774,7 +779,7 @@ def render(yields: Sequence[CriticYield]) -> None:
             f"critic yield: killed {pooled['kill_rate'].shown()},"
             f" rejected caught {pooled['rejected_kill_rate'].shown()},"
             f" real destroyed {pooled['matched_kill_rate'].shown()};"
-            f" gross kills lost for good {totals['matched_lost']}"
+            f" all kills lost for good {totals['matched_lost']}"
             f" (must-find {totals['must_find_lost']})"
             " (instrument, non-gating)"
         )
