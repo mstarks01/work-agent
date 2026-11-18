@@ -2262,15 +2262,10 @@ def _maps_label_to_text(node: ast.AST) -> bool:
 
 def test_a_job_s_source_texts_are_mapped_once():
     """Only ``seed_state`` maps a job's sources to their texts; the service and
-    the harness read its ``STATE_SOURCE_TEXTS``. Tests and frozen experiment
-    scripts build their own expectations."""
-    found = [
-        site
-        for site in _sites(_maps_label_to_text)
-        if not site[0].startswith(("tests/", "evals/experiments/"))
+    the harness read its ``STATE_SOURCE_TEXTS``."""
+    assert _sites(_maps_label_to_text) == [
+        ("src/analysis_service/execution.py", "seed_state")
     ]
-
-    assert found == [("src/analysis_service/execution.py", "seed_state")]
 
 
 def test_the_silent_causes_are_spelled_once():
