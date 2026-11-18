@@ -677,13 +677,14 @@ class Ground(BaseModel):
     * ``unknown-assertion`` — ``assertion`` alone, for an open row: its value
       is :data:`~analysis_service.system_model.UNKNOWN`,
       another row disputes it (:func:`~analysis_service.assertions.disputed`),
-      or the graph attribute states its opposite
+      or the graph attribute states the opposite of the value the rows project
       (:func:`~analysis_service.assertions.contradicted`). **The assertion layer's
       ``unknown-attribute``**, and it exists for the same reason that kind
       does. An element attribute nobody stated is offered as a fact an agent
       may raise a *conditional* claim on. This kind offers the same for a
       predicate with no graph field, such as a second factor the sources left
-      open, and for a row whose graph field states its opposite.
+      open, and for a row behind a value its graph field states the opposite
+      of.
       It is a separate kind rather than a flag on ``assertion`` because the two
       readings differ: a settled row is a fact in hand, and an unknown row is a
       question. The fields are identical and the fact is not, which is the

@@ -3233,10 +3233,9 @@ def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]
 
     An answer settles the fact even against the sources (:func:`answered`), and
     one that may state its value alone makes the projected value
-    (:func:`_drives_value`). So a
-    contradiction whose rows hold an answer holds none of its rows open: the
-    other rows grouped beside the answer did not make the value the graph
-    contradicts.
+    (:func:`_drives_value`). So a contradiction whose rows hold an answer that
+    makes the value holds none of its rows open: the other rows grouped beside
+    that answer did not make the value the graph contradicts.
     """
     answers = {assertion_id(entry) for entry in catalog.entries if _drives_value(entry)}
     return {
@@ -3631,8 +3630,8 @@ def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, .
     row says would otherwise reach no reader — a fact about a principal, a
     mechanism on a Process, a scoped control, one of two compatible values, or
     a row whose projection :func:`apply_projection` discarded. A
-    :func:`contradicted` row is not offered: the graph states its opposite, so
-    it is an open question against this model.
+    :func:`contradicted` row is not offered: the graph states the opposite of
+    the value the rows project, so it is an open question against this model.
 
     Asked of the model rather than of whether a projection ran, so a report
     re-checked on load and the job that wrote it agree without either
