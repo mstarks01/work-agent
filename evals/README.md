@@ -675,9 +675,10 @@ the next sitting, and only the rate over it is a score.
   beside the **eligible** and **reviewed** counts the artifact carries, and
   `rejected_rate_of_reviewed` beside those — which is still not precision,
   because a sitting reaches whatever it reaches rather than a drawn sample.
-- **critic yield** — always read as a **pair**: how many junk threats the critic
-  removed (good) *against* how many real threats it removed (bad). A kill count
-  on its own tells you nothing about which of those two is happening.
+- **critic yield** — always read as a **pair**: how many down-voted drafts the
+  critic rejected (good) *against* how many reference-matched drafts it rejected
+  (bad). A kill count on its own tells you nothing about which of those two is
+  happening. The drafts with no archived verdict are counted on their own line.
 - **near/far exemplar delta** — see below.
 - **holdout split** — coverage on the **Holdout Case**s beside coverage on the
   development ones (`holdout_split`, and `applicability_holdout_split` for ASVS).
