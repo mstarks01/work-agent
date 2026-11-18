@@ -58,31 +58,31 @@ from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_c
 #: The scored outcomes that matched a reference.
 MatchedOutcome = Literal["matched-must-find", "matched-expected"]
 
-# What one produced threat turned out to be, in the pass that scored it. The
-# first two are hits against the reference set, and the rest are the ways of
-# missing it.
+# What one produced threat turned out to be, in the pass that scored it.
+# ``MatchedOutcome`` gives the two hits against the reference set, and the rest
+# are the ways of missing it.
 #
 # **Composed from ``VoteStatus`` rather than restating it.** The ways an unmatched
 # finding can stand are the scorer's vocabulary, and a second copy here would
-# disagree with it the first time one was added. So the four names below are
-# the ones this module owns, and every standing arrives with the scorer's own
-# type.
+# disagree with it the first time one was added. So ``MatchedOutcome`` and the
+# two misses below are the names this module owns, and every standing arrives
+# with the scorer's own type.
 ScoredOutcome = MatchedOutcome | Literal["lane-error", "unscored"] | VoteStatus
 
-#: The fates that hold no verdict status in the block.
+#: The fates that hold no verdict status in the block. ``returned`` is a claim
+#: the critic kept and assembly sent back to the deferred set, so it is not in
+#: the report. ``omitted`` is a draft the block carries in none of its three
+#: lists.
 NoVerdictFate = Literal["returned", "omitted"]
 #: What the critic's pass did with one draft, read off the block it returned.
 #: ``needs-info`` is a qualification: it is neither a confirmation nor a
-#: rejection. ``omitted`` is a draft the block carries in none of its three
-#: lists.
+#: rejection.
 CriticFate = VerdictStatus | NoVerdictFate
 OMITTED: Literal["omitted"] = "omitted"
 FATES: tuple[CriticFate, ...] = tuple(
     value for part in get_args(CriticFate) for value in get_args(part)
 )
-#: The fates that are a critic's verdict on the block. A ``returned`` claim
-#: was ruled and sent back to the deferred set, so it is not in the report,
-#: and the block does not record its status.
+#: The fates that are a critic's verdict on the block.
 VERDICT_STATUSES: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
 #: The fates that hold no verdict, in the order a count of them names them.
 NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = tuple(sorted(get_args(NoVerdictFate)))
@@ -461,10 +461,10 @@ class CriticYield:
 
         The critic states why it rejected a draft, and nothing counted it: the
         second Baseline's four must-find kills were three ``reasoning`` and one
-        ``lane``, read by hand. Per key (a step or a fate), the kills, the ones that had matched a
-        reference, and the ones that had answered a must-find, so a prompt
-        change that moves the critic's reasoning kills is visible as that and
-        not as a bare count. A rejection that names no step is keyed
+        ``lane``, read by hand. Per key (a step or a fate), the kills, the ones
+        that had matched a reference, and the ones that had answered a
+        must-find, so a prompt change that moves the critic's reasoning kills is
+        visible as that and not as a bare count. A rejection that names no step is keyed
         ``unstated``, and a kill with no verdict is keyed by its fate.
         """
         by_cause: dict[KillCause, dict[str, int]] = {}
