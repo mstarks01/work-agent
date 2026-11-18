@@ -1,6 +1,6 @@
 """Summarize the scorecard and panel outputs of QA-2026-11-17-11, one group each.
 
-Usage: ``python3 summarize.py <out-dir>``. The directory holds the
+Usage: ``python3 scorecard_summary.py <out-dir>``. The directory holds the
 ``card-<group>-<artifact>.json`` and ``panels-<group>-<artifact>.json`` files
 that ``run.py scorecard --out`` and ``run.py panels --out`` write. A group is
 ``sweep`` (one case artifact for each case of one sweep) or a Baseline's
