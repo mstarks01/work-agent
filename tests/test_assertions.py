@@ -2042,7 +2042,11 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
         assert f"'{ABSENT_WORD}'" in issues[0].message
 
     def test_the_row_stays_settled_because_it_is_not_a_refused_row(self):
-        """A contradiction makes a fact visible; it never drops one."""
+        """A contradiction makes a fact visible; it never drops one.
+
+        The row stays in the catalog and in :func:`settled`; the evidence
+        catalog offers it as an open question (``tests/test_evidence_states.py``).
+        """
         held = catalog([stated(value=ABSENT)])
         assert len(settled(held)) == 1
         assert all(

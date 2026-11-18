@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service import evidence
 from analysis_service.assertions import (
     ABSENT,
     Assertion,
@@ -94,6 +95,24 @@ class TestEveryRowIsRoutedByTheJobsReaders:
 
         assert routes[assertion_id(silent)] == "open"
         assert routes[assertion_id(mfa())] == "set-aside"
+
+    def test_a_row_the_graph_contradicts_is_set_aside(self, monkeypatch) -> None:
+        """A projected model the validity gate refuses is discarded whole, and
+        :func:`~analysis_service.assertions.apply_projection` then returns the
+        model unchanged with nothing applied. The graph keeps its stated
+        mechanism beside the stated absence, so the absence is a question, like
+        a row another row disputes."""
+        monkeypatch.setattr(
+            evidence, "apply_projection", lambda model, catalog: (model, ())
+        )
+        absence = stated(value=ABSENT)
+
+        assert self.routes(record(absence))[assertion_id(absence)] == "set-aside"
+
+    def test_an_absence_the_graph_takes_is_projected(self) -> None:
+        absence = stated(value=ABSENT)
+
+        assert self.routes(record(absence))[assertion_id(absence)] == "projected"
 
     def test_a_refused_row_is_recorded_with_its_codes(self) -> None:
         issues = [

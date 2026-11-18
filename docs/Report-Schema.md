@@ -1281,6 +1281,8 @@ version before it. Read it when you load an archived report.
     record from another version is left alone. `assertions.issues` can say
     `graph-contradiction`: the one code that refuses no row. It reports that a
     graph attribute and the rows authoritative for it state opposite things.
+    The fact is open: the evidence catalog offers each such row as an
+    `unknown-assertion`, so a claim on it reads `needs-info`.
 
   **There is no version gate and none is needed.** `Report` forbids unknown
   fields, so this model refuses a 2.10 payload that carries `threats` at the

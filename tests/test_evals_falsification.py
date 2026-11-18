@@ -261,3 +261,49 @@ def test_the_reading_without_the_corrupted_rows_keeps_no_subject_behind(name):
     built = falsify.reading(name, case, reference, reviewed=False)
 
     assert built.without == without(built.without, ())
+
+
+class TestWhatAJobReadsAsAFact:
+    """A row the graph contradicts reaches a lane as a question, not a fact."""
+
+    def view(self, *entries):
+        from analysis_service.assertions import AssertionCatalog, Subject
+        from tests.test_assertions import (
+            FLOW,
+            SOURCES,
+            TestAGraphAttributeAndItsRowsStatingOpposites,
+        )
+
+        catalog = AssertionCatalog(
+            subjects=[
+                Subject(id=FLOW, type="interaction", label="place order"),
+            ],
+            entries=list(entries),
+        )
+        model = TestAGraphAttributeAndItsRowsStatingOpposites().model()
+        facts, _ = falsify.consumer_view(catalog, model, SOURCES)
+        return facts
+
+    def test_a_contradicted_absence_is_not_a_fact(self, monkeypatch) -> None:
+        """A projected model the validity gate refuses is discarded whole, and
+        :func:`~analysis_service.assertions.apply_projection` then returns the
+        model unchanged with nothing applied. The graph keeps its stated
+        mechanism beside the stated absence."""
+        from analysis_service import evidence
+        from analysis_service.assertions import ABSENT
+        from tests.test_assertions import stated
+
+        monkeypatch.setattr(
+            evidence, "apply_projection", lambda model, catalog: (model, ())
+        )
+        absence = stated(value=ABSENT)
+
+        assert self.view(absence) == frozenset()
+
+    def test_an_absence_the_graph_takes_is_a_fact(self) -> None:
+        from analysis_service.assertions import ABSENT, assertion_id
+        from tests.test_assertions import stated
+
+        absence = stated(value=ABSENT)
+
+        assert self.view(absence) == {assertion_id(absence)}

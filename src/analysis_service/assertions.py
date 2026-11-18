@@ -166,6 +166,7 @@ __all__ = [
     "catalog_coverage",
     "catalog_issues",
     "conflicts",
+    "contradicted",
     "contradiction_issues",
     "contradictions",
     "disputed",
@@ -187,6 +188,7 @@ __all__ = [
     "states_missing",
     "subject_id",
     "support_span",
+    "uncontradicted",
 ]
 
 #: The registry's version. It keys every assertion identity, so a bump re-keys
@@ -1243,9 +1245,10 @@ CatalogIssueCode = Literal[
     # A predicate whose value identifies rather than describes, carrying a
     # value this service inferred. See `Predicate.stated_only`.
     "inference-refused",
-    # Not a refused row. The row stands and stays citable; this says the graph
-    # attribute beside it states the opposite, which is the defect this layer
-    # exists to make visible rather than one to drop a fact over.
+    # Not a refused row. The row stands, and the evidence catalog offers it as
+    # an open question; this says the graph attribute beside it states the
+    # opposite, which is the defect this layer exists to make visible rather
+    # than one to drop a fact over.
     "graph-contradiction",
     # Not a refused row either. Rows merged into one identity cited more
     # passages between them than a row carries, and the row kept the first
@@ -1277,8 +1280,9 @@ ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
 #: the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
-#: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
-#: stays citable, and the finding is about the graph attribute beside it.
+#: ``graph-contradiction`` is not a refusal: the row stands in the catalog, the
+#: evidence catalog offers it as an open question (:func:`contradicted`), and
+#: the finding is about the graph attribute beside it.
 #: ``support-truncated`` is not one either: the row stands on the spans it kept,
 #: and the finding is about the ones it did not. ``superseded-by-answer`` is
 #: not one: the submitter's answer settles the fact the row stated, so the row
@@ -3177,6 +3181,35 @@ def contradictions(
     return tuple(found)
 
 
+def contradicted(
+    catalog: AssertionCatalog, model: SystemModel
+) -> tuple[Assertion, ...]:
+    """Every settled row behind a :func:`contradictions` entry, in catalog order.
+
+    The graph attribute states the opposite of the row, so neither side settles
+    the fact against this model. The evidence catalog offers each such row as
+    an open question, as it offers a row another row disputes.
+    """
+    rows = _contradicted_rows(catalog, model)
+    return tuple(entry for entry in settled(catalog) if assertion_id(entry) in rows)
+
+
+def uncontradicted(
+    catalog: AssertionCatalog, model: SystemModel
+) -> tuple[Assertion, ...]:
+    """Every settled row that is not :func:`contradicted`, in catalog order.
+
+    These are the rows a consumer of ``model`` reads as facts, through the
+    graph or through the evidence catalog.
+    """
+    rows = _contradicted_rows(catalog, model)
+    return tuple(entry for entry in settled(catalog) if assertion_id(entry) not in rows)
+
+
+def _contradicted_rows(catalog: AssertionCatalog, model: SystemModel) -> set[str]:
+    return {row for found in contradictions(catalog, model) for row in found.rows}
+
+
 @dataclass(frozen=True)
 class CatalogCoverage:
     """What one job's assertion pass reached, and what it left untouched.
@@ -3560,7 +3593,9 @@ def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, .
     model in front of the reader holds that value. Everything else a settled
     row says would otherwise reach no reader — a fact about a principal, a
     mechanism on a Process, a scoped control, one of two compatible values, or
-    a row whose projection :func:`apply_projection` discarded.
+    a row whose projection :func:`apply_projection` discarded. A
+    :func:`contradicted` row is not offered: the graph states its opposite, so
+    it is an open question against this model.
 
     Asked of the model rather than of whether a projection ran, so a report
     re-checked on load and the job that wrote it agree without either
@@ -3576,7 +3611,9 @@ def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, .
         for identity in projection.rows
     }
     return tuple(
-        entry for entry in settled(catalog) if assertion_id(entry) not in carried
+        entry
+        for entry in uncontradicted(catalog, model)
+        if assertion_id(entry) not in carried
     )
 
 

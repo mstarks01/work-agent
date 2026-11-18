@@ -51,11 +51,15 @@ attribute a rule could read. A row whose projection the graph holds stays
 cited through that attribute: one fact, one reader (ADR 0036). Which rows those
 are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
 settle is :func:`~analysis_service.assertions.settled`'s, so a conflict or an
-unsupported row is never in the table, and a claim can never rest on one.
+unsupported row is never in the table, and a claim can never rest on one. A
+settled row the graph attribute contradicts
+(:func:`~analysis_service.assertions.contradicted`) is not offered as settled
+either.
 
 An **unknown** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground, because the sources were
-asked about that fact and left it open, and an agent may raise a *conditional*
+asked about that fact and left it open, or another row or the graph attribute
+disputes it, and an agent may raise a *conditional*
 claim on it exactly as it may on an element attribute nobody stated. Which of
 the two an entry is, is the entry's own ``Ground.kind``, so a claim that grounds
 a settled row on an open question — or the reverse — is refused by comparing
@@ -91,6 +95,7 @@ from analysis_service.assertions import (
     Subject,
     apply_projection,
     assertion_id,
+    contradicted,
     disputed,
     offered,
     projected_attribute,
@@ -241,8 +246,8 @@ def evidence_catalog(
 
     A third enumeration follows where the job carried an assertion pass:
     every row :func:`~analysis_service.assertions.offered` returns — settled,
-    and not already carried by the attribute its projection wrote — in the
-    catalog's own order. ``None`` is a job that ran no such pass, and its
+    not contradicted by the graph, and not already carried by the attribute
+    its projection wrote — in the catalog's own order. ``None`` is a job that ran no such pass, and its
     catalog holds only the first two enumerations; an empty catalog is a pass
     that settled nothing, which offers the same rows and says so on the
     report.
@@ -295,8 +300,18 @@ def evidence_catalog(
         # a qualified unknown, but a principal's second factor has no
         # attribute to qualify.
         open_rows = (
-            *(row for row in assertions.entries if row.value == UNKNOWN),
-            *disputed(assertions),
+            *(
+                row
+                for row in (
+                    *(row for row in assertions.entries if row.value == UNKNOWN),
+                    *disputed(assertions),
+                )
+                if not projected_attribute(row.predicate, row.subject)
+            ),
+            # A row the graph attribute contradicts reaches a graph field, and
+            # that field states the opposite rather than an unknown, so only
+            # this offer carries the question.
+            *contradicted(assertions, model),
         )
         catalog.update(
             {
@@ -304,7 +319,6 @@ def evidence_catalog(
                     kind="unknown-assertion", assertion=assertion_id(row)
                 )
                 for row in open_rows
-                if not projected_attribute(row.predicate, row.subject)
             }
         )
     return catalog
