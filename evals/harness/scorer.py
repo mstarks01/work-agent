@@ -904,6 +904,11 @@ def _severity_confusion(matched: Iterable[MatchedPair]) -> dict[str, int]:
 def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float | None]:
     """The near-vs-far recall delta: tracked, deliberately **non-gating**.
 
+    A case whose figure has no value adds nothing to its mean
+    (:func:`~evals.harness.rates.mean`), because each mean reads one sweep. A
+    reader comparing two sweeps' figures compares means over the cases each
+    sweep could measure.
+
     A large delta is a finding to act on — the exemplars live in their own
     subtree precisely so they can be diversified — not a build to break.
 
@@ -927,6 +932,11 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float | None]:
 
 def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float | None] | None:
     """Coverage on the development cases beside coverage on the holdout cases (#744).
+
+    A case whose figure has no value adds nothing to its mean
+    (:func:`~evals.harness.rates.mean`), because each mean reads one sweep. A
+    reader comparing two sweeps' figures compares means over the cases each
+    sweep could measure.
 
     ``None`` where no holdout case was scored. A fix whose gain shows on the
     development cases and not on the holdout ones was shaped by the cases it was

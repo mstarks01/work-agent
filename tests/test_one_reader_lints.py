@@ -2297,8 +2297,8 @@ ONE_READERS: dict[str, _OneReader] = {
                 "its `/` joins a directory and a file name into a path"
             ),
             ("evals/harness/rates.py", "jaccard"): (
-                "two runs that both found nothing agree completely, so their"
-                " Jaccard is 1.0 by definition and not a gap"
+                "two empty sets agree completely, so their Jaccard is 1.0 by"
+                " definition and not a gap"
             ),
             ("evals/harness/transport_gate.py", "_primary"): (
                 "it counts standard deviations, and no spread is an infinite"

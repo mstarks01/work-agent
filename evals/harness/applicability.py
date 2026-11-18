@@ -919,6 +919,11 @@ def holdout_split(
 ) -> dict[str, float | None] | None:
     """Applicability recall on the development cases beside the holdout ones (#744).
 
+    A case whose figure has no value adds nothing to its mean
+    (:func:`~evals.harness.rates.mean`), because each mean reads one sweep. A
+    reader comparing two sweeps' figures compares means over the cases each
+    sweep could measure.
+
     ``None`` where no holdout case was scored. The same question the STRIDE
     scorer's split asks, over the recall this package produces, with an
     exhausted holdout counted as a development case
@@ -942,6 +947,11 @@ def holdout_split(
 
 def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float | None]:
     """The near-vs-far applicability-recall delta: tracked, **non-gating**.
+
+    A case whose figure has no value adds nothing to its mean
+    (:func:`~evals.harness.rates.mean`), because each mean reads one sweep. A
+    reader comparing two sweeps' figures compares means over the cases each
+    sweep could measure.
 
     The same question the STRIDE scorer's delta asks — does output get worse
     away from the architectures this package's exemplars demonstrate — over the
