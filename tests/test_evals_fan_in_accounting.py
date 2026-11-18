@@ -270,3 +270,56 @@ def test_a_capture_that_is_not_json_is_named(archive, case):  # noqa: F811
     [line] = sweep.capture_faults
     assert line.startswith(f"{case.id}: a capture is not JSON")
     assert sweep.rows == []
+
+
+def _rewrite_capture(archive, case, kind, rewrite):  # noqa: F811
+    path = reports_dir(archive) / f"{case.id}.{kind}.json"
+    path.write_text(json.dumps(rewrite(json.loads(path.read_text("utf-8")))), "utf-8")
+
+
+def test_sources_the_artifact_records_under_another_digest_are_incompatible(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+):
+    document = json.loads(archive.read_text(encoding="utf-8"))
+    document["rendered_sources"] = {case.id: "0" * 64}
+    archive.write_text(json.dumps(document), encoding="utf-8")
+
+    (row,) = fan_in_accounting.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert row.incompatible == (
+        "the artifact records the case's sources under another digest"
+    )
+
+
+def test_a_case_with_no_proposals_for_its_block_is_incompatible(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+):
+    _rewrite_capture(archive, case, "proposals", lambda held: {})
+
+    (row,) = fan_in_accounting.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert row.incompatible == "the archive holds no proposals"
+
+
+def test_a_batch_today_s_schema_refuses_is_incompatible(archive, case):  # noqa: F811
+    def refuse(held):
+        held["stride"]["spoofing"] = "not a batch"
+        return held
+
+    _rewrite_capture(archive, case, "proposals", refuse)
+
+    (row,) = fan_in_accounting.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert "validation error" in row.incompatible
+
+
+def test_a_capture_for_a_framework_the_report_lacks_is_named(archive, case):  # noqa: F811
+    _rewrite_capture(archive, case, "proposals", lambda held: {**held, "asvs": {}})
+
+    sweep = fan_in_accounting.replay_artifact(load_artifact(archive), [case])
+
+    [line] = sweep.capture_faults
+    assert "['asvs']" in line
+    assert [row.incompatible for row in sweep.rows] == [""]

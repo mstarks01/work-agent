@@ -67,7 +67,7 @@ from evals.harness.modes import REPORTING_MODES, EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
 #: Each package's batch type for a stored lane batch: the agent's own schema,
-#: or the archive's reading of it where the package declares one.
+#: or an archived reading of it that tolerates a field the run did not store.
 ARCHIVED_BATCHES: Mapping[FrameworkName, type[ProposalBatch]] = MappingProxyType(
     {"asvs": RequirementProposals, "stride": ArchivedThreatProposals}
 )
@@ -331,6 +331,12 @@ def replay_artifact(artifact: EvalArtifact, cases: Sequence[GoldenCase]) -> FanI
         except json.JSONDecodeError as error:
             sweep.capture_faults.append(f"{case.id}: a capture is not JSON: {error}")
             continue
+        blocks = {block.framework for block in report.analyses}
+        if stray := sorted((set(stored) | set(drafts)) - blocks):
+            sweep.capture_faults.append(
+                f"{case.id}: the captures hold {stray}, which the report has no"
+                " block for"
+            )
         digest = recorded.get(case.id)
         moved = (
             "the artifact records the case's sources under another digest"
