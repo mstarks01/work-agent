@@ -762,17 +762,17 @@ def test_a_population_rate_counts_a_draft_with_no_verdict_apart(capsys):
 def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
     """A draft the block does not carry left the report with no verdict."""
     kept = _draft_for(case, _expected(case), 1)
-    omitted = draft_threat(
+    down_voted = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
     lost = _draft_for(case, _must_find(case), 2)
 
     result = score_case_with_yield(
         case,
-        [kept, omitted, lost],
+        [kept, down_voted, lost],
         [promote(kept)],
         _identity_matcher([kept, lost]),
-        _rejecting(case, omitted),
+        _rejecting(case, down_voted),
         _ruled_block(case, [kept], []),
         rows=NO_ROWS,
     ).critic_yield

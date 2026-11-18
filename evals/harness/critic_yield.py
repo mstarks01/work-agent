@@ -11,9 +11,10 @@ Two comparators help in reading the numbers against something. Semgrep's
 assistant kills about 20% of findings at 92% to 96% agreement with human triage.
 Unfiltered LLM threat enumeration runs at about 86% raw false positives.
 
-Here is how it works. A killed draft is a draft that is not in the
-post-critic output, so the two sides are a superset and its subset. Its fate
-says whether the critic rejected it or the block holds no verdict for it. Both
+Here is how it works. Each post-critic claim is a draft the critic kept, so
+the two sides are a superset and its subset. A killed draft is a draft that is
+not in the post-critic output, and its fate says whether the critic rejected it
+or the block holds no verdict for it. Both
 sides are produced sets, so the whole instrument is a matter of scoring the
 same case twice through the shipped scorer, with no second metric
 implementation and no special-cased matching, and then reading the killed
