@@ -698,3 +698,88 @@ def test_a_mechanism_written_none_is_a_stated_value():
 
     (projection,) = project(catalog)
     assert (projection.value, projection.reason) == ("none", "stated")
+
+
+class TestAnAbsenceUnderAHiddenQualification:
+    """A field that reads absent under a qualifying projection the gate
+    refused is no stated absence: the applied projection would show it as an
+    unknown (the maintainer's ruling of 2026-11-18 on #2270). Open rows under
+    it carry the question; with none, the catalog offers no question about it,
+    and a settled row under it stays a fact."""
+
+    STORE = TestARowTheGraphContradicts.STORE
+    ABSENCE = TestARowTheGraphContradicts.STORED
+    ENCRYPTED = TestADisputedPairUnderARefusedProjection.ENCRYPTED
+    ABSENT_REF = TestTheGraphSideOfAContradiction.ABSENT_REF
+
+    def test_a_disputed_pair_drops_the_absence(self):
+        catalog = assertions(self.ABSENCE, self.ENCRYPTED, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert self.ABSENT_REF not in offered
+        assert offered[assertion_id(self.ENCRYPTED)].kind == "unknown-assertion"
+
+    def test_a_hedged_row_drops_the_absence(self):
+        hedged = self.ABSENCE.model_copy(
+            update={"value": UNKNOWN, "reason": "hedged", "explanation": "e"}
+        )
+        catalog = assertions(hedged, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert self.ABSENT_REF not in offered
+        assert offered[assertion_id(hedged)].kind == "unknown-assertion"
+
+    def test_a_silent_row_keeps_the_absence(self):
+        """The neighbour: a silent row leaves the field as extraction wrote it."""
+        silent = self.ABSENCE.model_copy(
+            update={"value": UNKNOWN, "reason": "silent", "explanation": "f"}
+        )
+        catalog = assertions(silent, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+
+    def test_a_set_aside_row_drops_the_absence_and_offers_no_question(self):
+        """A row a reviewer set aside qualifies the field too, and no row
+        carries a question, so the catalog offers nothing about it; this is
+        reported for a ruling."""
+        rejected = self.ENCRYPTED.model_copy(update={"assessment": "unsupported"})
+        catalog = assertions(rejected, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert self.ABSENT_REF not in offered
+        assert assertion_id(rejected) not in offered
+
+    def test_a_scoped_row_drops_the_absence_and_stays_a_fact(self):
+        """A scoped row qualifies the field and is a settled fact about part
+        of the store; no row carries a question about the whole."""
+        backups = self.ENCRYPTED.model_copy(
+            update={"scope": [Qualifier(kind="resource", value="backups")]}
+        )
+        catalog = assertions(backups, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert self.ABSENT_REF not in offered
+        assert offered[assertion_id(backups)].kind == "assertion"
+
+    def test_an_answer_of_none_beside_a_hedged_row_keeps_the_absence(self):
+        """The neighbour: the answer alone makes the value, so the projection
+        writes the absence and qualifies nothing."""
+        hedged = self.ABSENCE.model_copy(
+            update={"value": UNKNOWN, "reason": "hedged", "explanation": "e"}
+        )
+        answer = _as_answer(self.ABSENCE, "Orders database: not encrypted.")
+        catalog = assertions(hedged, answer, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("none"), catalog)
+
+        assert offered[self.ABSENT_REF].kind == "absent-attribute"
+
+    def test_a_claim_on_the_dropped_absence_is_told_why(self):
+        catalog = assertions(self.ABSENCE, self.ENCRYPTED, subjects=(self.STORE,))
+        ground = Ground(
+            kind="absent-attribute", element_id=ORDERS, attribute="encryption_at_rest"
+        )
+        claim = sample_draft("S-01", grounds=[ground])
+
+        (issue,) = ground_issues([claim], _with_encryption("none"), catalog)
+        assert "whose qualification the field hides" in issue

@@ -3279,6 +3279,14 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     ]
 
 
+def test_the_attributes_the_rows_hold_open_have_one_reader():
+    """``held_open_attributes`` decides which absences the evidence catalog
+    drops, through one caller in the evidence module."""
+    assert _sites(lambda node: _calls(node, "held_open_attributes")) == [
+        ("src/analysis_service/evidence.py", "_held_open_attributes"),
+    ]
+
+
 def test_a_row_value_has_one_graph_spelling():
     """``_graph_spelling`` is the one reader of how a graph field spells a
     row's value, so the projection, its qualification and the graph
