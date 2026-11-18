@@ -167,8 +167,8 @@ def trace(
 ) -> tuple[FactTrace, ...]:
     """Each of ``checks`` with the raw value of the element the alignment paired.
 
-    A paired entry that leaves the attribute out, or holds ``null`` for it,
-    reads as the field's default, because that is the value the parse fills.
+    A paired entry that leaves the attribute out reads as the field's default,
+    because that is the value the parse fills.
     """
     if parsed is None:
         return tuple(FactTrace(check, None) for check in checks)
