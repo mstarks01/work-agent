@@ -1853,8 +1853,8 @@ def _is_constant(node: ast.AST, value: object) -> bool:
 def _reads_the_verdict_rule(node: ast.AST) -> bool:
     """Whether ``node`` reads the verdict rule.
 
-    It reads the verdict statuses, or tests a fate against the fates with no
-    verdict.
+    It reads the verdict statuses, or tests a fate for membership in a set of
+    critic fates.
     """
     if _loads(node, "VERDICT_STATUSES") or _loads_attribute(node, "VERDICT_STATUSES"):
         return True
@@ -1864,14 +1864,22 @@ def _reads_the_verdict_rule(node: ast.AST) -> bool:
     )
 
 
+#: The constants that each name one critic fate or side.
+_ONE_FATE_NAMES = ("OMITTED", "UNRULED")
+
+
 def _holds_the_fates(node: ast.AST) -> bool:
     """Whether ``node`` names a set of critic fates.
 
-    The set is a constant of the rule, ``get_args`` of a fate type, or a
-    literal collection of two or more critic fates.
+    The set reads a constant of the rule anywhere inside it, is ``get_args`` of
+    a fate type, or is a literal collection of two or more critic fates.
     """
     names = ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
-    if any(_loads(node, name) or _loads_attribute(node, name) for name in names):
+    if any(
+        _loads(part, name) or _loads_attribute(part, name)
+        for part in ast.walk(node)
+        for name in names
+    ):
         return True
     if _calls(node, "get_args") and node.args:
         return any(
@@ -1880,12 +1888,21 @@ def _holds_the_fates(node: ast.AST) -> bool:
         )
     if not isinstance(node, (ast.Tuple, ast.List, ast.Set)):
         return False
-    values = {
-        element.value for element in node.elts if isinstance(element, ast.Constant)
-    }
-    if not values <= set(FATES):
-        return False
-    return len(values) > 1
+    members = [
+        element.value
+        if isinstance(element, ast.Constant)
+        else next(
+            (
+                name
+                for name in _ONE_FATE_NAMES
+                if _loads(element, name) or _loads_attribute(element, name)
+            ),
+            None,
+        )
+        for element in node.elts
+    ]
+    fates = {*FATES, *_ONE_FATE_NAMES}
+    return len(members) > 1 and all(member in fates for member in members)
 
 
 def _parses_a_version_segment(node: ast.AST) -> bool:
@@ -1940,6 +1957,9 @@ def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bo
         ("fate in critic_yield.VERDICT_STATUSES", True),
         ("fate not in NO_VERDICT_FATES", True),
         ("row.archived not in NO_VERDICT_SIDES", True),
+        ("fate in frozenset(NO_VERDICT_FATES)", True),
+        ("fate in {*NO_VERDICT_FATES}", True),
+        ('fate in (OMITTED, "returned")', True),
         ('fate in ("returned", "omitted")', True),
         ('fate in {"confirmed", "needs-info", "rejected"}', True),
         ("fate in get_args(VerdictStatus)", True),
