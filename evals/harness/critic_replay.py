@@ -67,7 +67,13 @@ from evals.harness.artifact import (
     repo_commit,
 )
 from evals.harness.bundle import check_out, finished_file, read_report
-from evals.harness.critic_yield import OMITTED, CriticFate, fate_by_claim
+from evals.harness.critic_yield import (
+    FATES,
+    OMITTED,
+    VERDICT_STATUSES,
+    CriticFate,
+    fate_by_claim,
+)
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call, spent_line
@@ -221,13 +227,22 @@ def parse(raw: str, framework: FrameworkName) -> list[Ruling]:
 #: failed before it wrote a block to read the archived verdict from.
 UNRULED: Literal["unruled"] = "unruled"
 
+#: What the archived side of one draft reads: its fate in the block, or
+#: :data:`UNRULED` where the case wrote no block.
+ArchivedSide = CriticFate | Literal["unruled"]
+
+#: The archived sides that hold no verdict, in the order the count names them.
+NO_VERDICT_SIDES: tuple[ArchivedSide, ...] = tuple(
+    sorted({*FATES, UNRULED} - VERDICT_STATUSES)
+)
+
 
 @dataclass(frozen=True)
 class Agreement:
     """One draft's verdict, as the archived critic ruled and as the replay did."""
 
     draft_id: str
-    archived: CriticFate | Literal["unruled"]
+    archived: ArchivedSide
     replayed: VerdictStatus | Literal["unruled"]
 
 
@@ -242,7 +257,7 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     failed before it wrote a block has no archived verdict, so each of its
     drafts reads :data:`UNRULED`.
     """
-    missing: CriticFate | Literal["unruled"] = UNRULED
+    missing: ArchivedSide = UNRULED
     before: dict[str, CriticFate] = {}
     if archived.block is not None:
         before, missing = fate_by_claim(archived.block), OMITTED
@@ -254,6 +269,41 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
         Agreement(draft.id, before.get(draft.id, missing), after.get(draft.id, UNRULED))
         for draft in archived.drafts
     ]
+
+
+def agreement_lines(rows: Sequence[Agreement]) -> list[str]:
+    """Each row marked, then how many archived verdicts the replay repeated.
+
+    A draft whose archived side is not in
+    :data:`~evals.harness.critic_yield.VERDICT_STATUSES` has nothing to agree with, so
+    it is marked ``·`` and counted on its own line, outside the denominator. A
+    draft the replay left unruled beside an archived verdict is a verdict that
+    did not repeat, so it stays in the denominator.
+    """
+    with_verdict = [row for row in rows if _has_verdict(row)]
+    same = sum(row.archived == row.replayed for row in with_verdict)
+    lines = [
+        f"  {_mark(row)} {row.draft_id:10} archived {row.archived:12}"
+        f" replayed {row.replayed}"
+        for row in rows
+    ]
+    lines.append(f"{same} of {len(with_verdict)} verdicts agree")
+    apart = len(rows) - len(with_verdict)
+    if apart:
+        drafts = "1 draft has" if apart == 1 else f"{apart} drafts have"
+        *first, last = NO_VERDICT_SIDES
+        lines.append(f"{drafts} no archived verdict ({', '.join(first)} or {last})")
+    return lines
+
+
+def _has_verdict(row: Agreement) -> bool:
+    return row.archived in VERDICT_STATUSES
+
+
+def _mark(row: Agreement) -> str:
+    if not _has_verdict(row):
+        return "·"
+    return "=" if row.archived == row.replayed else "≠"
 
 
 async def replay(
@@ -349,14 +399,8 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             "claims": [ruling.model_dump(mode="json") for ruling in settled],
         }
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    rows = compare(archived, rulings)
-    same = sum(row.archived == row.replayed for row in rows)
-    for row in rows:
-        mark = "=" if row.archived == row.replayed else "≠"
-        print(
-            f"  {mark} {row.draft_id:10} archived {row.archived:12} replayed {row.replayed}"
-        )
-    print(f"{same} of {len(rows)} verdicts agree")
+    for line in agreement_lines(compare(archived, rulings)):
+        print(line)
     problems = review_issues(archived.drafts, rulings, archived.model, {}).problems
     kinds = Counter(problem.kind for problem in problems)
     print(

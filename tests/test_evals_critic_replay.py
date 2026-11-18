@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 from dataclasses import replace
+from typing import get_args, get_type_hints
 
 import pytest
 
@@ -18,7 +19,7 @@ from analysis_service.assertions import AssertionCatalog, AssertionRecord
 from analysis_service.claims import ReturnedClaim
 from analysis_service.graph import STATE_ASSERTION_CATALOG
 from analysis_service.markdown_loader import MarkdownLoader
-from evals.harness import critic_replay
+from evals.harness import critic_replay, critic_yield
 from evals.harness.bundle import case_file, reports_dir, write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
@@ -280,14 +281,14 @@ def test_a_claim_assembly_returned_reads_as_returned(recorded, case):  # noqa: F
     assert all(status[claim.id] == claim.verdict.status for claim in rest)
 
 
-def test_a_returned_claim_counts_against_agreement(
+def test_a_returned_claim_is_counted_apart_from_agreement(
     recorded,  # noqa: F811
     case,  # noqa: F811
     monkeypatch,
     capsys,
 ):
-    """Pinned as the command counts today: a returned claim has no archived
-    verdict, and the printed count reads it as a disagreement, not apart."""
+    """A returned claim has no archived verdict to agree with, so the printed
+    count leaves it out of the denominator and names it on its own line."""
     out, _ = recorded
     artifact = finished(out, case.id)
     archived = critic_replay.load(artifact, case.id, "stride")
@@ -334,12 +335,67 @@ def test_a_returned_claim_counts_against_agreement(
 
     assert critic_replay.command_critic_replay(args) == 0
 
-    printed = capsys.readouterr().out
-    agreeing = sum(line.startswith("  = ") for line in printed.splitlines())
-    assert f"≠ {first.id:10} archived returned" in printed
+    lines = capsys.readouterr().out.splitlines()
+    agreeing = sum(line.startswith("  = ") for line in lines)
+    assert f"  · {first.id:10} archived returned     replayed confirmed" in lines
+    assert f"{agreeing} of {len(archived.drafts) - 1} verdicts agree" in lines
+    assert "1 draft has no archived verdict (omitted, returned or unruled)" in lines
+
+
+def test_an_omitted_draft_is_counted_apart(recorded, case):  # noqa: F811
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    block = archived.block.model_copy(update={"claims": archived.block.claims[1:]})
+    rows = critic_replay.compare(replace(archived, block=block), [])
+    sides = [row.archived for row in rows]
+    assert sides.count("omitted") == 1
+    assert set(sides) - {"omitted"} <= critic_yield.VERDICT_STATUSES
+
+    lines = critic_replay.agreement_lines(rows)
+
+    assert f"0 of {len(rows) - 1} verdicts agree" in lines
+    assert "1 draft has no archived verdict (omitted, returned or unruled)" in lines
+
+
+def test_a_case_with_no_block_has_no_verdict_to_agree_with(recorded, case):  # noqa: F811
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    rows = critic_replay.compare(replace(archived, block=None), [])
+    assert len(rows) > 1
+
+    lines = critic_replay.agreement_lines(rows)
+
+    assert "0 of 0 verdicts agree" in lines
     assert (
-        f"{agreeing} of {len(archived.drafts)} verdicts agree" in printed.splitlines()
+        f"{len(rows)} drafts have no archived verdict (omitted, returned or unruled)"
+        in lines
     )
+
+
+def test_a_draft_the_replay_left_unruled_still_counts_as_a_disagreement(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+):
+    """The archived side ruled, so the pair is a verdict that did not repeat."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    rows = critic_replay.compare(archived, [])
+    assert {row.archived for row in rows} <= critic_yield.VERDICT_STATUSES
+
+    lines = critic_replay.agreement_lines(rows)
+
+    assert f"0 of {len(rows)} verdicts agree" in lines
+    assert all("no archived verdict" not in line for line in lines)
+
+
+def test_the_no_verdict_sides_are_every_archived_side_outside_the_statuses():
+    """Read off the annotation the comparison writes, not off the sides' parts."""
+    annotation = get_type_hints(critic_replay.Agreement)["archived"]
+    sides = {value for part in get_args(annotation) for value in get_args(part)}
+    assert set(critic_replay.NO_VERDICT_SIDES) == (
+        sides - critic_yield.VERDICT_STATUSES
+    )
+    assert critic_replay.NO_VERDICT_SIDES == ("omitted", "returned", "unruled")
 
 
 def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # noqa: F811
