@@ -7,7 +7,7 @@ and every printer shows :data:`UNAVAILABLE`.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -66,6 +66,11 @@ class Rate:
             "denominator": self.denominator,
             "value": self.value,
         }
+
+    @classmethod
+    def from_json(cls, written: Mapping[str, Any]) -> Rate:
+        """The rate :meth:`to_json` wrote; its ``value`` is derived, not read."""
+        return cls(written["numerator"], written["denominator"])
 
 
 def mean(values: Iterable[float | None]) -> float | None:

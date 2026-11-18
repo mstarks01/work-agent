@@ -81,7 +81,8 @@ FATES: tuple[CriticFate, ...] = tuple(
     value for part in get_args(CriticFate) for value in get_args(part)
 )
 #: The fates that are a critic's verdict on the block. A ``returned`` claim
-#: was ruled and kept, but the block does not record its status.
+#: was ruled and sent back to the deferred set, so it is not in the report,
+#: and the block does not record its status.
 VERDICT_STATUSES: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
 #: The fates that hold no verdict, in the order a count of them names them.
 NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = tuple(sorted(get_args(NoVerdictFate)))
@@ -335,7 +336,9 @@ class KilledDraft:
     """One draft that left the report, and what it was before the critic.
 
     ``fate`` says whether the critic rejected it or the block holds no verdict
-    for it. The audit trail under the aggregate counts: a ``matched-must-find`` line
+    for it.
+
+    The audit trail under the aggregate counts: a ``matched-must-find`` line
     here is a real finding that left the report, named, with the reference it
     was answering — which is what makes the veto number actionable instead of
     merely alarming.
@@ -613,8 +616,8 @@ def _yield(
             claim=candidate_claim(draft),
             outcome=outcomes[draft.id][0],
             reference_index=outcomes[draft.id][1],
-            cause=steps.get(draft.id),
             fate=fates[draft.id],
+            cause=steps.get(draft.id),
         )
         for draft in drafts
         if draft.id not in surviving
@@ -772,10 +775,7 @@ def render(yields: Sequence[CriticYield]) -> None:
             print(f"  {no_verdict_line(apart, NO_VERDICT_FATES)}")
     if yields:
         totals = aggregate_yield(yields)
-        pooled = {
-            name: Rate(rate["numerator"], rate["denominator"])
-            for name, rate in totals["rates"].items()
-        }
+        pooled = {name: Rate.from_json(rate) for name, rate in totals["rates"].items()}
         print(
             f"critic yield: killed {pooled['kill_rate'].shown()},"
             f" rejected caught {pooled['rejected_kill_rate'].shown()},"

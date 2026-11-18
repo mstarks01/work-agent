@@ -829,3 +829,8 @@ def test_a_returned_draft_is_a_kill_counted_under_its_fate(case):
     }
     assert result.populations.no_verdict == 1
     assert result.rates["matched_kill_rate"] == Rate(0, 1)
+
+
+@pytest.mark.parametrize("rate", [Rate(0, 0), Rate(3, 7)])
+def test_a_written_rate_reads_back_as_the_same_rate(rate):
+    assert Rate.from_json(rate.to_json()) == rate
