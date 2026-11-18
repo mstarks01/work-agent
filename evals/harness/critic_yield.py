@@ -167,8 +167,9 @@ class CriticPopulations:
     """The drafts the critic was handed, by scored outcome and by fate.
 
     Each rate reads only its own population. ``real_rejected`` divides by the
-    real drafts, ``not_real_confirmed`` by the not-real ones, and a
-    ``needs-info`` fate counts in neither: it has a rate of its own.
+    real drafts with a verdict, ``not_real_confirmed`` by the not-real drafts
+    with a verdict, and a ``needs-info`` fate counts in neither: it has a
+    rate of its own.
     A draft with no verdict (:func:`has_verdict`) is in no denominator, and
     :attr:`no_verdict` counts it.
     A population with no draft that has a verdict gives a
@@ -679,10 +680,12 @@ def _cause_key(draft: KilledDraft) -> KillCause:
 
 
 def _matched(outcome: ScoredOutcome) -> bool:
+    """Whether ``outcome`` matched a reference."""
     return outcome in get_args(MatchedOutcome)
 
 
 def _any_outcome(_: ScoredOutcome) -> bool:
+    """The predicate that admits every scored outcome."""
     return True
 
 

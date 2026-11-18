@@ -1875,7 +1875,8 @@ def _holds_the_fates(node: ast.AST) -> bool:
         return True
     if _calls(node, "get_args") and node.args:
         return any(
-            _loads(node.args[0], kind) for kind in ("VerdictStatus", "NoVerdictFate")
+            _loads(node.args[0], kind) or _loads_attribute(node.args[0], kind)
+            for kind in ("VerdictStatus", "NoVerdictFate")
         )
     if not isinstance(node, (ast.Tuple, ast.List, ast.Set)):
         return False
@@ -1943,6 +1944,7 @@ def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bo
         ('fate in {"confirmed", "needs-info", "rejected"}', True),
         ("fate in get_args(VerdictStatus)", True),
         ("fate in get_args(NoVerdictFate)", True),
+        ("fate in get_args(claims.VerdictStatus)", True),
         ("fate in critic_yield.NO_VERDICT_FATES", True),
         ('fate in ("rejected",)', False),
         ('fate in ("omitted", "wrong_value")', False),
