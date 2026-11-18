@@ -377,7 +377,7 @@ class AttributeCheck:
     """
 
     element_id: str
-    attribute: str
+    attribute: ScoredAttribute
     blessed: str
     extracted: str
 
@@ -2155,6 +2155,11 @@ def _scored_fields(model: SystemModel) -> int:
     )
 
 
+def reduce_attribute(attribute: ScoredAttribute, value: Any) -> str:
+    """``value`` reduced the way the scorer compares ``attribute``."""
+    return _SCORED_ATTRIBUTES[attribute].reduce(value)
+
+
 def _check_attributes(
     blessed: SystemModel, extracted: SystemModel | None, alignment: Alignment
 ) -> tuple[AttributeCheck, ...]:
@@ -2180,15 +2185,17 @@ def _check_attributes(
         counterpart = counterparts.get(produced_of.get(element.id, ""))
         if counterpart is None:
             continue
-        for attribute, scored in _SCORED_ATTRIBUTES.items():
+        for attribute in _SCORED_ATTRIBUTES:
             if attribute not in type(element).model_fields:
                 continue
             checks.append(
                 AttributeCheck(
                     element_id=element.id,
                     attribute=attribute,
-                    blessed=scored.reduce(getattr(element, attribute)),
-                    extracted=scored.reduce(getattr(counterpart, attribute)),
+                    blessed=reduce_attribute(attribute, getattr(element, attribute)),
+                    extracted=reduce_attribute(
+                        attribute, getattr(counterpart, attribute)
+                    ),
                 )
             )
     return tuple(checks)

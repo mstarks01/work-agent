@@ -121,6 +121,7 @@ from analysis_service.system_model import (
     flow_label,
     parse_flow_id,
 )
+from evals.harness import fact_trace
 from evals.harness.alignment import (
     Alignment,
     align,
@@ -129,6 +130,7 @@ from evals.harness.alignment import (
     slug_key,
 )
 from evals.harness.artifact import EvalArtifact, recorded_sources
+from evals.harness.fact_trace import FactTrace, Stage
 from evals.harness.modes import (
     AssertionResult,
     AttributeCheck,
@@ -236,6 +238,15 @@ PRODUCED_FATES: tuple[ProducedFate, ...] = (
 )
 
 
+#: The stages a wrong fact with a raw value can take, in the order the printed
+#: table reads them.
+WRONG_STAGES: tuple[Stage, ...] = (
+    "wrong-in-raw",
+    "changed-by-code",
+    "changed-and-wrong",
+)
+
+
 @dataclass(frozen=True)
 class ElementFate:
     """One blessed element, what stood for it, and what could have."""
@@ -273,10 +284,15 @@ class ExtractionReplay:
     #: also one to read beside this flag.
     parsed: bool
     fates: tuple[ElementFate, ...]
-    #: Every scored attribute of every paired element, agreeing or not, so a
-    #: count of wrong facts carries the count it is taken over.
-    attributes: tuple[AttributeCheck, ...]
+    #: Every scored attribute of every paired element, agreeing or not, each
+    #: with its raw value, so a count of wrong facts carries the count it is
+    #: taken over and the stage each one went wrong at.
+    facts: tuple[FactTrace, ...]
     extra: tuple[str, ...]
+    #: The element ID of each ``duplicate-id`` issue the parse raised. The parse
+    #: raises one for each element whose emitted ID another element carried,
+    #: and one for each derived ID that two elements of one name share.
+    duplicate_id_issues: tuple[str, ...]
     issues: tuple[str, ...] = ()
 
     @property
@@ -284,15 +300,23 @@ class ExtractionReplay:
         return Counter(row.fate for row in self.fates)
 
     @property
+    def attributes(self) -> tuple[AttributeCheck, ...]:
+        return tuple(fact.check for fact in self.facts)
+
+    @property
     def wrong_facts(self) -> tuple[AttributeCheck, ...]:
         return differing(self.attributes)
 
     def to_json(self) -> dict[str, Any]:
+        wrong = set(self.wrong_facts)
         return {
             "case": self.case_id,
             "parsed": self.parsed,
             "counts": {fate: self.counts[fate] for fate in FATES},
-            "wrong_facts": [check.to_json() for check in self.wrong_facts],
+            "wrong_facts": [
+                fact.to_json() for fact in self.facts if fact.check in wrong
+            ],
+            "duplicate_id_issues": list(self.duplicate_id_issues),
             "extra": list(self.extra),
             "issues": list(self.issues),
             "fates": [row.to_json() for row in self.fates],
@@ -307,7 +331,14 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         case_id=case.id,
         parsed=result.extracted is not None,
         fates=classify_elements(case.model, result.extracted, score.alignment),
-        attributes=score.attributes,
+        facts=fact_trace.trace(
+            result.raw, result.extracted, score.alignment, score.attributes
+        ),
+        duplicate_id_issues=tuple(
+            issue.element_id
+            for issue in result.issues
+            if issue.code == "duplicate-id" and issue.element_id is not None
+        ),
         extra=score.alignment.unaligned_produced,
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues)
         + tuple(f"malformed-flow-id: {one}" for one in malformed),
@@ -1371,7 +1402,8 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     counts: Counter[str] = Counter()
     by_type: dict[str, Counter[str]] = defaultdict(Counter)
     per_element: dict[str, Counter[str]] = defaultdict(Counter)
-    attributes: list[AttributeCheck] = []
+    facts: list[FactTrace] = []
+    duplicates: Counter[str] = Counter()
     renamed_by: Counter[str] = Counter()
     emissions = 0
     unparsed = 0
@@ -1388,7 +1420,8 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
                     renamed_by[row.evidence] += 1
                 if row.fate in LOSSES:
                     per_element[f"{replay.case_id}/{row.reference}"][row.fate] += 1
-            attributes.extend(replay.attributes)
+            facts.extend(replay.facts)
+            duplicates[replay.case_id] += len(replay.duplicate_id_issues)
     targets = sorted(
         per_element.items(), key=lambda item: (-sum(item[1].values()), item[0])
     )
@@ -1409,7 +1442,9 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             kind: {fate: fates[fate] for fate in FATES}
             for kind, fates in sorted(by_type.items())
         },
-        "attribute_aggregate": attribute_agreement(attributes),
+        "attribute_aggregate": attribute_agreement([fact.check for fact in facts]),
+        "facts": fact_trace.pooled(facts),
+        "duplicate_id_issues": {case: n for case, n in sorted(duplicates.items()) if n},
         "targets": [
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
@@ -1689,6 +1724,25 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
             for key, row in by_attribute.items()
         )
         print(f"  wrong facts on paired elements, of the checks compared: {listed}")
+        by_stage = pool["facts"]["by_stage"]
+        print(
+            "  wrong facts by stage (" + ", ".join(WRONG_STAGES) + "); then the"
+            " checks the parse righted, and the checks with no raw value read"
+        )
+        for key, counts in by_stage.items():
+            wrong = " ".join(f"{counts[stage]:>4}" for stage in WRONG_STAGES)
+            print(
+                f"    {key:<32} {wrong}   corrected by code"
+                f" {counts['corrected-by-code']}, raw unread {counts['raw-unread']}"
+            )
+        for key, counts in pool["facts"]["by_certainty"].items():
+            listed = ", ".join(f"{name} {n}" for name, n in counts.items() if n)
+            print(f"    certainty {key}: {listed}")
+        duplicates = sum(pool["duplicate_id_issues"].values())
+        print(
+            f"  {duplicates} duplicate-id issue(s) the parse raised, in"
+            f" {len(pool['duplicate_id_issues'])} case(s)"
+        )
     if pool["targets"]:
         print(f"  targets (top {targets} of {len(pool['targets'])}):")
         for target in pool["targets"][:targets]:
