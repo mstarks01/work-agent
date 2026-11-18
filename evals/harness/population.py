@@ -45,8 +45,7 @@ from analysis_service.assertions import (
     settled,
 )
 from analysis_service.evidence import prepared_view
-from analysis_service.execution import seed_state
-from analysis_service.graph import STATE_SOURCE_TEXTS
+from analysis_service.execution import source_texts
 from analysis_service.reassess import ReviewerAssessment, reassess
 from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
@@ -243,7 +242,7 @@ def assertion_reports(
         record = AssertionRecord.of(
             CatalogProposal.model_validate(result.proposal),
             case.model,
-            seed_state(case.sources)[STATE_SOURCE_TEXTS],
+            source_texts(case.sources),
         )
         reports[f"{path.with_suffix('')}/{case_id}"] = {
             "assertions": record.model_dump(mode="json"),

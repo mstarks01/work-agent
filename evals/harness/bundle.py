@@ -44,12 +44,11 @@ from analysis_service.assertions import (
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.compact import FULL_FORMAT, parse_extraction
 from analysis_service.errors import refusal_text
-from analysis_service.execution import seed_state
+from analysis_service.execution import seed_state, source_texts
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.graph import (
     STATE_DIAGRAM_READINGS,
-    STATE_SOURCE_TEXTS,
     diagram_readings,
 )
 from analysis_service.report import Report
@@ -551,7 +550,7 @@ def runs_from_reports(
 
 def _source_texts(case: GoldenCase) -> dict[str, str]:
     """Label to text, which is what both resolvers read."""
-    return seed_state(case.sources)[STATE_SOURCE_TEXTS]
+    return source_texts(case.sources)
 
 
 def _case_files(
