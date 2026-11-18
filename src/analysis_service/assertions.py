@@ -3268,8 +3268,8 @@ def contradicted(
 ) -> tuple[Assertion, ...]:
     """Every settled row behind a :func:`contradictions` entry, in catalog order.
 
-    The graph attribute states the opposite of the value these rows project,
-    so none of them is a fact against this model, though each stays in
+    The graph attribute states the opposite of what these rows state, so
+    none of them is a fact against this model, though each stays in
     :func:`settled`, which reads the catalog alone. The evidence catalog offers
     each such row as an open question, as it offers a row another row
     disputes. Where a submitter's answer makes the value, no row behind it is
@@ -3752,7 +3752,7 @@ def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, .
     mechanism on a Process, a scoped control, one of two compatible values, or
     a row whose projection :func:`apply_projection` discarded. A
     :func:`contradicted` row is not offered: the graph states the opposite of
-    the value the rows project, so it is an open question against this model.
+    what the row states, so it is an open question against this model.
 
     Asked of the model rather than of whether a projection ran, so a report
     re-checked on load and the job that wrote it agree without either

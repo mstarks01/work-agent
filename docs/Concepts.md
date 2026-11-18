@@ -90,15 +90,16 @@ A ground has one of these kinds:
 
 - `quote`: a quote from a labeled source;
 - `unknown-attribute`: an attribute the source left unknown;
-- `absent-attribute`: an attribute the source explicitly said was absent;
+- `absent-attribute`: an attribute the source explicitly said was absent,
+  unless assertion rows state the opposite;
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
-- `assertion`: an assertion row that the sources settle, unless the value the
-  rows project and the model's attribute state opposites and no submitter's
-  answer makes that value (see below); or
+- `assertion`: an assertion row that the sources settle, unless the rows that
+  state the model's attribute and the attribute state opposites and no
+  submitter's answer makes that value (see below); or
 - `unknown-assertion`: an open assertion row: its value is unknown, another
-  row disputes it, or the value the rows project and the model's attribute
-  state opposites and no submitter's answer makes that value.
+  row disputes it, or the rows that state the model's attribute and the
+  attribute state opposites and no submitter's answer makes that value.
 
 Every carried claim has at least one ground. Quotes are checked against the
 source text. If a close source span can be found, code repairs the quote and
@@ -133,12 +134,15 @@ What code does with a row:
   A row that states an absence still fills an `unknown` field, because an
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
-  says why, when the service can write the model; where it cannot, the field
-  keeps what extraction wrote.
-- **Where the model's field still states the opposite of the value the rows
-  project**, because the service could not write that value into the model,
-  the rows are open questions, and a claim on one is conditional. Where a
-  submitter's answer makes the value, the rows stay facts.
+  says why, when the service can write the model. Where it cannot, the field
+  keeps what extraction wrote, and the rows are open questions.
+- **Where the model's field states the opposite of the rows that state its
+  value**, the rows are open questions, and a claim on one is conditional.
+  This happens where the service could not write the value into the model,
+  and where two compatible rows, such as a password and a token, sit beside a
+  field that extraction wrote as `none`. The field is then no fact either:
+  the lanes cannot cite it as a stated absence. Where a submitter's answer
+  makes the value, the rows stay facts.
 - **Each row states its basis.** `stated` means the source says it in words.
   `inferred` means the pass concluded it from what the source says, and the row
   gives the reasoning. `derived` means a rule in code wrote the value, and the

@@ -78,18 +78,27 @@ no reader, and four more — two pairs of compatible values on one flow's
 `authentication` — were lost the same way. A scoped control is too, whenever
 one is stated.
 
-*Amended by the maintainer's ruling of 2026-11-18 on #2270 (R2).* Where the
-value the rows project into an attribute and the graph attribute after the
-projection state opposites (`assertions.contradictions`), the settled rows
-behind that value are not offered as settled rows. The rows are not a fact
+*Amended by the maintainer's rulings of 2026-11-18 on #2270 (R2) and on the
+#2302 open items.* Where the rows that state an attribute's value and the
+graph attribute after the projection state opposites
+(`assertions.contradictions`), the settled rows behind that value are not
+offered as settled rows. The rows are not a fact
 against that model, so the catalog offers each such row as an open
 question, as it offers a row another row disputes, and a claim on it reads
 `needs-info`. `assertions.offered` starts from `assertions.uncontradicted`,
 and `assertions.contradicted` names the rows the catalog holds open. Where a
 submitter's answer makes the projected value, no row behind it is held open:
 an answer settles the fact even against the sources (the decision of
-2026-09-25 on #1225). Compatible rows project `unknown` and leave the
-attribute standing (ADR 0034), so they are not compared with it.
+2026-09-25 on #1225). Each row that states the value is compared by its own
+state, so two compatible rows, which project `unknown` and leave the
+attribute standing (ADR 0034), are open questions beside an extracted
+`none`. The catalog does not offer a contradicted attribute as an
+`absent-attribute` (`assertions.contradicted_attributes`): the rows carry
+the question. An unknown or disputed row that reaches a graph field is
+offered as an open question where the model does not hold what its
+projection writes (`assertions.unapplied`), because the field then keeps
+what extraction wrote. `assertions.catalog_coverage` counts a contradicted
+row as open and its attribute as not settled.
 
 **3. The reference is the identity.** ADR 0034 rule 4 made an assertion's ID
 a pure function of its four identifying parts, recomputed by every reader.

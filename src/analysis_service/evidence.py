@@ -59,12 +59,15 @@ never rest on one as a fact. A settled row the graph attribute contradicts
 An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground. A row is open where the
 sources were asked about the fact and left it open, or where another row
-disputes it; such a row is in the table where it reaches no graph field. A
+disputes it. Such a row is in the table where it reaches no graph field, or
+where the model does not hold what its projection writes
+(:func:`~analysis_service.assertions.unapplied`): the validity gate refused
+the projected model, so the field keeps what extraction wrote. Otherwise the
 field it reaches shows what
 :data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
-under it, or what extraction wrote where the validity gate refuses the
-projected model. A row the graph attribute contradicts is open too, and it is
-in the table whatever field it reaches. An agent may raise a *conditional*
+under it. A row the graph attribute contradicts is open too, and it is in the
+table whatever field it reaches. The attribute it contradicts is not offered
+as an ``absent-attribute``: the rows carry the question. An agent may raise a *conditional*
 claim on an open row exactly as it may on an element attribute nobody stated.
 Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
 that grounds a settled row on an open question — or the reverse — is refused
@@ -258,7 +261,9 @@ def evidence_catalog(
     contradicted by the graph, and not already carried by the attribute its
     projection wrote — in the catalog's own order. The open rows come after
     them as ``unknown-assertion`` entries: an unknown or disputed row that
-    reaches no graph field, and every contradicted row. ``None`` is a job that
+    reaches no graph field or sits under a projection the model does not hold,
+    and every contradicted row. An attribute the rows contradict is never an
+    ``absent-attribute`` entry. ``None`` is a job that
     ran no such pass, and its catalog holds only the first two enumerations;
     an empty catalog is a pass that settled nothing, which offers the same rows
     and says so on the report.
