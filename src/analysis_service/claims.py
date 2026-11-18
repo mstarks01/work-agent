@@ -1071,7 +1071,9 @@ class Claim(BaseModel):
         """Split a lane's proposals into the ones this job can settle, and the rest.
 
         Returns the kept proposals and, keyed by the unit the package answers
-        in, the reason each deferred one was set aside. One call rather than
+        in, the reason each deferred one was set aside. The kept list holds
+        the very objects it was given, never copies, so a caller can tell
+        which proposals were deferred. One call rather than
         two, so the neutral fan-in needs no way of composing a package's unit
         from a package's proposal.
 
