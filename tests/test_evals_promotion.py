@@ -91,7 +91,7 @@ class TestEveryGateReadsARealArtifact:
 class TestTheTwoKindsOfGate:
     """A ratio one pair answers, and a difference no single pair can."""
 
-    def artifact(self, charge: float, coverage: float) -> dict:
+    def artifact(self, charge: float, coverage: float | None) -> dict:
         return {
             "node_charges": {"one": charge},
             "node_latency": {"one": {"total_ms": 1000}},
@@ -120,6 +120,14 @@ class TestTheTwoKindsOfGate:
 
         assert reading.verdict == "inconclusive"
         assert reading.measured == 0.0
+
+    def test_a_coverage_with_no_value_is_unread_rather_than_zero(self) -> None:
+        """A case with no must-find has no coverage, and the gate cannot read it."""
+        held = self.artifact(0.1, None)
+        reading = promotion.read_gate("must-find-coverage", held, {}, spread=0.1)
+
+        assert reading.verdict == "inconclusive"
+        assert reading.measured is None
 
     def test_a_spread_gives_the_limit_its_scale(self) -> None:
         held = self.artifact(0.1, promotion.BASELINE["must_find_coverage"] - 0.05)

@@ -195,6 +195,23 @@ class TestTheMeasurementSide:
 
         assert not [path for path in paths if path.startswith("instruction")]
 
+    def test_a_figure_that_loses_its_value_moved(self, tmp_path):
+        """A figure that goes from a value to none is reported, with no delta."""
+        rows = [row("stride", "critic_stride", 4_326, "a")]
+        before = load_artifact(
+            write_run(tmp_path, "b.json", rows, coverage_totals={"rate": 0.5})
+        )
+        after = load_artifact(
+            write_run(tmp_path, "a.json", rows, coverage_totals={"rate": None})
+        )
+
+        (moved,) = [
+            item
+            for item in measurement_deltas(before, after)
+            if item.path == "coverage_totals.rate"
+        ]
+        assert (moved.before, moved.after, moved.delta) == (0.5, None, None)
+
     def test_two_identical_sweeps_report_nothing(self, tmp_path):
         """No edit, no delta — the reading a healthy re-run gives."""
         rows = [row("stride", "critic_stride", 4_326, "a")]
