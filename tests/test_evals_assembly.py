@@ -13,13 +13,14 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from analysis_service import graph
 from analysis_service.assertions import AssertionCatalog, AssertionRecord
-from analysis_service.claims import CLAIM_BOUND_MARKS, Verdict
+from analysis_service.claims import CLAIM_BOUND_MARKS, Severity, Verdict
 from analysis_service.report import Report
 from evals.harness import assembly
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import RepoCommit, load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.reference import load_case
 from evals.harness.run import main
@@ -163,7 +164,10 @@ def test_a_ruling_today_s_critic_may_not_write_refuses_its_block():
     assert (row.replayed, row.rejected_replayed) == ((), ())
 
 
-def test_the_command_names_the_refused_block_and_reads_the_rest(capsys):
+def test_the_command_names_the_refused_block_and_reads_the_rest(capsys, monkeypatch):
+    """The baseline predates #1208; the ancestry answer is given, because a
+    shallow checkout cannot place its commit."""
+    monkeypatch.setattr(assembly, "severity_oracle", lambda commit: "critic-set")
     code = main(
         [
             "assembly",
@@ -188,7 +192,11 @@ def test_the_command_names_the_refused_block_and_reads_the_rest(capsys):
             "drafts: 32 inspected, 18 accounted, 0 omitted, 0 filed differently,"
             " 14 unavailable; 0 ruled claim(s) with no draft"
         ),
-        "ruled severity: no oracle",
+        (
+            "ruled severity: 0 compared, 0 differ; 18 claim(s) incompatible,"
+            " because the run's critic set severity; 0 claim(s) with no oracle,"
+            " because the clone cannot place the run"
+        ),
     ]
 
 
@@ -442,7 +450,7 @@ def test_a_returned_claim_is_accounted_and_its_neighbour_kept(
 ):
     block, (returned, neighbour), model = _assembled_with_a_return(domain_loader)
 
-    row = assembly.replay_case(case, block, [returned, neighbour], model)
+    row = assembly.replay_case(case, block, [returned, neighbour], model, "compared")
 
     assert row.returned_reported == row.returned_replayed == (returned.id,)
     assert row.replayed == row.reported == (neighbour.id,)
@@ -459,7 +467,7 @@ def test_a_return_on_another_unit_than_its_draft_s_is_filed_differently(
     moved = entry.model_copy(update={"unit": "V11.2.2"})
     block = block.model_copy(update={"returned_claims": [moved]})
 
-    row = assembly.replay_case(case, block, [returned, neighbour], model)
+    row = assembly.replay_case(case, block, [returned, neighbour], model, "compared")
 
     assert row.unexplained == (returned.id,)
     assert row.replayed == row.reported == (neighbour.id,)
@@ -500,3 +508,124 @@ def test_an_undrafted_claim_today_s_record_refuses_leaves_its_block_replayed(
 
     assert (row.refused, row.undrafted) == ("", ("S-99",))
     assert row.accounted == row.draft_ids
+
+
+def _move_first_severity(block):
+    """``block`` with its first claim's severity moved off its draft's."""
+    first, *rest = block.claims
+    rating = "low" if first.severity.likelihood == "high" else "high"
+    severity = Severity(
+        likelihood=rating, impact=rating, justification=first.severity.justification
+    )
+    moved = first.model_copy(update={"severity": severity})
+    return _filed(block, [moved, *rest], block.rejected_claims)
+
+
+def test_a_reported_severity_its_draft_does_not_hold_is_named(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+    monkeypatch,
+):
+    """The run descends from #1208: no ruling replaces a severity, so the
+    report's must be the draft's."""
+    monkeypatch.setattr(assembly, "severity_oracle", lambda commit: "compared")
+    _rewritten(archive, case, _move_first_severity)
+
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert row.severity_differs == (row.reported[0],)
+    assert row.severity_compared == len(row.reported)
+    assert row.unexplained == ()
+
+
+def test_an_archive_s_severities_match_their_drafts(archive, case, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(assembly, "severity_oracle", lambda commit: "compared")
+
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert row.severity_differs == ()
+    assert row.severity_compared == len(row.reported) + len(row.rejected_reported)
+
+
+@pytest.mark.parametrize("oracle", ["critic-set", "unknown"])
+def test_a_run_with_no_severity_oracle_compares_none(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+    monkeypatch,
+    oracle,
+):
+    """A run before #1208, or one the checkout cannot place, is not read
+    against its drafts, so a moved severity is no difference."""
+    monkeypatch.setattr(assembly, "severity_oracle", lambda commit: oracle)
+    _rewritten(archive, case, _move_first_severity)
+
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
+
+    assert (row.severity_oracle, row.severity_differs) == (oracle, ())
+    assert row.severity_compared == 0
+    assert row.severity_unchecked == len(row.reported)
+
+
+#: A commit the 2026-09-28 history rewrite renamed, and its ID now. Its old
+#: ID does not descend from the renamed #1208, and its new one does.
+RENAMED = (
+    "00fedc2b6b13eb27d714a2a61e6e08020cd214c4",
+    "b82160bf7c425ed129529de4a8df15a7977ae2a7",
+)
+
+
+@pytest.mark.parametrize(
+    ("held", "descends", "oracle"),
+    [(False, False, "unknown"), (True, False, "critic-set"), (True, True, "compared")],
+)
+def test_the_oracle_reads_git_at_the_commit_s_id_now(
+    monkeypatch, held, descends, oracle
+):
+    """Git is asked about the renamed ID, and each of its answers maps to one
+    oracle. The answers are given, because a shallow clone cannot place them."""
+    asked = []
+
+    def holds(root, commit):
+        asked.append(commit)
+        return held
+
+    def ancestor(root, earlier, later):
+        asked.append(later)
+        return descends
+
+    monkeypatch.setattr(assembly, "is_shallow", lambda root: False)
+    monkeypatch.setattr(assembly, "holds_commit", holds)
+    monkeypatch.setattr(assembly, "is_ancestor", ancestor)
+
+    answer = assembly.severity_oracle(RepoCommit(commit=RENAMED[0], clean=True))
+
+    assert answer == oracle
+    assert RENAMED[1] in asked and RENAMED[0] not in asked
+
+
+def test_a_commit_that_is_not_hex_is_refused_before_any_git_call():
+    with pytest.raises(ValidationError):
+        RepoCommit(commit="-c core.pager=x", clean=True)
+
+
+def test_a_package_that_grades_no_harm_has_no_severity_to_count(
+    case,  # noqa: F811
+    domain_loader,  # noqa: F811
+):
+    block, drafts, model = _assembled_with_a_return(domain_loader)
+
+    row = assembly.replay_case(case, block, drafts, model, "critic-set")
+
+    assert (row.severity_compared, row.severity_unchecked) == (0, 0)
+
+
+def test_a_shallow_clone_cannot_place_a_run(monkeypatch):
+    """A cut history can hide the ancestry, so the answer is unknown, never
+    "the critic set severity"."""
+    monkeypatch.setattr(assembly, "is_shallow", lambda root: True)
+    monkeypatch.setattr(assembly, "holds_commit", lambda root, commit: True)
+    monkeypatch.setattr(assembly, "is_ancestor", lambda root, a, b: False)
+
+    answer = assembly.severity_oracle(RepoCommit(commit=RENAMED[0], clean=True))
+
+    assert answer == "unknown"

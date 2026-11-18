@@ -38,10 +38,20 @@ the unit its entry names.
 rulings, so a claim filed against its own verdict is the report's check to
 refuse, and one whose verdict moved with it reads as the critic's ruling. The
 report's check also owns each block's summary, so a summary that miscounts its
-block fails the load and is named as an unreadable report. No ruled severity
-has an oracle: the replay compares no severity. The report does not hold the
-units a Control row kept from the deferred set, only those it sent back, so a
+block fails the load and is named as an unreadable report. The report does
+not hold the units a Control row kept from the deferred set, only those it sent back, so a
 kept claim that assembly failed to send back reads as the critic's ruling.
+
+**Severity.** No ruling carries a severity, so each reported claim's severity
+must be its draft's, and the replay compares the two for a package whose
+record grades harm.
+
+A run whose code does not descend from :data:`CRITIC_RATES_NO_SEVERITY`
+holds severities its critic set, so the comparison holds only for a run that
+descends from it, read by git ancestry from the artifact's commit. An older
+run is incompatible. A commit the checkout cannot place, as in a shallow
+clone, gives no oracle. Only a package whose record grades harm is counted,
+and a refused block has no replay, so neither appears in the severity line.
 
 **What it counts.** Each draft of a replayed block is accounted, omitted,
 filed differently or unavailable, where its block was refused or its ID
@@ -60,7 +70,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, NamedTuple, get_args
+from typing import Any, Literal, NamedTuple, get_args
 
 from pydantic import ValidationError
 
@@ -76,9 +86,17 @@ from analysis_service.errors import error_place
 from analysis_service.fan_in import _drop_duplicate_ids, returned_to_deferred
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.system_model import SystemModel
-from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
+from evals.harness.artifact import (
+    EvalArtifact,
+    ProvenanceError,
+    RepoCommit,
+    load_artifact,
+)
+from evals.harness.baseline import holds_commit, is_ancestor, is_shallow
 from evals.harness.bundle import UnreadableReport, finished_file, read_report
+from evals.harness.history import current_commit
 from evals.harness.modes import REPORTING_MODES, EvalRunError
+from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
 
@@ -159,6 +177,15 @@ class AssemblyReplay:
     #: draft under each ID, so the capture is broken; the first copy replays,
     #: and the counts leave the ID out.
     repeated: tuple[str, ...]
+    #: Whether the run's code makes each draft's severity the report's.
+    severity_oracle: SeverityOracle
+    #: Claims whose reported severity is not the one assembly gives them.
+    severity_differs: tuple[str, ...] = ()
+    #: How many graded claims had their severity compared, and how many were
+    #: not: the run's critic set it, the clone cannot place the run, or the
+    #: report does not hold the claim.
+    severity_compared: int = 0
+    severity_unchecked: int = 0
     #: Why today's ruling record or review check refused the archived rulings,
     #: where one did. Assembly fails closed on a ruling either refuses, so an
     #: older archive can hold rulings today's code would never assemble.
@@ -217,8 +244,12 @@ def replay_case(
     block: FrameworkAnalysis,
     drafts: Sequence[Claim],
     model: SystemModel,
+    oracle: SeverityOracle,
 ) -> AssemblyReplay:
-    """Assembly run again over ``drafts`` and the rulings ``block`` carries."""
+    """Assembly run again over ``drafts`` and the rulings ``block`` carries.
+
+    ``oracle`` says whether the run's severities can be compared.
+    """
     framework = block.framework
     record = PACKAGES[framework].record
     # The fan-in's own rule picks the copy of a repeated ID that replays.
@@ -235,6 +266,7 @@ def replay_case(
         case=case.id,
         framework=framework,
         draft_ids=tuple(by_id),
+        severity_oracle=oracle,
         reported=tuple(claim.id for claim in block.claims),
         replayed=(),
         rejected_reported=tuple(claim.id for claim in block.rejected_claims),
@@ -284,8 +316,15 @@ def replay_case(
         for draft in by_id.values()
         if returned.get(draft.id) == record.unit_of(draft)
     ]
+    filed = [*assembled.claims, *outcome.rejected]
+    # Only a package whose record grades harm has a severity to compare.
+    graded = filed if PACKAGES[framework].carries_severity() else []
+    compared = _severities(block, graded) if oracle == "compared" else {}
     return replace(
         row,
+        severity_differs=tuple(sorted(i for i, same in compared.items() if not same)),
+        severity_compared=len(compared),
+        severity_unchecked=len(graded) - len(compared),
         replayed=tuple(claim.id for claim in assembled.claims),
         rejected_replayed=tuple(claim.id for claim in outcome.rejected),
         returned_replayed=(
@@ -293,6 +332,53 @@ def replay_case(
             *(entry.claim_id for entry in assembled.returned),
         ),
     )
+
+
+def _severities(block: FrameworkAnalysis, replayed: Sequence[Claim]) -> dict[str, bool]:
+    """Each claim with an oracle for its severity, against whether the report's
+    severity is the one assembly gives it.
+
+    The caller hands in claims of a package whose record grades harm.
+    """
+    reported = {claim.id: claim for claim in block.all_claims()}
+    # The neutral record has no severity field; the package's own record has
+    # one wherever carries_severity says so.
+    return {
+        claim.id: getattr(reported[claim.id], "severity")  # noqa: B009
+        == getattr(claim, "severity")  # noqa: B009
+        for claim in replayed
+        if claim.id in reported
+    }
+
+
+#: The commit of #1208, after which the critic rates no severity and the lane
+#: agent's rating stands on every claim.
+CRITIC_RATES_NO_SEVERITY = "8bbc10689a93e0caa2432143dbcaef9e7372170c"
+
+#: Whether a run's severities can be compared with its drafts': its code
+#: descends from :data:`CRITIC_RATES_NO_SEVERITY`, it does not, or the
+#: checkout cannot tell.
+SeverityOracle = Literal["compared", "critic-set", "unknown"]
+
+
+def severity_oracle(commit: RepoCommit) -> SeverityOracle:
+    """Whether the run on ``commit`` left each draft's severity in place.
+
+    :class:`~evals.harness.artifact.RepoCommit` holds only a hex commit ID, so
+    the ID reaches ``git`` as an object, never as an option. A history rewrite
+    renames a commit, so the check reads it at the ID it has now. A shallow
+    clone, or one that does not hold both commits, cannot place the run, so
+    the answer is ``unknown``.
+    """
+    now = current_commit(commit.commit)
+    placed = not is_shallow(REPO_ROOT) and all(
+        holds_commit(REPO_ROOT, held) for held in (now, CRITIC_RATES_NO_SEVERITY)
+    )
+    if not placed:
+        return "unknown"
+    if is_ancestor(REPO_ROOT, CRITIC_RATES_NO_SEVERITY, now):
+        return "compared"
+    return "critic-set"
 
 
 class AssemblySweep(NamedTuple):
@@ -323,6 +409,7 @@ def replay_artifact(
     )
     if not sweep.writes_reports:
         return sweep
+    oracle = severity_oracle(artifact.commit)
     for case in cases:
         try:
             report_path = finished_file(artifact, case.id, "report")
@@ -341,8 +428,15 @@ def replay_artifact(
         for block in report.analyses:
             record = PACKAGES[block.framework].record
             drafts = [record.model_validate(d) for d in held.get(block.framework, [])]
-            sweep.rows.append(replay_case(case, block, drafts, report.system_model))
+            sweep.rows.append(
+                replay_case(case, block, drafts, report.system_model, oracle)
+            )
     return sweep
+
+
+def _unchecked(rows: Sequence[AssemblyReplay], oracle: SeverityOracle) -> int:
+    """Claims not compared, in rows whose run reads ``oracle``."""
+    return sum(row.severity_unchecked for row in rows if row.severity_oracle == oracle)
 
 
 def arguments(parser: argparse.ArgumentParser) -> None:
@@ -375,7 +469,9 @@ def command_assembly(args: argparse.Namespace) -> int:
             print(f"  {row.case}: ruled on and omitted from the report: {claim_id}")
         for claim_id in row.repeated:
             print(f"  {row.case}: held twice in the drafts: {claim_id}")
-        differs = bool(row.omitted or row.repeated or row.unexplained)
+        differs = bool(
+            row.omitted or row.repeated or row.unexplained or row.severity_differs
+        )
         moved += differs
         if row.refused:
             print(f"{row.case:34} {row.framework:6} refused by today's check:")
@@ -391,6 +487,8 @@ def command_assembly(args: argparse.Namespace) -> int:
             print(f"  filed differently from its ruling: {claim_id}")
         for claim_id in row.undrafted:
             print(f"  ruled on with no draft: {claim_id}")
+        for claim_id in row.severity_differs:
+            print(f"  reported with a severity its draft does not hold: {claim_id}")
     refused = sum(bool(row.refused) for row in sweep.rows)
     print(
         f"{len(sweep.rows)} block(s), {moved} differ, {refused} refused by today's check;"
@@ -409,5 +507,12 @@ def command_assembly(args: argparse.Namespace) -> int:
         f" {total(lambda row: row.unavailable)} unavailable;"
         f" {total(lambda row: row.undrafted)} ruled claim(s) with no draft"
     )
-    print("ruled severity: no oracle")
+    print(
+        f"ruled severity: {sum(row.severity_compared for row in sweep.rows)}"
+        f" compared, {sum(len(row.severity_differs) for row in sweep.rows)} differ;"
+        f" {_unchecked(sweep.rows, 'critic-set')} claim(s) incompatible, because"
+        f" the run's critic set severity;"
+        f" {_unchecked(sweep.rows, 'unknown')} claim(s) with no oracle, because"
+        " the clone cannot place the run"
+    )
     return 1 if moved or sweep.capture_faults else 0

@@ -790,6 +790,23 @@ def _git(root: Path, *args: str) -> str | None:
         return None
 
 
+def holds_commit(root: Path, commit: str) -> bool:
+    """Whether the clone at ``root`` holds ``commit`` as a commit."""
+    return _git(root, "cat-file", "-e", f"{commit}^{{commit}}") is not None
+
+
+def is_shallow(root: Path) -> bool:
+    """Whether the clone at ``root`` is shallow, so an ancestry it reads can
+    stop at a cut it does not know about; true where git cannot answer."""
+    return _git(root, "rev-parse", "--is-shallow-repository") != "false\n"
+
+
+def is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
+    """Whether ``ancestor`` is an ancestor of ``descendant`` in the clone at
+    ``root``; false where git cannot answer."""
+    return _git(root, "merge-base", "--is-ancestor", ancestor, descendant) is not None
+
+
 def corpus_digest_at(commit: str, root: Path) -> str | None:
     """The corpus digest recomputed from a commit's tree, not the checkout's.
 
@@ -1027,8 +1044,8 @@ def verify(directory: Path, root: Path, base_ref: str) -> list[str]:
     # The identity keeps the ID it was sealed with; a history rewrite renames
     # the commit, and the git checks read it at the ID it has now.
     commit = current_commit(identity.repo_commit)
-    if _git(root, "cat-file", "-e", f"{commit}^{{commit}}") is not None:
-        if _git(root, "merge-base", "--is-ancestor", commit, base_ref) is None:
+    if holds_commit(root, commit):
+        if not is_ancestor(root, commit, base_ref):
             problems.append(
                 f"{identity.repo_commit[:12]}: not an ancestor of {base_ref};"
                 " a fork-only commit is refused because the identity names a"
