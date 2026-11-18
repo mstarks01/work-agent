@@ -203,7 +203,7 @@ def test_expected_tier_kills_are_separated_from_must_find(case):
         _identity_matcher([killed]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [], [killed]),
     ).critic_yield
 
     assert result.matched_killed == 1
@@ -520,7 +520,7 @@ def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
         _identity_matcher([first, second]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [second], [first]),
     ).critic_yield
 
     assert result.kill_count == 1
@@ -540,7 +540,7 @@ def test_a_kill_nothing_made_good_is_lost(case):
         _identity_matcher([killed]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [], [killed]),
     ).critic_yield
 
     assert (result.matched_killed, result.matched_lost) == (1, 1)
