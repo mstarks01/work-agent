@@ -13,17 +13,16 @@ import pytest
 from analysis_service.assertions import ABSENT, Subject, assertion_id, contradictions
 from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
 from analysis_service.critic import assemble_claims
-from analysis_service.evidence import evidence_catalog
+from analysis_service.evidence import absent_evidence_ref, evidence_catalog
 from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.system_model import DataStore, SystemModel
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.test_evidence import assertions, row
+from tests.test_fan_in import CROSSING
 
 SCHEMAS = schemas_for("stride")
-#: A flow the sample model derives as a decided boundary crossing.
-CROSSING = "flow:entity:customer>process:web-app>login"
 ORDERS = "store:orders-db"
 FIRST = "System description"
 SECOND = "Payment notes"
@@ -118,7 +117,8 @@ class TestIdenticalTextInTwoSources:
                     kind="quote",
                     text="The admin console has no login.",
                     source_label=label,
-                )
+                ),
+                Ground(kind="derived-fact", flow_id=CROSSING),
             ],
             SAME_SOURCES,
         )
@@ -143,7 +143,11 @@ class TestIdenticalTextInTwoSources:
 
 
 class TestAbsenceAgainstSilence:
-    """A stated absence is a fact in hand; an unstated control is a question."""
+    """A stated absence is a fact in hand; an unstated control is a question.
+
+    That silence cannot be cited as an absence is held at the join by
+    ``tests/test_fan_in.py`` (a ground naming an unknown as absent).
+    """
 
     def test_a_claim_on_a_stated_absence_can_be_confirmed(self):
         model = _with_encryption("none")
@@ -178,21 +182,6 @@ class TestAbsenceAgainstSilence:
         assert verdict.related_unknowns == [
             UnknownRef(element_id=ORDERS, attribute="encryption_at_rest")
         ]
-
-    def test_silence_cannot_be_cited_as_an_absence(self):
-        model = _with_encryption("unknown")
-
-        with pytest.raises(DraftJoinError, match="reads as unverified"):
-            _join(
-                [
-                    Ground(
-                        kind="absent-attribute",
-                        element_id=ORDERS,
-                        attribute="encryption_at_rest",
-                    )
-                ],
-                model=model,
-            )
 
 
 class TestAConflictCarriedToTheClaim:
@@ -290,4 +279,5 @@ class TestARowTheGraphContradicts:
         offered = evidence_catalog(model, catalog)
         assert contradictions(catalog, model) == ()
         assert assertion_id(self.STORED) not in offered
-        assert offered[f"absent:{ORDERS}:encryption_at_rest"].kind == "absent-attribute"
+        ref = absent_evidence_ref(ORDERS, "encryption_at_rest")
+        assert offered[ref].kind == "absent-attribute"
