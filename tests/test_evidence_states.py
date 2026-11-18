@@ -606,8 +606,8 @@ def test_a_claim_on_a_contradicted_absence_is_told_why():
 
 
 class TestRowsUnderARefusedProjection:
-    """What the standards read of #2306 asked: which open rows a refused
-    projection offers, and which shapes the per-row comparison reaches."""
+    """Which open rows a refused projection offers, and which shapes the
+    per-row comparison reaches."""
 
     STORE = TestARowTheGraphContradicts.STORE
     ENCRYPTED = TestTheGraphSideOfAContradiction.ENCRYPTED
@@ -635,7 +635,7 @@ class TestRowsUnderARefusedProjection:
         model = _with_encryption("none")
 
         (found,) = contradictions(catalog, model)
-        assert found.stated == "AES-256; AES-128"
+        assert found.values == "AES-256; AES-128"
         offered = evidence_catalog(model, catalog)
         assert TestTheGraphSideOfAContradiction.ABSENT_REF not in offered
         assert offered[assertion_id(other)].kind == "unknown-assertion"
@@ -670,3 +670,17 @@ def test_an_unknown_ground_on_a_contradicted_field_is_told_its_state():
 
     (issue,) = ground_issues([claim], _with_encryption("AES-256"), catalog)
     assert "reads as stated" in issue
+
+
+def test_a_disputed_pair_beside_an_unknown_field_is_asked_once():
+    """The field reads unknown, so the attribute enumeration carries the
+    question, and the pair is not offered a second time."""
+    absence = TestARowTheGraphContradicts.STORED
+    encrypted = TestADisputedPairUnderARefusedProjection.ENCRYPTED
+    catalog = assertions(
+        absence, encrypted, subjects=(TestARowTheGraphContradicts.STORE,)
+    )
+    offered = evidence_catalog(_with_encryption(UNKNOWN), catalog)
+
+    assert assertion_id(absence) not in offered
+    assert assertion_id(encrypted) not in offered

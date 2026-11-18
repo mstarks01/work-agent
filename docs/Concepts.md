@@ -91,7 +91,7 @@ A ground has one of these kinds:
 - `quote`: a quote from a labeled source;
 - `unknown-attribute`: an attribute the source left unknown;
 - `absent-attribute`: an attribute the source explicitly said was absent,
-  unless assertion rows state the opposite;
+  unless the assertion rows that state its value all state the opposite;
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
 - `assertion`: an assertion row that the sources settle, unless the rows that

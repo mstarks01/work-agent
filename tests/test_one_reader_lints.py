@@ -3279,16 +3279,12 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     ]
 
 
-def test_what_an_applied_projection_writes_has_one_reader():
-    """``_writes`` is the one reader of the value a projection writes, so the
-    projection and ``unapplied``, which compares a field with it, agree."""
-    for name in ("qualified", "_unchecked_over_lead"):
-        assert _sites(lambda node, name=name: _calls(node, name)) == [
-            ("src/analysis_service/assertions.py", "_writes"),
-        ]
-    assert _sites(lambda node: _calls(node, "_writes")) == [
-        ("src/analysis_service/assertions.py", "_projected_model"),
-        ("src/analysis_service/assertions.py", "unapplied"),
+def test_a_row_value_has_one_graph_spelling():
+    """``_graph_spelling`` is the one reader of how a graph field spells a
+    row's value, so the projection, its qualification and the graph
+    comparison spell one value the same way."""
+    assert _sites(lambda node: _calls(node, "_written")) == [
+        ("src/analysis_service/assertions.py", "_graph_spelling"),
     ]
 
 

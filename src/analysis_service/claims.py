@@ -641,8 +641,9 @@ class Ground(BaseModel):
       A consumer that folded the two would report a control the input described
       as missing as a gap in the *description*. Both branches say only what the
       model carries; neither says the control is inadequate, which stays the
-      agent's argument and the critic's to rule on. An absence the job's
-      assertion rows state the opposite of is not catalogued
+      agent's argument and the critic's to rule on. An absence is not
+      catalogued where the job's assertion rows that state the attribute's
+      value all state the opposite
       (:func:`~analysis_service.assertions.contradicted_attributes`); those
       rows are open questions instead.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a

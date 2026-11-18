@@ -60,15 +60,15 @@ An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground. A row is open where the
 sources were asked about the fact and left it open, or where another row
 disputes it. Such a row is in the table where it reaches no graph field, or
-where the model does not hold the qualified ``unknown`` its projection
-writes (:func:`~analysis_service.assertions.unapplied`): the validity gate refused
+where its projection qualifies the field and the field states a value
+(:func:`~analysis_service.assertions.unqualified`): the validity gate refused
 the projected model, so the field keeps what extraction wrote. Otherwise the
 field it reaches shows what
 :data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
 under it. A row the graph attribute contradicts is open too, and it is in the
 table whatever field it reaches. The attribute it contradicts is not offered
-as an ``absent-attribute``: the rows carry the question. An agent may raise a *conditional*
-claim on an open row exactly as it may on an element attribute nobody stated.
+as an ``absent-attribute``: the rows carry the question. An agent may raise a
+*conditional* claim on an open row exactly as it may on an element attribute nobody stated.
 Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
 that grounds a settled row on an open question — or the reverse — is refused
 by comparing its kind against the table rather than by a second reading of
@@ -110,7 +110,7 @@ from analysis_service.assertions import (
     offered,
     projected_attribute,
     states_missing,
-    unapplied,
+    unqualified,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
@@ -261,10 +261,9 @@ def evidence_catalog(
     contradicted by the graph, and not already carried by the attribute its
     projection wrote — in the catalog's own order. The open rows come after
     them as ``unknown-assertion`` entries: an unknown or disputed row that
-    reaches no graph field or sits under a qualifying projection the model
-    does not hold,
-    and every contradicted row. An attribute the rows contradict is never an
-    ``absent-attribute`` entry. ``None`` is a job that
+    reaches no graph field, or whose projection qualifies a field that still
+    states a value, and every contradicted row. An attribute the rows
+    contradict is never an ``absent-attribute`` entry. ``None`` is a job that
     ran no such pass, and its catalog holds only the first two enumerations;
     an empty catalog is a pass that settled nothing, which offers the same rows
     and says so on the report.
@@ -316,15 +315,15 @@ def evidence_catalog(
         # The open questions, after the settled rows and never merged with
         # them. An unknown row, or a row in a conflict, reaches here when it
         # reaches no graph field, or when its projection qualifies the field
-        # and the model does not hold it. An applied projection shows a disputed
+        # and the field still states a value. An applied projection shows a disputed
         # attribute as a qualified unknown, which the attribute enumeration
         # above offers, but a principal's second factor has no attribute to
         # qualify. Where the validity gate refuses the projected model, the
         # field keeps what extraction wrote, so only this offer carries the
         # question.
-        unapplied_rows = {
+        unqualified_rows = {
             row
-            for projection in unapplied(assertions, model)
+            for projection in unqualified(assertions, model)
             for row in projection.rows
         }
         unprojected = [
@@ -334,7 +333,7 @@ def evidence_catalog(
                 *disputed(assertions),
             )
             if not projected_attribute(row.predicate, row.subject)
-            or assertion_id(row) in unapplied_rows
+            or assertion_id(row) in unqualified_rows
         ]
         # A row the graph attribute contradicts reaches a graph field, and that
         # field states the opposite rather than an unknown, so only this offer
