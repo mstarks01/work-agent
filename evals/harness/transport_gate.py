@@ -153,10 +153,13 @@ def _margin(figure: str, margin: float) -> Callable[[Arm, Arm], tuple[bool, str]
     def verdict(full: Arm, compact: Arm) -> tuple[bool, str]:
         # A case one arm has a value for and the other has not would move one
         # mean and not the other, so the two means would not compare.
-        full_cases = _value_presence(full, figure)
-        if full_cases != _value_presence(compact, figure) or (
-            "some" in full_cases.values()
-        ):
+        full_cases, compact_cases = (
+            _value_presence(full, figure),
+            _value_presence(compact, figure),
+        )
+        if "some" in (*full_cases.values(), *compact_cases.values()):
+            return False, f"{UNAVAILABLE}: a sweep lacks a value another sweep holds"
+        if full_cases != compact_cases:
             return False, f"{UNAVAILABLE}: the arms hold a value on different cases"
         compact_mean, full_mean = (
             mean(compact.figure(figure)),
@@ -189,11 +192,11 @@ def _veto(full: Arm, compact: Arm) -> tuple[bool, str]:
             for case, runs in full_runs.items()
         }
         for case, runs in compact.per_case(figure).items():
-            if all(run is None for run in (*runs, *full_runs[case])):
+            if presence(runs) == "none" and presence(full_runs[case]) == "none":
                 # Neither arm has this figure for the case: they are alike.
                 continue
             floor = floors[case]
-            if floor is None or None in runs:
+            if floor is None or presence(runs) != "every":
                 fallen.append(f"{case}/{figure} {UNAVAILABLE}")
                 continue
             average = statistics.fmean(run for run in runs if run is not None)

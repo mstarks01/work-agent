@@ -2225,7 +2225,7 @@ def _print_stability(
     print(f"stability over {len(runs)} runs: {', '.join(run.label for run in runs)}")
     header = f"  {'framework':10} {'case':26} {'recalls':>22}"
     print(
-        f"{header} {'spread':>8} {'always':>16} {'jaccard':>9}"
+        f"{header} {'spread':>11} {'always':>16} {'jaccard':>11}"
         f" {'cause':>10} {'severity':>10} {'place':>10}"
     )
 
@@ -2245,8 +2245,8 @@ def _print_stability(
         always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
         print(
             f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
-            f" {shown_figure(entry.recall_spread, '.2f'):>8} {always:>16}"
-            f" {shown_figure(entry.mean_jaccard, '.2f'):>9}"
+            f" {shown_figure(entry.recall_spread, '.2f'):>11} {always:>16}"
+            f" {shown_figure(entry.mean_jaccard, '.2f'):>11}"
             f" {cause(entry):>10}"
             f" {held(entry.severity_held, entry.severity_moved):>10}"
             f" {held(entry.place_held, entry.place_moved):>10}"

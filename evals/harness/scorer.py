@@ -69,6 +69,7 @@ from evals.harness.fingerprint import key_claim
 from evals.harness.identity import CaseFlows, ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.rates import (
+    complete_mean,
     jaccard,
     mean,
     ratio,
@@ -1040,7 +1041,8 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
     its model, or whose fan-in rejected every draft, produces no score and so
     contributes to neither half of this mean. A sweep that lost three cases
     reads the same as one that lost none. A scored case whose figure has no
-    value adds nothing either (:func:`~evals.harness.rates.mean`). The
+    value makes the mean have none (:func:`~evals.harness.rates.complete_mean`),
+    so two rows of the table never average over different cases. The
     artifact's ``completion`` block carries the ``attempted`` and ``scored``
     counts, which are the numbers to quote beside any mean taken from here.
     """
@@ -1052,7 +1054,7 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
         and metric in row.get("metrics", {})
         and cases.wanted(row.get("case"))
     ]
-    return mean(values)
+    return complete_mean(values)
 
 
 def vote_coverage(blocks: Mapping[str, Any]) -> tuple[int, int]:

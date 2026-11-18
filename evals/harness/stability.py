@@ -447,8 +447,8 @@ class Band:
     @property
     def inflation(self) -> float | None:
         """How much wider the truth is than the floor, in variance. ``None`` uncalibrated."""
-        # A zero observed variance reads as uncalibrated: a band never sits
-        # below its floor, which is what :attr:`variance` relies on.
+        # A zero observed variance reads as uncalibrated, because a zero
+        # inflation would give a band of zero width.
         if not self.observed_variance or self.calibration_floor is None:
             return None
         return ratio(self.observed_variance, self.calibration_floor)

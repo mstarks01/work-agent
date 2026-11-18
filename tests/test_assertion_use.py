@@ -107,7 +107,7 @@ def test_the_command_reads_each_report_under_a_directory(tmp_path, capsys):
     assert command_assertion_use(argparse.Namespace(reports=[tmp_path])) == 0
 
     out = capsys.readouterr().out
-    assert "| 01-case | stride | 1 | 1 | 1 | — | 1 |" in out
+    assert "| 01-case | stride | 1 | 1 | 1 | unavailable | 1 |" in out
     assert (
         "Reports read: 1. Reports with no assertion pass: 1."
         " Reports today's model refuses: 1." in out

@@ -791,13 +791,13 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
         return
     print("\nASVS disposition (mechanical, closed vocabulary)")
     print(
-        f"{'case':<26} {'judged':>7} {'acc':>6} {'unjud':>6} {'unrch':>6}"
+        f"{'case':<26} {'judged':>7} {'acc':>11} {'unjud':>6} {'unrch':>6}"
         f" {'prose!':>7} {'conf!':>6} {'kind!':>6} {'na!':>4}"
     )
     for score in scores:
         print(
             f"{score.case:<26} {len(score.judged):>7}"
-            f" {percent(score.accuracy):>6}"
+            f" {percent(score.accuracy):>11}"
             f" {score.unjudged:>6} {len(score.unreached):>6}"
             f" {len(score.false_prose_requests):>7}"
             f" {len(score.false_confirmed):>6} {len(score.wrong_kind):>6}"
@@ -1147,13 +1147,13 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         return
     print("\nASVS applicability (mechanical, catalog match)")
     print(
-        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>11}"
+        f"{'case':<26} {'lvl':>3} {'rec':>11} {'must':>11} {'prec':>11}"
         f" {'miss':>5} {'defr':>5} {'unlst':>5} {'neg!':>5} {'rej':>5} {'off':>4}"
     )
     for score in scores:
         print(
-            f"{score.case:<26} {score.level:>3} {percent(score.recall):>6}"
-            f" {percent(score.must_find_recall):>6}"
+            f"{score.case:<26} {score.level:>3} {percent(score.recall):>11}"
+            f" {percent(score.must_find_recall):>11}"
             f" {percent(score.precision):>11}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"

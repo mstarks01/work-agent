@@ -611,8 +611,8 @@ class _AllCases:
         return blocks[key]
 
 
-def test_a_published_mean_skips_a_case_with_no_value():
-    """A case whose figure has no value adds nothing to the mean."""
+def test_a_published_mean_has_no_value_where_a_case_has_none():
+    """Two rows of the table never average over different cases."""
     from evals.harness.scorer import published
 
     blocks = {
@@ -622,7 +622,7 @@ def test_a_published_mean_skips_a_case_with_no_value():
         ]
     }
 
-    assert published(blocks, "reference_coverage", _AllCases()) == 0.5
+    assert published(blocks, "reference_coverage", _AllCases()) is None
 
 
 def test_the_rejected_gain_reads_no_value_where_a_case_has_none():
