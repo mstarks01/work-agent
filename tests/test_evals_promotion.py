@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -27,9 +28,12 @@ from analysis_service.assertions import (
 )
 from analysis_service.sources import text_digest
 from evals.harness import promotion
-from evals.harness.reference import load_corpus
+from evals.harness.ledger import Ledger
+from evals.harness.reference import load_case, load_corpus
 from evals.harness.replay import signed_reference
 from evals.harness.run import COMMANDS
+from evals.harness.scorer import score_case
+from tests.eval_factories import ScriptedMatcher
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
@@ -122,10 +126,22 @@ class TestTheTwoKindsOfGate:
         assert reading.measured == 0.0
 
     def test_a_coverage_with_no_value_is_unread_rather_than_zero(self) -> None:
-        """A case with no must-find has no coverage, and the gate cannot read it."""
+        """A case with no must-find writes no coverage, and the gate cannot read it.
+
+        The score block comes from the scorer, which wrote 0.0 here before an
+        empty denominator read as no value; the gate then failed on that zero.
+        """
+        corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
+        payments = load_case(corpus / "01-payments-checkout")
+        score = replace(
+            score_case(payments, [], ScriptedMatcher(), Ledger()), must_find_total=0
+        )
         held = self.artifact(0.1, None)
+        held["scores"] = [score.to_json()]
+
         reading = promotion.read_gate("must-find-coverage", held, {}, spread=0.1)
 
+        assert score.to_json()["metrics"]["must_find_coverage"] is None
         assert reading.verdict == "inconclusive"
         assert reading.measured is None
 

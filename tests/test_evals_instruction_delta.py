@@ -29,6 +29,7 @@ from evals.harness.instruction_delta import (
     command_compare,
     measurement_deltas,
     node_deltas,
+    render,
 )
 from evals.harness.instruction_delta import (
     artifact as delta_artifact,
@@ -195,7 +196,7 @@ class TestTheMeasurementSide:
 
         assert not [path for path in paths if path.startswith("instruction")]
 
-    def test_a_figure_that_loses_its_value_moved(self, tmp_path):
+    def test_a_figure_that_loses_its_value_moved(self, tmp_path, capsys):
         """A figure that goes from a value to none is reported, with no delta."""
         rows = [row("stride", "critic_stride", 4_326, "a")]
         before = load_artifact(
@@ -211,6 +212,9 @@ class TestTheMeasurementSide:
             if item.path == "coverage_totals.rate"
         ]
         assert (moved.before, moved.after, moved.delta) == (0.5, None, None)
+        assert moved.to_json()["delta"] is None
+        render([], [moved], [])
+        assert "unavailable" in capsys.readouterr().out
 
     def test_two_identical_sweeps_report_nothing(self, tmp_path):
         """No edit, no delta — the reading a healthy re-run gives."""
