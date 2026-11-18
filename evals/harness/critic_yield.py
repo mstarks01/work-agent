@@ -202,6 +202,16 @@ class CriticPopulations:
             if outcome_matches(outcome) and has_verdict(fate)
         )
 
+    def met(
+        self, fate: VerdictStatus, outcome_matches: Callable[[ScoredOutcome], bool]
+    ) -> int:
+        """The drafts that met ``fate`` whose scored outcome ``outcome_matches``."""
+        return sum(
+            n
+            for (outcome, met), n in self.counts.items()
+            if met == fate and outcome_matches(outcome)
+        )
+
     def ruled_in(self, label: Population) -> int:
         """The drafts with a verdict in one population."""
         return self.ruled(lambda outcome: LABEL_OF[outcome] == label)
@@ -326,7 +336,7 @@ class KilledDraft:
 
     ``fate`` says whether the critic rejected it or the block holds no verdict
     for it. The audit trail under the aggregate counts: a ``matched-must-find`` line
-    here is a real finding the critic destroyed, named, with the reference it
+    here is a real finding that left the report, named, with the reference it
     was answering — which is what makes the veto number actionable instead of
     merely alarming.
     """
@@ -411,11 +421,6 @@ class CriticYield:
         )
 
     @property
-    def rejected_kills(self) -> tuple[KilledDraft, ...]:
-        """The kills the critic rejected, which the yield rates count."""
-        return tuple(draft for draft in self.killed if draft.fate == "rejected")
-
-    @property
     def must_find_lost(self) -> int:
         """The net form of :attr:`must_find_killed`."""
         return sum(
@@ -435,7 +440,8 @@ class CriticYield:
 
     @property
     def killed_by_cause(self) -> dict[KillCause, dict[str, int]]:
-        """Every kill by the step the critic named, and what each step removed.
+        """Every kill by the step its verdict names, or by its fate where it has
+        no verdict, and what each removed.
 
         The critic states why it rejected a draft, and nothing counted it: the
         second Baseline's four must-find kills were three ``reasoning`` and one
@@ -474,7 +480,7 @@ class CriticYield:
         as a numerator or a denominator. A rate over an empty population has no
         value.
         """
-        return _critic_rates(self.populations, self.rejected_kills)
+        return _critic_rates(self.populations)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -659,21 +665,29 @@ def _matched(outcome: ScoredOutcome) -> bool:
     return outcome.startswith("matched")
 
 
-def _critic_rates(
-    populations: CriticPopulations, rejected_kills: Sequence[KilledDraft]
-) -> dict[YieldRate, Rate]:
-    """The yield's four rates, over the drafts with a verdict, of one case or pooled."""
-    down_voted = sum(draft.outcome == "rejected" for draft in rejected_kills)
+def _every(_: ScoredOutcome) -> bool:
+    return True
+
+
+def _down_voted(outcome: ScoredOutcome) -> bool:
+    return outcome == "rejected"
+
+
+def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
+    """The yield's four rates, over the drafts with a verdict, of one case or pooled.
+
+    A kill here is a draft the critic rejected, read off the same population
+    counts as each denominator.
+    """
+    killed = populations.met("rejected", _every)
+    down_voted_killed = populations.met("rejected", _down_voted)
     return {
-        "kill_rate": Rate(len(rejected_kills), populations.ruled(lambda _: True)),
-        "rejected_kill_rate": Rate(
-            down_voted, populations.ruled(lambda outcome: outcome == "rejected")
-        ),
+        "kill_rate": Rate(killed, populations.ruled(_every)),
+        "rejected_kill_rate": Rate(down_voted_killed, populations.ruled(_down_voted)),
         "matched_kill_rate": Rate(
-            sum(_matched(draft.outcome) for draft in rejected_kills),
-            populations.ruled(_matched),
+            populations.met("rejected", _matched), populations.ruled(_matched)
         ),
-        "kill_precision": Rate(down_voted, len(rejected_kills)),
+        "kill_precision": Rate(down_voted_killed, killed),
     }
 
 
@@ -684,17 +698,8 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     rates would let a case that drafted three threats outweigh one that drafted
     forty.
     """
-    return _aggregate(yields)[0]
-
-
-def _aggregate(
-    yields: Sequence[CriticYield],
-) -> tuple[dict[str, Any], dict[YieldRate, Rate]]:
-    """:func:`aggregate_yield`, and the pooled rates it rounds."""
     populations = CriticPopulations.pooled(yields)
-    rates = _critic_rates(
-        populations, [draft for entry in yields for draft in entry.rejected_kills]
-    )
+    rates = _critic_rates(populations)
     must_find_killed = sum(entry.must_find_killed for entry in yields)
     matched_lost = sum(entry.matched_lost for entry in yields)
     must_find_lost = sum(entry.must_find_lost for entry in yields)
@@ -702,7 +707,7 @@ def _aggregate(
     for entry in yields:
         for cause, counts in entry.killed_by_cause.items():
             by_cause.setdefault(cause, Counter()).update(counts)
-    totals: dict[str, Any] = {
+    return {
         "cases": len(yields),
         "drafts_in": sum(entry.drafts_in for entry in yields),
         "threats_out": sum(entry.threats_out for entry in yields),
@@ -717,13 +722,13 @@ def _aggregate(
         # no verdict, so they do not divide to a rate.
         "rates": {name: rate.to_json() for name, rate in rates.items()},
         "no_verdict": populations.no_verdict,
-        # Every kill by the step the critic named, pooled; the per-step
-        # ``matched`` and ``must_find`` are what a step removed.
+        # Every kill by the step its verdict names, or by its fate where it has
+        # no verdict, pooled; the per-key ``matched`` and ``must_find`` are
+        # what each removed.
         "killed_by_cause": {
             cause: dict(counts) for cause, counts in sorted(by_cause.items())
         },
     }
-    return totals, rates
 
 
 def render(yields: Sequence[CriticYield]) -> None:
@@ -745,7 +750,11 @@ def render(yields: Sequence[CriticYield]) -> None:
             + (f"  no archived verdict {apart}" if apart else "")
         )
     if yields:
-        totals, pooled = _aggregate(yields)
+        totals = aggregate_yield(yields)
+        pooled = {
+            name: Rate(rate["numerator"], rate["denominator"])
+            for name, rate in totals["rates"].items()
+        }
         print(
             f"critic yield: killed {pooled['kill_rate'].shown()},"
             f" rejected caught {pooled['rejected_kill_rate'].shown()},"
