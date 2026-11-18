@@ -25,10 +25,11 @@ from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS, DEFAULT_DESCRIPTION_LABEL
 from analysis_service.validation import MAX_ELEMENTS
 from tests.factories import (
     REPORTING_JOB,
+    SCRIPTED_FRAMEWORKS,
     sample_draft,
     sample_proposal,
     three_hop_model,
@@ -1493,3 +1494,20 @@ class TestTheEmissionBound:
 
         assert time.thread_time() - started < 2
         assert len(merged.drafts) == MAX_SEQUENCE
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_each_package_keeps_the_proposal_objects_it_was_given(framework):
+    """The fan-in names a deferred proposal by identity, so every package's
+    split must hand back the objects it was given, never copies."""
+    fixture = SCRIPTED_FRAMEWORKS[framework]
+    proposals = (
+        schemas_for(framework).proposals.model_validate_json(fixture.proposal).claims
+    )
+
+    kept, _ = PACKAGES[framework].record.partition_proposals(
+        proposals, fixture.lane, CARRIED_EVIDENCE_KINDS, ()
+    )
+
+    assert kept
+    assert all(any(held is given for given in proposals) for held in kept)
