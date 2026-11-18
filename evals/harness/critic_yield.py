@@ -77,7 +77,7 @@ FATES: tuple[CriticFate, ...] = tuple(
 )
 #: The fates that are a critic's verdict on the block. A ``returned`` claim
 #: was ruled and kept, but the block does not record its status.
-VERDICTS: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
+VERDICT_STATUSES: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
 
 #: Which input population a draft joins.
 Population = Literal["real", "not-real", "unlabelled"]

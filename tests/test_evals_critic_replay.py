@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 from dataclasses import replace
+from typing import get_args, get_type_hints
 
 import pytest
 
@@ -346,6 +347,9 @@ def test_an_omitted_draft_is_counted_apart(recorded, case):  # noqa: F811
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
     block = archived.block.model_copy(update={"claims": archived.block.claims[1:]})
     rows = critic_replay.compare(replace(archived, block=block), [])
+    sides = [row.archived for row in rows]
+    assert sides.count("omitted") == 1
+    assert set(sides) - {"omitted"} <= critic_yield.VERDICT_STATUSES
 
     lines = critic_replay.agreement_lines(rows)
 
@@ -376,7 +380,7 @@ def test_a_draft_the_replay_left_unruled_still_counts_as_a_disagreement(
     out, _ = recorded
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
     rows = critic_replay.compare(archived, [])
-    assert {row.archived for row in rows} <= critic_yield.VERDICTS
+    assert {row.archived for row in rows} <= critic_yield.VERDICT_STATUSES
 
     lines = critic_replay.agreement_lines(rows)
 
@@ -384,10 +388,16 @@ def test_a_draft_the_replay_left_unruled_still_counts_as_a_disagreement(
     assert all("no archived verdict" not in line for line in lines)
 
 
-def test_the_no_verdict_words_name_every_archived_side_outside_the_verdicts():
-    sides = {*critic_yield.FATES, critic_replay.UNRULED} - critic_yield.VERDICTS
-    assert critic_replay.NO_VERDICT_WORDS == "omitted, returned or unruled"
-    assert sides == {"omitted", "returned", "unruled"}
+def test_the_no_verdict_sides_are_every_archived_side_outside_the_statuses():
+    """Read off the annotation the comparison writes, not off the sides' parts."""
+    annotation = get_type_hints(critic_replay.Agreement)["archived"]
+    sides = {
+        value for part in get_args(annotation) for value in (get_args(part) or (part,))
+    }
+    assert set(critic_replay.NO_VERDICT_SIDES) == (
+        sides - critic_yield.VERDICT_STATUSES
+    )
+    assert critic_replay.NO_VERDICT_SIDES == ("omitted", "returned", "unruled")
 
 
 def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # noqa: F811

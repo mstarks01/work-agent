@@ -72,8 +72,9 @@ what the critic would keep (`lower` rejects every draft no critic ruled on,
 `upper` accepts it). `assembly` implements the reporting row: it names a
 ruled draft the report omits, and assembles the rest again from the rulings
 the report carries. `critic-replay` implements the critic row: it sends an
-archived case's critic request again, for one call, and compares every
-draft's verdict with the archived one.
+archived case's critic request again, for one call, and compares each
+draft's verdict with the archived one. It counts a draft with no archived
+verdict (`omitted`, `returned` or `unruled`) on its own line.
 
 To compare a whole route against a corrected input, rather than one stage,
 use `references/three-conditions.md`. It holds the three conditions, the

@@ -56,7 +56,7 @@ operator to what they accept; see `evals/harness/consent.py` and
 
 `python -m evals.harness.run lane-replay <artifact> --case <case> --framework <package> --lane <lane> --accept-cost unknown`
 costs one lane call. `python -m evals.harness.run critic-replay <artifact> --case <case> --framework <package> --accept-cost unknown`
-costs one critic call and compares every draft's verdict with the archived one. A draft with no archived verdict (`returned`, `omitted` or `unruled`) is counted on its own line, outside the agreement count. Pass `--out <file>` to keep the rulings, because a status says what moved and not why. It rebuilds the request one lane made from the sweep's
+costs one critic call and compares every draft's verdict with the archived one. The command counts a draft with no archived verdict (`omitted`, `returned` or `unruled`) on its own line, outside the agreement count. Pass `--out <file>` to keep the rulings, because a status says what moved and not why. It rebuilds the request one lane made from the sweep's
 `<case>.lanes.json` and sends it again, so a `place` loss can be read against
 what the lane was shown. The material is the run's and the prompt files are
 this checkout's, and the command prints both commits. To compare a lane with and without the assertion catalog, use
