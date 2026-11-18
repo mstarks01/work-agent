@@ -128,7 +128,7 @@ from evals.harness.alignment import (
     placeholder_zones,
     slug_key,
 )
-from evals.harness.artifact import EvalArtifact
+from evals.harness.artifact import EvalArtifact, recorded_sources
 from evals.harness.modes import (
     AssertionResult,
     AttributeCheck,
@@ -138,6 +138,7 @@ from evals.harness.modes import (
     differing,
     score_extraction,
 )
+from evals.harness.provenance import ProvenanceError
 from evals.harness.rates import ratio, shown_figure
 from evals.harness.reference import GoldenCase
 from evals.reference_facts import facts_path, load_facts, reference_catalog
@@ -1291,15 +1292,11 @@ def _treatment_of(artifact: EvalArtifact, named: str | None) -> tuple[str, Treat
     with neither is never pooled with another: the replay cannot tell whether
     two such sweeps read one input, and it does not guess.
     """
-    if artifact.carries("rendered_sources"):
-        rendered = artifact.block("rendered_sources")
-        if not isinstance(rendered, Mapping) or not all(
-            isinstance(digest, str) for digest in rendered.values()
-        ):
-            raise ValueError(
-                f"{artifact.path}: rendered_sources is not a digest per case, so"
-                " the sweep cannot be placed on an arm"
-            )
+    try:
+        rendered = recorded_sources(artifact)
+    except ProvenanceError as error:
+        raise ValueError(f"{error}, so the sweep cannot be placed on an arm") from error
+    if rendered is not None:
         return rendered_digest(rendered), "rendered_sources"
     if named is not None:
         return named, "named"

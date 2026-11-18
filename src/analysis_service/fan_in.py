@@ -122,7 +122,8 @@ def fan_in(
     model: SystemModel,
     sources: Mapping[str, str],
     ruled_out: Mapping[str, str] = _NO_TEXTS,
-    assertions: AssertionCatalog | None = None,
+    *,
+    assertions: AssertionCatalog | None,
     ruled_in: Mapping[str, str] = _NO_TEXTS,
     covered: Collection[str] = frozenset(),
 ) -> FanIn:

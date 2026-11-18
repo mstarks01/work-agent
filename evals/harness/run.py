@@ -77,6 +77,7 @@ from evals.harness import (
     envelope,
     extraction_losses,
     falsify,
+    fan_in_accounting,
     follow_up_policies,
     gain,
     guard_cost,
@@ -2998,6 +2999,12 @@ COMMANDS: dict[str, Command] = {
         " omits (#1091, no credentials)",
         run=assembly.command_assembly,
         arguments=assembly.arguments,
+    ),
+    "fan-in": Command(
+        help="run each archived fan-in again over its stored proposals and"
+        " account for every entry a lane emitted (#2273, no credentials)",
+        run=fan_in_accounting.command_fan_in,
+        arguments=fan_in_accounting.arguments,
     ),
     "near-misses": Command(
         help="write a ballot of the missed must-finds a same-lane draft may state"
