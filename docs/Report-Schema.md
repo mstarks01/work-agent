@@ -385,7 +385,7 @@ class Ground:
 | `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
-| `assertion` | `assertion` | the sources state this fact, and the model does not carry it in a field: it has no field for it, or the row is scoped, one of two compatible values, or a row whose value the model does not hold |
+| `assertion` | `assertion` | the sources state this fact, and the model does not carry it in a field: it has no field for it, or the row is scoped, one of two compatible values, or a row whose value the model does not hold, unless the model's attribute states the opposite of the value the rows project |
 | `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it; or the model's attribute states the opposite of the value the rows project, and no submitter's answer makes that value |
 
 **What the assertion pass reached.** A reader of `assertions` has no way to tell

@@ -3270,7 +3270,7 @@ def test_the_job_state_is_the_one_reader_of_whether_a_run_stops_to_ask():
 def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     """Only the assertion layer asks ``contradictions``: the report's issue
     and the rows the evidence catalog holds open both come from it.
-    ``test_settled_is_read_where_no_model_is_in_hand`` holds the callers of
+    ``test_each_caller_of_settled_has_a_reason`` holds the callers of
     ``settled``."""
     assert _sites(lambda node: _calls(node, "contradictions")) == [
         ("src/analysis_service/assertions.py", "_contradicted_ids"),
@@ -3278,18 +3278,33 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     ]
 
 
-def test_settled_is_read_where_no_model_is_in_hand():
-    """``settled`` reads the catalog alone. A reader that also holds a model
-    reads ``uncontradicted`` instead, so a contradicted row is not a fact to
-    it; this holds the callers of ``settled`` to the sites that read the
-    catalog alone, or that build the model-aware rule from it."""
-    assert _sites(_calls_settled) == [
-        ("src/analysis_service/assertions.py", "answer"),
-        ("src/analysis_service/assertions.py", "catalog_coverage"),
-        ("src/analysis_service/assertions.py", "contradicted"),
-        ("src/analysis_service/assertions.py", "uncontradicted"),
-        ("src/analysis_service/links.py", "link_questions"),
-    ]
+#: Each caller of ``settled``, and why it reads the catalog alone. A reader
+#: that holds a model and asks which rows are facts against it reads
+#: ``uncontradicted`` instead.
+SETTLED_CALLERS: dict[tuple[str, str], str] = {
+    ("src/analysis_service/assertions.py", "answer"): (
+        "the typed query over the catalog, which holds no model"
+    ),
+    ("src/analysis_service/assertions.py", "catalog_coverage"): (
+        "counts subjects that are not graph-bound, which no graph attribute"
+        " can contradict"
+    ),
+    ("src/analysis_service/assertions.py", "contradicted"): (
+        "builds the model-aware rule from the catalog rule"
+    ),
+    ("src/analysis_service/assertions.py", "uncontradicted"): (
+        "builds the model-aware rule from the catalog rule"
+    ),
+    ("src/analysis_service/links.py", "link_questions"): (
+        "counts facts about a principal, which reach no graph field"
+    ),
+}
+
+
+def test_each_caller_of_settled_has_a_reason():
+    """``settled`` reads the catalog alone, so a new caller beside a model
+    must state why it does not read ``uncontradicted``."""
+    assert _sites(_calls_settled) == sorted(SETTLED_CALLERS)
 
 
 def _calls_settled(node: ast.AST) -> bool:

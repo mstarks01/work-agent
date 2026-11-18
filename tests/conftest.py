@@ -214,11 +214,13 @@ def corpus_case():
 
 @pytest.fixture
 def refused_projection(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The validity gate refuses every projected model.
+    """The projection that ``prepared_view`` runs is refused whole.
 
-    :func:`~analysis_service.assertions.apply_projection` then returns the
-    model unchanged with nothing applied, so a graph attribute keeps what
-    extraction wrote beside the rows authoritative for it.
+    It stands for the validity gate refusing the projected model, where
+    :func:`~analysis_service.assertions.apply_projection` returns the model
+    unchanged with nothing applied, so a graph attribute keeps what extraction
+    wrote beside the rows authoritative for it. A caller that imports
+    ``apply_projection`` from ``assertions`` still projects.
     """
     from analysis_service import evidence
 
