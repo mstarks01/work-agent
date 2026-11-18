@@ -786,8 +786,8 @@ class ExtractionScore:
 
         Read beside the overall element recall rather than instead of it: the
         two together say whether an extraction is uniformly thin or is dropping
-        one *kind* of element. A case with no pure initiator reads 0.0, for the
-        reason every other empty denominator here does.
+        one *kind* of element. A case with no pure initiator has no value, as
+        every other empty denominator here has none.
 
         **A pure initiator is a graph source node**, an element that starts an
         interaction and never receives one, and that is narrower than an actor

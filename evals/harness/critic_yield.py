@@ -135,7 +135,7 @@ class CriticPopulations:
     Each rate reads only its own population. ``real_rejected`` divides by the
     real drafts, ``not_real_confirmed`` by the not-real ones, and a
     ``needs-info`` fate counts in neither: it has a rate of its own.
-    An empty population gives a :class:`~evals.harness.scorer.Rate` whose value
+    An empty population gives a :class:`~evals.harness.rates.Rate` whose value
     is ``None``, which is a gap in the labels and not a zero.
     """
 
