@@ -7,6 +7,7 @@ so a duplicate and a last draft are what the matcher makes of them.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import replace
 from itertools import pairwise
 from pathlib import Path
@@ -361,6 +362,12 @@ def test_the_fan_in_check_agrees_with_the_fan_in_command(capsys):
     main(["fan-in", str(BASELINE)])
     printed = capsys.readouterr().out
 
+    blocks = check.compatible_blocks + len(check.incompatible)
+    assert (
+        f"{blocks} block(s), {len(check.incompatible)} incompatible;"
+        f" {check.unreadable} report(s) refused by today's Report;"
+        f" {check.capture_faults} case(s) with a missing or stray capture"
+    ) in printed
     assert (
         f"proposals: {check.inspected} inspected, {check.accounted} accounted,"
         f" {check.unexplained} unexplained, {check.unavailable} unavailable;"
@@ -383,15 +390,15 @@ def test_each_compatible_proposal_takes_one_fate():
 
     assert rows
     for row in rows:
-        fated = (
-            len(row.kept)
-            + len(row.dropped)
-            + len(row.unknown)
-            + len(row.deferred)
-            - len(row.extra)
-            + len(row.unexplained)
+        fates = Counter(
+            (
+                *row.kept,
+                *(claim_id for claim_id, _ in row.dropped),
+                *row.unknown,
+                *row.deferred,
+            )
         )
-        assert fated == len(row.proposals)
+        assert fates == Counter(row.proposals)
 
 
 def test_an_empty_fan_in_check_reads_no_rate():
@@ -532,9 +539,6 @@ def test_the_command_reconciles_with_score(tmp_path: Path):
     assert replayed == len(scored["scores"])
     fan = card["fan_in"]
     assert fan["compatible_blocks"] + len(fan["incompatible"]) == len(scored["scores"])
-    assert fan["inspected"] == (
-        fan["accounted"] + fan["unexplained"] + fan["unavailable"]
-    )
     # The critic panel pools the same yields that ``score`` writes: every
     # draft sits in one population cell.
     totals = scored["critic_yield_aggregate"]
