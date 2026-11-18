@@ -59,7 +59,7 @@ from analysis_service.report import (
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
 from evals.harness.prices import UnitPrices, price_calls, unit_prices
-from evals.harness.rates import ratio
+from evals.harness.rates import mean
 
 Label = Literal["recorded", "estimated", "unpriced"]
 
@@ -297,7 +297,7 @@ def _recorded_actual(manifest: dict[str, Any]) -> float | None:
         for sweep in manifest.get("sweeps", [])
         if (value := baseline.recorded_usd(sweep.get("cost", {}))) is not None
     ]
-    return ratio(sum(actuals), len(actuals))
+    return mean(actuals)
 
 
 def estimate(
@@ -441,8 +441,8 @@ def _borrow(
             if repriced is not None:
                 amount, lender_cases = repriced
                 priced.append(amount)
-        if priced:
-            mean = sum(priced) / len(priced)
+        average = mean(priced)
+        if average is not None:
             scaled = None
             if (
                 cases is not None
@@ -450,10 +450,10 @@ def _borrow(
                 and lender_cases > 0
                 and cases != lender_cases
             ):
-                mean = mean * cases / lender_cases
+                average = average * cases / lender_cases
                 scaled = (cases, lender_cases)
             return Borrowed(
-                amount_usd=mean,
+                amount_usd=average,
                 source=str(manifest.get("name")),
                 differs=_differences(identity, manifest.get("identity", {})),
                 scaled=scaled,

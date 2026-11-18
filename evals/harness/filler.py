@@ -56,7 +56,7 @@ from typing import Any
 
 from analysis_service.report import Report
 from analysis_service.system_model import attribute_names
-from evals.harness.rates import ratio, rounded_figure, shown_figure
+from evals.harness.rates import Rate, ratio, rounded_figure, shown_figure
 
 __all__ = ["FillerRow", "artifact", "render", "rows"]
 
@@ -150,12 +150,7 @@ def render(measured: Sequence[FillerRow]) -> None:
     print("\n| framework | claims | ineligible pointers | modal grounds | share |")
     print("| --- | ---: | ---: | --- | ---: |")
     for row in measured:
-        pointers = (
-            f"{row.ineligible}/{row.pointers}"
-            f" ({shown_figure(row.ineligible_share, '.0%')})"
-            if row.pointers
-            else "0/0"
-        )
+        pointers = Rate(row.ineligible, row.pointers).shown()
         print(
             f"| {row.framework} | {row.claims} | {pointers} |"
             f" `{row.modal_grounds}` | {shown_figure(row.modal_share, '.0%')} |"
