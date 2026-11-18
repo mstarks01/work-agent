@@ -91,18 +91,20 @@ NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = tuple(sorted(get_args(NoVerdictFat
 def has_verdict(fate: str) -> TypeIs[VerdictStatus]:
     """Whether ``fate`` is a verdict status the block records.
 
-    A draft with no verdict is in no population rate and no yield rate: each
-    instrument counts it on its own line, which :func:`no_verdict_line` words.
+    A draft with no verdict is in no population rate and no yield rate:
+    ``critic_yield`` and ``critic_replay`` each count it on its own line, which
+    :func:`no_verdict_line` words.
     """
     return fate in VERDICT_STATUSES
 
 
-def no_verdict_line(drafts: int, fates: Sequence[str]) -> str:
-    """The line that counts ``drafts`` with no archived verdict, and names ``fates``.
+def no_verdict_line(apart: int, fates: Sequence[str]) -> str:
+    """The line that counts ``apart`` drafts with no archived verdict.
 
-    ``fates`` holds two or more fates, as each caller's constant does.
+    It names ``fates``, which holds two or more fates, as each caller's
+    constant does.
     """
-    counted = "1 draft has" if drafts == 1 else f"{drafts} drafts have"
+    counted = "1 draft has" if apart == 1 else f"{apart} drafts have"
     *first, last = fates
     return f"{counted} no archived verdict ({', '.join(first)} or {last})"
 
@@ -170,12 +172,12 @@ class CriticPopulations:
     real drafts with a verdict, ``not_real_confirmed`` by the not-real drafts
     with a verdict, and a ``needs-info`` fate counts in neither: it has a
     rate of its own.
+
     A draft with no verdict (:func:`has_verdict`) is in no denominator, and
-    :attr:`no_verdict` counts it.
-    A population with no draft that has a verdict gives a
-    :class:`~evals.harness.rates.Rate` whose value is ``None``, which is a gap
-    and not a zero; :attr:`not_real_gap` names the reason for the not-real
-    population.
+    :attr:`no_verdict` counts it. A population with no draft that has a verdict
+    gives a :class:`~evals.harness.rates.Rate` whose value is ``None``, which is
+    a gap and not a zero; :attr:`not_real_gap` names the reason for the
+    not-real population.
     """
 
     counts: Mapping[tuple[ScoredOutcome, CriticFate], int]
