@@ -25,6 +25,8 @@ import pytest
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
+from evals.harness.critic_replay import UNRULED
+from evals.harness.critic_yield import FATES, OMITTED
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
     EXPERIMENTS_LEFT_OUT,
@@ -1849,6 +1851,66 @@ def _is_constant(node: ast.AST, value: object) -> bool:
     return isinstance(node, ast.Constant) and node.value == value
 
 
+def _reads_the_verdict_rule(node: ast.AST) -> bool:
+    """Whether ``node`` reads the verdict rule.
+
+    It reads the verdict statuses, or tests a fate for membership in a set of
+    critic fates.
+    """
+    if _loads(node, "VERDICT_STATUSES") or _loads_attribute(node, "VERDICT_STATUSES"):
+        return True
+    return isinstance(node, ast.Compare) and any(
+        isinstance(op, (ast.In, ast.NotIn)) and _holds_the_fates(right)
+        for op, right in zip(node.ops, node.comparators, strict=True)
+    )
+
+
+#: The constants that each name one critic fate or side, and their values.
+_ONE_FATE_CONSTANTS = {"OMITTED": OMITTED, "UNRULED": UNRULED}
+
+#: Every critic fate and archived side a literal collection can spell.
+_FATE_VALUES = frozenset({*FATES, UNRULED})
+
+
+def _holds_the_fates(node: ast.AST) -> bool:
+    """Whether ``node`` names a set of critic fates.
+
+    Anywhere inside it, it reads a constant of the rule, calls ``get_args`` of
+    a fate type, or holds a literal collection of two or more critic fates.
+    """
+    return any(_names_the_fates(part) for part in ast.walk(node))
+
+
+def _names_the_fates(node: ast.AST) -> bool:
+    """Whether one node of a membership test names a set of critic fates."""
+    names = ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
+    if any(_loads(node, name) or _loads_attribute(node, name) for name in names):
+        return True
+    if _calls(node, "get_args") and node.args:
+        return any(
+            _loads(node.args[0], kind) or _loads_attribute(node.args[0], kind)
+            for kind in ("VerdictStatus", "NoVerdictFate")
+        )
+    if not isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return False
+    members = [_fate_value(element) for element in node.elts]
+    return len(members) > 1 and all(member in _FATE_VALUES for member in members)
+
+
+def _fate_value(node: ast.AST) -> object:
+    """The value a collection member spells: a constant, or a fate constant's value."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    return next(
+        (
+            value
+            for name, value in _ONE_FATE_CONSTANTS.items()
+            if _loads(node, name) or _loads_attribute(node, name)
+        ),
+        None,
+    )
+
+
 def _parses_a_version_segment(node: ast.AST) -> bool:
     return _calls(node, "ascii_int") and isinstance(node.args[0], ast.Subscript)
 
@@ -1890,6 +1952,41 @@ def _reads_an_answer_status(node: ast.AST) -> bool:
 def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bool):
     found = any(
         _reads_an_answer_status(node) for node in ast.walk(ast.parse(expression))
+    )
+    assert found is refused
+
+
+@pytest.mark.parametrize(
+    ("expression", "refused"),
+    [
+        ("fate in VERDICT_STATUSES", True),
+        ("fate in critic_yield.VERDICT_STATUSES", True),
+        ("fate not in NO_VERDICT_FATES", True),
+        ("row.archived not in NO_VERDICT_SIDES", True),
+        ("fate in frozenset(NO_VERDICT_FATES)", True),
+        ("fate in {*NO_VERDICT_FATES}", True),
+        ('fate in (OMITTED, "returned")', True),
+        ('fate in ("omitted", "returned", "unruled")', True),
+        ("fate in frozenset(get_args(NoVerdictFate))", True),
+        ('fate in frozenset(("omitted", "returned"))', True),
+        ('fate in ("OMITTED", "rejected")', False),
+        ('fate in ("returned", "omitted")', True),
+        ('fate in {"confirmed", "needs-info", "rejected"}', True),
+        ("fate in get_args(VerdictStatus)", True),
+        ("fate in get_args(NoVerdictFate)", True),
+        ("fate in get_args(claims.VerdictStatus)", True),
+        ("fate in critic_yield.NO_VERDICT_FATES", True),
+        ('fate in ("rejected",)', False),
+        ('fate in ("omitted",)', False),
+        ('fate in ("omitted", "wrong_value")', False),
+        ("has_verdict(fate)", False),
+        ("{*NO_VERDICT_FATES, UNRULED}", False),
+        ("no_verdict_line(apart, NO_VERDICT_FATES)", False),
+    ],
+)
+def test_the_verdict_rule_lint_reads_each_spelling(expression: str, refused: bool):
+    found = any(
+        _reads_the_verdict_rule(node) for node in ast.walk(ast.parse(expression))
     )
     assert found is refused
 
@@ -2370,6 +2467,12 @@ ONE_READERS: dict[str, _OneReader] = {
                 " instrument with a rule of its own"
             ),
         },
+        "evals/",
+    ),
+    "whether a critic fate holds a verdict": _OneReader(
+        _reads_the_verdict_rule,
+        ("evals/harness/critic_yield.py", "has_verdict"),
+        {},
         "evals/",
     ),
     "which statuses answer a finding": _OneReader(

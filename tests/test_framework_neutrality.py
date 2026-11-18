@@ -350,10 +350,11 @@ DECLARED: dict[str, str] = {
     ),
     "evals/harness/critic_yield.py": (
         "This code is STRIDE's, through `DraftThreat` and a category. Yield is"
-        " the pair of counts over drafts a critic killed and references it"
-        " destroyed, which only a package whose lane agents propose an open"
-        " claim set has. `INSTRUMENTS` already declares the instrument"
-        ' `frameworks=("stride",)`; this is the module behind it.'
+        " the pair of rates over the drafts a critic rejected: the down-voted"
+        " drafts and the reference-matched drafts, which only a package whose"
+        " lane agents propose an open claim set has. `INSTRUMENTS` already"
+        ' declares the instrument `frameworks=("stride",)`; this is the module'
+        " behind it."
     ),
     "evals/harness/verb_pricing.py": (
         "This code is STRIDE's, through `SubsetVerbIdentity` and the STRIDE"

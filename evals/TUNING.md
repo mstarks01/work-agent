@@ -372,7 +372,7 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find coverage** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. It is coverage of a reference, not a measure of whether the argument is right (#890). |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average coverage while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
+| **critic yield** (a pair) | rejects more down-voted drafts (`rejected_kill_rate`) without rejecting reference-matched drafts (`matched_kill_rate`) | A kill count alone tells you nothing — read both halves together. Each rate counts only the drafts with a verdict, and its numerator counts the critic's rejections. The "no archived verdict" line counts each draft that leaves the report with no verdict, and the "lost for good" count of the "all kills" figures also counts a reference-matched one whose reference no claim took. |
 
 All of these are *relative to the rule and the ledger*. Use them to compare
 configurations and track movement; never quote them as absolute scores or
@@ -425,7 +425,7 @@ artifact:
 | **applicability recall and precision** | both go up, or one holds while the other rises | **Read them together or not at all.** An ASVS claim rules applicability and never a pass, so a lane that ruled *everything* applicable scores 100% recall. Recall alone is trivially winnable and worthless. Precision reads `unavailable` until a case declares `reference_set: exhaustive`, because the complement of a sample is not a set of negatives — so today recall has no partner and no ASVS run is tunable on this row. |
 | **`off_catalog`** | is zero, and stays zero | Not a tuning number. It counts claims naming a requirement the run's level does not carry — the package composing an identifier its own catalog cannot reach. Any value here is a bug to fix, not a lever to pull. |
 | **applicability exemplar delta** | shrinks or holds | Same question as STRIDE's, over this package's own exemplars. `exemplar_proximity` sits on the `(case, framework)` pair, so a case near STRIDE's payments exemplar is near nothing of ASVS's. |
-| **applicability yield** (a pair) | rejects more the corpus did not expect (`earned`) without rejecting what it did (`destroyed`) | The ASVS critic's only destructive move is `rejected` — the ruling that a requirement does not apply. `destroyed` is the veto number here, exactly as `matched_killed` is for STRIDE, and a rejection count alone reads as either. |
+| **applicability yield** (a pair) | rejects more the corpus did not expect (`earned`) without rejecting what it did (`destroyed`) | The ASVS critic's only destructive move is `rejected` — the ruling that a requirement does not apply. `destroyed` is the veto number here. Its STRIDE counterpart among the rejections is the numerator of `matched_kill_rate`; STRIDE's veto number `matched_killed` also counts a kill with no verdict. A rejection count alone reads as either. |
 
 **What moves each cell, when recall is short:**
 
@@ -704,12 +704,16 @@ compare to the baseline band:
   and the next sweep may not reproduce it.
 - **Near/far delta** — did the gap widen? If so, you may have traded far-domain
   coverage for a better-looking average.
-- **Critic yield** — did `killed-real` (real findings the critic threw out) go
-  up? That's a regression hiding inside a higher kill rate.
+- **Critic yield** — did `matched_kill_rate` (reference-matched drafts the critic
+  rejected) go up? That's a regression hiding inside a higher kill rate. Also
+  read the "no archived verdict" line, which counts each draft that leaves the
+  report with no verdict, and the "lost for good" count of the "all kills"
+  figures, which also counts a reference-matched one whose reference no claim
+  took. A draft with no verdict does not raise `matched_kill_rate`.
 
 A change that lifts or holds per-case recall, without widening the delta or
-raising `killed-real`, is a keeper. Anything else is noise, or a trade you should
-justify in the pull request.
+raising `matched_kill_rate`, is a keeper. Anything else is noise, or a trade you
+should justify in the pull request.
 
 ## Step 6 — Promote the winner
 
