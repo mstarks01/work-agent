@@ -741,8 +741,7 @@ class TestAnAbsenceUnderAHiddenQualification:
 
     def test_a_set_aside_row_drops_the_absence_and_offers_no_question(self):
         """A row a reviewer set aside qualifies the field too, and no row
-        carries a question, so the catalog offers nothing about it; this is
-        reported for a ruling."""
+        carries a question, so the catalog offers nothing about it."""
         rejected = self.ENCRYPTED.model_copy(update={"assessment": "unsupported"})
         catalog = assertions(rejected, subjects=(self.STORE,))
         offered = evidence_catalog(_with_encryption("none"), catalog)
