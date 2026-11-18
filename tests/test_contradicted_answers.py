@@ -244,3 +244,52 @@ class TestADisputedRowWithNoGraphField:
             assert rows == [("required", "answer")]
             codes = [issue.code for issue in report.assertions.issues]
             assert "unmatched-answer" not in codes
+
+
+class TestAnAnswerToADisputedPlace:
+    """The answer is a new row at the place; each side it overrules is named,
+    whatever the catalog order."""
+
+    @staticmethod
+    def written(catalog, value):
+        from analysis_service.fact_writes import fact_rows
+        from analysis_service.sources import ANSWERS_LABEL
+        from analysis_service.assertions import support_span
+
+        line = f"Customer accounts: {value}."
+        span = support_span(line, ANSWERS_LABEL, line)
+        answer = FactAnswer(key=PLACE_KEY, value=value)
+        return fact_rows(catalog, valid_model(), [answer], [span])
+
+    def test_the_overruled_side_is_named_in_either_order(self):
+        for entries in ([REQUIRED, NOT_REQUIRED], [NOT_REQUIRED, REQUIRED]):
+            catalog = disputed().model_copy(update={"entries": entries})
+            written, issues = self.written(catalog, ABSENT)
+
+            rows = [(row.value, row.origin) for row in written.entries]
+            assert rows == [(ABSENT, "answer")]
+            named = {issue.assertion for issue in issues}
+            assert assertion_id(REQUIRED) in named
+
+    def test_the_answer_keeps_no_explanation_of_a_source_row(self):
+        written, _ = self.written(disputed(), "required")
+
+        (row,) = written.entries
+        assert (row.origin, row.explanation) == ("answer", "")
+
+
+def test_a_scoped_disagreement_is_asked_at_its_place():
+    """A scoped row states a narrower fact than the attribute, so a scoped
+    disagreement is asked at its place, not as the graph attribute."""
+    from analysis_service.assertions import Qualifier
+
+    backups = [Qualifier(kind="resource", value="backups")]
+    first = MECHANISM.model_copy(update={"value": ABSENT, "scope": backups})
+    second = MECHANISM.model_copy(update={"scope": backups, "explanation": "b"})
+    catalog = AssertionCatalog(subjects=SUBJECTS, entries=[first, second])
+    ref = UnknownRef(assertion=assertion_id(first))
+
+    keys = asked(waiting_on(ref), model_with("none"), catalog)
+
+    place = assertion_id(first.model_copy(update={"value": UNKNOWN}))
+    assert keys == [("", "", place, "", "", "")]
