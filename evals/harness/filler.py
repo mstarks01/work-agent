@@ -56,6 +56,7 @@ from typing import Any
 
 from analysis_service.report import Report
 from analysis_service.system_model import attribute_names
+from evals.harness.rates import ratio, rounded_share, shown_figure
 
 __all__ = ["FillerRow", "artifact", "render", "rows"]
 
@@ -75,11 +76,11 @@ class FillerRow:
     #: The most common combination of ground kinds, and the share of claims
     #: whose grounds use exactly it.
     modal_grounds: str
-    modal_share: float
+    modal_share: float | None
 
     @property
-    def ineligible_share(self) -> float:
-        return self.ineligible / self.pointers if self.pointers else 0.0
+    def ineligible_share(self) -> float | None:
+        return ratio(self.ineligible, self.pointers)
 
 
 def _kind_set(claim: Any) -> str:
@@ -129,7 +130,7 @@ def rows(reports: Iterable[Report]) -> tuple[FillerRow, ...]:
                 ineligible=ineligible[framework],
                 claims=total,
                 modal_grounds=modal,
-                modal_share=count / total if total else 0.0,
+                modal_share=ratio(count, total),
             )
         )
     return tuple(built)
@@ -150,13 +151,13 @@ def render(measured: Sequence[FillerRow]) -> None:
     print("| --- | ---: | ---: | --- | ---: |")
     for row in measured:
         pointers = (
-            f"{row.ineligible}/{row.pointers} ({row.ineligible_share:.0%})"
+            f"{row.ineligible}/{row.pointers} ({shown_figure(row.ineligible_share, '.0%')})"
             if row.pointers
             else "0/0"
         )
         print(
             f"| {row.framework} | {row.claims} | {pointers} |"
-            f" `{row.modal_grounds}` | {row.modal_share:.0%} |"
+            f" `{row.modal_grounds}` | {shown_figure(row.modal_share, '.0%')} |"
         )
 
 
@@ -168,9 +169,9 @@ def artifact(measured: Sequence[FillerRow]) -> dict[str, Any]:
                 "claims": row.claims,
                 "pointers": row.pointers,
                 "ineligible_pointers": row.ineligible,
-                "ineligible_share": round(row.ineligible_share, 4),
+                "ineligible_share": rounded_share(row.ineligible_share, 4),
                 "modal_grounds": row.modal_grounds,
-                "modal_grounds_share": round(row.modal_share, 4),
+                "modal_grounds_share": rounded_share(row.modal_share, 4),
             }
             for row in measured
         }

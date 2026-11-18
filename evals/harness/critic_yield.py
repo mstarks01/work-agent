@@ -48,15 +48,9 @@ from analysis_service.claims import FrameworkAnalysis, VerdictStatus
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
+from evals.harness.rates import Rate, percent
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import (
-    CaseScore,
-    Rate,
-    VoteStatus,
-    candidate_claim,
-    percent,
-    score_case,
-)
+from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_case
 
 # What one produced threat turned out to be, in the pass that scored it. The
 # first two are hits against the reference set, and the rest are the ways of

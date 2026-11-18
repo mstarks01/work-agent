@@ -593,7 +593,7 @@ def _score(artifact: Path, tmp_path: Path, roster_path: Path) -> int:
 
 def test_a_share_over_an_empty_denominator_is_unavailable():
     """A gap in the inputs reads None, never a measured zero."""
-    from evals.harness.scorer import Rate, ratio
+    from evals.harness.rates import Rate, ratio
 
     assert ratio(0, 0) is None
     assert ratio(1, 4) == 0.25

@@ -65,6 +65,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks import lane_of
+from evals.harness.rates import ratio, rounded_share, shown_figure
 
 # Why the fan-in killed a case. A claim that loses every ground loses its own
 # entry and not the case: it is dropped and marked, and
@@ -163,7 +164,7 @@ class CaseGrounds:
         return {kind: counts.get(kind, 0) for kind in _KINDS}
 
     @property
-    def grounds_per_threat(self) -> float:
+    def grounds_per_threat(self) -> float | None:
         """The padding number: ``analyze.md`` asks for one per load-bearing fact."""
         return ratio(self.ground_count, self.threat_count)
 
@@ -173,7 +174,7 @@ class CaseGrounds:
         return sum(1 for entry in self.threats if not entry.has_quote)
 
     @property
-    def quoteless_rate(self) -> float:
+    def quoteless_rate(self) -> float | None:
         return ratio(self.quoteless_count, self.threat_count)
 
     # --- measurement 2: the unverified-quote rate ------------------------
@@ -187,7 +188,7 @@ class CaseGrounds:
         return sum(len(entry.unverified) for entry in self.threats)
 
     @property
-    def unverified_rate(self) -> float:
+    def unverified_rate(self) -> float | None:
         """Of the quotes the agents wrote, the share the ladder could not find.
 
         Denominated in *quotes*, never in grounds: an unknown-attribute ground
@@ -202,7 +203,7 @@ class CaseGrounds:
         return sum(len(entry.repaired) for entry in self.threats)
 
     @property
-    def repaired_rate(self) -> float:
+    def repaired_rate(self) -> float | None:
         """Of the quotes the agents wrote, the share the repair rung rewrote."""
         return ratio(self.repaired_count, self.quote_count)
 
@@ -212,7 +213,7 @@ class CaseGrounds:
         return len(self.dropped)
 
     @property
-    def dropped_rate(self) -> float:
+    def dropped_rate(self) -> float | None:
         """Of every claim the lanes drafted, the share the service dropped.
 
         Denominated in drafts plus drops: a dropped claim is not in ``threats``,
@@ -234,11 +235,11 @@ class CaseGrounds:
                 **self.kind_counts,
             },
             "metrics": {
-                "grounds_per_threat": round(self.grounds_per_threat, 3),
-                "quoteless_rate": round(self.quoteless_rate, 3),
-                "unverified_rate": round(self.unverified_rate, 3),
-                "repaired_rate": round(self.repaired_rate, 3),
-                "dropped_rate": round(self.dropped_rate, 3),
+                "grounds_per_threat": rounded_share(self.grounds_per_threat, 3),
+                "quoteless_rate": rounded_share(self.quoteless_rate, 3),
+                "unverified_rate": rounded_share(self.unverified_rate, 3),
+                "repaired_rate": rounded_share(self.repaired_rate, 3),
+                "dropped_rate": rounded_share(self.dropped_rate, 3),
             },
             "threats": [entry.to_json() for entry in self.threats],
             "dropped": [mark.model_dump(mode="json") for mark in self.dropped],
@@ -277,11 +278,6 @@ class GroundsFailure:
 
     def to_json(self) -> dict[str, Any]:
         return {"case": self.case_id, "kind": self.kind, "detail": self.detail}
-
-
-def ratio(numerator: float, denominator: float) -> float:
-    """Zero denominators are 0.0, never a crash and never a silent 100%."""
-    return numerator / denominator if denominator else 0.0
 
 
 def measure_grounds(
@@ -419,11 +415,11 @@ def aggregate_grounds(
         "repaired_quotes": repaired,
         "dropped_claims": dropped,
         **{kind: kinds.get(kind, 0) for kind in _KINDS},
-        "grounds_per_threat": round(ratio(grounds, threats), 3),
-        "quoteless_rate": round(ratio(quoteless, threats), 3),
-        "unverified_rate": round(ratio(unverified, quotes), 3),
-        "repaired_rate": round(ratio(repaired, quotes), 3),
-        "dropped_rate": round(ratio(dropped, threats + dropped), 3),
+        "grounds_per_threat": rounded_share(ratio(grounds, threats), 3),
+        "quoteless_rate": rounded_share(ratio(quoteless, threats), 3),
+        "unverified_rate": rounded_share(ratio(unverified, quotes), 3),
+        "repaired_rate": rounded_share(ratio(repaired, quotes), 3),
+        "dropped_rate": rounded_share(ratio(dropped, threats + dropped), 3),
         "failed_cases": len(failures),
     }
 
@@ -442,10 +438,10 @@ def render(
         counts = entry.kind_counts
         print(
             f"{entry.case_id:<26} grounds {entry.ground_count}"
-            f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
+            f" on {entry.threat_count} threats ({shown_figure(entry.grounds_per_threat, '.2f')} ea)"
             f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
             f"/{counts['absent-attribute']}/{counts['derived-fact']}"
-            f"  quoteless {entry.quoteless_rate:.0%}"
+            f"  quoteless {shown_figure(entry.quoteless_rate, '.0%')}"
             f"  unverified {entry.unverified_count}/{entry.quote_count}"
             f"  repaired {entry.repaired_count}"
             f"  dropped {entry.dropped_count}"
@@ -455,11 +451,11 @@ def render(
     if measurements or failures:
         totals = aggregate_grounds(measurements, failures)
         print(
-            f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
-            f" quoteless {totals['quoteless_rate']:.0%},"
-            f" unverified {totals['unverified_rate']:.1%},"
-            f" repaired {totals['repaired_rate']:.1%},"
-            f" dropped {totals['dropped_rate']:.1%},"
+            f"grounds: {shown_figure(totals['grounds_per_threat'], '.2f')} per threat,"
+            f" quoteless {shown_figure(totals['quoteless_rate'], '.0%')},"
+            f" unverified {shown_figure(totals['unverified_rate'], '.1%')},"
+            f" repaired {shown_figure(totals['repaired_rate'], '.1%')},"
+            f" dropped {shown_figure(totals['dropped_rate'], '.1%')},"
             f" failed cases {totals['failed_cases']}"
             " (instrument, non-gating)"
         )

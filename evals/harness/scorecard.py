@@ -65,8 +65,9 @@ from evals.harness.audit import Phase, phase_of
 from evals.harness.critic_yield import CriticAudit
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE, CaseLosses, Cause
+from evals.harness.rates import Rate
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import Rate, none_stated
+from evals.harness.scorer import none_stated
 from evals.harness.triggers import case_trigger_recall
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]

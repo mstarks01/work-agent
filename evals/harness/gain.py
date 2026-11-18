@@ -58,6 +58,7 @@ from evals.harness.promotion import (
     in_spreads,
     read_spread,
 )
+from evals.harness.rates import ratio, shown_figure
 from evals.harness.scorer import review_coverage
 
 #: One figure, read from one artifact over the cases a selector keeps, or
@@ -112,7 +113,7 @@ def refuse_incomparable(
 
 
 def _mean(values: Sequence[float]) -> float | None:
-    return sum(values) / len(values) if values else None
+    return ratio(sum(values), len(values))
 
 
 def _stride_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
@@ -375,7 +376,7 @@ def render(
     for row in readings:
         gate = table_entry(GATES, row.gate)
         cells = [
-            "—" if value is None else f"{value:.4g}"
+            shown_figure(value, ".4g")
             for value in (row.measured, row.baseline, row.against_limit)
         ]
         lines.append(

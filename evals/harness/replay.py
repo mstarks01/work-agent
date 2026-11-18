@@ -138,8 +138,8 @@ from evals.harness.modes import (
     differing,
     score_extraction,
 )
+from evals.harness.rates import ratio, shown_figure
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import shown_share
 from evals.reference_facts import facts_path, load_facts, reference_catalog
 
 Fate = Literal[
@@ -520,11 +520,9 @@ class AssertionReplay:
         )
 
     @property
-    def recall(self) -> float:
-        """Required-fact recall for one run. A case with no required row is 1.0."""
-        if not self.required:
-            return 1.0
-        return self.recovered / len(self.required)
+    def recall(self) -> float | None:
+        """Required-fact recall for one run, or ``None`` for a case with no required row."""
+        return ratio(self.recovered, len(self.required))
 
     @property
     def credited(self) -> frozenset[str]:
@@ -1563,7 +1561,7 @@ def pooled_bindings(sweeps: Sequence[BindingSweep]) -> dict[str, Any]:
         "pairs": pairs,
         "unparsed": unparsed,
         "fates": {fate: counts[fate] for fate in BIND_FATES},
-        "bound_share": counts["bound"] / graph_bound if graph_bound else None,
+        "bound_share": ratio(counts["bound"], graph_bound),
         "offered": offered,
         "offered_blessed": offered_blessed,
         "targets": [
@@ -1594,7 +1592,7 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
         for fate in BIND_FATES:
             print(f"  {fate:<20} {pool['fates'][fate]:>5}")
         share = pool["bound_share"]
-        print(f"  bound share of graph-bound rows: {shown_share(share, '.3f')}")
+        print(f"  bound share of graph-bound rows: {shown_figure(share, '.3f')}")
         print(
             f"  rows a lane could cite: {pool['offered']} over the extracted graphs,"
             f" {pool['offered_blessed']} over the blessed one"
@@ -1702,7 +1700,7 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
 
 
 def _sd(value: float | None) -> str:
-    return "-" if value is None else f"{value:.2f}"
+    return shown_figure(value, ".2f")
 
 
 def _render_assertions(pool: dict[str, Any], targets: int) -> None:
@@ -1722,7 +1720,7 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
     # ``found`` above counts every reference row, inferred and unknown ones
     # included; this counts only the stated rows the denominator holds.
     required, recovered = pool["required"], pool["recovered"]
-    share = f"{recovered / required:.3f}" if required else "-"
+    share = shown_figure(ratio(recovered, required), ".3f")
     print(f"  required-fact recall: {recovered}/{required} = {share}")
     # The two readings #926 asks to see apart from the fates above, which are
     # the semantic-support half.

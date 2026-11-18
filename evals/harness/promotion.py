@@ -70,6 +70,7 @@ from evals.harness import falsify
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, finished_file
 from evals.harness.modes import AssertionResult, EvalRunError
+from evals.harness.rates import shown_figure
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import (
     replay_assertions,
@@ -815,9 +816,9 @@ def render(readings: Sequence[Reading]) -> str:
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        baseline = "—" if row.baseline is None else f"{row.baseline:.4g}"
-        against = "—" if row.against_limit is None else f"{row.against_limit:.3f}"
-        measured = "—" if row.measured is None else f"{row.measured:.4g}"
+        baseline = shown_figure(row.baseline, ".4g")
+        against = shown_figure(row.against_limit, ".3f")
+        measured = shown_figure(row.measured, ".4g")
         name = member(row.gate, GATES)
         if name is not None:
             gate = GATES[name]

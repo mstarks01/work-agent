@@ -46,6 +46,7 @@ from typing import Any
 
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.instruments import INSTRUMENTS
+from evals.harness.rates import shown_figure
 from evals.harness.run_record import run_record
 
 #: What an instruction row is keyed by. The pair is unique within a sweep —
@@ -230,9 +231,9 @@ def render(
         print(f"instruction delta: {len(changed)} of {len(nodes)} nodes moved")
         print(f"  {'framework':10} {'node':50} {'before':>7} {'after':>7} {'delta':>7}")
         for row in sorted(changed, key=lambda item: -abs(item.delta or 0)):
-            before = "—" if row.before is None else f"{row.before:,}"
-            after = "—" if row.after is None else f"{row.after:,}"
-            delta = "—" if row.delta is None else f"{row.delta:+,}"
+            before = shown_figure(row.before, ",")
+            after = shown_figure(row.after, ",")
+            delta = shown_figure(row.delta, "+,")
             print(
                 f"  {row.framework:10} {row.node:50} {before:>7} {after:>7} {delta:>7}"
             )

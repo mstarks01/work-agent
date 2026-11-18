@@ -50,6 +50,15 @@ from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution, audit
 from evals.harness.attribution import ObservedKind
+from evals.harness.rates import (
+    Rate,
+    difference,
+    mean,
+    percent,
+    ratio,
+    rounded_share,
+    shown_figure,
+)
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
     AsvsDisposition,
@@ -58,7 +67,6 @@ from evals.harness.reference import (
     ReferenceRequirement,
     diagnosable,
 )
-from evals.harness.scorer import Rate, percent
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases
@@ -146,16 +154,16 @@ class ApplicabilityScore:
     excluded: int
 
     @property
-    def recall(self) -> float:
+    def recall(self) -> float | None:
         """Of the requirements this case expects a ruling on, how many arrived."""
-        return len(self.matched) / len(self.expected) if self.expected else 0.0
+        return ratio(len(self.matched), len(self.expected))
 
     @property
-    def must_find_recall(self) -> float:
+    def must_find_recall(self) -> float | None:
         """The same over the tier a gate would read."""
-        if not self.must_find:
-            return 0.0
-        return (len(self.must_find) - len(self.must_find_missed)) / len(self.must_find)
+        return ratio(
+            len(self.must_find) - len(self.must_find_missed), len(self.must_find)
+        )
 
     @property
     def precision(self) -> float | None:
@@ -183,7 +191,7 @@ class ApplicabilityScore:
         if self.reference_set != "exhaustive":
             return None
         applied = sum(len(getattr(self, cell)) for cell in APPLIED_CELLS)
-        return len(self.matched) / applied if applied else 0.0
+        return ratio(len(self.matched), applied)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -206,8 +214,8 @@ class ApplicabilityScore:
             "rejected": list(self.rejected),
             "off_catalog": list(self.off_catalog),
             "excluded": self.excluded,
-            "recall": round(self.recall, 4),
-            "must_find_recall": round(self.must_find_recall, 4),
+            "recall": rounded_share(self.recall, 4),
+            "must_find_recall": rounded_share(self.must_find_recall, 4),
             "precision": None if self.precision is None else round(self.precision, 4),
         }
 
@@ -560,12 +568,12 @@ class DispositionScore:
         return tuple(entry for entry in self.judged if not entry.ok)
 
     @property
-    def accuracy(self) -> float:
+    def accuracy(self) -> float | None:
         """Of the judged requirements the run answered, how many it answered right."""
-        return len(self.correct) / len(self.judged) if self.judged else 0.0
+        return ratio(len(self.correct), len(self.judged))
 
     @property
-    def coverage(self) -> float:
+    def coverage(self) -> float | None:
         """Of the judged requirements, the share the run answered at all.
 
         The denominator :attr:`accuracy` is conditional on. A run that answers
@@ -573,7 +581,7 @@ class DispositionScore:
         and no coverage, and the pair says so where either alone would not.
         """
         reached = len(self.judged) + len(self.unreached)
-        return len(self.judged) / reached if reached else 0.0
+        return ratio(len(self.judged), reached)
 
     @property
     def needs_other_evidence(self) -> tuple[Judged, ...]:
@@ -639,8 +647,8 @@ class DispositionScore:
             "carried": list(self.carried),
             "judged": len(self.judged),
             "correct": len(self.correct),
-            "accuracy": round(self.accuracy, 4),
-            "coverage": round(self.coverage, 4),
+            "accuracy": rounded_share(self.accuracy, 4),
+            "coverage": rounded_share(self.coverage, 4),
             "unreached": list(self.unreached),
             "unjudged": self.unjudged,
             "needs_other_evidence": len(self.needs_other_evidence),
@@ -748,12 +756,8 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
         )["accuracy"],
         # Correct over every judged record, reached or not: the unconditional
         # figure a headline should carry, beside the conditional one above.
-        "correct_of_expected": (
-            round(correct / (judged + unreached), 4) if judged + unreached else 0.0
-        ),
-        "coverage": round(judged / (judged + unreached), 4)
-        if judged + unreached
-        else 0.0,
+        "correct_of_expected": (rounded_share(ratio(correct, (judged + unreached)), 4)),
+        "coverage": rounded_share(ratio(judged, judged + unreached), 4),
         "unreached": unreached,
         "unjudged": sum(score.unjudged for score in scores),
         "needs_other_evidence": reachable,
@@ -762,21 +766,17 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
             judged=judged, correct=correct, reachable=reachable, false_prose=false_prose
         )["false_prose_request_rate"],
         "false_confirmed": false_confirmed,
-        "false_confirmed_rate": (
-            round(false_confirmed / reachable, 4) if reachable else 0.0
-        ),
+        "false_confirmed_rate": (rounded_share(ratio(false_confirmed, reachable), 4)),
         "wrong_kind": wrong_kind,
         # Counted from the records that were actually right, never from the
         # three named failures subtracted off the denominator. A record the run
         # ruled out entirely is none of those three and is still wrong, so
         # subtracting would report it as correctly routed.
-        "evidence_kind_accuracy": (
-            round(routed_right / reachable, 4) if reachable else 0.0
-        ),
+        "evidence_kind_accuracy": (rounded_share(ratio(routed_right, reachable), 4)),
         "applicable_judged": applicable,
         "false_not_applicable": false_not_applicable,
         "false_not_applicable_rate": (
-            round(false_not_applicable / applicable, 4) if applicable else 0.0
+            rounded_share(ratio(false_not_applicable, applicable), 4)
         ),
     }
 
@@ -797,7 +797,7 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
     )
     for score in scores:
         print(
-            f"{score.case:<26} {len(score.judged):>7} {score.accuracy:>6.0%}"
+            f"{score.case:<26} {len(score.judged):>7} {shown_figure(score.accuracy, '.0%'):>6}"
             f" {score.unjudged:>6} {len(score.unreached):>6}"
             f" {len(score.false_prose_requests):>7}"
             f" {len(score.false_confirmed):>6} {len(score.wrong_kind):>6}"
@@ -806,9 +806,9 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
     totals = pooled_dispositions(scores)
     print(
         f"pooled over {totals['cases']} cases:"
-        f" accuracy {totals['accuracy']:.0%}"
+        f" accuracy {shown_figure(totals['accuracy'], '.0%')}"
         f" ({totals['correct']}/{totals['judged']})"
-        f" over {totals['coverage']:.0%} coverage"
+        f" over {shown_figure(totals['coverage'], '.0%')} coverage"
         f" ({totals['judged']}/{totals['judged'] + totals['unreached']} reached),"
         f" {totals['unjudged']} records carry no expected disposition"
         " (instrument, non-gating)"
@@ -855,17 +855,15 @@ def published_disposition(
 
 def routing_rates(
     *, judged: int, correct: int, reachable: int, false_prose: int
-) -> dict[str, float]:
+) -> dict[str, float | None]:
     """The two routing rates the table publishes, from their four counts.
 
     The one rule :func:`pooled_dispositions` and :func:`published_disposition`
     both read.
     """
     return {
-        "accuracy": round(correct / judged, 4) if judged else 0.0,
-        "false_prose_request_rate": (
-            round(false_prose / reachable, 4) if reachable else 0.0
-        ),
+        "accuracy": rounded_share(ratio(correct, judged), 4),
+        "false_prose_request_rate": (rounded_share(ratio(false_prose, reachable), 4)),
     }
 
 
@@ -903,20 +901,22 @@ def pooled_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "matched": matched,
         "missed": sum(len(row["missed"]) for row in rows),
         "matched_by_deferral": sum(len(row["matched_by_deferral"]) for row in rows),
-        "recall": round(matched / expected, 4) if expected else 0.0,
+        "recall": rounded_share(ratio(matched, expected), 4),
         "must_find": must_find,
         "must_find_recall": (
-            round((must_find - must_find_missed) / must_find, 4) if must_find else 0.0
+            rounded_share(ratio((must_find - must_find_missed), must_find), 4)
         ),
         "negatives": sum(len(row["negatives"]) for row in rows),
         "negatives_applied": sum(len(row["negatives_applied"]) for row in rows),
-        "precision": round(read_matched / applied, 4) if applied else None,
+        "precision": rounded_share(ratio(read_matched, applied), 4),
         "precision_cases": len(read),
         "off_catalog": sum(len(row["off_catalog"]) for row in rows),
     }
 
 
-def holdout_split(scores: Sequence[ApplicabilityScore]) -> dict[str, float] | None:
+def holdout_split(
+    scores: Sequence[ApplicabilityScore],
+) -> dict[str, float | None] | None:
     """Applicability recall on the development cases beside the holdout ones (#744).
 
     ``None`` where no holdout case was scored. The same question the STRIDE
@@ -933,14 +933,14 @@ def holdout_split(scores: Sequence[ApplicabilityScore]) -> dict[str, float] | No
     if not held:
         return None
     return {
-        "development_recall": round(
-            _mean(score.recall for score in scores if score not in held), 3
+        "development_recall": rounded_share(
+            mean(score.recall for score in scores if score not in held), 3
         ),
-        "holdout_recall": round(_mean(score.recall for score in held), 3),
+        "holdout_recall": rounded_share(mean(score.recall for score in held), 3),
     }
 
 
-def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float]:
+def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float | None]:
     """The near-vs-far applicability-recall delta: tracked, **non-gating**.
 
     The same question the STRIDE scorer's delta asks — does output get worse
@@ -952,12 +952,12 @@ def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float]:
     """
     near = [score for score in scores if score.exemplar_proximity == "near"]
     far = [score for score in scores if score.exemplar_proximity == "far"]
-    near_recall = _mean(score.recall for score in near)
-    far_recall = _mean(score.recall for score in far)
+    near_recall = mean(score.recall for score in near)
+    far_recall = mean(score.recall for score in far)
     return {
-        "near_recall": round(near_recall, 3),
-        "far_recall": round(far_recall, 3),
-        "delta": round(near_recall - far_recall, 3),
+        "near_recall": rounded_share(near_recall, 3),
+        "far_recall": rounded_share(far_recall, 3),
+        "delta": difference(near_recall, far_recall),
     }
 
 
@@ -1135,11 +1135,6 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
     }
 
 
-def _mean(values: Iterable[float]) -> float:
-    collected = list(values)
-    return sum(collected) / len(collected) if collected else 0.0
-
-
 def render(scores: Sequence[ApplicabilityScore]) -> None:
     """ASVS's rows, then the pooled figures. Never folded into STRIDE's table.
 
@@ -1157,17 +1152,17 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     )
     for score in scores:
         print(
-            f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
-            f" {score.must_find_recall:>6.0%} {percent(score.precision):>11}"
+            f"{score.case:<26} {score.level:>3} {shown_figure(score.recall, '.0%'):>6}"
+            f" {shown_figure(score.must_find_recall, '.0%'):>6} {percent(score.precision):>11}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
         )
     totals = pooled(scores)
     print(
-        f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
+        f"pooled over {totals['cases']} cases: recall {shown_figure(totals['recall'], '.0%')}"
         f" ({totals['matched']}/{totals['expected']}),"
-        f" must-find {totals['must_find_recall']:.0%},"
+        f" must-find {shown_figure(totals['must_find_recall'], '.0%')},"
         f" precision {percent(totals['precision'])}"
         f" (over {totals['precision_cases']} of {totals['cases']} cases read"
         " as exhaustive),"

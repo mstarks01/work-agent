@@ -21,6 +21,7 @@ from evals.harness.critic_yield import OMITTED, CriticAudit, fate_by_claim
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
+from evals.harness.rates import Rate
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.run import main
 from evals.harness.scorecard import (
@@ -34,7 +35,7 @@ from evals.harness.scorecard import (
     charged_misses,
     summarize,
 )
-from evals.harness.scorer import Rate, none_stated, score_case
+from evals.harness.scorer import none_stated, score_case
 from tests.source_tree import REPO_ROOT
 
 BASELINE = (

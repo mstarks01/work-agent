@@ -46,6 +46,7 @@ from analysis_service.fact_writes import answered_model
 from analysis_service.frameworks import PACKAGES
 from analysis_service.parsing import signer
 from analysis_service.system_model import CapabilityStatement, SystemModel
+from evals.harness.rates import ratio
 
 __all__ = [
     "FIXTURES_DIR",
@@ -383,7 +384,7 @@ def report(fixtures: Sequence[Fixture]) -> dict[str, Any]:
         pooled["signed" if signed else "unsigned"] = {
             "fixtures": len(group),
             "adjudicated": rows,
-            "accuracy": sum(score.correct for score in group) / rows if rows else None,
+            "accuracy": ratio(sum(score.correct for score in group), rows),
             "false_exclusions": sum(len(score.false_exclusions) for score in group),
             "false_inclusions": sum(len(score.false_inclusions) for score in group),
             "unknown_accuracy": (

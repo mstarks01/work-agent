@@ -62,8 +62,8 @@ from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
+from evals.harness.rates import mean, ratio, rounded_share
 from evals.harness.reference import MUST_FIND
-from evals.harness.scorer import ratio
 
 #: One case of one framework. Stability is per framework because the two
 #: instruments answer over different sets — STRIDE's open claim set through a
@@ -155,7 +155,7 @@ class CaseStability:
     always: int
     sometimes: int
     never: int
-    mean_jaccard: float
+    mean_jaccard: float | None
     #: The references every run missed, in three counts that sum to ``never``:
     #: charged to one cause in every run, charged to more than one, and charged
     #: ``unstated`` by any run. ``unstated`` says the archive holds no position
@@ -179,7 +179,7 @@ class CaseStability:
         return max(self.recalls) - min(self.recalls)
 
     @property
-    def volatile_rate(self) -> float:
+    def volatile_rate(self) -> float | None:
         return ratio(self.sometimes, self.references)
 
     def to_json(self) -> dict[str, Any]:
@@ -193,8 +193,8 @@ class CaseStability:
             "always_matched": self.always,
             "sometimes_matched": self.sometimes,
             "never_matched": self.never,
-            "volatile_rate": round(self.volatile_rate, 3),
-            "mean_jaccard": round(self.mean_jaccard, 3),
+            "volatile_rate": rounded_share(self.volatile_rate, 3),
+            "mean_jaccard": rounded_share(self.mean_jaccard, 3),
             "cause_stable": self.cause_stable,
             "cause_moving": self.cause_moving,
             "cause_unread": self.cause_unread,
@@ -571,8 +571,8 @@ def band(
         volatile=sum(1 for m, k in fates.values() if 0 < m < k),
         runs=len(runs),
         floor_variance=_floor(fates),
-        observed_variance=observed / freedom if freedom else None,
-        calibration_floor=floor / freedom if freedom else None,
+        observed_variance=ratio(observed, freedom),
+        calibration_floor=ratio(floor, freedom),
         calibration_freedom=freedom,
     )
 
@@ -601,7 +601,7 @@ def load_runs(paths: Iterable[Path | str]) -> list[ScoredRun]:
     return [read_run(load_artifact(path)) for path in paths]
 
 
-def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float:
+def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float | None:
     """Mean pairwise Jaccard, with the empty-vs-empty pair scored 1.0.
 
     Two runs that both found nothing agree completely, and calling that 0.0
@@ -807,10 +807,10 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
         "always_matched": always,
         "sometimes_matched": sometimes,
         "never_matched": sum(entry.never for entry in stability),
-        "always_rate": round(ratio(always, references), 3),
-        "volatile_rate": round(ratio(sometimes, references), 3),
-        "mean_jaccard": round(
-            ratio(sum(entry.mean_jaccard for entry in stability), len(stability)), 3
+        "always_rate": rounded_share(ratio(always, references), 3),
+        "volatile_rate": rounded_share(ratio(sometimes, references), 3),
+        "mean_jaccard": rounded_share(
+            mean(entry.mean_jaccard for entry in stability), 3
         ),
         "worst_case_recall_spread": round(
             max((entry.recall_spread for entry in stability), default=0.0), 3

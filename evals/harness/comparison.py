@@ -52,6 +52,7 @@ from evals.harness import audit, baseline, standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Cases, Column
+from evals.harness.rates import UNAVAILABLE
 from evals.harness.scorer import vote_coverage
 
 #: Where the generated table lives, beside the Baselines it reads. Relative,
@@ -173,7 +174,7 @@ def _format(values: list[float]) -> str:
     a bare number a reader would take as settled.
     """
     if not values:
-        return "—"
+        return UNAVAILABLE
     mean = sum(values) / len(values)
     if len(values) == 1:
         return f"{mean:.3f} ({UNSPREAD})"

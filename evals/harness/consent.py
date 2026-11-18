@@ -59,6 +59,7 @@ from analysis_service.report import (
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
 from evals.harness.prices import UnitPrices, price_calls, unit_prices
+from evals.harness.rates import ratio
 
 Label = Literal["recorded", "estimated", "unpriced"]
 
@@ -296,7 +297,7 @@ def _recorded_actual(manifest: dict[str, Any]) -> float | None:
         for sweep in manifest.get("sweeps", [])
         if (value := baseline.recorded_usd(sweep.get("cost", {}))) is not None
     ]
-    return sum(actuals) / len(actuals) if actuals else None
+    return ratio(sum(actuals), len(actuals))
 
 
 def estimate(
