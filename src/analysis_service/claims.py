@@ -379,8 +379,8 @@ class UnknownRef(BaseModel):
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )
     subject: str = Field(default="", max_length=300)
-    #: The third spelling: one row of the job's **Assertion** catalog that the
-    #: sources left open, by its computed identity.
+    #: The third spelling: one open row of the job's **Assertion** catalog, by
+    #: its computed identity.
     #:
     #: **Why it exists.** ``unknown-attribute`` and ``unknown-assertion`` are
     #: one question asked at two seams — :data:`CONDITIONAL_GROUNDS` says so —

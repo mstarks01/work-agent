@@ -386,7 +386,7 @@ class Ground:
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
 | `assertion` | `assertion` | the sources state this fact, which the model has no field for |
-| `unknown-assertion` | `assertion` | the sources were asked this and left it open, and the model has no field for it; or the model's field states the opposite of the row |
+| `unknown-assertion` | `assertion` | the sources were asked this and left it open, or another row disputes it, and the model has no field for it; or the model's attribute states the opposite of the row |
 
 **What the assertion pass reached.** A reader of `assertions` has no way to tell
 a system with few stated facts from a pass that asked few questions, and the two

@@ -3269,8 +3269,9 @@ def test_the_job_state_is_the_one_reader_of_whether_a_run_stops_to_ask():
 
 def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     """Only the assertion layer asks ``contradictions``: the report's issue
-    and the rows the evidence catalog holds open both come from it, so a
-    second reader cannot route a contradicted row another way."""
+    and the rows the evidence catalog holds open both come from it. This
+    holds the calls of the rule; a caller of ``settled`` beside a model is
+    answered in review."""
     assert _sites(lambda node: _calls(node, "contradictions")) == [
         ("src/analysis_service/assertions.py", "_contradicted_ids"),
         ("src/analysis_service/assertions.py", "contradiction_issues"),

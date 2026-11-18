@@ -53,8 +53,8 @@ are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
 settle is :func:`~analysis_service.assertions.settled`'s, so a conflict or an
 unsupported row is never in the table, and a claim can never rest on one. A
 settled row the graph attribute contradicts
-(:func:`~analysis_service.assertions.contradicted`) is not offered as settled
-either.
+(:func:`~analysis_service.assertions.contradicted`) is not offered as an
+``assertion`` either.
 
 An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground, because the sources were
