@@ -15,9 +15,9 @@ Here is how it works. A killed draft is a draft that is not in the
 post-critic output, so the two sides are a superset and its subset. Its fate
 says whether the critic rejected it or the block holds no verdict for it. Both
 sides are produced sets, so the whole instrument is a matter of scoring the
-same case twice through the shipped scorer, with no second metric implementation and no special-cased
-matching, and then reading the killed drafts' pre-critic scored outcomes, which
-is the state the critic faced.
+same case twice through the shipped scorer, with no second metric
+implementation and no special-cased matching, and then reading the killed
+drafts' pre-critic scored outcomes, which is the state the critic faced.
 
 One property holds this together: the scored task is identical on both sides.
 Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
@@ -55,6 +55,9 @@ from evals.harness.rates import Rate
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_case
 
+#: The scored outcomes that matched a reference.
+MatchedOutcome = Literal["matched-must-find", "matched-expected"]
+
 # What one produced threat turned out to be, in the pass that scored it. The
 # first two are hits against the reference set, and the rest are the ways of
 # missing it.
@@ -64,8 +67,6 @@ from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_c
 # disagree with it the first time one was added. So the four names below are
 # the ones this module owns, and every standing arrives with the scorer's own
 # type.
-#: The scored outcomes that matched a reference.
-MatchedOutcome = Literal["matched-must-find", "matched-expected"]
 ScoredOutcome = MatchedOutcome | Literal["lane-error", "unscored"] | VoteStatus
 
 #: The fates that hold no verdict status in the block.
@@ -142,8 +143,8 @@ YieldRate = Literal[
     "kill_rate", "rejected_kill_rate", "matched_kill_rate", "kill_precision"
 ]
 
-#: Why the not-real population is empty: each draft with a current down-vote
-#: has no verdict, some draft reads ``stale``, or neither.
+#: Why the not-real population has no draft with a verdict: each draft with a
+#: current down-vote has no verdict, some draft reads ``stale``, or neither.
 #: :data:`GAP_WORDS` says what each one means.
 NotRealGap = Literal["no-verdict", "stale-drafts", "no-down-vote"]
 
@@ -236,7 +237,7 @@ class CriticPopulations:
 
     @property
     def not_real_gap(self) -> NotRealGap | None:
-        """Why the not-real population is empty, or ``None`` where it is not."""
+        """Why the not-real population has no draft with a verdict, or ``None``."""
         if self.with_verdict(_in("not-real")):
             return None
         if self.count("not-real"):
@@ -319,7 +320,7 @@ class CriticAudit:
         gap = populations.not_real_gap
         if gap is not None:
             print(
-                f"  not-real population empty ({gap}, stale drafts:"
+                f"  not-real rates unavailable ({gap}, stale drafts:"
                 f" {populations.stale_drafts}): {GAP_WORDS[gap]}"
             )
         if populations.no_verdict:
@@ -396,16 +397,20 @@ class CriticYield:
 
     @property
     def rejected_killed(self) -> int:
-        """A gross count of the drafts that left the report, with a verdict or
-        not (:attr:`KilledDraft.fate` tells which), that a person had already
-        rejected for substance."""
+        """A gross count of the down-voted drafts that left the report.
+
+        It holds drafts with a verdict or not (:attr:`KilledDraft.fate` tells
+        which) that a person had already rejected for substance.
+        """
         return sum(1 for draft in self.killed if LABEL_OF[draft.outcome] == "not-real")
 
     @property
     def matched_killed(self) -> int:
-        """The critic destroying real findings — the gross number that can veto
-        the pattern. A draft that had matched a reference and left the report,
-        with a verdict or not."""
+        """The gross number that can veto the pattern: matched drafts that left.
+
+        A draft that had matched a reference and left the report, with a
+        verdict or not: the critic destroying real findings.
+        """
         return sum(1 for draft in self.killed if _matched(draft.outcome))
 
     @property
@@ -435,9 +440,11 @@ class CriticYield:
 
     @property
     def must_find_killed(self) -> int:
-        """The sharpest form of the veto: a draft that left the report, with a
-        verdict or not, that had answered a reference the Tier 2 gate depends
-        on."""
+        """The sharpest form of the veto: must-find drafts that left the report.
+
+        Each had answered a reference the Tier 2 gate depends on, and left with
+        a verdict or not.
+        """
         return sum(1 for draft in self.killed if draft.outcome == "matched-must-find")
 
     # --- rates, all rule-and-ledger-relative ------------------------------
@@ -669,13 +676,12 @@ def _matched(outcome: ScoredOutcome) -> bool:
     return outcome in get_args(MatchedOutcome)
 
 
-def _every(_: ScoredOutcome) -> bool:
+def _any_outcome(_: ScoredOutcome) -> bool:
     return True
 
 
 def _in(label: Population) -> Callable[[ScoredOutcome], bool]:
-    """The predicate that tests whether a scored outcome puts a draft in
-    ``label``."""
+    """The predicate that a scored outcome puts a draft in ``label``."""
     return lambda outcome: LABEL_OF[outcome] == label
 
 
@@ -685,10 +691,10 @@ def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
     Each numerator counts the drafts the critic rejected, read off the same
     population counts as each denominator.
     """
-    rejected = populations.met("rejected", _every)
+    rejected = populations.met("rejected", _any_outcome)
     down_voted_rejected = populations.met("rejected", _in("not-real"))
     return {
-        "kill_rate": Rate(rejected, populations.with_verdict(_every)),
+        "kill_rate": Rate(rejected, populations.with_verdict(_any_outcome)),
         "rejected_kill_rate": Rate(
             down_voted_rejected, populations.with_verdict(_in("not-real"))
         ),

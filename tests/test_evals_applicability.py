@@ -626,7 +626,7 @@ def test_the_critic_pair_reads_both_sides(case):
     """A rejection count alone reads as the critic working or breaking things.
 
     So the instrument reports `earned` and `destroyed` together, the way
-    `critic_yield` reports `unsupported_killed` beside `matched_killed`.
+    `critic_yield` reports `rejected_killed` beside `matched_killed`.
     """
     from evals.harness.applicability import score_yield
 

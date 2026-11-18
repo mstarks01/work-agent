@@ -25,6 +25,7 @@ import pytest
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
+from evals.harness.critic_yield import NO_VERDICT_FATES, VERDICT_STATUSES
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
     EXPERIMENTS_LEFT_OUT,
@@ -1860,11 +1861,6 @@ def _reads_the_verdict_rule(node: ast.AST) -> bool:
     )
 
 
-#: The critic fates with no verdict status, which a literal collection must
-#: hold one of to spell the verdict rule.
-_NO_VERDICT_SPELLINGS = frozenset({"returned", "omitted"})
-
-
 def _holds_the_fates(node: ast.AST) -> bool:
     """Whether ``node`` names a set of critic fates: a constant of the rule,
     ``get_args`` of a fate type, or a literal collection of verdict statuses
@@ -1881,8 +1877,7 @@ def _holds_the_fates(node: ast.AST) -> bool:
     values = {
         element.value for element in node.elts if isinstance(element, ast.Constant)
     }
-    verdicts = {"confirmed", "needs-info", "rejected"}
-    return bool(values & _NO_VERDICT_SPELLINGS) or len(values & verdicts) > 1
+    return bool(values & set(NO_VERDICT_FATES)) or len(values & VERDICT_STATUSES) > 1
 
 
 def _parses_a_version_segment(node: ast.AST) -> bool:

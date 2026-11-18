@@ -1011,7 +1011,7 @@ class ApplicabilityYield:
 
     * ``earned`` — requirements it rejected that the case labels
       ``not-applicable``. The critic doing its job, and the direct counterpart
-      of ``unsupported_killed``.
+      of ``rejected_killed``.
     * ``destroyed`` — requirements it rejected that the case *did* expect. **The
       number that can veto the pattern here**, exactly as ``matched_killed``
       does for STRIDE.

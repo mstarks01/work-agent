@@ -722,7 +722,7 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     CriticAudit.of([result]).render()
     shown = capsys.readouterr().out
     assert "not_real_confirmed       0/0 (unavailable)" in shown
-    assert "not-real population empty (stale-drafts, stale drafts: 1)" in shown
+    assert "not-real rates unavailable (stale-drafts, stale drafts: 1)" in shown
     assert populations.not_real_gap == "stale-drafts"
     assert populations.to_json()["stale_drafts"] == 1
     for current in ("pooled", "open", "unvoted"):
@@ -750,7 +750,7 @@ def test_a_population_rate_counts_a_draft_with_no_verdict_apart(capsys):
     CriticAudit(populations, Rate(0, 0)).render()
     shown = capsys.readouterr().out
     assert "3 drafts have no archived verdict (omitted or returned)" in shown
-    assert "not-real population empty (no-verdict," in shown
+    assert "not-real rates unavailable (no-verdict," in shown
 
 
 def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
