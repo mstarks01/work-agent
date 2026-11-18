@@ -138,14 +138,14 @@ def reassess(
     # A row the review settles may leave the evidence because the attribute
     # now carries it, and a finding citing it still rests on a fact. A row the
     # graph attribute contradicts does not stand.
-    standing = {assertion_id(entry) for entry in uncontradicted(after, model)}
+    facts = {assertion_id(entry) for entry in uncontradicted(after, model)}
     withdrawn = []
     for block in report.analyses:
         for claim in block.all_claims():
             open_grounds = [
                 ground
                 for ground in claim.grounds
-                if not (ground.kind == "assertion" and ground.assertion in standing)
+                if not (ground.kind == "assertion" and ground.assertion in facts)
             ]
             reasons = ground_issues(
                 [claim.model_copy(update={"grounds": open_grounds})], model, after

@@ -3276,3 +3276,30 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
         ("src/analysis_service/assertions.py", "_contradicted_ids"),
         ("src/analysis_service/assertions.py", "contradiction_issues"),
     ]
+
+
+def test_settled_is_read_where_no_model_is_in_hand():
+    """``settled`` reads the catalog alone. A reader that also holds a model
+    reads ``uncontradicted`` instead, so a contradicted row is not a fact to
+    it; this holds the callers of ``settled`` to the sites that read the
+    catalog alone, or that build the model-aware rule from it."""
+    assert _sites(_calls_settled) == [
+        ("src/analysis_service/assertions.py", "answer"),
+        ("src/analysis_service/assertions.py", "catalog_coverage"),
+        ("src/analysis_service/assertions.py", "contradicted"),
+        ("src/analysis_service/assertions.py", "uncontradicted"),
+        ("src/analysis_service/links.py", "link_questions"),
+    ]
+
+
+def _calls_settled(node: ast.AST) -> bool:
+    """Whether ``node`` calls the assertion layer's ``settled`` by its bare name.
+
+    A method of another object that shares the name, such as a workspace's
+    ``settled``, is not this rule.
+    """
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "settled"
+    )

@@ -50,7 +50,7 @@ CASES = {case.id: case for case in load_corpus(CORPUS)}
 ROW = re.compile(r"^\| `([^`]+)` \| (.*) \|$", re.MULTILINE)
 #: The words an open row's gloss uses where another row disputes it or the
 #: graph contradicts it, which a lane reads as a question whatever value the
-#: row states.
+#: row states. ``tests/test_evidence.py`` pins the gloss that spells them.
 DISAGREE = "the sources disagree"
 
 

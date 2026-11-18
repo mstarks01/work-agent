@@ -276,6 +276,17 @@ class TestARowTheGraphContradicts:
 
     STORE = Subject(id=ORDERS, type="component", label="orders database")
 
+    def answer(self):
+        """The stored absence, written as a submitter's answer."""
+        said = "Orders database: not encrypted."
+        return self.STORED.model_copy(
+            update={
+                "origin": "answer",
+                "basis": "stated",
+                "support": [support_span(said, ANSWERS_LABEL, said)],
+            }
+        )
+
     def test_an_opposite_graph_value_is_named_and_the_row_is_open(self):
         model = _with_encryption("AES-256")
         catalog = assertions(self.STORED, subjects=(self.STORE,))
@@ -315,14 +326,7 @@ class TestARowTheGraphContradicts:
         """An answer settles the fact even against the sources (#1225), so the
         graph's opposite value does not hold an answered row open."""
         model = _with_encryption("AES-256")
-        said = "Orders database: not encrypted."
-        answer = self.STORED.model_copy(
-            update={
-                "origin": "answer",
-                "basis": "stated",
-                "support": [support_span(said, ANSWERS_LABEL, said)],
-            }
-        )
+        answer = self.answer()
         catalog = assertions(answer, subjects=(self.STORE,))
 
         assert [c.attribute for c in contradictions(catalog, model)] == [
@@ -335,14 +339,7 @@ class TestARowTheGraphContradicts:
         """The answer alone makes the projected value, so the scoped row the
         projection groups beside it is not what the graph contradicts."""
         model = _with_encryption("AES-256")
-        said = "Orders database: not encrypted."
-        answer = self.STORED.model_copy(
-            update={
-                "origin": "answer",
-                "basis": "stated",
-                "support": [support_span(said, ANSWERS_LABEL, said)],
-            }
-        )
+        answer = self.answer()
         backups = self.STORED.model_copy(
             update={
                 "value": "AES-256",
