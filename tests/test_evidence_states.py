@@ -247,12 +247,12 @@ class TestAConfirmationOnAnOpenFact:
 
 
 class TestARowTheGraphContradicts:
-    """R2, pinned: a stated row against an opposite graph value stays citable.
+    """A stated row against an opposite graph value is an open question.
 
     Where a projection is not written into the graph, a row stating an absence
-    beside an attribute stating a control is a contradiction the report names,
-    and the evidence catalog still offers the row as a settled fact. Pinned as
-    today's behaviour; whether the row should read as a question is open.
+    beside an attribute stating a control is a contradiction the report names.
+    Neither side settles the fact, so the evidence catalog offers the row as
+    an open question, and a claim on it reads needs-info.
     """
 
     STORED = row(
@@ -264,7 +264,7 @@ class TestARowTheGraphContradicts:
 
     STORE = Subject(id=ORDERS, type="component", label="orders database")
 
-    def test_an_opposite_graph_value_is_named_and_the_row_stays_settled(self):
+    def test_an_opposite_graph_value_is_named_and_the_row_is_open(self):
         model = _with_encryption("AES-256")
         catalog = assertions(self.STORED, subjects=(self.STORE,))
 
@@ -272,7 +272,32 @@ class TestARowTheGraphContradicts:
             "encryption_at_rest"
         ]
         ground = evidence_catalog(model, catalog)[assertion_id(self.STORED)]
-        assert ground.kind == "assertion"
+        assert ground.kind == "unknown-assertion"
+
+    def test_a_claim_on_the_contradicted_row_is_needs_info(self):
+        model = _with_encryption("AES-256")
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+        ref = assertion_id(self.STORED)
+        joined = _join(
+            [Ground(kind="unknown-assertion", assertion=ref)],
+            catalog=catalog,
+            model=model,
+        )
+
+        verdict = _status(joined, model=model)
+        assert verdict.status == "needs-info"
+        assert verdict.related_unknowns == [UnknownRef(assertion=ref)]
+
+    def test_the_contradicted_row_cannot_be_cited_as_settled(self):
+        model = _with_encryption("AES-256")
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+
+        with pytest.raises(DraftJoinError, match="leaves that row open"):
+            _join(
+                [Ground(kind="assertion", assertion=assertion_id(self.STORED))],
+                catalog=catalog,
+                model=model,
+            )
 
     def test_an_agreeing_graph_value_carries_the_row_and_names_nothing(self):
         model = _with_encryption("none")
