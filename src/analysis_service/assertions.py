@@ -2051,6 +2051,10 @@ def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
     until a recorded adjudication does, and an ``unsupported`` or
     ``unresolved`` row is set aside rather than read as a fact.
 
+    The rule reads the catalog alone. Against a model, :func:`contradicted`
+    names the settled rows the graph attribute states the opposite of, and
+    the evidence catalog offers those as open questions.
+
     ``inferred`` and ``derived`` rows are settled: they are this service's
     conclusions rather than the source's, and every reader labels them by
     ``basis`` rather than dropping them, so an inference is visible as one.
@@ -3186,11 +3190,12 @@ def contradicted(
 ) -> tuple[Assertion, ...]:
     """Every settled row behind a :func:`contradictions` entry, in catalog order.
 
-    The graph attribute states the opposite of the row, so neither side settles
-    the fact against this model. The evidence catalog offers each such row as
-    an open question, as it offers a row another row disputes.
+    The graph attribute states the opposite of the row, so the row is not a
+    fact against this model, though it stays in :func:`settled`, which reads
+    the catalog alone. The evidence catalog offers each such row as an open
+    question, as it offers a row another row disputes.
     """
-    rows = _contradicted_rows(catalog, model)
+    rows = _contradicted_ids(catalog, model)
     return tuple(entry for entry in settled(catalog) if assertion_id(entry) in rows)
 
 
@@ -3199,14 +3204,14 @@ def uncontradicted(
 ) -> tuple[Assertion, ...]:
     """Every settled row that is not :func:`contradicted`, in catalog order.
 
-    These are the rows a consumer of ``model`` reads as facts, through the
-    graph or through the evidence catalog.
+    :func:`offered` and the eval harness read these as the rows a lane may rest
+    a definite conclusion on against ``model``.
     """
-    rows = _contradicted_rows(catalog, model)
+    rows = _contradicted_ids(catalog, model)
     return tuple(entry for entry in settled(catalog) if assertion_id(entry) not in rows)
 
 
-def _contradicted_rows(catalog: AssertionCatalog, model: SystemModel) -> set[str]:
+def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]:
     return {row for found in contradictions(catalog, model) for row in found.rows}
 
 

@@ -9,8 +9,10 @@ freeze over a catalog that already carries an assessment is refused.
 A row's **route** is what the job did with it, read off the same functions the
 job calls: ``projected`` is a settled row the graph carries,
 ``offered`` is a settled row the Evidence Catalog cites as itself, ``open`` is
-an unknown, ``set-aside`` is a row a conflict, an opposite graph value or an
-assessment kept from settling, and ``refused`` is a row the gate refused, named by the code that
+an unknown, ``set-aside`` is a row a conflict or an assessment kept from
+settling, or a settled row the graph contradicts
+(:func:`~analysis_service.assertions.contradicted`), and ``refused`` is a row
+the gate refused, named by the code that
 refused it. The first two are the rows that reach a consumer, which is the
 population the owner's decision of 2026-09-23 fixes; the rest are recorded
 beside them so a reviewer sees what the job did not use as well.

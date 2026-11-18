@@ -247,7 +247,8 @@ def evidence_catalog(
     A third enumeration follows where the job carried an assertion pass:
     every row :func:`~analysis_service.assertions.offered` returns — settled,
     not contradicted by the graph, and not already carried by the attribute
-    its projection wrote — in the catalog's own order. ``None`` is a job that ran no such pass, and its
+    its projection wrote — in the catalog's own order. ``None`` is a job that
+    ran no such pass, and its
     catalog holds only the first two enumerations; an empty catalog is a pass
     that settled nothing, which offers the same rows and says so on the
     report.
@@ -291,34 +292,27 @@ def evidence_catalog(
             }
         )
         # The open questions, after the settled rows and never merged with
-        # them. A row reaches here when its value is the unknown sentinel and
-        # it reaches no graph field: the one class of fact that no other offer
-        # reaches, because the attribute enumeration above walks elements
-        # and this row's subject may be a principal.
-        # A row in a conflict is a question too, and this offer carries one
-        # with no graph field to a lane: the model shows a disputed attribute as
-        # a qualified unknown, but a principal's second factor has no
-        # attribute to qualify.
-        open_rows = (
-            *(
-                row
-                for row in (
-                    *(row for row in assertions.entries if row.value == UNKNOWN),
-                    *disputed(assertions),
-                )
-                if not projected_attribute(row.predicate, row.subject)
-            ),
-            # A row the graph attribute contradicts reaches a graph field, and
-            # that field states the opposite rather than an unknown, so only
-            # this offer carries the question.
-            *contradicted(assertions, model),
-        )
+        # them. An unknown row, or a row in a conflict, reaches here when it
+        # reaches no graph field: the model shows a disputed attribute as a
+        # qualified unknown, which the attribute enumeration above offers, but
+        # a principal's second factor has no attribute to qualify.
+        unprojected = [
+            row
+            for row in (
+                *(row for row in assertions.entries if row.value == UNKNOWN),
+                *disputed(assertions),
+            )
+            if not projected_attribute(row.predicate, row.subject)
+        ]
+        # A row the graph attribute contradicts reaches a graph field, and that
+        # field states the opposite rather than an unknown, so only this offer
+        # carries the question.
         catalog.update(
             {
                 assertion_id(row): Ground(
                     kind="unknown-assertion", assertion=assertion_id(row)
                 )
-                for row in open_rows
+                for row in (*unprojected, *contradicted(assertions, model))
             }
         )
     return catalog
