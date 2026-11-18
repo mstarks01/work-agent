@@ -171,8 +171,8 @@ class CriticPopulations:
 
     Each rate reads only its own population. ``real_rejected`` divides by the
     real drafts with a verdict, ``not_real_confirmed`` by the not-real drafts
-    with a verdict, and a ``needs-info`` fate counts in neither: it has a
-    rate of its own.
+    with a verdict, and a ``needs-info`` fate counts in neither numerator: it
+    has a rate of its own.
 
     A draft with no verdict (:func:`has_verdict`) is in no denominator, and
     :attr:`no_verdict` counts it. A population with no draft that has a verdict
@@ -382,7 +382,7 @@ class KilledDraft:
 
 @dataclass(frozen=True)
 class CriticYield:
-    """What one case's critic pass removed, and what it gained."""
+    """What left one case's report across the critic pass, and what it gained."""
 
     case_id: str
     drafts_in: int
@@ -416,7 +416,7 @@ class CriticYield:
         """The gross veto number: reference-matched drafts that left the report.
 
         A draft that had matched a reference and left the report, with a
-        verdict or not: the critic destroying real findings.
+        verdict or not.
         """
         return sum(1 for draft in self.killed if _matched(draft.outcome))
 

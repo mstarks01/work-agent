@@ -569,7 +569,8 @@ def attribute_case(
 
     ``drafts`` are the pre-critic drafts and ``produced`` the report's claims,
     the two sides :mod:`evals.harness.critic_yield` already scores; a draft in
-    the first and not the second is one the critic killed.
+    the first and not the second left the report, with a verdict or not, and is
+    charged to the critic.
 
     ``block`` is the report's own STRIDE block, read for one fact the drafts do
     not carry: whether the ruling on the draft a row names came out of a
