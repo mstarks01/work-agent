@@ -25,8 +25,8 @@ order, and the first that finds the finding charges it; ``position`` and
 * ``position``: claims cite the place with a reading's action, and a
   person ruled the reference an attacker position that none of them states.
   The lane wrote the action against another attacker, which the scorer's
-  position gate refuses. Each later stage reads the same rule: a draft the
-  critic killed and a proposal the fan-in lost answer the reference only where
+  position gate refuses. Each later stage reads the same rule: a draft that
+  left the report and a proposal the fan-in lost answer the reference only where
   they state its ruled position, so a stage that finds the action at the place
   and only other positions charges ``position``, not itself.
 * ``unstated``: as ``position``, except that none of those items states any
@@ -42,8 +42,9 @@ order, and the first that finds the finding charges it; ``position`` and
   reference's action — the scorer's own lane error. The finding was written and
   filed under the wrong category, which is a routing fix and neither a lead nor
   a verb; charging it to ``place`` hid it behind the lane's silence.
-* ``critic``: no surviving claim cites the place, but a draft the critic
-  rejected did, with a reading's action. The finding was written and killed.
+* ``critic``: no surviving claim cites the place, but a draft that left the
+  report (with a verdict or not) cites it with a reading's action. The finding
+  was written and left the report.
 * ``fan-in``: no draft cites the place, but the lane *proposed* a claim there
   with a reading's action. The finding was written and lost before the
   critic saw it, in one of two ways, which :data:`FanInEffect` names. The fan-in
@@ -569,7 +570,8 @@ def attribute_case(
 
     ``drafts`` are the pre-critic drafts and ``produced`` the report's claims,
     the two sides :mod:`evals.harness.critic_yield` already scores; a draft in
-    the first and not the second is one the critic killed.
+    the first and not the second left the report, with a verdict or not, and is
+    charged to the critic.
 
     ``block`` is the report's own STRIDE block, read for one fact the drafts do
     not carry: whether the ruling on the draft a row names came out of a

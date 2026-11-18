@@ -499,7 +499,7 @@ def test_a_merge_names_the_claim_that_states_the_ruled_position(
 
 def test_a_killed_draft_at_a_ruled_reading_is_the_critics(case, flows):
     """The ladder reads every reading the scorer accepts (``stride_readings``),
-    so a draft the critic killed at a ruled place charges the critic."""
+    so a draft that left the report at a ruled place charges the critic."""
     reference = case.stride_claims()[0]
     own = endpoint_form(reference.affected_element_ids, flows)
     elsewhere = next(

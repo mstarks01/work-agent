@@ -2,22 +2,28 @@
 
 The critic is the most expensive node in the graph, at one strong-tier pass over
 every category agent's output, and this module is the evidence that it earns
-that cost. It is deliberately two-sided. A critic that kills rejected threats is
-earning its cost, and the same critic killing threats that matched a reference
-is destroying real findings. Only the pair means anything, because a kill count
-alone can be read as either.
+that cost. It is deliberately two-sided. A critic that rejects down-voted drafts
+is earning its cost, and the same critic rejecting drafts that matched a
+reference is destroying real findings. Only the pair means anything, because a
+kill count alone can be read as either.
 
 Two comparators help in reading the numbers against something. Semgrep's
 assistant kills about 20% of findings at 92% to 96% agreement with human triage.
 Unfiltered LLM threat enumeration runs at about 86% raw false positives.
 
-Here is how it works. The critic returns exactly the drafts it was given, which
-:func:`~analysis_service.critic.assemble_claims` enforces, so a killed draft is
-one carrying a ``rejected`` verdict, and the two sides are a superset and its
-subset. The whole instrument is therefore a matter of scoring the same case
-twice through the shipped scorer, with no second metric implementation and no
-special-cased matching, and then reading the killed drafts' pre-critic
-scored outcomes, which is the state the critic faced.
+Here is how it works. Each post-critic claim is a draft the critic kept, so
+the two sides are a superset and its subset. A killed draft is a draft that is
+not in the post-critic output, and its fate says whether the critic rejected it
+or the block holds no verdict for it. Both sides are produced sets, so the
+whole instrument is a matter of scoring the same case twice through the shipped
+scorer, with no second metric implementation and no special-cased matching,
+and then reading each draft's pre-critic scored outcome beside its fate in the
+block, which is the state the critic faced and what it did.
+
+In this instrument, a draft's verdict is the status its block records:
+``confirmed``, ``needs-info`` or ``rejected``. A ``returned`` claim was ruled
+by the critic, but its block records no status, so "a draft with no verdict"
+here means a draft with no archived verdict.
 
 One property holds this together: the scored task is identical on both sides.
 Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
@@ -33,51 +39,81 @@ It is credential-free, like the rest of the scorer. It takes plain data, a
 Nothing here gates. This is an instrument. Any threshold over these numbers
 comes from observed spread across the baseline sweeps rather than from a guess
 here, and the number that could veto the generator-critic pattern outright is
-``matched_killed``.
+``matched_killed``, which counts every reference-matched draft that left the
+report, with a verdict or not.
 """
 
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Literal, get_args
 
-from analysis_service.claims import FrameworkAnalysis, VerdictStatus
+from typing_extensions import TypeIs
+
+from analysis_service.claims import FrameworkAnalysis, RejectionStep, VerdictStatus
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
-from evals.harness.rates import Rate, percent
+from evals.harness.rates import Rate
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_case
 
-# What one produced threat turned out to be, in the pass that scored it. The
-# first two are hits against the reference set, and the rest are the ways of
-# missing it.
+#: The scored outcomes that matched a reference.
+MatchedOutcome = Literal["matched-must-find", "matched-expected"]
+
+# What one produced threat turned out to be, in the pass that scored it.
+# ``MatchedOutcome`` gives the two hits against the reference set, and the rest
+# are the ways of missing it.
 #
 # **Composed from ``VoteStatus`` rather than restating it.** The ways an unmatched
 # finding can stand are the scorer's vocabulary, and a second copy here would
-# disagree with it the first time one was added. So the four names below are
-# the ones this module owns, and every standing arrives with the scorer's own
-# type.
-ScoredOutcome = (
-    Literal["matched-must-find", "matched-expected", "lane-error", "unscored"]
-    | VoteStatus
-)
+# disagree with it the first time one was added. So ``MatchedOutcome`` and the
+# two misses below are the names this module owns, and every standing arrives
+# with the scorer's own type.
+ScoredOutcome = MatchedOutcome | Literal["lane-error", "unscored"] | VoteStatus
 
+#: The fates that hold no verdict status in the block. ``returned`` is a claim
+#: the critic kept and assembly sent back to the deferred set, so it is not in
+#: the report. ``omitted`` is a draft the block carries in none of its three
+#: lists.
+NoVerdictFate = Literal["returned", "omitted"]
 #: What the critic's pass did with one draft, read off the block it returned.
 #: ``needs-info`` is a qualification: it is neither a confirmation nor a
-#: rejection. ``omitted`` is a draft the block carries in none of its three
-#: lists.
-CriticFate = VerdictStatus | Literal["returned", "omitted"]
-OMITTED: CriticFate = "omitted"
+#: rejection.
+CriticFate = VerdictStatus | NoVerdictFate
+OMITTED: Literal["omitted"] = "omitted"
 FATES: tuple[CriticFate, ...] = tuple(
     value for part in get_args(CriticFate) for value in get_args(part)
 )
-#: The fates that are a critic's verdict on the block. A ``returned`` claim
-#: was ruled and kept, but the block does not record its status.
+#: The fates that are a critic's verdict on the block.
 VERDICT_STATUSES: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
+#: The fates that hold no verdict, in the order a count of them names them.
+NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = tuple(sorted(get_args(NoVerdictFate)))
+
+
+def has_verdict(fate: str) -> TypeIs[VerdictStatus]:
+    """Whether ``fate`` is a verdict status the block records.
+
+    A draft with no verdict is in no population rate, no yield rate and no
+    agreement count: ``critic_yield`` and ``critic_replay`` each count it on its
+    own line, which :func:`no_verdict_line` words.
+    """
+    return fate in VERDICT_STATUSES
+
+
+def no_verdict_line(apart: int, fates: Sequence[str]) -> str:
+    """The line that counts ``apart`` drafts with no archived verdict.
+
+    It names ``fates``, which holds two or more fates, as each caller's
+    constant does.
+    """
+    counted = "1 draft has" if apart == 1 else f"{apart} drafts have"
+    *first, last = fates
+    return f"{counted} no archived verdict ({', '.join(first)} or {last})"
+
 
 #: Which input population a draft joins.
 Population = Literal["real", "not-real", "unlabelled"]
@@ -116,16 +152,19 @@ YieldRate = Literal[
     "kill_rate", "rejected_kill_rate", "matched_kill_rate", "kill_precision"
 ]
 
-#: Why the not-real population is empty: some draft reads ``stale``, or none
-#: does. :data:`GAP_WORDS` says what each one means.
-NotRealGap = Literal["stale-drafts", "no-down-vote"]
+#: Why the not-real population has no draft with a verdict: each draft with a
+#: current down-vote has no verdict, some draft reads ``stale``, or neither.
+#: :data:`GAP_WORDS` says what each one means.
+NotRealGap = Literal["no-verdict", "stale-drafts", "no-down-vote"]
 
 #: What a report prints for each :data:`NotRealGap`.
 GAP_WORDS: Mapping[NotRealGap, str] = MappingProxyType(
     {
+        "no-verdict": "each draft with a current down-vote has no archived"
+        " verdict, so it is counted apart",
         "stale-drafts": "no draft carries a current down-vote, and some carry"
         " only a vote on another argument: a vote judges a reported claim with"
-        " its verdict (ADR 0029), and a draft has no verdict",
+        " its verdict (ADR 0029), and a draft is not yet a reported claim",
         "no-down-vote": "no draft carries a current down-vote",
     }
 )
@@ -136,10 +175,15 @@ class CriticPopulations:
     """The drafts the critic was handed, by scored outcome and by fate.
 
     Each rate reads only its own population. ``real_rejected`` divides by the
-    real drafts, ``not_real_confirmed`` by the not-real ones, and a
-    ``needs-info`` fate counts in neither: it has a rate of its own.
-    An empty population gives a :class:`~evals.harness.rates.Rate` whose value
-    is ``None``, which is a gap in the labels and not a zero.
+    real drafts with a verdict, ``not_real_confirmed`` by the not-real drafts
+    with a verdict, and a ``needs-info`` fate counts in neither numerator: it
+    has a rate of its own.
+
+    A draft with no verdict (:func:`has_verdict`) is in no denominator, and
+    :attr:`no_verdict` counts it. A population with no draft that has a verdict
+    gives a :class:`~evals.harness.rates.Rate` whose value is ``None``, which is
+    a gap and not a zero; :attr:`not_real_gap` names the reason for the
+    not-real population.
     """
 
     counts: Mapping[tuple[ScoredOutcome, CriticFate], int]
@@ -152,17 +196,39 @@ class CriticPopulations:
             total.update(entry.populations.counts)
         return cls(dict(total))
 
-    def count(self, label: Population, among: Sequence[CriticFate] = FATES) -> int:
-        """The drafts of one population, met by any fate in ``among``."""
+    def count(self, label: Population) -> int:
+        """The drafts of one population, with a verdict or not."""
+        return sum(n for (outcome, _), n in self.counts.items() if _in(label)(outcome))
+
+    def rate(self, label: Population, fate: VerdictStatus) -> Rate:
+        """The share of one population's drafts with a verdict that met one fate."""
+        return Rate(
+            self.met(fate, _in(label)),
+            self.with_verdict(_in(label)),
+        )
+
+    def with_verdict(self, outcome_matches: Callable[[ScoredOutcome], bool]) -> int:
+        """The drafts with a verdict whose scored outcome ``outcome_matches``."""
         return sum(
             n
             for (outcome, fate), n in self.counts.items()
-            if LABEL_OF[outcome] == label and fate in among
+            if outcome_matches(outcome) and has_verdict(fate)
         )
 
-    def rate(self, label: Population, fate: CriticFate) -> Rate:
-        """The share of one population that met one fate."""
-        return Rate(self.count(label, (fate,)), self.count(label))
+    def met(
+        self, fate: VerdictStatus, outcome_matches: Callable[[ScoredOutcome], bool]
+    ) -> int:
+        """The drafts that met ``fate`` whose scored outcome ``outcome_matches``."""
+        return sum(
+            n
+            for (outcome, held), n in self.counts.items()
+            if held == fate and outcome_matches(outcome)
+        )
+
+    @property
+    def no_verdict(self) -> int:
+        """The drafts with no verdict, which no rate divides by."""
+        return sum(n for (_, fate), n in self.counts.items() if not has_verdict(fate))
 
     @property
     def rates(self) -> dict[PopulationRate, Rate]:
@@ -181,9 +247,11 @@ class CriticPopulations:
 
     @property
     def not_real_gap(self) -> NotRealGap | None:
-        """Why the not-real population is empty, or ``None`` where it is not."""
-        if self.count("not-real"):
+        """Why the not-real population has no draft with a verdict, or ``None``."""
+        if self.with_verdict(_in("not-real")):
             return None
+        if self.count("not-real"):
+            return "no-verdict"
         return "stale-drafts" if self.stale_drafts else "no-down-vote"
 
     def to_json(self) -> dict[str, Any]:
@@ -195,6 +263,7 @@ class CriticPopulations:
             **{name: rate.to_json() for name, rate in self.rates.items()},
             "not_real_gap": self.not_real_gap,
             "stale_drafts": self.stale_drafts,
+            "no_verdict": self.no_verdict,
         }
 
 
@@ -203,9 +272,11 @@ class CriticAudit:
     """The critic's two sides over a sweep: its input populations and its loss.
 
     ``populations`` counts drafts. ``reference_loss`` counts references: its
-    denominator is the gross count of reference-matched drafts the critic
-    killed, and its numerator the kills whose reference no reported claim
-    matched. Another retained draft can still carry a killed draft's
+    denominator is the gross count of reference-matched drafts that left the
+    report, and its numerator the kills whose reference no reported claim
+    matched. It counts every kill, with a verdict or not, as
+    :func:`~evals.harness.losses.attribute_case` charges each one to the
+    critic. Another retained draft can still carry a killed draft's
     reference, so the two counts differ.
 
     Neither half measures quote membership, ruling validity or agreement
@@ -234,7 +305,10 @@ class CriticAudit:
         }
 
     def render(self) -> None:
-        """The population table, its four rates, its gap and the loss line."""
+        """Print the population table, its rates and the loss line.
+
+        The gap line and the no-verdict line print where they apply.
+        """
         populations = self.populations
         print(
             "critic input populations, in drafts (labels are relative to the"
@@ -256,22 +330,27 @@ class CriticAudit:
         gap = populations.not_real_gap
         if gap is not None:
             print(
-                f"  not-real population empty ({gap}, stale drafts:"
+                f"  not-real rates unavailable ({gap}, stale drafts:"
                 f" {populations.stale_drafts}): {GAP_WORDS[gap]}"
             )
+        if populations.no_verdict:
+            print(f"  {no_verdict_line(populations.no_verdict, NO_VERDICT_FATES)}")
         loss = self.reference_loss
         print(
-            f"  gross: {loss.denominator} reference-matched drafts killed;"
+            f"  gross: {loss.denominator} reference-matched drafts left the report;"
             f" net: {loss.numerator} of their references no reported claim took"
         )
 
 
 @dataclass(frozen=True)
 class KilledDraft:
-    """One draft the critic rejected, and what it was before it was rejected.
+    """One draft that left the report, and what it was before the critic.
+
+    ``fate`` says whether the critic rejected it or the block holds no verdict
+    for it.
 
     The audit trail under the aggregate counts: a ``matched-must-find`` line
-    here is a real finding the critic destroyed, named, with the reference it
+    here is a real finding that left the report, named, with the reference it
     was answering — which is what makes the veto number actionable instead of
     merely alarming.
     """
@@ -281,13 +360,18 @@ class KilledDraft:
     claim: str
     outcome: ScoredOutcome
     reference_index: int | None
+    #: What the block did with the draft: ``rejected``, or a fate with no
+    #: verdict (:data:`NO_VERDICT_FATES`), which no population rate or yield
+    #: rate counts.
+    fate: CriticFate
     #: The step the critic said it rejected the draft at, off the block's own
     #: verdict: ``lane``, ``reasoning``, ``duplicate``, ``evidence`` and the
     #: rest of :data:`~analysis_service.claims.RejectionStep`. ``None`` where
-    #: the block carries no verdict for the draft, which is a kill the record
-    #: cannot explain and is counted under its own key rather than folded into
-    #: a step the critic never named.
-    cause: str | None = None
+    #: the verdict names no step, or the block carries no verdict for the
+    #: draft. :attr:`CriticYield.killed_by_cause` counts the first under
+    #: :data:`UNSTATED` and the second under its fate, so neither is folded
+    #: into a step the critic never named.
+    cause: RejectionStep | None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -296,13 +380,14 @@ class KilledDraft:
             "claim": self.claim,
             "disposition": self.outcome,
             "reference_index": self.reference_index,
+            "fate": self.fate,
             "cause": self.cause,
         }
 
 
 @dataclass(frozen=True)
 class CriticYield:
-    """What one case's critic pass removed, and what it gained."""
+    """What left one case's report across the critic pass, and what it gained."""
 
     case_id: str
     drafts_in: int
@@ -317,34 +402,45 @@ class CriticYield:
     must_find_total: int
     populations: CriticPopulations
     #: The references the post-critic score matched, so a kill can be read as
-    #: gross (the draft that had matched died) or net (nothing took its place).
-    matched_after_indices: frozenset[int] = frozenset()
+    #: gross (the draft that had matched left the report) or net (nothing took
+    #: its place).
+    matched_after_indices: frozenset[int]
 
-    # --- the two numbers that matter -------------------------------------
+    # --- the kill counts, over all kills ---------------------------------
 
     @property
     def rejected_killed(self) -> int:
-        """The critic earning its cost: drafts it removed that a person had
-        already rejected for substance."""
-        return sum(1 for draft in self.killed if draft.outcome == "rejected")
+        """The count of every down-voted draft that left the report.
+
+        It holds drafts with a verdict or not (:attr:`KilledDraft.fate` tells
+        which) that a person had already rejected for substance.
+        """
+        return sum(1 for draft in self.killed if LABEL_OF[draft.outcome] == "not-real")
 
     @property
     def matched_killed(self) -> int:
-        """The critic destroying real findings — the number that can veto the
-        pattern. A draft that had matched a reference, killed anyway."""
-        return sum(1 for draft in self.killed if draft.outcome.startswith("matched"))
+        """The gross veto number: reference-matched drafts that left the report.
+
+        A draft that had matched a reference and left the report, with a
+        verdict or not.
+        """
+        return sum(1 for draft in self.killed if _matched(draft.outcome))
 
     @property
     def matched_lost(self) -> int:
-        """Of :attr:`matched_killed`, the kills whose reference no surviving
-        claim took: the net destruction. A killed draft's reference can be
-        matched again by another draft after the critic, so the gross count
-        overstates the loss: such a kill reads as a destroyed finding while the
-        report still carries it. ``matched_killed`` stays the gross count."""
-        return sum(
-            1
-            for draft in self.killed
-            if draft.outcome.startswith("matched")
+        """The kills of :attr:`matched_killed` whose reference no surviving claim took.
+
+        This is the net destruction. A killed draft's reference can be matched
+        again by another draft after the critic, so the gross count overstates
+        the loss: such a kill reads as a destroyed finding while the report
+        still carries it. ``matched_killed`` is the gross count.
+        """
+        return sum(self._lost(draft) for draft in self.killed)
+
+    def _lost(self, draft: KilledDraft) -> bool:
+        """Whether ``draft`` had matched a reference that no surviving claim took."""
+        return (
+            _matched(draft.outcome)
             and draft.reference_index not in self.matched_after_indices
         )
 
@@ -352,38 +448,38 @@ class CriticYield:
     def must_find_lost(self) -> int:
         """The net form of :attr:`must_find_killed`."""
         return sum(
-            1
+            self._lost(draft)
             for draft in self.killed
             if draft.outcome == "matched-must-find"
-            and draft.reference_index not in self.matched_after_indices
         )
 
     @property
     def must_find_killed(self) -> int:
-        """The sharpest form of the veto: a killed draft that had answered a
-        reference the Tier 2 gate depends on."""
+        """The sharpest form of the veto: must-find drafts that left the report.
+
+        Each had answered a reference the Tier 2 gate depends on, and left with
+        a verdict or not.
+        """
         return sum(1 for draft in self.killed if draft.outcome == "matched-must-find")
 
-    # --- rates, all rule-and-ledger-relative ------------------------------
-
     @property
-    def killed_by_cause(self) -> dict[str, dict[str, int]]:
-        """Every kill by the step the critic named, and what each step removed.
+    def killed_by_cause(self) -> dict[KillCause, dict[str, int]]:
+        """Every kill by its step or fate, and what each removed.
 
-        The critic states why it rejected a draft, and nothing counted it: the
-        second Baseline's four must-find kills were three ``reasoning`` and one
-        ``lane``, read by hand. Per step, the kills, the ones that had matched a
-        reference, and the ones that had answered a must-find, so a prompt
-        change that moves the critic's reasoning kills is visible as that and
-        not as a bare count. An unexplained kill is keyed ``unstated``.
+        A kill is keyed by the step its verdict names, by ``unstated`` for a
+        rejection that names no step, or by its fate where it has no verdict.
+
+        Per key, it gives the kills, the ones that had matched a reference, and
+        the ones that had answered a must-find, so a prompt change that moves
+        the critic's reasoning kills is visible as that and not as a bare count.
         """
-        by_cause: dict[str, dict[str, int]] = {}
+        by_cause: dict[KillCause, dict[str, int]] = {}
         for draft in self.killed:
             entry = by_cause.setdefault(
-                draft.cause or UNSTATED, {"killed": 0, "matched": 0, "must_find": 0}
+                _cause_key(draft), {"killed": 0, "matched": 0, "must_find": 0}
             )
             entry["killed"] += 1
-            entry["matched"] += draft.outcome.startswith("matched")
+            entry["matched"] += _matched(draft.outcome)
             entry["must_find"] += draft.outcome == "matched-must-find"
         return dict(sorted(by_cause.items()))
 
@@ -391,28 +487,25 @@ class CriticYield:
     def kill_count(self) -> int:
         return len(self.killed)
 
+    # --- rates, all rule-and-ledger-relative ------------------------------
+
     @property
     def rates(self) -> dict[YieldRate, Rate]:
         """Each rate with its counts, keyed by the rate's name.
 
+        Each numerator counts drafts the critic rejected, not every kill.
         ``kill_rate`` is the share of drafts the critic rejected, the Semgrep
         ~20% comparator. ``rejected_kill_rate`` is the share of the drafts a
-        person rejected that the critic killed, and ``matched_kill_rate`` the
-        share of reference-matched drafts it killed. ``kill_precision`` is the
-        share of the kills that a person rejected for substance. It is not the
-        inverse of ``matched_kill_rate``: a killed ``pooled`` or ``unvoted``
-        draft is neither a win nor a loss here, because the reference sets are
-        non-exhaustive by construction. A rate over an empty population has no
-        value.
+        person rejected that the critic rejected too, and ``matched_kill_rate``
+        the share of reference-matched drafts it rejected. ``kill_precision``
+        is the share of its rejections that a person rejected for substance.
+        It is not the inverse of ``matched_kill_rate``: a rejected ``pooled``
+        or ``unvoted`` draft is neither a win nor a loss here, because the
+        reference sets are non-exhaustive by construction. A draft with no
+        verdict is in no rate, as a numerator or a denominator. A rate whose
+        population holds no draft with a verdict has no value.
         """
-        return _critic_rates(
-            drafts_in=self.drafts_in,
-            killed=self.kill_count,
-            rejected_before=self.rejected_before,
-            rejected_killed=self.rejected_killed,
-            matched_before=self.matched_before,
-            matched_killed=self.matched_killed,
-        )
+        return _critic_rates(self.populations)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -435,6 +528,7 @@ class CriticYield:
                 "must_find_lost": self.must_find_lost,
             },
             "metrics": {name: rate.rounded() for name, rate in self.rates.items()},
+            "rates": {name: rate.to_json() for name, rate in self.rates.items()},
             "populations": self.populations.to_json(),
             "killed_by_cause": self.killed_by_cause,
             "killed": [draft.to_json() for draft in self.killed],
@@ -464,22 +558,29 @@ def score_case_with_yield(
     reports — identical to what :func:`score_case` alone would have returned,
     because the rule is deterministic and both passes read one ledger.
 
-    ``block`` is the report's own framework block, read for the one fact the
-    drafts do not carry: the step the critic said it rejected each killed draft
-    at.
+    ``block`` is the report's own framework block, read for the two facts the
+    drafts do not carry: each draft's fate, and the step the critic said it
+    rejected each killed draft at.
     """
     pre = score_case(case, drafts, matcher, votes, rows)
     post = score_case(case, produced, matcher, votes, rows)
     return ScoredCase(score=post, critic_yield=_yield(pre, post, drafts, block))
 
 
+#: The cause of a kill whose verdict names no step.
+Unstated = Literal["unstated"]
+
 #: The cause a kill reads where its verdict names no step. **The one spelling
 #: of a missing ``rejected_because``**: the critic yield and the loss
 #: attribution both read it, so neither invents a step the critic never wrote.
-UNSTATED = "unstated"
+UNSTATED: Unstated = "unstated"
+
+#: What :attr:`CriticYield.killed_by_cause` counts a kill under: the step its
+#: verdict names, :data:`UNSTATED`, or the fate of a kill with no verdict.
+KillCause = RejectionStep | Unstated | NoVerdictFate
 
 
-def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
+def rejection_steps(block: FrameworkAnalysis) -> dict[str, RejectionStep]:
     """Each rejected claim's stated step, keyed by claim ID, off the block's verdicts.
 
     The one reader of ``rejected_because`` for this instrument. A rejected
@@ -515,6 +616,7 @@ def _yield(
 ) -> CriticYield:
     steps = rejection_steps(block)
     fate_of = fate_by_claim(block)
+    fates = {draft.id: fate_of.get(draft.id, OMITTED) for draft in drafts}
     surviving = set(post.produced_ids)
     outcomes = _scored_outcomes(pre)
     killed = tuple(
@@ -524,6 +626,7 @@ def _yield(
             claim=candidate_claim(draft),
             outcome=outcomes[draft.id][0],
             reference_index=outcomes[draft.id][1],
+            fate=fates[draft.id],
             cause=steps.get(draft.id),
         )
         for draft in drafts
@@ -542,12 +645,7 @@ def _yield(
         must_find_after=post.must_find_matched,
         must_find_total=pre.must_find_total,
         populations=CriticPopulations(
-            dict(
-                Counter(
-                    (outcomes[draft.id][0], fate_of.get(draft.id, OMITTED))
-                    for draft in drafts
-                )
-            )
+            dict(Counter((outcomes[draft.id][0], fates[draft.id]) for draft in drafts))
         ),
         matched_after_indices=frozenset(pair.reference_index for pair in post.matched),
     )
@@ -579,21 +677,49 @@ def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | N
     return records
 
 
-def _critic_rates(
-    *,
-    drafts_in: int,
-    killed: int,
-    rejected_before: int,
-    rejected_killed: int,
-    matched_before: int,
-    matched_killed: int,
-) -> dict[YieldRate, Rate]:
-    """The yield's four rates, from one case's counts or from pooled ones."""
+def _cause_key(draft: KilledDraft) -> KillCause:
+    """The key a kill is counted under in :attr:`CriticYield.killed_by_cause`.
+
+    It is the stated step, :data:`UNSTATED` for a rejection that names none,
+    or the fate of a kill with no verdict.
+    """
+    if not has_verdict(draft.fate):
+        return draft.fate
+    return draft.cause or UNSTATED
+
+
+def _matched(outcome: ScoredOutcome) -> bool:
+    """Whether ``outcome`` matched a reference."""
+    return outcome in get_args(MatchedOutcome)
+
+
+def _any_outcome(_: ScoredOutcome) -> bool:
+    """The predicate that admits every scored outcome."""
+    return True
+
+
+def _in(label: Population) -> Callable[[ScoredOutcome], bool]:
+    """The predicate that a scored outcome puts a draft in ``label``."""
+    return lambda outcome: LABEL_OF[outcome] == label
+
+
+def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
+    """The yield's four rates, over the drafts with a verdict, of one case or pooled.
+
+    Each numerator counts the drafts the critic rejected, read off the same
+    population counts as each denominator.
+    """
+    rejected = populations.met("rejected", _any_outcome)
+    down_voted_rejected = populations.met("rejected", _in("not-real"))
     return {
-        "kill_rate": Rate(killed, drafts_in),
-        "rejected_kill_rate": Rate(rejected_killed, rejected_before),
-        "matched_kill_rate": Rate(matched_killed, matched_before),
-        "kill_precision": Rate(rejected_killed, killed),
+        "kill_rate": Rate(rejected, populations.with_verdict(_any_outcome)),
+        "rejected_kill_rate": Rate(
+            down_voted_rejected, populations.with_verdict(_in("not-real"))
+        ),
+        "matched_kill_rate": Rate(
+            populations.met("rejected", _matched), populations.with_verdict(_matched)
+        ),
+        "kill_precision": Rate(down_voted_rejected, rejected),
     }
 
 
@@ -604,42 +730,33 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     rates would let a case that drafted three threats outweigh one that drafted
     forty.
     """
-    drafts_in = sum(entry.drafts_in for entry in yields)
-    killed = sum(entry.kill_count for entry in yields)
-    rejected_before = sum(entry.rejected_before for entry in yields)
-    rejected_killed = sum(entry.rejected_killed for entry in yields)
-    matched_before = sum(entry.matched_before for entry in yields)
-    matched_killed = sum(entry.matched_killed for entry in yields)
+    populations = CriticPopulations.pooled(yields)
+    rates = _critic_rates(populations)
     must_find_killed = sum(entry.must_find_killed for entry in yields)
     matched_lost = sum(entry.matched_lost for entry in yields)
     must_find_lost = sum(entry.must_find_lost for entry in yields)
-    by_cause: dict[str, Counter[str]] = {}
+    by_cause: dict[KillCause, Counter[str]] = {}
     for entry in yields:
         for cause, counts in entry.killed_by_cause.items():
             by_cause.setdefault(cause, Counter()).update(counts)
     return {
         "cases": len(yields),
-        "drafts_in": drafts_in,
+        "drafts_in": sum(entry.drafts_in for entry in yields),
         "threats_out": sum(entry.threats_out for entry in yields),
-        "killed": killed,
-        "rejected_killed": rejected_killed,
-        "matched_killed": matched_killed,
+        "killed": sum(entry.kill_count for entry in yields),
+        "rejected_killed": sum(entry.rejected_killed for entry in yields),
+        "matched_killed": sum(entry.matched_killed for entry in yields),
         "must_find_killed": must_find_killed,
         "matched_lost": matched_lost,
         "must_find_lost": must_find_lost,
-        **{
-            name: rate.rounded()
-            for name, rate in _critic_rates(
-                drafts_in=drafts_in,
-                killed=killed,
-                rejected_before=rejected_before,
-                rejected_killed=rejected_killed,
-                matched_before=matched_before,
-                matched_killed=matched_killed,
-            ).items()
-        },
-        # Every kill by the step the critic named, pooled; the per-step
-        # ``matched`` and ``must_find`` are what a step removed.
+        **{name: rate.rounded() for name, rate in rates.items()},
+        # Each rate's counts: the kill counts above include the drafts with
+        # no verdict, so they do not divide to a rate.
+        "rates": {name: rate.to_json() for name, rate in rates.items()},
+        "no_verdict": populations.no_verdict,
+        # Every kill by the step its verdict names, or by its fate where it has
+        # no verdict, pooled; the per-key ``matched`` and ``must_find`` are
+        # what each removed.
         "killed_by_cause": {
             cause: dict(counts) for cause, counts in sorted(by_cause.items())
         },
@@ -649,38 +766,47 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
 def render(yields: Sequence[CriticYield]) -> None:
     """Both sides of the critic, always printed together.
 
-    ``killed-real`` is deliberately on the same line as ``killed-rejected``:
-    a kill count read on its own says nothing about whether the critic removes
-    noise or destroys findings.
+    Each printed rate carries its artifact name. ``matched_kill_rate`` is
+    deliberately on the same line as ``rejected_kill_rate``: a kill count read
+    on its own says nothing about whether the critic removes noise or destroys
+    findings. Each rate counts only drafts with a verdict, the "all kills"
+    counts keep every draft that left the report, and a no-verdict line prints
+    under a case and under the total where a draft has no verdict.
     """
     for entry in yields:
+        rates = entry.rates
+        apart = entry.populations.no_verdict
         print(
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
-            f"  killed-rejected {entry.rejected_killed}/{entry.rejected_before}"
-            f"  killed-real {entry.matched_killed}/{entry.matched_before}"
-            f"  (must-find {entry.must_find_killed}, lost for good"
+            f"  rejected_kill_rate {rates['rejected_kill_rate'].shown()}"
+            f"  matched_kill_rate {rates['matched_kill_rate'].shown()}"
+            f"  (all kills: must-find {entry.must_find_killed}, lost for good"
             f" {entry.matched_lost})"
         )
+        if apart:
+            print(f"  {no_verdict_line(apart, NO_VERDICT_FATES)}")
     if yields:
         totals = aggregate_yield(yields)
+        pooled = {name: Rate.from_json(rate) for name, rate in totals["rates"].items()}
         print(
-            f"critic yield: killed {totals['killed']}/{totals['drafts_in']}"
-            f" ({percent(totals['kill_rate'])}),"
-            f" rejected caught {percent(totals['rejected_kill_rate'])},"
-            f" real destroyed {percent(totals['matched_kill_rate'])}"
-            f" of which lost for good {totals['matched_lost']}"
+            f"critic yield: kill_rate {pooled['kill_rate'].shown()},"
+            f" rejected_kill_rate {pooled['rejected_kill_rate'].shown()},"
+            f" matched_kill_rate {pooled['matched_kill_rate'].shown()};"
+            f" all kills lost for good {totals['matched_lost']}"
             f" (must-find {totals['must_find_lost']})"
             " (instrument, non-gating)"
         )
         if totals["killed_by_cause"]:
             print(
-                "  by the step the critic named: "
+                "  by the step its verdict names, or by fate: "
                 + ", ".join(
                     f"{cause} {counts['killed']} (matched {counts['matched']},"
                     f" must-find {counts['must_find']})"
                     for cause, counts in totals["killed_by_cause"].items()
                 )
             )
+        if totals["no_verdict"]:
+            print(f"  {no_verdict_line(totals['no_verdict'], NO_VERDICT_FATES)}")
 
 
 def artifact(yields: Sequence[CriticYield]) -> dict[str, Any]:
