@@ -232,7 +232,9 @@ python -m evals.harness.run stability baseline-*.json --out baseline-spread.json
 ```
 
 Read two things off it. `worst_case_recall_spread` is the band any later
-comparison has to clear. `sometimes_matched` — references found in some runs and
+comparison has to clear, read beside `cases_without_recall_spread`: a case
+whose recall has no value in some run has no spread, so the band covers the
+other cases only. `sometimes_matched` — references found in some runs and
 not others — is the same fact per reference, and it is the more useful one when
 a case's recall happens to land on the same number twice by finding different
 threats.

@@ -2261,6 +2261,7 @@ def _divides_under_a_guard(node: ast.AST) -> bool:
         and len(node.body) == 1
         and isinstance(node.body[0], ast.Return)
         and isinstance(node.body[0].value, ast.Constant)
+        and node.body[0].value.value in (0.0, 1.0)
         and isinstance(node.body[0].value.value, float)
     )
 

@@ -185,3 +185,18 @@ def test_a_margin_with_a_gap_in_one_sweep_only_fails():
         full, compact
     )
     assert not passed and "different cases" in reading
+
+
+def test_a_figure_the_corpus_cannot_measure_fails_the_margin():
+    """With no value in either arm, the margin cannot read the figure, so it
+    fails closed; the per-case veto has no collapse to name."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in (*full.artifacts, *compact.artifacts):
+        for row in artifact["mode_output"]:
+            row["precision"] = None
+    passed, reading = gate._margin("precision", gate.QUALITY_MARGINS["precision"])(
+        full, compact
+    )
+    assert not passed and "unavailable" in reading
+    assert gate._veto(full, compact)[0]
