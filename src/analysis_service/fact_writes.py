@@ -393,7 +393,7 @@ def fact_rows(
     answer's identity or disagrees with it**, so the answer settles the fact.
     A row that can hold beside the answer stays, and so does a row of another
     scope. A ``superseded-by-answer`` issue names each removed row that holds
-    a value the answer overrules. An assertion answer at an attribute that an
+    a value. An assertion answer at an attribute that an
     attribute answer settles writes nothing, and an ``unmatched-answer`` issue
     names its place.
     """
@@ -509,7 +509,6 @@ def fact_rows(
         key: row for key, row in replaced.items() if not at_answered_attribute(row)
     }
     placed = {key: row for key, row in placed.items() if not at_answered_attribute(row)}
-    answer_ids = {assertion_id(row) for row in (*replaced.values(), *placed.values())}
     answer_rows = (*replaced.values(), *placed.values())
     asked, parts = _part_rows(
         catalog, model, answers, spans, answer_rows, attributes.keys()
@@ -556,10 +555,7 @@ def fact_rows(
             assertion=assertion_id(entry),
         )
         for entry in catalog.entries
-        if answered_over(entry)
-        and not answered(entry)
-        and entry.value != UNKNOWN
-        and assertion_id(entry) not in answer_ids
+        if answered_over(entry) and not answered(entry) and entry.value != UNKNOWN
     )
 
     entries = [

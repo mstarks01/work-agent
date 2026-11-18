@@ -571,8 +571,7 @@ element, unless the sources state that part. An assertion answer, or a part,
 removes each catalog fact at its place (the same subject, fact and scope) that
 is open, set aside (`unsupported` or `unresolved`) or disagrees with your
 answer, and a
-`superseded-by-answer` issue names each removed fact that holds a value your
-answer overrules. A fact
+`superseded-by-answer` issue names each removed fact that holds a value. A fact
 that can hold beside your answer, such as a second mechanism of one connection,
 stays. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said

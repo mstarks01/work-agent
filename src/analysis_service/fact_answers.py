@@ -435,16 +435,15 @@ def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
     earlier answer wrote there. The last is the row a resumed job's checkpoint
     holds, and a later run writes it again, so that its quote reads the
     answers Source this run composed. A row the sources settled is none of
-    these, so no answer names it.
+    these, so no answer names it. The open row or the earlier answer comes
+    before a side of a disagreement, so a later answer writes over the earlier
+    one whatever the catalog order.
     """
     sides = {assertion_id(entry) for entry in disputed(catalog)}
-    for entry in catalog.entries:
-        open_here = (
-            entry.value == UNKNOWN or answered(entry) or assertion_id(entry) in sides
-        )
-        if open_here and place_identity(entry) == identity:
-            return entry
-    return None
+    at_place = [entry for entry in catalog.entries if place_identity(entry) == identity]
+    written = [entry for entry in at_place if entry.value == UNKNOWN or answered(entry)]
+    disagreeing = [entry for entry in at_place if assertion_id(entry) in sides]
+    return next(iter([*written, *disagreeing]), None)
 
 
 def refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:

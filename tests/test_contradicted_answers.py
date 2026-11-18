@@ -247,8 +247,8 @@ class TestADisputedRowWithNoGraphField:
 
 
 class TestAnAnswerToADisputedPlace:
-    """The answer is a new row at the place; each side it overrules is named,
-    whatever the catalog order."""
+    """The answer is a new row at the place; each source row it removes is
+    named, whatever the catalog order."""
 
     @staticmethod
     def written(catalog, value):
@@ -257,7 +257,7 @@ class TestAnAnswerToADisputedPlace:
         answer = FactAnswer(key=PLACE_KEY, value=value)
         return fact_rows(catalog, valid_model(), [answer], [span])
 
-    def test_the_overruled_side_is_named_in_either_order(self):
+    def test_each_side_is_named_in_either_order(self):
         for entries in ([REQUIRED, NOT_REQUIRED], [NOT_REQUIRED, REQUIRED]):
             catalog = disputed().model_copy(update={"entries": entries})
             written, issues = self.written(catalog, ABSENT)
@@ -265,8 +265,7 @@ class TestAnAnswerToADisputedPlace:
             rows = [(row.value, row.origin) for row in written.entries]
             assert rows == [(ABSENT, "answer")]
             named = {issue.assertion for issue in issues}
-            assert assertion_id(REQUIRED) in named
-            assert assertion_id(NOT_REQUIRED) not in named
+            assert named == {assertion_id(REQUIRED), assertion_id(NOT_REQUIRED)}
 
     def test_the_answer_keeps_no_explanation_of_a_source_row(self):
         written, _ = self.written(disputed(), "required")
@@ -352,22 +351,23 @@ def test_a_hidden_qualification_asks_one_fact(refused_projection):
 
 class TestAnAnswerBesideAnOpenRow:
     """An unknown row at a disputed place takes the answer in place; the
-    issues name only the side the answer overrules, and an answer the
-    writer drops names itself."""
+    issues name each source row the answer removes, and an answer the writer
+    drops names itself."""
 
     SILENT = REQUIRED.model_copy(
         update={"value": UNKNOWN, "reason": "silent", "explanation": ""}
     )
 
-    def test_the_agreeing_side_is_not_named(self):
+    def test_each_removed_side_is_named(self):
+        """Each source row the answer removes that holds a value is named,
+        the side it agrees with too, whatever the catalog order."""
         catalog = disputed().model_copy(
             update={"entries": [self.SILENT, REQUIRED, NOT_REQUIRED]}
         )
         _, issues = TestAnAnswerToADisputedPlace.written(catalog, "required")
 
         named = {issue.assertion for issue in issues}
-        assert assertion_id(NOT_REQUIRED) in named
-        assert assertion_id(REQUIRED) not in named
+        assert named == {assertion_id(REQUIRED), assertion_id(NOT_REQUIRED)}
 
     def test_an_answer_at_an_answered_attribute_is_named(self):
         silent = MECHANISM.model_copy(
