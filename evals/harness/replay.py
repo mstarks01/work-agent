@@ -138,6 +138,7 @@ from evals.harness.modes import (
     differing,
     score_extraction,
 )
+from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import shown_share
 from evals.reference_facts import facts_path, load_facts, reference_catalog
@@ -1295,7 +1296,7 @@ def _treatment_of(artifact: EvalArtifact, named: str | None) -> tuple[str, Treat
     """
     try:
         rendered = recorded_sources(artifact)
-    except ValueError as error:
+    except ProvenanceError as error:
         raise ValueError(f"{error}, so the sweep cannot be placed on an arm") from error
     if rendered is not None:
         return rendered_digest(rendered), "rendered_sources"

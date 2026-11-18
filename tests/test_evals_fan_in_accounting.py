@@ -323,3 +323,18 @@ def test_a_capture_for_a_framework_the_report_lacks_is_named(archive, case):  # 
     [line] = sweep.capture_faults
     assert "['asvs']" in line
     assert [row.incompatible for row in sweep.rows] == [""]
+
+
+def test_a_sources_record_that_is_not_a_digest_per_case_is_refused(
+    archive,  # noqa: F811
+    case,  # noqa: F811
+    capsys,
+):
+    document = json.loads(archive.read_text(encoding="utf-8"))
+    document["rendered_sources"] = ["not", "a", "mapping"]
+    archive.write_text(json.dumps(document), encoding="utf-8")
+
+    code = main(["fan-in", str(archive), "--case", case.id])
+
+    assert code == 1
+    assert "rendered_sources is not a digest per case" in capsys.readouterr().err

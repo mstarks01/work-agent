@@ -176,8 +176,8 @@ def rendered_sources(cases: Iterable[GoldenCase]) -> dict[str, str]:
 def recorded_sources(artifact: EvalArtifact) -> Mapping[str, str] | None:
     """The sweep's own record of each case's :func:`rendered_sources` digest.
 
-    ``None`` for a sweep that records none. Raises :class:`ValueError` for a
-    block that is not a digest per case.
+    ``None`` for a sweep that records none. Raises :class:`ProvenanceError` for
+    a block that is not a digest per case.
     """
     if not artifact.carries("rendered_sources"):
         return None
@@ -185,7 +185,9 @@ def recorded_sources(artifact: EvalArtifact) -> Mapping[str, str] | None:
     if not isinstance(rendered, Mapping) or not all(
         isinstance(digest, str) for digest in rendered.values()
     ):
-        raise ValueError(f"{artifact.path}: rendered_sources is not a digest per case")
+        raise ProvenanceError(
+            f"{artifact.path}: rendered_sources is not a digest per case"
+        )
     return rendered
 
 

@@ -76,16 +76,16 @@ ARCHIVED_BATCHES: Mapping[FrameworkName, type[ProposalBatch]] = MappingProxyType
 def replay_fan_in(
     case: GoldenCase,
     report: Report,
-    proposals: Mapping[str, Any],
+    lanes: Mapping[str, Any],
     framework: FrameworkName,
 ) -> tuple[dict[str, ProposalBatch], FanIn]:
     """The shipped fan-in over one framework's stored lane batches.
 
-    ``proposals`` is each lane against its stored batch. Raises
+    ``lanes`` is each lane against its stored batch. Raises
     :class:`~analysis_service.fan_in.DraftJoinError` where the fan-in does.
     """
     batch_type = ARCHIVED_BATCHES[framework]
-    batches = {lane: batch_type.model_validate(raw) for lane, raw in proposals.items()}
+    batches = {lane: batch_type.model_validate(raw) for lane, raw in lanes.items()}
     merged = fan_in(
         batches,
         PACKAGES[framework],
