@@ -916,7 +916,7 @@ class TestTakingAnAnswerBack:
         assert admitted.answers.facts == (back,)
         after = _asked_after(admitted.answers.facts)
         element_id, attribute = question.key[:2]
-        assert open_attribute(after.model, element_id, attribute)
+        assert open_attribute(after.model, element_id, attribute, after.catalog)
         assert [a for q, a in after.answered_early if q.key == question.key] == [back]
 
     def test_the_pause_takes_a_facet_answer_back(self):

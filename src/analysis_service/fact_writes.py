@@ -36,6 +36,7 @@ from analysis_service.assertions import (
     assertion_id,
     conflicts,
     graph_subject_type,
+    place_identity,
     projected_attribute,
     subjects_of,
 )
@@ -151,7 +152,7 @@ def check_fact_answers(
                     f"facts[{at}]: no attribute of that name on that element"
                 )
             if answer.key not in answered_before and not open_attribute(
-                prepared, element_id, attribute
+                prepared, element_id, attribute, catalog
             ):
                 raise ValueError(
                     f"{attribute!r} on {element_id!r} is stated, so it takes no answer"
@@ -471,29 +472,31 @@ def fact_rows(
     )
     rewritten = {assertion_id(row) for row in replaced.values()}
     written_here = {
-        **{
-            (row.subject, row.predicate): row
-            for row in replaced.values()
-            if not row.scope
-        },
-        **parts,
+        place_identity(row): row for row in (*replaced.values(), *parts.values())
     }
 
     def answered_over(entry: Assertion) -> bool:
         """An earlier run's part row, or a source row an answer settles now.
 
-        At a place an answer writes, a source row goes where it is open, set
-        aside, the answer's own identity, or where it disagrees with the
-        answer (:func:`~analysis_service.assertions.conflicts`). A row that can
-        hold beside the answer, such as another value of a predicate of many,
-        stays. A row an attribute answer removes is that step's.
+        At the place an answer writes, its subject, predicate and scope
+        (:func:`~analysis_service.assertions.place_identity`), a source row
+        goes where it is open, set aside, the answer's own identity, or where
+        it disagrees with the answer
+        (:func:`~analysis_service.assertions.conflicts`). A row that can hold
+        beside the answer, such as another value of a predicate of many, or a
+        row of a narrower scope, stays. A row an attribute answer removes is
+        that step's.
         """
-        place = (entry.subject, entry.predicate)
-        if entry.scope or assertion_id(entry) in superseded:
+        if assertion_id(entry) in superseded:
             return False
         if answered(entry):
-            return place in asked and assertion_id(entry) not in rewritten
-        written_row = written_here.get(place)
+            place = (entry.subject, entry.predicate)
+            return (
+                not entry.scope
+                and place in asked
+                and assertion_id(entry) not in rewritten
+            )
+        written_row = written_here.get(place_identity(entry))
         if written_row is None or assertion_id(entry) in replaced:
             return False
         return (

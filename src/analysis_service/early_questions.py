@@ -349,11 +349,16 @@ class EarlyQuestion:
         }
 
 
-def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | None:
+def _open_key(
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    element: Element,
+    field: str,
+) -> UnknownKey | None:
     """The fact this field asks about this element, or ``None`` where it is not open."""
     if parse_question_kind(field) is not None:
         return UnknownRef(element_id=element.id, question=field).key
-    if open_attribute(model, element.id, field):
+    if open_attribute(model, element.id, field, catalog):
         return UnknownRef(element_id=element.id, attribute=field).key
     return None
 
@@ -492,7 +497,7 @@ def _early_questions(
         for element in model.elements():
             rates = prior[name].rates.get(element_type(element), {})
             for field, rate in rates.items():
-                key = _open_key(model, element, field)
+                key = _open_key(model, catalog, element, field)
                 if key is None or key in decided:
                     continue
                 on_element = named.get(element.id, [])
@@ -592,7 +597,7 @@ def _gate_questions(
             continue
         for ref in PACKAGES[name].precondition_facts(model):
             if ref.kind == "attribute" and not open_attribute(
-                model, ref.element_id, ref.attribute
+                model, ref.element_id, ref.attribute, catalog
             ):
                 continue
             deciding.setdefault(ref.key, []).append(name)

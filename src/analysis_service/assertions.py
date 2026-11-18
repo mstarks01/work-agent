@@ -179,6 +179,7 @@ __all__ = [
     "open_rows",
     "parse_predicate",
     "parse_subject_type",
+    "place_identity",
     "project",
     "projected_attribute",
     "projection_fields",
@@ -1646,6 +1647,17 @@ def assertion_id(assertion: Assertion) -> str:
     """
     parts = identity_parts(assertion)
     return f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~{parts.value}"
+
+
+def place_identity(assertion: Assertion) -> str:
+    """The identity this row's place takes, whatever value the row states.
+
+    The row's identity with the value :data:`UNKNOWN`: the subject, the
+    predicate and the scope name the place. A Fact Question about a place is
+    asked under this key, so an answer finds the row an earlier answer wrote
+    there, whose value differs from the row the question named.
+    """
+    return assertion_id(assertion.model_copy(update={"value": UNKNOWN}))
 
 
 def read_assertion_id(identity: str) -> IdentityParts | None:

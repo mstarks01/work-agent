@@ -64,6 +64,8 @@ from analysis_service.assertions import (
     PredicateName,
     answered,
     assertion_id,
+    disputed,
+    place_identity,
 )
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import (
@@ -424,22 +426,23 @@ def part_answers(fact: FactAnswer) -> tuple[tuple[PredicateName, str], ...]:
 
 
 def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
-    """The row an answer to the open row ``identity`` writes over, if any.
+    """The row an answer to the open place ``identity`` writes over, if any.
 
-    **The one reader of "which row does this answer settle".** That is the open
-    row itself, or the stated row an earlier answer wrote in its place. The
-    second is the row a resumed job's checkpoint holds, and a later run
-    writes it again, so that its quote reads the answers Source this run
-    composed. A row the sources settled is neither, so no answer names it.
+    **The one reader of "which row does this answer settle".** ``identity``
+    names a place (:func:`~analysis_service.assertions.place_identity`). The
+    row is the open row there, a side of a disagreement there
+    (:func:`~analysis_service.assertions.disputed`), or the stated row an
+    earlier answer wrote there. The last is the row a resumed job's checkpoint
+    holds, and a later run writes it again, so that its quote reads the
+    answers Source this run composed. A row the sources settled is none of
+    these, so no answer names it.
     """
+    sides = {assertion_id(entry) for entry in disputed(catalog)}
     for entry in catalog.entries:
-        if entry.value == UNKNOWN:
-            reopened = entry
-        elif answered(entry):
-            reopened = entry.model_copy(update={"value": UNKNOWN})
-        else:
-            continue
-        if assertion_id(reopened) == identity:
+        open_here = (
+            entry.value == UNKNOWN or answered(entry) or assertion_id(entry) in sides
+        )
+        if open_here and place_identity(entry) == identity:
             return entry
     return None
 

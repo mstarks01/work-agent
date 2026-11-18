@@ -329,7 +329,11 @@ class Answerable:
                 ],
                 "corrected_findings": list(
                     corrected_findings(
-                        self.analyses, record.answers.facts, record.corrections
+                        self.analyses,
+                        record.answers.facts,
+                        record.corrections,
+                        self.model,
+                        None if self.assertions is None else self.assertions.catalog,
                     )
                 ),
                 # What the extraction read, for a person to review at the
@@ -982,7 +986,15 @@ class JobAnswers:
             corrections=corrections,
             corrected_findings=list(
                 corrected_findings(
-                    answerable.analyses, parent.answers.facts, corrections
+                    answerable.analyses,
+                    parent.answers.facts,
+                    corrections,
+                    answerable.model,
+                    (
+                        None
+                        if answerable.assertions is None
+                        else answerable.assertions.catalog
+                    ),
                 )
             ),
         )

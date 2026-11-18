@@ -111,8 +111,7 @@ def waiting_on(ref: UnknownRef) -> list[FrameworkAnalysis]:
 
 def asked(analyses, model, catalog, earlier=()):
     return [
-        question.key
-        for question in fact_questions(analyses, model, catalog, earlier)
+        question.key for question in fact_questions(analyses, model, catalog, earlier)
     ]
 
 

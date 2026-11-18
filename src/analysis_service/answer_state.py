@@ -919,7 +919,7 @@ def question_set(
     moot: list[tuple[EarlyQuestion, Reason]] = []
     facts = resolve(prepared.capability_facts())
     for question in waiting_on.values():
-        reason = _left_out(question, gates, facts, prepared)
+        reason = _left_out(question, gates, facts, prepared, catalog)
         (held if reason == "gate-undecided" else moot).append((question, reason))
     # What each undecidable framework would ask once its gate is satisfied:
     # listed as waiting on the gate, so a page can say how much a gate answer
@@ -1018,6 +1018,7 @@ def _left_out(
     gates: Mapping[FrameworkName, PreconditionResult],
     facts: Mapping[str, CapabilityFact],
     prepared: SystemModel,
+    catalog: AssertionCatalog | None,
 ) -> Reason:
     """Why a question the pause first listed is open and no longer listed.
 
@@ -1045,7 +1046,7 @@ def _left_out(
             return "no-longer-needed-by-selected-units"
         return "parent-absent" if fact.derived_from else "fact-settled"
     if ref.kind == "attribute" and not open_attribute(
-        prepared, ref.element_id, ref.attribute
+        prepared, ref.element_id, ref.attribute, catalog
     ):
         return "fact-settled"
     return "no-longer-needed-by-selected-units"

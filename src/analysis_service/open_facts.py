@@ -17,7 +17,7 @@ it, so it cannot drift from the verdicts it describes.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from analysis_service.analysis import ControlAttribute, control_state
@@ -28,10 +28,15 @@ from analysis_service.assertions import (
     answer,
     answered,
     assertion_id,
+    contradicted,
+    disputed,
+    held_open_attributes,
     identity_parts,
     parse_predicate,
+    place_identity,
     projected_attribute,
     read_assertion_id,
+    uncontradicted,
 )
 from analysis_service.capabilities import CAPABILITIES, parse_capability_key
 from analysis_service.claims import AttributeGround, UnknownRef
@@ -348,13 +353,20 @@ def gaps(model: SystemModel) -> tuple[Gap, ...]:
     return tuple(Gap(attribute, tuple(unstated[attribute])) for attribute in order)
 
 
-def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
+def open_attribute(
+    model: SystemModel,
+    element_id: str,
+    attribute: str,
+    catalog: AssertionCatalog | None,
+) -> bool:
     """True where this attribute is a fact the model leaves open.
 
     **The one reader of "may this attribute be asked, and answered".** Open is
-    unverified by :func:`~analysis_service.analysis.control_state`, the
-    reading the evidence catalog uses, or a zone the service inferred. The
-    early list, the report list and the answer check all ask it.
+    unverified by :func:`~analysis_service.analysis.control_state`, a zone
+    the service inferred, or an attribute the assertion rows hold open
+    against ``model`` (:func:`~analysis_service.assertions.held_open_attributes`),
+    whose value the evidence catalog does not offer as a fact. The early
+    list, the report list and the answer check all ask it.
     """
     element = model.get(element_id)
     value = getattr(element, attribute, None)
@@ -362,7 +374,51 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
     assumed = (
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
-    return element is not None and (unverified or assumed)
+    held_open = catalog is not None and (element_id, attribute) in (
+        held_open_attributes(catalog, model)
+    )
+    return element is not None and (unverified or assumed or held_open)
+
+
+def fact_routes(
+    catalog: AssertionCatalog | None, model: SystemModel
+) -> Mapping[str, UnknownRef]:
+    """The fact each open row a finding may name is asked as, by row identity.
+
+    **The one reader of "which fact does a reference to an open row ask".**
+    A row the graph contradicts (:func:`~analysis_service.assertions.contradicted`)
+    or another row disputes (:func:`~analysis_service.assertions.disputed`)
+    states a value, so its own identity names no row an answer could write
+    over. Where it reaches a graph field, the question is that attribute's,
+    and the attribute path writes the answer. Where it reaches none, the
+    question is its place's
+    (:func:`~analysis_service.assertions.place_identity`), which names the
+    answer's row in every later run too (the maintainer's ruling of
+    2026-11-18 on #2270). ``model`` is read as the lanes read it
+    (:func:`prepared_model`).
+    """
+    if catalog is None:
+        return {}
+    prepared = prepared_model(model, catalog)
+    routes: dict[str, UnknownRef] = {}
+    for row in (*contradicted(catalog, prepared), *disputed(catalog)):
+        attribute = projected_attribute(row.predicate, row.subject)
+        routes[assertion_id(row)] = (
+            UnknownRef(element_id=row.subject, attribute=attribute)
+            if attribute
+            else UnknownRef(assertion=place_identity(row))
+        )
+    return routes
+
+
+def routed(
+    refs: Iterable[UnknownRef], routes: Mapping[str, UnknownRef]
+) -> list[UnknownRef]:
+    """``refs``, each reference to an open row replaced by its fact (:func:`fact_routes`)."""
+    return [
+        routes.get(ref.assertion, ref) if ref.kind == "assertion" else ref
+        for ref in refs
+    ]
 
 
 def source_states(
@@ -384,14 +440,23 @@ def source_states(
     theirs.
     """
     held = answer(catalog or AssertionCatalog(), element_id, predicate)
-    if any(not row.scope and not answered(row) for row in held.settled):
+    prepared = prepared_model(model, catalog)
+    facts = (
+        set()
+        if catalog is None
+        else {assertion_id(row) for row in uncontradicted(catalog, prepared)}
+    )
+    if any(
+        not row.scope and not answered(row) and assertion_id(row) in facts
+        for row in held.settled
+    ):
         return True
     attribute = projected_attribute(predicate, element_id)
     answer_wrote = any(answered(row) for row in held.rows)
     return (
         bool(attribute)
         and not answer_wrote
-        and not open_attribute(model, element_id, attribute)
+        and not open_attribute(prepared, element_id, attribute, catalog)
     )
 
 

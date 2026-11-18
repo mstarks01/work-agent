@@ -51,10 +51,12 @@ from analysis_service.fact_answers import (
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import (
     element_names,
+    fact_routes,
     group_of,
     label_of,
     open_attribute,
     prepared_model,
+    routed,
 )
 from analysis_service.question_kinds import Facet
 from analysis_service.system_model import SystemModel
@@ -278,6 +280,9 @@ def follow_up_needs(
     a fact it waits on without settling it, because no answer in the list can
     cover it.
 
+    A reference to a row the graph contradicts or another row disputes is
+    read as the fact it is asked as (:func:`~analysis_service.open_facts.fact_routes`).
+
     **A finding that needs only some facets of a kind**
     (:func:`~analysis_service.fact_answers.needs_of`) waits on it until those
     facets are known, and no longer (ADR 0073).
@@ -287,6 +292,7 @@ def follow_up_needs(
     refs: dict[UnknownKey, UnknownRef] = {}
     conditional: set[Finding] = set()
     prepared = prepared_model(model, catalog)
+    routes = fact_routes(catalog, prepared)
     done = answered_keys(earlier)
     said = {answer.key: answer for answer in earlier}
     bands: dict[Finding, Band] = {}
@@ -296,7 +302,7 @@ def follow_up_needs(
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
             bands[finding] = rank(claim)
-            waited = claim.waits_on()
+            waited = routed(claim.waits_on(), routes)
             wanted = needs_of(waited)
             covered = {
                 key for key, need in wanted.items() if covers(said.get(key), need)
@@ -313,14 +319,14 @@ def follow_up_needs(
                 conditional.add(finding)
             grounds = [
                 ref
-                for ref in claim.unknown_grounds()
-                if _open(ref, prepared) and ref.key not in done
+                for ref in routed(claim.unknown_grounds(), routes)
+                if _open(ref, prepared, catalog) and ref.key not in done
             ]
             evidence[finding] = frozenset(ref.key for ref in grounds)
             verdict = [
                 ref
                 for ref in waited
-                if _open(ref, prepared) and ref.key not in done | covered
+                if _open(ref, prepared, catalog) and ref.key not in done | covered
             ]
             named[finding] = frozenset(ref.key for ref in verdict)
             for ref in (*grounds, *verdict):
@@ -460,11 +466,13 @@ def fact_questions(
     return tuple(asked)
 
 
-def _open(ref: UnknownRef, model: SystemModel) -> bool:
+def _open(
+    ref: UnknownRef, model: SystemModel, catalog: AssertionCatalog | None
+) -> bool:
     """False for an attribute the model states; every other fact is open."""
     element_id, attribute = ref.element_id, ref.attribute
     return fact_kind(ref.key) != "attribute" or open_attribute(
-        model, element_id, attribute
+        model, element_id, attribute, catalog
     )
 
 

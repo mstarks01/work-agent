@@ -381,6 +381,6 @@ def test_a_question_left_out_is_not_settled_by_a_closed_attribute():
         frameworks=("stride",),
     )
 
-    reason = _left_out(question, {"stride": "satisfied"}, {}, model)
+    reason = _left_out(question, {"stride": "satisfied"}, {}, model, None)
 
     assert reason == "no-longer-needed-by-selected-units"
