@@ -827,7 +827,7 @@ class ExtractionScore:
         A model that separated nothing is the opposite failure and recall
         already sees it, which is why both are reported rather than folded.
 
-        ``0.0`` where the extraction derived none, on the same reading
+        No value where the extraction derived none, on the same reading
         :attr:`crossings_recall` gives an empty reference: nothing derived is
         not a perfect score.
         """
@@ -991,7 +991,7 @@ class ExtractionScore:
         (#961). :attr:`same_zone_recall`, :attr:`different_zone_agreement` and
         :attr:`zone_pair_coverage` are the three readings beside it.
 
-        ``0.0`` where fewer than two zoned elements are paired, because there
+        No value where fewer than two zoned elements are paired, because there
         is no pair to ask and an empty agreement is not a perfect one.
         """
         pairs = self.zone_pairs

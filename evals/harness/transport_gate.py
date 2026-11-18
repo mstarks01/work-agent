@@ -138,13 +138,18 @@ def _primary(full: Arm, compact: Arm) -> tuple[bool, str]:
     return sigmas >= PRIMARY_SIGMAS, f"{saved:+.1f}%, {-sigmas:.2f} sd"
 
 
-def _valued_cases(arm: Arm, figure: str) -> frozenset[str]:
-    """The cases on which some sweep of ``arm`` holds a value for ``figure``."""
-    return frozenset(
-        case
-        for case, runs in arm.per_case(figure).items()
-        if any(run is not None for run in runs)
-    )
+def _valued_cases(arm: Arm, figure: str) -> dict[str, bool | None]:
+    """Each case: whether every sweep of ``arm`` holds a value for ``figure``.
+
+    ``True`` where every sweep does, ``False`` where none does, and ``None``
+    where some sweeps do and others do not. A sweep that lacks a case would
+    drop it from that sweep's mean alone.
+    """
+    valued: dict[str, bool | None] = {}
+    for case, runs in arm.per_case(figure).items():
+        held = sum(run is not None for run in runs)
+        valued[case] = None if 0 < held < len(runs) else held == len(runs)
+    return valued
 
 
 def _margin(figure: str, margin: float) -> Callable[[Arm, Arm], tuple[bool, str]]:
@@ -153,7 +158,11 @@ def _margin(figure: str, margin: float) -> Callable[[Arm, Arm], tuple[bool, str]
     def verdict(full: Arm, compact: Arm) -> tuple[bool, str]:
         # A case one arm has a value for and the other has not would move one
         # mean and not the other, so the two means would not compare.
-        if _valued_cases(full, figure) != _valued_cases(compact, figure):
+        full_cases, compact_cases = (
+            _valued_cases(full, figure),
+            _valued_cases(compact, figure),
+        )
+        if full_cases != compact_cases or None in full_cases.values():
             return False, f"{UNAVAILABLE}: the arms hold a value on different cases"
         compact_mean, full_mean = (
             mean(compact.figure(figure)),

@@ -174,3 +174,14 @@ def test_a_margin_over_arms_valued_on_different_cases_fails():
         full, compact
     )
     assert not passed and "different cases" in reading
+
+
+def test_a_margin_with_a_gap_in_one_sweep_only_fails():
+    """One sweep's gap drops the case from that sweep's mean alone."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    compact.artifacts[0]["mode_output"][0]["precision"] = None
+    passed, reading = gate._margin("precision", gate.QUALITY_MARGINS["precision"])(
+        full, compact
+    )
+    assert not passed and "different cases" in reading

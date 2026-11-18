@@ -62,7 +62,7 @@ from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
-from evals.harness.rates import mean, ratio, rounded_figure
+from evals.harness.rates import jaccard, mean, ratio, rounded_figure
 from evals.harness.reference import MUST_FIND
 
 #: One case of one framework. Stability is per framework because the two
@@ -617,10 +617,7 @@ def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float | None:
     would report the most stable outcome there is as the least stable one.
     """
     pairs = list(itertools.combinations(sets, 2))
-    overlaps = [
-        1.0 if not (left | right) else len(left & right) / len(left | right)
-        for left, right in pairs
-    ]
+    overlaps = [jaccard(left, right) for left, right in pairs]
     return ratio(sum(overlaps), len(overlaps))
 
 

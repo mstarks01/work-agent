@@ -7,7 +7,7 @@ and every printer shows :data:`UNAVAILABLE`.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -80,3 +80,13 @@ def mean(values: Iterable[float | None]) -> float | None:
 def rounded_difference(left: float | None, right: float | None) -> float | None:
     """``left - right`` to three places, or ``None`` where either has no value."""
     return None if left is None or right is None else round(left - right, 3)
+
+
+def jaccard(left: Collection[str], right: Collection[str]) -> float:
+    """The overlap of two sets over their union.
+
+    Two empty sets agree completely, so their Jaccard is 1.0. That is a
+    definition, not a gap: nothing is missing from either side.
+    """
+    union = set(left) | set(right)
+    return 1.0 if not union else len(set(left) & set(right)) / len(union)

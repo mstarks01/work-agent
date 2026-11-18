@@ -69,6 +69,7 @@ from evals.harness.fingerprint import key_claim
 from evals.harness.identity import CaseFlows, ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.rates import (
+    jaccard,
     mean,
     ratio,
     rounded_difference,
@@ -128,7 +129,7 @@ class MatchedPair:
     threat_id: str
     tier: str
     element_overlap: bool
-    element_jaccard: float | None
+    element_jaccard: float
     reference_level: SeverityLevel
     produced_level: SeverityLevel
     likelihood_agrees: bool
@@ -722,7 +723,7 @@ def _matched_pair(
         threat_id=threat.id,
         tier=reference.tier,
         element_overlap=bool(shared),
-        element_jaccard=ratio(len(shared), len(reference_ids | produced_ids)),
+        element_jaccard=jaccard(reference_ids, produced_ids),
         reference_level=reference.severity.level,
         # The matrix rather than the field: ``Severity.level`` is optional
         # until the model validator derives it, and this is that same
@@ -1003,7 +1004,10 @@ def render(scores: Sequence[CaseScore]) -> None:
         # Named because the rows above are a mean over survivors. The artifact
         # carries the same counts; printing one without the other is how a
         # sweep that lost cases gets quoted as if it had not.
-        print(f"scored {len(scores)} case(s); every mean above divides by that")
+        print(
+            f"scored {len(scores)} case(s); a mean above skips a case whose"
+            " figure has no value"
+        )
         delta = exemplar_delta(scores)
         print(
             f"exemplar delta: near {shown_figure(delta['near_coverage'], '.2f')}"

@@ -2295,7 +2295,7 @@ ONE_READERS: dict[str, _OneReader] = {
             ("evals/harness/submit.py", "_vote_rows"): (
                 "its `/` joins a directory and a file name into a path"
             ),
-            ("evals/harness/stability.py", "_mean_jaccard"): (
+            ("evals/harness/rates.py", "jaccard"): (
                 "two runs that both found nothing agree completely, so their"
                 " Jaccard is 1.0 by definition and not a gap"
             ),

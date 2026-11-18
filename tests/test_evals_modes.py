@@ -1435,7 +1435,7 @@ class TestTheInitiatorReadingOfAnExtraction:
         assert score.initiator_recall == 0.5
         assert score.initiators_missing == frozenset({"process:store-server"})
 
-    def test_a_case_with_no_initiator_reads_zero(self):
+    def test_a_case_with_no_initiator_reads_unavailable(self):
         """An empty denominator is never a silent 1.00, as everywhere else here."""
         score = modes.ExtractionScore(
             case_id="x",
