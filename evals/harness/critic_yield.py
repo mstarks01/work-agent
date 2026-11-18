@@ -20,6 +20,11 @@ scorer, with no second metric implementation and no special-cased matching,
 and then reading each draft's pre-critic scored outcome beside its fate in the
 block, which is the state the critic faced and what it did.
 
+In this instrument, a draft's verdict is the status its block records:
+``confirmed``, ``needs-info`` or ``rejected``. A ``returned`` claim was ruled
+by the critic, but its block records no status, so "a draft with no verdict"
+here means a draft with no archived verdict.
+
 One property holds this together: the scored task is identical on both sides.
 Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
 the threat's ``title`` either way, ruled by the same deterministic matcher
@@ -784,7 +789,7 @@ def render(yields: Sequence[CriticYield]) -> None:
         totals = aggregate_yield(yields)
         pooled = {name: Rate.from_json(rate) for name, rate in totals["rates"].items()}
         print(
-            f"critic yield: killed {pooled['kill_rate'].shown()},"
+            f"critic yield: rejected {pooled['kill_rate'].shown()},"
             f" rejected caught {pooled['rejected_kill_rate'].shown()},"
             f" real destroyed {pooled['matched_kill_rate'].shown()};"
             f" all kills lost for good {totals['matched_lost']}"
