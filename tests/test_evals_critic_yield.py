@@ -345,8 +345,10 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     assert [score.case_id for score in scores] == [case.id]
     assert yields[0].rejected_killed == 1
     printed = capsys.readouterr().out
-    assert "rejected_kill_rate 1/1" in printed
-    assert "matched_kill_rate 0/1" in printed
+    assert (
+        f"{case.id:<26} critic 2->1  rejected_kill_rate 1/1 (100%)"
+        "  matched_kill_rate 0/1 (0%)"
+    ) in printed
     assert (
         "critic yield: kill_rate 1/2 (50%), rejected_kill_rate 1/1 (100%),"
         " matched_kill_rate 0/1 (0%);"
@@ -802,7 +804,7 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
     assert totals["kill_rate"] == 0.0
     critic_yield.render([result])
     shown = capsys.readouterr().out
-    assert "rejected_kill_rate 0/0" in shown
+    assert shown.count("rejected_kill_rate 0/0 (unavailable)") == 2
     assert shown.count("2 drafts have no archived verdict (omitted or returned)") == 2
     assert totals["rates"]["kill_rate"] == Rate(0, 1).to_json()
     assert result.to_json()["rates"]["kill_precision"] == Rate(0, 0).to_json()

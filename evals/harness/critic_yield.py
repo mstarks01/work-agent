@@ -766,13 +766,12 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
 def render(yields: Sequence[CriticYield]) -> None:
     """Both sides of the critic, always printed together.
 
-    Each rate prints under its own name. ``matched_kill_rate`` is deliberately
-    on the same line as ``rejected_kill_rate``:
-    a kill count read on its own says nothing about whether the critic removes
-    noise or destroys findings. Each rate counts only drafts with a verdict,
-    the "all kills" counts keep every draft that left the report, and a
-    no-verdict line prints under a case and under the total where a draft has
-    no verdict.
+    Each printed rate carries its artifact name. ``matched_kill_rate`` is
+    deliberately on the same line as ``rejected_kill_rate``: a kill count read
+    on its own says nothing about whether the critic removes noise or destroys
+    findings. Each rate counts only drafts with a verdict, the "all kills"
+    counts keep every draft that left the report, and a no-verdict line prints
+    under a case and under the total where a draft has no verdict.
     """
     for entry in yields:
         rates = entry.rates
