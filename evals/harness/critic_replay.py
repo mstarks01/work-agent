@@ -29,7 +29,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from google.genai import types
 
@@ -221,6 +221,9 @@ def parse(raw: str, framework: FrameworkName) -> list[Ruling]:
 #: failed before it wrote a block to read the archived verdict from.
 UNRULED: Literal["unruled"] = "unruled"
 
+#: The archived fates that are a critic's verdict, so a replay can agree.
+VERDICTS: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
+
 
 @dataclass(frozen=True)
 class Agreement:
@@ -254,6 +257,36 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
         Agreement(draft.id, before.get(draft.id, missing), after.get(draft.id, UNRULED))
         for draft in archived.drafts
     ]
+
+
+def tally(rows: Sequence[Agreement]) -> list[str]:
+    """Each row marked, then how many archived verdicts the replay repeated.
+
+    A draft with no archived verdict (``returned``, :data:`OMITTED` or
+    :data:`UNRULED` on the archived side) has nothing to agree with, so it is
+    marked ``·`` and counted on its own line, outside the denominator. A
+    draft the replay left unruled beside an archived verdict is a verdict
+    that did not repeat, so it stays in the denominator.
+    """
+    ruled = [row for row in rows if row.archived in VERDICTS]
+    same = sum(row.archived == row.replayed for row in ruled)
+    lines = [
+        f"  {_mark(row)} {row.draft_id:10} archived {row.archived:12}"
+        f" replayed {row.replayed}"
+        for row in rows
+    ]
+    lines.append(f"{same} of {len(ruled)} verdicts agree")
+    apart = len(rows) - len(ruled)
+    if apart:
+        drafts = "1 draft has" if apart == 1 else f"{apart} drafts have"
+        lines.append(f"{drafts} no archived verdict (returned, omitted or unruled)")
+    return lines
+
+
+def _mark(row: Agreement) -> str:
+    if row.archived not in VERDICTS:
+        return "·"
+    return "=" if row.archived == row.replayed else "≠"
 
 
 async def replay(
@@ -349,14 +382,8 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             "claims": [ruling.model_dump(mode="json") for ruling in settled],
         }
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    rows = compare(archived, rulings)
-    same = sum(row.archived == row.replayed for row in rows)
-    for row in rows:
-        mark = "=" if row.archived == row.replayed else "≠"
-        print(
-            f"  {mark} {row.draft_id:10} archived {row.archived:12} replayed {row.replayed}"
-        )
-    print(f"{same} of {len(rows)} verdicts agree")
+    for line in tally(compare(archived, rulings)):
+        print(line)
     problems = review_issues(archived.drafts, rulings, archived.model, {}).problems
     kinds = Counter(problem.kind for problem in problems)
     print(
