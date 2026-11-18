@@ -225,6 +225,11 @@ DECLARED: dict[str, str] = {
         " variant equals E1 by construction. The other variants change the"
         " turn rule, which names no package."
     ),
+    "evals/experiments/QA-2026-11-17-13/rows.py": (
+        "This code is that framework's. It reads the loss rows charged to a"
+        " verb, and only the package whose identity is an action at a place"
+        " charges a miss to the action a draft wrote there."
+    ),
     "evals/experiments/QA-2026-10-27-01/price.py": (
         "This code is that framework's. It prices trial lead rules against the"
         " lanes that read them, which exists only for a package whose leads"
