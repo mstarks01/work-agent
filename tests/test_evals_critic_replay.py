@@ -337,7 +337,9 @@ def test_a_returned_claim_counts_against_agreement(
     printed = capsys.readouterr().out
     agreeing = sum(line.startswith("  = ") for line in printed.splitlines())
     assert f"≠ {first.id:10} archived returned" in printed
-    assert f"{agreeing} of {len(archived.drafts)} verdicts agree" in printed
+    assert (
+        f"{agreeing} of {len(archived.drafts)} verdicts agree" in printed.splitlines()
+    )
 
 
 def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # noqa: F811

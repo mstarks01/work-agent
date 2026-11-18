@@ -106,11 +106,12 @@ class TestTheSourceAQuoteNames:
         assert joined.drafts[0].grounds[0].source_label == SECOND
 
     def test_a_label_that_names_no_source_leaves_the_quote_unverified(self):
+        """The text sits in a source, so only the label can refuse it."""
         joined = _join(
             [
                 Ground(
                     kind="quote",
-                    text="The admin console has no login.",
+                    text="Payments are settled by the card processor.",
                     source_label="Meeting notes",
                 ),
                 Ground(kind="derived-fact", flow_id=CROSSING),
@@ -118,7 +119,9 @@ class TestTheSourceAQuoteNames:
             SPLIT_SOURCES,
         )
 
-        assert [m.index for m in joined.marks.unverified_grounds] == [0]
+        (mark,) = joined.marks.unverified_grounds
+        assert mark.index == 0
+        assert "not one of this job's sources" in mark.reason
 
 
 class TestIdenticalTextInTwoSources:
