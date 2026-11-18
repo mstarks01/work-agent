@@ -167,8 +167,8 @@ def test_every_exemplar_draft_passes_the_fan_in_unmarked(framework, lane):
                 model,
                 sources_of(name),
                 inputs.ruled_out,
-                None,
-                inputs.ruled_in,
+                assertions=None,
+                ruled_in=inputs.ruled_in,
             )
         except DraftJoinError as exc:
             pytest.fail(f"{where}: {exc}")

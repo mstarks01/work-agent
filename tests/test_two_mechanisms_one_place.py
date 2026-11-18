@@ -122,8 +122,8 @@ def merged(emitted_drafts):
         fixture_model("A"),
         sources_of("A"),
         {},
-        None,
-        {},
+        assertions=None,
+        ruled_in={},
     )
 
 
