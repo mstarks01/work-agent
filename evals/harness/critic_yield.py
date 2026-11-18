@@ -171,8 +171,10 @@ class CriticPopulations:
     ``needs-info`` fate counts in neither: it has a rate of its own.
     A draft with no verdict (:func:`has_verdict`) is in no denominator, and
     :attr:`no_verdict` counts it.
-    An empty population gives a :class:`~evals.harness.rates.Rate` whose value
-    is ``None``, which is a gap in the labels and not a zero.
+    A population with no draft that has a verdict gives a
+    :class:`~evals.harness.rates.Rate` whose value is ``None``, which is a gap
+    and not a zero; :attr:`not_real_gap` names the reason for the not-real
+    population.
     """
 
     counts: Mapping[tuple[ScoredOutcome, CriticFate], int]
@@ -459,7 +461,7 @@ class CriticYield:
 
         The critic states why it rejected a draft, and nothing counted it: the
         second Baseline's four must-find kills were three ``reasoning`` and one
-        ``lane``, read by hand. Per step, the kills, the ones that had matched a
+        ``lane``, read by hand. Per key (a step or a fate), the kills, the ones that had matched a
         reference, and the ones that had answered a must-find, so a prompt
         change that moves the critic's reasoning kills is visible as that and
         not as a bare count. A rejection that names no step is keyed

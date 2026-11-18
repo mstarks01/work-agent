@@ -1851,8 +1851,11 @@ def _is_constant(node: ast.AST, value: object) -> bool:
 
 
 def _reads_the_verdict_rule(node: ast.AST) -> bool:
-    """Whether ``node`` reads the verdict statuses, or tests a fate against
-    the fates with no verdict."""
+    """Whether ``node`` reads the verdict rule.
+
+    It reads the verdict statuses, or tests a fate against the fates with no
+    verdict.
+    """
     if _loads(node, "VERDICT_STATUSES") or _loads_attribute(node, "VERDICT_STATUSES"):
         return True
     return isinstance(node, ast.Compare) and any(
@@ -1862,9 +1865,11 @@ def _reads_the_verdict_rule(node: ast.AST) -> bool:
 
 
 def _holds_the_fates(node: ast.AST) -> bool:
-    """Whether ``node`` names a set of critic fates: a constant of the rule,
-    ``get_args`` of a fate type, or a literal collection of verdict statuses
-    or of fates with no verdict."""
+    """Whether ``node`` names a set of critic fates.
+
+    The set is a constant of the rule, ``get_args`` of a fate type, or a
+    literal collection of verdict statuses or of fates with no verdict.
+    """
     names = ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
     if any(_loads(node, name) or _loads_attribute(node, name) for name in names):
         return True
