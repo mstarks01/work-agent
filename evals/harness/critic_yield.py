@@ -766,7 +766,8 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
 def render(yields: Sequence[CriticYield]) -> None:
     """Both sides of the critic, always printed together.
 
-    ``killed-real`` is deliberately on the same line as ``killed-rejected``:
+    Each rate prints under its own name. ``matched_kill_rate`` is deliberately
+    on the same line as ``rejected_kill_rate``:
     a kill count read on its own says nothing about whether the critic removes
     noise or destroys findings. Each rate counts only drafts with a verdict,
     the "all kills" counts keep every draft that left the report, and a
@@ -778,8 +779,8 @@ def render(yields: Sequence[CriticYield]) -> None:
         apart = entry.populations.no_verdict
         print(
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
-            f"  killed-rejected {rates['rejected_kill_rate'].shown()}"
-            f"  killed-real {rates['matched_kill_rate'].shown()}"
+            f"  rejected_kill_rate {rates['rejected_kill_rate'].shown()}"
+            f"  matched_kill_rate {rates['matched_kill_rate'].shown()}"
             f"  (all kills: must-find {entry.must_find_killed}, lost for good"
             f" {entry.matched_lost})"
         )
@@ -789,9 +790,9 @@ def render(yields: Sequence[CriticYield]) -> None:
         totals = aggregate_yield(yields)
         pooled = {name: Rate.from_json(rate) for name, rate in totals["rates"].items()}
         print(
-            f"critic yield: rejected {pooled['kill_rate'].shown()},"
-            f" down-voted caught {pooled['rejected_kill_rate'].shown()},"
-            f" real destroyed {pooled['matched_kill_rate'].shown()};"
+            f"critic yield: kill_rate {pooled['kill_rate'].shown()},"
+            f" rejected_kill_rate {pooled['rejected_kill_rate'].shown()},"
+            f" matched_kill_rate {pooled['matched_kill_rate'].shown()};"
             f" all kills lost for good {totals['matched_lost']}"
             f" (must-find {totals['must_find_lost']})"
             " (instrument, non-gating)"
