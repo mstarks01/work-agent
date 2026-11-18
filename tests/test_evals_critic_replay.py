@@ -10,10 +10,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+from dataclasses import replace
 
 import pytest
 
 from analysis_service.assertions import AssertionCatalog, AssertionRecord
+from analysis_service.claims import ReturnedClaim
 from analysis_service.graph import STATE_ASSERTION_CATALOG
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness import critic_replay
@@ -254,3 +256,25 @@ def test_a_failure_dump_keeps_the_fact_catalog_the_drafts_cited(
     archived = critic_replay.load(failed(out, case.id), case.id, "stride")
 
     assert archived.assertions == record
+
+
+def test_a_claim_assembly_returned_reads_as_returned(recorded, case):  # noqa: F811
+    """Assembly took the claim out of both arrays after the critic kept it, so
+    the archive holds no verdict for it, and the critic did rule on it."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    first, *rest = archived.block.claims
+    block = archived.block.model_copy(
+        update={
+            "claims": rest,
+            "returned_claims": [
+                ReturnedClaim(claim_id=first.id, unit="u", needs="code")
+            ],
+        }
+    )
+
+    rows = critic_replay.compare(replace(archived, block=block), [])
+
+    status = {row.draft_id: row.archived for row in rows}
+    assert status[first.id] == "returned"
+    assert all(status[claim.id] == claim.verdict.status for claim in rest)

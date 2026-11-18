@@ -228,12 +228,15 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     """Each draft's verdict status, archived against replayed.
 
     The replayed rulings are completed first, as the graph completes them, so
-    the status read is the one that would have reached the report.
+    the status read is the one that would have reached the report. A claim
+    assembly returned to the deferred set (ADR 0126) left the block with no
+    verdict after the critic kept it, so it reads ``returned``.
     """
     before = {}
     if archived.block is not None:
         before = {
-            claim.id: claim.verdict.status for claim in archived.block.all_claims()
+            **{entry.claim_id: "returned" for entry in archived.block.returned_claims},
+            **{claim.id: claim.verdict.status for claim in archived.block.all_claims()},
         }
     after = {
         ruling.id: ruling.verdict.status
