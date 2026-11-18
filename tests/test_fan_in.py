@@ -781,8 +781,8 @@ class TestQuoteVerification:
         assert joined.drafts == []
         assert [mark.claim_id for mark in joined.marks.dropped_claims] == ["S-01"]
 
-    def test_a_repair_that_moves_only_punctuation_still_passes(self, model):
-        """The neighbour of the guard: punctuation alone keeps the repair."""
+    def test_a_repair_that_moves_no_negation_or_number_still_passes(self, model):
+        """The neighbour of the guard: case, spacing and a comma keep the repair."""
         drafts = self.quoting("customers  log in to the WEB app which stores orders")
 
         joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)

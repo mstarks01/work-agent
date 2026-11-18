@@ -1822,7 +1822,8 @@ class RepairedQuote(BaseModel):
     computes it from ``written`` and the ground's text. The fan-in refuses a
     span that moves either, so a repair it makes carries an empty list, and an
     archived report can carry a non-empty one. Stored rather than left for a
-    reader to derive, because the viewer shows it on an archived report, and
+    reader to derive, because the critic reads it (empty on a new repair) and
+    the viewer shows it on an archived report, and
     checked on load against those two texts so it cannot drift from them.
     ``similarity`` says how near the span was; it never says whether the span
     supports the claim.

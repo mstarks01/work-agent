@@ -37,3 +37,8 @@ still carry a non-empty one, and the load check still reads it.
 
 A claim whose only ground is such a quote is dropped, where ADR 0018 kept it
 on the flipped span.
+
+The guard reads the best window the scan finds. Where that window moves a
+negation or a number, the quote stays refused, even if a later window that
+keeps both would also pass the threshold. Skipping to such a window would
+change the scan's budget and deadline, so this decision leaves it out.

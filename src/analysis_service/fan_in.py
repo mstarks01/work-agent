@@ -81,6 +81,7 @@ from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
     faithful_repair,
+    meaning_moved,
     normalize,
     prepare_source,
     repair_deadline,
@@ -830,7 +831,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
                     index=index,
                     written=ground.text,
                     similarity=round(repair.similarity, 3),
-                    moved=[],
+                    moved=list(meaning_moved(ground.text, repair.span)),
                     scan_complete=repair.complete,
                 )
             )
