@@ -41,7 +41,9 @@ from analysis_service.assertions import (
     apply_projection,
 )
 from analysis_service.candidates import generate_candidates
+from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES, FrameworkName
+from analysis_service.graph import STATE_SOURCE_TEXTS
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import validate
 from evals.harness.artifact import load_artifact
@@ -169,7 +171,7 @@ def price(
         held = [case for case in cases if case.id in artifact.cases]
         for case_id, result in assertions_from_reports(artifact, held).items():
             case = by_id[case_id]
-            sources = {source.label: source.text for source in case.sources}
+            sources = seed_state(case.sources)[STATE_SOURCE_TEXTS]
             proposal = CatalogProposal.model_validate(result.proposal)
             for sweep in extracted:
                 reading = sweep.get(case_id)
