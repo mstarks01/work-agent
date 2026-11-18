@@ -7,7 +7,7 @@ Usage::
 ``<scored dir>`` holds one ``run.py score --out`` artifact per case of
 ``<run dir>``. The script writes ``verb-rows.csv``, ``controls.csv`` and
 ``summary.txt`` into ``<out dir>``. The ``classification`` column of
-``verb-rows.csv`` is the reader's reading of each draft against the
+``verb-rows.csv`` classifies each draft against the
 reference and its rulings; it is not a ruling.
 """
 
@@ -30,7 +30,7 @@ from evals.harness.reference import (
 )
 from evals.harness.verbs import same_action
 
-#: The reader's classification of each verb row, keyed by case ID and
+#: The classification of each verb row, keyed by case ID and
 #: reference index, with the mechanism the draft states in place of the
 #: reference's.
 CLASSIFICATION = {
