@@ -3205,11 +3205,12 @@ def contradicted(
 ) -> tuple[Assertion, ...]:
     """Every settled row behind a :func:`contradictions` entry, in catalog order.
 
-    The graph attribute states the opposite of the row, so the row is not a
-    fact against this model, though it stays in :func:`settled`, which reads
-    the catalog alone. The evidence catalog offers each such row as an open
-    question, as it offers a row another row disputes. A submitter's answer is
-    never here: it settles the fact even against the sources.
+    The graph attribute states the opposite of the value these rows project,
+    so the row is not a fact against this model, though it stays in
+    :func:`settled`, which reads the catalog alone. The evidence catalog offers
+    each such row as an open question, as it offers a row another row
+    disputes. Where a submitter's answer makes the value, no row behind it is
+    here (:func:`_contradicted_ids`).
     """
     rows = _contradicted_ids(catalog, model)
     return tuple(entry for entry in settled(catalog) if assertion_id(entry) in rows)
