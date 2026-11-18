@@ -185,7 +185,7 @@ GroundKind = Literal[
 #: added later — and the consumer that matters licenses a threat to offer no
 #: countermeasure, so the hole reads as a well-formed claim rather than as an
 #: error. The two entries are the two questions: an attribute of an element
-#: nobody filled in, and a row of the assertion layer the sources left open.
+#: nobody filled in, and an open row of the assertion layer.
 #:
 #: A *stated absence* is not here, under either spelling. "The control is not
 #: there" is a fact in hand, and "put the control in" is a countermeasure an
@@ -379,8 +379,8 @@ class UnknownRef(BaseModel):
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )
     subject: str = Field(default="", max_length=300)
-    #: The third spelling: one row of the job's **Assertion** catalog that the
-    #: sources left open, by its computed identity.
+    #: The third spelling: one open row of the job's **Assertion** catalog, by
+    #: its computed identity.
     #:
     #: **Why it exists.** ``unknown-attribute`` and ``unknown-assertion`` are
     #: one question asked at two seams — :data:`CONDITIONAL_GROUNDS` says so —
@@ -671,19 +671,22 @@ class Ground(BaseModel):
       shared. A reference on the same terms as ``derived-fact``: the row's
       subject, value, basis, scope and spans are read off the catalog the
       report embeds, never copied here, so the ground cannot say more than the
-      row does. Only a settled row is ever catalogued
-      (:func:`~analysis_service.assertions.settled`), so a conflict or an
-      unsupported row grounds nothing.
-    * ``unknown-assertion`` — ``assertion`` alone, for a row the sources left
-      open: its value is :data:`~analysis_service.system_model.UNKNOWN`, or
-      another row disputes it (:func:`~analysis_service.assertions.disputed`). **The assertion layer's
+      row does. Only a settled row the graph does not contradict is ever
+      catalogued (:func:`~analysis_service.assertions.uncontradicted`), so a
+      conflict or an unsupported row grounds no ``assertion``.
+    * ``unknown-assertion`` — ``assertion`` alone, for an open row: its value
+      is :data:`~analysis_service.system_model.UNKNOWN`, another row disputes
+      it (:func:`~analysis_service.assertions.disputed`),
+      or the graph attribute states the opposite of the value the rows project
+      (:func:`~analysis_service.assertions.contradicted`). **The assertion layer's
       ``unknown-attribute``**, and it exists for the same reason that kind
       does. An element attribute nobody stated is offered as a fact an agent
       may raise a *conditional* claim on. This kind offers the same for a
       predicate with no graph field, such as a second factor the sources left
-      open.
+      open, and for a row behind a value whose opposite its graph field
+      states.
       It is a separate kind rather than a flag on ``assertion`` because the two
-      readings differ: a settled row is a fact in hand, and an unknown row is a
+      readings differ: a settled row is a fact in hand, and an open row is a
       question. The fields are identical and the fact is not, which is the
       argument ``absent-attribute`` already makes against ``unknown-attribute``.
     """

@@ -78,6 +78,19 @@ no reader, and four more — two pairs of compatible values on one flow's
 `authentication` — were lost the same way. A scoped control is too, whenever
 one is stated.
 
+*Amended by the maintainer's ruling of 2026-11-18 on #2270 (R2).* Where the
+value the rows project into an attribute and the graph attribute after the
+projection state opposites (`assertions.contradictions`), the settled rows
+behind that value are not offered as settled rows. The rows are not a fact
+against that model, so the catalog offers each such row as an open
+question, as it offers a row another row disputes, and a claim on it reads
+`needs-info`. `assertions.offered` starts from `assertions.uncontradicted`,
+and `assertions.contradicted` names the rows the catalog holds open. Where a
+submitter's answer makes the projected value, no row behind it is held open:
+an answer settles the fact even against the sources (the decision of
+2026-09-25 on #1225). Compatible rows project `unknown` and leave the
+attribute standing (ADR 0034), so they are not compared with it.
+
 **3. The reference is the identity.** ADR 0034 rule 4 made an assertion's ID
 a pure function of its four identifying parts, recomputed by every reader.
 The catalog uses that ID as the reference, so the row and the entry can never

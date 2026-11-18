@@ -378,8 +378,10 @@ def source_states(
     row never answers a question about an element, and a scoped row answers
     nothing wider. A row an answer wrote is not the sources'. A predicate that
     projects into an attribute is stated too where ``model`` states the
-    attribute and no answer wrote a row of it here, because that value is the
-    sources' and the row would outrank it.
+    attribute and no answer wrote a row of it here. Any answer row counts
+    here, not only one that makes the projected value: the question is whether
+    the submitter already spoke to this fact, so a later answer may replace
+    theirs.
     """
     held = answer(catalog or AssertionCatalog(), element_id, predicate)
     if any(not row.scope and not answered(row) for row in held.settled):

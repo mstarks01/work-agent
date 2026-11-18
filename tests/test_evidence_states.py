@@ -10,15 +10,28 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.assertions import ABSENT, Subject, assertion_id, contradictions
+from analysis_service.assertions import (
+    ABSENT,
+    UNKNOWN,
+    Qualifier,
+    Subject,
+    apply_projection,
+    assertion_id,
+    contradicted,
+    contradictions,
+    support_span,
+)
 from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
 from analysis_service.critic import assemble_claims
 from analysis_service.evidence import absent_evidence_ref, evidence_catalog
 from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import DataStore, SystemModel
+from tests import test_assertions
 from tests.factories import sample_draft, sample_ruling, valid_model
+from tests.test_assertions import FLOW, stated
 from tests.test_evidence import assertions, row
 from tests.test_fan_in import CROSSING
 
@@ -247,12 +260,12 @@ class TestAConfirmationOnAnOpenFact:
 
 
 class TestARowTheGraphContradicts:
-    """R2, pinned: a stated row against an opposite graph value stays citable.
+    """A source row against an opposite graph value is an open question.
 
     Where a projection is not written into the graph, a row stating an absence
-    beside an attribute stating a control is a contradiction the report names,
-    and the evidence catalog still offers the row as a settled fact. Pinned as
-    today's behaviour; whether the row should read as a question is open.
+    beside an attribute stating a control is a contradiction the report names.
+    The row is not a fact against that model, so the evidence catalog offers
+    it as an open question, and a claim on it reads needs-info.
     """
 
     STORED = row(
@@ -264,7 +277,11 @@ class TestARowTheGraphContradicts:
 
     STORE = Subject(id=ORDERS, type="component", label="orders database")
 
-    def test_an_opposite_graph_value_is_named_and_the_row_stays_settled(self):
+    def answer(self):
+        """The stored absence, written as a submitter's answer."""
+        return _as_answer(self.STORED, "Orders database: not encrypted.")
+
+    def test_an_opposite_graph_value_is_named_and_the_row_is_open(self):
         model = _with_encryption("AES-256")
         catalog = assertions(self.STORED, subjects=(self.STORE,))
 
@@ -272,6 +289,61 @@ class TestARowTheGraphContradicts:
             "encryption_at_rest"
         ]
         ground = evidence_catalog(model, catalog)[assertion_id(self.STORED)]
+        assert ground.kind == "unknown-assertion"
+
+    def test_a_claim_on_the_contradicted_row_is_needs_info(self):
+        model = _with_encryption("AES-256")
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+        ref = assertion_id(self.STORED)
+        joined = _join(
+            [Ground(kind="unknown-assertion", assertion=ref)],
+            catalog=catalog,
+            model=model,
+        )
+
+        verdict = _status(joined, model=model)
+        assert verdict.status == "needs-info"
+        assert verdict.related_unknowns == [UnknownRef(assertion=ref)]
+
+    def test_the_contradicted_row_cannot_be_cited_as_settled(self):
+        model = _with_encryption("AES-256")
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+
+        with pytest.raises(DraftJoinError, match="leaves that row open"):
+            _join(
+                [Ground(kind="assertion", assertion=assertion_id(self.STORED))],
+                catalog=catalog,
+                model=model,
+            )
+
+    def test_an_answer_against_an_opposite_graph_value_stays_settled(self):
+        """An answer settles the fact even against the sources (#1225), so the
+        graph's opposite value does not hold an answered row open."""
+        model = _with_encryption("AES-256")
+        answer = self.answer()
+        catalog = assertions(answer, subjects=(self.STORE,))
+
+        assert [c.attribute for c in contradictions(catalog, model)] == [
+            "encryption_at_rest"
+        ]
+        ground = evidence_catalog(model, catalog)[assertion_id(answer)]
+        assert ground.kind == "assertion"
+
+    def test_a_scoped_row_beside_an_answer_stays_settled(self):
+        """The answer alone makes the projected value, so the scoped row the
+        projection groups beside it is not what the graph contradicts."""
+        model = _with_encryption("AES-256")
+        answer = self.answer()
+        backups = self.STORED.model_copy(
+            update={
+                "value": "AES-256",
+                "scope": [Qualifier(kind="resource", value="backups")],
+            }
+        )
+        catalog = assertions(answer, backups, subjects=(self.STORE,))
+
+        assert contradicted(catalog, model) == ()
+        ground = evidence_catalog(model, catalog)[assertion_id(backups)]
         assert ground.kind == "assertion"
 
     def test_an_agreeing_graph_value_carries_the_row_and_names_nothing(self):
@@ -283,3 +355,76 @@ class TestARowTheGraphContradicts:
         assert assertion_id(self.STORED) not in offered
         ref = absent_evidence_ref(ORDERS, "encryption_at_rest")
         assert offered[ref].kind == "absent-attribute"
+
+
+def _as_answer(row, said, **update):
+    """``row`` written as a submitter's answer that quotes ``said``."""
+    return row.model_copy(
+        update={
+            "origin": "answer",
+            "basis": "stated",
+            "support": [support_span(said, ANSWERS_LABEL, said)],
+            **update,
+        }
+    )
+
+
+class TestARejectedAnswer:
+    """An answer a reviewer set aside makes no projected value, so it neither
+    exempts a contradiction nor lifts the guard on an unchecked row."""
+
+    SAID = "Orders database: encrypted with AES-256."
+
+    def answer(self, row, value):
+        return _as_answer(row, self.SAID, value=value, assessment="unsupported")
+
+    def test_the_source_row_it_sits_beside_is_still_held_open(self):
+        source = TestARowTheGraphContradicts.STORED
+        catalog = assertions(
+            self.answer(source, "AES-256"),
+            source,
+            subjects=(TestARowTheGraphContradicts.STORE,),
+        )
+        model = _with_encryption("AES-256")
+
+        assert contradicted(catalog, model) == (source,)
+        ground = evidence_catalog(model, catalog)[assertion_id(source)]
+        assert ground.kind == "unknown-assertion"
+
+    def test_it_does_not_lift_the_unchecked_guard(self):
+        source = stated()
+        catalog = assertions(
+            self.answer(source, "a hardware token"),
+            source,
+            subjects=(Subject(id=FLOW, type="interaction", label="place order"),),
+        )
+        graph = test_assertions.TestAGraphAttributeAndItsRowsStatingOpposites()
+        model = graph.model("unknown")
+
+        updated, _ = apply_projection(model, catalog)
+
+        (flow,) = updated.data_flows
+        assert flow.authentication.startswith("unknown")
+
+
+def test_an_answer_of_unknown_does_not_lift_the_unchecked_guard():
+    """An answer that the submitter does not know makes no value, so an
+    unchecked row beside it still cannot close the lead (ADR 0041)."""
+    source = stated()
+    dunno = _as_answer(
+        source,
+        "Place order: no idea how it authenticates.",
+        value=UNKNOWN,
+        reason="hedged",
+    )
+    catalog = assertions(
+        dunno,
+        source,
+        subjects=(Subject(id=FLOW, type="interaction", label="place order"),),
+    )
+    graph = test_assertions.TestAGraphAttributeAndItsRowsStatingOpposites()
+
+    updated, _ = apply_projection(graph.model("none"), catalog)
+
+    (flow,) = updated.data_flows
+    assert flow.authentication.startswith("unknown")

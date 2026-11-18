@@ -385,8 +385,8 @@ class Ground:
 | `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
-| `assertion` | `assertion` | the sources state this fact, which the model has no field for |
-| `unknown-assertion` | `assertion` | the sources were asked this and left it open, and the model has no field for it |
+| `assertion` | `assertion` | the sources state this fact, and the model does not carry it in a field: it has no field for it, or the row is scoped, one of two compatible values, or a row whose value the model does not hold, unless the model's attribute states the opposite of the value the rows project and no submitter's answer makes that value |
+| `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it; or the model's attribute states the opposite of the value the rows project, and no submitter's answer makes that value |
 
 **What the assertion pass reached.** A reader of `assertions` has no way to tell
 a system with few stated facts from a pass that asked few questions, and the two
@@ -407,9 +407,11 @@ row's subject, predicate, value, basis, scope and support spans are read there.
 On load the report checks the row is one the catalog *settles* — it holds a
 value rather than `unknown`, its basis is support of some kind, no assessment
 set it aside, and no other row disagrees at its subject, predicate and scope —
-and refuses the report otherwise. A report whose `assertions` is `None` settles
-nothing, so a claim citing one is refused the way a claim citing a crossing the
-model does not derive is.
+and that the embedded model's attribute does not state the opposite of the
+value the rows project, unless a submitter's answer makes that value, and
+refuses the report otherwise. A
+report whose `assertions` is `None` settles nothing, so a claim citing one is
+refused the way a claim citing a crossing the model does not derive is.
 
 **One flat model, not a discriminated union.** Fields belonging to the other
 kinds are empty strings, and a record carrying a field its own kind does not
@@ -1277,8 +1279,10 @@ version before it. Read it when you load an archived report.
     rows into graph attributes. It has its own number, not the catalog's
     `registry_version`, because the projection's loss rules live in `project`
     and can change with no registry change. It lets a loaded report be
-    re-checked for contradictions against the rules that produced it, and a
-    record from another version is left alone. `assertions.issues` can say
+    re-checked for contradictions against the rules that produced it; the
+    issue re-check declines for a record from another version. The ground
+    check on load reads every record's grounds against today's evidence
+    catalog, whatever its version. `assertions.issues` can say
     `graph-contradiction`: the one code that refuses no row. It reports that a
     graph attribute and the rows authoritative for it state opposite things.
 

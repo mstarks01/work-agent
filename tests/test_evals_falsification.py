@@ -16,10 +16,23 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import GATE_REFUSALS
+from analysis_service.assertions import (
+    ABSENT,
+    GATE_REFUSALS,
+    Assertion,
+    AssertionCatalog,
+    Subject,
+    assertion_id,
+)
 from evals.harness import falsify
 from evals.harness.replay import ROW_FATES
 from evals.harness.run import COMMANDS
+from tests.test_assertions import (
+    FLOW,
+    SOURCES,
+    TestAGraphAttributeAndItsRowsStatingOpposites,
+    stated,
+)
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
@@ -261,3 +274,26 @@ def test_the_reading_without_the_corrupted_rows_keeps_no_subject_behind(name):
     built = falsify.reading(name, case, reference, reviewed=False)
 
     assert built.without == without(built.without, ())
+
+
+class TestWhatAJobReadsAsAFact:
+    """A row the graph contradicts reaches a lane as a question, not a fact."""
+
+    def facts(self, *entries: Assertion) -> frozenset[str]:
+        """The identities ``consumer_view`` reads as facts from these rows."""
+        catalog = AssertionCatalog(
+            subjects=[Subject(id=FLOW, type="interaction", label="place order")],
+            entries=list(entries),
+        )
+        model = TestAGraphAttributeAndItsRowsStatingOpposites().model()
+        facts, _ = falsify.consumer_view(catalog, model, SOURCES)
+        return facts
+
+    def test_a_contradicted_absence_is_not_a_fact(self, refused_projection) -> None:
+        """The graph keeps its stated mechanism beside the stated absence."""
+        assert self.facts(stated(value=ABSENT)) == frozenset()
+
+    def test_an_absence_the_graph_takes_is_a_fact(self) -> None:
+        absence = stated(value=ABSENT)
+
+        assert self.facts(absence) == {assertion_id(absence)}

@@ -266,7 +266,7 @@ class DraftThreat(Claim):
 
         Which grounds are conditional is
         :data:`~analysis_service.claims.CONDITIONAL_GROUNDS`, read rather than
-        spelled here: an assertion row the sources left open licenses the empty
+        spelled here: an open assertion row licenses the empty
         for the same reason an unstated attribute does, and a set written out
         at this seam would answer for one and not the other.
 

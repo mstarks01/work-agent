@@ -3265,3 +3265,58 @@ def test_the_job_state_is_the_one_reader_of_whether_a_run_stops_to_ask():
         ("src/analysis_service/job_state.py", "job_state"),
         ("src/analysis_service/job_state.py", "waits_for_answers"),
     ]
+
+
+def test_a_graph_contradiction_is_read_in_the_assertion_layer():
+    """Only the assertion layer asks ``contradictions``: the report's issue
+    and the rows the evidence catalog holds open both come from it.
+    ``test_each_caller_of_settled_has_a_reason`` holds the callers of
+    ``settled``."""
+    assert _sites(lambda node: _calls(node, "contradictions")) == [
+        ("src/analysis_service/assertions.py", "_contradicted_ids"),
+        ("src/analysis_service/assertions.py", "contradiction_issues"),
+    ]
+
+
+#: Each caller of ``settled``, and why it reads the catalog alone. A reader
+#: that holds a model and asks which rows are facts against it reads
+#: ``uncontradicted`` instead.
+SETTLED_CALLERS: dict[tuple[str, str], str] = {
+    ("src/analysis_service/assertions.py", "answer"): (
+        "the typed query over the catalog, which holds no model"
+    ),
+    ("src/analysis_service/assertions.py", "catalog_coverage"): (
+        "counts subjects that are not graph-bound, which no graph attribute"
+        " can contradict"
+    ),
+    ("src/analysis_service/assertions.py", "contradicted"): (
+        "builds the model-aware rule from the catalog rule"
+    ),
+    ("src/analysis_service/assertions.py", "uncontradicted"): (
+        "builds the model-aware rule from the catalog rule"
+    ),
+    ("src/analysis_service/links.py", "link_questions"): (
+        "counts facts about a principal, which reach no graph field"
+    ),
+}
+
+
+def test_each_caller_of_settled_has_a_reason():
+    """``settled`` reads the catalog alone, so a new direct caller must state
+    why it does not read ``uncontradicted``. The callers of ``answer(...)``
+    read ``Answer.settled`` through the ``answer`` row; this test does not
+    reach them."""
+    assert _sites(_calls_settled) == sorted(SETTLED_CALLERS)
+
+
+def _calls_settled(node: ast.AST) -> bool:
+    """Whether ``node`` calls the assertion layer's ``settled`` by its bare name.
+
+    A method of another object that shares the name, such as a workspace's
+    ``settled``, is not this rule.
+    """
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "settled"
+    )

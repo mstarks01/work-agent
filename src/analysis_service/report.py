@@ -178,8 +178,8 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #   verdict, because a recommendation never decides a claim. ``None`` says the
 #   critic read no advice here, which is a different fact from advice it
 #   approved.
-# * ``assertion`` on an ``UnknownRef``: one row of the job's fact catalog the
-#   sources left open, so a ``confirmed`` claim on an open assertion has a
+# * ``assertion`` on an ``UnknownRef``: one open row of the job's fact catalog,
+#   so a ``confirmed`` claim on an open assertion has a
 #   dismissal to name (#1082).
 #
 # **``Report`` has no version gate.** It keeps ``extra="forbid"``, so a 2.10
@@ -970,8 +970,9 @@ class Report(BaseModel):
         projection with *this* service's rules, so a record written under
         another version would be re-read under rules it never ran, and every
         difference that caused would be reported as a contradiction the writer
-        hid. So a foreign record is left alone: its own issues stand as
-        written, and this check declines rather than guessing.
+        hid. So this check declines for a foreign record: its own issues
+        stand as written. The ground check on load is not version-gated; it
+        reads every record's grounds against today's evidence catalog.
         """
         if self.assertions is None:
             return []

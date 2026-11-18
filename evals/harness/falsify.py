@@ -43,7 +43,7 @@ from analysis_service.assertions import (
     AssertionRecord,
     Subject,
     assertion_id,
-    settled,
+    uncontradicted,
 )
 from analysis_service.assertions import without as retracted
 from analysis_service.evidence import lead_topics, prepared_view
@@ -905,8 +905,9 @@ FIXTURE_REVIEWER = "reviewer:falsification-fixture"
 class Consumed:
     """What one corrupted reading does to a job.
 
-    ``reached`` is every corrupted row the job settles, so a lane reads it
-    through the graph or the evidence table as a fact.
+    ``reached`` is every corrupted row the job settles and the graph does not
+    contradict, so a lane reads it through the graph or the evidence table as a
+    fact.
 
     Lost leads are split by what lost them, against the same reading with the
     corrupted rows simply left out. ``suppressed`` is a lead that reading
@@ -944,11 +945,12 @@ class Consumed:
 
 def consumer_view(
     catalog: AssertionCatalog, model: SystemModel, sources: Mapping[str, str]
-) -> tuple[AssertionCatalog, frozenset[str]]:
-    """What a job reads from this catalog: the rows it keeps, and its leads.
+) -> tuple[frozenset[str], frozenset[str]]:
+    """What a job reads from this catalog: the rows it reads as facts, and its leads.
 
     The job's own sequence, with nothing re-derived: the gate quarantines, the
     projection writes the graph, and the evidence catalog is built over both.
+    A fact is a settled row the graph does not contradict, by identity.
 
     **A lead is named by what it is about**, an element's attribute or a
     subject's predicate, not by its evidence key. A stated absence that becomes
@@ -958,8 +960,11 @@ def consumer_view(
     record = AssertionRecord.over(
         catalog, model, sources, proposed=len(catalog.entries)
     )
-    _, _, evidence = prepared_view(model, record.catalog)
-    return record.catalog, lead_topics(evidence, record.catalog)
+    projected, _, evidence = prepared_view(model, record.catalog)
+    facts = frozenset(
+        assertion_id(entry) for entry in uncontradicted(record.catalog, projected)
+    )
+    return facts, lead_topics(evidence, record.catalog)
 
 
 @dataclass(frozen=True)
@@ -1030,17 +1035,11 @@ def consume_probe(
         source_texts(case.sources),
     )
     _, without = consumer_view(built.without, built.model, built.sources)
-    kept, leads = consumer_view(built.catalog, built.model, built.sources)
+    facts, leads = consumer_view(built.catalog, built.model, built.sources)
     return Consumed(
         probe=name,
         reviewed=reviewed,
-        reached=tuple(
-            sorted(
-                assertion_id(entry)
-                for entry in settled(kept)
-                if assertion_id(entry) in built.changed
-            )
-        ),
+        reached=tuple(sorted(facts & built.changed)),
         suppressed=tuple(sorted(without - leads)),
         omitted=tuple(sorted(perfect - without)),
     )

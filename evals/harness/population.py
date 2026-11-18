@@ -10,10 +10,12 @@ A row's **route** is what the job did with it, read off the same functions the
 job calls: ``projected`` is a settled row the graph carries,
 ``offered`` is a settled row the Evidence Catalog cites as itself, ``open`` is
 an unknown, ``set-aside`` is a row a conflict or an assessment kept from
-settling, and ``refused`` is a row the gate refused, named by the code that
-refused it. The first two are the rows that reach a consumer, which is the
-population the owner's decision of 2026-09-23 fixes; the rest are recorded
-beside them so a reviewer sees what the job did not use as well.
+settling, or a settled row the graph contradicts
+(:func:`~analysis_service.assertions.contradicted`), and ``refused`` is a row
+the gate refused, named by the code that refused it. The first two are the
+rows that reach a consumer, which is the population the owner's decision of
+2026-09-23 fixes; the rest are recorded beside them so a reviewer sees what the
+job did not use as well.
 
 Nothing here assesses anything, and it runs no model.
 
@@ -42,7 +44,7 @@ from analysis_service.assertions import (
     CatalogProposal,
     assertion_id,
     offered,
-    settled,
+    uncontradicted,
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.execution import source_texts
@@ -70,7 +72,9 @@ REACHES: frozenset[Route] = frozenset({"projected", "offered"})
 
 #: The format of a frozen population file. Bumped when a field changes
 #: meaning, so a population frozen under one rule is never read under another.
-POPULATION_VERSION = 1
+#: Version 2: a settled row the graph contradicts routes ``set-aside``, not
+#: ``projected``.
+POPULATION_VERSION = 2
 
 
 class PopulationError(ValueError):
@@ -115,7 +119,7 @@ def population(
     catalog = record.catalog
     projected, _, _ = prepared_view(model, catalog)
     cited = {assertion_id(entry) for entry in offered(catalog, projected)}
-    held = {assertion_id(entry) for entry in settled(catalog)}
+    held = {assertion_id(entry) for entry in uncontradicted(catalog, projected)}
     rows = []
     for entry in catalog.entries:
         identity = assertion_id(entry)

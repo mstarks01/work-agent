@@ -166,6 +166,7 @@ __all__ = [
     "catalog_coverage",
     "catalog_issues",
     "conflicts",
+    "contradicted",
     "contradiction_issues",
     "contradictions",
     "disputed",
@@ -187,6 +188,7 @@ __all__ = [
     "states_missing",
     "subject_id",
     "support_span",
+    "uncontradicted",
 ]
 
 #: The registry's version. It keys every assertion identity, so a bump re-keys
@@ -254,7 +256,12 @@ REGISTRY_VERSION = 9
 #: unscoped row that quotes the answers Source outranks every other row
 #: (:func:`answered`), and the scoped rows stay in the catalog as the scoped
 #: facts they state (#1289, F5).
-PROJECTION_VERSION = 6
+#:
+#: Version 7: only an answer that may state its value lifts the unchecked guard
+#: (:func:`_drives_value`). An answer a reviewer set aside, or an answer of
+#: ``unknown``, leaves an unchecked row under the guard, which writes a
+#: qualified ``unknown`` over the lead (#2270).
+PROJECTION_VERSION = 7
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -1243,9 +1250,9 @@ CatalogIssueCode = Literal[
     # A predicate whose value identifies rather than describes, carrying a
     # value this service inferred. See `Predicate.stated_only`.
     "inference-refused",
-    # Not a refused row. The row stands and stays citable; this says the graph
-    # attribute beside it states the opposite, which is the defect this layer
-    # exists to make visible rather than one to drop a fact over.
+    # Not a refused row. The row stands; this says the graph attribute beside
+    # it, before the projection, states the opposite, which is the defect this
+    # layer exists to make visible rather than one to drop a fact over.
     "graph-contradiction",
     # Not a refused row either. Rows merged into one identity cited more
     # passages between them than a row carries, and the row kept the first
@@ -1277,8 +1284,10 @@ ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
 #: the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
-#: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
-#: stays citable, and the finding is about the graph attribute beside it.
+#: ``graph-contradiction`` is not a refusal: the row stands in the catalog, and
+#: the finding is about the graph attribute beside it before the projection.
+#: Where the projected model still states the opposite, the evidence catalog
+#: offers the row as an open question (:func:`contradicted`).
 #: ``support-truncated`` is not one either: the row stands on the spans it kept,
 #: and the finding is about the ones it did not. ``superseded-by-answer`` is
 #: not one: the submitter's answer settles the fact the row stated, so the row
@@ -2047,6 +2056,10 @@ def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
     until a recorded adjudication does, and an ``unsupported`` or
     ``unresolved`` row is set aside rather than read as a fact.
 
+    The rule reads the catalog alone. Against a model, :func:`contradicted`
+    names the settled rows the graph attribute states the opposite of, and
+    the evidence catalog offers those as open questions.
+
     ``inferred`` and ``derived`` rows are settled: they are this service's
     conclusions rather than the source's, and every reader labels them by
     ``basis`` rather than dropping them, so an inference is visible as one.
@@ -2084,11 +2097,26 @@ def answered(entry: Assertion) -> bool:
 
     **The one reader of "is this row an answer".** An answer to a question this
     service asked settles the fact, even against the sources (the maintainer's
-    decision of 2026-09-25 on #1225), so :func:`project` lets an unscoped one
-    outrank every other row, and the question readers find the row an earlier
-    run wrote by it.
+    decision of 2026-09-25 on #1225), so :func:`project` lets one that may
+    state its value (:func:`_drives_value`) outrank every other row, and the
+    question readers find the row an earlier run wrote by it.
     """
     return entry.origin == "answer"
+
+
+def _drives_value(entry: Assertion) -> bool:
+    """Whether this row is an answer that alone makes its attribute's value.
+
+    An answer outranks every other row (:func:`answered`), but only where it
+    may state its value at all: admissible, valued and unscoped. An answer a
+    reviewer set aside makes no value, so the rows beside it still do.
+    """
+    return (
+        answered(entry)
+        and admissible(entry)
+        and entry.value != UNKNOWN
+        and not entry.scope
+    )
 
 
 def missing_value(predicate: Predicate) -> str:
@@ -3177,6 +3205,52 @@ def contradictions(
     return tuple(found)
 
 
+def contradicted(
+    catalog: AssertionCatalog, model: SystemModel
+) -> tuple[Assertion, ...]:
+    """Every settled row behind a :func:`contradictions` entry, in catalog order.
+
+    The graph attribute states the opposite of the value these rows project,
+    so none of them is a fact against this model, though each stays in
+    :func:`settled`, which reads the catalog alone. The evidence catalog offers
+    each such row as an open question, as it offers a row another row
+    disputes. Where a submitter's answer makes the value, no row behind it is
+    here (:func:`_contradicted_ids`).
+    """
+    rows = _contradicted_ids(catalog, model)
+    return tuple(entry for entry in settled(catalog) if assertion_id(entry) in rows)
+
+
+def uncontradicted(
+    catalog: AssertionCatalog, model: SystemModel
+) -> tuple[Assertion, ...]:
+    """Every settled row that is not :func:`contradicted`, in catalog order.
+
+    These are the settled rows a lane may rest a definite conclusion on against
+    ``model``.
+    """
+    rows = _contradicted_ids(catalog, model)
+    return tuple(entry for entry in settled(catalog) if assertion_id(entry) not in rows)
+
+
+def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]:
+    """The rows behind each contradiction no submitter's answer drives.
+
+    An answer settles the fact even against the sources (:func:`answered`), and
+    one that may state its value alone makes the projected value
+    (:func:`_drives_value`). So a contradiction whose rows hold an answer that
+    makes the value holds none of its rows open: the other rows grouped beside
+    that answer did not make the value the graph contradicts.
+    """
+    answers = {assertion_id(entry) for entry in catalog.entries if _drives_value(entry)}
+    return {
+        row
+        for found in contradictions(catalog, model)
+        if answers.isdisjoint(found.rows)
+        for row in found.rows
+    }
+
+
 @dataclass(frozen=True)
 class CatalogCoverage:
     """What one job's assertion pass reached, and what it left untouched.
@@ -3477,7 +3551,10 @@ def _unchecked_over_lead(
     review status in the gloss (:func:`offered`).
 
     A row a reviewer marked ``supported`` may close the lead; that is what a
-    review is for. ``run.py guard-cost`` measures what it holds back, and ADR
+    review is for. A submitter's answer that may state its value
+    (:func:`_drives_value`) closes it too, because an answer settles the fact
+    (#1225); an answer a reviewer set aside, or an answer of ``unknown``, does
+    not. ``run.py guard-cost`` measures what it holds back, and ADR
     0041 records the reading: over the archived proposal/graph pairings a job
     could project onto, 44 values the blessed model agrees with reach the lane
     as cited unchecked rows instead, and 18 wrong ``none`` authentications
@@ -3487,7 +3564,7 @@ def _unchecked_over_lead(
     """
     if control_state(projection.value) != "stated":
         return False
-    if any(answered(entry) for entry in rows):
+    if any(_drives_value(entry) for entry in rows):
         return False
     if control_state(str(held)) == "stated":
         return False
@@ -3560,7 +3637,9 @@ def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, .
     model in front of the reader holds that value. Everything else a settled
     row says would otherwise reach no reader — a fact about a principal, a
     mechanism on a Process, a scoped control, one of two compatible values, or
-    a row whose projection :func:`apply_projection` discarded.
+    a row whose projection :func:`apply_projection` discarded. A
+    :func:`contradicted` row is not offered: the graph states the opposite of
+    the value the rows project, so it is an open question against this model.
 
     Asked of the model rather than of whether a projection ran, so a report
     re-checked on load and the job that wrote it agree without either
@@ -3576,7 +3655,9 @@ def offered(catalog: AssertionCatalog, model: SystemModel) -> tuple[Assertion, .
         for identity in projection.rows
     }
     return tuple(
-        entry for entry in settled(catalog) if assertion_id(entry) not in carried
+        entry
+        for entry in uncontradicted(catalog, model)
+        if assertion_id(entry) not in carried
     )
 
 
@@ -3610,7 +3691,7 @@ def _projected(
     stated = [entry for entry in valued if admissible(entry)]
     # An answer settles the attribute; the scoped rows beside it stay in the
     # catalog as the narrower facts they state.
-    answers = [entry for entry in stated if answered(entry) and not entry.scope]
+    answers = [entry for entry in stated if _drives_value(entry)]
     if answers:
         stated = answers
 
