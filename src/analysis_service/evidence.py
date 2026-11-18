@@ -60,8 +60,8 @@ An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground. A row is open where the
 sources were asked about the fact and left it open, or where another row
 disputes it. Such a row is in the table where it reaches no graph field, or
-where the model does not hold what its projection writes
-(:func:`~analysis_service.assertions.unapplied`): the validity gate refused
+where the model does not hold the qualified ``unknown`` its projection
+writes (:func:`~analysis_service.assertions.unapplied`): the validity gate refused
 the projected model, so the field keeps what extraction wrote. Otherwise the
 field it reaches shows what
 :data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
@@ -261,7 +261,8 @@ def evidence_catalog(
     contradicted by the graph, and not already carried by the attribute its
     projection wrote — in the catalog's own order. The open rows come after
     them as ``unknown-assertion`` entries: an unknown or disputed row that
-    reaches no graph field or sits under a projection the model does not hold,
+    reaches no graph field or sits under a qualifying projection the model
+    does not hold,
     and every contradicted row. An attribute the rows contradict is never an
     ``absent-attribute`` entry. ``None`` is a job that
     ran no such pass, and its catalog holds only the first two enumerations;
@@ -286,11 +287,7 @@ def evidence_catalog(
     """
     # The graph side of a contradiction is no fact: the rows behind it state
     # the opposite, and their open entries below carry the question.
-    opposed = (
-        frozenset()
-        if assertions is None
-        else contradicted_attributes(assertions, model)
-    )
+    opposed = _opposed(model, assertions)
     catalog: EvidenceCatalog = dict(
         entry
         for element in model.elements()
@@ -318,14 +315,14 @@ def evidence_catalog(
         )
         # The open questions, after the settled rows and never merged with
         # them. An unknown row, or a row in a conflict, reaches here when it
-        # reaches no graph field, or when its projection changes the field and
-        # the model does not hold it. An applied projection shows a disputed
+        # reaches no graph field, or when its projection qualifies the field
+        # and the model does not hold it. An applied projection shows a disputed
         # attribute as a qualified unknown, which the attribute enumeration
         # above offers, but a principal's second factor has no attribute to
         # qualify. Where the validity gate refuses the projected model, the
         # field keeps what extraction wrote, so only this offer carries the
         # question.
-        held_open = {
+        unapplied_rows = {
             row
             for projection in unapplied(assertions, model)
             for row in projection.rows
@@ -337,7 +334,7 @@ def evidence_catalog(
                 *disputed(assertions),
             )
             if not projected_attribute(row.predicate, row.subject)
-            or assertion_id(row) in held_open
+            or assertion_id(row) in unapplied_rows
         ]
         # A row the graph attribute contradicts reaches a graph field, and that
         # field states the opposite rather than an unknown, so only this offer
@@ -479,11 +476,7 @@ def ground_issues(
     catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
     text = model_text(model)
-    opposed = (
-        frozenset()
-        if assertions is None
-        else contradicted_attributes(assertions, model)
-    )
+    opposed = _opposed(model, assertions)
     issues = []
     for claim in claims:
         for ground in claim.grounds:
@@ -491,6 +484,15 @@ def ground_issues(
             if issue:
                 issues.append(issue)
     return issues
+
+
+def _opposed(
+    model: SystemModel, assertions: AssertionCatalog | None
+) -> frozenset[tuple[str, str]]:
+    """The attributes the job's assertion rows contradict, or none without a pass."""
+    if assertions is None:
+        return frozenset()
+    return contradicted_attributes(assertions, model)
 
 
 def _one_ground_issue(
@@ -570,13 +572,18 @@ def _one_ground_issue(
     )
     if ref in catalog:
         return ""
-    if (ground.element_id, ground.attribute) in opposed:
+    state = control_state(getattr(element, ground.attribute))
+    contradicted_absence = (
+        ground.kind == "absent-attribute"
+        and state == "absent"
+        and (ground.element_id, ground.attribute) in opposed
+    )
+    if contradicted_absence:
         return (
             f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
             f" {ground.element_id!r}, which the assertion rows contradict, so the"
             " job's catalog leaves it open"
         )
-    state = control_state(getattr(element, ground.attribute))
     return (
         f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
         f" {ground.element_id!r}, which the system model reads as {state}"

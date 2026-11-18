@@ -265,9 +265,10 @@ REGISTRY_VERSION = 9
 #: qualified ``unknown`` over the lead (#2270).
 #:
 #: Version 8: :func:`contradictions` compares the state of each row that states
-#: the attribute's value, not the projected value, so two ``compatible`` rows
-#: beside an opposite attribute are a ``graph-contradiction`` issue, and an
-#: issue names a row that states the value (#2270). A record of version 7 keeps
+#: the attribute's value, not the projected value, so three more shapes beside
+#: an opposite attribute are a ``graph-contradiction`` issue: two ``compatible``
+#: rows, two rows of ``several-values`` in one state, and an unscoped row beside
+#: a scoped one. An issue names a row that states the value (#2270). A record of version 7 keeps
 #: its own issues; the issue re-check on load declines for it.
 PROJECTION_VERSION = 8
 
@@ -2130,7 +2131,7 @@ def _drives_value(entry: Assertion) -> bool:
 def _value_rows(rows: Sequence[Assertion]) -> list[Assertion]:
     """The rows under one attribute that state its value, in the order given.
 
-    **The one reader of "which rows make an attribute's value".** A row states
+    A row states
     a value where it holds one and :func:`admissible` admits it. Where an
     answer may state its value (:func:`_drives_value`), the answers alone do:
     the rows beside them stay in the catalog as the facts they state.
@@ -3170,7 +3171,7 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
 class Contradiction:
     """A graph attribute and the rows authoritative for it that state opposites.
 
-    ``projected`` is what the rows that state the attribute's value say, each
+    ``stated`` is what the rows that state the attribute's value say, each
     distinct value once; ``carried`` is what the **System Model** beside them
     actually holds. Both are quoted as written, because which of the two is
     wrong is not decidable here and a reader has to see the pair. ``rows``
@@ -3180,7 +3181,7 @@ class Contradiction:
 
     element_id: str
     attribute: str
-    projected: str
+    stated: str
     carried: str
     rows: tuple[str, ...]
 
@@ -3239,7 +3240,7 @@ def contradictions(
                 Contradiction(
                     element_id=projection.element_id,
                     attribute=projection.attribute,
-                    projected="; ".join(values),
+                    stated="; ".join(values),
                     carried=held,
                     rows=tuple(sorted(assertion_id(entry) for entry in stating)),
                 )
@@ -3329,11 +3330,12 @@ class CatalogCoverage:
 
     ``reachable`` and ``settled`` are the honest denominator and numerator: the
     element attributes some predicate could speak to on *this* model, and how
-    many the catalog actually settles against this model. ``open`` counts the
-    questions the sources raised and left unanswered, and the rows the graph
+    many the catalog's projections write and the model does not contradict.
+    ``open`` counts the rows that hold :data:`UNKNOWN` and the rows the graph
     contradicts, which is coverage stated as rows. A row the graph contradicts
     (:func:`contradicted`) is the same open question the evidence catalog
-    offers, so its attribute is not counted as settled.
+    offers, so its attribute is not counted as settled. A disputed row is in
+    neither count.
     ``own_subjects`` counts what the graph has no place for at all — a fact
     about a principal or a credential — because that is the part of the catalog
     a reader cannot find anywhere else.
@@ -3355,7 +3357,7 @@ def catalog_coverage(catalog: AssertionCatalog, model: SystemModel) -> CatalogCo
         if hasattr(element, attribute)
     )
     settled_rows = settled(catalog)
-    held_open = {assertion_id(entry) for entry in contradicted(catalog, model)}
+    open_rows = {assertion_id(entry) for entry in contradicted(catalog, model)}
     graph_bound = {
         subject.id for subject in catalog.subjects if subject.type in GRAPH_BOUND
     }
@@ -3366,11 +3368,11 @@ def catalog_coverage(catalog: AssertionCatalog, model: SystemModel) -> CatalogCo
                 (projection.element_id, projection.attribute)
                 for projection in project(catalog)
                 if projection.reason in SETTLING_REASONS
-                and held_open.isdisjoint(projection.rows)
+                and open_rows.isdisjoint(projection.rows)
             }
         ),
         open=sum(1 for entry in catalog.entries if entry.value == UNKNOWN)
-        + len(held_open),
+        + len(open_rows),
         own_subjects=sum(
             1 for entry in settled_rows if entry.subject not in graph_bound
         ),
@@ -3391,7 +3393,7 @@ def contradiction_issues(
             code="graph-contradiction",
             message=f"{found.element_id}.{found.attribute} holds"
             f" {found.carried!r} and the rows behind it state"
-            f" {found.projected!r}, which is the opposite state",
+            f" {found.stated!r}, which is the opposite state",
             assertion=found.rows[0] if found.rows else None,
         )
         for found in contradictions(catalog, model)
@@ -3613,27 +3615,28 @@ def _writes(
 
 
 def unapplied(catalog: AssertionCatalog, model: SystemModel) -> tuple[Projection, ...]:
-    """Every projection that changes a field and that ``model`` does not hold.
+    """Every projection that qualifies a field and that ``model`` does not hold.
 
-    A projection whose effect is ``leave`` changes nothing, so it is never
-    here. Any other is here where its field holds a value other than the one
-    :func:`apply_projection` writes (:func:`_writes`): the validity gate
-    refused the projected model, so the field keeps what extraction wrote.
-    The evidence catalog then offers the open rows behind it as questions,
-    because the field does not show them as a qualified ``unknown``.
+    A qualifying projection writes a qualified ``unknown`` (:func:`_writes`),
+    and that field is the question its open rows raise. Where the field holds
+    another value, the validity gate refused the projected model and the field
+    keeps what extraction wrote, so the evidence catalog offers the open rows
+    behind the projection as questions. A projection that writes a value
+    settles the field from its stated rows, so a silent row beside them is no
+    question; one that leaves the field changes nothing.
 
     Asked of the model rather than of whether a projection ran, as
     :func:`offered` is, so a report re-checked on load and the job that wrote
     it agree.
     """
-    held = {element.id: element for element in model.elements()}
+    elements = {element.id: element for element in model.elements()}
     rows = {assertion_id(entry): entry for entry in catalog.entries}
     subjects = {subject.id: subject for subject in catalog.subjects}
     found = []
     for projection in project(catalog):
-        element = held.get(projection.element_id)
+        element = elements.get(projection.element_id)
         if (
-            PROJECTION_EFFECT[projection.reason] == "leave"
+            PROJECTION_EFFECT[projection.reason] != "qualify"
             or element is None
             or not hasattr(element, projection.attribute)
         ):
@@ -3825,9 +3828,9 @@ def _projected(
         if len({entry.predicate for entry in stated}) > 1:
             return projected(UNKNOWN, "several-predicates")
         return projected(UNKNOWN, "several-values")
-    value = _graph_spelling(stated[0].value, subjects)
-    if value == ABSENT_WORD:
-        return projected(value, "absent")
+    value = _written(stated[0].value, subjects)
+    if value == ABSENT:
+        return projected(ABSENT_WORD, "absent")
     return projected(value, "stated")
 
 

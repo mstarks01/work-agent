@@ -603,3 +603,70 @@ def test_a_claim_on_a_contradicted_absence_is_told_why():
 
     (issue,) = ground_issues([claim], _with_encryption("none"), catalog)
     assert "the assertion rows contradict" in issue
+
+
+class TestRowsUnderARefusedProjection:
+    """What the standards read of #2306 asked: which open rows a refused
+    projection offers, and which shapes the per-row comparison reaches."""
+
+    STORE = TestARowTheGraphContradicts.STORE
+    ENCRYPTED = TestTheGraphSideOfAContradiction.ENCRYPTED
+
+    def test_a_silent_row_beside_a_stated_row_is_not_offered(self):
+        """A projection that writes settles the field from the stated row; a
+        silent row beside it is no question, whether or not the model holds
+        the value."""
+        silent = self.ENCRYPTED.model_copy(
+            update={"value": UNKNOWN, "reason": "silent", "explanation": "c"}
+        )
+        catalog = assertions(self.ENCRYPTED, silent, subjects=(self.STORE,))
+        offered = evidence_catalog(_with_encryption("AES-128"), catalog)
+
+        assert offered[assertion_id(self.ENCRYPTED)].kind == "assertion"
+        assert assertion_id(silent) not in offered
+
+    def test_two_values_in_one_state_contradict_an_opposite_field(self):
+        """Two stated values that disagree with each other both state a
+        control, so a graph absence beside them is contradicted."""
+        other = self.ENCRYPTED.model_copy(
+            update={"value": "AES-128", "explanation": "d"}
+        )
+        catalog = assertions(self.ENCRYPTED, other, subjects=(self.STORE,))
+        model = _with_encryption("none")
+
+        (found,) = contradictions(catalog, model)
+        assert found.stated == "AES-256; AES-128"
+        offered = evidence_catalog(model, catalog)
+        assert TestTheGraphSideOfAContradiction.ABSENT_REF not in offered
+        assert offered[assertion_id(other)].kind == "unknown-assertion"
+
+    def test_an_unscoped_row_beside_a_scoped_one_is_compared(self):
+        """The scoped row states a narrower fact and is not compared; the
+        unscoped absence states the opposite of the field."""
+        absence = TestARowTheGraphContradicts.STORED
+        backups = self.ENCRYPTED.model_copy(
+            update={"scope": [Qualifier(kind="resource", value="backups")]}
+        )
+        catalog = assertions(absence, backups, subjects=(self.STORE,))
+        model = _with_encryption("AES-256")
+
+        assert contradicted(catalog, model) == (absence,)
+        offered = evidence_catalog(model, catalog)
+        assert offered[assertion_id(absence)].kind == "unknown-assertion"
+        assert offered[assertion_id(backups)].kind == "assertion"
+
+
+def test_an_unknown_ground_on_a_contradicted_field_is_told_its_state():
+    """The contradiction message is for a cited absence; an unknown ground on
+    a field that states a value is told the field's state."""
+    catalog = assertions(
+        TestARowTheGraphContradicts.STORED,
+        subjects=(TestARowTheGraphContradicts.STORE,),
+    )
+    ground = Ground(
+        kind="unknown-attribute", element_id=ORDERS, attribute="encryption_at_rest"
+    )
+    claim = sample_draft("S-01", grounds=[ground])
+
+    (issue,) = ground_issues([claim], _with_encryption("AES-256"), catalog)
+    assert "reads as stated" in issue
