@@ -1271,10 +1271,10 @@ class TestFanIn:
             direction="question" if needs else "gap",
             quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
         )
-        batches = {lane: schemas_for("asvs").proposals(claims=[proposal])}
+        stored = {lane: schemas_for("asvs").proposals(claims=[proposal])}
 
         merged = fan_in.fan_in(
-            batches, PACKAGES["asvs"], model, sources={}, assertions=None
+            stored, PACKAGES["asvs"], model, sources={}, assertions=None
         )
 
         assert merged.deferred_ids == (["v5.0.0-1.2.4"] if needs else [])

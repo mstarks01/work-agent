@@ -3106,6 +3106,12 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "the split of a lane's proposals into kept and deferred": _OneReader(
+        lambda node: _calls(node, "partition_proposals"),
+        ("src/analysis_service/fan_in.py", "fan_in"),
+        {},
+        "",
+    ),
     "the render of a job's sources": _OneReader(
         lambda node: _calls(node, "render_sources"),
         ("src/analysis_service/execution.py", "seed_state"),
