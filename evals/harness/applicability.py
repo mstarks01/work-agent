@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from analysis_service.claims import (
     Claim,
@@ -58,6 +58,7 @@ from evals.harness.reference import (
     ReferenceRequirement,
     diagnosable,
 )
+from evals.harness.scorer import Rate, percent
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases
@@ -868,16 +869,6 @@ def routing_rates(
     }
 
 
-def _rate(value: float | None) -> str:
-    """One rate for a table cell, or ``n/a`` where the figure is undefined.
-
-    Printed rather than defaulted to zero: a rate nobody can compute and a rate
-    that came out at zero are different facts, and a column that spells them the
-    same way reads the second as the first.
-    """
-    return "n/a" if value is None else f"{value:.0%}"
-
-
 def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
     """The corpus-wide figures, pooled over claims rather than averaged per case.
 
@@ -1040,14 +1031,17 @@ class ApplicabilityYield:
     unlisted: tuple[str, ...]
 
     @property
-    def rejection_rate(self) -> float:
-        """Of what the critic was handed, the share it ruled inapplicable."""
-        return len(self.rejected) / self.drafts if self.drafts else 0.0
+    def rates(self) -> dict[ApplicabilityRate, Rate]:
+        """Both rates with their counts, keyed by the rate's name.
 
-    @property
-    def destroyed_rate(self) -> float:
-        """Of what it rejected, the share the case expected a ruling on."""
-        return len(self.destroyed) / len(self.rejected) if self.rejected else 0.0
+        ``rejection_rate`` is the share of what the critic was handed that it
+        ruled inapplicable. ``destroyed_rate`` is the share of its rejections
+        that the case expected a ruling on, and has no value where it rejected
+        nothing.
+        """
+        return _applicability_rates(
+            self.drafts, len(self.rejected), len(self.destroyed)
+        )
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -1059,9 +1053,22 @@ class ApplicabilityYield:
             "destroyed": list(self.destroyed),
             "earned": list(self.earned),
             "unlisted": list(self.unlisted),
-            "rejection_rate": round(self.rejection_rate, 3),
-            "destroyed_rate": round(self.destroyed_rate, 3),
+            **{name: rate.rounded() for name, rate in self.rates.items()},
         }
+
+
+#: The names of the rates :attr:`ApplicabilityYield.rates` gives.
+ApplicabilityRate = Literal["rejection_rate", "destroyed_rate"]
+
+
+def _applicability_rates(
+    drafts: int, rejected: int, destroyed: int
+) -> dict[ApplicabilityRate, Rate]:
+    """The yield's two rates, from one case's counts or from pooled ones."""
+    return {
+        "rejection_rate": Rate(rejected, drafts),
+        "destroyed_rate": Rate(destroyed, rejected),
+    }
 
 
 def score_yield(
@@ -1121,8 +1128,10 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
         "destroyed": destroyed,
         "earned": sum(len(entry.earned) for entry in yields),
         "unlisted": sum(len(entry.unlisted) for entry in yields),
-        "rejection_rate": round(rejected / drafts, 3) if drafts else 0.0,
-        "destroyed_rate": round(destroyed / rejected, 3) if rejected else 0.0,
+        **{
+            name: rate.rounded()
+            for name, rate in _applicability_rates(drafts, rejected, destroyed).items()
+        },
     }
 
 
@@ -1143,13 +1152,13 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         return
     print("\nASVS applicability (mechanical, catalog match)")
     print(
-        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
+        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>11}"
         f" {'miss':>5} {'defr':>5} {'unlst':>5} {'neg!':>5} {'rej':>5} {'off':>4}"
     )
     for score in scores:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
-            f" {score.must_find_recall:>6.0%} {_rate(score.precision):>6}"
+            f" {score.must_find_recall:>6.0%} {percent(score.precision):>11}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
@@ -1159,7 +1168,7 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
         f" ({totals['matched']}/{totals['expected']}),"
         f" must-find {totals['must_find_recall']:.0%},"
-        f" precision {_rate(totals['precision'])}"
+        f" precision {percent(totals['precision'])}"
         f" (over {totals['precision_cases']} of {totals['cases']} cases read"
         " as exhaustive),"
         f" negatives applied {totals['negatives_applied']}/{totals['negatives']},"
@@ -1237,9 +1246,9 @@ def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
     totals = aggregate_yield(yields)
     print(
         f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
-        f" ({totals['rejection_rate']:.0%}),"
+        f" ({percent(totals['rejection_rate'])}),"
         f" earned {totals['earned']}, destroyed {totals['destroyed']}"
-        f" ({totals['destroyed_rate']:.0%} of rejections),"
+        f" ({percent(totals['destroyed_rate'])} of rejections),"
         f" unlisted {totals['unlisted']}"
         " (instrument, non-gating)"
     )

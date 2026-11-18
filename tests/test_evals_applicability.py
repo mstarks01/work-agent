@@ -653,8 +653,8 @@ def test_the_critic_pair_reads_both_sides(case):
     assert critic.earned == ()
     assert critic.unlisted == (unexpected,)
     assert critic.confirmed == (expected[0],)
-    assert critic.rejection_rate == pytest.approx(2 / 3)
-    assert critic.destroyed_rate == 0.5
+    assert critic.rates["rejection_rate"].value == pytest.approx(2 / 3)
+    assert critic.rates["destroyed_rate"].value == 0.5
 
 
 def test_a_lane_or_duplicate_rejection_neither_destroys_nor_earns(case):
@@ -707,7 +707,7 @@ def test_the_split_comes_from_the_list_a_claim_sits_in(case):
     assert critic.confirmed == ()
 
 
-def test_a_critic_that_rejected_nothing_reports_zero_rather_than_dividing(case):
+def test_a_critic_that_rejected_nothing_reads_unavailable_rather_than_zero(case):
     from evals.harness.applicability import aggregate_yield, score_yield
 
     expected = [reference.requirement for reference in case.references["asvs"]]
@@ -716,8 +716,9 @@ def test_a_critic_that_rejected_nothing_reports_zero_rather_than_dividing(case):
     )
 
     assert critic.rejected == ()
-    assert critic.destroyed_rate == 0.0
-    assert aggregate_yield([critic])["destroyed_rate"] == 0.0
+    assert critic.rates["destroyed_rate"].value is None
+    assert critic.to_json()["destroyed_rate"] is None
+    assert aggregate_yield([critic])["destroyed_rate"] is None
 
 
 def test_pooling_the_yield_weights_by_draft_and_not_by_case(case):

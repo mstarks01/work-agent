@@ -141,6 +141,7 @@ from evals.harness.modes import (
     score_extraction,
 )
 from evals.harness.reference import GoldenCase
+from evals.harness.scorer import shown_share
 from evals.reference_facts import facts_path, load_facts, reference_catalog
 
 Fate = Literal[
@@ -1255,12 +1256,15 @@ ROUTES_OF: Mapping[SweepMode, tuple[tuple[str, ...], ...]] = {
 }
 
 
+#: What a replayable mode keeps beside its artifact.
+Kept = Literal["extraction", "catalog"]
+
 #: What each replayable mode keeps beside its artifact, and so which emission a
 #: replay grades. **Apart from** :data:`ROUTES_OF`, which answers a different
 #: question — which nodes' instructions place the sweep on an arm. The head-only
 #: mode reads through ``extract`` and keeps a catalog, so the two tables answer
 #: apart.
-KEEPS: Mapping[SweepMode, str] = {
+KEEPS: Mapping[SweepMode, Kept] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
     "assertions": "catalog",
@@ -1625,9 +1629,7 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
         for fate in BIND_FATES:
             print(f"  {fate:<20} {pool['fates'][fate]:>5}")
         share = pool["bound_share"]
-        print(
-            f"  bound share of graph-bound rows: {'n/a' if share is None else f'{share:.3f}'}"
-        )
+        print(f"  bound share of graph-bound rows: {shown_share(share, '.3f')}")
         print(
             f"  rows a lane could cite: {pool['offered']} over the extracted graphs,"
             f" {pool['offered_blessed']} over the blessed one"
