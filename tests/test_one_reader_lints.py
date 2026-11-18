@@ -1849,6 +1849,21 @@ def _is_constant(node: ast.AST, value: object) -> bool:
     return isinstance(node, ast.Constant) and node.value == value
 
 
+def _reads_the_verdict_rule(node: ast.AST) -> bool:
+    """Whether ``node`` reads the verdict statuses, or tests a fate against
+    the fates with no verdict."""
+    if _loads(node, "VERDICT_STATUSES") or _loads_attribute(node, "VERDICT_STATUSES"):
+        return True
+    return isinstance(node, ast.Compare) and any(
+        isinstance(op, (ast.In, ast.NotIn))
+        and (
+            _loads(right, "NO_VERDICT_FATES")
+            or _loads_attribute(right, "NO_VERDICT_FATES")
+        )
+        for op, right in zip(node.ops, node.comparators, strict=True)
+    )
+
+
 def _parses_a_version_segment(node: ast.AST) -> bool:
     return _calls(node, "ascii_int") and isinstance(node.args[0], ast.Subscript)
 
@@ -2373,10 +2388,7 @@ ONE_READERS: dict[str, _OneReader] = {
         "evals/",
     ),
     "whether a critic fate holds a verdict": _OneReader(
-        lambda node: (
-            _loads(node, "VERDICT_STATUSES")
-            or _loads_attribute(node, "VERDICT_STATUSES")
-        ),
+        _reads_the_verdict_rule,
         ("evals/harness/critic_yield.py", "has_verdict"),
         {},
         "evals/",
