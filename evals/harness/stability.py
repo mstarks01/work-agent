@@ -62,7 +62,7 @@ from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
-from evals.harness.rates import jaccard, mean, ratio, rounded_figure
+from evals.harness.rates import jaccard, mean, presence, ratio, rounded_figure
 from evals.harness.reference import MUST_FIND
 
 #: One case of one framework. Stability is per framework because the two
@@ -177,9 +177,9 @@ class CaseStability:
     @property
     def recall_spread(self) -> float | None:
         """How far apart the runs' recalls lie, or ``None`` where a run has none."""
-        held = [recall for recall in self.recalls if recall is not None]
-        if len(held) < len(self.recalls):
+        if presence(self.recalls) != "every":
             return None
+        held = [recall for recall in self.recalls if recall is not None]
         return max(held) - min(held)
 
     @property
@@ -235,7 +235,7 @@ def _claim_scored_framework() -> FrameworkName:
     return composed[0]
 
 
-def _share(value: float | None) -> float | None:
+def _recall(value: float | None) -> float | None:
     """A recall read off an artifact: a number, or ``None`` where it has none."""
     return None if value is None else float(value)
 
@@ -271,7 +271,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
                 str(pair["reference_index"]) for pair in score["matched"]
             )
             references[scope] = int(score["counts"]["references"])
-            recall[scope] = _share(score["metrics"]["reference_coverage"])
+            recall[scope] = _recall(score["metrics"]["reference_coverage"])
             # This package marks the tier on each matched row and names no
             # missed reference, so the missed half stays empty.
             must_find[scope] = MustFindFate(
@@ -285,7 +285,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
             scope = ("asvs", str(entry["case"]))
             matched[scope] = frozenset(str(item) for item in entry["matched"])
             references[scope] = int(entry["expected"])
-            recall[scope] = _share(entry["recall"])
+            recall[scope] = _recall(entry["recall"])
             # This one names the missed must-finds by catalog identifier, and
             # marks no tier on a matched row — so the matched half is the
             # matched set narrowed to identifiers some run named as a must-find,
@@ -447,7 +447,9 @@ class Band:
     @property
     def inflation(self) -> float | None:
         """How much wider the truth is than the floor, in variance. ``None`` uncalibrated."""
-        if self.observed_variance is None or self.calibration_floor is None:
+        # A zero observed variance reads as uncalibrated: a band never sits
+        # below its floor, which is what :attr:`variance` relies on.
+        if not self.observed_variance or self.calibration_floor is None:
             return None
         return ratio(self.observed_variance, self.calibration_floor)
 

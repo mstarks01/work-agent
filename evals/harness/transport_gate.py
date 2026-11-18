@@ -183,7 +183,9 @@ def _veto(full: Arm, compact: Arm) -> tuple[bool, str]:
     for figure in QUALITY_MARGINS:
         full_runs = full.per_case(figure)
         floors = {
-            case: None if None in runs else min(run for run in runs if run is not None)
+            case: None
+            if presence(runs) != "every"
+            else min(run for run in runs if run is not None)
             for case, runs in full_runs.items()
         }
         for case, runs in compact.per_case(figure).items():

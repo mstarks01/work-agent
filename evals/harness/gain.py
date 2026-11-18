@@ -343,7 +343,7 @@ def _decide(
             after,
             before,
             None,
-            "an artifact carries no value for this figure on every case,"
+            "an artifact has no value for this figure on some selected case,"
             " which is not a zero",
         )
     if gate.unit == "count":
