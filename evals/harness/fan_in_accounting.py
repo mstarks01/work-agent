@@ -137,13 +137,16 @@ def account(
 ) -> FanInAccount:
     """Each proposal of ``batches``, given its fate from the fan-in's ``merged``.
 
-    A deferred proposal is the one output the fan-in does not key by ID, so
-    each lane's known proposals go through the package's own split again, with
-    the empty set of covered units the replay passes the fan-in.
+    The fan-in keys a deferral by unit, and a unit can hold more than one
+    proposal, so each lane's known proposals go through the package's own split
+    again, with the empty set of covered units the replay passes the fan-in.
+    The units that split defers must be the fan-in's own, or the account is
+    incompatible.
     """
     key_field = schemas_for(package.name).key_field
     proposals: list[str] = []
     deferred: list[str] = []
+    units: dict[str, str] = {}
     for lane, batch in batches.items():
         ids = {
             id(proposal): package.compose_id(lane, getattr(proposal, key_field))
@@ -157,9 +160,10 @@ def account(
             ).dropped_claims
         ]
         known, _ = known_proposals(batch.claims, package, lane)
-        kept, _ = package.record.partition_proposals(
+        kept, reasons = package.record.partition_proposals(
             known, lane, CARRIED_EVIDENCE_KINDS, ()
         )
+        units.update(reasons)
         held = {id(proposal) for proposal in kept}
         deferred += [ids[id(p)] for p in known if id(p) not in held]
     marks = merged.marks
@@ -193,6 +197,11 @@ def account(
         quotes_verified=quotes - repaired - refused,
         quotes_repaired=repaired,
         quotes_refused=refused,
+        incompatible=(
+            ""
+            if units == merged.deferred
+            else "the package's split defers other units than the fan-in did"
+        ),
     )
 
 
@@ -228,7 +237,7 @@ def _drift_reason(
     )
 
 
-def replay_case(
+def account_case(
     case: GoldenCase,
     report: Report,
     stored: Mapping[str, Any],
@@ -267,8 +276,10 @@ def replay_case(
             rows.append(replace(empty, incompatible=str(error)))
             continue
         row = account(case.id, batches, package, merged)
-        reason = sources_moved or _drift_reason(
-            merged, drafts.get(framework, []), package
+        reason = (
+            row.incompatible
+            or sources_moved
+            or _drift_reason(merged, drafts.get(framework, []), package)
         )
         rows.append(replace(row, incompatible=reason))
     return rows
@@ -326,7 +337,7 @@ def replay_artifact(artifact: EvalArtifact, cases: Sequence[GoldenCase]) -> FanI
             if digest is not None and digest != rendered_sources([case])[case.id]
             else ""
         )
-        sweep.rows.extend(replay_case(case, report, stored, drafts, moved))
+        sweep.rows.extend(account_case(case, report, stored, drafts, moved))
     return sweep
 
 
@@ -388,5 +399,5 @@ def command_fan_in(args: argparse.Namespace) -> int:
         f" verified, {sum(row.quotes_repaired for row in compatible)} repaired,"
         f" {sum(row.quotes_refused for row in compatible)} refused"
     )
-    unexplained = any(row.unexplained or row.extra for row in compatible)
-    return 1 if unexplained or sweep.capture_faults else 0
+    unaccounted = any(row.unexplained or row.extra for row in compatible)
+    return 1 if unaccounted or sweep.capture_faults else 0
