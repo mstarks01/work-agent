@@ -134,8 +134,8 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the checks of the item 4 control arm, which has no spoofing runs"
     ),
     ("evals.harness.critic_replay", "NO_VERDICT_SIDES"): (
-        "the archived sides that hold no verdict status, which leaves out the"
-        " three statuses a replay can agree with"
+        "the archived sides that hold no verdict status, which leaves out each"
+        " status a replay can agree with"
     ),
     ("evals.harness.replay", "WRONG_STAGES"): (
         "the stages of a wrong fact whose raw value was read, which leaves out"

@@ -29,7 +29,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Any, Literal
 
 from google.genai import types
 
@@ -68,6 +68,7 @@ from evals.harness.artifact import (
 )
 from evals.harness.bundle import check_out, finished_file, read_report
 from evals.harness.critic_yield import (
+    FATES,
     OMITTED,
     VERDICT_STATUSES,
     CriticFate,
@@ -232,12 +233,7 @@ ArchivedSide = CriticFate | Literal["unruled"]
 
 #: The archived sides that hold no verdict, in the order the count names them.
 NO_VERDICT_SIDES: tuple[ArchivedSide, ...] = tuple(
-    sorted(
-        side
-        for part in get_args(ArchivedSide)
-        for side in get_args(part) or (part,)
-        if side not in VERDICT_STATUSES
-    )
+    sorted({*FATES, UNRULED} - VERDICT_STATUSES)
 )
 
 

@@ -391,9 +391,7 @@ def test_a_draft_the_replay_left_unruled_still_counts_as_a_disagreement(
 def test_the_no_verdict_sides_are_every_archived_side_outside_the_statuses():
     """Read off the annotation the comparison writes, not off the sides' parts."""
     annotation = get_type_hints(critic_replay.Agreement)["archived"]
-    sides = {
-        value for part in get_args(annotation) for value in (get_args(part) or (part,))
-    }
+    sides = {value for part in get_args(annotation) for value in get_args(part)}
     assert set(critic_replay.NO_VERDICT_SIDES) == (
         sides - critic_yield.VERDICT_STATUSES
     )
