@@ -42,12 +42,9 @@ block fails the load and is named as an unreadable report. The report does not h
 units a Control row kept from the deferred set, only those it sent back, so a
 kept claim that assembly failed to send back reads as the critic's ruling.
 
-**Severity.** A ruling that carries no severity leaves the draft's in place,
-so each reported claim's severity must be its draft's, and the replay compares
-the two. Where the package's ruling carries a severity, the rebuilt ruling
-takes it from the report, so that comparison would read the report against
-itself; there, and where the draft holds no severity, the claim has no oracle
-and is not compared.
+**Severity.** No ruling carries a severity, so each reported claim's severity
+must be its draft's, and the replay compares the two for a package whose
+record grades harm.
 
 The critic rated severity until #1208 (:data:`CRITIC_RATES_NO_SEVERITY`), so
 the comparison holds only for a run whose code descends from that commit, read
@@ -68,8 +65,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
-import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
@@ -90,8 +85,15 @@ from analysis_service.errors import error_place
 from analysis_service.fan_in import _drop_duplicate_ids, returned_to_deferred
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.system_model import SystemModel
-from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
+from evals.harness.artifact import (
+    EvalArtifact,
+    ProvenanceError,
+    RepoCommit,
+    load_artifact,
+)
+from evals.harness.baseline import _git
 from evals.harness.bundle import UnreadableReport, finished_file, read_report
+from evals.harness.history import current_commit
 from evals.harness.modes import REPORTING_MODES, EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
@@ -332,17 +334,18 @@ def _severities(block: FrameworkAnalysis, replayed: Sequence[Claim]) -> dict[str
     """Each claim with an oracle for its severity, against whether the report's
     severity is the one assembly gives it.
 
-    A package whose ruling carries a severity has no oracle: the rebuilt
-    ruling takes the severity from the report it is compared with.
+    A package whose record grades no harm has no severity to compare.
     """
-    if "severity" in ruling_type(block.framework).model_fields:
+    if not PACKAGES[block.framework].carries_severity():
         return {}
     reported = {claim.id: claim for claim in block.all_claims()}
+    # The neutral record has no severity field; the package's own record has
+    # one wherever carries_severity says so.
     return {
-        claim.id: getattr(reported[claim.id], "severity", None) == severity
+        claim.id: getattr(reported[claim.id], "severity")  # noqa: B009
+        == getattr(claim, "severity")  # noqa: B009
         for claim in replayed
         if claim.id in reported
-        and (severity := getattr(claim, "severity", None)) is not None
     }
 
 
@@ -355,26 +358,22 @@ CRITIC_RATES_NO_SEVERITY = "8bbc10689a93e0caa2432143dbcaef9e7372170c"
 #: checkout cannot tell.
 SeverityOracle = Literal["compared", "critic-set", "unknown"]
 
-_COMMIT = re.compile(r"[0-9a-f]{40}")
 
-
-def severity_oracle(commit: str) -> SeverityOracle:
+def severity_oracle(commit: RepoCommit) -> SeverityOracle:
     """Whether the run on ``commit`` left each draft's severity in place.
 
-    Read by ``git merge-base --is-ancestor`` in this checkout. A value that
-    is not a full commit ID, or a commit the checkout does not hold, is
-    ``unknown``.
+    :class:`~evals.harness.artifact.RepoCommit` holds only a hex commit ID, so
+    the ID reaches ``git`` as an object, never as an option. A history rewrite
+    renames a commit, so the check reads it at the ID it has now. A commit
+    this checkout does not hold, as in a shallow clone, is ``unknown``.
     """
-    if not _COMMIT.fullmatch(commit):
+    now = current_commit(commit.commit)
+    if _git(REPO_ROOT, "cat-file", "-e", f"{now}^{{commit}}") is None:
         return "unknown"
-    answer = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", CRITIC_RATES_NO_SEVERITY, commit],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        check=False,
+    descends = _git(
+        REPO_ROOT, "merge-base", "--is-ancestor", CRITIC_RATES_NO_SEVERITY, now
     )
-    readings: dict[int, SeverityOracle] = {0: "compared", 1: "critic-set"}
-    return readings.get(answer.returncode, "unknown")
+    return "critic-set" if descends is None else "compared"
 
 
 class AssemblySweep(NamedTuple):
@@ -405,7 +404,7 @@ def replay_artifact(
     )
     if not sweep.writes_reports:
         return sweep
-    oracle = severity_oracle(artifact.commit.commit)
+    oracle = severity_oracle(artifact.commit)
     for case in cases:
         try:
             report_path = finished_file(artifact, case.id, "report")

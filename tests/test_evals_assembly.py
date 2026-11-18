@@ -13,13 +13,14 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from analysis_service import graph
 from analysis_service.assertions import AssertionCatalog, AssertionRecord
 from analysis_service.claims import CLAIM_BOUND_MARKS, Severity, Verdict
 from analysis_service.report import Report
 from evals.harness import assembly
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import RepoCommit, load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.reference import load_case
 from evals.harness.run import main
@@ -564,6 +565,40 @@ def test_a_run_with_no_severity_oracle_compares_none(
     assert row.severity_unchecked == len(row.reported)
 
 
-@pytest.mark.parametrize("commit", ["", "0" * 39, "-c core.pager=x", "G" * 40])
-def test_a_commit_that_is_not_a_full_id_has_no_oracle(commit):
-    assert assembly.severity_oracle(commit) == "unknown"
+#: A commit the 2026-09-28 history rewrite renamed, and its ID now. Its old
+#: ID does not descend from the renamed #1208, and its new one does.
+RENAMED = (
+    "00fedc2b6b13eb27d714a2a61e6e08020cd214c4",
+    "b82160bf7c425ed129529de4a8df15a7977ae2a7",
+)
+
+
+@pytest.mark.parametrize(
+    ("held", "descends", "oracle"),
+    [(False, False, "unknown"), (True, False, "critic-set"), (True, True, "compared")],
+)
+def test_the_oracle_reads_git_at_the_commit_s_id_now(
+    monkeypatch, held, descends, oracle
+):
+    """Git is asked about the renamed ID, and each of its answers maps to one
+    oracle. The answers are given, because a shallow clone cannot place them."""
+    asked = []
+
+    def git(root, *args):
+        asked.append(args)
+        if args[0] == "cat-file":
+            return "" if held else None
+        return "" if descends else None
+
+    monkeypatch.setattr(assembly, "_git", git)
+
+    answer = assembly.severity_oracle(RepoCommit(commit=RENAMED[0], clean=True))
+
+    assert answer == oracle
+    assert all(RENAMED[1] in " ".join(args) for args in asked)
+    assert all(RENAMED[0] not in " ".join(args) for args in asked)
+
+
+def test_a_commit_that_is_not_hex_never_reaches_git():
+    with pytest.raises(ValidationError):
+        RepoCommit(commit="-c core.pager=x", clean=True)
