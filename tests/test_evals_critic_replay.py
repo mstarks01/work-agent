@@ -25,6 +25,7 @@ from evals.harness.provenance import REPO_ROOT
 from evals.harness.run_record import loaded
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
+from tests.factories import sample_ruling
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
     finished,
     record_requests,
@@ -278,6 +279,30 @@ def test_a_claim_assembly_returned_reads_as_returned(recorded, case):  # noqa: F
     status = {row.draft_id: row.archived for row in rows}
     assert status[first.id] == "returned"
     assert all(status[claim.id] == claim.verdict.status for claim in rest)
+
+
+def test_a_returned_claim_counts_against_agreement(recorded, case):  # noqa: F811
+    """Pinned as the command counts today: a returned claim has no archived
+    verdict, so beside a replayed one it reads as a disagreement, not apart."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    first, *rest = archived.block.claims
+    block = archived.block.model_copy(
+        update={
+            "claims": rest,
+            "returned_claims": [
+                ReturnedClaim(claim_id=first.id, unit="u", needs="code")
+            ],
+        }
+    )
+
+    rows = critic_replay.compare(
+        replace(archived, block=block), [sample_ruling(first.id)]
+    )
+
+    (returned,) = [row for row in rows if row.draft_id == first.id]
+    assert (returned.archived, returned.replayed) == ("returned", "confirmed")
+    assert returned.archived != returned.replayed
 
 
 def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # noqa: F811
