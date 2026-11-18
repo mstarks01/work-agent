@@ -66,6 +66,7 @@ from evals.harness.artifact import (
     repo_commit,
 )
 from evals.harness.bundle import check_out, finished_file, read_report
+from evals.harness.critic_yield import fate_by_claim
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call, spent_line
@@ -228,16 +229,13 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     """Each draft's verdict status, archived against replayed.
 
     The replayed rulings are completed first, as the graph completes them, so
-    the status read is the one that would have reached the report. A claim
-    assembly returned to the deferred set (ADR 0126) left the block with no
-    verdict after the critic kept it, so it reads ``returned``.
+    the status read is the one that would have reached the report. The
+    archived side is :func:`~evals.harness.critic_yield.fate_by_claim`, so a
+    claim assembly returned to the deferred set (ADR 0126) reads ``returned``.
     """
-    before = {}
+    before: dict[str, str] = {}
     if archived.block is not None:
-        before = {
-            **{entry.claim_id: "returned" for entry in archived.block.returned_claims},
-            **{claim.id: claim.verdict.status for claim in archived.block.all_claims()},
-        }
+        before = dict(fate_by_claim(archived.block))
     after = {
         ruling.id: ruling.verdict.status
         for ruling in complete_rulings(archived.drafts, rulings)
