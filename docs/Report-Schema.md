@@ -1279,7 +1279,8 @@ version before it. Read it when you load an archived report.
     reader of which kinds make a claim conditional, and both `unknown` kinds
     are in it.
   - `assertions[].projection_version` names the rules that turn the catalog's
-    rows into graph attributes. It has its own number, not the catalog's
+    rows into graph attributes, and which rows `contradictions` compares with
+    an attribute. It has its own number, not the catalog's
     `registry_version`, because the projection's loss rules live in `project`
     and can change with no registry change. It lets a loaded report be
     re-checked for contradictions against the rules that produced it; the

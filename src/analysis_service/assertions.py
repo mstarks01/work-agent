@@ -274,9 +274,10 @@ REGISTRY_VERSION = 9
 #: projected model, rows of ``several-values`` or of ``several-predicates`` in
 #: one state, or an unscoped row beside a scoped one. An issue names a row
 #: that states the value. A record of version 7 keeps its own issues, and the
-#: issue re-check on load declines for it. The ground check on load is not versioned: a claim of such a record on
-#: an ``absent-attribute`` the rows now contradict, or on a row they now hold
-#: open, fails the load, as a hard cutover.
+#: issue re-check on load declines for it. The ground check on load is not
+#: versioned: a claim of such a record on an ``absent-attribute`` the rows now
+#: contradict, or on a row they now hold open, fails the load, as a hard
+#: cutover.
 PROJECTION_VERSION = 8
 
 #: The value that says a source stated this fact is **not there**. A positive
@@ -3220,11 +3221,11 @@ def contradictions(
     attribute as extraction wrote it, yet each states a control, so an
     extracted ``none`` beside them is a contradiction (the maintainer's ruling
     of 2026-11-18). Rows that read two states disagree with each other, so
-    the attribute states neither side against them: :func:`conflicts` reports
-    two such rows of one predicate, and the projection qualifies the field. A
-    scoped row states a narrower fact than the
-    attribute and is not compared. A row that holds :data:`UNKNOWN` states
-    nothing to contradict.
+    the attribute states neither side against them. :func:`conflicts` reports
+    two such rows of one predicate; two such rows of two predicates
+    (``several-predicates``) are neither contradicted nor disputed. A scoped
+    row states a narrower fact than the attribute and is not compared. A row
+    that holds :data:`UNKNOWN` states nothing to contradict.
     """
     carried = {element.id: element for element in model.elements()}
     entries = {assertion_id(entry): entry for entry in catalog.entries}

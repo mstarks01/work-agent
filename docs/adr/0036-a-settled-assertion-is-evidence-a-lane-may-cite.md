@@ -96,9 +96,9 @@ attribute standing (ADR 0034), are open questions beside an extracted
 `absent-attribute` (`assertions.contradicted_attributes`): the rows carry
 the question. An unknown or disputed row that reaches a graph field is
 offered as an open question where its projection qualifies the field and
-the field states a value (`assertions.hidden_qualifications`), because the field then
-keeps what extraction wrote. `assertions.catalog_coverage` counts a
-contradicted row as open and its attribute as not settled.
+the field states a value (`assertions.hidden_qualifications`), because the
+field then keeps what extraction wrote. `assertions.catalog_coverage` counts
+a contradicted row as open and its attribute as not settled.
 
 **3. The reference is the identity.** ADR 0034 rule 4 made an assertion's ID
 a pure function of its four identifying parts, recomputed by every reader.
