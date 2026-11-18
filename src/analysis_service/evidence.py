@@ -61,14 +61,15 @@ the same identity and a ``unknown-assertion`` ground. A row is open where the
 sources were asked about the fact and left it open, or where another row
 disputes it. Such a row is in the table where it reaches no graph field, or
 where its projection qualifies the field and the field states a value
-(:func:`~analysis_service.assertions.unqualified`): the validity gate refused
+(:func:`~analysis_service.assertions.hidden_qualifications`): the validity gate refused
 the projected model, so the field keeps what extraction wrote. Otherwise the
 field it reaches shows what
 :data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
 under it. A row the graph attribute contradicts is open too, and it is in the
 table whatever field it reaches. The attribute it contradicts is not offered
 as an ``absent-attribute``: the rows carry the question. An agent may raise a
-*conditional* claim on an open row exactly as it may on an element attribute nobody stated.
+*conditional* claim on an open row exactly as it may on an element attribute
+nobody stated.
 Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
 that grounds a settled row on an open question — or the reverse — is refused
 by comparing its kind against the table rather than by a second reading of
@@ -107,10 +108,10 @@ from analysis_service.assertions import (
     contradicted,
     contradicted_attributes,
     disputed,
+    hidden_qualifications,
     offered,
     projected_attribute,
     states_missing,
-    unqualified,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
@@ -286,14 +287,15 @@ def evidence_catalog(
     """
     # The graph side of a contradiction is no fact: the rows behind it state
     # the opposite, and their open entries below carry the question.
-    opposed = _opposed(model, assertions)
+    contradicted_fields = _contradicted_fields(model, assertions)
     catalog: EvidenceCatalog = dict(
         entry
         for element in model.elements()
         for attribute in attribute_names(element)
         if (entry := _attribute_entry(element, attribute)) is not None
         and not (
-            entry[1].kind == "absent-attribute" and (element.id, attribute) in opposed
+            entry[1].kind == "absent-attribute"
+            and (element.id, attribute) in contradicted_fields
         )
     )
     catalog.update(
@@ -321,9 +323,9 @@ def evidence_catalog(
         # qualify. Where the validity gate refuses the projected model, the
         # field keeps what extraction wrote, so only this offer carries the
         # question.
-        unqualified_rows = {
+        hidden_question_rows = {
             row
-            for projection in unqualified(assertions, model)
+            for projection in hidden_qualifications(assertions, model)
             for row in projection.rows
         }
         unprojected = [
@@ -333,7 +335,7 @@ def evidence_catalog(
                 *disputed(assertions),
             )
             if not projected_attribute(row.predicate, row.subject)
-            or assertion_id(row) in unqualified_rows
+            or assertion_id(row) in hidden_question_rows
         ]
         # A row the graph attribute contradicts reaches a graph field, and that
         # field states the opposite rather than an unknown, so only this offer
@@ -475,17 +477,19 @@ def ground_issues(
     catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
     text = model_text(model)
-    opposed = _opposed(model, assertions)
+    contradicted_fields = _contradicted_fields(model, assertions)
     issues = []
     for claim in claims:
         for ground in claim.grounds:
-            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text, opposed)
+            issue = _one_ground_issue(
+                claim.id, ground, catalog, by_id, text, contradicted_fields
+            )
             if issue:
                 issues.append(issue)
     return issues
 
 
-def _opposed(
+def _contradicted_fields(
     model: SystemModel, assertions: AssertionCatalog | None
 ) -> frozenset[tuple[str, str]]:
     """The attributes the job's assertion rows contradict, or none without a pass."""
@@ -500,11 +504,11 @@ def _one_ground_issue(
     catalog: EvidenceCatalog,
     by_id: Mapping[str, Element],
     text: ModelText,
-    opposed: frozenset[tuple[str, str]],
+    contradicted_fields: frozenset[tuple[str, str]],
 ) -> str:
     """Why one catalogued ground is not in this model's catalog, or ``""``.
 
-    ``opposed`` holds the attributes the assertion rows contradict
+    ``contradicted_fields`` holds the attributes the assertion rows contradict
     (:func:`~analysis_service.assertions.contradicted_attributes`).
     """
     if ground.kind == "quote":
@@ -575,7 +579,7 @@ def _one_ground_issue(
     contradicted_absence = (
         ground.kind == "absent-attribute"
         and state == "absent"
-        and (ground.element_id, ground.attribute) in opposed
+        and (ground.element_id, ground.attribute) in contradicted_fields
     )
     if contradicted_absence:
         return (

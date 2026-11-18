@@ -172,6 +172,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "graph_subject_type",
+    "hidden_qualifications",
     "missing_value",
     "offered",
     "parse_predicate",
@@ -190,7 +191,6 @@ __all__ = [
     "subject_id",
     "support_span",
     "uncontradicted",
-    "unqualified",
 ]
 
 #: The registry's version. It keys every assertion identity, so a bump re-keys
@@ -2139,8 +2139,7 @@ def _drives_value(entry: Assertion) -> bool:
 def _value_rows(rows: Sequence[Assertion]) -> list[Assertion]:
     """The rows under one attribute that state its value, in the order given.
 
-    A row states
-    a value where it holds one and :func:`admissible` admits it. Where an
+    A row states a value where it holds one and :func:`admissible` admits it. Where an
     answer may state its value (:func:`_drives_value`), the answers alone do:
     the rows beside them stay in the catalog as the facts they state.
     :func:`project` reads the value from these rows, and
@@ -3179,12 +3178,13 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
 class Contradiction:
     """A graph attribute and the rows authoritative for it that state opposites.
 
-    ``values`` is what the rows that state the attribute's value say, each
-    distinct value once and joined by ``"; "``; ``carried`` is what the **System Model** beside them
-    actually holds. Both are quoted as written, because which of the two is
-    wrong is not decidable here and a reader has to see the pair. ``rows``
-    names the rows that state the value (:func:`_value_rows`), not every row the
-    projection grouped under the attribute.
+    ``values`` is what the unscoped rows that state the attribute's value
+    say, each distinct value once and joined by ``"; "``; ``carried`` is what
+    the **System Model** beside them actually holds. Both are quoted as
+    written, because which of the two is wrong is not decidable here and a
+    reader has to see the pair. ``rows`` names the unscoped rows that state the
+    value (:func:`_value_rows`), not every row the projection grouped under the
+    attribute.
     """
 
     element_id: str
@@ -3338,8 +3338,8 @@ class CatalogCoverage:
 
     ``reachable`` and ``settled`` are the honest denominator and numerator: the
     element attributes some predicate could speak to on *this* model, and how
-    many the catalog's projections write and the model does not contradict,
-    or contradicts only where a submitter's answer makes the value.
+    many the catalog answers and the model does not contradict, or
+    contradicts only where a submitter's answer makes the value.
     ``open`` counts the rows that hold :data:`UNKNOWN` and the rows the graph
     contradicts, which is coverage stated as rows. A row the graph contradicts
     (:func:`contradicted`) is the same open question the evidence catalog
@@ -3403,7 +3403,7 @@ def contradiction_issues(
             message=f"{found.element_id}.{found.attribute} holds"
             f" {found.carried!r} and the rows behind it state"
             f" {found.values!r}, which is the opposite state",
-            assertion=found.rows[0] if found.rows else None,
+            assertion=found.rows[0],
         )
         for found in contradictions(catalog, model)
     ]
@@ -3608,10 +3608,12 @@ def _projected_model(
     return updated
 
 
-def unqualified(
+def hidden_qualifications(
     catalog: AssertionCatalog, model: SystemModel
 ) -> tuple[Projection, ...]:
     """Every qualifying projection whose field in ``model`` states a value.
+
+    The field hides the qualification: it does not show the question.
 
     A qualifying projection writes a qualified ``unknown`` (:func:`qualified`),
     and that field is the question its open rows raise. Where the field reads
