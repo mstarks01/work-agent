@@ -372,7 +372,7 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find coverage** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. It is coverage of a reference, not a measure of whether the argument is right (#890). |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average coverage while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing reference-matched drafts (`killed-real`) | A kill count alone tells you nothing — read both halves together. Each rate counts only the drafts with a verdict, and its numerator counts the critic's rejections. The "no archived verdict" line counts each draft that leaves the report with no verdict, and "all kills lost for good" also counts a reference-matched one whose reference no claim took. |
+| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing reference-matched drafts (`killed-real`) | A kill count alone tells you nothing — read both halves together. Each rate counts only the drafts with a verdict, and its numerator counts the critic's rejections. The "no archived verdict" line counts each draft that leaves the report with no verdict, and the "lost for good" count of the "all kills" figures also counts a reference-matched one whose reference no claim took. |
 
 All of these are *relative to the rule and the ledger*. Use them to compare
 configurations and track movement; never quote them as absolute scores or
@@ -707,9 +707,9 @@ compare to the baseline band:
 - **Critic yield** — did `killed-real` (reference-matched drafts the critic
   rejected) go up? That's a regression hiding inside a higher kill rate. Also
   read the "no archived verdict" line, which counts each draft that leaves the
-  report with no verdict, and "all kills lost for good", which also counts a
-  reference-matched one whose reference no claim took. Neither raises
-  `killed-real`.
+  report with no verdict, and the "lost for good" count of the "all kills"
+  figures, which also counts a reference-matched one whose reference no claim
+  took. Neither raises `killed-real`.
 
 A change that lifts or holds per-case recall, without widening the delta or
 raising `killed-real`, is a keeper. Anything else is noise, or a trade you should

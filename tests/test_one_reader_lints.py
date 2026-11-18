@@ -25,7 +25,7 @@ import pytest
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
-from evals.harness.critic_yield import NO_VERDICT_FATES, VERDICT_STATUSES
+from evals.harness.critic_yield import FATES, NO_VERDICT_FATES, VERDICT_STATUSES
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
     EXPERIMENTS_LEFT_OUT,
@@ -1882,6 +1882,8 @@ def _holds_the_fates(node: ast.AST) -> bool:
     values = {
         element.value for element in node.elts if isinstance(element, ast.Constant)
     }
+    if not values <= set(FATES):
+        return False
     return bool(values & set(NO_VERDICT_FATES)) or len(values & VERDICT_STATUSES) > 1
 
 
@@ -1943,6 +1945,7 @@ def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bo
         ("fate in get_args(NoVerdictFate)", True),
         ("fate in critic_yield.NO_VERDICT_FATES", True),
         ('fate in ("rejected",)', False),
+        ('fate in ("omitted", "wrong_value")', False),
         ("has_verdict(fate)", False),
         ("{*NO_VERDICT_FATES, UNRULED}", False),
         ("no_verdict_line(apart, NO_VERDICT_FATES)", False),
