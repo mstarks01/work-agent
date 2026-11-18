@@ -407,7 +407,8 @@ row's subject, predicate, value, basis, scope and support spans are read there.
 On load the report checks the row is one the catalog *settles* — it holds a
 value rather than `unknown`, its basis is support of some kind, no assessment
 set it aside, and no other row disagrees at its subject, predicate and scope —
-and refuses the report otherwise. A report whose `assertions` is `None` settles
+and that the embedded model's attribute does not state its opposite, and
+refuses the report otherwise. A report whose `assertions` is `None` settles
 nothing, so a claim citing one is refused the way a claim citing a crossing the
 model does not derive is.
 

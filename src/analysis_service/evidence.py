@@ -57,10 +57,11 @@ settled row the graph attribute contradicts
 ``assertion`` either.
 
 An **open** row is in the table and is a different thing. It is offered under
-the same identity and a ``unknown-assertion`` ground, because the sources were
-asked about that fact and left it open, another row disputes it, or the graph
-attribute contradicts it, and an agent may raise a *conditional*
-claim on it exactly as it may on an element attribute nobody stated. Which of
+the same identity and a ``unknown-assertion`` ground. A row is open where the
+sources were asked about the fact and left it open, where another row disputes
+it, or where the graph attribute contradicts it. An agent may raise a
+*conditional* claim on it exactly as it may on an element attribute nobody
+stated. Which of
 the two an entry is, is the entry's own ``Ground.kind``, so a claim that grounds
 a settled row on an open question — or the reverse — is refused by comparing
 its kind against the table rather than by a second reading of ``settled``.
@@ -244,7 +245,9 @@ def evidence_catalog(
     its ``trust_zone`` above, and the fact a reader needs is offered there, in
     the words that say it is a question.
 
-    A third enumeration follows where the job carried an assertion pass:
+    The assertion rows follow where the job carried an assertion pass, and
+    each open row (unknown, disputed or contradicted) is offered after them as
+    an ``unknown-assertion``. The settled rows are a third enumeration:
     every row :func:`~analysis_service.assertions.offered` returns — settled,
     not contradicted by the graph, and not already carried by the attribute
     its projection wrote — in the catalog's own order. ``None`` is a job that

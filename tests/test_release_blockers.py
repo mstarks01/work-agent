@@ -48,6 +48,9 @@ FRAMEWORKS = tuple(PACKAGES)
 KEYS = graph.GraphKeys.of(FRAMEWORKS)
 CASES = {case.id: case for case in load_corpus(CORPUS)}
 ROW = re.compile(r"^\| `([^`]+)` \| (.*) \|$", re.MULTILINE)
+#: The words an open row's gloss uses where another row or the graph disputes
+#: it, which a lane reads as a question whatever value the row states.
+DISAGREE = "the sources disagree"
 
 
 class Prepared:
@@ -93,12 +96,14 @@ class Prepared:
         """
         rows = {assertion_id(entry): entry for entry in self.catalog.entries}
         found = set()
-        for ref in self.table:
+        for ref, gloss in self.table.items():
             prefix, _, rest = ref.partition(":")
             if prefix in ("unknown", "absent"):
                 element, _, attribute = rest.rpartition(":")
                 found.add(f"{element}.{attribute}")
-            elif ref in rows and rows[ref].value in (UNKNOWN, ABSENT):
+            elif ref in rows and (
+                rows[ref].value in (UNKNOWN, ABSENT) or DISAGREE in gloss
+            ):
                 found.add(f"{rows[ref].subject}.{rows[ref].predicate}")
         return frozenset(found)
 

@@ -140,7 +140,7 @@ No person has checked a row when the report is built, so every row starts
 A row marked `unsupported` or `unresolved` reaches neither the evidence nor any
 field. The report itself is not rewritten after a review: a reassessment is
 computed from it and recorded beside it, and it names every finding that rested
-on a rejected row. The report states how many rows were checked, rejected and
+on a rejected row or on a row the reviewed graph contradicts. The report states how many rows were checked, rejected and
 left unchecked.
 
 ## Proposal, claim, and verdict

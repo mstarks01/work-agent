@@ -291,7 +291,6 @@ class TestWhatAJobReadsAsAFact:
 
     def test_a_contradicted_absence_is_not_a_fact(self, refused_projection) -> None:
         """The graph keeps its stated mechanism beside the stated absence."""
-
         assert self.facts(stated(value=ABSENT)) == frozenset()
 
     def test_an_absence_the_graph_takes_is_a_fact(self) -> None:
