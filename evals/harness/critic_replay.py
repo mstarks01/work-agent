@@ -29,7 +29,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Any, Literal
 
 from google.genai import types
 
@@ -67,7 +67,13 @@ from evals.harness.artifact import (
     repo_commit,
 )
 from evals.harness.bundle import check_out, finished_file, read_report
-from evals.harness.critic_yield import OMITTED, CriticFate, fate_by_claim
+from evals.harness.critic_yield import (
+    FATES,
+    OMITTED,
+    VERDICTS,
+    CriticFate,
+    fate_by_claim,
+)
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call, spent_line
@@ -221,9 +227,6 @@ def parse(raw: str, framework: FrameworkName) -> list[Ruling]:
 #: failed before it wrote a block to read the archived verdict from.
 UNRULED: Literal["unruled"] = "unruled"
 
-#: The archived fates that are a critic's verdict, so a replay can agree.
-VERDICTS: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
-
 
 @dataclass(frozen=True)
 class Agreement:
@@ -259,32 +262,41 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     ]
 
 
-def tally(rows: Sequence[Agreement]) -> list[str]:
+def agreement_lines(rows: Sequence[Agreement]) -> list[str]:
     """Each row marked, then how many archived verdicts the replay repeated.
 
-    A draft with no archived verdict (``returned``, :data:`OMITTED` or
-    :data:`UNRULED` on the archived side) has nothing to agree with, so it is
-    marked ``·`` and counted on its own line, outside the denominator. A
-    draft the replay left unruled beside an archived verdict is a verdict
-    that did not repeat, so it stays in the denominator.
+    A draft whose archived side is not in
+    :data:`~evals.harness.critic_yield.VERDICTS` has nothing to agree with, so
+    it is marked ``·`` and counted on its own line, outside the denominator. A
+    draft the replay left unruled beside an archived verdict is a verdict that
+    did not repeat, so it stays in the denominator.
     """
-    ruled = [row for row in rows if row.archived in VERDICTS]
-    same = sum(row.archived == row.replayed for row in ruled)
+    with_verdict = [row for row in rows if _has_verdict(row)]
+    same = sum(row.archived == row.replayed for row in with_verdict)
     lines = [
         f"  {_mark(row)} {row.draft_id:10} archived {row.archived:12}"
         f" replayed {row.replayed}"
         for row in rows
     ]
-    lines.append(f"{same} of {len(ruled)} verdicts agree")
-    apart = len(rows) - len(ruled)
+    lines.append(f"{same} of {len(with_verdict)} verdicts agree")
+    apart = len(rows) - len(with_verdict)
     if apart:
         drafts = "1 draft has" if apart == 1 else f"{apart} drafts have"
-        lines.append(f"{drafts} no archived verdict (returned, omitted or unruled)")
+        lines.append(f"{drafts} no archived verdict ({NO_VERDICT_WORDS})")
     return lines
 
 
+#: The archived sides that hold no verdict, as :func:`agreement_lines` names them.
+*_FIRST, _LAST = sorted({*FATES, UNRULED} - VERDICTS)
+NO_VERDICT_WORDS = f"{', '.join(_FIRST)} or {_LAST}"
+
+
+def _has_verdict(row: Agreement) -> bool:
+    return row.archived in VERDICTS
+
+
 def _mark(row: Agreement) -> str:
-    if row.archived not in VERDICTS:
+    if not _has_verdict(row):
         return "·"
     return "=" if row.archived == row.replayed else "≠"
 
@@ -382,7 +394,7 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             "claims": [ruling.model_dump(mode="json") for ruling in settled],
         }
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    for line in tally(compare(archived, rulings)):
+    for line in agreement_lines(compare(archived, rulings)):
         print(line)
     problems = review_issues(archived.drafts, rulings, archived.model, {}).problems
     kinds = Counter(problem.kind for problem in problems)
