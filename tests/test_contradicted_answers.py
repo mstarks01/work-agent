@@ -19,6 +19,7 @@ from analysis_service.assertions import (
     Qualifier,
     Subject,
     assertion_id,
+    place_identity,
     support_span,
 )
 from analysis_service.claims import FrameworkAnalysis, UnknownRef, Verdict
@@ -347,3 +348,42 @@ def test_a_hidden_qualification_asks_one_fact(refused_projection):
     ]
 
     assert asked(analyses, model_with("a password"), catalog) == [ATTRIBUTE_KEY]
+
+
+class TestAnAnswerBesideAnOpenRow:
+    """An unknown row at a disputed place takes the answer in place; the
+    issues name only the side the answer overrules, and an answer the
+    writer drops names itself."""
+
+    SILENT = REQUIRED.model_copy(
+        update={"value": UNKNOWN, "reason": "silent", "explanation": ""}
+    )
+
+    def test_the_agreeing_side_is_not_named(self):
+        catalog = disputed().model_copy(
+            update={"entries": [self.SILENT, REQUIRED, NOT_REQUIRED]}
+        )
+        _, issues = TestAnAnswerToADisputedPlace.written(catalog, "required")
+
+        named = {issue.assertion for issue in issues}
+        assert assertion_id(NOT_REQUIRED) in named
+        assert assertion_id(REQUIRED) not in named
+
+    def test_an_answer_at_an_answered_attribute_is_named(self):
+        silent = MECHANISM.model_copy(
+            update={"value": UNKNOWN, "reason": "silent", "explanation": ""}
+        )
+        catalog = AssertionCatalog(subjects=SUBJECTS, entries=[silent])
+        line = "Login: a client certificate."
+        place = FactAnswer(
+            key=("", "", place_identity(silent), "", "", ""),
+            value="a client certificate",
+        )
+        spans = [
+            support_span(text, ANSWERS_LABEL, text)
+            for text in ("Login: a hardware token.", line)
+        ]
+
+        _, issues = fact_rows(catalog, model_with("unknown"), [ANSWER, place], spans)
+
+        assert "unmatched-answer" in [issue.code for issue in issues]
