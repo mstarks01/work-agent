@@ -290,3 +290,30 @@ def test_a_scoped_disagreement_is_asked_at_its_place():
 
     place = assertion_id(first.model_copy(update={"value": UNKNOWN}))
     assert keys == [("", "", place, "", "", "")]
+
+
+def test_every_row_at_a_routed_attribute_asks_one_fact():
+    """An unknown row beside a disagreement on the same attribute asks the
+    same fact, so a finding on either waits on the one attribute key."""
+    absent = MECHANISM.model_copy(update={"value": ABSENT, "explanation": "none"})
+    silent = MECHANISM.model_copy(
+        update={"value": UNKNOWN, "reason": "silent", "explanation": ""}
+    )
+    catalog = AssertionCatalog(subjects=SUBJECTS, entries=[MECHANISM, absent, silent])
+    analyses = [
+        sample_analysis(
+            [
+                sample_threat(
+                    claim,
+                    verdict=Verdict(
+                        status="needs-info",
+                        reason="The sources disagree about this.",
+                        related_unknowns=[UnknownRef(assertion=assertion_id(row))],
+                    ),
+                )
+                for claim, row in (("S-01", MECHANISM), ("S-02", silent))
+            ]
+        )
+    ]
+
+    assert asked(analyses, model_with("none"), catalog) == [ATTRIBUTE_KEY]
