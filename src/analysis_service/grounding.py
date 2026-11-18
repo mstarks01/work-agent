@@ -602,13 +602,13 @@ def meaning_moved(written: str, span: str) -> tuple[MovedKind, ...]:
 
     A repair inside :data:`REPAIR_THRESHOLD` can still flip what a quote
     asserts: "does not encrypt" and "does encrypt" are three characters apart
-    on a forty-character quote. The substitution is right — the span is the
-    submitter's words — and the reader of the result has to be told that the
-    words changed what the claim rests on. This is the minimum mechanical
-    safeguard and not an entailment check: it compares the negation tokens and
-    the number tokens of the two texts as multisets, folded through
-    :func:`normalize`, and names each class that differs. A changed principal or
-    a changed control term is a judgement and stays with the critic.
+    on a forty-character quote. :func:`faithful_repair` reads this to refuse
+    such a span, and the load check of a stored repair mark reads it too. This
+    is the minimum mechanical safeguard and not an entailment check: it
+    compares the negation tokens and the number tokens of the two texts as
+    multisets, folded through :func:`normalize`, and names each class that
+    differs. A changed principal or a changed control term is a judgement and
+    stays with the critic.
     """
     moved: list[MovedKind] = []
     written_tokens = _tokens(written)
@@ -721,7 +721,7 @@ def faithful_repair(
 ) -> Repair | None:
     """The span :func:`repair_prepared` finds, or ``None`` where it moves meaning.
 
-    **The one reader of "may a refused quote take the source's span".** A
+    **The one reader of whether a refused quote may take the source's span.** A
     span that changes a negation or a number (:func:`meaning_moved`) states a
     different fact from the one the writer cited, so the quote stays refused.
     A guard, not proof of meaning: it compares those two token classes only,

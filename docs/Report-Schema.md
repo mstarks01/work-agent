@@ -508,11 +508,11 @@ class RepairedQuote:
 ```
 
 The ladder refused what the agent wrote, and the repair rung
-(`analysis_service.grounding.faithful_repair`) found a window of the named source
-near enough to hand back, with no negation or number changed. The ground carries that window — the submitter's
-words, whitespace collapsed — and this mark carries the agent's, so the
-substitution is on the record. A repaired quote verifies, so an entry here is
-never also in `unverified_grounds`.
+(`analysis_service.grounding.faithful_repair`) found a window of the named
+source near enough to hand back, with no negation or number changed. The ground
+carries that window — the submitter's words, whitespace collapsed — and this
+mark carries the agent's, so the substitution is on the record. A repaired quote
+verifies, so an entry here is never also in `unverified_grounds`.
 
 The rung never accepts the agent's words: it replaces them. What can go wrong
 is a replacement that says something different from what the claim rests on.

@@ -781,8 +781,8 @@ class TestQuoteVerification:
         assert joined.drafts == []
         assert [mark.claim_id for mark in joined.marks.dropped_claims] == ["S-01"]
 
-    def test_a_repair_that_moves_only_case_and_spacing_still_passes(self, model):
-        """The neighbour of the guard: a cosmetic difference keeps the repair."""
+    def test_a_repair_that_moves_only_punctuation_still_passes(self, model):
+        """The neighbour of the guard: punctuation alone keeps the repair."""
         drafts = self.quoting("customers  log in to the WEB app which stores orders")
 
         joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
@@ -1192,7 +1192,7 @@ class TestAGroundIsAboutTheClaimsElements:
 class TestASpentBodyDeadlineFoldsNoSource:
     """The bound the fan-in actually runs under.
 
-    The fan-in prepares each source itself and calls ``repair_prepared``, so
+    The fan-in prepares each source itself and calls ``faithful_repair``, so
     the guard that holds the bound is the one at the call site, and this is what
     holds it there.
     """
