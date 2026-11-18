@@ -23,6 +23,7 @@ from analysis_service.assertions import (
     assertion_id,
     conflicts,
     settled,
+    support_span,
 )
 from analysis_service.claims import Ground
 from analysis_service.evidence import evidence_catalog
@@ -32,6 +33,7 @@ from analysis_service.reassess import (
     reassess,
     reviewed,
 )
+from analysis_service.sources import ANSWERS_LABEL
 from tests.factories import sample_report, sample_threat
 
 SHOPPERS = Subject(
@@ -293,17 +295,26 @@ class TestSameNamedSubjects:
 def test_a_row_the_graph_contradicts_after_review_does_not_stand(
     refused_projection,
 ) -> None:
-    """Two compatible mechanisms leave the login's ``none`` in place, so a
-    finding may cite one as a fact. The review keeps one and rejects the
-    other; where the validity gate then refuses the projected model whole,
-    the graph still states no authentication beside the kept mechanism, and
-    the finding is withdrawn."""
-    certificate = MECHANISM.model_copy(update={"value": "a client certificate"})
+    """A submitter's answer makes the login's value, so the graph's ``none``
+    holds no row open, and a finding may cite the compatible source row beside
+    the answer as a fact. The review rejects the answer; where the validity
+    gate then refuses the projected model whole, the source row alone states
+    a control beside the graph's ``none``, and the finding is withdrawn."""
+    said = "Login: a client certificate."
+    answer = MECHANISM.model_copy(
+        update={
+            "value": "a client certificate",
+            "origin": "answer",
+            "basis": "stated",
+            "explanation": "",
+            "support": [support_span(said, ANSWERS_LABEL, said)],
+        }
+    )
     record = AssertionRecord(
         proposed=2,
         catalog=AssertionCatalog(
             subjects=[Subject(id=LOGIN, type="interaction", label="login")],
-            entries=[MECHANISM, certificate],
+            entries=[answer, MECHANISM],
         ),
     )
     threat = sample_threat(
@@ -319,7 +330,7 @@ def test_a_row_the_graph_contradicts_after_review_does_not_stand(
         "assertion"
     )
     verdicts = {
-        **reject(certificate),
+        **reject(answer),
         assertion_id(MECHANISM): ReviewerAssessment("supported", REVIEWER),
     }
 
