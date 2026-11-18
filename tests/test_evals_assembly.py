@@ -584,21 +584,34 @@ def test_the_oracle_reads_git_at_the_commit_s_id_now(
     oracle. The answers are given, because a shallow clone cannot place them."""
     asked = []
 
-    def git(root, *args):
-        asked.append(args)
-        if args[0] == "cat-file":
-            return "" if held else None
-        return "" if descends else None
+    def holds(root, commit):
+        asked.append(commit)
+        return held
 
-    monkeypatch.setattr(assembly, "_git", git)
+    def ancestor(root, earlier, later):
+        asked.append(later)
+        return descends
+
+    monkeypatch.setattr(assembly, "holds_commit", holds)
+    monkeypatch.setattr(assembly, "is_ancestor", ancestor)
 
     answer = assembly.severity_oracle(RepoCommit(commit=RENAMED[0], clean=True))
 
     assert answer == oracle
-    assert all(RENAMED[1] in " ".join(args) for args in asked)
-    assert all(RENAMED[0] not in " ".join(args) for args in asked)
+    assert asked and set(asked) == {RENAMED[1]}
 
 
 def test_a_commit_that_is_not_hex_never_reaches_git():
     with pytest.raises(ValidationError):
         RepoCommit(commit="-c core.pager=x", clean=True)
+
+
+def test_a_package_that_grades_no_harm_has_no_severity_to_count(
+    case,  # noqa: F811
+    domain_loader,  # noqa: F811
+):
+    block, drafts, model = _assembled_with_a_return(domain_loader)
+
+    row = assembly.replay_case(case, block, drafts, model, "critic-set")
+
+    assert (row.severity_compared, row.severity_unchecked) == (0, 0)

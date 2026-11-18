@@ -46,11 +46,12 @@ kept claim that assembly failed to send back reads as the critic's ruling.
 must be its draft's, and the replay compares the two for a package whose
 record grades harm.
 
-The critic rated severity until #1208 (:data:`CRITIC_RATES_NO_SEVERITY`), so
-the comparison holds only for a run whose code descends from that commit, read
-by git ancestry from the artifact's commit. An older run is
-incompatible: its critic set the severity. A commit the checkout cannot place,
-as in a shallow clone, gives no oracle.
+A run whose code does not descend from :data:`CRITIC_RATES_NO_SEVERITY`
+holds severities its critic set, so the comparison holds only for a run that
+descends from it, read by git ancestry from the artifact's commit. An older
+run is incompatible. A commit the checkout cannot place, as in a shallow
+clone, gives no oracle. Only a package whose record grades harm is counted,
+and a refused block has no replay, so neither appears in the severity line.
 
 **What it counts.** Each draft of a replayed block is accounted, omitted,
 filed differently or unavailable, where its block was refused or its ID
@@ -91,7 +92,7 @@ from evals.harness.artifact import (
     RepoCommit,
     load_artifact,
 )
-from evals.harness.baseline import _git
+from evals.harness.baseline import holds_commit, is_ancestor
 from evals.harness.bundle import UnreadableReport, finished_file, read_report
 from evals.harness.history import current_commit
 from evals.harness.modes import REPORTING_MODES, EvalRunError
@@ -315,12 +316,14 @@ def replay_case(
         if returned.get(draft.id) == record.unit_of(draft)
     ]
     filed = [*assembled.claims, *outcome.rejected]
-    compared = _severities(block, filed) if oracle == "compared" else {}
+    # Only a package whose record grades harm has a severity to compare.
+    graded = filed if PACKAGES[framework].carries_severity() else []
+    compared = _severities(block, graded) if oracle == "compared" else {}
     return replace(
         row,
         severity_differs=tuple(sorted(i for i, same in compared.items() if not same)),
         severity_compared=len(compared),
-        severity_unchecked=len(filed) - len(compared),
+        severity_unchecked=len(graded) - len(compared),
         replayed=tuple(claim.id for claim in assembled.claims),
         rejected_replayed=tuple(claim.id for claim in outcome.rejected),
         returned_replayed=(
@@ -334,10 +337,8 @@ def _severities(block: FrameworkAnalysis, replayed: Sequence[Claim]) -> dict[str
     """Each claim with an oracle for its severity, against whether the report's
     severity is the one assembly gives it.
 
-    A package whose record grades no harm has no severity to compare.
+    The caller hands in claims of a package whose record grades harm.
     """
-    if not PACKAGES[block.framework].carries_severity():
-        return {}
     reported = {claim.id: claim for claim in block.all_claims()}
     # The neutral record has no severity field; the package's own record has
     # one wherever carries_severity says so.
@@ -368,12 +369,11 @@ def severity_oracle(commit: RepoCommit) -> SeverityOracle:
     this checkout does not hold, as in a shallow clone, is ``unknown``.
     """
     now = current_commit(commit.commit)
-    if _git(REPO_ROOT, "cat-file", "-e", f"{now}^{{commit}}") is None:
+    if not holds_commit(REPO_ROOT, now):
         return "unknown"
-    descends = _git(
-        REPO_ROOT, "merge-base", "--is-ancestor", CRITIC_RATES_NO_SEVERITY, now
-    )
-    return "critic-set" if descends is None else "compared"
+    if is_ancestor(REPO_ROOT, CRITIC_RATES_NO_SEVERITY, now):
+        return "compared"
+    return "critic-set"
 
 
 class AssemblySweep(NamedTuple):
