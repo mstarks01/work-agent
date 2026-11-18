@@ -2261,10 +2261,10 @@ def _maps_label_to_text(node: ast.AST) -> bool:
 
 
 def test_a_job_s_source_texts_are_mapped_once():
-    """Only ``seed_state`` maps a job's sources to their texts; the service and
-    the harness read its ``STATE_SOURCE_TEXTS``."""
+    """Only ``source_texts`` maps a job's sources to their texts; the service
+    and the harness call it."""
     assert _sites(_maps_label_to_text) == [
-        ("src/analysis_service/execution.py", "seed_state")
+        ("src/analysis_service/execution.py", "source_texts")
     ]
 
 

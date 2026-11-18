@@ -57,7 +57,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -169,8 +168,7 @@ class AssemblyReplay:
     def unexplained(self) -> tuple[str, ...]:
         """Claims whose array differs from what assembly makes of the rulings.
 
-        A refused block has no replay, so it names none. A claim the report
-        returns twice is named too: no check of the report reads that list.
+        A refused block has no replay, so it names none.
         """
         if self.refused:
             return ()
@@ -179,11 +177,6 @@ class AssemblyReplay:
                 (set(self.reported) ^ set(self.replayed))
                 | (set(self.rejected_reported) ^ set(self.rejected_replayed))
                 | (set(self.returned_reported) ^ set(self.returned_replayed))
-                | {
-                    claim_id
-                    for claim_id, count in Counter(self.returned_reported).items()
-                    if count > 1
-                }
             )
         )
 

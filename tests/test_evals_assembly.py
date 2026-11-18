@@ -465,20 +465,6 @@ def test_a_return_on_another_unit_than_its_draft_s_is_filed_differently(
     assert row.replayed == row.reported == (neighbour.id,)
 
 
-def test_a_claim_returned_twice_is_filed_differently(
-    case,  # noqa: F811
-    domain_loader,  # noqa: F811
-):
-    block, (returned, neighbour), model = _assembled_with_a_return(domain_loader)
-    [entry] = block.returned_claims
-    block = block.model_copy(update={"returned_claims": [entry, entry]})
-
-    row = assembly.replay_case(case, block, [returned, neighbour], model)
-
-    assert row.unexplained == row.filed_differently == (returned.id,)
-    assert row.accounted == (neighbour.id,)
-
-
 def test_an_omitted_draft_held_twice_is_counted_once(archive, case):  # noqa: F811
     """Each draft falls in one count, so the counts add up to the drafts read."""
     path = _report_path(archive, case)

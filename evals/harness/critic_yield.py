@@ -501,9 +501,7 @@ def fate_by_claim(block: FrameworkAnalysis) -> dict[str, CriticFate]:
 
     A draft the block does not carry has the fate :data:`OMITTED`, the
     report omission of :mod:`evals.harness.assembly`. The block's validation
-    refuses one ID in both ``claims`` and ``rejected_claims``. It does not
-    check ``returned_claims`` against them, and ``returned`` wins here, as it
-    does in the assembly replay.
+    refuses one ID in two of its three lists, so each ID has one fate.
     """
     return {
         **{claim.id: "rejected" for claim in block.rejected_claims},

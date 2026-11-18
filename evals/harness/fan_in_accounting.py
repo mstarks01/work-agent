@@ -4,7 +4,7 @@ The fan-in merges a framework's lane batches into the drafts its critic reads.
 It is deterministic, so it can run again on an archived case: the batches are
 ``<case>.proposals.json``, and :func:`replay_fan_in` hands them to the shipped
 :func:`~analysis_service.fan_in.fan_in` with the case's own model, its sources
-as :func:`~analysis_service.execution.seed_state` renders them, and the
+as :func:`~analysis_service.execution.source_texts` maps them, and the
 assertion catalog its report holds. ``descendants`` replays through the same
 function.
 
@@ -47,12 +47,11 @@ from pydantic import ValidationError
 
 from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.evidence import invalid_proposal_marks, known_proposals
-from analysis_service.execution import seed_state
+from analysis_service.execution import source_texts
 from analysis_service.fan_in import DraftJoinError, FanIn, fan_in
 from analysis_service.frameworks import PACKAGES, FrameworkPackage, schemas_for
 from analysis_service.frameworks.asvs.record import RequirementProposals
 from analysis_service.frameworks.stride.record import ArchivedThreatProposals
-from analysis_service.graph import STATE_SOURCE_TEXTS
 from analysis_service.report import Report
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness.artifact import (
@@ -90,7 +89,7 @@ def replay_fan_in(
         batches,
         PACKAGES[framework],
         report.system_model,
-        seed_state(case.sources)[STATE_SOURCE_TEXTS],
+        source_texts(case.sources),
         assertions=report.assertions.catalog if report.assertions else None,
     )
     return batches, merged

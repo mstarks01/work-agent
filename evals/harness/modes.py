@@ -77,7 +77,7 @@ from analysis_service.execution import (
     GraphFailed,
     GraphRun,
     emitted_state,
-    seed_state,
+    source_texts,
 )
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -2049,7 +2049,7 @@ def _basis(
     """
     if extracted is None:
         return (), BasisCoverage.empty()
-    sources = seed_state(case.sources)[STATE_SOURCE_TEXTS]
+    sources = source_texts(case.sources)
     flags, read = read_controls(extracted, sources)
     return tuple(flags), read
 

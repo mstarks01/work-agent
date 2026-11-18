@@ -213,6 +213,16 @@ async def _seed_off_the_loop(
     return await asyncio.shield(read)
 
 
+def source_texts(sources: Sequence[Source]) -> dict[str, str]:
+    """Each source's label against its text: what a quote's label resolves to.
+
+    The one map of a job's sources to their texts. :func:`seed_state` stores
+    it as ``STATE_SOURCE_TEXTS``; an offline reader that needs only the texts
+    calls this, and renders nothing and reads no diagram.
+    """
+    return {source.label: source.text for source in sources}
+
+
 def seed_state(
     sources: Sequence[Source], extra_state: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -245,7 +255,7 @@ def seed_state(
     # than about the model. Keyed by label safely — a job with two sources
     # sharing one is refused before it reaches here, since a citation naming
     # two sources at once resolves while pointing nowhere.
-    seed[STATE_SOURCE_TEXTS] = {source.label: source.text for source in sources}
+    seed[STATE_SOURCE_TEXTS] = source_texts(sources)
     return seed
 
 

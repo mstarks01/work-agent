@@ -42,10 +42,9 @@ from typing import Any, cast
 
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import FrameworkName
-from analysis_service.execution import seed_state
+from analysis_service.execution import source_texts
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
-from analysis_service.graph import STATE_SOURCE_TEXTS
 from analysis_service.parsing import signer, strings
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
@@ -267,7 +266,7 @@ def withheld_case(case: GoldenCase, answer_file: AnswerFile) -> GoldenCase:
             )
     # The gate's own reading of an excerpt, which takes ``…`` as a cut, so a
     # case the gate admits is never refused here for an excerpt it accepts.
-    cited = seed_state(sources)[STATE_SOURCE_TEXTS]
+    cited = source_texts(sources)
     for issue in validate(model, sources=cited):
         if issue.is_citation:
             raise EvalRunError(
