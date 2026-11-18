@@ -10,13 +10,20 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.assertions import ABSENT, Subject, assertion_id, contradictions
+from analysis_service.assertions import (
+    ABSENT,
+    Subject,
+    assertion_id,
+    contradictions,
+    support_span,
+)
 from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
 from analysis_service.critic import assemble_claims
 from analysis_service.evidence import absent_evidence_ref, evidence_catalog
 from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import DataStore, SystemModel
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.test_evidence import assertions, row
@@ -298,6 +305,26 @@ class TestARowTheGraphContradicts:
                 catalog=catalog,
                 model=model,
             )
+
+    def test_an_answer_against_an_opposite_graph_value_stays_settled(self):
+        """An answer settles the fact even against the sources (#1225), so the
+        graph's opposite value does not hold an answered row open."""
+        model = _with_encryption("AES-256")
+        said = "Orders database: not encrypted."
+        answer = self.STORED.model_copy(
+            update={
+                "origin": "answer",
+                "basis": "stated",
+                "support": [support_span(said, ANSWERS_LABEL, said)],
+            }
+        )
+        catalog = assertions(answer, subjects=(self.STORE,))
+
+        assert [c.attribute for c in contradictions(catalog, model)] == [
+            "encryption_at_rest"
+        ]
+        ground = evidence_catalog(model, catalog)[assertion_id(answer)]
+        assert ground.kind == "assertion"
 
     def test_an_agreeing_graph_value_carries_the_row_and_names_nothing(self):
         model = _with_encryption("none")

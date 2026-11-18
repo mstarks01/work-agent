@@ -51,7 +51,8 @@ attribute a rule could read. A row whose projection the graph holds stays
 cited through that attribute: one fact, one reader (ADR 0036). Which rows those
 are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
 settle is :func:`~analysis_service.assertions.settled`'s, so a conflict or an
-unsupported row is never in the table, and a claim can never rest on one. A
+unsupported row is never in the table as an ``assertion``, and a claim can
+never rest on one as a fact. A
 settled row the graph attribute contradicts
 (:func:`~analysis_service.assertions.contradicted`) is not offered as an
 ``assertion`` either.
@@ -254,9 +255,9 @@ def evidence_catalog(
     projection wrote — in the catalog's own order. The open rows come after
     them as ``unknown-assertion`` entries: an unknown or disputed row that
     reaches no graph field, and every contradicted row. ``None`` is a job that
-    ran no such pass, and its catalog holds only the first two enumerations; an empty catalog is a pass
-    that settled nothing, which offers the same rows and says so on the
-    report.
+    ran no such pass, and its catalog holds only the first two enumerations;
+    an empty catalog is a pass that settled nothing, which offers the same rows
+    and says so on the report.
 
     Only the *type-specific* attributes are eligible
     (:func:`~analysis_service.system_model.attribute_names`). ``notes`` holding

@@ -673,7 +673,7 @@ class Ground(BaseModel):
       report embeds, never copied here, so the ground cannot say more than the
       row does. Only a settled row the graph does not contradict is ever
       catalogued (:func:`~analysis_service.assertions.uncontradicted`), so a
-      conflict or an unsupported row grounds nothing.
+      conflict or an unsupported row grounds no ``assertion``.
     * ``unknown-assertion`` — ``assertion`` alone, for an open row: its value
       is :data:`~analysis_service.system_model.UNKNOWN`,
       another row disputes it (:func:`~analysis_service.assertions.disputed`),

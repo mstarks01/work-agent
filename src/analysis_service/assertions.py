@@ -3193,7 +3193,8 @@ def contradicted(
     The graph attribute states the opposite of the row, so the row is not a
     fact against this model, though it stays in :func:`settled`, which reads
     the catalog alone. The evidence catalog offers each such row as an open
-    question, as it offers a row another row disputes.
+    question, as it offers a row another row disputes. A submitter's answer is
+    never here: it settles the fact even against the sources.
     """
     rows = _contradicted_ids(catalog, model)
     return tuple(entry for entry in settled(catalog) if assertion_id(entry) in rows)
@@ -3212,7 +3213,15 @@ def uncontradicted(
 
 
 def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]:
-    return {row for found in contradictions(catalog, model) for row in found.rows}
+    """The rows behind each contradiction, less the submitter's answers.
+
+    An answer settles the fact even against the sources (:func:`answered`), so
+    an opposite graph value does not hold it open.
+    """
+    answers = {assertion_id(entry) for entry in catalog.entries if answered(entry)}
+    return {
+        row for found in contradictions(catalog, model) for row in found.rows
+    } - answers
 
 
 @dataclass(frozen=True)
