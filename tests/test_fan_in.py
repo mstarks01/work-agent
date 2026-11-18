@@ -1216,7 +1216,11 @@ class TestFanIn:
 
     def test_a_lane_with_no_batch_contributes_nothing(self, model):
         merged = fan_in.fan_in(
-            batches(spoofing=[sample_proposal("S-01")]), STRIDE, model, sources={}
+            batches(spoofing=[sample_proposal("S-01")]),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
 
         assert [draft.id for draft in merged.drafts] == ["S-01"]
@@ -1226,7 +1230,11 @@ class TestFanIn:
     def test_a_proposal_resolves_to_the_draft_the_fixtures_promise(self, model):
         """The catalog is derived from the same model the agent chose from."""
         merged = fan_in.fan_in(
-            batches(spoofing=[sample_proposal("S-01")]), STRIDE, model, sources={}
+            batches(spoofing=[sample_proposal("S-01")]),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
 
         assert merged.drafts == [sample_draft("S-01")]
@@ -1244,7 +1252,11 @@ class TestFanIn:
             "S-01", affected_element_ids=["process:invented", three_hops]
         )
         merged = fan_in.fan_in(
-            batches(spoofing=[proposal]), STRIDE, three_hop_model(), SOURCES
+            batches(spoofing=[proposal]),
+            STRIDE,
+            three_hop_model(),
+            SOURCES,
+            assertions=None,
         )
 
         assert merged.drafts == []
@@ -1264,6 +1276,7 @@ class TestFanIn:
             model,
             ruled_out={"S-01": "ruled out in code by a test"},
             sources={},
+            assertions=None,
         )
 
         assert merged.drafts == []
@@ -1289,6 +1302,7 @@ class TestFanIn:
             model,
             ruled_in={"S-01": "Applies: the rule says so."},
             sources={},
+            assertions=None,
         )
 
         assert merged.drafts == []
@@ -1302,6 +1316,7 @@ class TestFanIn:
             model,
             ruled_in={"S-01": "Applies: the rule says so."},
             sources={},
+            assertions=None,
         )
 
         assert [draft.id for draft in merged.drafts] == ["S-01"]
@@ -1315,6 +1330,7 @@ class TestFanIn:
             STRIDE,
             model,
             sources={},
+            assertions=None,
         )
 
         by_lane = {row.lane: row.drafts for row in merged.coverage}
@@ -1344,7 +1360,9 @@ class TestTheEmissionBound:
         batch = self._batch(MAX_CLAIMS_PER_BATCH, 0)
 
         assert len(batch.claims) == MAX_CLAIMS_PER_BATCH
-        assert fan_in.fan_in({"spoofing": batch}, STRIDE, model, sources={}).drafts
+        assert fan_in.fan_in(
+            {"spoofing": batch}, STRIDE, model, sources={}, assertions=None
+        ).drafts
 
     def test_a_batch_one_over_the_cap_is_refused_with_the_lane_and_the_count(
         self, model
@@ -1355,7 +1373,9 @@ class TestTheEmissionBound:
             fan_in.DraftJoinError,
             match=f"spoofing emitted {MAX_CLAIMS_PER_BATCH + 1}",
         ):
-            fan_in.fan_in({"spoofing": batch}, STRIDE, model, sources={})
+            fan_in.fan_in(
+                {"spoofing": batch}, STRIDE, model, sources={}, assertions=None
+            )
 
     def test_the_bound_counts_what_the_agent_wrote_not_what_survived(self, model):
         """The case a bound on ``claims`` alone cannot see.
@@ -1371,7 +1391,9 @@ class TestTheEmissionBound:
         assert len(batch.claims) == half
         assert len(batch.invalid) == half
         with pytest.raises(fan_in.DraftJoinError, match=f"emitted {half * 2}"):
-            fan_in.fan_in({"spoofing": batch}, STRIDE, model, sources={})
+            fan_in.fan_in(
+                {"spoofing": batch}, STRIDE, model, sources={}, assertions=None
+            )
 
     def test_a_lane_of_absences_at_the_bound_is_a_short_body(self):
         """#1316: every absent term is searched against every element's text.
@@ -1401,7 +1423,9 @@ class TestTheEmissionBound:
         ]
         started = time.thread_time()
 
-        merged = fan_in.fan_in(batches(spoofing=proposals), STRIDE, model, SOURCES)
+        merged = fan_in.fan_in(
+            batches(spoofing=proposals), STRIDE, model, SOURCES, assertions=None
+        )
 
         assert time.thread_time() - started < 2
         assert len(merged.drafts) == MAX_SEQUENCE

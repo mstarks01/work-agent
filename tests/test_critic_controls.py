@@ -625,6 +625,7 @@ class TestTheUnDefer:
             valid_model(),
             {},
             covered=covered,
+            assertions=None,
         )
 
     def test_a_covered_config_proposal_becomes_a_draft(self):
