@@ -722,8 +722,10 @@ def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str
     stated* and *stated absent*, at the seam where the fact has no attribute.
 
     A row with a value is open because another row disputes it
-    (:func:`~analysis_service.assertions.disputed`), so the gloss says the
-    sources disagree and names this side's value.
+    (:func:`~analysis_service.assertions.disputed`) or the graph attribute the
+    sources were extracted into states the opposite
+    (:func:`~analysis_service.assertions.contradicted`). Either way the gloss
+    says the sources disagree and names this side's value.
     """
     about = _about(row, subjects)
     if row.value != UNKNOWN:
