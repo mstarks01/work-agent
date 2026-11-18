@@ -28,9 +28,10 @@ Each check takes one :data:`Stage`:
 * ``changed-and-wrong``: the raw value is wrong, and the parse changed it to
   another wrong value.
 * ``raw-unread``: no raw value is read: the emission did not parse, the group
-  pairs nothing, or two parsed elements carry the check's ID. A paired entry
-  that leaves the attribute out reads as the default the parse fills, so an
-  omission is ``wrong-in-raw`` or ``agrees``.
+  pairs nothing, two parsed elements carry the check's ID, or a paired entry
+  leaves out a required attribute. A paired entry that leaves out an attribute
+  with a default reads as that default, so that omission is ``wrong-in-raw``
+  or ``agrees``.
 
 A state-reduced attribute (a control attribute or the protocol) that is wrong
 also takes one
@@ -167,8 +168,10 @@ def trace(
 ) -> tuple[FactTrace, ...]:
     """Each of ``checks`` with the raw value of the element the alignment paired.
 
-    A paired entry that leaves the attribute out reads as the field's default,
-    because that is the value the parse fills.
+    A paired entry that leaves out an attribute with a default reads as that
+    default, because that is the value the parse fills. A required attribute
+    left out reads as ``raw-unread``, and only a parse that read it some other
+    way reaches this code.
     """
     if parsed is None:
         return tuple(FactTrace(check, None) for check in checks)
@@ -182,8 +185,8 @@ def trace(
         value = None
         if entry is not None:
             value = entry.get(check.attribute)
-            if value is None:
-                field = type(elements[produced]).model_fields[check.attribute]
+            field = type(elements[produced]).model_fields[check.attribute]
+            if value is None and not field.is_required():
                 value = field.get_default(call_default_factory=True)
         traced.append(
             FactTrace(

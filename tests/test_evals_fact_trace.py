@@ -222,20 +222,36 @@ def test_the_position_pairing_is_the_parses_own(golden):
         assert paired[element.id]["name"] == element.name
 
 
+FLOW = "flow:entity:shopper>process:storefront-api>place-order"
+
+
 def test_a_key_the_emission_left_out_reads_as_the_default_the_parse_fills(golden):
-    default = (
-        type(golden.model.processes[0])
-        .model_fields["exposure"]
-        .get_default(call_default_factory=True)
-    )
-    parsed = _exposed(golden, default)
+    """``operations`` defaults to ``unknown``, so an emission that leaves it
+    out stated ``unknown``, and that is the emission's own wrong value."""
+    parsed = golden.model.model_copy(deep=True)
+    next(f for f in parsed.data_flows if f.id == FLOW).operations = "unknown"
     raw = _emitted(golden.model)
-    entry = next(p for p in raw["processes"] if p["id"] == PROCESS)
-    del entry["exposure"]
+    del next(f for f in raw["data_flows"] if f["id"] == FLOW)["operations"]
 
     graded = replay.replay_extraction(
         golden, ExtractionResult(golden.id, parsed, (), raw=raw)
     )
 
-    assert _exposure(graded).check.blessed != _exposure(graded).check.extracted
-    assert _exposure(graded).stage == "wrong-in-raw"
+    (fact,) = [
+        fact
+        for fact in graded.facts
+        if fact.check.element_id == FLOW and fact.check.attribute == "operations"
+    ]
+    assert (fact.check.blessed, fact.check.extracted) == ("write", "unknown")
+    assert fact.stage == "wrong-in-raw"
+
+
+def test_a_required_key_the_emission_left_out_is_raw_unread(golden):
+    raw = _emitted(golden.model)
+    del next(p for p in raw["processes"] if p["id"] == PROCESS)["exposure"]
+
+    graded = replay.replay_extraction(
+        golden, ExtractionResult(golden.id, golden.model, (), raw=raw)
+    )
+
+    assert _exposure(graded).stage == "raw-unread"
