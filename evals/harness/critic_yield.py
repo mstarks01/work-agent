@@ -33,7 +33,8 @@ It is credential-free, like the rest of the scorer. It takes plain data, a
 Nothing here gates. This is an instrument. Any threshold over these numbers
 comes from observed spread across the baseline sweeps rather than from a guess
 here, and the number that could veto the generator-critic pattern outright is
-``matched_killed``.
+``matched_killed``, a gross count of the reference-matched drafts that left the
+report, with a verdict or not.
 """
 
 from __future__ import annotations
@@ -96,7 +97,10 @@ def has_verdict(fate: str) -> TypeIs[VerdictStatus]:
 
 
 def no_verdict_line(drafts: int, fates: Sequence[str]) -> str:
-    """The line that counts ``drafts`` with no archived verdict, and names ``fates``."""
+    """The line that counts ``drafts`` with no archived verdict, and names ``fates``.
+
+    ``fates`` holds two or more fates, as each caller's constant does.
+    """
     counted = "1 draft has" if drafts == 1 else f"{drafts} drafts have"
     *first, last = fates
     return f"{counted} no archived verdict ({', '.join(first)} or {last})"
@@ -395,14 +399,16 @@ class CriticYield:
 
     @property
     def rejected_killed(self) -> int:
-        """The critic earning its cost: drafts it removed that a person had
-        already rejected for substance."""
-        return sum(1 for draft in self.killed if draft.outcome == "rejected")
+        """The critic earning its cost: drafts that left the report, with a
+        verdict or not (:attr:`KilledDraft.fate` tells which), that a person
+        had already rejected for substance."""
+        return sum(1 for draft in self.killed if _down_voted(draft.outcome))
 
     @property
     def matched_killed(self) -> int:
-        """The critic destroying real findings — the number that can veto the
-        pattern. A draft that had matched a reference, killed anyway."""
+        """The critic destroying real findings — the gross number that can veto
+        the pattern. A draft that had matched a reference and left the report,
+        with a verdict or not."""
         return sum(1 for draft in self.killed if _matched(draft.outcome))
 
     @property
@@ -432,8 +438,9 @@ class CriticYield:
 
     @property
     def must_find_killed(self) -> int:
-        """The sharpest form of the veto: a killed draft that had answered a
-        reference the Tier 2 gate depends on."""
+        """The sharpest form of the veto: a draft that left the report, with a
+        verdict or not, that had answered a reference the Tier 2 gate depends
+        on."""
         return sum(1 for draft in self.killed if draft.outcome == "matched-must-find")
 
     # --- rates, all rule-and-ledger-relative ------------------------------
@@ -476,8 +483,8 @@ class CriticYield:
         the share of reference-matched drafts it rejected. ``kill_precision``
         is the share of its rejections that a person rejected for substance.
         It is not the inverse of ``matched_kill_rate``: a rejected ``pooled``
-        or ``unvoted`` draft is neither a win nor a loss here, because the reference sets are
-        non-exhaustive by construction. A draft with no verdict is in no rate,
+        or ``unvoted`` draft is neither a win nor a loss here, because the
+        reference sets are non-exhaustive by construction. A draft with no verdict is in no rate,
         as a numerator or a denominator. A rate over an empty population has no
         value.
         """
@@ -534,9 +541,9 @@ def score_case_with_yield(
     reports — identical to what :func:`score_case` alone would have returned,
     because the rule is deterministic and both passes read one ledger.
 
-    ``block`` is the report's own framework block, read for the one fact the
-    drafts do not carry: the step the critic said it rejected each killed draft
-    at.
+    ``block`` is the report's own framework block, read for the two facts the
+    drafts do not carry: each draft's fate, and the step the critic said it
+    rejected each killed draft at.
     """
     pre = score_case(case, drafts, matcher, votes, rows)
     post = score_case(case, produced, matcher, votes, rows)
@@ -589,6 +596,7 @@ def _yield(
 ) -> CriticYield:
     steps = rejection_steps(block)
     fate_of = fate_by_claim(block)
+    fates = {draft.id: fate_of.get(draft.id, OMITTED) for draft in drafts}
     surviving = set(post.produced_ids)
     outcomes = _scored_outcomes(pre)
     killed = tuple(
@@ -599,7 +607,7 @@ def _yield(
             outcome=outcomes[draft.id][0],
             reference_index=outcomes[draft.id][1],
             cause=steps.get(draft.id),
-            fate=fate_of.get(draft.id, OMITTED),
+            fate=fates[draft.id],
         )
         for draft in drafts
         if draft.id not in surviving
@@ -617,12 +625,7 @@ def _yield(
         must_find_after=post.must_find_matched,
         must_find_total=pre.must_find_total,
         populations=CriticPopulations(
-            dict(
-                Counter(
-                    (outcomes[draft.id][0], fate_of.get(draft.id, OMITTED))
-                    for draft in drafts
-                )
-            )
+            dict(Counter((outcomes[draft.id][0], fates[draft.id]) for draft in drafts))
         ),
         matched_after_indices=frozenset(pair.reference_index for pair in post.matched),
     )
@@ -671,7 +674,7 @@ def _every(_: ScoredOutcome) -> bool:
 
 
 def _down_voted(outcome: ScoredOutcome) -> bool:
-    return outcome == "rejected"
+    return LABEL_OF[outcome] == "not-real"
 
 
 def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:

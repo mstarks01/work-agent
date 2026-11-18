@@ -796,3 +796,35 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
     assert shown.count("2 drafts have no archived verdict (omitted or returned)") == 2
     assert totals["rates"]["kill_rate"] == Rate(0, 1).to_json()
     assert result.to_json()["rates"]["kill_precision"] == Rate(0, 0).to_json()
+
+
+def test_a_returned_draft_is_a_kill_counted_under_its_fate(case):
+    """A claim assembly returned to the deferred set left the report unruled."""
+    from analysis_service.claims import ReturnedClaim
+
+    kept = _draft_for(case, _expected(case), 1)
+    returned = _draft_for(case, _must_find(case), 2)
+    block = _ruled_block(case, [promote(kept)], []).model_copy(
+        update={
+            "returned_claims": [
+                ReturnedClaim(claim_id=returned.id, unit="S-unit", needs="config")
+            ]
+        }
+    )
+
+    result = score_case_with_yield(
+        case,
+        [kept, returned],
+        [promote(kept)],
+        _identity_matcher([kept, returned]),
+        Ledger(),
+        block,
+        rows=NO_ROWS,
+    ).critic_yield
+
+    assert [draft.fate for draft in result.killed] == ["returned"]
+    assert result.killed_by_cause == {
+        "returned": {"killed": 1, "matched": 1, "must_find": 1}
+    }
+    assert result.populations.no_verdict == 1
+    assert result.rates["matched_kill_rate"] == Rate(0, 1)
