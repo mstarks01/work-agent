@@ -371,11 +371,12 @@ def fact_rows(
     """The catalog with each answer written over the rows it settles.
 
     ``spans`` are where each answer's line sits in the answers Source, in the
-    order of ``answers``. An assertion answer replaces the open row it answers,
-    and the stated row keeps the open row's subject, predicate and scope, so it
-    answers exactly what was asked. An answer an earlier run wrote is written again
-    over the row it wrote, so its quote reads this run's answers Source. Each
-    row written here has the origin ``answer``.
+    order of ``answers``. An assertion answer names a place and replaces the
+    open row there, and the stated row keeps the open row's subject, predicate
+    and scope, so it answers exactly what was asked. An answer to a place where
+    the sources disagree is a new row there. An answer an earlier run wrote is
+    written again over the row it wrote, so its quote reads this run's answers
+    Source. Each row written here has the origin ``answer``.
 
     **An attribute answer removes every unscoped row that reaches its
     attribute.** The answer settles the attribute, and such a row left beside it
@@ -387,12 +388,13 @@ def fact_rows(
 
     **A question-kind answer writes a row for each part it answers** (ADR
     0117), about the element it asks of, through :func:`_part_rows`. **An
-    assertion answer or a part row removes each unscoped source row at its
-    place that is open, is set aside, has the answer's identity or disagrees
-    with it**, so
-    the answer settles the fact. A row that can hold beside the answer stays.
-    A ``superseded-by-answer`` issue names each removed row that holds a
-    value.
+    assertion answer or a part row removes each source row at its place, the
+    same subject, predicate and scope, that is open, is set aside, has the
+    answer's identity or disagrees with it**, so the answer settles the fact.
+    A row that can hold beside the answer stays, and so does a row of another
+    scope. A ``superseded-by-answer`` issue names each removed row that holds
+    a value. An assertion answer at an attribute that an attribute answer
+    settles writes nothing.
     """
     replaced: dict[str, Assertion] = {}
     placed: dict[str, Assertion] = {}
@@ -482,6 +484,13 @@ def fact_rows(
             origin="answer",
             support=[span],
         )
+    # An attribute answer settles every unscoped row at its attribute, as it
+    # removes a replaced row there, so a place answer there writes nothing.
+    placed = {
+        key: row
+        for key, row in placed.items()
+        if row.scope or reached(row) not in attributes
+    }
     answer_rows = (*replaced.values(), *placed.values())
     asked, parts = _part_rows(
         catalog, model, answers, spans, answer_rows, attributes.keys()

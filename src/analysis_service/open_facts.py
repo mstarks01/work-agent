@@ -389,9 +389,10 @@ def fact_routes(
     or another row disputes (:func:`~analysis_service.assertions.disputed`)
     states a value, so its own identity names no row an answer could write
     over. Where an unscoped row reaches a graph field, the question is that
-    attribute's, and the attribute path writes the answer. Where it reaches
-    none, or states a narrower scope than the attribute, the question is its
-    place's
+    attribute's, and the attribute path writes the answer; every other
+    unscoped row that reaches the same attribute, an unknown row among them,
+    asks that one fact too. Where a row reaches no field, or states a narrower
+    scope than the attribute, the question is its place's
     (:func:`~analysis_service.assertions.place_identity`), which names the
     answer's row in every later run too (the maintainer's ruling of
     2026-11-18 on #2270). ``model`` is read as the lanes read it
@@ -401,13 +402,19 @@ def fact_routes(
         return {}
     prepared = prepared_model(model, catalog)
     routes: dict[str, UnknownRef] = {}
+    fields: set[tuple[str, str]] = set()
     for row in (*contradicted(catalog, prepared), *disputed(catalog)):
         attribute = projected_attribute(row.predicate, row.subject)
-        routes[assertion_id(row)] = (
-            UnknownRef(element_id=row.subject, attribute=attribute)
-            if attribute and not row.scope
-            else UnknownRef(assertion=place_identity(row))
-        )
+        if attribute and not row.scope:
+            fields.add((row.subject, attribute))
+        else:
+            routes[assertion_id(row)] = UnknownRef(assertion=place_identity(row))
+    for entry in catalog.entries:
+        attribute = projected_attribute(entry.predicate, entry.subject)
+        if not entry.scope and (entry.subject, attribute) in fields:
+            routes[assertion_id(entry)] = UnknownRef(
+                element_id=entry.subject, attribute=attribute
+            )
     return routes
 
 

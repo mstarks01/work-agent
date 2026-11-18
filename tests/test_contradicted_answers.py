@@ -197,7 +197,7 @@ class TestTheAnswerSurvivesAResumedRun:
         codes = [issue.code for issue in second.assertions.issues]
         assert "unmatched-answer" not in codes
 
-    def test_the_second_run_does_not_ask_again(self):
+    def test_the_second_run_does_not_ask_the_attribute_again(self):
         _, second = self.runs()
         ref = UnknownRef(assertion=assertion_id(MECHANISM))
 
