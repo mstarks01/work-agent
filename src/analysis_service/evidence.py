@@ -64,12 +64,12 @@ field it reaches shows what
 :data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
 under it, or what extraction wrote where the validity gate refuses the
 projected model. A row the graph attribute contradicts is open too, and it is
-in the table whatever field it reaches. An
-agent may raise a *conditional* claim on an open row exactly as it may on an
-element attribute nobody stated. Which of the two an entry is, is the entry's
-own ``Ground.kind``, so a claim that grounds a settled row on an open question
-— or the reverse — is refused by comparing its kind against the table rather
-than by a second reading of ``settled``.
+in the table whatever field it reaches. An agent may raise a *conditional*
+claim on an open row exactly as it may on an element attribute nobody stated.
+Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
+that grounds a settled row on an open question — or the reverse — is refused
+by comparing its kind against the table rather than by a second reading of
+``settled``.
 
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
 and never parsed, interpolated, or matched by a pattern compiled from it, so the

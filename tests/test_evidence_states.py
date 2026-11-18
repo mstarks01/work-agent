@@ -264,8 +264,8 @@ class TestARowTheGraphContradicts:
 
     Where a projection is not written into the graph, a row stating an absence
     beside an attribute stating a control is a contradiction the report names.
-    Neither side is a fact against that model, so the evidence catalog offers
-    the row as an open question, and a claim on it reads needs-info.
+    The row is not a fact against that model, so the evidence catalog offers
+    it as an open question, and a claim on it reads needs-info.
     """
 
     STORED = row(

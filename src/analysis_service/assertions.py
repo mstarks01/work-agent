@@ -3551,7 +3551,10 @@ def _unchecked_over_lead(
     review status in the gloss (:func:`offered`).
 
     A row a reviewer marked ``supported`` may close the lead; that is what a
-    review is for. ``run.py guard-cost`` measures what it holds back, and ADR
+    review is for. A submitter's answer that may state its value
+    (:func:`_drives_value`) closes it too, because an answer settles the fact
+    (#1225); an answer a reviewer set aside, or an answer of ``unknown``, does
+    not. ``run.py guard-cost`` measures what it holds back, and ADR
     0041 records the reading: over the archived proposal/graph pairings a job
     could project onto, 44 values the blessed model agrees with reach the lane
     as cited unchecked rows instead, and 18 wrong ``none`` authentications

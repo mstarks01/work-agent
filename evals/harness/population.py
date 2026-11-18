@@ -72,7 +72,9 @@ REACHES: frozenset[Route] = frozenset({"projected", "offered"})
 
 #: The format of a frozen population file. Bumped when a field changes
 #: meaning, so a population frozen under one rule is never read under another.
-POPULATION_VERSION = 1
+#: Version 2: a settled row the graph contradicts routes ``set-aside``, not
+#: ``projected``.
+POPULATION_VERSION = 2
 
 
 class PopulationError(ValueError):

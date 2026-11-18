@@ -129,6 +129,7 @@ What code does with a row:
   limit. A row no person has checked never closes an open question: where the
   field reads `unknown`, or says a control is absent, the field stays open and
   names the row's value, and the lanes see the row itself, marked `unchecked`.
+  A submitter's answer with a value does close it.
   A row that states an absence still fills an `unknown` field, because an
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
