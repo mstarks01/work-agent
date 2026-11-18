@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Mapping
-from types import MappingProxyType
 
 import pytest
 
@@ -21,7 +19,6 @@ from analysis_service import fan_in as fan_in_module
 from analysis_service import graph
 from analysis_service.critic import CriticOutputError
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
-from analysis_service.frameworks.stride import STRIDE
 from analysis_service.jobs import PipelineCompleted
 from evals.harness import fan_in_accounting
 from tests.factories import (
@@ -29,11 +26,27 @@ from tests.factories import (
     SCRIPTED_FRAMEWORKS,
     adk_runner,
     emitted,
-    sample_proposal,
     valid_model,
 )
 from tests.factories import scripted_pipeline as build
 from tests.test_pipeline import pair_job
+
+
+def _two_drafts(framework: FrameworkName) -> tuple[dict, str]:
+    """The fixture lane's emission with a second draft beside the first, and
+    the ID the second draft composes to."""
+    fixture = SCRIPTED_FRAMEWORKS[framework]
+    key_field = schemas_for(framework).key_field
+    emission = json.loads(fixture.proposal)
+    emission["claims"].append(
+        {
+            **emission["claims"][0],
+            key_field: fixture.second_key,
+            "title": "A second scripted draft",
+        }
+    )
+    second_id = PACKAGES[framework].compose_id(fixture.lane, fixture.second_key)
+    return emission, second_id
 
 
 def _replies(framework: FrameworkName, critic: str, recritic: str) -> dict[str, str]:
@@ -122,17 +135,6 @@ def test_an_invalid_proposal_costs_only_itself(framework, fault):
     assert all(reason.startswith("fails the proposal schema") for reason in reasons)
 
 
-#: A second key each package's scripted lane can propose beside its fixture's,
-#: in the same lane: a draft to drop while the fixture's draft is re-ruled.
-SECOND_KEY: Mapping[FrameworkName, object] = MappingProxyType(
-    {"asvs": "2.2", "stride": 2}
-)
-
-
-def test_every_package_has_a_second_key():
-    assert set(SECOND_KEY) == set(PACKAGES)
-
-
 @pytest.mark.parametrize("fault", [True, False])
 @pytest.mark.parametrize("framework", sorted(PACKAGES))
 def test_a_re_ask_keeps_the_first_pass_ruling_it_was_not_asked_to_change(
@@ -142,16 +144,7 @@ def test_a_re_ask_keeps_the_first_pass_ruling_it_was_not_asked_to_change(
     and a re-ask that also changes the first draft's ruling keeps the first
     pass's ruling and records the unbriefed change."""
     fixture = SCRIPTED_FRAMEWORKS[framework]
-    package = PACKAGES[framework]
-    key_field = schemas_for(framework).key_field
-    emission = json.loads(fixture.proposal)
-    second = {
-        **emission["claims"][0],
-        key_field: SECOND_KEY[framework],
-        "title": "A second scripted draft",
-    }
-    emission["claims"].append(second)
-    second_id = package.compose_id(fixture.lane, SECOND_KEY[framework])
+    emission, second_id = _two_drafts(framework)
     (ruling,) = json.loads(fixture.ruling)["claims"]
     changed = {**ruling, "verdict": {"reason": "r", "rejected_because": "reasoning"}}
     replies = _replies(
@@ -179,16 +172,16 @@ def test_a_re_ask_keeps_the_first_pass_ruling_it_was_not_asked_to_change(
 
 
 @pytest.mark.parametrize("fault", [True, False])
-def test_a_proposal_the_fan_in_drops_silently_is_unexplained(monkeypatch, fault):
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_a_proposal_the_fan_in_drops_silently_is_unexplained(
+    monkeypatch, framework, fault
+):
     """The fan-in loses a draft and records no reason. The accounting must
-    name it, against a count taken from the lanes' own emissions."""
-    stored = {
-        "spoofing": schemas_for("stride").proposals(claims=[sample_proposal("S-01")]),
-        "tampering": schemas_for("stride").proposals(
-            claims=[sample_proposal("T-01", "tampering", verb="alter")]
-        ),
-    }
-    emitted_count = sum(len(batch.claims) for batch in stored.values())
+    name it, against a count taken from the lane's own emission."""
+    fixture = SCRIPTED_FRAMEWORKS[framework]
+    emission, second_id = _two_drafts(framework)
+    stored = {fixture.lane: schemas_for(framework).proposals.model_validate(emission)}
+    emitted_count = len(emission["claims"])
     if fault:
         real = fan_in_module.join_drafts
 
@@ -198,9 +191,10 @@ def test_a_proposal_the_fan_in_drops_silently_is_unexplained(monkeypatch, fault)
 
         monkeypatch.setattr(fan_in_module, "join_drafts", loses_the_first)
 
-    merged = fan_in_module.fan_in(stored, STRIDE, valid_model(), {}, assertions=None)
-    row = fan_in_accounting.account("case", stored, STRIDE, merged)
+    package = PACKAGES[framework]
+    merged = fan_in_module.fan_in(stored, package, valid_model(), {}, assertions=None)
+    row = fan_in_accounting.account("case", stored, package, merged)
 
     assert len(row.proposals) == emitted_count
-    assert row.unexplained == (("S-01",) if fault else ())
-    assert "T-01" in row.kept
+    assert row.unexplained == ((fixture.claim_id,) if fault else ())
+    assert second_id in row.kept
