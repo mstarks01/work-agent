@@ -93,6 +93,7 @@ valid model goes on to the next node.
   fan-in: every reference resolves, no two lanes reused a claim ID, and every
   quote ground is matched against the bytes of the source it names. A refused
   quote is rewritten to the source's own nearest span where one is near enough
+  and changes no negation and no number
   ([`repaired_quotes`](Report-Schema.md#repaired_quotes--quotes-rewritten-to-the-sources-own-span)).
   An unverifiable quote is marked and still renders; a claim where *nothing*
   verifies is dropped and marked as a
