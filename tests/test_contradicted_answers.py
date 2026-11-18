@@ -25,7 +25,7 @@ from analysis_service.claims import FrameworkAnalysis, UnknownRef, Verdict
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers, fact_rows
 from analysis_service.jobs import Checkpoint
-from analysis_service.open_facts import source_states
+from analysis_service.open_facts import open_attribute, source_states
 from analysis_service.questions import fact_questions
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.sources import ANSWERS_LABEL
@@ -197,17 +197,14 @@ class TestTheAnswerSurvivesAResumedRun:
         codes = [issue.code for issue in second.assertions.issues]
         assert "unmatched-answer" not in codes
 
-    def test_the_second_run_does_not_ask_the_attribute_again(self):
+    def test_the_answer_leaves_no_open_attribute(self):
+        """After the second run the attribute states the answer, and no row
+        holds it open, so it takes no question."""
         _, second = self.runs()
-        ref = UnknownRef(assertion=assertion_id(MECHANISM))
 
-        keys = asked(
-            waiting_on(ref),
-            second.system_model,
-            second.assertions.catalog,
-            earlier=[ANSWER],
+        assert not open_attribute(
+            second.system_model, LOGIN, "authentication", second.assertions.catalog
         )
-        assert ATTRIBUTE_KEY not in keys
 
 
 class TestADisputedRowWithNoGraphField:
@@ -317,3 +314,36 @@ def test_every_row_at_a_routed_attribute_asks_one_fact():
     ]
 
     assert asked(analyses, model_with("none"), catalog) == [ATTRIBUTE_KEY]
+
+
+def test_a_hidden_qualification_asks_one_fact(refused_projection):
+    """Where the gate refuses the projected model, a scoped row qualifies a
+    field that still states a value; an unknown row there and the field
+    itself are one fact, asked once as the attribute."""
+    silent = MECHANISM.model_copy(
+        update={"value": UNKNOWN, "reason": "silent", "explanation": ""}
+    )
+    backups = MECHANISM.model_copy(
+        update={"scope": [Qualifier(kind="resource", value="backups")]}
+    )
+    catalog = AssertionCatalog(subjects=SUBJECTS, entries=[silent, backups])
+    analyses = [
+        sample_analysis(
+            [
+                sample_threat(
+                    claim,
+                    verdict=Verdict(
+                        status="needs-info",
+                        reason="The sources leave this open.",
+                        related_unknowns=[ref],
+                    ),
+                )
+                for claim, ref in (
+                    ("S-01", UnknownRef(assertion=assertion_id(silent))),
+                    ("S-02", UnknownRef(element_id=LOGIN, attribute="authentication")),
+                )
+            ]
+        )
+    ]
+
+    assert asked(analyses, model_with("a password"), catalog) == [ATTRIBUTE_KEY]
