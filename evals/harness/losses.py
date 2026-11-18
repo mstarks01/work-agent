@@ -42,8 +42,8 @@ order, and the first that finds the finding charges it; ``position`` and
   reference's action — the scorer's own lane error. The finding was written and
   filed under the wrong category, which is a routing fix and neither a lead nor
   a verb; charging it to ``place`` hid it behind the lane's silence.
-* ``critic``: no surviving claim cites the place, but a draft the critic
-  rejected did, with a reading's action. The finding was written and killed.
+* ``critic``: no surviving claim cites the place, but a draft that left the
+  report, with a verdict or not, did, with a reading's action. The finding was written and killed.
 * ``fan-in``: no draft cites the place, but the lane *proposed* a claim there
   with a reading's action. The finding was written and lost before the
   critic saw it, in one of two ways, which :data:`FanInEffect` names. The fan-in

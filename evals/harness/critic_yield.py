@@ -406,7 +406,7 @@ class CriticYield:
     #: its place).
     matched_after_indices: frozenset[int]
 
-    # --- the gross kill counts -------------------------------------------
+    # --- the kill counts, over all kills ---------------------------------
 
     @property
     def rejected_killed(self) -> int:
