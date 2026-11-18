@@ -146,7 +146,8 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #   submitter's words and the mark carries the agent's, so a consumer reading a
 #   quote as "what the agent wrote" must read this list too. Each entry carries
 #   ``moved``, what the substitution changed in the claim's own terms,
-#   required and checked on load; and ``scan_complete``, whether the rung
+#   required and checked on load, and empty on a repair made today because the
+#   fan-in refuses one that moves a negation or a number; and ``scan_complete``, whether the rung
 #   ranked every window, ``None`` on an archived repair (#675).
 # * ``unreconciled_rulings``: how the *first* critic pass failed to reconcile
 #   with its drafts, before the bounded re-ask. Each entry is a record — the

@@ -508,8 +508,8 @@ class RepairedQuote:
 ```
 
 The ladder refused what the agent wrote, and the repair rung
-(`analysis_service.grounding.repair_prepared`) found a window of the named source
-near enough to hand back. The ground carries that window — the submitter's
+(`analysis_service.grounding.faithful_repair`) found a window of the named source
+near enough to hand back, with no negation or number changed. The ground carries that window — the submitter's
 words, whitespace collapsed — and this mark carries the agent's, so the
 substitution is on the record. A repaired quote verifies, so an entry here is
 never also in `unverified_grounds`.
@@ -517,14 +517,16 @@ never also in `unverified_grounds`.
 The rung never accepts the agent's words: it replaces them. What can go wrong
 is a replacement that says something different from what the claim rests on.
 `moved` is the mechanical part of that: the negation tokens and the number
-tokens of the two texts, compared as multisets, so a span that put a "not"
-back or changed a figure is named as such. It is computed from `written` and
+tokens of the two texts, compared as multisets. The rung refuses a span that
+moves either, so a repair made today carries an empty `moved`, and an archived
+report can carry `negation` or `number` (ADR 0130). It is computed from `written` and
 the ground's text and checked against them on load. `similarity` says how
 near the span was and never whether it supports the claim. The critic reads
 the replaced span with `written` and `moved` beside it, and the viewer shows
 the difference to a reader. `scan_complete` is `False` where the work budget
 or a deadline stopped the scan before every window was ranked, so the span is
-the best found by then. See [ADR 0018](adr/0018-the-repair-rung.md).
+the best found by then. See [ADR 0018](adr/0018-the-repair-rung.md) and
+[ADR 0130](adr/0130-a-quote-repair-that-moves-a-negation-or-a-number-is-refused.md).
 
 ## `returned_claims` — claims a Control row kept that went back to the deferred set
 

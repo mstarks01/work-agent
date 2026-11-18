@@ -5,6 +5,8 @@
 - **Amends**: [ADR 0002](0002-finding-level-attribution.md), whose ladder is
   unchanged and now has a rung after it.
 - **Relates to**: [ADR 0017](0017-a-groundless-claim-costs-its-entry.md).
+- **Amended by**: [ADR 0130](0130-a-quote-repair-that-moves-a-negation-or-a-number-is-refused.md),
+  which refuses a span that changes a negation or a number.
 
 ## Context
 

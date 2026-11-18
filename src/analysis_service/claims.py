@@ -1801,8 +1801,8 @@ class RepairedQuote(BaseModel):
     """A quote ground whose text the service replaced with the source's own span.
 
     The ladder refused what the agent wrote, and
-    :func:`~analysis_service.grounding.repair_prepared` found a window of the named
-    source near enough to hand back. The ground carries that window — the
+    :func:`~analysis_service.grounding.faithful_repair` found a window of the named
+    source near enough to hand back, with no negation or number changed. The ground carries that window — the
     submitter's words — and this mark carries what the agent wrote, so the
     substitution is on the record rather than silent. ``similarity`` is the
     ratio that licensed it.
@@ -1819,10 +1819,11 @@ class RepairedQuote(BaseModel):
 
     ``moved`` names what the substitution changed in the claim's own terms —
     a negation, a number — as :func:`~analysis_service.grounding.meaning_moved`
-    computes it from ``written`` and the ground's text. Stored rather than left
-    for a reader to derive, because the critic and the viewer both route on
-    it, and checked on load against those two texts so it cannot drift from
-    them. ``similarity`` says how near the span was; it never says whether the
+    computes it from ``written`` and the ground's text. The fan-in refuses a
+    span that moves either, so a repair it makes carries an empty list, and an
+    archived report can carry a non-empty one. Stored rather than left for a
+    reader to derive, because the critic and the viewer both route on it, and
+    checked on load against those two texts so it cannot drift from them. ``similarity`` says how near the span was; it never says whether the
     span supports the claim, and a reader who wants that reads ``moved``.
 
     ``scan_complete`` is whether the rung ranked every window before it
