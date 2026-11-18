@@ -14,6 +14,7 @@ from analysis_service.assertions import (
     ABSENT,
     Qualifier,
     Subject,
+    apply_projection,
     assertion_id,
     contradicted,
     contradictions,
@@ -27,7 +28,9 @@ from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import DataStore, SystemModel
+from tests import test_assertions
 from tests.factories import sample_draft, sample_ruling, valid_model
+from tests.test_assertions import FLOW, stated
 from tests.test_evidence import assertions, row
 from tests.test_fan_in import CROSSING
 
@@ -361,3 +364,49 @@ class TestARowTheGraphContradicts:
         assert assertion_id(self.STORED) not in offered
         ref = absent_evidence_ref(ORDERS, "encryption_at_rest")
         assert offered[ref].kind == "absent-attribute"
+
+
+class TestARejectedAnswer:
+    """An answer a reviewer set aside makes no projected value, so it neither
+    exempts a contradiction nor lifts the guard on an unchecked row."""
+
+    SAID = "Orders database: encrypted with AES-256."
+
+    def answer(self, row, value):
+        return row.model_copy(
+            update={
+                "value": value,
+                "origin": "answer",
+                "basis": "stated",
+                "assessment": "unsupported",
+                "support": [support_span(self.SAID, ANSWERS_LABEL, self.SAID)],
+            }
+        )
+
+    def test_the_source_row_it_sits_beside_is_still_held_open(self):
+        source = TestARowTheGraphContradicts.STORED
+        catalog = assertions(
+            self.answer(source, "AES-256"),
+            source,
+            subjects=(TestARowTheGraphContradicts.STORE,),
+        )
+        model = _with_encryption("AES-256")
+
+        assert contradicted(catalog, model) == (source,)
+        ground = evidence_catalog(model, catalog)[assertion_id(source)]
+        assert ground.kind == "unknown-assertion"
+
+    def test_it_does_not_lift_the_unchecked_guard(self):
+        source = stated()
+        catalog = assertions(
+            self.answer(source, "a hardware token"),
+            source,
+            subjects=(Subject(id=FLOW, type="interaction", label="place order"),),
+        )
+        graph = test_assertions.TestAGraphAttributeAndItsRowsStatingOpposites()
+        model = graph.model("unknown")
+
+        updated, _ = apply_projection(model, catalog)
+
+        (flow,) = updated.data_flows
+        assert flow.authentication.startswith("unknown")

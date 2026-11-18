@@ -2099,6 +2099,21 @@ def answered(entry: Assertion) -> bool:
     return entry.origin == "answer"
 
 
+def _drives_value(entry: Assertion) -> bool:
+    """Whether this row is an answer that alone makes its attribute's value.
+
+    An answer outranks every other row (:func:`answered`), but only where it
+    may state its value at all: admissible, valued and unscoped. An answer a
+    reviewer set aside makes no value, so the rows beside it still do.
+    """
+    return (
+        answered(entry)
+        and admissible(entry)
+        and entry.value != UNKNOWN
+        and not entry.scope
+    )
+
+
 def missing_value(predicate: Predicate) -> str:
     """The value a row of ``predicate`` writes to state its control missing.
 
@@ -3216,12 +3231,13 @@ def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]
     """The rows behind each contradiction no submitter's answer drives.
 
     An answer settles the fact even against the sources (:func:`answered`), and
-    an unscoped one alone makes the projected value (:func:`project`). So a
+    one that may state its value alone makes the projected value
+    (:func:`_drives_value`). So a
     contradiction whose rows hold an answer holds none of its rows open: the
     other rows grouped beside the answer did not make the value the graph
     contradicts.
     """
-    answers = {assertion_id(entry) for entry in catalog.entries if answered(entry)}
+    answers = {assertion_id(entry) for entry in catalog.entries if _drives_value(entry)}
     return {
         row
         for found in contradictions(catalog, model)
@@ -3540,7 +3556,7 @@ def _unchecked_over_lead(
     """
     if control_state(projection.value) != "stated":
         return False
-    if any(answered(entry) for entry in rows):
+    if any(_drives_value(entry) for entry in rows):
         return False
     if control_state(str(held)) == "stated":
         return False
@@ -3667,7 +3683,7 @@ def _projected(
     stated = [entry for entry in valued if admissible(entry)]
     # An answer settles the attribute; the scoped rows beside it stay in the
     # catalog as the narrower facts they state.
-    answers = [entry for entry in stated if answered(entry) and not entry.scope]
+    answers = [entry for entry in stated if _drives_value(entry)]
     if answers:
         stated = answers
 

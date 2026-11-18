@@ -94,7 +94,7 @@ A ground has one of these kinds:
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
 - `assertion`: an assertion row that the sources settle and the model does not
-  contradict (see below); or
+  contradict, or a submitter's answer (see below); or
 - `unknown-assertion`: an open assertion row: its value is unknown, another
   row disputes it, or the model's attribute states the opposite and the row is
   not a submitter's answer.
