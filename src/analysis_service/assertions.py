@@ -268,11 +268,11 @@ REGISTRY_VERSION = 9
 #: qualified ``unknown`` over the lead (#2270).
 #:
 #: Version 8: :func:`contradictions` compares the state of each row that states
-#: the attribute's value, not the projected value (#2270). Three more shapes
+#: the attribute's value, not the projected value (#2270). Four more shapes
 #: beside an opposite attribute are a ``graph-contradiction`` issue: two
 #: ``compatible`` rows, in any job; and, where the validity gate refuses the
-#: projected model, two rows of ``several-values`` in one state, or an unscoped
-#: row beside a scoped one. An issue names a row that states the value, and a
+#: projected model, rows of ``several-values`` or of ``several-predicates`` in
+#: one state, or an unscoped row beside a scoped one. An issue names a row that states the value, and a
 #: row value spelled ``none`` projects with the reason ``absent``. A record of
 #: version 7 keeps its own issues, and the issue re-check on load declines for
 #: it. The ground check on load is not versioned: a claim of such a record on
@@ -3220,8 +3220,10 @@ def contradictions(
     value's. Two ``compatible`` rows project ``unknown`` and leave the
     attribute as extraction wrote it, yet each states a control, so an
     extracted ``none`` beside them is a contradiction (the maintainer's ruling
-    of 2026-11-18). Rows that read two states disagree with each other, which
-    :func:`conflicts` reports. A scoped row states a narrower fact than the
+    of 2026-11-18). Rows that read two states disagree with each other, so
+    the attribute states neither side against them: :func:`conflicts` reports
+    two such rows of one predicate, and the projection qualifies the field. A
+    scoped row states a narrower fact than the
     attribute and is not compared. A row that holds :data:`UNKNOWN` states
     nothing to contradict.
     """
@@ -3308,8 +3310,9 @@ def _contradicted_ids(catalog: AssertionCatalog, model: SystemModel) -> set[str]
     An answer settles the fact even against the sources (:func:`answered`), and
     one that may state its value alone makes the projected value
     (:func:`_drives_value`). So a contradiction whose rows hold an answer that
-    makes the value holds none of its rows open: the other rows grouped beside
-    that answer did not make the value the graph contradicts.
+    makes the value holds none of its rows open. The rows of a contradiction
+    are the rows that make the value (:func:`_value_rows`), so the source rows
+    beside such an answer are never among them.
     """
     answers = {assertion_id(entry) for entry in catalog.entries if _drives_value(entry)}
     return {
@@ -3619,7 +3622,7 @@ def hidden_qualifications(
     and that field is the question its open rows raise. Where the field reads
     as stated or absent instead, the validity gate refused the projected model
     and the field keeps what extraction wrote, so the evidence catalog offers
-    the open rows behind the projection as questions. A field that reads
+    the open rows behind the projection, if any, as questions. A field that reads
     ``unknown`` carries the question, whoever wrote it. A projection that
     writes a value settles the field from its stated rows, so a silent row
     beside them is no question; one that leaves the field changes nothing.

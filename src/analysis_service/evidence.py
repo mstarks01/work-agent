@@ -287,7 +287,7 @@ def evidence_catalog(
     """
     # The graph side of a contradiction is no fact: the rows behind it state
     # the opposite, and their open entries below carry the question.
-    contradicted_fields = _contradicted_fields(model, assertions)
+    attributes_contradicted = _contradicted_attributes(model, assertions)
     catalog: EvidenceCatalog = dict(
         entry
         for element in model.elements()
@@ -295,7 +295,7 @@ def evidence_catalog(
         if (entry := _attribute_entry(element, attribute)) is not None
         and not (
             entry[1].kind == "absent-attribute"
-            and (element.id, attribute) in contradicted_fields
+            and (element.id, attribute) in attributes_contradicted
         )
     )
     catalog.update(
@@ -477,19 +477,19 @@ def ground_issues(
     catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
     text = model_text(model)
-    contradicted_fields = _contradicted_fields(model, assertions)
+    attributes_contradicted = _contradicted_attributes(model, assertions)
     issues = []
     for claim in claims:
         for ground in claim.grounds:
             issue = _one_ground_issue(
-                claim.id, ground, catalog, by_id, text, contradicted_fields
+                claim.id, ground, catalog, by_id, text, attributes_contradicted
             )
             if issue:
                 issues.append(issue)
     return issues
 
 
-def _contradicted_fields(
+def _contradicted_attributes(
     model: SystemModel, assertions: AssertionCatalog | None
 ) -> frozenset[tuple[str, str]]:
     """The attributes the job's assertion rows contradict, or none without a pass."""
@@ -504,12 +504,12 @@ def _one_ground_issue(
     catalog: EvidenceCatalog,
     by_id: Mapping[str, Element],
     text: ModelText,
-    contradicted_fields: frozenset[tuple[str, str]],
+    attributes_contradicted: frozenset[tuple[str, str]],
 ) -> str:
     """Why one catalogued ground is not in this model's catalog, or ``""``.
 
-    ``contradicted_fields`` holds the attributes the assertion rows contradict
-    (:func:`~analysis_service.assertions.contradicted_attributes`).
+    ``attributes_contradicted`` holds the attributes the assertion rows
+    contradict (:func:`~analysis_service.assertions.contradicted_attributes`).
     """
     if ground.kind == "quote":
         return ""
@@ -579,13 +579,13 @@ def _one_ground_issue(
     contradicted_absence = (
         ground.kind == "absent-attribute"
         and state == "absent"
-        and (ground.element_id, ground.attribute) in contradicted_fields
+        and (ground.element_id, ground.attribute) in attributes_contradicted
     )
     if contradicted_absence:
         return (
             f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
             f" {ground.element_id!r}, which the assertion rows contradict, so the"
-            " job's catalog leaves it open"
+            " job's catalog offers no such fact"
         )
     return (
         f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"

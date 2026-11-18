@@ -77,7 +77,8 @@ REACHES: frozenset[Route] = frozenset({"projected", "offered"})
 #: Version 3: two ``compatible`` rows beside an opposite graph attribute are
 #: contradicted, so they route ``set-aside``, not ``offered``. Where the
 #: validity gate refuses the projected model, an unscoped row beside a scoped
-#: one that the field opposes routes ``set-aside`` too.
+#: one, and rows of ``several-predicates`` in one state, that the field
+#: opposes route ``set-aside`` too.
 POPULATION_VERSION = 3
 
 
