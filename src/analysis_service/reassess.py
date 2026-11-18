@@ -39,7 +39,7 @@ from analysis_service.assertions import (
     Assessment,
     Projection,
     assertion_id,
-    settled,
+    uncontradicted,
 )
 from analysis_service.evidence import (
     EvidenceCatalog,
@@ -136,8 +136,9 @@ def reassess(
     after = reviewed(before, verdicts)
     model, projections, evidence = prepared_view(report.system_model, after)
     # A row the review settles may leave the evidence because the attribute
-    # now carries it, and a finding citing it still rests on a fact.
-    standing = {assertion_id(entry) for entry in settled(after)}
+    # now carries it, and a finding citing it still rests on a fact. A row the
+    # graph attribute contradicts does not stand.
+    standing = {assertion_id(entry) for entry in uncontradicted(after, model)}
     withdrawn = []
     for block in report.analyses:
         for claim in block.all_claims():

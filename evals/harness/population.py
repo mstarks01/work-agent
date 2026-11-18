@@ -12,9 +12,10 @@ job calls: ``projected`` is a settled row the graph carries,
 an unknown, ``set-aside`` is a row a conflict or an assessment kept from
 settling, or a settled row the graph contradicts
 (:func:`~analysis_service.assertions.contradicted`), and ``refused`` is a row
-the gate refused, named by the code that refused it. The first two are the rows that reach a consumer, which is the
-population the owner's decision of 2026-09-23 fixes; the rest are recorded
-beside them so a reviewer sees what the job did not use as well.
+the gate refused, named by the code that refused it. The first two are the
+rows that reach a consumer, which is the population the owner's decision of
+2026-09-23 fixes; the rest are recorded beside them so a reviewer sees what the
+job did not use as well.
 
 Nothing here assesses anything, and it runs no model.
 

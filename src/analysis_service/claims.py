@@ -185,7 +185,7 @@ GroundKind = Literal[
 #: added later — and the consumer that matters licenses a threat to offer no
 #: countermeasure, so the hole reads as a well-formed claim rather than as an
 #: error. The two entries are the two questions: an attribute of an element
-#: nobody filled in, and a row of the assertion layer the sources left open.
+#: nobody filled in, and an open row of the assertion layer.
 #:
 #: A *stated absence* is not here, under either spelling. "The control is not
 #: there" is a fact in hand, and "put the control in" is a countermeasure an

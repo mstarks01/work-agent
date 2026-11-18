@@ -1245,10 +1245,9 @@ CatalogIssueCode = Literal[
     # A predicate whose value identifies rather than describes, carrying a
     # value this service inferred. See `Predicate.stated_only`.
     "inference-refused",
-    # Not a refused row. The row stands, and the evidence catalog offers it as
-    # an open question; this says the graph attribute beside it states the
-    # opposite, which is the defect this layer exists to make visible rather
-    # than one to drop a fact over.
+    # Not a refused row. The row stands; this says the graph attribute beside
+    # it, before the projection, states the opposite, which is the defect this
+    # layer exists to make visible rather than one to drop a fact over.
     "graph-contradiction",
     # Not a refused row either. Rows merged into one identity cited more
     # passages between them than a row carries, and the row kept the first
@@ -1280,9 +1279,10 @@ ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
 #: the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
-#: ``graph-contradiction`` is not a refusal: the row stands in the catalog, the
-#: evidence catalog offers it as an open question (:func:`contradicted`), and
-#: the finding is about the graph attribute beside it.
+#: ``graph-contradiction`` is not a refusal: the row stands in the catalog, and
+#: the finding is about the graph attribute beside it before the projection.
+#: Where the projected model still states the opposite, the evidence catalog
+#: offers the row as an open question (:func:`contradicted`).
 #: ``support-truncated`` is not one either: the row stands on the spans it kept,
 #: and the finding is about the ones it did not. ``superseded-by-answer`` is
 #: not one: the submitter's answer settles the fact the row stated, so the row
@@ -3204,8 +3204,8 @@ def uncontradicted(
 ) -> tuple[Assertion, ...]:
     """Every settled row that is not :func:`contradicted`, in catalog order.
 
-    :func:`offered` and the eval harness read these as the rows a lane may rest
-    a definite conclusion on against ``model``.
+    These are the settled rows a lane may rest a definite conclusion on against
+    ``model``.
     """
     rows = _contradicted_ids(catalog, model)
     return tuple(entry for entry in settled(catalog) if assertion_id(entry) not in rows)

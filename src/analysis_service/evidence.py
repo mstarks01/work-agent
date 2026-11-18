@@ -707,7 +707,7 @@ def _gloss(
 
 
 def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
-    """One row the sources left open, in the words that say it is a question.
+    """One open row, in the words that say it is a question.
 
     It names the ``reason`` rather than the value, because the value is the
     unknown sentinel and carries nothing: what an agent needs is whether the

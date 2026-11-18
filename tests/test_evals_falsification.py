@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import evidence
 from analysis_service.assertions import (
     ABSENT,
     GATE_REFUSALS,
@@ -290,14 +289,8 @@ class TestWhatAJobReadsAsAFact:
         facts, _ = falsify.consumer_view(catalog, model, SOURCES)
         return facts
 
-    def test_a_contradicted_absence_is_not_a_fact(self, monkeypatch) -> None:
-        """A projected model the validity gate refuses is discarded whole, and
-        :func:`~analysis_service.assertions.apply_projection` then returns the
-        model unchanged with nothing applied. The graph keeps its stated
-        mechanism beside the stated absence."""
-        monkeypatch.setattr(
-            evidence, "apply_projection", lambda model, catalog: (model, ())
-        )
+    def test_a_contradicted_absence_is_not_a_fact(self, refused_projection) -> None:
+        """The graph keeps its stated mechanism beside the stated absence."""
 
         assert self.facts(stated(value=ABSENT)) == frozenset()
 

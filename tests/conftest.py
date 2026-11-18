@@ -210,3 +210,18 @@ def corpus_case():
     from evals.harness.reference import load_corpus
 
     return load_corpus(REPO_ROOT / "evals" / "corpus")[0]
+
+
+@pytest.fixture
+def refused_projection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The validity gate refuses every projected model.
+
+    :func:`~analysis_service.assertions.apply_projection` then returns the
+    model unchanged with nothing applied, so a graph attribute keeps what
+    extraction wrote beside the rows authoritative for it.
+    """
+    from analysis_service import evidence
+
+    monkeypatch.setattr(
+        evidence, "apply_projection", lambda model, catalog: (model, ())
+    )
