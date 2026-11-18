@@ -14,11 +14,11 @@ Unfiltered LLM threat enumeration runs at about 86% raw false positives.
 Here is how it works. Each post-critic claim is a draft the critic kept, so
 the two sides are a superset and its subset. A killed draft is a draft that is
 not in the post-critic output, and its fate says whether the critic rejected it
-or the block holds no verdict for it. Both
-sides are produced sets, so the whole instrument is a matter of scoring the
-same case twice through the shipped scorer, with no second metric
-implementation and no special-cased matching, and then reading the killed
-drafts' pre-critic scored outcomes, which is the state the critic faced.
+or the block holds no verdict for it. Both sides are produced sets, so the
+whole instrument is a matter of scoring the same case twice through the shipped
+scorer, with no second metric implementation and no special-cased matching,
+and then reading each draft's pre-critic scored outcome beside its fate in the
+block, which is the state the critic faced and what it did.
 
 One property holds this together: the scored task is identical on both sides.
 Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
@@ -496,8 +496,8 @@ class CriticYield:
         It is not the inverse of ``matched_kill_rate``: a rejected ``pooled``
         or ``unvoted`` draft is neither a win nor a loss here, because the
         reference sets are non-exhaustive by construction. A draft with no
-        verdict is in no rate, as a numerator or a denominator. A rate over an
-        empty population has no value.
+        verdict is in no rate, as a numerator or a denominator. A rate whose
+        population holds no draft with a verdict has no value.
         """
         return _critic_rates(self.populations)
 

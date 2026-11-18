@@ -709,7 +709,7 @@ compare to the baseline band:
   read the "no archived verdict" line, which counts each draft that leaves the
   report with no verdict, and the "lost for good" count of the "all kills"
   figures, which also counts a reference-matched one whose reference no claim
-  took. Neither raises `killed-real`.
+  took. A draft with no verdict does not raise `killed-real`.
 
 A change that lifts or holds per-case recall, without widening the delta or
 raising `killed-real`, is a keeper. Anything else is noise, or a trade you should

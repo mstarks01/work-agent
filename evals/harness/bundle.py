@@ -503,7 +503,8 @@ def runs_from_reports(
     """Read a finished sweep's saved reports, drafts and proposals back into runs.
 
     The report holds what survived the critic and the drafts hold what it was
-    handed, and critic yield is the difference. ``losses`` reads the lanes'
+    handed, and critic yield compares the two, with each draft's fate in the
+    block. ``losses`` reads the lanes'
     proposals for the ``fan-in`` cause.
 
     :func:`finished_file` reads each case's files, so a failed case is left
