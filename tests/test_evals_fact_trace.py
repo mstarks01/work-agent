@@ -255,3 +255,11 @@ def test_a_required_key_the_emission_left_out_is_raw_unread(golden):
     )
 
     assert _exposure(graded).stage == "raw-unread"
+
+
+def test_the_printed_stages_are_every_stage():
+    """The table prints the wrong stages, then the two it names, and no
+    stage is left out of it."""
+    printed = {*replay.WRONG_STAGES, "corrected-by-code", "raw-unread"}
+
+    assert printed | {"agrees"} == set(fact_trace.STAGES)

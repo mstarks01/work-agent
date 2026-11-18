@@ -30,8 +30,7 @@ Each check takes one :data:`Stage`:
 * ``raw-unread``: no raw value is read: the emission did not parse, the group
   pairs nothing, two parsed elements carry the check's ID, or a paired entry
   leaves out a required attribute. A paired entry that leaves out an attribute
-  with a default reads as that default, so that omission is ``wrong-in-raw``
-  or ``agrees``.
+  with a default reads as that default.
 
 A state-reduced attribute (a control attribute or the protocol) that is wrong
 also takes one
