@@ -194,7 +194,8 @@ def test_the_command_names_the_refused_block_and_reads_the_rest(capsys, monkeypa
         ),
         (
             "ruled severity: 0 compared, 0 differ; 18 claim(s) incompatible,"
-            " because the run's critic set severity; 0 claim(s) with no oracle"
+            " because the run's critic set severity; 0 claim(s) with no oracle,"
+            " because the clone cannot place the run"
         ),
     ]
 
@@ -509,7 +510,7 @@ def test_an_undrafted_claim_today_s_record_refuses_leaves_its_block_replayed(
     assert row.accounted == row.draft_ids
 
 
-def _raise_first_severity(block):
+def _move_first_severity(block):
     """``block`` with its first claim's severity moved off its draft's."""
     first, *rest = block.claims
     rating = "low" if first.severity.likelihood == "high" else "high"
@@ -528,7 +529,7 @@ def test_a_reported_severity_its_draft_does_not_hold_is_named(
     """The run descends from #1208: no ruling replaces a severity, so the
     report's must be the draft's."""
     monkeypatch.setattr(assembly, "severity_oracle", lambda commit: "compared")
-    _rewritten(archive, case, _raise_first_severity)
+    _rewritten(archive, case, _move_first_severity)
 
     (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
 
@@ -556,7 +557,7 @@ def test_a_run_with_no_severity_oracle_compares_none(
     """A run before #1208, or one the checkout cannot place, is not read
     against its drafts, so a moved severity is no difference."""
     monkeypatch.setattr(assembly, "severity_oracle", lambda commit: oracle)
-    _rewritten(archive, case, _raise_first_severity)
+    _rewritten(archive, case, _move_first_severity)
 
     (row,) = assembly.replay_artifact(load_artifact(archive), [case]).rows
 
@@ -592,16 +593,17 @@ def test_the_oracle_reads_git_at_the_commit_s_id_now(
         asked.append(later)
         return descends
 
+    monkeypatch.setattr(assembly, "is_shallow", lambda root: False)
     monkeypatch.setattr(assembly, "holds_commit", holds)
     monkeypatch.setattr(assembly, "is_ancestor", ancestor)
 
     answer = assembly.severity_oracle(RepoCommit(commit=RENAMED[0], clean=True))
 
     assert answer == oracle
-    assert asked and set(asked) == {RENAMED[1]}
+    assert RENAMED[1] in asked and RENAMED[0] not in asked
 
 
-def test_a_commit_that_is_not_hex_never_reaches_git():
+def test_a_commit_that_is_not_hex_is_refused_before_any_git_call():
     with pytest.raises(ValidationError):
         RepoCommit(commit="-c core.pager=x", clean=True)
 
@@ -615,3 +617,15 @@ def test_a_package_that_grades_no_harm_has_no_severity_to_count(
     row = assembly.replay_case(case, block, drafts, model, "critic-set")
 
     assert (row.severity_compared, row.severity_unchecked) == (0, 0)
+
+
+def test_a_shallow_clone_cannot_place_a_run(monkeypatch):
+    """A cut history can hide the ancestry, so the answer is unknown, never
+    "the critic set severity"."""
+    monkeypatch.setattr(assembly, "is_shallow", lambda root: True)
+    monkeypatch.setattr(assembly, "holds_commit", lambda root, commit: True)
+    monkeypatch.setattr(assembly, "is_ancestor", lambda root, a, b: False)
+
+    answer = assembly.severity_oracle(RepoCommit(commit=RENAMED[0], clean=True))
+
+    assert answer == "unknown"

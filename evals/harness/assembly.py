@@ -38,8 +38,8 @@ the unit its entry names.
 rulings, so a claim filed against its own verdict is the report's check to
 refuse, and one whose verdict moved with it reads as the critic's ruling. The
 report's check also owns each block's summary, so a summary that miscounts its
-block fails the load and is named as an unreadable report. The report does not hold the
-units a Control row kept from the deferred set, only those it sent back, so a
+block fails the load and is named as an unreadable report. The report does
+not hold the units a Control row kept from the deferred set, only those it sent back, so a
 kept claim that assembly failed to send back reads as the critic's ruling.
 
 **Severity.** No ruling carries a severity, so each reported claim's severity
@@ -92,7 +92,7 @@ from evals.harness.artifact import (
     RepoCommit,
     load_artifact,
 )
-from evals.harness.baseline import holds_commit, is_ancestor
+from evals.harness.baseline import holds_commit, is_ancestor, is_shallow
 from evals.harness.bundle import UnreadableReport, finished_file, read_report
 from evals.harness.history import current_commit
 from evals.harness.modes import REPORTING_MODES, EvalRunError
@@ -181,8 +181,9 @@ class AssemblyReplay:
     severity_oracle: SeverityOracle
     #: Claims whose reported severity is not the one assembly gives them.
     severity_differs: tuple[str, ...] = ()
-    #: How many replayed claims had their severity compared, and how many
-    #: were not: the run's critic set it, or nothing says what it should be.
+    #: How many graded claims had their severity compared, and how many were
+    #: not: the run's critic set it, the clone cannot place the run, or the
+    #: report does not hold the claim.
     severity_compared: int = 0
     severity_unchecked: int = 0
     #: Why today's ruling record or review check refused the archived rulings,
@@ -365,11 +366,15 @@ def severity_oracle(commit: RepoCommit) -> SeverityOracle:
 
     :class:`~evals.harness.artifact.RepoCommit` holds only a hex commit ID, so
     the ID reaches ``git`` as an object, never as an option. A history rewrite
-    renames a commit, so the check reads it at the ID it has now. A commit
-    this checkout does not hold, as in a shallow clone, is ``unknown``.
+    renames a commit, so the check reads it at the ID it has now. A shallow
+    clone, or one that does not hold both commits, cannot place the run, so
+    the answer is ``unknown``.
     """
     now = current_commit(commit.commit)
-    if not holds_commit(REPO_ROOT, now):
+    placed = not is_shallow(REPO_ROOT) and all(
+        holds_commit(REPO_ROOT, held) for held in (now, CRITIC_RATES_NO_SEVERITY)
+    )
+    if not placed:
         return "unknown"
     if is_ancestor(REPO_ROOT, CRITIC_RATES_NO_SEVERITY, now):
         return "compared"
@@ -507,7 +512,7 @@ def command_assembly(args: argparse.Namespace) -> int:
         f" compared, {sum(len(row.severity_differs) for row in sweep.rows)} differ;"
         f" {_unchecked(sweep.rows, 'critic-set')} claim(s) incompatible, because"
         f" the run's critic set severity;"
-        f" {_unchecked(sweep.rows, 'compared') + _unchecked(sweep.rows, 'unknown')}"
-        " claim(s) with no oracle"
+        f" {_unchecked(sweep.rows, 'unknown')} claim(s) with no oracle, because"
+        " the clone cannot place the run"
     )
     return 1 if moved or sweep.capture_faults else 0

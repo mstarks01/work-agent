@@ -795,6 +795,12 @@ def holds_commit(root: Path, commit: str) -> bool:
     return _git(root, "cat-file", "-e", f"{commit}^{{commit}}") is not None
 
 
+def is_shallow(root: Path) -> bool:
+    """Whether the clone at ``root`` is shallow, so an ancestry it reads can
+    stop at a cut it does not know about; true where git cannot answer."""
+    return _git(root, "rev-parse", "--is-shallow-repository") != "false\n"
+
+
 def is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
     """Whether ``ancestor`` is an ancestor of ``descendant`` in the clone at
     ``root``; false where git cannot answer."""
