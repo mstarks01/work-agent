@@ -186,9 +186,7 @@ class CriticPopulations:
 
     def count(self, label: Population) -> int:
         """The drafts of one population, with a verdict or not."""
-        return sum(
-            n for (outcome, _), n in self.counts.items() if LABEL_OF[outcome] == label
-        )
+        return sum(n for (outcome, _), n in self.counts.items() if _in(label)(outcome))
 
     def rate(self, label: Population, fate: VerdictStatus) -> Rate:
         """The share of one population's drafts with a verdict that met one fate."""
@@ -755,7 +753,10 @@ def render(yields: Sequence[CriticYield]) -> None:
 
     ``killed-real`` is deliberately on the same line as ``killed-rejected``:
     a kill count read on its own says nothing about whether the critic removes
-    noise or destroys findings.
+    noise or destroys findings. Each rate counts only drafts with a verdict,
+    the "all kills" counts keep every draft that left the report, and a
+    no-verdict line prints under a case and under the total where a draft has
+    no verdict.
     """
     for entry in yields:
         rates = entry.rates

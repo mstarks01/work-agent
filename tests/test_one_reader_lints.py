@@ -1935,6 +1935,8 @@ def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bo
         ('fate in ("returned", "omitted")', True),
         ('fate in {"confirmed", "needs-info", "rejected"}', True),
         ("fate in get_args(VerdictStatus)", True),
+        ("fate in get_args(NoVerdictFate)", True),
+        ("fate in critic_yield.NO_VERDICT_FATES", True),
         ('fate in ("rejected",)', False),
         ("has_verdict(fate)", False),
         ("{*NO_VERDICT_FATES, UNRULED}", False),
