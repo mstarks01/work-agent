@@ -1,0 +1,43 @@
+# QA-2026-11-17-13-E1: loss causes before (6de96fa6) and after (#2280, merged as d4bfc1af), score --out on identical archives.
+# Each 'moved' row: (case, reference), cause before, cause after, must_find.
+## sweep 2026-10-24: misses 126, must-find misses 79
+  must-find before {'place': 1, 'unled': 4, 'unstated': 59, 'verb': 15} 
+  must-find after  {'place': 1, 'unled': 4, 'unstated': 65, 'verb': 9}
+  all before {'place': 12, 'unled': 13, 'unstated': 59, 'verb': 42} 
+  all after  {'place': 12, 'unled': 13, 'unstated': 65, 'verb': 36}
+  moved (('03', 1), 'verb', 'unstated', True)
+  moved (('03', 12), 'verb', 'unstated', True)
+  moved (('06', 15), 'verb', 'unstated', True)
+  moved (('09', 1), 'verb', 'unstated', True)
+  moved (('12', 0), 'verb', 'unstated', True)
+  moved (('12', 13), 'verb', 'unstated', True)
+## 2198870: misses 173, must-find misses 89
+  must-find before {'place': 18, 'unled': 5, 'unstated': 50, 'verb': 16} 
+  must-find after  {'place': 18, 'unled': 5, 'unstated': 53, 'verb': 13}
+  all before {'critic': 1, 'fan-in': 1, 'merged': 1, 'misfiled': 1, 'place': 61, 'unled': 24, 'unstated': 50, 'verb': 34} 
+  all after  {'critic': 1, 'fan-in': 1, 'merged': 1, 'misfiled': 1, 'place': 61, 'unled': 24, 'unstated': 53, 'verb': 31}
+  moved (('11', 14), 'verb', 'unstated', True)
+  moved (('12', 0), 'verb', 'unstated', True)
+  moved (('12', 13), 'verb', 'unstated', True)
+## 6bff717: misses 179, must-find misses 87
+  must-find before {'critic': 1, 'place': 9, 'unled': 6, 'unstated': 57, 'verb': 14} 
+  must-find after  {'critic': 1, 'place': 9, 'unled': 6, 'unstated': 59, 'verb': 12}
+  all before {'critic': 8, 'fan-in': 2, 'merged': 1, 'misfiled': 2, 'place': 58, 'unled': 25, 'unstated': 57, 'verb': 26} 
+  all after  {'critic': 8, 'fan-in': 2, 'merged': 1, 'misfiled': 2, 'place': 58, 'unled': 25, 'unstated': 59, 'verb': 24}
+  moved (('12', 0), 'verb', 'unstated', True)
+  moved (('12', 13), 'verb', 'unstated', True)
+## d3f1898: misses 178, must-find misses 90
+  must-find before {'place': 22, 'unled': 8, 'unstated': 44, 'verb': 16} 
+  must-find after  {'place': 22, 'unled': 8, 'unstated': 46, 'verb': 14}
+  all before {'fan-in': 3, 'merged': 2, 'misfiled': 2, 'place': 69, 'unled': 26, 'unstated': 44, 'verb': 32} 
+  all after  {'fan-in': 3, 'merged': 2, 'misfiled': 2, 'place': 69, 'unled': 26, 'unstated': 46, 'verb': 30}
+  moved (('11', 14), 'verb', 'unstated', True)
+  moved (('12', 13), 'verb', 'unstated', True)
+## d4edd64: misses 173, must-find misses 92
+  must-find before {'place': 23, 'unled': 6, 'unstated': 43, 'verb': 20} 
+  must-find after  {'place': 23, 'unled': 6, 'unstated': 46, 'verb': 17}
+  all before {'fan-in': 2, 'place': 73, 'unled': 23, 'unstated': 43, 'verb': 32} 
+  all after  {'fan-in': 2, 'place': 73, 'unled': 23, 'unstated': 46, 'verb': 29}
+  moved (('11', 10), 'verb', 'unstated', True)
+  moved (('11', 14), 'verb', 'unstated', True)
+  moved (('12', 0), 'verb', 'unstated', True)

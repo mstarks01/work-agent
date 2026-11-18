@@ -1,0 +1,17 @@
+lane | must-finds | matched | place | unled | unstated | verb
+spoofing | 28 | 0 | 0 | 0 | 27 | 1
+tampering | 24 | 8 | 1 | 0 | 10 | 5
+repudiation | 4 | 4 | 0 | 0 | 0 | 0
+information-disclosure | 22 | 4 | 0 | 0 | 16 | 2
+denial-of-service | 11 | 3 | 0 | 0 | 8 | 0
+elevation-of-privilege | 11 | 2 | 0 | 4 | 4 | 1
+total | 100 | 21 | 1 | 4 | 65 | 9
+
+lane | proposals | drafts | report claims
+spoofing | 56 | 56 | 54
+tampering | 76 | 76 | 75
+repudiation | 52 | 52 | 52
+information-disclosure | 111 | 111 | 110
+denial-of-service | 46 | 46 | 46
+elevation-of-privilege | 44 | 44 | 37
+total | 385 | 385 | 374

@@ -1,0 +1,22 @@
+case,reference,lane,reference_verb,claim,claim_verb,claim_title
+02-iot-fleet-telemetry,5,repudiation,unattributable,R-01,unattributable,Fleet-wide shared pre-shared key makes individual sensor readings unattributable to a device
+03-batch-data-pipeline,3,tampering,alter,T-03,plant,Un-rotated partner SFTP keys and absent origin checks let falsified extracts be planted in the landing bucket
+04-ml-inference-service,3,tampering,plant,T-04,plant,A shared publish credential and unverified loading let a substituted model artifact run as the production model
+04-ml-inference-service,8,information-disclosure,read,I-05,read,Raw end-user prompts logged into an inference log of unverified protection and classification
+06-cookbook-online-game,4,tampering,alter,T-04,alter,Unverified write path lets falsified statistics into the stats database
+07-cicd-store-deploy,6,tampering,plant,T-04,plant,Unauthenticated push lets a malicious image be planted in the registry
+07-cicd-store-deploy,11,repudiation,unattributable,R-03,unattributable,"The shared, unrotated build token leaves release changes unattributable to any one pipeline"
+07-cicd-store-deploy,12,information-disclosure,recover-credential,I-04,recover-credential,"The never-rotated, pipeline-wide build token is a secret living outside any vault"
+08-sso-identity-broker,4,tampering,alter,T-05,alter,Unverified write access lets a colleague-and-group record in the directory be rewritten
+08-sso-identity-broker,8,repudiation,unattributable,R-03,unattributable,"Audit log content, franchise coverage and write integrity are all undocumented"
+08-sso-identity-broker,10,information-disclosure,recover-credential,I-05,recover-credential,The shared signing key readable in transit from the key store
+08-sso-identity-broker,15,denial-of-service,disable,D-01,flood,Unauthenticated-strength sign-in flow lets a flood of colleagues exhaust the one identity broker every application depends on
+09-cookbook-sokify-retail,13,information-disclosure,read,I-09,read,Unverified fax destinations deliver customer name and address to the wrong recipient
+10-cookbook-generic-cms,4,tampering,plant,T-03,plant,Unauthenticated publish path lets an attacker plant malicious assets in the CDN bucket
+10-cookbook-generic-cms,15,elevation-of-privilege,plant,E-01,abuse-grant,Web server's unauthenticated publish path lets a compromised CMS overwrite content served to every reader via the CDN
+11-sparse-shift-scheduling,4,tampering,alter,T-05,alter,Unverified write path lets the payroll export be tampered with before collection
+11-sparse-shift-scheduling,13,denial-of-service,disable,D-02,flood,The payroll file share is a shared dependency with no stated quota or collection authentication
+12-overclaiming-supplier-portal,3,tampering,alter,T-05,plant,Unauthenticated write path lets a fabricated nightly extract be planted directly in the landing bucket
+12-overclaiming-supplier-portal,12,denial-of-service,disable,D-03,disable,An unvalidated nightly extract can crash-loop the supplier master service
+16-library-lending-interview,4,repudiation,unattributable,R-01,unattributable,"Desk staff share one login, so a disputed loan change cannot be pinned to a person"
+16-library-lending-interview,9,elevation-of-privilege,escalate,E-01,escalate,Member app calls reach the lending API across the internet with no confirmed binding to the calling member
