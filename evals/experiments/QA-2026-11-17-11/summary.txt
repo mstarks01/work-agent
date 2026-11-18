@@ -9,9 +9,9 @@ matched of compatible 14/20; matched of all 14/103
   spoofing                matched 0 missed 0 incompatible 29 uncaptured 0
   tampering               matched 5 missed 4 incompatible 16 uncaptured 0
 left out: []
-assembly: {'reproduced': 13, 'differ': 0, 'refused': 0}
+assembly: {'reproduced': 13, 'differ': 0, 'refused': 0}, refused cases []
 fan-in: {'compatible_blocks': 4, 'unread_blocks': 0, 'inspected': 244, 'accounted': 78, 'unexplained': 0, 'extra': 0, 'unavailable': 166, 'unreadable': 0, 'capture_faults': 0, 'incompatible_blocks': 9}
-critic: {'killed matched references': 2, 'of them no reported claim took': 2}
+critic: {'killed matched references': 2, 'of them no reported claim took': 2, 'not-real drafts': 0}, not-real gap by artifact {'stale-drafts': 1}
 == 6bff717: 1 artifact(s), run/corpus/scored [('6bff7172', 'd5f345c2eedb', 'b814eb5b59b5')]
 must-finds 103: matched 16, missed 7, incompatible 80, uncaptured 0
 compatibility: {'compatible': 23, 'position-unstated': 80}
@@ -23,9 +23,9 @@ matched of compatible 16/23; matched of all 16/103
   spoofing                matched 0 missed 0 incompatible 29 uncaptured 0
   tampering               matched 8 missed 3 incompatible 14 uncaptured 0
 left out: []
-assembly: {'reproduced': 11, 'differ': 0, 'refused': 2}
+assembly: {'reproduced': 11, 'differ': 0, 'refused': 2}, refused cases ['02-iot-fleet-telemetry', '13-dispatch-control-plane']
 fan-in: {'compatible_blocks': 2, 'unread_blocks': 0, 'inspected': 195, 'accounted': 31, 'unexplained': 0, 'extra': 0, 'unavailable': 164, 'unreadable': 0, 'capture_faults': 0, 'incompatible_blocks': 11}
-critic: {'killed matched references': 8, 'of them no reported claim took': 8}
+critic: {'killed matched references': 8, 'of them no reported claim took': 8, 'not-real drafts': 0}, not-real gap by artifact {'stale-drafts': 1}
 == d3f1898: 1 artifact(s), run/corpus/scored [('d3f1898c', 'b09805c6726d', 'b814eb5b59b5')]
 must-finds 103: matched 13, missed 7, incompatible 83, uncaptured 0
 compatibility: {'compatible': 20, 'position-unstated': 71, 're-keyed': 12}
@@ -37,9 +37,9 @@ matched of compatible 13/20; matched of all 13/103
   spoofing                matched 0 missed 0 incompatible 29 uncaptured 0
   tampering               matched 5 missed 4 incompatible 16 uncaptured 0
 left out: []
-assembly: {'reproduced': 12, 'differ': 0, 'refused': 1}
+assembly: {'reproduced': 12, 'differ': 0, 'refused': 1}, refused cases ['08-sso-identity-broker']
 fan-in: {'compatible_blocks': 4, 'unread_blocks': 0, 'inspected': 226, 'accounted': 71, 'unexplained': 0, 'extra': 0, 'unavailable': 155, 'unreadable': 0, 'capture_faults': 0, 'incompatible_blocks': 9}
-critic: {'killed matched references': 0, 'of them no reported claim took': 0}
+critic: {'killed matched references': 0, 'of them no reported claim took': 0, 'not-real drafts': 0}, not-real gap by artifact {'stale-drafts': 1}
 == d4edd64: 1 artifact(s), run/corpus/scored [('d4edd642', '09772afde754', 'b814eb5b59b5')]
 must-finds 103: matched 11, missed 9, incompatible 83, uncaptured 0
 compatibility: {'compatible': 20, 'position-unstated': 71, 're-keyed': 12}
@@ -51,9 +51,9 @@ matched of compatible 11/20; matched of all 11/103
   spoofing                matched 0 missed 0 incompatible 29 uncaptured 0
   tampering               matched 4 missed 5 incompatible 16 uncaptured 0
 left out: []
-assembly: {'reproduced': 13, 'differ': 0, 'refused': 0}
+assembly: {'reproduced': 13, 'differ': 0, 'refused': 0}, refused cases []
 fan-in: {'compatible_blocks': 3, 'unread_blocks': 0, 'inspected': 238, 'accounted': 48, 'unexplained': 0, 'extra': 0, 'unavailable': 190, 'unreadable': 0, 'capture_faults': 0, 'incompatible_blocks': 10}
-critic: {'killed matched references': 0, 'of them no reported claim took': 0}
+critic: {'killed matched references': 0, 'of them no reported claim took': 0, 'not-real drafts': 0}, not-real gap by artifact {'stale-drafts': 1}
 == sweep: 13 artifact(s), run/corpus/scored [('5d75b23f', '081b7ff674ce', 'b814eb5b59b5')]
 must-finds 100: matched 21, missed 4, incompatible 75, uncaptured 0
 compatibility: {'compatible': 25, 'position-unstated': 75}
@@ -65,9 +65,9 @@ matched of compatible 21/25; matched of all 21/100
   spoofing                matched 0 missed 0 incompatible 28 uncaptured 0
   tampering               matched 8 missed 3 incompatible 13 uncaptured 0
 left out: []
-assembly: {'reproduced': 13, 'differ': 0, 'refused': 0}
+assembly: {'reproduced': 13, 'differ': 0, 'refused': 0}, refused cases []
 fan-in: {'compatible_blocks': 13, 'unread_blocks': 0, 'inspected': 385, 'accounted': 385, 'unexplained': 0, 'extra': 0, 'unavailable': 0, 'unreadable': 0, 'capture_faults': 0, 'incompatible_blocks': 0}
-critic: {'killed matched references': 0, 'of them no reported claim took': 0}
+critic: {'killed matched references': 0, 'of them no reported claim took': 0, 'not-real drafts': 0}, not-real gap by artifact {'stale-drafts': 12, 'no-down-vote': 1}
 == panels
 panels-2198870-mstarks01-e5d71171 preparation/prepare: {'capture uncaptured': 11, 'rebuilt absent': 2, 'rebuilt draft-contains': 1, 'rebuilt equal': 6, 'rebuilt overlap': 2, 'with an archived lead rule': 6, 're-keyed must-finds outside the population': 12} rates [('lane material captured', (0, 11))] means {} unread 11 path unverified
 panels-6bff717-mstarks01-e32ad9c5 preparation/prepare: {'capture uncaptured': 15, 'rebuilt absent': 4, 'rebuilt draft-contains': 2, 'rebuilt equal': 4, 'rebuilt overlap': 3, 'rebuilt reference-contains': 2, 'with an archived lead rule': 9, 're-keyed must-finds outside the population': 0} rates [('lane material captured', (0, 15))] means {} unread 15 path unverified
@@ -89,3 +89,4 @@ panels-sweep-11-sparse-shift-scheduling preparation/prepare: {'with an archived 
 panels-sweep-12-overclaiming-supplier-portal preparation/prepare: {'with an archived lead rule': 0, 're-keyed must-finds outside the population': 0} rates [('lane material captured', (0, 0))] means {} unread 0 path unverified
 panels-sweep-13-dispatch-control-plane preparation/prepare: {'with an archived lead rule': 0, 're-keyed must-finds outside the population': 0} rates [('lane material captured', (0, 0))] means {} unread 0 path unverified
 panels-sweep-16-library-lending-interview preparation/prepare: {'with an archived lead rule': 0, 're-keyed must-finds outside the population': 0} rates [('lane material captured', (0, 0))] means {} unread 0 path unverified
+uncaptured panels skipped: 56
