@@ -19,43 +19,37 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from evals.harness.reference import load_corpus
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.system_model import ModelIndex
+from evals.harness.identity import CaseFlows, endpoint_subset
+from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.verbs import same_action
 
-LANES = (
-    "spoofing",
-    "tampering",
-    "repudiation",
-    "information-disclosure",
-    "denial-of-service",
-    "elevation-of-privilege",
-)
-
-#: The reader's classification of each verb row, keyed by case prefix and
+#: The reader's classification of each verb row, keyed by case ID and
 #: reference index, with the mechanism the draft states in place of the
 #: reference's.
 CLASSIFICATION = {
-    ("02", 3): (
+    ("02-iot-fleet-telemetry", 3): (
         "wrong mechanism",
         "on-path",
         "an on-path swap of the firmware in transit, not a bucket writer",
     ),
-    ("03", 8): (
+    ("03-batch-data-pipeline", 8): (
         "wrong mechanism",
         "storage-copy",
         "a storage copy on unknown encryption at rest, not a grant holder",
     ),
-    ("06", 3): (
+    ("06-cookbook-online-game", 3): (
         "wrong mechanism",
         "on-path",
         "an on-path change of gameplay traffic, not the player's own client",
     ),
-    ("09", 4): (
+    ("09-cookbook-sokify-retail", 4): (
         "wrong mechanism",
         "on-path",
         "an on-path rewrite of the SQL, not a party that drives the macros",
     ),
-    ("10", 0): (
+    ("10-cookbook-generic-cms", 0): (
         "no ruling can move it",
         "",
         (
@@ -63,12 +57,12 @@ CLASSIFICATION = {
             " outside position that S-03 does not state"
         ),
     ),
-    ("10", 17): (
+    ("10-cookbook-generic-cms", 17): (
         "wrong mechanism",
         "storage-copy",
         "an offline change of a database copy, not stored comment injection",
     ),
-    ("12", 17): (
+    ("12-overclaiming-supplier-portal", 17): (
         "wrong mechanism",
         "other",
         (
@@ -76,7 +70,7 @@ CLASSIFICATION = {
             " the genuine channel"
         ),
     ),
-    ("13", 16): (
+    ("13-dispatch-control-plane", 16): (
         "wrong mechanism",
         "other",
         (
@@ -84,7 +78,7 @@ CLASSIFICATION = {
             " engineer's session"
         ),
     ),
-    ("13", 19): (
+    ("13-dispatch-control-plane", 19): (
         "wrong mechanism",
         "on-path",
         (
@@ -105,20 +99,24 @@ def _report_claims(path: Path) -> list[dict]:
     return analysis["claims"]
 
 
-def _ruling(rulings: list[dict], reference, lane: str, draft_verb: str) -> dict | None:
-    """The ruling on a reading of ``reference`` under the draft's action, if any."""
-    return next(
-        (
-            ruling
-            for ruling in rulings
-            if ruling["lane"] == lane
-            and ruling["reference"]["verb"] == reference.verb
-            and set(ruling["reference"]["affected_element_ids"])
-            == set(reference.affected_element_ids)
-            and same_action(ruling["reading"]["verb"], draft_verb)
-        ),
-        None,
-    )
+def _ruling(case: GoldenCase, index: int, draft: dict, flows: CaseFlows) -> str:
+    """The verdict a person gave on the draft's reading of reference ``index``.
+
+    A reading answers the draft where it carries the draft's action at the
+    draft's place, as ``near_misses`` reads a ruling. ``""`` where no ruling
+    reads the draft.
+    """
+
+    def reads(reading) -> bool:
+        return same_action(reading.verb, draft["verb"]) and endpoint_subset(
+            reading.affected_element_ids, draft["affected_element_ids"], flows
+        )
+
+    if any(reads(one) for one in case.ruled_readings.get(index, ())):
+        return "same"
+    if any(reads(one) for one in case.refused_readings.get(index, ())):
+        return "different"
+    return ""
 
 
 def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
@@ -137,12 +135,12 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
         proposals = _stride(reports / f"{case.id}.proposals.json")
         drafts = _stride(reports / f"{case.id}.drafts.json")
         claims = _report_claims(reports / f"{case.id}.report.json")
-        for lane in LANES:
+        for lane in STRIDE_CATEGORIES:
             batch = proposals.get(lane) or {}
             volume[(lane, "proposals")] += len(batch.get("claims") or [])
             volume[(lane, "drafts")] += sum(d["category"] == lane for d in drafts)
             volume[(lane, "report")] += sum(c["category"] == lane for c in claims)
-        for index, reference in enumerate(references):
+        for reference in references:
             if reference.must_find:
                 must_finds[reference.category] += 1
         by_id = {claim["id"]: claim for claim in claims}
@@ -163,7 +161,7 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
                     "claim_title": claim["title"],
                 }
             )
-        rulings = json.loads((corpus / case.id / "rulings.json").read_text())
+        flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
         drafts_by_id = {draft["id"]: draft for draft in drafts}
         (losses,) = scored_case["losses"]
         for loss in losses["losses"]:
@@ -173,12 +171,8 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
             if loss["cause"] != "verb":
                 continue
             index = loss["reference_index"]
-            reference = references[index]
             draft = drafts_by_id[loss["draft_id"]]
-            ruling = _ruling(
-                rulings.get("stride", []), reference, loss["lane"], loss["draft_verb"]
-            )
-            kind, mechanism, note = CLASSIFICATION[(case.id[:2], index)]
+            kind, mechanism, note = CLASSIFICATION[(case.id, index)]
             verb_rows.append(
                 {
                     "case": case.id,
@@ -191,8 +185,7 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
                     "place_relation": loss["place_relation"],
                     "draft_title": draft["title"],
                     "in_report": loss["draft_id"] in by_id,
-                    "ruling": ruling["verdict"] if ruling else "",
-                    "ruling_source": ruling["source"] if ruling else "",
+                    "ruling": _ruling(case, index, draft, flows),
                     "classification": kind,
                     "draft_mechanism": mechanism,
                     "note": note,
@@ -206,7 +199,7 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
             writer.writerows(rows)
     named = sorted({cause for _, cause in causes})
     lines = ["lane | must-finds | matched | " + " | ".join(named)]
-    for lane in LANES:
+    for lane in STRIDE_CATEGORIES:
         lines.append(
             f"{lane} | {must_finds[lane]} | {matched[lane]} | "
             + " | ".join(str(causes[(lane, cause)]) for cause in named)
@@ -219,7 +212,7 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
     )
     lines.append("")
     lines.append("lane | proposals | drafts | report claims")
-    for lane in LANES:
+    for lane in STRIDE_CATEGORIES:
         lines.append(
             f"{lane} | {volume[(lane, 'proposals')]} | {volume[(lane, 'drafts')]}"
             f" | {volume[(lane, 'report')]}"
