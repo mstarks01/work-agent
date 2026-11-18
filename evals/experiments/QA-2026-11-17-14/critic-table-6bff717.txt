@@ -1,0 +1,14 @@
+critic input populations, in drafts (labels are relative to the reference set and the ledger). Rows are scored outcomes, where 'rejected' is a person's down-vote; columns are the critic's fates, where 'rejected' is the critic's verdict:
+  scored outcome     label         confirmed needs-info   rejected   returned    omitted
+  lane-error         unlabelled            1          1          0          0          0
+  matched-expected   real                  5         42          7          0          0
+  matched-must-find  real                  4         12          1          0          0
+  stale              unlabelled           26         87          3          0          0
+  unvoted            unlabelled            0          0          6          0          0
+  real_rejected            8/71 (11%)
+  real_needs_info          54/71 (76%)
+  not_real_confirmed       0/0 (unavailable)
+  not_real_needs_info      0/0 (unavailable)
+  not-real population empty (stale-drafts, stale drafts: 116): no draft carries a current down-vote, and some carry only a vote on another argument: a vote judges a reported claim with its verdict (ADR 0029), and a draft has no verdict
+  gross: 8 reference-matched drafts killed; net: 8 of their references no reported claim took
+repeats: 1; run-to-run variation unmeasured

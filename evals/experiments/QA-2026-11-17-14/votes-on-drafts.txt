@@ -1,0 +1,4 @@
+# Reported claims by scored outcome, and the draft outcome beside each live-voted reported claim.
+post-critic reported claims by outcome: {'matched-expected': 929, 'stale': 573, 'unscored': 1055, 'unvoted': 998, 'pooled': 140, 'matched-must-find': 139, 'open': 92, 'lane-error': 22, 'rejected': 43}
+draft outcome -> reported outcome, where reported is live-voted: {('stale', 'pooled'): 140, ('stale', 'open'): 91, ('stale', 'rejected'): 43, ('matched-expected', 'open'): 1}
+archives with a live vote: 28 ['20260909T152856Z-stride-spread-01-r2', '20260909T153048Z-stride-spread-01-r3', '20260909T153224Z-stride-spread-01-r4', '20260909T153442Z-stride-spread-01-r5', '20260909T161416Z-stride-sweep', '20260912-stride-730-flex', '20260912T192510Z-stride-verb-batch', '20260920T-openrouter-preflight-03', '20260920T-stride-baseline-01', '20260921T-stride-1110-case02', '20260921T-stride-1110-case06', '20260923T-assertions-ab']

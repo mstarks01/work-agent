@@ -1,0 +1,43 @@
+# Census of the 113 readable archived artifacts (development cases), STRIDE drafts by scored outcome and fate.
+# The label column here is the phase A script's own: "supported" is a matched reference or a live pooling vote, "unsupported" a live down-vote. #2283 names them real and not-real.
+# Read with the vote ledger at the time; commit 6de96fa6 (before #2283).
+artifacts read: 113 skipped: {'ProvenanceError': 876, 'runs:EvalRunError': 254, 'runs:UnreadableReport': 7}
+POP ('lane-error', 'lane-error', 'confirmed') 6
+POP ('lane-error', 'lane-error', 'needs-info') 16
+POP ('lane-error', 'lane-error', 'rejected') 11
+POP ('stale', 'stale', 'confirmed') 160
+POP ('stale', 'stale', 'needs-info') 689
+POP ('stale', 'stale', 'rejected') 15
+POP ('supported', 'matched-expected', 'confirmed') 191
+POP ('supported', 'matched-expected', 'needs-info') 737
+POP ('supported', 'matched-expected', 'rejected') 19
+POP ('supported', 'matched-must-find', 'confirmed') 39
+POP ('supported', 'matched-must-find', 'needs-info') 100
+POP ('supported', 'matched-must-find', 'rejected') 2
+POP ('unscored', 'unscored', 'confirmed') 197
+POP ('unscored', 'unscored', 'needs-info') 858
+POP ('unscored', 'unscored', 'rejected') 27
+POP ('unvoted', 'unvoted', 'confirmed') 208
+POP ('unvoted', 'unvoted', 'needs-info') 790
+POP ('unvoted', 'unvoted', 'rejected') 314
+EVID ('conditional-ground', 'confirmed') 51
+EVID ('conditional-ground', 'needs-info') 2896
+EVID ('conditional-ground', 'rejected') 268
+EVID ('dropped', 'fails the proposal schema at affected_el') 2
+EVID ('dropped', 'fails the proposal schema at title') 1
+EVID ('dropped', 'names only elements its grounds do not r') 4
+EVID ('dropped', 'names the same action at the same place ') 3
+EVID ('dropped', 'no ground verifies') 5
+EVID ('dropped', 'repeats the ID of an earlier draft in th') 2
+EVID ('repaired', 'same', 'confirmed') 6
+EVID ('repaired', 'same', 'needs-info') 17
+EVID ('repaired', 'same', 'rejected') 7
+EVID ('unreconciled', 'confirmed-on-unknown') 1
+EVID ('unreconciled', 'dismissal-off-grounds') 95
+EVID ('unreconciled', 'duplicate-id') 1
+EVID ('unreconciled', 'unbriefed-change') 6
+EVID ('unreconciled', 'unresolved-unknown') 66
+EVID ('unreconciled', 'verdict-shape') 35
+EVID ('unverified', 'confirmed') 15
+EVID ('unverified', 'needs-info') 29
+EVID ('unverified', 'rejected') 6
