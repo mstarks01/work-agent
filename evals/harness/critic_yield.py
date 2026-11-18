@@ -399,7 +399,7 @@ class CriticYield:
     #: gross (the draft that had matched died) or net (nothing took its place).
     matched_after_indices: frozenset[int]
 
-    # --- the two numbers that matter -------------------------------------
+    # --- the gross kill counts -------------------------------------------
 
     @property
     def rejected_killed(self) -> int:

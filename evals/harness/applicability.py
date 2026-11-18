@@ -1013,9 +1013,9 @@ class ApplicabilityYield:
       ``not-applicable``. The critic doing its job, and the counterpart of
       the numerator of STRIDE's ``rejected_kill_rate``.
     * ``destroyed`` — requirements it rejected that the case *did* expect. **The
-      number that can veto the pattern here**, as the numerator of
-      ``matched_kill_rate`` does for STRIDE. ``matched_killed`` also counts a
-      draft that left the report with no verdict.
+      number that can veto the pattern here**. Its STRIDE counterpart among
+      the rejections is the numerator of ``matched_kill_rate``; STRIDE's veto
+      number ``matched_killed`` also counts a kill with no verdict.
     * ``unlisted`` — requirements it rejected that the case says nothing
       about. On a sampled reference set that is unjudged rather than earned:
       the case did not list the requirement, and did not rule it out either.
