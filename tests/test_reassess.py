@@ -298,12 +298,12 @@ def test_a_row_the_graph_contradicts_after_review_does_not_stand(
     other; where the validity gate then refuses the projected model whole,
     the graph still states no authentication beside the kept mechanism, and
     the finding is withdrawn."""
-    token = MECHANISM.model_copy(update={"value": "a client certificate"})
+    certificate = MECHANISM.model_copy(update={"value": "a client certificate"})
     record = AssertionRecord(
         proposed=2,
         catalog=AssertionCatalog(
             subjects=[Subject(id=LOGIN, type="interaction", label="login")],
-            entries=[MECHANISM, token],
+            entries=[MECHANISM, certificate],
         ),
     )
     threat = sample_threat(
@@ -319,7 +319,7 @@ def test_a_row_the_graph_contradicts_after_review_does_not_stand(
         "assertion"
     )
     verdicts = {
-        **reject(token),
+        **reject(certificate),
         assertion_id(MECHANISM): ReviewerAssessment("supported", REVIEWER),
     }
 

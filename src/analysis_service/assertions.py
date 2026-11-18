@@ -257,10 +257,10 @@ REGISTRY_VERSION = 9
 #: (:func:`answered`), and the scoped rows stay in the catalog as the scoped
 #: facts they state (#1289, F5).
 #:
-#: Version 7: only an answer that may state its value makes the projected value
-#: and lifts the unchecked guard (:func:`_drives_value`). An answer a reviewer
-#: set aside, or an answer of ``unknown``, leaves an unchecked row under the
-#: guard, which writes a qualified ``unknown`` over the lead (#2270).
+#: Version 7: only an answer that may state its value lifts the unchecked guard
+#: (:func:`_drives_value`). An answer a reviewer set aside, or an answer of
+#: ``unknown``, leaves an unchecked row under the guard, which writes a
+#: qualified ``unknown`` over the lead (#2270).
 PROJECTION_VERSION = 7
 
 #: The value that says a source stated this fact is **not there**. A positive
@@ -2097,9 +2097,9 @@ def answered(entry: Assertion) -> bool:
 
     **The one reader of "is this row an answer".** An answer to a question this
     service asked settles the fact, even against the sources (the maintainer's
-    decision of 2026-09-25 on #1225), so :func:`project` lets an unscoped one
-    outrank every other row, and the question readers find the row an earlier
-    run wrote by it.
+    decision of 2026-09-25 on #1225), so :func:`project` lets one that may
+    state its value (:func:`_drives_value`) outrank every other row, and the
+    question readers find the row an earlier run wrote by it.
     """
     return entry.origin == "answer"
 
