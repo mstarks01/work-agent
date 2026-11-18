@@ -172,6 +172,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "graph_subject_type",
+    "held_open_attributes",
     "hidden_qualifications",
     "missing_value",
     "offered",
@@ -3273,6 +3274,25 @@ def contradicted_attributes(
     return frozenset(
         (found.element_id, found.attribute) for found in contradictions(catalog, model)
     )
+
+
+def held_open_attributes(
+    catalog: AssertionCatalog, model: SystemModel
+) -> frozenset[tuple[str, str]]:
+    """Each ``(element_id, attribute)`` the rows hold open against ``model``.
+
+    The rows contradict the attribute (:func:`contradicted_attributes`), or
+    the attribute's projection qualifies it and the model does not show that
+    (:func:`hidden_qualifications`), so the field's value is no fact and the
+    open rows carry the question. The evidence catalog offers no
+    ``absent-attribute`` entry for these (the maintainer's rulings of
+    2026-11-18 on #2270).
+    """
+    hidden = {
+        (projection.element_id, projection.attribute)
+        for projection in hidden_qualifications(catalog, model)
+    }
+    return contradicted_attributes(catalog, model) | hidden
 
 
 def contradicted(

@@ -644,9 +644,10 @@ class Ground(BaseModel):
       agent's argument and the critic's to rule on. An absence is not
       catalogued where the job's unscoped assertion rows that state the
       attribute's value (the answers alone, where a submitter's answer makes
-      it) all state the opposite
-      (:func:`~analysis_service.assertions.contradicted_attributes`); those
-      rows are open questions instead.
+      it) all state the opposite, or where the field hides the qualification
+      its projection writes
+      (:func:`~analysis_service.assertions.held_open_attributes`); those rows
+      are open questions instead.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a
       thing, which no element's free text names. **The only branch whose
       referent is the whole model rather than an element of it**, and the one a

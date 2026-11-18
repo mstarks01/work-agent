@@ -92,7 +92,8 @@ A ground has one of these kinds:
 - `unknown-attribute`: an attribute the source left unknown;
 - `absent-attribute`: an attribute the source explicitly said was absent,
   unless the unscoped assertion rows that state its value all state the
-  opposite (the answers alone, where a submitter's answer makes the value);
+  opposite (the answers alone, where a submitter's answer makes the value),
+  or the rows leave it open where the service could not write the model;
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
 - `assertion`: an assertion row that the sources settle, unless the rows that
