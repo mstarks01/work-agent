@@ -9,16 +9,21 @@ assertion detects, not a snapshot of what the run happens to emit.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import re
 
 import pytest
 
+from analysis_service import fan_in as fan_in_module
 from analysis_service import graph
 from analysis_service.claims import ProposedVerdict
-from analysis_service.frameworks import PACKAGES, FrameworkName
+from analysis_service.critic import CriticOutputError
+from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
+from analysis_service.frameworks.stride import STRIDE
 from analysis_service.jobs import PipelineCompleted
+from evals.harness import fan_in_accounting
 from tests.factories import (
     EMPTY_CLAIMS,
     SCRIPTED_FRAMEWORKS,
@@ -85,8 +90,14 @@ def test_a_re_ask_that_still_drops_the_draft_fails_the_job(framework, fault):
     replies = _replies(framework, EMPTY_CLAIMS, recritic)
 
     if fault:
-        with pytest.raises(Exception, match=fixture.claim_id):
+        with pytest.raises(Exception, match=fixture.claim_id) as caught:
             _run(framework, replies)
+        chain = []
+        error: BaseException | None = caught.value
+        while error is not None:
+            chain.append(error)
+            error = error.__cause__ or error.__context__
+        assert any(isinstance(link, CriticOutputError) for link in chain)
     else:
         outcome, _ = _run(framework, replies)
         assert isinstance(outcome, PipelineCompleted)
@@ -150,14 +161,51 @@ _NAMED = re.compile(r"`(test_\w+\.py)((?:::\w+)+)`")
 
 
 def test_each_test_the_matrix_names_exists():
-    """A row whose test is renamed or deleted fails here, not silently."""
+    """Each test the matrix names, by its full ID, is in the tree: a renamed or
+    deleted test fails here. A cell that names a test with no file fails too."""
     text = (REPO_ROOT / "docs/agents/regression-matrix.md").read_text("utf-8")
+    bare = re.findall(r"`(test_\w+)`", text)
+    assert bare == [], f"name each test with its file: {bare}"
     named = _NAMED.findall(text)
     assert named
     for path, parts in named:
-        source = (REPO_ROOT / "tests" / path).read_text("utf-8")
+        tree = ast.parse((REPO_ROOT / "tests" / path).read_text("utf-8"))
+        scope: list[ast.stmt] = tree.body
         for part in parts.split("::")[1:]:
-            assert re.search(rf"^\s*(def|class) {part}\b", source, re.MULTILINE), (
-                path,
-                part,
-            )
+            found = [
+                node
+                for node in scope
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef))
+                and node.name == part
+            ]
+            assert found, (path, part)
+            scope = found[0].body if isinstance(found[0], ast.ClassDef) else []
+
+
+@pytest.mark.parametrize("fault", [True, False])
+def test_a_proposal_the_fan_in_drops_silently_is_unexplained(monkeypatch, fault):
+    """The fan-in loses a draft and records no reason. The accounting must
+    name it, against a count taken from the lanes' own emissions."""
+    stored = {
+        "spoofing": schemas_for("stride").proposals(claims=[sample_proposal("S-01")]),
+        "tampering": schemas_for("stride").proposals(
+            claims=[sample_proposal("T-01", "tampering", verb="alter")]
+        ),
+    }
+    emitted_count = sum(len(batch.claims) for batch in stored.values())
+    if fault:
+        real = fan_in_module.join_drafts
+
+        def loses_the_first(*args, **kwargs):
+            joined = real(*args, **kwargs)
+            return joined._replace(drafts=joined.drafts[1:])
+
+        monkeypatch.setattr(fan_in_module, "join_drafts", loses_the_first)
+
+    merged = fan_in_module.fan_in(stored, STRIDE, valid_model(), {}, assertions=None)
+    row = fan_in_accounting.account("case", stored, STRIDE, merged)
+
+    assert len(row.proposals) == emitted_count
+    assert emitted_count - row.accounted == int(fault)
+    assert row.unexplained == (("S-01",) if fault else ())
+    assert "T-01" in row.kept

@@ -56,6 +56,11 @@ A **Vendor** row has the same failure mode: a constant, a branch or a short
 table entry that does not raise. `tests/test_vendor_neutrality.py` checks it.
 See `docs/agents/vendor-parity.md`.
 
+### Regression matrix
+
+Before you add a regression test, read `docs/agents/regression-matrix.md`,
+and add a row for the failure the test holds.
+
 ### Quality audits
 
 "Run a quality audit" invokes `.claude/skills/quality-audit/`. Before you
