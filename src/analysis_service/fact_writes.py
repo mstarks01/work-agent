@@ -486,11 +486,21 @@ def fact_rows(
         )
     # An attribute answer settles every unscoped row at its attribute, as it
     # removes a replaced row there, so a place answer there writes nothing.
-    placed = {
-        key: row
+    attribute_answered = [
+        key
         for key, row in placed.items()
-        if row.scope or reached(row) not in attributes
-    }
+        if not row.scope and reached(row) in attributes
+    ]
+    issues.extend(
+        CatalogIssue(
+            code="unmatched-answer",
+            message=f"an attribute answer settles the attribute of {key!r}, so"
+            " the answer placed nothing",
+        )
+        for key in attribute_answered
+    )
+    placed = {key: row for key, row in placed.items() if key not in attribute_answered}
+    placed_ids = {assertion_id(row) for row in placed.values()}
     answer_rows = (*replaced.values(), *placed.values())
     asked, parts = _part_rows(
         catalog, model, answers, spans, answer_rows, attributes.keys()
@@ -537,7 +547,10 @@ def fact_rows(
             assertion=assertion_id(entry),
         )
         for entry in catalog.entries
-        if answered_over(entry) and not answered(entry) and entry.value != UNKNOWN
+        if answered_over(entry)
+        and not answered(entry)
+        and entry.value != UNKNOWN
+        and assertion_id(entry) not in placed_ids
     )
 
     entries = [
@@ -594,6 +607,7 @@ def _part_rows(
     }
     asked: set[tuple[str, str]] = set()
     rows: dict[tuple[str, str], Assertion] = {}
+    stated = source_states(model, catalog)
     for fact, span in zip(answers, spans, strict=True):
         element_id = key_ref(fact.key).element_id
         subject_type = graph_subject_type(element_id)
@@ -608,7 +622,7 @@ def _part_rows(
                 value is None
                 or place in answered_places
                 or (element_id, projected_attribute(name, element_id)) in attributes
-                or source_states(model, catalog, element_id, name)
+                or stated(element_id, name)
             ):
                 continue
             rows[place] = Assertion(

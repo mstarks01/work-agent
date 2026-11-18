@@ -151,9 +151,8 @@ class TestAContradictedRow:
     def test_the_sources_do_not_state_the_fact(self):
         """A contradicted row is no statement of the sources, so a Control or
         a question-kind answer may write it (ADR 0125)."""
-        assert not source_states(
-            model_with("none"), compatible(), LOGIN, "authentication-mechanism"
-        )
+        states = source_states(model_with("none"), compatible())
+        assert not states(LOGIN, "authentication-mechanism")
 
     def test_a_correction_reaches_the_finding(self):
         corrected = ANSWER.model_copy(update={"value": "a client certificate"})

@@ -17,7 +17,7 @@ it, so it cannot drift from the verdicts it describes.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from analysis_service.analysis import ControlAttribute, control_state
@@ -392,9 +392,11 @@ def fact_routes(
     attribute's, and the attribute path writes the answer; every other
     unscoped row that reaches the same attribute, an unknown row among them,
     asks that one fact too, and so does every unscoped row at an attribute
-    the rows hold open (:func:`~analysis_service.assertions.held_open_attributes`),
-    which takes an answer as an attribute (:func:`open_attribute`). Where a row reaches no field, or states a narrower
-    scope than the attribute, the question is its place's
+    the rows hold open
+    (:func:`~analysis_service.assertions.held_open_attributes`), which takes
+    an answer as an attribute (:func:`open_attribute`). Where a row reaches no
+    field, or states a narrower scope than the attribute, the question is its
+    place's
     (:func:`~analysis_service.assertions.place_identity`), which names the
     answer's row in every later run too (the maintainer's ruling of
     2026-11-18 on #2270). ``model`` is read as the lanes read it
@@ -423,7 +425,10 @@ def fact_routes(
 def routed(
     refs: Iterable[UnknownRef], routes: Mapping[str, UnknownRef]
 ) -> list[UnknownRef]:
-    """``refs``, each reference to an open row replaced by its fact (:func:`fact_routes`)."""
+    """``refs``, each reference to an open row replaced by its fact.
+
+    The facts are :func:`fact_routes`'s.
+    """
     return [
         routes.get(ref.assertion, ref) if ref.kind == "assertion" else ref
         for ref in refs
@@ -431,12 +436,13 @@ def routed(
 
 
 def source_states(
-    model: SystemModel,
-    catalog: AssertionCatalog | None,
-    element_id: str,
-    predicate: PredicateName,
-) -> bool:
-    """True where the sources settle ``predicate`` about this element (ADR 0117).
+    model: SystemModel, catalog: AssertionCatalog | None
+) -> Callable[[str, PredicateName], bool]:
+    """Whether the sources settle a predicate about an element (ADR 0117).
+
+    Returns the check for ``model`` and ``catalog``, which reads the projected
+    model and the uncontradicted rows once, so a writer that asks it of every
+    part of every answer projects the model once.
 
     **The subject rule.** The writer of an answer's rows asks it, and so does
     the tripwire that measures stated parts. Only a settled, unscoped row about
@@ -452,25 +458,30 @@ def source_states(
     the submitter already spoke to this fact, so a later answer may replace
     theirs.
     """
-    held = answer(catalog or AssertionCatalog(), element_id, predicate)
+    rows = catalog or AssertionCatalog()
     prepared = prepared_model(model, catalog)
     facts = (
         set()
         if catalog is None
         else {assertion_id(row) for row in uncontradicted(catalog, prepared)}
     )
-    if any(
-        not row.scope and not answered(row) and assertion_id(row) in facts
-        for row in held.settled
-    ):
-        return True
-    attribute = projected_attribute(predicate, element_id)
-    answer_wrote = any(answered(row) for row in held.rows)
-    return (
-        bool(attribute)
-        and not answer_wrote
-        and not open_attribute(prepared, element_id, attribute, catalog)
-    )
+
+    def states(element_id: str, predicate: PredicateName) -> bool:
+        held = answer(rows, element_id, predicate)
+        if any(
+            not row.scope and not answered(row) and assertion_id(row) in facts
+            for row in held.settled
+        ):
+            return True
+        attribute = projected_attribute(predicate, element_id)
+        answer_wrote = any(answered(row) for row in held.rows)
+        return (
+            bool(attribute)
+            and not answer_wrote
+            and not open_attribute(prepared, element_id, attribute, catalog)
+        )
+
+    return states
 
 
 def stated_capability(model: SystemModel, capability: str) -> str | None:

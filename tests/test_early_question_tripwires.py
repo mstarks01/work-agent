@@ -45,9 +45,9 @@ def _stated_parts(
     0117, so a part whose predicate the assertion pass extracts counts here
     from the run that turns it on.
     """
+    states = source_states(model, catalog)
     return sum(
-        source_states(model, catalog, element_id, predicate)
-        for _, predicate in QUESTION_KINDS[name].parts
+        states(element_id, predicate) for _, predicate in QUESTION_KINDS[name].parts
     )
 
 
