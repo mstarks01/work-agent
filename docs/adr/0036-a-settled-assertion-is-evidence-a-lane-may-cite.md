@@ -81,8 +81,8 @@ one is stated.
 *Amended by the maintainer's ruling of 2026-11-18 on #2270 (R2).* Where the
 value the rows project into an attribute and the graph attribute after the
 projection state opposites (`assertions.contradictions`), the settled rows
-behind that value are not offered as settled rows. Neither side settles the
-fact against that model, so the catalog offers each such row as an open
+behind that value are not offered as settled rows. Neither side is a fact
+against that model, so the catalog offers each such row as an open
 question, as it offers a row another row disputes, and a claim on it reads
 `needs-info`. `assertions.offered` starts from `assertions.uncontradicted`,
 and `assertions.contradicted` names the rows the catalog holds open. Where a

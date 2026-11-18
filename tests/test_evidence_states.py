@@ -12,6 +12,7 @@ import pytest
 
 from analysis_service.assertions import (
     ABSENT,
+    UNKNOWN,
     Qualifier,
     Subject,
     apply_projection,
@@ -263,8 +264,8 @@ class TestARowTheGraphContradicts:
 
     Where a projection is not written into the graph, a row stating an absence
     beside an attribute stating a control is a contradiction the report names.
-    Neither side settles the fact, so the evidence catalog offers the row as
-    an open question, and a claim on it reads needs-info.
+    Neither side is a fact against that model, so the evidence catalog offers
+    the row as an open question, and a claim on it reads needs-info.
     """
 
     STORED = row(
@@ -278,14 +279,7 @@ class TestARowTheGraphContradicts:
 
     def answer(self):
         """The stored absence, written as a submitter's answer."""
-        said = "Orders database: not encrypted."
-        return self.STORED.model_copy(
-            update={
-                "origin": "answer",
-                "basis": "stated",
-                "support": [support_span(said, ANSWERS_LABEL, said)],
-            }
-        )
+        return _as_answer(self.STORED, "Orders database: not encrypted.")
 
     def test_an_opposite_graph_value_is_named_and_the_row_is_open(self):
         model = _with_encryption("AES-256")
@@ -363,6 +357,18 @@ class TestARowTheGraphContradicts:
         assert offered[ref].kind == "absent-attribute"
 
 
+def _as_answer(row, said, **update):
+    """``row`` written as a submitter's answer that quotes ``said``."""
+    return row.model_copy(
+        update={
+            "origin": "answer",
+            "basis": "stated",
+            "support": [support_span(said, ANSWERS_LABEL, said)],
+            **update,
+        }
+    )
+
+
 class TestARejectedAnswer:
     """An answer a reviewer set aside makes no projected value, so it neither
     exempts a contradiction nor lifts the guard on an unchecked row."""
@@ -370,15 +376,7 @@ class TestARejectedAnswer:
     SAID = "Orders database: encrypted with AES-256."
 
     def answer(self, row, value):
-        return row.model_copy(
-            update={
-                "value": value,
-                "origin": "answer",
-                "basis": "stated",
-                "assessment": "unsupported",
-                "support": [support_span(self.SAID, ANSWERS_LABEL, self.SAID)],
-            }
-        )
+        return _as_answer(row, self.SAID, value=value, assessment="unsupported")
 
     def test_the_source_row_it_sits_beside_is_still_held_open(self):
         source = TestARowTheGraphContradicts.STORED
@@ -407,3 +405,26 @@ class TestARejectedAnswer:
 
         (flow,) = updated.data_flows
         assert flow.authentication.startswith("unknown")
+
+
+def test_an_answer_of_unknown_does_not_lift_the_unchecked_guard():
+    """An answer that the submitter does not know makes no value, so an
+    unchecked row beside it still cannot close the lead (ADR 0041)."""
+    source = stated()
+    dunno = _as_answer(
+        source,
+        "Place order: no idea how it authenticates.",
+        value=UNKNOWN,
+        reason="hedged",
+    )
+    catalog = assertions(
+        dunno,
+        source,
+        subjects=(Subject(id=FLOW, type="interaction", label="place order"),),
+    )
+    graph = test_assertions.TestAGraphAttributeAndItsRowsStatingOpposites()
+
+    updated, _ = apply_projection(graph.model("none"), catalog)
+
+    (flow,) = updated.data_flows
+    assert flow.authentication.startswith("unknown")
