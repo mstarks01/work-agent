@@ -64,10 +64,9 @@ from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_c
 # disagree with it the first time one was added. So the four names below are
 # the ones this module owns, and every standing arrives with the scorer's own
 # type.
-ScoredOutcome = (
-    Literal["matched-must-find", "matched-expected", "lane-error", "unscored"]
-    | VoteStatus
-)
+#: The scored outcomes that matched a reference.
+MatchedOutcome = Literal["matched-must-find", "matched-expected"]
+ScoredOutcome = MatchedOutcome | Literal["lane-error", "unscored"] | VoteStatus
 
 #: The fates that hold no verdict status in the block.
 NoVerdictFate = Literal["returned", "omitted"]
@@ -194,7 +193,7 @@ class CriticPopulations:
         """The share of one population's drafts with a verdict that met one fate."""
         return Rate(
             self.met(fate, _in(label)),
-            self.with_verdict_in(label),
+            self.with_verdict(_in(label)),
         )
 
     def with_verdict(self, outcome_matches: Callable[[ScoredOutcome], bool]) -> int:
@@ -214,10 +213,6 @@ class CriticPopulations:
             for (outcome, held), n in self.counts.items()
             if held == fate and outcome_matches(outcome)
         )
-
-    def with_verdict_in(self, label: Population) -> int:
-        """The drafts with a verdict in one population."""
-        return self.with_verdict(_in(label))
 
     @property
     def no_verdict(self) -> int:
@@ -242,7 +237,7 @@ class CriticPopulations:
     @property
     def not_real_gap(self) -> NotRealGap | None:
         """Why the not-real population is empty, or ``None`` where it is not."""
-        if self.with_verdict_in("not-real"):
+        if self.with_verdict(_in("not-real")):
             return None
         if self.count("not-real"):
             return "no-verdict"
@@ -401,10 +396,10 @@ class CriticYield:
 
     @property
     def rejected_killed(self) -> int:
-        """The critic earning its cost: drafts that left the report, with a
-        verdict or not (:attr:`KilledDraft.fate` tells which), that a person
-        had already rejected for substance."""
-        return sum(1 for draft in self.killed if _in("not-real")(draft.outcome))
+        """A gross count of the drafts that left the report, with a verdict or
+        not (:attr:`KilledDraft.fate` tells which), that a person had already
+        rejected for substance."""
+        return sum(1 for draft in self.killed if LABEL_OF[draft.outcome] == "not-real")
 
     @property
     def matched_killed(self) -> int:
@@ -671,7 +666,7 @@ def _cause_key(draft: KilledDraft) -> KillCause:
 
 
 def _matched(outcome: ScoredOutcome) -> bool:
-    return outcome.startswith("matched")
+    return outcome in get_args(MatchedOutcome)
 
 
 def _every(_: ScoredOutcome) -> bool:
@@ -679,7 +674,8 @@ def _every(_: ScoredOutcome) -> bool:
 
 
 def _in(label: Population) -> Callable[[ScoredOutcome], bool]:
-    """Whether a scored outcome puts a draft in the population ``label``."""
+    """The predicate that tests whether a scored outcome puts a draft in
+    ``label``."""
     return lambda outcome: LABEL_OF[outcome] == label
 
 
@@ -694,7 +690,7 @@ def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
     return {
         "kill_rate": Rate(killed, populations.with_verdict(_every)),
         "rejected_kill_rate": Rate(
-            down_voted_killed, populations.with_verdict_in("not-real")
+            down_voted_killed, populations.with_verdict(_in("not-real"))
         ),
         "matched_kill_rate": Rate(
             populations.met("rejected", _matched), populations.with_verdict(_matched)
