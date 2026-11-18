@@ -1474,7 +1474,8 @@ class ScriptedFramework:
     whole emission and ``ruling`` is the critic's, both in the package's own
     node schema. ``claim_id`` is the ID the graph composes for that draft, so a
     test can find it on the finished block. ``options`` is a complete selection
-    for the package.
+    for the package. ``second_key`` is another key the same lane can propose,
+    for a test that needs a second draft beside the first.
     """
 
     lane: str
@@ -1482,6 +1483,7 @@ class ScriptedFramework:
     claim_id: str
     proposal: str
     ruling: str
+    second_key: str | int
 
 
 #: One scripted fixture per package, keyed by framework and checked against
@@ -1494,6 +1496,7 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
             lane="spoofing",
             options={},
             claim_id="S-01",
+            second_key=2,
             proposal=claims_json(sample_proposal("S-01", "spoofing")),
             ruling=claims_json(sample_ruling("S-01")),
         ),
@@ -1501,6 +1504,7 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
             lane="authentication",
             options={"level": 1},
             claim_id="v5.0.0-6.2.1",
+            second_key="2.2",
             proposal=claims_json(
                 RequirementProposal(
                     requirement="2.1",
