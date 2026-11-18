@@ -1,7 +1,7 @@
 """Critic yield, offline, with zero provider calls.
 
-The instrument has one job: say what the critic killed *and* what killing it
-lost. These tests hold the two halves apart — a critic that kills a rejected
+The instrument has one job: say what left the report across the critic pass
+*and* what losing it cost. These tests hold the two halves apart — a critic that kills a rejected
 draft and a critic that kills a must-find draft must never produce the same
 number — and pin the two properties the whole measurement rests on: the scored
 claim is the same string on both sides, and the post-critic score is exactly

@@ -397,7 +397,8 @@ class CriticYield:
     must_find_total: int
     populations: CriticPopulations
     #: The references the post-critic score matched, so a kill can be read as
-    #: gross (the draft that had matched died) or net (nothing took its place).
+    #: gross (the draft that had matched left the report) or net (nothing took
+    #: its place).
     matched_after_indices: frozenset[int]
 
     # --- the gross kill counts -------------------------------------------

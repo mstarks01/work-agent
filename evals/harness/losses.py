@@ -25,8 +25,8 @@ order, and the first that finds the finding charges it; ``position`` and
 * ``position``: claims cite the place with a reading's action, and a
   person ruled the reference an attacker position that none of them states.
   The lane wrote the action against another attacker, which the scorer's
-  position gate refuses. Each later stage reads the same rule: a draft the
-  critic killed and a proposal the fan-in lost answer the reference only where
+  position gate refuses. Each later stage reads the same rule: a draft that
+  left the report and a proposal the fan-in lost answer the reference only where
   they state its ruled position, so a stage that finds the action at the place
   and only other positions charges ``position``, not itself.
 * ``unstated``: as ``position``, except that none of those items states any
