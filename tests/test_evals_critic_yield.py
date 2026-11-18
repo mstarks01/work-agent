@@ -686,3 +686,86 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     for current in ("pooled", "open", "unvoted"):
         empty = CriticPopulations({(current, "confirmed"): 1})
         assert empty.not_real_gap == "no-down-vote"
+
+
+def _ruled_block(case, kept, rejected):
+    """The STRIDE block of a critic that kept ``kept`` and rejected ``rejected``."""
+    return (
+        _report_with(case, kept)
+        .analyses[0]
+        .model_copy(
+            update={
+                "rejected_claims": [
+                    promote(
+                        draft,
+                        verdict=Verdict(
+                            status="rejected",
+                            reason="does not follow",
+                            rejected_because="reasoning",
+                        ),
+                    )
+                    for draft in rejected
+                ]
+            }
+        )
+    )
+
+
+def test_a_population_rate_counts_a_draft_with_no_verdict_apart(capsys):
+    """An omitted or returned draft is in no population's denominator."""
+    populations = CriticPopulations(
+        {
+            ("matched-expected", "rejected"): 1,
+            ("matched-must-find", "omitted"): 1,
+            ("matched-expected", "returned"): 1,
+            ("rejected", "omitted"): 1,
+        }
+    )
+
+    assert populations.rates["real_rejected"] == Rate(1, 1)
+    assert populations.rates["real_needs_info"] == Rate(0, 1)
+    assert populations.rates["not_real_confirmed"] == Rate(0, 0)
+    assert populations.no_verdict == 3
+    assert populations.not_real_gap == "no-verdict"
+    assert populations.to_json()["no_verdict"] == 3
+    CriticAudit(populations, Rate(0, 0)).render()
+    shown = capsys.readouterr().out
+    assert "3 drafts have no archived verdict (omitted or returned)" in shown
+    assert "not-real population empty (no-verdict," in shown
+
+
+def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
+    """A draft the block does not carry left the report with no verdict."""
+    kept = _draft_for(case, _expected(case), 1)
+    omitted = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    lost = _draft_for(case, _must_find(case), 2)
+
+    result = score_case_with_yield(
+        case,
+        [kept, omitted, lost],
+        [promote(kept)],
+        _identity_matcher([kept, lost]),
+        _rejecting(case, omitted),
+        _ruled_block(case, [promote(kept)], []),
+        rows=NO_ROWS,
+    ).critic_yield
+
+    assert result.rates == {
+        "kill_rate": Rate(0, 1),
+        "rejected_kill_rate": Rate(0, 0),
+        "matched_kill_rate": Rate(0, 1),
+        "kill_precision": Rate(0, 0),
+    }
+    assert {draft.fate for draft in result.killed} == {"omitted"}
+    assert result.kill_count == 2
+    assert result.populations.no_verdict == 2
+    assert CriticAudit.of([result]).reference_loss == Rate(0, 0)
+    totals = aggregate_yield([result])
+    assert totals["no_verdict"] == 2
+    assert totals["kill_rate"] == 0.0
+    critic_yield.render([result])
+    shown = capsys.readouterr().out
+    assert "killed-rejected 0/0" in shown
+    assert "2 drafts have no archived verdict (omitted or returned)" in shown
