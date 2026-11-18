@@ -387,3 +387,24 @@ class TestAnAnswerBesideAnOpenRow:
         _, issues = fact_rows(catalog, model_with("unknown"), [ANSWER, place], spans)
 
         assert "unmatched-answer" in [issue.code for issue in issues]
+
+
+def test_a_later_answer_writes_over_the_earlier_answer_at_its_place():
+    """An earlier answer row and a source row that disputes it share a place;
+    the later answer writes over the earlier one, whatever the catalog order,
+    so the place holds one answer row."""
+    said = "Customer accounts: required."
+    earlier = REQUIRED.model_copy(
+        update={
+            "origin": "answer",
+            "basis": "stated",
+            "explanation": "",
+            "support": [support_span(said, ANSWERS_LABEL, said)],
+        }
+    )
+    catalog = disputed().model_copy(update={"entries": [NOT_REQUIRED, earlier]})
+
+    written, _ = TestAnAnswerToADisputedPlace.written(catalog, "required")
+
+    rows = [(row.value, row.origin) for row in written.entries]
+    assert rows == [("required", "answer")]
