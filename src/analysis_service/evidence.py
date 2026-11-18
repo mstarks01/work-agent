@@ -56,10 +56,10 @@ settled row the graph attribute contradicts
 (:func:`~analysis_service.assertions.contradicted`) is not offered as settled
 either.
 
-An **unknown** row is in the table and is a different thing. It is offered under
+An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground, because the sources were
-asked about that fact and left it open, or another row or the graph attribute
-disputes it, and an agent may raise a *conditional*
+asked about that fact and left it open, another row disputes it, or the graph
+attribute contradicts it, and an agent may raise a *conditional*
 claim on it exactly as it may on an element attribute nobody stated. Which of
 the two an entry is, is the entry's own ``Ground.kind``, so a claim that grounds
 a settled row on an open question — or the reverse — is refused by comparing
@@ -716,10 +716,11 @@ def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str
     stated* and *stated absent*, at the seam where the fact has no attribute.
 
     A row with a value is open because another row disputes it
-    (:func:`~analysis_service.assertions.disputed`) or the graph attribute the
-    sources were extracted into states the opposite
-    (:func:`~analysis_service.assertions.contradicted`). Either way the gloss
-    says the sources disagree and names this side's value.
+    (:func:`~analysis_service.assertions.disputed`) or the graph attribute
+    contradicts it (:func:`~analysis_service.assertions.contradicted`). The
+    gloss says the sources disagree and names this side's value. For a
+    contradicted row the other side is the graph attribute, which extraction
+    read from the same sources or inferred.
     """
     about = _about(row, subjects)
     if row.value != UNKNOWN:

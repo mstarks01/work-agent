@@ -671,11 +671,11 @@ class Ground(BaseModel):
       shared. A reference on the same terms as ``derived-fact``: the row's
       subject, value, basis, scope and spans are read off the catalog the
       report embeds, never copied here, so the ground cannot say more than the
-      row does. Only a settled row is ever catalogued
-      (:func:`~analysis_service.assertions.settled`), so a conflict or an
-      unsupported row grounds nothing.
-    * ``unknown-assertion`` — ``assertion`` alone, for a row the sources left
-      open: its value is :data:`~analysis_service.system_model.UNKNOWN`,
+      row does. Only a settled row the graph does not contradict is ever
+      catalogued (:func:`~analysis_service.assertions.uncontradicted`), so a
+      conflict or an unsupported row grounds nothing.
+    * ``unknown-assertion`` — ``assertion`` alone, for an open row: its value
+      is :data:`~analysis_service.system_model.UNKNOWN`,
       another row disputes it (:func:`~analysis_service.assertions.disputed`),
       or the graph attribute states its opposite
       (:func:`~analysis_service.assertions.contradicted`). **The assertion layer's

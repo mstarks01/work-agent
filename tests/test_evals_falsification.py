@@ -16,10 +16,24 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import GATE_REFUSALS
+from analysis_service import evidence
+from analysis_service.assertions import (
+    ABSENT,
+    GATE_REFUSALS,
+    Assertion,
+    AssertionCatalog,
+    Subject,
+    assertion_id,
+)
 from evals.harness import falsify
 from evals.harness.replay import ROW_FATES
 from evals.harness.run import COMMANDS
+from tests.test_assertions import (
+    FLOW,
+    SOURCES,
+    TestAGraphAttributeAndItsRowsStatingOpposites,
+    stated,
+)
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
@@ -266,18 +280,10 @@ def test_the_reading_without_the_corrupted_rows_keeps_no_subject_behind(name):
 class TestWhatAJobReadsAsAFact:
     """A row the graph contradicts reaches a lane as a question, not a fact."""
 
-    def view(self, *entries):
-        from analysis_service.assertions import AssertionCatalog, Subject
-        from tests.test_assertions import (
-            FLOW,
-            SOURCES,
-            TestAGraphAttributeAndItsRowsStatingOpposites,
-        )
-
+    def facts(self, *entries: Assertion) -> frozenset[str]:
+        """The identities ``consumer_view`` reads as facts from these rows."""
         catalog = AssertionCatalog(
-            subjects=[
-                Subject(id=FLOW, type="interaction", label="place order"),
-            ],
+            subjects=[Subject(id=FLOW, type="interaction", label="place order")],
             entries=list(entries),
         )
         model = TestAGraphAttributeAndItsRowsStatingOpposites().model()
@@ -289,21 +295,13 @@ class TestWhatAJobReadsAsAFact:
         :func:`~analysis_service.assertions.apply_projection` then returns the
         model unchanged with nothing applied. The graph keeps its stated
         mechanism beside the stated absence."""
-        from analysis_service import evidence
-        from analysis_service.assertions import ABSENT
-        from tests.test_assertions import stated
-
         monkeypatch.setattr(
             evidence, "apply_projection", lambda model, catalog: (model, ())
         )
-        absence = stated(value=ABSENT)
 
-        assert self.view(absence) == frozenset()
+        assert self.facts(stated(value=ABSENT)) == frozenset()
 
     def test_an_absence_the_graph_takes_is_a_fact(self) -> None:
-        from analysis_service.assertions import ABSENT, assertion_id
-        from tests.test_assertions import stated
-
         absence = stated(value=ABSENT)
 
-        assert self.view(absence) == {assertion_id(absence)}
+        assert self.facts(absence) == {assertion_id(absence)}
