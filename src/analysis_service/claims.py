@@ -643,7 +643,8 @@ class Ground(BaseModel):
       model carries; neither says the control is inadequate, which stays the
       agent's argument and the critic's to rule on. An absence is not
       catalogued where the job's unscoped assertion rows that state the
-      attribute's value all state the opposite
+      attribute's value (the answers alone, where a submitter's answer makes
+      it) all state the opposite
       (:func:`~analysis_service.assertions.contradicted_attributes`); those
       rows are open questions instead.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a

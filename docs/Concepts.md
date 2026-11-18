@@ -92,7 +92,7 @@ A ground has one of these kinds:
 - `unknown-attribute`: an attribute the source left unknown;
 - `absent-attribute`: an attribute the source explicitly said was absent,
   unless the unscoped assertion rows that state its value all state the
-  opposite;
+  opposite (the answers alone, where a submitter's answer makes the value);
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
 - `assertion`: an assertion row that the sources settle, unless the rows that
@@ -136,8 +136,8 @@ What code does with a row:
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
   says why, when the service can write the model. Where it cannot, the field
-  keeps what extraction wrote, and two rows of one predicate that disagree
-  are open questions.
+  keeps what extraction wrote, and the hedged rows and the two rows of one
+  predicate that disagree are open questions.
 - **Where the model's field states the opposite of the rows that state its
   value**, the rows are open questions, and a claim on one is conditional.
   This happens where the service could not write the value into the model,
