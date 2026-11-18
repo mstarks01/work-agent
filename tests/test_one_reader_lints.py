@@ -1855,13 +1855,34 @@ def _reads_the_verdict_rule(node: ast.AST) -> bool:
     if _loads(node, "VERDICT_STATUSES") or _loads_attribute(node, "VERDICT_STATUSES"):
         return True
     return isinstance(node, ast.Compare) and any(
-        isinstance(op, (ast.In, ast.NotIn))
-        and any(
-            _loads(right, name) or _loads_attribute(right, name)
-            for name in ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
-        )
+        isinstance(op, (ast.In, ast.NotIn)) and _holds_the_fates(right)
         for op, right in zip(node.ops, node.comparators, strict=True)
     )
+
+
+#: The critic fates with no verdict status, which a literal collection must
+#: hold one of to spell the verdict rule.
+_NO_VERDICT_SPELLINGS = frozenset({"returned", "omitted"})
+
+
+def _holds_the_fates(node: ast.AST) -> bool:
+    """Whether ``node`` names a set of critic fates: a constant of the rule,
+    ``get_args`` of a fate type, or a literal collection of verdict statuses
+    or of fates with no verdict."""
+    names = ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
+    if any(_loads(node, name) or _loads_attribute(node, name) for name in names):
+        return True
+    if _calls(node, "get_args") and node.args:
+        return any(
+            _loads(node.args[0], kind) for kind in ("VerdictStatus", "NoVerdictFate")
+        )
+    if not isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return False
+    values = {
+        element.value for element in node.elts if isinstance(element, ast.Constant)
+    }
+    verdicts = {"confirmed", "needs-info", "rejected"}
+    return bool(values & _NO_VERDICT_SPELLINGS) or len(values & verdicts) > 1
 
 
 def _parses_a_version_segment(node: ast.AST) -> bool:
@@ -1916,6 +1937,10 @@ def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bo
         ("fate in critic_yield.VERDICT_STATUSES", True),
         ("fate not in NO_VERDICT_FATES", True),
         ("row.archived not in NO_VERDICT_SIDES", True),
+        ('fate in ("returned", "omitted")', True),
+        ('fate in {"confirmed", "needs-info", "rejected"}', True),
+        ("fate in get_args(VerdictStatus)", True),
+        ('fate in ("rejected",)', False),
         ("has_verdict(fate)", False),
         ("{*NO_VERDICT_FATES, UNRULED}", False),
         ("no_verdict_line(apart, NO_VERDICT_FATES)", False),

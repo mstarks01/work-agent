@@ -13,9 +13,9 @@ Unfiltered LLM threat enumeration runs at about 86% raw false positives.
 
 Here is how it works. A killed draft is a draft that is not in the
 post-critic output, so the two sides are a superset and its subset. Its fate
-says whether the critic rejected it or the block holds no verdict for it. The
-whole instrument is therefore a matter of scoring the same case twice through
-the shipped scorer, with no second metric implementation and no special-cased
+says whether the critic rejected it or the block holds no verdict for it. Both
+sides are produced sets, so the whole instrument is a matter of scoring the
+same case twice through the shipped scorer, with no second metric implementation and no special-cased
 matching, and then reading the killed drafts' pre-critic scored outcomes, which
 is the state the critic faced.
 
@@ -685,17 +685,17 @@ def _critic_rates(populations: CriticPopulations) -> dict[YieldRate, Rate]:
     Each numerator counts the drafts the critic rejected, read off the same
     population counts as each denominator.
     """
-    killed = populations.met("rejected", _every)
-    down_voted_killed = populations.met("rejected", _in("not-real"))
+    rejected = populations.met("rejected", _every)
+    down_voted_rejected = populations.met("rejected", _in("not-real"))
     return {
-        "kill_rate": Rate(killed, populations.with_verdict(_every)),
+        "kill_rate": Rate(rejected, populations.with_verdict(_every)),
         "rejected_kill_rate": Rate(
-            down_voted_killed, populations.with_verdict(_in("not-real"))
+            down_voted_rejected, populations.with_verdict(_in("not-real"))
         ),
         "matched_kill_rate": Rate(
             populations.met("rejected", _matched), populations.with_verdict(_matched)
         ),
-        "kill_precision": Rate(down_voted_killed, killed),
+        "kill_precision": Rate(down_voted_rejected, rejected),
     }
 
 

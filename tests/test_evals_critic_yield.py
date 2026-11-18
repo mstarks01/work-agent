@@ -455,6 +455,29 @@ def _report_with(case, threats):
     )
 
 
+def _ruled_block(case, kept, rejected):
+    """The STRIDE block of a critic that kept ``kept`` and rejected ``rejected``."""
+    return (
+        _report_with(case, kept)
+        .analyses[0]
+        .model_copy(
+            update={
+                "rejected_claims": [
+                    promote(
+                        draft,
+                        verdict=Verdict(
+                            status="rejected",
+                            reason="does not follow",
+                            rejected_because="reasoning",
+                        ),
+                    )
+                    for draft in rejected
+                ]
+            }
+        )
+    )
+
+
 def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
     draft = _draft_for(case, _must_find(case), 1)
 
@@ -705,29 +728,6 @@ def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, 
     for current in ("pooled", "open", "unvoted"):
         empty = CriticPopulations({(current, "confirmed"): 1})
         assert empty.not_real_gap == "no-down-vote"
-
-
-def _ruled_block(case, kept, rejected):
-    """The STRIDE block of a critic that kept ``kept`` and rejected ``rejected``."""
-    return (
-        _report_with(case, kept)
-        .analyses[0]
-        .model_copy(
-            update={
-                "rejected_claims": [
-                    promote(
-                        draft,
-                        verdict=Verdict(
-                            status="rejected",
-                            reason="does not follow",
-                            rejected_because="reasoning",
-                        ),
-                    )
-                    for draft in rejected
-                ]
-            }
-        )
-    )
 
 
 def test_a_population_rate_counts_a_draft_with_no_verdict_apart(capsys):
