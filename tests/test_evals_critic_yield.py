@@ -155,7 +155,7 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
         _identity_matcher([kept]),
         votes,
         rows=NO_ROWS,
-        block=_ruled_block(case, [promote(kept)], [junk]),
+        block=_ruled_block(case, [kept], [junk]),
     )
     result = scored.critic_yield
 
@@ -292,7 +292,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         _identity_matcher([kept]),
         _rejecting(case, junk),
         rows=NO_ROWS,
-        block=_ruled_block(case, [promote(kept)], [junk]),
+        block=_ruled_block(case, [kept], [junk]),
     ).critic_yield
     small = score_case_with_yield(
         case,
@@ -301,7 +301,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         _identity_matcher([kept]),
         Ledger(),
         rows=NO_ROWS,
-        block=_ruled_block(case, [promote(kept)], []),
+        block=_ruled_block(case, [kept], []),
     )
 
     totals = aggregate_yield([big, small.critic_yield])
@@ -326,7 +326,7 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     )
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]).model_copy(
-            update={"analyses": [_ruled_block(case, [promote(kept)], [junk])]}
+            update={"analyses": [_ruled_block(case, [kept], [junk])]}
         ),
         drafts={"stride": (kept, junk)},
     )
@@ -456,9 +456,12 @@ def _report_with(case, threats):
 
 
 def _ruled_block(case, kept, rejected):
-    """The STRIDE block of a critic that kept ``kept`` and rejected ``rejected``."""
+    """The STRIDE block of a critic that kept ``kept`` and rejected ``rejected``.
+
+    Both lists hold drafts, and the helper rules on each.
+    """
     return (
-        _report_with(case, kept)
+        _report_with(case, [promote(draft) for draft in kept])
         .analyses[0]
         .model_copy(
             update={
@@ -488,7 +491,7 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
         _identity_matcher([draft]),
         Ledger(),
         rows=NO_ROWS,
-        block=_ruled_block(case, [promote(draft)], []),
+        block=_ruled_block(case, [draft], []),
     ).critic_yield
 
     assert result.killed == ()
@@ -770,7 +773,7 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
         [promote(kept)],
         _identity_matcher([kept, lost]),
         _rejecting(case, omitted),
-        _ruled_block(case, [promote(kept)], []),
+        _ruled_block(case, [kept], []),
         rows=NO_ROWS,
     ).critic_yield
 
@@ -805,7 +808,7 @@ def test_a_returned_draft_is_a_kill_counted_under_its_fate(case):
     """A returned claim left the report with no archived verdict."""
     kept = _draft_for(case, _expected(case), 1)
     returned = _draft_for(case, _must_find(case), 2)
-    block = _ruled_block(case, [promote(kept)], []).model_copy(
+    block = _ruled_block(case, [kept], []).model_copy(
         update={
             "returned_claims": [
                 ReturnedClaim(claim_id=returned.id, unit="S-unit", needs="config")
