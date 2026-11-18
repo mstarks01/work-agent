@@ -22,7 +22,12 @@ from pathlib import Path
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.system_model import ModelIndex
 from evals.harness.identity import CaseFlows, endpoint_subset
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import (
+    MUST_FIND,
+    GoldenCase,
+    development_cases,
+    load_corpus,
+)
 from evals.harness.verbs import same_action
 
 #: The reader's classification of each verb row, keyed by case ID and
@@ -120,7 +125,7 @@ def _ruling(case: GoldenCase, index: int, draft: dict, flows: CaseFlows) -> str:
 
 
 def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
-    cases = {case.id: case for case in load_corpus(corpus)}
+    cases = {case.id: case for case in development_cases(load_corpus(corpus))}
     causes: Counter[tuple[str, str]] = Counter()
     must_finds: Counter[str] = Counter()
     matched: Counter[str] = Counter()
@@ -145,7 +150,7 @@ def main(scored: Path, run: Path, corpus: Path, out: Path) -> None:
                 must_finds[reference.category] += 1
         by_id = {claim["id"]: claim for claim in claims}
         for pair in score["matched"]:
-            if pair["tier"] != "must-find":
+            if pair["tier"] != MUST_FIND:
                 continue
             reference = references[pair["reference_index"]]
             matched[reference.category] += 1
