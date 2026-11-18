@@ -25,7 +25,7 @@ import pytest
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
-from evals.harness.critic_yield import FATES, NO_VERDICT_FATES, VERDICT_STATUSES
+from evals.harness.critic_yield import FATES
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
     EXPERIMENTS_LEFT_OUT,
@@ -1868,7 +1868,7 @@ def _holds_the_fates(node: ast.AST) -> bool:
     """Whether ``node`` names a set of critic fates.
 
     The set is a constant of the rule, ``get_args`` of a fate type, or a
-    literal collection of verdict statuses or of fates with no verdict.
+    literal collection of two or more critic fates.
     """
     names = ("NO_VERDICT_FATES", "NO_VERDICT_SIDES")
     if any(_loads(node, name) or _loads_attribute(node, name) for name in names):
@@ -1885,7 +1885,7 @@ def _holds_the_fates(node: ast.AST) -> bool:
     }
     if not values <= set(FATES):
         return False
-    return bool(values & set(NO_VERDICT_FATES)) or len(values & VERDICT_STATUSES) > 1
+    return len(values) > 1
 
 
 def _parses_a_version_segment(node: ast.AST) -> bool:
@@ -1947,6 +1947,7 @@ def test_the_answer_status_lint_reads_each_spelling(expression: str, refused: bo
         ("fate in get_args(claims.VerdictStatus)", True),
         ("fate in critic_yield.NO_VERDICT_FATES", True),
         ('fate in ("rejected",)', False),
+        ('fate in ("omitted",)', False),
         ('fate in ("omitted", "wrong_value")', False),
         ("has_verdict(fate)", False),
         ("{*NO_VERDICT_FATES, UNRULED}", False),

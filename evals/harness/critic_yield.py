@@ -91,9 +91,9 @@ NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = tuple(sorted(get_args(NoVerdictFat
 def has_verdict(fate: str) -> TypeIs[VerdictStatus]:
     """Whether ``fate`` is a verdict status the block records.
 
-    A draft with no verdict is in no population rate and no yield rate:
-    ``critic_yield`` and ``critic_replay`` each count it on its own line, which
-    :func:`no_verdict_line` words.
+    A draft with no verdict is in no population rate, no yield rate and no
+    agreement count: ``critic_yield`` and ``critic_replay`` each count it on its
+    own line, which :func:`no_verdict_line` words.
     """
     return fate in VERDICT_STATUSES
 
@@ -455,8 +455,6 @@ class CriticYield:
         """
         return sum(1 for draft in self.killed if draft.outcome == "matched-must-find")
 
-    # --- rates, all rule-and-ledger-relative ------------------------------
-
     @property
     def killed_by_cause(self) -> dict[KillCause, dict[str, int]]:
         """Every kill by its step or fate, and what each removed.
@@ -481,6 +479,8 @@ class CriticYield:
     @property
     def kill_count(self) -> int:
         return len(self.killed)
+
+    # --- rates, all rule-and-ledger-relative ------------------------------
 
     @property
     def rates(self) -> dict[YieldRate, Rate]:
