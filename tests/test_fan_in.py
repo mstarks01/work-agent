@@ -18,9 +18,11 @@ from analysis_service.claims import (
     MENTION_MAX_CHARS,
     Ground,
     Mitigation,
+    QuoteCandidate,
 )
 from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
 from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
@@ -1254,6 +1256,27 @@ def batches(**proposals_by_lane):
 
 class TestFanIn:
     """The one interface: batches in, drafts, marks, deferrals and coverage out."""
+
+    @pytest.mark.parametrize("needs", ["code", ""])
+    def test_each_deferred_proposal_is_named_by_its_claim_id(self, model, needs):
+        """A unit holds the reason; the proposal that took it holds an ID, so a
+        reader can tie a deferral back to what the lane emitted."""
+        lane = "encoding-and-sanitization"
+        proposal = RequirementProposal(
+            title="t",
+            description="d",
+            requirement="2.4",
+            needs_evidence=needs,
+            direction="question" if needs else "gap",
+            quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
+        )
+        batches = {lane: schemas_for("asvs").proposals(claims=[proposal])}
+
+        merged = fan_in.fan_in(
+            batches, PACKAGES["asvs"], model, sources={}, assertions=None
+        )
+
+        assert merged.deferred_ids == (["v5.0.0-1.2.4"] if needs else [])
 
     def test_a_lane_with_no_batch_contributes_nothing(self, model):
         merged = fan_in.fan_in(

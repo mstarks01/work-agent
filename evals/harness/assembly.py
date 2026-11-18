@@ -83,7 +83,7 @@ from analysis_service.claims import (
 )
 from analysis_service.critic_round import CriticRound, Failed
 from analysis_service.errors import error_place
-from analysis_service.fan_in import _drop_duplicate_ids, returned_to_deferred
+from analysis_service.fan_in import drop_duplicate_ids, returned_to_deferred
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import (
@@ -253,7 +253,7 @@ def replay_case(
     framework = block.framework
     record = PACKAGES[framework].record
     # The fan-in's own rule picks the copy of a repeated ID that replays.
-    kept, dropped = _drop_duplicate_ids(drafts)
+    kept, dropped = drop_duplicate_ids(drafts)
     by_id = {draft.id: draft for draft in kept}
     returned = {entry.claim_id: entry.unit for entry in block.returned_claims}
     ruled = {claim.id for claim in block.all_claims()} | returned.keys()
