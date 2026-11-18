@@ -59,8 +59,9 @@ never rest on one as a fact. A settled row the graph attribute contradicts
 An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground. A row is open where the
 sources were asked about the fact and left it open, or where another row
-disputes it; such a row is in the table where it reaches no graph field, and a
-field it reaches shows a qualified unknown instead. A row the graph attribute
+disputes it; such a row is in the table where it reaches no graph field. A
+field that a hedged or disputed row reaches shows a qualified unknown instead,
+and a field that an unhedged unknown row reaches keeps what extraction wrote. A row the graph attribute
 contradicts is open too, and it is in the table whatever field it reaches. An
 agent may raise a *conditional* claim on an open row exactly as it may on an
 element attribute nobody stated. Which of the two an entry is, is the entry's
