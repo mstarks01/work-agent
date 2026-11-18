@@ -17,13 +17,18 @@ from analysis_service.assertions import (
     Subject,
     apply_projection,
     assertion_id,
+    catalog_coverage,
     contradicted,
     contradictions,
     support_span,
 )
 from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
 from analysis_service.critic import assemble_claims
-from analysis_service.evidence import absent_evidence_ref, evidence_catalog
+from analysis_service.evidence import (
+    absent_evidence_ref,
+    evidence_catalog,
+    ground_issues,
+)
 from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
@@ -553,3 +558,48 @@ class TestADisputedPairUnderARefusedProjection:
         store = model.get(ORDERS)
         assert isinstance(store, DataStore)
         assert store.encryption_at_rest.startswith(UNKNOWN)
+
+
+class TestCoverageOfAContradictedAttribute:
+    """Coverage reads the rule the evidence catalog reads: a row the projected
+    graph contradicts is open, and its attribute is not settled (the
+    maintainer's ruling of 2026-11-18)."""
+
+    STORE = TestARowTheGraphContradicts.STORE
+    STORED = TestARowTheGraphContradicts.STORED
+
+    def test_a_contradicted_row_counts_as_open(self):
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+        coverage = catalog_coverage(catalog, _with_encryption("AES-256"))
+
+        assert (coverage.settled, coverage.open) == (0, 1)
+
+    def test_an_agreeing_row_counts_as_settled(self):
+        """The neighbour: the graph holds the absence the row states."""
+        catalog = assertions(self.STORED, subjects=(self.STORE,))
+        coverage = catalog_coverage(catalog, _with_encryption("none"))
+
+        assert (coverage.settled, coverage.open) == (1, 0)
+
+    def test_an_answer_the_graph_contradicts_counts_as_settled(self):
+        """An answer settles the fact even against the sources (#1225)."""
+        answer = _as_answer(self.STORED, "Orders database: not encrypted.")
+        catalog = assertions(answer, subjects=(self.STORE,))
+        coverage = catalog_coverage(catalog, _with_encryption("AES-256"))
+
+        assert (coverage.settled, coverage.open) == (1, 0)
+
+
+def test_a_claim_on_a_contradicted_absence_is_told_why():
+    """The ground check names the contradiction, not the field's state."""
+    catalog = assertions(
+        TestTheGraphSideOfAContradiction.ENCRYPTED,
+        subjects=(TestARowTheGraphContradicts.STORE,),
+    )
+    ground = Ground(
+        kind="absent-attribute", element_id=ORDERS, attribute="encryption_at_rest"
+    )
+    claim = sample_draft("S-01", grounds=[ground])
+
+    (issue,) = ground_issues([claim], _with_encryption("none"), catalog)
+    assert "the assertion rows contradict" in issue

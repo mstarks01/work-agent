@@ -3274,7 +3274,30 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     ``settled``."""
     assert _sites(lambda node: _calls(node, "contradictions")) == [
         ("src/analysis_service/assertions.py", "_contradicted_ids"),
+        ("src/analysis_service/assertions.py", "contradicted_attributes"),
         ("src/analysis_service/assertions.py", "contradiction_issues"),
+    ]
+
+
+def test_what_an_applied_projection_writes_has_one_reader():
+    """``_writes`` is the one reader of the value a projection writes, so the
+    projection and ``unapplied``, which compares a field with it, agree."""
+    for name in ("qualified", "_unchecked_over_lead"):
+        assert _sites(lambda node, name=name: _calls(node, name)) == [
+            ("src/analysis_service/assertions.py", "_writes"),
+        ]
+    assert _sites(lambda node: _calls(node, "_writes")) == [
+        ("src/analysis_service/assertions.py", "_projected_model"),
+        ("src/analysis_service/assertions.py", "unapplied"),
+    ]
+
+
+def test_the_rows_that_make_a_value_have_one_reader():
+    """``_value_rows`` names the rows that make an attribute's value, so the
+    projection and the graph comparison read the same rows."""
+    assert _sites(lambda node: _calls(node, "_value_rows")) == [
+        ("src/analysis_service/assertions.py", "_projected"),
+        ("src/analysis_service/assertions.py", "contradictions"),
     ]
 
 

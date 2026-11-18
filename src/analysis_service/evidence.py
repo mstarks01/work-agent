@@ -102,10 +102,12 @@ from analysis_service.assertions import (
     apply_projection,
     assertion_id,
     contradicted,
+    contradicted_attributes,
     disputed,
     offered,
     projected_attribute,
     states_missing,
+    unapplied,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
@@ -277,11 +279,21 @@ def evidence_catalog(
     dangling flow endpoint would offer agents evidence about a system nobody
     described.
     """
+    # The graph side of a contradiction is no fact: the rows behind it state
+    # the opposite, and their open entries below carry the question.
+    opposed = (
+        frozenset()
+        if assertions is None
+        else contradicted_attributes(assertions, model)
+    )
     catalog: EvidenceCatalog = dict(
         entry
         for element in model.elements()
         for attribute in attribute_names(element)
         if (entry := _attribute_entry(element, attribute)) is not None
+        and not (
+            entry[1].kind == "absent-attribute" and (element.id, attribute) in opposed
+        )
     )
     catalog.update(
         {
@@ -301,11 +313,18 @@ def evidence_catalog(
         )
         # The open questions, after the settled rows and never merged with
         # them. An unknown row, or a row in a conflict, reaches here when it
-        # reaches no graph field: an applied projection shows a disputed
+        # reaches no graph field, or when its projection changes the field and
+        # the model does not hold it. An applied projection shows a disputed
         # attribute as a qualified unknown, which the attribute enumeration
         # above offers, but a principal's second factor has no attribute to
-        # qualify. Where the validity gate refuses the projected model, a
-        # disputed attribute keeps what extraction wrote.
+        # qualify. Where the validity gate refuses the projected model, the
+        # field keeps what extraction wrote, so only this offer carries the
+        # question.
+        held_open = {
+            row
+            for projection in unapplied(assertions, model)
+            for row in projection.rows
+        }
         unprojected = [
             row
             for row in (
@@ -313,6 +332,7 @@ def evidence_catalog(
                 *disputed(assertions),
             )
             if not projected_attribute(row.predicate, row.subject)
+            or assertion_id(row) in held_open
         ]
         # A row the graph attribute contradicts reaches a graph field, and that
         # field states the opposite rather than an unknown, so only this offer
@@ -454,10 +474,15 @@ def ground_issues(
     catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
     text = model_text(model)
+    opposed = (
+        frozenset()
+        if assertions is None
+        else contradicted_attributes(assertions, model)
+    )
     issues = []
     for claim in claims:
         for ground in claim.grounds:
-            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text)
+            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text, opposed)
             if issue:
                 issues.append(issue)
     return issues
@@ -469,8 +494,13 @@ def _one_ground_issue(
     catalog: EvidenceCatalog,
     by_id: Mapping[str, Element],
     text: ModelText,
+    opposed: frozenset[tuple[str, str]],
 ) -> str:
-    """Why one catalogued ground is not in this model's catalog, or ``""``."""
+    """Why one catalogued ground is not in this model's catalog, or ``""``.
+
+    ``opposed`` holds the attributes the assertion rows contradict
+    (:func:`~analysis_service.assertions.contradicted_attributes`).
+    """
     if ground.kind == "quote":
         return ""
     if ground.kind == "absent-element":
@@ -535,6 +565,12 @@ def _one_ground_issue(
     )
     if ref in catalog:
         return ""
+    if (ground.element_id, ground.attribute) in opposed:
+        return (
+            f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
+            f" {ground.element_id!r}, which the assertion rows contradict, so the"
+            " job's catalog leaves it open"
+        )
     state = control_state(getattr(element, ground.attribute))
     return (
         f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"

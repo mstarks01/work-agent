@@ -167,6 +167,7 @@ __all__ = [
     "catalog_issues",
     "conflicts",
     "contradicted",
+    "contradicted_attributes",
     "contradiction_issues",
     "contradictions",
     "disputed",
@@ -188,6 +189,7 @@ __all__ = [
     "states_missing",
     "subject_id",
     "support_span",
+    "unapplied",
     "uncontradicted",
 ]
 
@@ -261,7 +263,13 @@ REGISTRY_VERSION = 9
 #: (:func:`_drives_value`). An answer a reviewer set aside, or an answer of
 #: ``unknown``, leaves an unchecked row under the guard, which writes a
 #: qualified ``unknown`` over the lead (#2270).
-PROJECTION_VERSION = 7
+#:
+#: Version 8: :func:`contradictions` compares the state of each row that states
+#: the attribute's value, not the projected value, so two ``compatible`` rows
+#: beside an opposite attribute are a ``graph-contradiction`` issue, and an
+#: issue names a row that states the value (#2270). A record of version 7 keeps
+#: its own issues; the issue re-check on load declines for it.
+PROJECTION_VERSION = 8
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -2119,6 +2127,20 @@ def _drives_value(entry: Assertion) -> bool:
     )
 
 
+def _value_rows(rows: Sequence[Assertion]) -> list[Assertion]:
+    """The rows under one attribute that state its value, in the order given.
+
+    **The one reader of "which rows make an attribute's value".** A row states
+    a value where it holds one and :func:`admissible` admits it. Where an
+    answer may state its value (:func:`_drives_value`), the answers alone do:
+    the rows beside them stay in the catalog as the facts they state.
+    :func:`project` reads the value from these rows, and
+    :func:`contradictions` compares their states with the graph.
+    """
+    valued = [entry for entry in rows if entry.value != UNKNOWN and admissible(entry)]
+    return [entry for entry in valued if _drives_value(entry)] or valued
+
+
 def missing_value(predicate: Predicate) -> str:
     """The value a row of ``predicate`` writes to state its control missing.
 
@@ -3146,12 +3168,14 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
 
 @dataclass(frozen=True)
 class Contradiction:
-    """A graph attribute and the row authoritative for it that state opposites.
+    """A graph attribute and the rows authoritative for it that state opposites.
 
-    ``projected`` is what the catalog's rows say the attribute would hold;
-    ``carried`` is what the **System Model** beside them actually holds. Both
-    are quoted as written, because which of the two is wrong is not decidable
-    here and a reader has to see the pair.
+    ``projected`` is what the rows that state the attribute's value say, each
+    distinct value once; ``carried`` is what the **System Model** beside them
+    actually holds. Both are quoted as written, because which of the two is
+    wrong is not decidable here and a reader has to see the pair. ``rows``
+    names the rows that state the value (:func:`_value_rows`), not every row the
+    projection grouped under the attribute.
     """
 
     element_id: str
@@ -3180,29 +3204,63 @@ def contradictions(
     than an opposite: a graph attribute nobody stated and a row that states one
     is the projection doing its job.
 
-    A projection that did not settle — ``unknown`` under any
-    :data:`ProjectionReason` — states nothing to contradict, so it is skipped
-    here and its loss is reported by :func:`project` where it happened.
+    **Each row's own state, not the projected value.** The rows compared are
+    the unscoped rows that state the attribute's value (:func:`_value_rows`), and a
+    pair is reported where they all read one state and the attribute reads the
+    opposite. Under a projection that writes, that state is the projected
+    value's. Two ``compatible`` rows project ``unknown`` and leave the
+    attribute as extraction wrote it, yet each states a control, so an
+    extracted ``none`` beside them is a contradiction (the maintainer's ruling
+    of 2026-11-18). Rows that read two states disagree with each other, which
+    :func:`conflicts` reports. A scoped row states a narrower fact than the
+    attribute and is not compared. A row that holds :data:`UNKNOWN` states
+    nothing to contradict.
     """
     carried = {element.id: element for element in model.elements()}
+    entries = {assertion_id(entry): entry for entry in catalog.entries}
+    subjects = {subject.id: subject for subject in catalog.subjects}
     found = []
     for projection in project(catalog):
         element = carried.get(projection.element_id)
         if element is None:
             continue
         held = str(getattr(element, projection.attribute, ""))
-        states = {control_state(projection.value), control_state(held)}
-        if states == {"stated", "absent"}:
+        stating = [
+            entry
+            for entry in _value_rows([entries[ref] for ref in projection.rows])
+            if not entry.scope
+        ]
+        values = tuple(
+            dict.fromkeys(_graph_spelling(entry.value, subjects) for entry in stating)
+        )
+        states = {control_state(value) for value in values}
+        if len(states) == 1 and states | {control_state(held)} == {"stated", "absent"}:
             found.append(
                 Contradiction(
                     element_id=projection.element_id,
                     attribute=projection.attribute,
-                    projected=projection.value,
+                    projected="; ".join(values),
                     carried=held,
-                    rows=projection.rows,
+                    rows=tuple(sorted(assertion_id(entry) for entry in stating)),
                 )
             )
     return tuple(found)
+
+
+def contradicted_attributes(
+    catalog: AssertionCatalog, model: SystemModel
+) -> frozenset[tuple[str, str]]:
+    """Each ``(element_id, attribute)`` a :func:`contradictions` entry names.
+
+    The graph side of a contradiction is no fact against these rows, so the
+    evidence catalog does not offer the attribute as stated absent; the rows
+    carry the question (the maintainer's ruling of 2026-11-18). Every entry
+    counts, one a submitter's answer drives too, because an answer settles the
+    fact even against the sources (:func:`answered`).
+    """
+    return frozenset(
+        (found.element_id, found.attribute) for found in contradictions(catalog, model)
+    )
 
 
 def contradicted(
@@ -3215,7 +3273,9 @@ def contradicted(
     :func:`settled`, which reads the catalog alone. The evidence catalog offers
     each such row as an open question, as it offers a row another row
     disputes. Where a submitter's answer makes the value, no row behind it is
-    here (:func:`_contradicted_ids`).
+    here (:func:`_contradicted_ids`). Each row is compared by its own state
+    (:func:`contradictions`), so two ``compatible`` rows beside an opposite
+    attribute are here too.
     """
     rows = _contradicted_ids(catalog, model)
     return tuple(entry for entry in settled(catalog) if assertion_id(entry) in rows)
@@ -3269,8 +3329,11 @@ class CatalogCoverage:
 
     ``reachable`` and ``settled`` are the honest denominator and numerator: the
     element attributes some predicate could speak to on *this* model, and how
-    many the catalog actually settles. ``open`` counts the questions the
-    sources raised and left unanswered, which is coverage stated as rows.
+    many the catalog actually settles against this model. ``open`` counts the
+    questions the sources raised and left unanswered, and the rows the graph
+    contradicts, which is coverage stated as rows. A row the graph contradicts
+    (:func:`contradicted`) is the same open question the evidence catalog
+    offers, so its attribute is not counted as settled.
     ``own_subjects`` counts what the graph has no place for at all — a fact
     about a principal or a credential — because that is the part of the catalog
     a reader cannot find anywhere else.
@@ -3292,6 +3355,7 @@ def catalog_coverage(catalog: AssertionCatalog, model: SystemModel) -> CatalogCo
         if hasattr(element, attribute)
     )
     settled_rows = settled(catalog)
+    held_open = {assertion_id(entry) for entry in contradicted(catalog, model)}
     graph_bound = {
         subject.id for subject in catalog.subjects if subject.type in GRAPH_BOUND
     }
@@ -3302,9 +3366,11 @@ def catalog_coverage(catalog: AssertionCatalog, model: SystemModel) -> CatalogCo
                 (projection.element_id, projection.attribute)
                 for projection in project(catalog)
                 if projection.reason in SETTLING_REASONS
+                and held_open.isdisjoint(projection.rows)
             }
         ),
-        open=sum(1 for entry in catalog.entries if entry.value == UNKNOWN),
+        open=sum(1 for entry in catalog.entries if entry.value == UNKNOWN)
+        + len(held_open),
         own_subjects=sum(
             1 for entry in settled_rows if entry.subject not in graph_bound
         ),
@@ -3495,24 +3561,17 @@ def _projected_model(
         element = elements.get(projection.element_id)
         if element is None or not hasattr(element, projection.attribute):
             continue
-        if PROJECTION_EFFECT[projection.reason] == "qualify":
-            setattr(
-                element,
-                projection.attribute,
-                qualified(projection, [rows[ref] for ref in projection.rows], subjects),
-            )
-            continue
         behind = [rows[ref] for ref in projection.rows if ref in rows]
-        if hold_unchecked and _unchecked_over_lead(
-            projection, getattr(element, projection.attribute), behind
-        ):
-            setattr(
-                element,
-                projection.attribute,
-                qualified(projection, behind, subjects, because=UNCHECKED_BECAUSE),
-            )
+        value = _writes(
+            projection,
+            getattr(element, projection.attribute),
+            behind,
+            subjects,
+            hold_unchecked=hold_unchecked,
+        )
+        setattr(element, projection.attribute, value)
+        if PROJECTION_EFFECT[projection.reason] != "write" or value != projection.value:
             continue
-        setattr(element, projection.attribute, projection.value)
         bases = {entry.basis for entry in behind}
         if "inferred" in bases and not any(
             entry.element_id == projection.element_id
@@ -3529,6 +3588,61 @@ def _projected_model(
                 )
             )
     return updated
+
+
+def _writes(
+    projection: Projection,
+    held: object,
+    rows: Sequence[Assertion],
+    subjects: Mapping[str, Subject],
+    *,
+    hold_unchecked: bool,
+) -> str:
+    """The value applying ``projection`` writes over ``held``, the field's value.
+
+    **The one reader of "what does an applied projection write".**
+    :func:`apply_projection` writes it, and :func:`unapplied` compares a
+    model's field with it. Writing it twice gives the same value, because the
+    unchecked guard reads the qualified ``unknown`` it wrote as a lead again.
+    """
+    if PROJECTION_EFFECT[projection.reason] == "qualify":
+        return qualified(projection, rows, subjects)
+    if hold_unchecked and _unchecked_over_lead(projection, held, rows):
+        return qualified(projection, rows, subjects, because=UNCHECKED_BECAUSE)
+    return projection.value
+
+
+def unapplied(catalog: AssertionCatalog, model: SystemModel) -> tuple[Projection, ...]:
+    """Every projection that changes a field and that ``model`` does not hold.
+
+    A projection whose effect is ``leave`` changes nothing, so it is never
+    here. Any other is here where its field holds a value other than the one
+    :func:`apply_projection` writes (:func:`_writes`): the validity gate
+    refused the projected model, so the field keeps what extraction wrote.
+    The evidence catalog then offers the open rows behind it as questions,
+    because the field does not show them as a qualified ``unknown``.
+
+    Asked of the model rather than of whether a projection ran, as
+    :func:`offered` is, so a report re-checked on load and the job that wrote
+    it agree.
+    """
+    held = {element.id: element for element in model.elements()}
+    rows = {assertion_id(entry): entry for entry in catalog.entries}
+    subjects = {subject.id: subject for subject in catalog.subjects}
+    found = []
+    for projection in project(catalog):
+        element = held.get(projection.element_id)
+        if (
+            PROJECTION_EFFECT[projection.reason] == "leave"
+            or element is None
+            or not hasattr(element, projection.attribute)
+        ):
+            continue
+        value = getattr(element, projection.attribute)
+        behind = [rows[ref] for ref in projection.rows if ref in rows]
+        if value != _writes(projection, value, behind, subjects, hold_unchecked=True):
+            found.append(projection)
+    return tuple(found)
 
 
 #: What a qualified ``unknown`` says when an unchecked row would have turned a
@@ -3599,8 +3713,7 @@ def qualified(
             if entry.reason == "hedged":
                 stated.extend(f'"{span.quote}"' for span in entry.support)
             continue
-        value = _written(entry.value, subjects)
-        value = ABSENT_WORD if value == ABSENT else value
+        value = _graph_spelling(entry.value, subjects)
         scope = ", ".join(f"{q.kind} {q.value}" for q in entry.scope)
         stated.append(f"{value} ({scope})" if scope else value)
     said = "; ".join(dict.fromkeys(stated))
@@ -3688,12 +3801,7 @@ def _projected(
     """One attribute's projected value, and the reason it reads that way."""
     ids = tuple(sorted(identity for identity, _ in rows))
     valued = [entry for _, entry in rows if entry.value != UNKNOWN]
-    stated = [entry for entry in valued if admissible(entry)]
-    # An answer settles the attribute; the scoped rows beside it stay in the
-    # catalog as the narrower facts they state.
-    answers = [entry for entry in stated if _drives_value(entry)]
-    if answers:
-        stated = answers
+    stated = _value_rows([entry for _, entry in rows])
 
     def projected(value: str, reason: ProjectionReason) -> Projection:
         return Projection(element_id, attribute, value, reason, ids)
@@ -3717,9 +3825,9 @@ def _projected(
         if len({entry.predicate for entry in stated}) > 1:
             return projected(UNKNOWN, "several-predicates")
         return projected(UNKNOWN, "several-values")
-    value = _written(stated[0].value, subjects)
-    if value == ABSENT:
-        return projected(ABSENT_WORD, "absent")
+    value = _graph_spelling(stated[0].value, subjects)
+    if value == ABSENT_WORD:
+        return projected(value, "absent")
     return projected(value, "stated")
 
 
@@ -3737,6 +3845,15 @@ def _compatible(rows: Sequence[Assertion]) -> bool:
         and entry.value != ABSENT
         for entry in rows
     )
+
+
+def _graph_spelling(value: str, subjects: Mapping[str, Subject]) -> str:
+    """One row's value as the graph attribute it reaches would hold it.
+
+    :data:`ABSENT` is the word the **System Model** reads as absent
+    (:data:`ABSENT_WORD`); every other value is :func:`_written`.
+    """
+    return ABSENT_WORD if value == ABSENT else _written(value, subjects)
 
 
 def _written(value: str, subjects: Mapping[str, Subject]) -> str:
