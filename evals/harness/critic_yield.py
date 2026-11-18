@@ -72,7 +72,7 @@ ScoredOutcome = (
 #: ``needs-info`` is a qualification: it is neither a confirmation nor a
 #: rejection. ``omitted`` is a draft the block carries in none of its three
 #: lists.
-NoVerdictFate = Literal["omitted", "returned"]
+NoVerdictFate = Literal["returned", "omitted"]
 CriticFate = VerdictStatus | NoVerdictFate
 OMITTED: CriticFate = "omitted"
 FATES: tuple[CriticFate, ...] = tuple(
@@ -82,7 +82,7 @@ FATES: tuple[CriticFate, ...] = tuple(
 #: was ruled and kept, but the block does not record its status.
 VERDICT_STATUSES: frozenset[VerdictStatus] = frozenset(get_args(VerdictStatus))
 #: The fates that hold no verdict, in the order a count of them names them.
-NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = get_args(NoVerdictFate)
+NO_VERDICT_FATES: tuple[NoVerdictFate, ...] = tuple(sorted(get_args(NoVerdictFate)))
 
 
 def has_verdict(fate: str) -> TypeIs[VerdictStatus]:
@@ -150,7 +150,7 @@ GAP_WORDS: Mapping[NotRealGap, str] = MappingProxyType(
         " verdict, so it is counted apart",
         "stale-drafts": "no draft carries a current down-vote, and some carry"
         " only a vote on another argument: a vote judges a reported claim with"
-        " its verdict (ADR 0029), and a draft has no verdict",
+        " its verdict (ADR 0029), and a draft is not yet a reported claim",
         "no-down-vote": "no draft carries a current down-vote",
     }
 )
@@ -179,18 +179,16 @@ class CriticPopulations:
             total.update(entry.populations.counts)
         return cls(dict(total))
 
-    def count(self, label: Population, among: Sequence[CriticFate] = FATES) -> int:
-        """The drafts of one population, met by any fate in ``among``."""
+    def count(self, label: Population) -> int:
+        """The drafts of one population, with a verdict or not."""
         return sum(
-            n
-            for (outcome, fate), n in self.counts.items()
-            if LABEL_OF[outcome] == label and fate in among
+            n for (outcome, _), n in self.counts.items() if LABEL_OF[outcome] == label
         )
 
     def rate(self, label: Population, fate: VerdictStatus) -> Rate:
         """The share of one population's drafts with a verdict that met one fate."""
         return Rate(
-            self.count(label, (fate,)),
+            self.met(fate, lambda outcome: LABEL_OF[outcome] == label),
             self.ruled_in(label),
         )
 
@@ -296,7 +294,8 @@ class CriticAudit:
         }
 
     def render(self) -> None:
-        """The population table, its rates, its gaps and the loss line."""
+        """The population table, its rates, its gap, its no-verdict line and the
+        loss line."""
         populations = self.populations
         print(
             "critic input populations, in drafts (labels are relative to the"
@@ -424,10 +423,9 @@ class CriticYield:
     def must_find_lost(self) -> int:
         """The net form of :attr:`must_find_killed`."""
         return sum(
-            1
+            self._lost(draft)
             for draft in self.killed
             if draft.outcome == "matched-must-find"
-            and draft.reference_index not in self.matched_after_indices
         )
 
     @property
@@ -747,8 +745,9 @@ def render(yields: Sequence[CriticYield]) -> None:
             f"  killed-real {rates['matched_kill_rate'].shown()}"
             f"  (gross kills: must-find {entry.must_find_killed}, lost for good"
             f" {entry.matched_lost})"
-            + (f"  no archived verdict {apart}" if apart else "")
         )
+        if apart:
+            print(f"  {no_verdict_line(apart, NO_VERDICT_FATES)}")
     if yields:
         totals = aggregate_yield(yields)
         pooled = {

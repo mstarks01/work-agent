@@ -793,7 +793,6 @@ def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
     critic_yield.render([result])
     shown = capsys.readouterr().out
     assert "killed-rejected 0/0" in shown
-    assert "no archived verdict 2" in shown
+    assert shown.count("2 drafts have no archived verdict (omitted or returned)") == 2
     assert totals["rates"]["kill_rate"] == Rate(0, 1).to_json()
     assert result.to_json()["rates"]["kill_precision"] == Rate(0, 0).to_json()
-    assert "2 drafts have no archived verdict (omitted or returned)" in shown
