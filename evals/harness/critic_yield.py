@@ -418,11 +418,13 @@ class CriticYield:
 
     @property
     def matched_lost(self) -> int:
-        """Of :attr:`matched_killed`, the kills whose reference no surviving
-        claim took: the net destruction. A killed draft's reference can be
-        matched again by another draft after the critic, so the gross count
-        overstates the loss: such a kill reads as a destroyed finding while the
-        report still carries it. ``matched_killed`` stays the gross count."""
+        """The kills of :attr:`matched_killed` whose reference no surviving claim took.
+
+        This is the net destruction. A killed draft's reference can be matched
+        again by another draft after the critic, so the gross count overstates
+        the loss: such a kill reads as a destroyed finding while the report
+        still carries it. ``matched_killed`` stays the gross count.
+        """
         return sum(self._lost(draft) for draft in self.killed)
 
     def _lost(self, draft: KilledDraft) -> bool:
