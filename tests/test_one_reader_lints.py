@@ -2567,7 +2567,7 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "",
     ),
-    "the row an answer settles": _OneReader(
+    "a place's identity": _OneReader(
         _opens_an_answered_row,
         ("src/analysis_service/assertions.py", "place_identity"),
         {},
@@ -3384,3 +3384,18 @@ def test_each_reader_of_waiting_facts_reads_them_as_asked():
         ("src/analysis_service/report_conditions.py", "conditions"),
         ("src/analysis_service/report_conditions.py", "corrected_findings"),
     ]
+
+
+def test_the_row_an_answer_settles_has_one_reader():
+    """Only ``answered_row`` matches a key against a row's place, so the
+    admission check, the answer forms and the writer find one row."""
+    assert _sites(_compares_a_place) == [
+        ("src/analysis_service/fact_answers.py", "answered_row"),
+    ]
+
+
+def _compares_a_place(node: ast.AST) -> bool:
+    """Whether ``node`` compares a row's ``place_identity`` with something."""
+    return isinstance(node, ast.Compare) and any(
+        _calls(part, "place_identity") for part in ast.walk(node)
+    )

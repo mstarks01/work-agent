@@ -388,9 +388,10 @@ def fact_routes(
     A row the graph contradicts (:func:`~analysis_service.assertions.contradicted`)
     or another row disputes (:func:`~analysis_service.assertions.disputed`)
     states a value, so its own identity names no row an answer could write
-    over. Where it reaches a graph field, the question is that attribute's,
-    and the attribute path writes the answer. Where it reaches none, the
-    question is its place's
+    over. Where an unscoped row reaches a graph field, the question is that
+    attribute's, and the attribute path writes the answer. Where it reaches
+    none, or states a narrower scope than the attribute, the question is its
+    place's
     (:func:`~analysis_service.assertions.place_identity`), which names the
     answer's row in every later run too (the maintainer's ruling of
     2026-11-18 on #2270). ``model`` is read as the lanes read it
@@ -404,7 +405,7 @@ def fact_routes(
         attribute = projected_attribute(row.predicate, row.subject)
         routes[assertion_id(row)] = (
             UnknownRef(element_id=row.subject, attribute=attribute)
-            if attribute
+            if attribute and not row.scope
             else UnknownRef(assertion=place_identity(row))
         )
     return routes

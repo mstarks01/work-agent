@@ -16,16 +16,19 @@ from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
     AssertionRecord,
+    Qualifier,
     Subject,
     assertion_id,
+    support_span,
 )
 from analysis_service.claims import FrameworkAnalysis, UnknownRef, Verdict
 from analysis_service.fact_answers import FactAnswer
-from analysis_service.fact_writes import check_fact_answers
+from analysis_service.fact_writes import check_fact_answers, fact_rows
 from analysis_service.jobs import Checkpoint
 from analysis_service.open_facts import source_states
 from analysis_service.questions import fact_questions
 from analysis_service.report_conditions import conditions, corrected_findings
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import SystemModel
 from tests.factories import sample_analysis, sample_threat, valid_model
 from tests.test_questions import PRINCIPAL, resume
@@ -252,10 +255,6 @@ class TestAnAnswerToADisputedPlace:
 
     @staticmethod
     def written(catalog, value):
-        from analysis_service.fact_writes import fact_rows
-        from analysis_service.sources import ANSWERS_LABEL
-        from analysis_service.assertions import support_span
-
         line = f"Customer accounts: {value}."
         span = support_span(line, ANSWERS_LABEL, line)
         answer = FactAnswer(key=PLACE_KEY, value=value)
@@ -281,8 +280,6 @@ class TestAnAnswerToADisputedPlace:
 def test_a_scoped_disagreement_is_asked_at_its_place():
     """A scoped row states a narrower fact than the attribute, so a scoped
     disagreement is asked at its place, not as the graph attribute."""
-    from analysis_service.assertions import Qualifier
-
     backups = [Qualifier(kind="resource", value="backups")]
     first = MECHANISM.model_copy(update={"value": ABSENT, "scope": backups})
     second = MECHANISM.model_copy(update={"scope": backups, "explanation": "b"})

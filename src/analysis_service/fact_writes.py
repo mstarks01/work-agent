@@ -395,6 +395,7 @@ def fact_rows(
     value.
     """
     replaced: dict[str, Assertion] = {}
+    placed: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
     attributes = {
         attribute_place(answer.key): (answer, span)
@@ -457,23 +458,36 @@ def fact_rows(
                 )
             )
             continue
-        replaced[assertion_id(row)] = Assertion.model_validate(
-            {
-                **dict(row),
-                "value": answer.value,
-                "basis": "stated",
-                "origin": "answer",
-                "reason": None,
-                "support": [span],
-            }
+        if row.value == UNKNOWN or answered(row):
+            replaced[assertion_id(row)] = Assertion.model_validate(
+                {
+                    **dict(row),
+                    "value": answer.value,
+                    "basis": "stated",
+                    "origin": "answer",
+                    "reason": None,
+                    "support": [span],
+                }
+            )
+            continue
+        # A side of a disagreement holds a source's value, so the answer is a
+        # new row at the place, and each side it overrules goes below with
+        # an issue that names it.
+        placed[assertion] = Assertion(
+            subject=row.subject,
+            predicate=row.predicate,
+            scope=row.scope,
+            value=answer.value,
+            basis="stated",
+            origin="answer",
+            support=[span],
         )
+    answer_rows = (*replaced.values(), *placed.values())
     asked, parts = _part_rows(
-        catalog, model, answers, spans, replaced.values(), attributes.keys()
+        catalog, model, answers, spans, answer_rows, attributes.keys()
     )
-    rewritten = {assertion_id(row) for row in replaced.values()}
-    written_here = {
-        place_identity(row): row for row in (*replaced.values(), *parts.values())
-    }
+    rewritten = {assertion_id(row) for row in answer_rows}
+    written_here = {place_identity(row): row for row in (*answer_rows, *parts.values())}
 
     def answered_over(entry: Assertion) -> bool:
         """An earlier run's part row, or a source row an answer settles now.
@@ -527,6 +541,7 @@ def fact_rows(
             )
             if not answered_over(entry)
         ),
+        *placed.values(),
         *written.values(),
         *parts.values(),
     ]

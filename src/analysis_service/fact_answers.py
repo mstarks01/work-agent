@@ -429,8 +429,7 @@ def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
     """The row an answer to the open place ``identity`` writes over, if any.
 
     **The one reader of "which row does this answer settle".** ``identity``
-    names a place, and `place_identity` is the one spelling of it
-    (:func:`~analysis_service.assertions.place_identity`). The
+    names a place (:func:`~analysis_service.assertions.place_identity`). The
     row is the open row there, a side of a disagreement there
     (:func:`~analysis_service.assertions.disputed`), or the stated row an
     earlier answer wrote there. The last is the row a resumed job's checkpoint

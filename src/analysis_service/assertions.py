@@ -278,9 +278,9 @@ REGISTRY_VERSION = 9
 #: against the projected model, the last three remain only where the validity
 #: gate refuses it. An issue names a row that states the value. A record of version 7 keeps its own issues, and the
 #: issue re-check on load declines for it. The ground check on load is not
-#: versioned: a claim of such a record on an ``absent-attribute`` the rows now
-#: hold open (:func:`held_open_attributes`), or on a row they now hold open,
-#: fails the load, as a hard cutover.
+#: versioned: a claim of such a record on an ``absent-attribute`` in
+#: :func:`held_open_attributes`, or on a row the evidence catalog offers as an
+#: open question, fails the load, as a hard cutover.
 PROJECTION_VERSION = 8
 
 #: The value that says a source stated this fact is **not there**. A positive
