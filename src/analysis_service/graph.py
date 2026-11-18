@@ -2067,8 +2067,8 @@ def merge_drafts(
         model,
         source_texts or {},
         state.get(nodes.key("ruled_out")) or {},
-        held_assertions(state),
-        state.get(nodes.key("ruled_in")) or {},
+        assertions=held_assertions(state),
+        ruled_in=state.get(nodes.key("ruled_in")) or {},
         covered=covered_units(nodes.package, controls),
     )
     state.put(nodes.key("deferred"), merged.deferred)

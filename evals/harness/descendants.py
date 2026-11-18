@@ -160,8 +160,8 @@ def lane_drafts(
         SystemModel.model_validate(state[STATE_VALID_MODEL]),
         state[STATE_SOURCE_TEXTS],
         state.get(nodes.key("ruled_out")) or {},
-        held_assertions(session),
-        state.get(nodes.key("ruled_in")) or {},
+        assertions=held_assertions(session),
+        ruled_in=state.get(nodes.key("ruled_in")) or {},
     )
     return [draft for draft in merged.drafts if isinstance(draft, DraftThreat)]
 

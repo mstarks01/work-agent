@@ -28,7 +28,7 @@ ASVS = PACKAGES["asvs"]
 
 
 def _accounted(stride_batches, sources=SOURCES):
-    merged = fan_in(stride_batches, STRIDE, valid_model(), sources)
+    merged = fan_in(stride_batches, STRIDE, valid_model(), sources, assertions=None)
     return fan_in_accounting.account("case", stride_batches, STRIDE, merged)
 
 
@@ -129,7 +129,7 @@ def test_a_deferred_proposal_is_accounted():
         quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
     )
     stored = {lane: schemas_for("asvs").proposals(claims=[proposal])}
-    merged = fan_in(stored, ASVS, valid_model(), {})
+    merged = fan_in(stored, ASVS, valid_model(), {}, assertions=None)
 
     row = fan_in_accounting.account("case", stored, ASVS, merged)
 
@@ -142,7 +142,7 @@ def test_a_proposal_the_output_loses_is_unexplained():
         spoofing=[sample_proposal("S-01")],
         tampering=[sample_proposal("T-01", "tampering")],
     )
-    merged = fan_in(stored, STRIDE, valid_model(), SOURCES)
+    merged = fan_in(stored, STRIDE, valid_model(), SOURCES, assertions=None)
     lost = merged._replace(drafts=merged.drafts[1:])
 
     row = fan_in_accounting.account("case", stored, STRIDE, lost)
@@ -153,7 +153,7 @@ def test_a_proposal_the_output_loses_is_unexplained():
 
 def test_an_output_no_proposal_carries_is_extra():
     stored = batches(spoofing=[sample_proposal("S-01")])
-    merged = fan_in(stored, STRIDE, valid_model(), SOURCES)
+    merged = fan_in(stored, STRIDE, valid_model(), SOURCES, assertions=None)
     extra = merged.drafts[0].model_copy(update={"id": "S-07"})
     grown = merged._replace(drafts=[*merged.drafts, extra])
 
@@ -167,7 +167,7 @@ def test_a_second_copy_of_a_kept_id_is_extra_and_its_proposal_accounted():
         spoofing=[sample_proposal("S-01")],
         tampering=[sample_proposal("T-01", "tampering")],
     )
-    merged = fan_in(stored, STRIDE, valid_model(), SOURCES)
+    merged = fan_in(stored, STRIDE, valid_model(), SOURCES, assertions=None)
     doubled = merged._replace(drafts=[*merged.drafts, merged.drafts[0]])
 
     row = fan_in_accounting.account("case", stored, STRIDE, doubled)
