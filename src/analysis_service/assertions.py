@@ -3206,7 +3206,7 @@ def contradicted(
     """Every settled row behind a :func:`contradictions` entry, in catalog order.
 
     The graph attribute states the opposite of the value these rows project,
-    so the row is not a fact against this model, though it stays in
+    so none of them is a fact against this model, though each stays in
     :func:`settled`, which reads the catalog alone. The evidence catalog offers
     each such row as an open question, as it offers a row another row
     disputes. Where a submitter's answer makes the value, no row behind it is

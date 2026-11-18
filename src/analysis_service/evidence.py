@@ -60,9 +60,11 @@ An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground. A row is open where the
 sources were asked about the fact and left it open, or where another row
 disputes it; such a row is in the table where it reaches no graph field. A
-field that a hedged or disputed row reaches shows a qualified unknown instead,
-and a field that an unhedged unknown row reaches keeps what extraction wrote. A row the graph attribute
-contradicts is open too, and it is in the table whatever field it reaches. An
+field it reaches shows what
+:data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
+under it, or what extraction wrote where the validity gate refuses the
+projected model. A row the graph attribute contradicts is open too, and it is
+in the table whatever field it reaches. An
 agent may raise a *conditional* claim on an open row exactly as it may on an
 element attribute nobody stated. Which of the two an entry is, is the entry's
 own ``Ground.kind``, so a claim that grounds a settled row on an open question
@@ -299,9 +301,11 @@ def evidence_catalog(
         )
         # The open questions, after the settled rows and never merged with
         # them. An unknown row, or a row in a conflict, reaches here when it
-        # reaches no graph field: the model shows a disputed attribute as a
-        # qualified unknown, which the attribute enumeration above offers, but
-        # a principal's second factor has no attribute to qualify.
+        # reaches no graph field: an applied projection shows a disputed
+        # attribute as a qualified unknown, which the attribute enumeration
+        # above offers, but a principal's second factor has no attribute to
+        # qualify. Where the validity gate refuses the projected model, a
+        # disputed attribute keeps what extraction wrote.
         unprojected = [
             row
             for row in (

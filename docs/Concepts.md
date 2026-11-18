@@ -132,7 +132,8 @@ What code does with a row:
   A row that states an absence still fills an `unknown` field, because an
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
-  says why.
+  says why, when the service can write the model; where it cannot, the field
+  keeps what extraction wrote.
 - **Where the model's field still states the opposite of the value the rows
   project**, because the service could not write that value into the model,
   the rows are open questions, and a claim on one is conditional. Where a
