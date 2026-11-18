@@ -17,7 +17,7 @@ from analysis_service.evidence import evidence_catalog
 from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import DataStore, SystemModel
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.test_evidence import assertions, row
 
@@ -27,6 +27,15 @@ CROSSING = "flow:entity:customer>process:web-app>login"
 ORDERS = "store:orders-db"
 FIRST = "System description"
 SECOND = "Payment notes"
+
+
+def _with_encryption(value: str) -> SystemModel:
+    """The sample model with the orders store's encryption at rest set to ``value``."""
+    model = valid_model()
+    store = model.get(ORDERS)
+    assert isinstance(store, DataStore)
+    store.encryption_at_rest = value
+    return model
 
 
 def _join(grounds, sources=None, catalog=None, model=None):
@@ -117,18 +126,27 @@ class TestIdenticalTextInTwoSources:
         assert joined.marks.unverified_grounds == []
         assert joined.drafts[0].grounds[0].source_label == label
 
+    def test_a_label_that_names_no_source_leaves_the_quote_unverified(self):
+        joined = _join(
+            [
+                Ground(
+                    kind="quote",
+                    text="The admin console has no login.",
+                    source_label="Meeting notes",
+                ),
+                Ground(kind="derived-fact", flow_id=CROSSING),
+            ],
+            SAME_SOURCES,
+        )
+
+        assert [m.index for m in joined.marks.unverified_grounds] == [0]
+
 
 class TestAbsenceAgainstSilence:
     """A stated absence is a fact in hand; an unstated control is a question."""
 
-    def _model(self, value):
-        model = valid_model()
-        store = model.get(ORDERS)
-        store.encryption_at_rest = value
-        return model
-
     def test_a_claim_on_a_stated_absence_can_be_confirmed(self):
-        model = self._model("none")
+        model = _with_encryption("none")
         joined = _join(
             [
                 Ground(
@@ -143,7 +161,7 @@ class TestAbsenceAgainstSilence:
         assert _status(joined, model=model).status == "confirmed"
 
     def test_a_claim_on_silence_is_needs_info(self):
-        model = self._model("unknown")
+        model = _with_encryption("unknown")
         joined = _join(
             [
                 Ground(
@@ -162,7 +180,7 @@ class TestAbsenceAgainstSilence:
         ]
 
     def test_silence_cannot_be_cited_as_an_absence(self):
-        model = self._model("unknown")
+        model = _with_encryption("unknown")
 
         with pytest.raises(DraftJoinError, match="reads as unverified"):
             _join(
@@ -214,14 +232,15 @@ class TestAConflictCarriedToTheClaim:
 
 
 class TestAConfirmationOnAnOpenFact:
-    """An unresolved fact the argument needs never reads as confirmed."""
+    """An unresolved fact the argument needs never reads as confirmed.
+
+    The negative is ``TestAbsenceAgainstSilence.test_a_claim_on_silence_is_needs_info``:
+    a confirming ruling that dismisses nothing reads ``needs-info``.
+    """
 
     GROUND = Ground(
         kind="unknown-attribute", element_id=ORDERS, attribute="encryption_at_rest"
     )
-
-    def test_a_confirmation_that_dismisses_nothing_is_needs_info(self):
-        assert _status(_join([self.GROUND])).status == "needs-info"
 
     def test_a_confirmation_that_names_the_fact_immaterial_stands(self):
         ruling = sample_ruling(
@@ -254,13 +273,8 @@ class TestARowTheGraphContradicts:
 
     STORE = Subject(id=ORDERS, type="component", label="orders database")
 
-    def _model(self, value):
-        model = valid_model()
-        model.get(ORDERS).encryption_at_rest = value
-        return model
-
     def test_an_opposite_graph_value_is_named_and_the_row_stays_settled(self):
-        model = self._model("AES-256")
+        model = _with_encryption("AES-256")
         catalog = assertions(self.STORED, subjects=(self.STORE,))
 
         assert [c.attribute for c in contradictions(catalog, model)] == [
@@ -270,8 +284,10 @@ class TestARowTheGraphContradicts:
         assert ground.kind == "assertion"
 
     def test_an_agreeing_graph_value_carries_the_row_and_names_nothing(self):
-        model = self._model("none")
+        model = _with_encryption("none")
         catalog = assertions(self.STORED, subjects=(self.STORE,))
 
+        offered = evidence_catalog(model, catalog)
         assert contradictions(catalog, model) == ()
-        assert assertion_id(self.STORED) not in evidence_catalog(model, catalog)
+        assert assertion_id(self.STORED) not in offered
+        assert offered[f"absent:{ORDERS}:encryption_at_rest"].kind == "absent-attribute"

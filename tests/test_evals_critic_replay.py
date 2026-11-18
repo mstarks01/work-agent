@@ -25,7 +25,6 @@ from evals.harness.provenance import REPO_ROOT
 from evals.harness.run_record import loaded
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
-from tests.factories import sample_ruling
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
     finished,
     record_requests,
@@ -281,11 +280,17 @@ def test_a_claim_assembly_returned_reads_as_returned(recorded, case):  # noqa: F
     assert all(status[claim.id] == claim.verdict.status for claim in rest)
 
 
-def test_a_returned_claim_counts_against_agreement(recorded, case):  # noqa: F811
+def test_a_returned_claim_counts_against_agreement(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+    monkeypatch,
+    capsys,
+):
     """Pinned as the command counts today: a returned claim has no archived
-    verdict, so beside a replayed one it reads as a disagreement, not apart."""
+    verdict, and the printed count reads it as a disagreement, not apart."""
     out, _ = recorded
-    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    artifact = finished(out, case.id)
+    archived = critic_replay.load(artifact, case.id, "stride")
     first, *rest = archived.block.claims
     block = archived.block.model_copy(
         update={
@@ -295,14 +300,48 @@ def test_a_returned_claim_counts_against_agreement(recorded, case):  # noqa: F81
             ],
         }
     )
-
-    rows = critic_replay.compare(
-        replace(archived, block=block), [sample_ruling(first.id)]
+    returned = replace(archived, block=block)
+    ruled = json.dumps(
+        {
+            "claims": [
+                {
+                    "id": claim.id,
+                    "verdict": {},
+                    "confidence": getattr(claim, "confidence", "medium"),
+                }
+                for claim in archived.drafts
+            ]
+        }
     )
 
-    (returned,) = [row for row in rows if row.draft_id == first.id]
-    assert (returned.archived, returned.replayed) == ("returned", "confirmed")
-    assert returned.archived != returned.replayed
+    def scripted(*_):
+        async def call(instruction, turn):
+            return ruled
+
+        return call
+
+    monkeypatch.setattr(critic_replay, "load", lambda *_: returned)
+    monkeypatch.setattr(critic_replay, "node_call", scripted)
+    monkeypatch.setattr(critic_replay.Deployment, "from_env", lambda: None)
+    args = argparse.Namespace(
+        artifact=artifact.path,
+        case=case.id,
+        framework="stride",
+        accept_cost="unknown",
+        out=None,
+        raw=None,
+    )
+
+    assert critic_replay.command_critic_replay(args) == 0
+
+    printed = capsys.readouterr().out
+    assert f"≠ {first.id:10} archived returned" in printed
+    agreeing = sum(
+        1
+        for claim in rest
+        if f"= {claim.id:10} archived {claim.verdict.status:12}" in printed
+    )
+    assert f"{agreeing} of {len(archived.drafts)} verdicts agree" in printed
 
 
 def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # noqa: F811
