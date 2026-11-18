@@ -387,11 +387,9 @@ def report(fixtures: Sequence[Fixture]) -> dict[str, Any]:
             "accuracy": ratio(sum(score.correct for score in group), rows),
             "false_exclusions": sum(len(score.false_exclusions) for score in group),
             "false_inclusions": sum(len(score.false_inclusions) for score in group),
-            "unknown_accuracy": (
-                sum(score.correct_unknown for score in group)
-                / sum(score.expected_unknown for score in group)
-                if any(score.expected_unknown for score in group)
-                else None
+            "unknown_accuracy": ratio(
+                sum(score.correct_unknown for score in group),
+                sum(score.expected_unknown for score in group),
             ),
         }
     return {

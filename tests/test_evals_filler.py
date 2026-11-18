@@ -76,7 +76,7 @@ class TestIneligiblePointers:
         row = filler.rows([report])[0]
 
         assert row.pointers == 0
-        assert row.ineligible_share == 0.0
+        assert row.ineligible_share is None
 
     def test_eligibility_follows_the_element_type(self):
         """`exposure` is real on a process and on nothing else.

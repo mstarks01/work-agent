@@ -70,7 +70,7 @@ def test_a_lane_offered_nothing_rates_zero_rather_than_dividing_by_it():
         ),
     )
 
-    assert lane.cited_rate("candidates", "candidates_cited") == 0.0
+    assert lane.cited_rate("candidates", "candidates_cited") is None
 
 
 def test_rules_fired_is_the_unambiguous_number(two_cases):

@@ -32,6 +32,7 @@ from typing import Any
 
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import finished_file
+from evals.harness.rates import UNAVAILABLE, mean
 
 #: Each quality figure against the margin ADR 0035 allows it, in the order the
 #: record tabulates them. A table rather than six comparisons, so a figure added
@@ -81,16 +82,13 @@ class Arm:
             for run in self.artifacts
         ]
 
-    def figure(self, name: str) -> list[float]:
-        """One quality figure's corpus mean, per sweep."""
-        return [
-            statistics.fmean([row[name] for row in run["mode_output"]])
-            for run in self.artifacts
-        ]
+    def figure(self, name: str) -> list[float | None]:
+        """One quality figure's corpus mean, per sweep, over the cases that have it."""
+        return [mean(row[name] for row in run["mode_output"]) for run in self.artifacts]
 
-    def per_case(self, name: str) -> dict[str, list[float]]:
+    def per_case(self, name: str) -> dict[str, list[float | None]]:
         """One quality figure per case, across the sweeps."""
-        cases: dict[str, list[float]] = {}
+        cases: dict[str, list[float | None]] = {}
         for run in self.artifacts:
             for row in run["mode_output"]:
                 cases.setdefault(row["case"], []).append(row[name])
@@ -144,9 +142,13 @@ def _margin(figure: str, margin: float) -> Callable[[Arm, Arm], tuple[bool, str]
     """One non-inferiority margin, one-sided: better by any amount gains nothing."""
 
     def verdict(full: Arm, compact: Arm) -> tuple[bool, str]:
-        delta = statistics.fmean(compact.figure(figure)) - statistics.fmean(
-            full.figure(figure)
+        compact_mean, full_mean = (
+            mean(compact.figure(figure)),
+            mean(full.figure(figure)),
         )
+        if compact_mean is None or full_mean is None:
+            return False, f"{UNAVAILABLE} against {margin}"
+        delta = compact_mean - full_mean
         return delta >= -margin, f"{delta:+.3f} against {margin}"
 
     return verdict
@@ -163,11 +165,18 @@ def _veto(full: Arm, compact: Arm) -> tuple[bool, str]:
     """
     fallen: list[str] = []
     for figure in QUALITY_MARGINS:
-        floors = {case: min(runs) for case, runs in full.per_case(figure).items()}
+        floors = {
+            case: None if None in runs else min(run for run in runs if run is not None)
+            for case, runs in full.per_case(figure).items()
+        }
         for case, runs in compact.per_case(figure).items():
-            mean = statistics.fmean(runs)
-            if mean < floors[case]:
-                fallen.append(f"{case}/{figure} {mean:.3f}<{floors[case]:.3f}")
+            floor = floors[case]
+            if floor is None or None in runs:
+                fallen.append(f"{case}/{figure} {UNAVAILABLE}")
+                continue
+            average = statistics.fmean(run for run in runs if run is not None)
+            if average < floor:
+                fallen.append(f"{case}/{figure} {average:.3f}<{floor:.3f}")
     return not fallen, "; ".join(fallen) if fallen else "no case below its floor"
 
 

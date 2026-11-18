@@ -1002,7 +1002,7 @@ def render(scores: Sequence[CaseScore]) -> None:
         print(
             f"exemplar delta: near {shown_figure(delta['near_coverage'], '.2f')}"
             f" vs far {shown_figure(delta['far_coverage'], '.2f')}"
-            f" = {delta['delta']:+.2f} (tracked, non-gating)"
+            f" = {shown_figure(delta['delta'], '+.2f')} (tracked, non-gating)"
         )
         split = holdout_split(scores)
         if split:

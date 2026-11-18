@@ -2271,8 +2271,22 @@ def test_the_silent_causes_are_spelled_once():
 ONE_READERS: dict[str, _OneReader] = {
     "a share over an empty denominator": _OneReader(
         _divides_under_a_guard,
-        ("evals/harness/scorer.py", "ratio"),
-        {},
+        ("evals/harness/rates.py", "ratio"),
+        {
+            ("evals/harness/consent.py", "hold"): (
+                "it projects a cost from the cases run so far, not a share"
+            ),
+            ("evals/harness/submit.py", "_check_your_file_appends"): (
+                "its `/` joins a directory and a file name into a path"
+            ),
+            ("evals/harness/submit.py", "_vote_rows"): (
+                "its `/` joins a directory and a file name into a path"
+            ),
+            ("evals/harness/transport_gate.py", "_primary"): (
+                "it counts standard deviations, and no spread is an infinite"
+                " distance rather than a share"
+            ),
+        },
         "evals/harness/",
     ),
     "the join of a page's scripts": _OneReader(

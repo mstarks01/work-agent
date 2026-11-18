@@ -35,7 +35,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.claims import LaneCoverage as ReportLaneCoverage
 from analysis_service.frameworks import PACKAGES
-from evals.harness.rates import ratio, rounded_share
+from evals.harness.rates import percent, ratio, rounded_share
 
 # The offered/cited pairs, in the order they read on a row. Named once because
 # the fold, the rates and the printed table would otherwise each carry their
@@ -199,9 +199,9 @@ def render(lanes: Sequence[LaneCoverage], offered: bool) -> None:
     totals = coverage_totals(lanes)
     print(
         f"coverage: {totals['rules_fired']}/{totals['rules']} rule evaluations fired,"
-        f" candidates cited {totals['cited_rates']['candidates_cited']:.0%},"
-        f" elements {totals['cited_rates']['elements_cited']:.0%},"
-        f" unknown controls {totals['cited_rates']['unknown_controls_cited']:.0%}"
+        f" candidates cited {percent(totals['cited_rates']['candidates_cited'])},"
+        f" elements {percent(totals['cited_rates']['elements_cited'])},"
+        f" unknown controls {percent(totals['cited_rates']['unknown_controls_cited'])}"
         " (instrument, non-gating)"
     )
 

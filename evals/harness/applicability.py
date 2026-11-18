@@ -818,9 +818,9 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
             f"  of {totals['needs_other_evidence']} requirements needing evidence"
             " this job cannot carry:"
             f" {totals['false_prose_requests']} asked for more prose"
-            f" ({totals['false_prose_request_rate']:.0%}),"
+            f" ({percent(totals['false_prose_request_rate'])}),"
             f" {totals['false_confirmed']} were ruled from prose"
-            f" ({totals['false_confirmed_rate']:.0%}),"
+            f" ({percent(totals['false_confirmed_rate'])}),"
             f" {totals['wrong_kind']} named the wrong kind"
         )
 
