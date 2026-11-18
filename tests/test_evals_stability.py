@@ -994,3 +994,23 @@ def test_a_run_with_no_recall_value_is_read_as_a_gap(tmp_path, sampling):  # noq
     assert case.recalls == (None, round(1 / 3, 3))
     assert case.recall_spread is None
     assert case.to_json()["recall_spread"] is None
+
+
+def test_repeats_that_agree_exactly_measure_no_inflation_rather_than_none():
+    """A measured variance of zero is a measurement, not an uncalibrated band."""
+    from evals.harness.stability import Band
+
+    agreed = Band(
+        references=1,
+        volatile=1,
+        runs=2,
+        floor_variance=1.0,
+        observed_variance=0.0,
+        calibration_floor=1.0,
+    )
+    uncalibrated = Band(references=1, volatile=1, runs=2, floor_variance=1.0)
+
+    assert agreed.inflation == 0.0
+    assert agreed.variance == 0.0
+    assert uncalibrated.inflation is None
+    assert uncalibrated.variance == 1.0

@@ -57,7 +57,6 @@ from evals.harness.rates import (
     ratio,
     rounded_difference,
     rounded_figure,
-    shown_figure,
 )
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
@@ -798,7 +797,7 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
     for score in scores:
         print(
             f"{score.case:<26} {len(score.judged):>7}"
-            f" {shown_figure(score.accuracy, '.0%'):>6}"
+            f" {percent(score.accuracy):>6}"
             f" {score.unjudged:>6} {len(score.unreached):>6}"
             f" {len(score.false_prose_requests):>7}"
             f" {len(score.false_confirmed):>6} {len(score.wrong_kind):>6}"
@@ -807,9 +806,9 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
     totals = pooled_dispositions(scores)
     print(
         f"pooled over {totals['cases']} cases:"
-        f" accuracy {shown_figure(totals['accuracy'], '.0%')}"
+        f" accuracy {percent(totals['accuracy'])}"
         f" ({totals['correct']}/{totals['judged']})"
-        f" over {shown_figure(totals['coverage'], '.0%')} coverage"
+        f" over {percent(totals['coverage'])} coverage"
         f" ({totals['judged']}/{totals['judged'] + totals['unreached']} reached),"
         f" {totals['unjudged']} records carry no expected disposition"
         " (instrument, non-gating)"
@@ -1153,8 +1152,8 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     )
     for score in scores:
         print(
-            f"{score.case:<26} {score.level:>3} {shown_figure(score.recall, '.0%'):>6}"
-            f" {shown_figure(score.must_find_recall, '.0%'):>6}"
+            f"{score.case:<26} {score.level:>3} {percent(score.recall):>6}"
+            f" {percent(score.must_find_recall):>6}"
             f" {percent(score.precision):>11}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"
@@ -1163,9 +1162,9 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     totals = pooled(scores)
     print(
         f"pooled over {totals['cases']} cases: recall"
-        f" {shown_figure(totals['recall'], '.0%')}"
+        f" {percent(totals['recall'])}"
         f" ({totals['matched']}/{totals['expected']}),"
-        f" must-find {shown_figure(totals['must_find_recall'], '.0%')},"
+        f" must-find {percent(totals['must_find_recall'])},"
         f" precision {percent(totals['precision'])}"
         f" (over {totals['precision_cases']} of {totals['cases']} cases read"
         " as exhaustive),"

@@ -625,7 +625,8 @@ def test_a_published_mean_skips_a_case_with_no_value():
     assert published(blocks, "reference_coverage", _AllCases()) == 0.5
 
 
-def test_the_rejected_gain_skips_a_case_with_no_value():
+def test_the_rejected_gain_reads_no_value_where_a_case_has_none():
+    """A mean that skipped the case would cover other cases than its pair."""
     from evals.harness.gain import _stride_rejected
 
     blocks = {
@@ -634,5 +635,7 @@ def test_the_rejected_gain_skips_a_case_with_no_value():
             {"case": "b", "metrics": {"rejected_rate": 0.25}},
         ]
     }
+    held = {"scores": [{"case": "b", "metrics": {"rejected_rate": 0.25}}]}
 
-    assert _stride_rejected(blocks, _AllCases()) == 0.25
+    assert _stride_rejected(blocks, _AllCases()) is None
+    assert _stride_rejected(held, _AllCases()) == 0.25

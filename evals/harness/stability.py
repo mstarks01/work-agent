@@ -447,13 +447,14 @@ class Band:
     @property
     def inflation(self) -> float | None:
         """How much wider the truth is than the floor, in variance. ``None`` uncalibrated."""
-        if not self.observed_variance or not self.calibration_floor:
+        if self.observed_variance is None or self.calibration_floor is None:
             return None
-        return self.observed_variance / self.calibration_floor
+        return ratio(self.observed_variance, self.calibration_floor)
 
     @property
     def variance(self) -> float:
-        return self.floor_variance * (self.inflation or 1.0)
+        inflation = self.inflation
+        return self.floor_variance * (1.0 if inflation is None else inflation)
 
     @property
     def sd(self) -> float:
@@ -618,7 +619,7 @@ def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float | None:
     """
     pairs = list(itertools.combinations(sets, 2))
     overlaps = [jaccard(left, right) for left, right in pairs]
-    return ratio(sum(overlaps), len(overlaps))
+    return mean(overlaps)
 
 
 def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:

@@ -58,7 +58,7 @@ from evals.harness.promotion import (
     in_spreads,
     read_spread,
 )
-from evals.harness.rates import mean, shown_figure
+from evals.harness.rates import complete_mean, mean, shown_figure
 from evals.harness.scorer import review_coverage
 
 #: One figure, read from one artifact over the cases a selector keeps, or
@@ -126,8 +126,12 @@ def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
 
 
 def _stride_rejected(blocks: Mapping[str, Any], cases: Cases) -> float | None:
-    """The share of produced findings a person rejected, per case."""
-    return mean(
+    """The share of produced findings a person rejected, per case.
+
+    ``None`` where a selected case has no value, so the two artifacts a gain
+    compares are read over one set of cases.
+    """
+    return complete_mean(
         [row["metrics"]["rejected_rate"] for row in cases.rows(blocks, "scores")]
     )
 
@@ -339,7 +343,8 @@ def _decide(
             after,
             before,
             None,
-            "an artifact carries no such figure, which is not a zero",
+            "an artifact carries no value for this figure on every case,"
+            " which is not a zero",
         )
     if gate.unit == "count":
         value = after

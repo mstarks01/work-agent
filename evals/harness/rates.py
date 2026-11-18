@@ -7,9 +7,9 @@ and every printer shows :data:`UNAVAILABLE`.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 #: The word :func:`shown_figure` prints for a figure with no value: a gap,
 #: never a zero.
@@ -90,3 +90,26 @@ def jaccard(left: Collection[str], right: Collection[str]) -> float:
     """
     union = set(left) | set(right)
     return 1.0 if not union else len(set(left) & set(right)) / len(union)
+
+
+#: Whether a set of readings of one figure holds a value: in every reading, in
+#: none, or in some and not others.
+Presence = Literal["every", "none", "some"]
+
+
+def presence(values: Sequence[float | None]) -> Presence:
+    """Which of :data:`Presence` the readings ``values`` are."""
+    held = sum(value is not None for value in values)
+    if held == len(values):
+        return "every"
+    return "none" if held == 0 else "some"
+
+
+def complete_mean(values: Sequence[float | None]) -> float | None:
+    """The mean where every value is held, or ``None`` where any is missing.
+
+    For a figure compared between two artifacts over one selection of cases:
+    a mean that skipped a case on one side would cover other cases than the
+    mean it is compared with.
+    """
+    return mean(values) if presence(values) == "every" else None
