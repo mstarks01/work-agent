@@ -105,6 +105,21 @@ class TestTheSourceAQuoteNames:
         assert joined.marks.unverified_grounds == []
         assert joined.drafts[0].grounds[0].source_label == SECOND
 
+    def test_a_label_that_names_no_source_leaves_the_quote_unverified(self):
+        joined = _join(
+            [
+                Ground(
+                    kind="quote",
+                    text="The admin console has no login.",
+                    source_label="Meeting notes",
+                ),
+                Ground(kind="derived-fact", flow_id=CROSSING),
+            ],
+            SPLIT_SOURCES,
+        )
+
+        assert [m.index for m in joined.marks.unverified_grounds] == [0]
+
 
 class TestIdenticalTextInTwoSources:
     """One sentence in two sources: each quote keeps the source it names."""
@@ -125,21 +140,6 @@ class TestIdenticalTextInTwoSources:
 
         assert joined.marks.unverified_grounds == []
         assert joined.drafts[0].grounds[0].source_label == label
-
-    def test_a_label_that_names_no_source_leaves_the_quote_unverified(self):
-        joined = _join(
-            [
-                Ground(
-                    kind="quote",
-                    text="The admin console has no login.",
-                    source_label="Meeting notes",
-                ),
-                Ground(kind="derived-fact", flow_id=CROSSING),
-            ],
-            SAME_SOURCES,
-        )
-
-        assert [m.index for m in joined.marks.unverified_grounds] == [0]
 
 
 class TestAbsenceAgainstSilence:
@@ -221,15 +221,14 @@ class TestAConflictCarriedToTheClaim:
 
 
 class TestAConfirmationOnAnOpenFact:
-    """An unresolved fact the argument needs never reads as confirmed.
-
-    The negative is ``TestAbsenceAgainstSilence.test_a_claim_on_silence_is_needs_info``:
-    a confirming ruling that dismisses nothing reads ``needs-info``.
-    """
+    """An unresolved fact the argument needs never reads as confirmed."""
 
     GROUND = Ground(
         kind="unknown-attribute", element_id=ORDERS, attribute="encryption_at_rest"
     )
+
+    def test_a_confirmation_that_dismisses_nothing_is_needs_info(self):
+        assert _status(_join([self.GROUND])).status == "needs-info"
 
     def test_a_confirmation_that_names_the_fact_immaterial_stands(self):
         ruling = sample_ruling(

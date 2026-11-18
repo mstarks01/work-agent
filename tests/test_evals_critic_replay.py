@@ -335,8 +335,7 @@ def test_a_returned_claim_counts_against_agreement(
     assert critic_replay.command_critic_replay(args) == 0
 
     printed = capsys.readouterr().out
-    rows = critic_replay.compare(returned, critic_replay.parse(ruled, "stride"))
-    agreeing = sum(row.archived == row.replayed for row in rows)
+    agreeing = sum(line.startswith("  = ") for line in printed.splitlines())
     assert f"≠ {first.id:10} archived returned" in printed
     assert f"{agreeing} of {len(archived.drafts)} verdicts agree" in printed
 
