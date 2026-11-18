@@ -266,6 +266,7 @@ class TestAnAnswerToADisputedPlace:
             assert rows == [(ABSENT, "answer")]
             named = {issue.assertion for issue in issues}
             assert assertion_id(REQUIRED) in named
+            assert assertion_id(NOT_REQUIRED) not in named
 
     def test_the_answer_keeps_no_explanation_of_a_source_row(self):
         written, _ = self.written(disputed(), "required")
