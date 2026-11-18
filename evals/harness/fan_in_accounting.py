@@ -46,14 +46,13 @@ from typing import Any, NamedTuple
 from pydantic import ValidationError
 
 from analysis_service.claims import FrameworkName, ProposalBatch
-from analysis_service.evidence import invalid_proposal_marks, known_proposals
+from analysis_service.evidence import invalid_proposal_marks
 from analysis_service.execution import source_texts
 from analysis_service.fan_in import DraftJoinError, FanIn, fan_in
 from analysis_service.frameworks import PACKAGES, FrameworkPackage, schemas_for
 from analysis_service.frameworks.asvs.record import RequirementProposals
 from analysis_service.frameworks.stride.record import ArchivedThreatProposals
 from analysis_service.report import Report
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
@@ -134,37 +133,20 @@ def account(
     package: FrameworkPackage,
     merged: FanIn,
 ) -> FanInAccount:
-    """Each proposal of ``batches``, given its fate from the fan-in's ``merged``.
-
-    The fan-in keys a deferral by unit, and a unit can hold more than one
-    proposal, so each lane's known proposals go through the package's own split
-    again, with the empty set of covered units the replay passes the fan-in.
-    The units that split defers must be the fan-in's own, or the account is
-    incompatible.
-    """
+    """Each proposal of ``batches``, given its fate from the fan-in's ``merged``."""
     key_field = schemas_for(package.name).key_field
     proposals: list[str] = []
-    deferred: list[str] = []
-    units: dict[str, str] = {}
     for lane, batch in batches.items():
-        ids = {
-            id(proposal): package.compose_id(lane, getattr(proposal, key_field))
+        proposals += [
+            package.compose_id(lane, getattr(proposal, key_field))
             for proposal in batch.claims
-        }
-        proposals += ids.values()
+        ]
         proposals += [
             mark.claim_id
             for mark in invalid_proposal_marks(
                 batch.invalid, package, lane
             ).dropped_claims
         ]
-        known, _ = known_proposals(batch.claims, package, lane)
-        kept, reasons = package.record.partition_proposals(
-            known, lane, CARRIED_EVIDENCE_KINDS, ()
-        )
-        units.update(reasons)
-        held = {id(proposal) for proposal in kept}
-        deferred += [ids[id(p)] for p in known if id(p) not in held]
     marks = merged.marks
     dropped = [(mark.claim_id, mark.reason) for mark in marks.dropped_claims]
     unknown = [mark.claim_id for mark in marks.unknown_claim_identities]
@@ -173,7 +155,7 @@ def account(
         [draft.id for draft in merged.drafts],
         [claim_id for claim_id, _ in dropped],
         unknown,
-        deferred,
+        merged.deferred_ids,
     ):
         left.subtract(fate)
     unexplained = [i for i, count in sorted(left.items()) for _ in range(count)]
@@ -190,17 +172,12 @@ def account(
         kept=tuple(draft.id for draft in merged.drafts),
         dropped=tuple(dropped),
         unknown=tuple(unknown),
-        deferred=tuple(deferred),
+        deferred=tuple(merged.deferred_ids),
         unexplained=tuple(unexplained),
         extra=tuple(extra),
         quotes_verified=quotes - repaired - refused,
         quotes_repaired=repaired,
         quotes_refused=refused,
-        incompatible=(
-            ""
-            if units == merged.deferred
-            else "the package's split defers other units than the fan-in did"
-        ),
     )
 
 
@@ -275,10 +252,8 @@ def account_case(
             rows.append(replace(empty, incompatible=str(error)))
             continue
         row = account(case.id, batches, package, merged)
-        reason = (
-            row.incompatible
-            or sources_moved
-            or _drift_reason(merged, drafts.get(framework, []), package)
+        reason = sources_moved or _drift_reason(
+            merged, drafts.get(framework, []), package
         )
         rows.append(replace(row, incompatible=reason))
     return rows

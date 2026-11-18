@@ -137,26 +137,6 @@ def test_a_deferred_proposal_is_accounted():
     assert (row.kept, row.unexplained, row.accounted) == ((), (), 1)
 
 
-def test_a_split_that_disagrees_with_the_fan_in_is_incompatible():
-    lane = "encoding-and-sanitization"
-    proposal = RequirementProposal(
-        title="t",
-        description="d",
-        requirement="2.4",
-        needs_evidence="code",
-        direction="question",
-        quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
-    )
-    stored = {lane: schemas_for("asvs").proposals(claims=[proposal])}
-    merged = fan_in(stored, ASVS, valid_model(), {}, assertions=None)
-    moved = merged._replace(deferred={"V1.2.5": "code"})
-
-    row = fan_in_accounting.account("case", stored, ASVS, moved)
-
-    assert row.incompatible.startswith("the package's split defers other units")
-    assert row.accounted == 0
-
-
 def test_a_proposal_the_output_loses_is_unexplained():
     stored = batches(
         spoofing=[sample_proposal("S-01")],

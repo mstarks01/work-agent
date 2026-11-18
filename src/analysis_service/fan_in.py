@@ -107,6 +107,8 @@ class FanIn(NamedTuple):
     this lane look at the system — is about what the agents did rather than
     about what survived review. ``undeferred`` is each unit a Control row kept
     from ``deferred``, against the kind it would have been deferred for.
+    ``deferred_ids`` is the claim ID of each proposal the package deferred,
+    once per proposal, because one unit can hold more than one.
     """
 
     drafts: list[Claim]
@@ -114,6 +116,7 @@ class FanIn(NamedTuple):
     deferred: dict[str, str]
     coverage: list[LaneCoverage]
     undeferred: dict[str, str]
+    deferred_ids: list[str]
 
 
 def fan_in(
@@ -211,6 +214,13 @@ def fan_in(
     deferred: dict[str, str] = {}
     for _, reasons in partitions.values():
         deferred.update(reasons)
+    key_field = schemas_for(package.name).key_field
+    deferred_ids = [
+        package.compose_id(lane, getattr(proposal, key_field))
+        for lane, (kept, _) in partitions.items()
+        for proposal in known[lane]
+        if not any(proposal is held for held in kept)
+    ]
     # The package says which units a row kept by its answer with no row, so
     # a draft the critic keeps against every row can go back (ADR 0126).
     undeferred: dict[str, str] = {}
@@ -238,7 +248,6 @@ def fan_in(
     # reason, before it can become a draft (ADR 0028): the neutral answer
     # refuses nothing, and the ASVS answer refuses a gap resting on absence
     # alone. Read after the split, because a deferred proposal is already gone.
-    key_field = schemas_for(package.name).key_field
     unsupported: list[DroppedClaim] = []
     supported: dict[str, list] = {}
     for lane, (kept, _) in partitions.items():
@@ -314,7 +323,7 @@ def fan_in(
         model,
         package,
     )
-    return FanIn(merged, marks, deferred, coverage, undeferred)
+    return FanIn(merged, marks, deferred, coverage, undeferred, deferred_ids)
 
 
 class Returned(NamedTuple):
@@ -700,7 +709,7 @@ def _scope_grounds(
     return _ScopeCheck(drafts, unresolved, dropped)
 
 
-def _drop_duplicate_ids(
+def drop_duplicate_ids(
     claims: Iterable[Claim],
 ) -> tuple[list[Claim], list[DroppedClaim]]:
     """Keep the first draft under each ID; drop and mark every later one.
@@ -937,7 +946,7 @@ def join_drafts(
         known_ids,
         sources.keys(),
     )
-    unique, duplicates = _drop_duplicate_ids(snapped)
+    unique, duplicates = drop_duplicate_ids(snapped)
     referenced = _resolve_element_references(unique, known_ids)
     issues = ground_issues(referenced.drafts, system_model, assertions)
     if issues:

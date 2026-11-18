@@ -18,15 +18,18 @@ from analysis_service.claims import (
     MENTION_MAX_CHARS,
     Ground,
     Mitigation,
+    QuoteCandidate,
 )
 from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
 from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS, DEFAULT_DESCRIPTION_LABEL
 from analysis_service.validation import MAX_ELEMENTS
 from tests.factories import (
     REPORTING_JOB,
+    SCRIPTED_FRAMEWORKS,
     sample_draft,
     sample_proposal,
     three_hop_model,
@@ -1255,6 +1258,27 @@ def batches(**proposals_by_lane):
 class TestFanIn:
     """The one interface: batches in, drafts, marks, deferrals and coverage out."""
 
+    @pytest.mark.parametrize("needs", ["code", ""])
+    def test_each_deferred_proposal_is_named_by_its_claim_id(self, model, needs):
+        """A unit holds the reason; the proposal that took it holds an ID, so a
+        reader can tie a deferral back to what the lane emitted."""
+        lane = "encoding-and-sanitization"
+        proposal = RequirementProposal(
+            title="t",
+            description="d",
+            requirement="2.4",
+            needs_evidence=needs,
+            direction="question" if needs else "gap",
+            quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
+        )
+        stored = {lane: schemas_for("asvs").proposals(claims=[proposal])}
+
+        merged = fan_in.fan_in(
+            stored, PACKAGES["asvs"], model, sources={}, assertions=None
+        )
+
+        assert merged.deferred_ids == (["v5.0.0-1.2.4"] if needs else [])
+
     def test_a_lane_with_no_batch_contributes_nothing(self, model):
         merged = fan_in.fan_in(
             batches(spoofing=[sample_proposal("S-01")]),
@@ -1470,3 +1494,20 @@ class TestTheEmissionBound:
 
         assert time.thread_time() - started < 2
         assert len(merged.drafts) == MAX_SEQUENCE
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_each_package_keeps_the_proposal_objects_it_was_given(framework):
+    """The fan-in names a deferred proposal by identity, so every package's
+    split must hand back the objects it was given, never copies."""
+    fixture = SCRIPTED_FRAMEWORKS[framework]
+    proposals = (
+        schemas_for(framework).proposals.model_validate_json(fixture.proposal).claims
+    )
+
+    kept, _ = PACKAGES[framework].record.partition_proposals(
+        proposals, fixture.lane, CARRIED_EVIDENCE_KINDS, ()
+    )
+
+    assert kept
+    assert all(any(held is given for given in proposals) for held in kept)
