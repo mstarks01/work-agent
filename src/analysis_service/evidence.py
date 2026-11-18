@@ -510,8 +510,8 @@ def _one_ground_issue(
 ) -> str:
     """Why one catalogued ground is not in this model's catalog, or ``""``.
 
-    ``held_open`` holds the attributes whose absence the assertion rows
-    contradict or leave open
+    ``held_open`` holds the attributes the assertion rows contradict, or whose
+    qualification the field hides
     (:func:`~analysis_service.assertions.held_open_attributes`).
     """
     if ground.kind == "quote":
