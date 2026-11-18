@@ -93,7 +93,8 @@ A ground has one of these kinds:
 - `absent-attribute`: an attribute the source explicitly said was absent;
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
-- `assertion`: an assertion row that the sources settle (see below); or
+- `assertion`: an assertion row that the sources settle and the model does not
+  contradict (see below); or
 - `unknown-assertion`: an open assertion row: its value is unknown, another
   row disputes it, or the model's attribute states the opposite.
 
@@ -130,6 +131,9 @@ What code does with a row:
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
   says why.
+- **Where the model's field still states the opposite of a row**, because the
+  service could not write the row's value into the model, the row is an open
+  question, and a claim on it is conditional.
 - **Each row states its basis.** `stated` means the source says it in words.
   `inferred` means the pass concluded it from what the source says, and the row
   gives the reasoning. `derived` means a rule in code wrote the value, and the
@@ -140,8 +144,8 @@ No person has checked a row when the report is built, so every row starts
 A row marked `unsupported` or `unresolved` reaches neither the evidence nor any
 field. The report itself is not rewritten after a review: a reassessment is
 computed from it and recorded beside it, and it names every finding that rested
-on a rejected row or on a row the reviewed graph contradicts. The report states how many rows were checked, rejected and
-left unchecked.
+on a rejected row or on a row the reviewed graph contradicts. The report states
+how many rows were checked, rejected and left unchecked.
 
 ## Proposal, claim, and verdict
 

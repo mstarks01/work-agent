@@ -58,11 +58,13 @@ settled row the graph attribute contradicts
 
 An **open** row is in the table and is a different thing. It is offered under
 the same identity and a ``unknown-assertion`` ground. A row is open where the
-sources were asked about the fact and left it open, where another row disputes
-it, or where the graph attribute contradicts it. An agent may raise a
-*conditional* claim on it exactly as it may on an element attribute nobody
-stated. Which of
-the two an entry is, is the entry's own ``Ground.kind``, so a claim that grounds
+sources were asked about the fact and left it open, or where another row
+disputes it; such a row is in the table where it reaches no graph field, and a
+field it reaches shows a qualified unknown instead. A row the graph attribute
+contradicts is open too, and it is in the table whatever field it reaches. An
+agent may raise a *conditional* claim on an open row exactly as it may on an
+element attribute nobody stated. Which of the two an entry is, is the entry's
+own ``Ground.kind``, so a claim that grounds
 a settled row on an open question — or the reverse — is refused by comparing
 its kind against the table rather than by a second reading of ``settled``.
 
@@ -245,14 +247,14 @@ def evidence_catalog(
     its ``trust_zone`` above, and the fact a reader needs is offered there, in
     the words that say it is a question.
 
-    The assertion rows follow where the job carried an assertion pass, and
-    each open row (unknown, disputed or contradicted) is offered after them as
-    an ``unknown-assertion``. The settled rows are a third enumeration:
-    every row :func:`~analysis_service.assertions.offered` returns — settled,
-    not contradicted by the graph, and not already carried by the attribute
-    its projection wrote — in the catalog's own order. ``None`` is a job that
-    ran no such pass, and its
-    catalog holds only the first two enumerations; an empty catalog is a pass
+    The assertion rows follow where the job carried an assertion pass. The
+    settled rows are a third enumeration: every row
+    :func:`~analysis_service.assertions.offered` returns — settled, not
+    contradicted by the graph, and not already carried by the attribute its
+    projection wrote — in the catalog's own order. The open rows come after
+    them as ``unknown-assertion`` entries: an unknown or disputed row that
+    reaches no graph field, and every contradicted row. ``None`` is a job that
+    ran no such pass, and its catalog holds only the first two enumerations; an empty catalog is a pass
     that settled nothing, which offers the same rows and says so on the
     report.
 
