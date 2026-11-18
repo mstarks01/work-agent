@@ -171,6 +171,7 @@ from evals.harness.provenance import (
     provenance_of,
     tree_identity,
 )
+from evals.harness.rates import UNAVAILABLE, Rate, shown_figure
 from evals.harness.reference import (
     CorpusError,
     GoldenCase,
@@ -181,12 +182,7 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.run_record import run_record, sweep_inputs
-from evals.harness.scorer import (
-    CaseScore,
-    Rate,
-    review_coverage,
-    score_case,
-)
+from evals.harness.scorer import CaseScore, review_coverage, score_case
 from evals.harness.stability import (
     Band,
     CaseStability,
@@ -2230,13 +2226,15 @@ def _print_stability(
     print(f"stability over {len(runs)} runs: {', '.join(run.label for run in runs)}")
     header = f"  {'framework':10} {'case':26} {'recalls':>22}"
     print(
-        f"{header} {'spread':>8} {'always':>16} {'jaccard':>9}"
+        f"{header} {'spread':>11} {'always':>16} {'jaccard':>11}"
         f" {'cause':>10} {'severity':>10} {'place':>10}"
     )
 
     def held(kept: int | None, moved: int | None) -> str:
-        """``kept/compared``, or ``-`` where a run lacks the record it needs."""
-        return "-" if kept is None or moved is None else f"{kept}/{kept + moved}"
+        """``kept/compared``, or unavailable where a run lacks the record it needs."""
+        if kept is None or moved is None:
+            return UNAVAILABLE
+        return f"{kept}/{kept + moved}"
 
     def cause(entry: CaseStability) -> str:
         """The cause cell: ``kept/compared``, then ``+unread`` where there is one."""
@@ -2244,11 +2242,12 @@ def _print_stability(
         return f"{compared} +{entry.cause_unread}" if entry.cause_unread else compared
 
     for entry in stability:
-        recalls = " ".join(f"{recall:.2f}" for recall in entry.recalls)
+        recalls = " ".join(f"{shown_figure(recall, '.2f')}" for recall in entry.recalls)
         always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
         print(
             f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
-            f" {entry.recall_spread:8.2f} {always:>16} {entry.mean_jaccard:9.2f}"
+            f" {shown_figure(entry.recall_spread, '.2f'):>11} {always:>16}"
+            f" {shown_figure(entry.mean_jaccard, '.2f'):>11}"
             f" {cause(entry):>10}"
             f" {held(entry.severity_held, entry.severity_moved):>10}"
             f" {held(entry.place_held, entry.place_moved):>10}"
@@ -2256,10 +2255,12 @@ def _print_stability(
     totals = aggregate_stability(stability)
     print(
         f"stability: {totals['always_matched']}/{totals['references']} references"
-        f" matched in every run ({totals['always_rate']:.0%}),"
-        f" volatile {totals['volatile_rate']:.0%},"
-        f" mean jaccard {totals['mean_jaccard']:.2f},"
-        f" worst case recall spread {totals['worst_case_recall_spread']:.2f}"
+        f" matched in every run ({shown_figure(totals['always_rate'], '.0%')}),"
+        f" volatile {shown_figure(totals['volatile_rate'], '.0%')},"
+        f" mean jaccard {shown_figure(totals['mean_jaccard'], '.2f')},"
+        f" worst case recall spread"
+        f" {shown_figure(totals['worst_case_recall_spread'], '.2f')}"
+        f" ({totals['cases_without_recall_spread']} case(s) with no spread)"
         " (instrument, non-gating)"
     )
     print(
@@ -2403,7 +2404,7 @@ def command_calibrate(args: argparse.Namespace) -> int:
             f" (no candidate pairs: {entry.why})"
         )
     print(
-        f"admission gate: {result.agreement:.1%} label agreement over"
+        f"admission gate: {shown_figure(result.agreement, '.1%')} label agreement over"
         f" {result.total} pairs (bar {AGREEMENT_BAR:.0%})"
     )
     if args.out:

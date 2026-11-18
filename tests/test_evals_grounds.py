@@ -164,13 +164,13 @@ class TestMeasureGrounds:
         assert by_id["S-01"].unverified == (0, 1)
         assert by_id["S-02"].unverified == ()
 
-    def test_an_empty_case_reports_zeros_rather_than_dividing_by_none(self):
+    def test_an_empty_case_reports_unavailable_rather_than_zero(self):
         measurement = measure_grounds(
             "case-a", "stride", [], [], dropped=(), repaired=()
         )
 
-        assert measurement.grounds_per_threat == 0.0
-        assert measurement.unverified_rate == 0.0
+        assert measurement.grounds_per_threat is None
+        assert measurement.unverified_rate is None
         assert measurement.to_json()["counts"]["threats"] == 0
 
 

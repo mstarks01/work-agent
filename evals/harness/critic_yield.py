@@ -48,15 +48,9 @@ from analysis_service.claims import FrameworkAnalysis, VerdictStatus
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
+from evals.harness.rates import Rate, percent
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import (
-    CaseScore,
-    Rate,
-    VoteStatus,
-    candidate_claim,
-    percent,
-    score_case,
-)
+from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_case
 
 # What one produced threat turned out to be, in the pass that scored it. The
 # first two are hits against the reference set, and the rest are the ways of
@@ -141,7 +135,7 @@ class CriticPopulations:
     Each rate reads only its own population. ``real_rejected`` divides by the
     real drafts, ``not_real_confirmed`` by the not-real ones, and a
     ``needs-info`` fate counts in neither: it has a rate of its own.
-    An empty population gives a :class:`~evals.harness.scorer.Rate` whose value
+    An empty population gives a :class:`~evals.harness.rates.Rate` whose value
     is ``None``, which is a gap in the labels and not a zero.
     """
 

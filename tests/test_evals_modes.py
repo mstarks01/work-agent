@@ -919,7 +919,7 @@ def test_an_extraction_that_produced_nothing_compares_no_attributes(case):
     score = score_of(case, None)
 
     assert score.attributes == ()
-    assert score.scored_field_agreement == 0.0
+    assert score.scored_field_agreement is None
     assert score.crossings_match is False
 
 
@@ -1240,9 +1240,9 @@ class TestTheEndpointReadingOfAnExtraction:
 
         assert s.recall == s.endpoint_recall
 
-    def test_an_empty_score_reads_zero_on_both(self):
-        assert self.score().recall == 0.0
-        assert self.score().endpoint_recall == 0.0
+    def test_an_empty_score_reads_unavailable_on_both(self):
+        assert self.score().recall is None
+        assert self.score().endpoint_recall is None
 
 
 class TestTheNameFreeReadingOfCrossings:
@@ -1295,9 +1295,9 @@ class TestTheNameFreeReadingOfCrossings:
         assert s.crossings_derivable is False
         assert s.crossings_recall == 0.0
 
-    def test_a_case_with_no_blessed_crossing_reads_zero(self):
-        """No denominator, so no rate — never a silent 1.0."""
-        assert self.score(blessed=(), extracted=()).crossings_recall == 0.0
+    def test_a_case_with_no_blessed_crossing_reads_unavailable(self):
+        """No denominator, so no rate: never a silent 1.0 and never a 0.0."""
+        assert self.score(blessed=(), extracted=()).crossings_recall is None
 
     def test_the_flow_label_is_folded_here_too(self):
         """Keyed by ``_endpoint_key``, so #293's fold reaches crossings.
@@ -1435,7 +1435,7 @@ class TestTheInitiatorReadingOfAnExtraction:
         assert score.initiator_recall == 0.5
         assert score.initiators_missing == frozenset({"process:store-server"})
 
-    def test_a_case_with_no_initiator_reads_zero(self):
+    def test_a_case_with_no_initiator_reads_unavailable(self):
         """An empty denominator is never a silent 1.00, as everywhere else here."""
         score = modes.ExtractionScore(
             case_id="x",
@@ -1446,7 +1446,7 @@ class TestTheInitiatorReadingOfAnExtraction:
             attributes=(),
         )
 
-        assert score.initiator_recall == 0.0
+        assert score.initiator_recall is None
 
     def test_every_corpus_case_has_an_initiator_to_measure(self):
         """Guards the guard: a metric with no denominator anywhere measures nothing."""
@@ -2343,7 +2343,7 @@ class TestThePartitionFigureIsReadThreeWays:
 
         score = self.score(case, model)
 
-        assert score.same_zone_recall == 0.0
+        assert score.same_zone_recall is None
         assert score.zone_pair_coverage == 0.0
         assert score.zone_pairs is not None
         assert score.zone_pairs.compared == 0
@@ -2382,14 +2382,14 @@ class TestThePartitionFigureIsReadThreeWays:
         assert payload["different_zone_agreement"] == 1.0
         assert payload["zone_pair_coverage"] == 1.0
 
-    def test_no_extraction_reads_zero_on_every_reading(self):
+    def test_no_extraction_reads_unavailable_on_every_reading(self):
         score = modes.ExtractionScore("x", (), (), (), False, ())
 
         assert score.zone_pairs is None
-        assert score.zone_partition_agreement == 0.0
-        assert score.same_zone_recall == 0.0
-        assert score.different_zone_agreement == 0.0
-        assert score.zone_pair_coverage == 0.0
+        assert score.zone_partition_agreement is None
+        assert score.same_zone_recall is None
+        assert score.different_zone_agreement is None
+        assert score.zone_pair_coverage is None
 
 
 class TestWhatNoFigureHereReaches:

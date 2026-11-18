@@ -52,6 +52,7 @@ from evals.harness import audit, baseline, standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Cases, Column
+from evals.harness.rates import UNAVAILABLE, mean
 from evals.harness.scorer import vote_coverage
 
 #: Where the generated table lives, beside the Baselines it reads. Relative,
@@ -172,12 +173,12 @@ def _format(values: list[float]) -> str:
     One sweep measures no spread, so its figure says so rather than printing
     a bare number a reader would take as settled.
     """
-    if not values:
-        return "—"
-    mean = sum(values) / len(values)
+    average = mean(values)
+    if average is None:
+        return UNAVAILABLE
     if len(values) == 1:
-        return f"{mean:.3f} ({UNSPREAD})"
-    return f"{mean:.3f} ({min(values):.3f}–{max(values):.3f})"
+        return f"{average:.3f} ({UNSPREAD})"
+    return f"{average:.3f} ({min(values):.3f}–{max(values):.3f})"
 
 
 def _columns_for(framework: FrameworkName) -> list[Column]:

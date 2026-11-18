@@ -23,7 +23,6 @@ because the archive does not record every setting a job sends.
 from __future__ import annotations
 
 import csv
-import statistics
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -35,6 +34,7 @@ from evals.harness.audit import Experiment, Phase, changed_since, phase_of
 from evals.harness.delivery import Delivery
 from evals.harness.losses import SILENT
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.rates import mean, shown_figure
 from evals.harness.replay import (
     FATES,
     PRODUCED_FATES,
@@ -87,7 +87,7 @@ class Panel:
     unit: str
     counts: Mapping[str, int]
     rates: Mapping[str, Rate]
-    means: Mapping[str, tuple[float, int]]
+    means: Mapping[str, tuple[float | None, int]]
     unread: int | None
     path: ProductionPath | None
     uncaptured: str = ""
@@ -250,8 +250,8 @@ def assertion_panel(sweep: SweepReplay) -> Panel:
         },
         means={
             "mean of each emission's required-fact recall": (
-                statistics.fmean(replay.recall for replay in sweep.assertions),
-                len(sweep.assertions),
+                mean(replay.recall for replay in sweep.assertions),
+                sum(replay.recall is not None for replay in sweep.assertions),
             )
         },
         unread=pool["produced"]["unreviewed"],
@@ -373,11 +373,10 @@ def render(panels: Sequence[Panel]) -> None:
         for name, count in panel.counts.items():
             print(f"  {name}: {count}")
         for name, rate in panel.rates.items():
-            value = rate.value
-            shown = "undefined" if value is None else f"{value:.3f}"
+            shown = shown_figure(rate.value, ".3f")
             print(f"  {name}: {rate.numerator}/{rate.denominator} ({shown})")
-        for name, (mean, over) in panel.means.items():
-            print(f"  {name}: {mean:.3f} over {over}")
+        for name, (average, over) in panel.means.items():
+            print(f"  {name}: {shown_figure(average, '.3f')} over {over}")
         print(f"  unread: {panel.unread}")
         if panel.path is not None:
             print(f"  production path: {panel.path.fidelity}")

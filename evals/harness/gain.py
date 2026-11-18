@@ -58,6 +58,7 @@ from evals.harness.promotion import (
     in_spreads,
     read_spread,
 )
+from evals.harness.rates import complete_mean, mean, shown_figure
 from evals.harness.scorer import review_coverage
 
 #: One figure, read from one artifact over the cases a selector keeps, or
@@ -111,13 +112,9 @@ def refuse_incomparable(
         )
 
 
-def _mean(values: Sequence[float]) -> float | None:
-    return sum(values) / len(values) if values else None
-
-
 def _stride_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     """Unmatched findings a person could review, per case."""
-    return _mean([row["counts"]["eligible"] for row in cases.rows(blocks, "scores")])
+    return mean([row["counts"]["eligible"] for row in cases.rows(blocks, "scores")])
 
 
 def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
@@ -129,15 +126,19 @@ def _stride_unanswered(blocks: Mapping[str, Any], cases: Cases) -> float | None:
 
 
 def _stride_rejected(blocks: Mapping[str, Any], cases: Cases) -> float | None:
-    """The share of produced findings a person rejected, per case."""
-    return _mean(
+    """The share of produced findings a person rejected, per case.
+
+    ``None`` where a selected case has no value, so the two artifacts a gain
+    compares are read over one set of cases.
+    """
+    return complete_mean(
         [row["metrics"]["rejected_rate"] for row in cases.rows(blocks, "scores")]
     )
 
 
 def _asvs_volume(blocks: Mapping[str, Any], cases: Cases) -> float | None:
     """Requirements the run applied that the case did not list, per case."""
-    return _mean(
+    return mean(
         [
             len(row["over_applied"]) + len(row["off_catalog"])
             for row in cases.rows(blocks, "applicability")
@@ -342,7 +343,8 @@ def _decide(
             after,
             before,
             None,
-            "an artifact carries no such figure, which is not a zero",
+            "an artifact has no value for this figure over the selected cases,"
+            " which is not a zero",
         )
     if gate.unit == "count":
         value = after
@@ -375,7 +377,7 @@ def render(
     for row in readings:
         gate = table_entry(GATES, row.gate)
         cells = [
-            "—" if value is None else f"{value:.4g}"
+            shown_figure(value, ".4g")
             for value in (row.measured, row.baseline, row.against_limit)
         ]
         lines.append(

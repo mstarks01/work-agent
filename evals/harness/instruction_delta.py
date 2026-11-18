@@ -46,6 +46,7 @@ from typing import Any
 
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.instruments import INSTRUMENTS
+from evals.harness.rates import rounded_figure, shown_figure
 from evals.harness.run_record import run_record
 
 #: What an instruction row is keyed by. The pair is unique within a sweep —
@@ -94,11 +95,14 @@ class MeasurementDelta:
 
     instrument: str
     path: str
-    before: float
-    after: float
+    before: float | None
+    after: float | None
 
     @property
-    def delta(self) -> float:
+    def delta(self) -> float | None:
+        """``after - before``, or ``None`` where either side has no value."""
+        if self.before is None or self.after is None:
+            return None
         return self.after - self.before
 
     def to_json(self) -> dict[str, Any]:
@@ -107,7 +111,7 @@ class MeasurementDelta:
             "path": self.path,
             "before": self.before,
             "after": self.after,
-            "delta": round(self.delta, 4),
+            "delta": rounded_figure(self.delta, 4),
         }
 
 
@@ -143,8 +147,11 @@ def node_deltas(before: EvalArtifact, after: EvalArtifact) -> list[NodeDelta]:
     return rows
 
 
-def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float]]:
+def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float | None]]:
     """Every numeric leaf of one artifact block, with its path.
+
+    A ``null`` leaf is a figure with no value, so it is a leaf too: a figure
+    that moves between a value and none has moved.
 
     Generic because an aggregate's shape is the instrument's own business. A
     reader comparing two sweeps wants every number that moved, and enumerating
@@ -153,7 +160,9 @@ def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float]]:
     """
     if isinstance(value, bool):
         return
-    if isinstance(value, int | float):
+    if value is None:
+        yield prefix, None
+    elif isinstance(value, int | float):
         yield prefix, float(value)
     elif isinstance(value, Mapping):
         for key, item in value.items():
@@ -230,9 +239,9 @@ def render(
         print(f"instruction delta: {len(changed)} of {len(nodes)} nodes moved")
         print(f"  {'framework':10} {'node':50} {'before':>7} {'after':>7} {'delta':>7}")
         for row in sorted(changed, key=lambda item: -abs(item.delta or 0)):
-            before = "—" if row.before is None else f"{row.before:,}"
-            after = "—" if row.after is None else f"{row.after:,}"
-            delta = "—" if row.delta is None else f"{row.delta:+,}"
+            before = shown_figure(row.before, ",")
+            after = shown_figure(row.after, ",")
+            delta = shown_figure(row.delta, "+,")
             print(
                 f"  {row.framework:10} {row.node:50} {before:>7} {after:>7} {delta:>7}"
             )
@@ -247,7 +256,8 @@ def render(
     for moved_number in measurements:
         print(
             f"  {moved_number.instrument:16} {moved_number.path:46}"
-            f" {moved_number.before:9.3f} {moved_number.after:9.3f}"
+            f" {shown_figure(moved_number.before, '.3f'):>9}"
+            f" {shown_figure(moved_number.after, '.3f'):>9}"
         )
     print(
         "measurement delta: a change smaller than the run-to-run spread"

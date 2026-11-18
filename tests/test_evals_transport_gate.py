@@ -142,3 +142,61 @@ def test_a_lost_extraction_is_refused_by_name(tmp_path):
     )
     with pytest.raises(modes.EvalRunError, match=CASES[2]):
         gate.load("full", [artifact])
+
+
+def test_a_figure_neither_arm_has_is_no_veto():
+    """A case with no value in both arms is alike in both, so it vetoes nothing."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in (*full.artifacts, *compact.artifacts):
+        artifact["mode_output"][0]["precision"] = None
+    passed, _ = gate._veto(full, compact)
+    assert passed
+
+
+def test_a_figure_only_one_arm_has_is_a_veto():
+    """A value in one arm and a gap in the other is not a match, so it fails closed."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in compact.artifacts:
+        artifact["mode_output"][0]["precision"] = None
+    passed, reading = gate._veto(full, compact)
+    assert not passed and "precision unavailable" in reading
+
+
+def test_a_margin_over_arms_valued_on_different_cases_fails():
+    """One arm's gap would drop a case from its mean alone, so the means differ."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in compact.artifacts:
+        artifact["mode_output"][0]["precision"] = None
+    passed, reading = gate._margin("precision", gate.QUALITY_MARGINS["precision"])(
+        full, compact
+    )
+    assert not passed and "unavailable" in reading
+
+
+def test_a_margin_with_a_gap_in_one_sweep_only_fails():
+    """One sweep's gap drops the case from that sweep's mean alone."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    compact.artifacts[0]["mode_output"][0]["precision"] = None
+    passed, reading = gate._margin("precision", gate.QUALITY_MARGINS["precision"])(
+        full, compact
+    )
+    assert not passed and "unavailable" in reading
+
+
+def test_a_figure_the_corpus_cannot_measure_fails_the_margin():
+    """With no value in either arm, the margin cannot read the figure, so it
+    fails closed; the per-case veto has no collapse to name."""
+    full = _arm("full", 1000)
+    compact = _arm("compact", 900)
+    for artifact in (*full.artifacts, *compact.artifacts):
+        for row in artifact["mode_output"]:
+            row["precision"] = None
+    passed, reading = gate._margin("precision", gate.QUALITY_MARGINS["precision"])(
+        full, compact
+    )
+    assert not passed and "unavailable" in reading
+    assert gate._veto(full, compact)[0]

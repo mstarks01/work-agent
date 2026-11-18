@@ -135,6 +135,7 @@ def _calibration() -> Mapping[str, object]:
     pairs = load_pairs()
     result = measure_agreement(matcher, pairs)
     floor = measure_agreement(MechanicalIdentity(), pairs)
+    assert result.agreement is not None and floor.agreement is not None
     return {
         "agreed": result.agreements,
         "total": result.total,

@@ -973,3 +973,24 @@ class TestBothPackagesAnswerTheBand:
         # in the population; V1.2.4 is, and it moved.
         assert (measured.references, measured.volatile) == (1, 1)
         assert measured.floor_variance == pytest.approx(0.5)
+
+
+def test_a_run_with_no_recall_value_is_read_as_a_gap(tmp_path, sampling):  # noqa: F811
+    """A case whose recall has no value reads as unavailable, never as 0.0."""
+    record = provenance(sampling)
+    gap = score("01-payments-checkout", 3, [])
+    gap["metrics"]["reference_coverage"] = None
+    runs = load_runs(
+        [
+            write_run(tmp_path, "a.json", record, [gap]),
+            write_run(
+                tmp_path, "b.json", record, [score("01-payments-checkout", 3, [1])]
+            ),
+        ]
+    )
+
+    (case,) = compare_runs(runs)
+
+    assert case.recalls == (None, round(1 / 3, 3))
+    assert case.recall_spread is None
+    assert case.to_json()["recall_spread"] is None

@@ -37,8 +37,8 @@ fan-in check counts proposals by the ID the fan-in gives them, not
 references, so it does not fill the ``proposed`` stage.
 
 **Rates.** Each rate is a :class:`Rate` with its numerator and denominator.
-An empty denominator gives ``None``, which prints as unavailable, where
-:func:`~evals.harness.scorer.ratio` gives 0.0. A rate here is a share of matched
+An empty denominator gives ``None``, which prints as unavailable
+(:func:`~evals.harness.rates.ratio`). A rate here is a share of matched
 must-finds, not the per-lane **Coverage** of ``GLOSSARY.md``.
 
 **One run.** :func:`summarize` refuses rows of more than one
@@ -71,8 +71,9 @@ from evals.harness.critic_yield import CriticAudit
 from evals.harness.fan_in_accounting import FanInSweep
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.losses import UNREAD_CAUSE, CaseLosses, Cause
+from evals.harness.rates import Rate
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import Rate, none_stated
+from evals.harness.scorer import none_stated
 from evals.harness.triggers import case_trigger_recall
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]

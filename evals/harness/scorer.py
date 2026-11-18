@@ -68,6 +68,15 @@ from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import CaseFlows, ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
+from evals.harness.rates import (
+    complete_mean,
+    jaccard,
+    mean,
+    ratio,
+    rounded_difference,
+    rounded_figure,
+    shown_figure,
+)
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
 from evals.harness.standings import SubstanceClass
 
@@ -143,7 +152,7 @@ class MatchedPair:
             "threat_id": self.threat_id,
             "tier": self.tier,
             "element_overlap": self.element_overlap,
-            "element_jaccard": round(self.element_jaccard, 3),
+            "element_jaccard": rounded_figure(self.element_jaccard, 3),
             "reference_level": self.reference_level,
             "produced_level": self.produced_level,
             "likelihood_agrees": self.likelihood_agrees,
@@ -261,17 +270,17 @@ class CaseScore:
         return sum(1 for pair in self.matched if pair.must_find)
 
     @property
-    def must_find_coverage(self) -> float:
+    def must_find_coverage(self) -> float | None:
         return ratio(self.must_find_matched, self.must_find_total)
 
     @property
-    def expected_coverage(self) -> float:
+    def expected_coverage(self) -> float | None:
         expected_total = self.reference_count - self.must_find_total
         matched = sum(1 for pair in self.matched if pair.tier == "expected")
         return ratio(matched, expected_total)
 
     @property
-    def reference_coverage(self) -> float:
+    def reference_coverage(self) -> float | None:
         """The share of this case's references some produced claim matches.
 
         **Coverage, not recall, and the distinction is the whole name.** A
@@ -293,14 +302,14 @@ class CaseScore:
     # --- Tier 3: tracked, never absolute ---------------------------------
 
     @property
-    def lane_accuracy(self) -> float:
+    def lane_accuracy(self) -> float | None:
         """Of the produced threats that correspond to a reference at all, the
         fraction filed in the right lane. Categorization is a documented
         failure mode (arXiv:2505.04101) and otherwise invisible."""
         return ratio(len(self.matched), len(self.matched) + len(self.lane_errors))
 
     @property
-    def element_agreement(self) -> float:
+    def element_agreement(self) -> float | None:
         """Of matched pairs, the fraction citing at least one shared element.
 
         Traceability is the property the whole report schema exists for.
@@ -313,10 +322,8 @@ class CaseScore:
         )
 
     @property
-    def element_jaccard(self) -> float:
-        return ratio(
-            sum(pair.element_jaccard for pair in self.matched), len(self.matched)
-        )
+    def element_jaccard(self) -> float | None:
+        return mean(pair.element_jaccard for pair in self.matched)
 
     @property
     def status_counts(self) -> dict[str, int]:
@@ -350,7 +357,7 @@ class CaseScore:
         return answered
 
     @property
-    def rejected_rate(self) -> float:
+    def rejected_rate(self) -> float | None:
         """The one gating Tier 3 number: hallucination is what destroys trust.
 
         Human-confirmed only: the numerator is findings a person voted down
@@ -370,7 +377,7 @@ class CaseScore:
         return ratio(self.status_counts["rejected"], self.produced_count)
 
     @property
-    def rejected_rate_of_reviewed(self) -> float:
+    def rejected_rate_of_reviewed(self) -> float | None:
         """The same numerator over the findings somebody actually read.
 
         The nearest honest thing to precision this harness can compute, and it
@@ -393,7 +400,7 @@ class CaseScore:
         return self.status_counts["stale"]
 
     @property
-    def severity_exact_rate(self) -> float:
+    def severity_exact_rate(self) -> float | None:
         exact = sum(
             1 for pair in self.matched if pair.reference_level == pair.produced_level
         )
@@ -422,15 +429,17 @@ class CaseScore:
                 **self.status_counts,
             },
             "metrics": {
-                "must_find_coverage": round(self.must_find_coverage, 3),
-                "expected_coverage": round(self.expected_coverage, 3),
-                "reference_coverage": round(self.reference_coverage, 3),
-                "lane_accuracy": round(self.lane_accuracy, 3),
-                "element_agreement": round(self.element_agreement, 3),
-                "element_jaccard": round(self.element_jaccard, 3),
-                "rejected_rate": round(self.rejected_rate, 3),
-                "rejected_rate_of_reviewed": round(self.rejected_rate_of_reviewed, 3),
-                "severity_exact_rate": round(self.severity_exact_rate, 3),
+                "must_find_coverage": rounded_figure(self.must_find_coverage, 3),
+                "expected_coverage": rounded_figure(self.expected_coverage, 3),
+                "reference_coverage": rounded_figure(self.reference_coverage, 3),
+                "lane_accuracy": rounded_figure(self.lane_accuracy, 3),
+                "element_agreement": rounded_figure(self.element_agreement, 3),
+                "element_jaccard": rounded_figure(self.element_jaccard, 3),
+                "rejected_rate": rounded_figure(self.rejected_rate, 3),
+                "rejected_rate_of_reviewed": rounded_figure(
+                    self.rejected_rate_of_reviewed, 3
+                ),
+                "severity_exact_rate": rounded_figure(self.severity_exact_rate, 3),
             },
             "severity_confusion": self.severity_confusion,
             "matched": [pair.to_json() for pair in self.matched],
@@ -467,59 +476,6 @@ def review_coverage(counts: Mapping[str, int]) -> tuple[int, int]:
     answered = sum(counts.get(status, 0) for status in _ANSWERED)
     eligible = sum(counts.get(status, 0) for status in _VOTE_STATUSES)
     return answered, eligible
-
-
-#: The word :func:`shown_share` prints for a share with no value: a gap, never
-#: a zero.
-UNAVAILABLE = "unavailable"
-
-
-def shown_share(value: float | None, spec: str) -> str:
-    """A share in the format ``spec``, or :data:`UNAVAILABLE` where it has no value."""
-    return UNAVAILABLE if value is None else format(value, spec)
-
-
-def percent(value: float | None) -> str:
-    """A share as a whole percentage, as :func:`shown_share` prints it."""
-    return shown_share(value, ".0%")
-
-
-def ratio(numerator: float, denominator: float) -> float:
-    """Zero denominators are 0.0, never a crash and never a silent 100%."""
-    return numerator / denominator if denominator else 0.0
-
-
-@dataclass(frozen=True)
-class Rate:
-    """A share with its counts. ``value`` is ``None`` on an empty denominator.
-
-    The form for a rate whose empty denominator is a gap in what was measured:
-    :func:`ratio` reads that gap as 0.0, and a reader cannot tell it from a
-    measured zero.
-    """
-
-    numerator: int
-    denominator: int
-
-    @property
-    def value(self) -> float | None:
-        return self.numerator / self.denominator if self.denominator else None
-
-    def shown(self) -> str:
-        """The rate as a report prints it: its counts, then its share."""
-        return f"{self.numerator}/{self.denominator} ({percent(self.value)})"
-
-    def rounded(self) -> float | None:
-        """:attr:`value` to three places, as an artifact records it."""
-        value = self.value
-        return None if value is None else round(value, 3)
-
-    def to_json(self) -> dict[str, Any]:
-        return {
-            "numerator": self.numerator,
-            "denominator": self.denominator,
-            "value": self.value,
-        }
 
 
 def score_case(
@@ -768,7 +724,7 @@ def _matched_pair(
         threat_id=threat.id,
         tier=reference.tier,
         element_overlap=bool(shared),
-        element_jaccard=ratio(len(shared), len(reference_ids | produced_ids)),
+        element_jaccard=jaccard(reference_ids, produced_ids),
         reference_level=reference.severity.level,
         # The matrix rather than the field: ``Severity.level`` is optional
         # until the model validator derives it, and this is that same
@@ -945,8 +901,13 @@ def _severity_confusion(matched: Iterable[MatchedPair]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
+def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float | None]:
     """The near-vs-far recall delta: tracked, deliberately **non-gating**.
+
+    A case whose figure has no value adds nothing to its mean
+    (:func:`~evals.harness.rates.mean`), because each mean reads one sweep. A
+    reader comparing two sweeps' figures compares means over the cases each
+    sweep could measure.
 
     A large delta is a finding to act on — the exemplars live in their own
     subtree precisely so they can be diversified — not a build to break.
@@ -960,17 +921,22 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
     """
     near = [score for score in scores if score.exemplar_proximity == "near"]
     far = [score for score in scores if score.exemplar_proximity == "far"]
-    near_coverage = ratio(sum(score.reference_coverage for score in near), len(near))
-    far_coverage = ratio(sum(score.reference_coverage for score in far), len(far))
+    near_coverage = mean(score.reference_coverage for score in near)
+    far_coverage = mean(score.reference_coverage for score in far)
     return {
-        "near_coverage": round(near_coverage, 3),
-        "far_coverage": round(far_coverage, 3),
-        "delta": round(near_coverage - far_coverage, 3),
+        "near_coverage": rounded_figure(near_coverage, 3),
+        "far_coverage": rounded_figure(far_coverage, 3),
+        "delta": rounded_difference(near_coverage, far_coverage),
     }
 
 
-def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float] | None:
+def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float | None] | None:
     """Coverage on the development cases beside coverage on the holdout cases (#744).
+
+    A case whose figure has no value adds nothing to its mean
+    (:func:`~evals.harness.rates.mean`), because each mean reads one sweep. A
+    reader comparing two sweeps' figures compares means over the cases each
+    sweep could measure.
 
     ``None`` where no holdout case was scored. A fix whose gain shows on the
     development cases and not on the holdout ones was shaped by the cases it was
@@ -987,23 +953,17 @@ def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float] | None:
         return None
     development = [score for score in scores if score not in held]
     return {
-        "development_coverage": round(
-            ratio(
-                sum(score.reference_coverage for score in development), len(development)
-            ),
-            3,
+        "development_coverage": rounded_figure(
+            mean(score.reference_coverage for score in development), 3
         ),
-        "holdout_coverage": round(
-            ratio(sum(score.reference_coverage for score in held), len(held)), 3
+        "holdout_coverage": rounded_figure(
+            mean(score.reference_coverage for score in held), 3
         ),
-        "development_must_find_coverage": round(
-            ratio(
-                sum(score.must_find_coverage for score in development), len(development)
-            ),
-            3,
+        "development_must_find_coverage": rounded_figure(
+            mean(score.must_find_coverage for score in development), 3
         ),
-        "holdout_must_find_coverage": round(
-            ratio(sum(score.must_find_coverage for score in held), len(held)), 3
+        "holdout_must_find_coverage": rounded_figure(
+            mean(score.must_find_coverage for score in held), 3
         ),
     }
 
@@ -1043,10 +1003,10 @@ def render(scores: Sequence[CaseScore]) -> None:
         print(
             f"{score.case_id:<26} must-find {score.must_find_matched}/"
             f"{score.must_find_total}"
-            f"  coverage {score.reference_coverage:.2f}"
-            f"  lane {score.lane_accuracy:.2f}"
-            f"  element {score.element_agreement:.2f}"
-            f"  rejected {score.rejected_rate:.2f}"
+            f"  coverage {shown_figure(score.reference_coverage, '.2f')}"
+            f"  lane {shown_figure(score.lane_accuracy, '.2f')}"
+            f"  element {shown_figure(score.element_agreement, '.2f')}"
+            f"  rejected {shown_figure(score.rejected_rate, '.2f')}"
             f"  unvoted {score.unvoted_count}"
             f"  stale {score.stale_count}"
             + (f"  foreign {len(score.foreign)}" if score.foreign else "")
@@ -1055,20 +1015,25 @@ def render(scores: Sequence[CaseScore]) -> None:
         # Named because the rows above are a mean over survivors. The artifact
         # carries the same counts; printing one without the other is how a
         # sweep that lost cases gets quoted as if it had not.
-        print(f"scored {len(scores)} case(s); every mean above divides by that")
+        print(
+            f"scored {len(scores)} case(s); a mean above skips a case whose"
+            " figure has no value"
+        )
         delta = exemplar_delta(scores)
         print(
-            f"exemplar delta: near {delta['near_coverage']:.2f}"
-            f" vs far {delta['far_coverage']:.2f}"
-            f" = {delta['delta']:+.2f} (tracked, non-gating)"
+            f"exemplar delta: near {shown_figure(delta['near_coverage'], '.2f')}"
+            f" vs far {shown_figure(delta['far_coverage'], '.2f')}"
+            f" = {shown_figure(delta['delta'], '+.2f')} (tracked, non-gating)"
         )
         split = holdout_split(scores)
         if split:
             print(
-                f"holdout: coverage {split['holdout_coverage']:.2f}"
-                f" vs development {split['development_coverage']:.2f}; must-find"
-                f" {split['holdout_must_find_coverage']:.2f}"
-                f" vs development {split['development_must_find_coverage']:.2f}"
+                f"holdout: coverage {shown_figure(split['holdout_coverage'], '.2f')}"
+                " vs development"
+                f" {shown_figure(split['development_coverage'], '.2f')}; must-find"
+                f" {shown_figure(split['holdout_must_find_coverage'], '.2f')}"
+                " vs development"
+                f" {shown_figure(split['development_must_find_coverage'], '.2f')}"
             )
         line = audit.exhausted_line(score.case_id for score in scores if score.holdout)
         if line:
@@ -1085,9 +1050,11 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
     **Conditional on success, never end-to-end.** A case whose graph refused
     its model, or whose fan-in rejected every draft, produces no score and so
     contributes to neither half of this mean. A sweep that lost three cases
-    reads the same as one that lost none. The artifact's ``completion`` block
-    carries the ``attempted`` and ``scored`` counts this divides by, and they
-    are the numbers to quote beside any mean taken from here.
+    reads the same as one that lost none. A scored case whose figure has no
+    value makes the mean have none (:func:`~evals.harness.rates.complete_mean`),
+    so two rows of the table never average over different cases. The
+    artifact's ``completion`` block carries the ``attempted`` and ``scored``
+    counts, which are the numbers to quote beside any mean taken from here.
     """
     rows = blocks.get("scores") or []
     values = [
@@ -1097,7 +1064,7 @@ def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | N
         and metric in row.get("metrics", {})
         and cases.wanted(row.get("case"))
     ]
-    return sum(values) / len(values) if values else None
+    return complete_mean(values)
 
 
 def vote_coverage(blocks: Mapping[str, Any]) -> tuple[int, int]:

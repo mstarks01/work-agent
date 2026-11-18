@@ -234,7 +234,7 @@ class TestTheRejectedRateCarriesItsDenominators:
         assert len(score.matched) == 1
         assert score.eligible_count == 1, "the matched finding cannot be voted down"
 
-    def test_nothing_reviewed_reads_as_zero_either_way(self, case, no_votes):
+    def test_nothing_reviewed_has_no_rate_of_reviewed(self, case, no_votes):
         produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
 
         score = score_case(case, produced, ScriptedMatcher(), no_votes)
@@ -242,7 +242,7 @@ class TestTheRejectedRateCarriesItsDenominators:
         assert score.eligible_count == 1
         assert score.reviewed_count == 0
         assert score.rejected_rate == 0.0
-        assert score.rejected_rate_of_reviewed == 0.0, (
+        assert score.rejected_rate_of_reviewed is None, (
             "no reviewer answered, so there is no rate rather than a good one"
         )
 
@@ -270,7 +270,7 @@ class TestTheRejectedRateCarriesItsDenominators:
         ("votes_cast", "reviewed", "rate"),
         [
             pytest.param(("down", "stale"), 1, 1.0, id="current-and-stale"),
-            pytest.param(("stale", "stale"), 0, 0.0, id="all-stale"),
+            pytest.param(("stale", "stale"), 0, None, id="all-stale"),
             pytest.param(("up", "stale", None), 1, 0.0, id="mixed"),
         ],
     )
@@ -310,7 +310,7 @@ class TestTheRejectedRateCarriesItsDenominators:
         score = score_case(case, [], ScriptedMatcher(), no_votes)
 
         assert (score.eligible_count, score.reviewed_count) == (0, 0)
-        assert score.rejected_rate_of_reviewed == 0.0
+        assert score.rejected_rate_of_reviewed is None
         assert vote_coverage({"scores": [score.to_json()]}) == (0, 0)
 
     def test_the_artifact_carries_all_three(self, case, no_votes):
@@ -738,9 +738,9 @@ def test_position_fate_tells_another_position_from_none(ruled, stated, fate):
 
 def test_exemplar_delta_is_reported_near_minus_far(case):
     matcher = ScriptedMatcher()
-    near = score_case(case, [], matcher, no_votes)
+    near = replace(score_case(case, [], matcher, no_votes), exemplar_proximity="near")
     far_case = load_case(CORPUS_DIR / "02-iot-fleet-telemetry")
-    far = score_case(far_case, [], matcher, no_votes)
+    far = replace(score_case(far_case, [], matcher, no_votes), exemplar_proximity="far")
 
     delta = exemplar_delta([near, far])
 
@@ -754,8 +754,9 @@ def test_empty_production_scores_zero_without_crashing(case):
 
     assert score.reference_coverage == 0.0
     assert score.must_find_coverage == 0.0
-    assert score.element_agreement == 0.0
-    assert score.lane_accuracy == 0.0
+    # Nothing matched, so no pair is there to agree or to sit in a lane.
+    assert score.element_agreement is None
+    assert score.lane_accuracy is None
     assert len(score.missed) == len(case.claims_for("stride"))
 
 

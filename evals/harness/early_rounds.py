@@ -62,6 +62,7 @@ from analysis_service.jobs import Checkpoint
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
 from evals.harness.bundle import read_report
+from evals.harness.rates import ratio
 from evals.harness.run_record import Selections, run_record
 
 #: A replay that has not ended by this save is reported as not ending.
@@ -486,10 +487,9 @@ def _unknown_shares(rows: Sequence[Replay]) -> dict[str, dict[str, object]]:
                 total = sum(
                     count for state, count in states.items() if state != "unaskable"
                 )
-                if total:
-                    shares.setdefault(f"{name} / {band}", []).append(
-                        states.get("unknown", 0) / total
-                    )
+                share = ratio(states.get("unknown", 0), total)
+                if share is not None:
+                    shares.setdefault(f"{name} / {band}", []).append(share)
     return {
         key: {
             "median": round(statistics.median(values), 3),

@@ -589,3 +589,53 @@ def _score(artifact: Path, tmp_path: Path, roster_path: Path) -> int:
             str(roster_path),
         ]
     )
+
+
+def test_a_share_over_an_empty_denominator_is_unavailable():
+    """A gap in the inputs reads None, never a measured zero."""
+    from evals.harness.rates import Rate, ratio
+
+    assert ratio(0, 0) is None
+    assert ratio(1, 4) == 0.25
+    assert Rate(0, 0).value is None
+
+
+class _AllCases:
+    """A selector that keeps every case, as a sweep with no filter does."""
+
+    def wanted(self, case: object) -> bool:
+        del case
+        return True
+
+    def rows(self, blocks, key):
+        return blocks[key]
+
+
+def test_a_published_mean_has_no_value_where_a_case_has_none():
+    """Two rows of the table never average over different cases."""
+    from evals.harness.scorer import published
+
+    blocks = {
+        "scores": [
+            {"case": "a", "metrics": {"reference_coverage": None}},
+            {"case": "b", "metrics": {"reference_coverage": 0.5}},
+        ]
+    }
+
+    assert published(blocks, "reference_coverage", _AllCases()) is None
+
+
+def test_the_rejected_gain_reads_no_value_where_a_case_has_none():
+    """A mean that skipped the case would cover other cases than its pair."""
+    from evals.harness.gain import _stride_rejected
+
+    blocks = {
+        "scores": [
+            {"case": "a", "metrics": {"rejected_rate": None}},
+            {"case": "b", "metrics": {"rejected_rate": 0.25}},
+        ]
+    }
+    held = {"scores": [{"case": "b", "metrics": {"rejected_rate": 0.25}}]}
+
+    assert _stride_rejected(blocks, _AllCases()) is None
+    assert _stride_rejected(held, _AllCases()) == 0.25

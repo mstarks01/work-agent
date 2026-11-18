@@ -99,6 +99,7 @@ from evals.harness.identity import (
     endpoint_subset,
     flow_directions,
 )
+from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import GoldenCase
 from evals.harness.verbs import UNSEPARATED, same_action
 
@@ -273,18 +274,20 @@ class CalibrationResult:
     set_aside: Mapping[Label, int] = field(default_factory=dict)
 
     @property
-    def agreement(self) -> float:
-        return self.agreements / self.total if self.total else 0.0
+    def agreement(self) -> float | None:
+        return ratio(self.agreements, self.total)
 
     @property
     def meets_bar(self) -> bool:
-        return self.agreement >= AGREEMENT_BAR
+        """Whether the agreement reaches the bar. No pair read never meets it."""
+        agreement = self.agreement
+        return agreement is not None and agreement >= AGREEMENT_BAR
 
     def to_json(self) -> dict[str, Any]:
         return {
             "total": self.total,
             "agreements": self.agreements,
-            "agreement": round(self.agreement, 4),
+            "agreement": rounded_figure(self.agreement, 4),
             "bar": AGREEMENT_BAR,
             "meets_bar": self.meets_bar,
             "refused": self.refused,

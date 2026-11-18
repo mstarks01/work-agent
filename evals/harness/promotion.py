@@ -70,6 +70,7 @@ from evals.harness import falsify
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, finished_file
 from evals.harness.modes import AssertionResult, EvalRunError
+from evals.harness.rates import UNAVAILABLE, ratio, shown_figure
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import (
     replay_assertions,
@@ -359,8 +360,8 @@ def _required_fact_recall(
     and re-seal every Baseline for a figure the report can answer. Graded by
     the signed reference's own matcher through
     :func:`~evals.harness.replay.replay_assertions`, whose ``recall`` is the
-    one reader of the endpoint. ``None`` for a job that ran no assertion pass
-    or a case nobody signed.
+    one reader of the endpoint. ``None`` for a job that ran no assertion pass,
+    a case nobody signed, or a case with no required row.
     """
     record = _record(report)
     case = _case_of(report)
@@ -608,10 +609,6 @@ class Reading:
     why: str = ""
 
 
-def _ratio(measured: float, baseline: float) -> float | None:
-    return None if not baseline else measured / baseline
-
-
 def in_spreads(difference: float, spread: float) -> float:
     """A difference in standard deviations of the repeat spread.
 
@@ -744,13 +741,14 @@ def read_gate(
             None,
             baseline,
             None,
-            unreadable or "the artifact carries no such figure, which is not a zero",
+            unreadable
+            or "the artifact carries no value for this figure, which is not a zero",
         )
     if gate.unit == "count":
         value: float | None = measured
     elif gate.unit == "ratio":
         assert baseline is not None
-        value = _ratio(measured, baseline)
+        value = ratio(measured, baseline)
     elif spread is not None:
         assert baseline is not None
         value = in_spreads(measured - baseline, spread)
@@ -815,9 +813,9 @@ def render(readings: Sequence[Reading]) -> str:
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        baseline = "—" if row.baseline is None else f"{row.baseline:.4g}"
-        against = "—" if row.against_limit is None else f"{row.against_limit:.3f}"
-        measured = "—" if row.measured is None else f"{row.measured:.4g}"
+        baseline = shown_figure(row.baseline, ".4g")
+        against = shown_figure(row.against_limit, ".3f")
+        measured = shown_figure(row.measured, ".4g")
         name = member(row.gate, GATES)
         if name is not None:
             gate = GATES[name]
@@ -903,8 +901,10 @@ def command_gates(args: argparse.Namespace) -> int:
             "\nRequired-fact recall of this report's own catalog, end to end,"
             f" reported and not gated: {measured:.3f}"
         )
-    elif unreadable:
-        print(f"\n{unreadable}")
+    else:
+        print(
+            f"\n{unreadable or 'Required-fact recall of this report: ' + UNAVAILABLE}"
+        )
     shares = support_shares(report)
     if shares is not None:
         print(

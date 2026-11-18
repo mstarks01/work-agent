@@ -27,8 +27,9 @@ from evals.harness.critic_yield import (
 from evals.harness.fingerprint import components_for, version_for
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
+from evals.harness.rates import Rate
 from evals.harness.reference import load_case
-from evals.harness.scorer import Rate, score_case
+from evals.harness.scorer import score_case
 from evals.harness.triggers import rebuilt_candidates
 from tests.eval_factories import (
     ScriptedMatcher,

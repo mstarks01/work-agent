@@ -324,7 +324,7 @@ def test_a_rejected_ruling_is_not_an_applied_one(read_case):
     assert score.matched == ()
     assert set(score.missed) == set(expected)
     assert set(score.rejected) == set(expected)
-    assert score.precision == 0.0
+    assert score.precision is None
 
 
 def test_needs_info_asserts_the_requirement_applies():
@@ -1024,7 +1024,7 @@ class TestWhatTheRoutingScoreExcludes:
         score = score_dispositions(case, DispositionBlock(), carried=("prose",))
 
         assert score.judged == ()
-        assert score.accuracy == 0.0
+        assert score.accuracy is None
         assert len(score.unreached) == len(case.references["asvs"])
 
     def test_an_unjudged_record_is_counted_rather_than_scored(self, case):

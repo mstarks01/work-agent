@@ -60,6 +60,7 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
 
 __all__ = [
@@ -248,7 +249,7 @@ def lead_rules(fired: CandidateSet | None, targets: Iterable[str]) -> tuple[str,
     )
 
 
-def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int]:
+def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int | None]:
     """Totals over the results given, for a report line or a CI threshold.
 
     **Filter to one framework before calling this.** Pooling two packages would
@@ -267,18 +268,16 @@ def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int]:
         # `overlap`, never `recall`. The numerator counts claims whose lane
         # fired a rule on an element they name, which is not the same fact as
         # the claim being recognised -- see this module's opening.
-        "overlap": round(triggered / total, 4) if total else 0.0,
+        "overlap": rounded_figure(ratio(triggered, total), 4),
         "must_find_references": must_total,
         "must_find_triggered": must_triggered,
-        "must_find_overlap": round(must_triggered / must_total, 4)
-        if must_total
-        else 0.0,
+        "must_find_overlap": rounded_figure(ratio(must_triggered, must_total), 4),
     }
 
 
 def by_framework(
     results: Sequence[CaseTriggerRecall],
-) -> dict[FrameworkName, dict[str, float | int]]:
+) -> dict[FrameworkName, dict[str, float | int | None]]:
     """One :func:`summarize` per framework the results carry."""
     frameworks = sorted({result.framework for result in results})
     return {
