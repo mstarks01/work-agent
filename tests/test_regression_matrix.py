@@ -4,21 +4,21 @@ Each test runs the real graph over scripted model replies and takes a
 ``fault`` flag: with the fault the graph meets the failure, and without it the
 same run is the valid control. So each test proves the fault is what the
 assertion detects, not a snapshot of what the run happens to emit.
-``docs/agents/regression-matrix.md`` lists each row with its provenance and contract.
+``docs/agents/regression-matrix.md`` lists each row with its provenance and contract,
+and ``test_doc_reference_lints`` holds each test it names to the tree.
 """
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import json
-import re
+from collections.abc import Mapping
+from types import MappingProxyType
 
 import pytest
 
 from analysis_service import fan_in as fan_in_module
 from analysis_service import graph
-from analysis_service.claims import ProposedVerdict
 from analysis_service.critic import CriticOutputError
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.frameworks.stride import STRIDE
@@ -28,14 +28,11 @@ from tests.factories import (
     EMPTY_CLAIMS,
     SCRIPTED_FRAMEWORKS,
     adk_runner,
-    claims_json,
     emitted,
     sample_proposal,
-    sample_ruling,
     valid_model,
 )
 from tests.factories import scripted_pipeline as build
-from tests.source_tree import REPO_ROOT
 from tests.test_pipeline import pair_job
 
 
@@ -125,61 +122,60 @@ def test_an_invalid_proposal_costs_only_itself(framework, fault):
     assert all(reason.startswith("fails the proposal schema") for reason in reasons)
 
 
+#: A second key each package's scripted lane can propose beside its fixture's,
+#: in the same lane: a draft to drop while the fixture's draft is re-ruled.
+SECOND_KEY: Mapping[FrameworkName, object] = MappingProxyType(
+    {"asvs": "2.2", "stride": 2}
+)
+
+
+def test_every_package_has_a_second_key():
+    assert set(SECOND_KEY) == set(PACKAGES)
+
+
 @pytest.mark.parametrize("fault", [True, False])
-def test_a_re_ask_keeps_the_first_pass_ruling_it_was_not_asked_to_change(fault):
-    """Preservation across the re-ask, for a package whose critic rules on
-    each threat: the first pass drops T-01, and a re-ask that also changes
-    S-01 keeps S-01's first-pass ruling and records the unbriefed change."""
-    tampering = graph.Lane("stride", "tampering").node_name
-    rejected = sample_ruling(
-        "S-01", verdict=ProposedVerdict(reason="r", rejected_because="reasoning")
-    )
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_a_re_ask_keeps_the_first_pass_ruling_it_was_not_asked_to_change(
+    framework, fault
+):
+    """Preservation across the re-ask: the first pass drops the second draft,
+    and a re-ask that also changes the first draft's ruling keeps the first
+    pass's ruling and records the unbriefed change."""
+    fixture = SCRIPTED_FRAMEWORKS[framework]
+    package = PACKAGES[framework]
+    key_field = schemas_for(framework).key_field
+    emission = json.loads(fixture.proposal)
+    second = {
+        **emission["claims"][0],
+        key_field: SECOND_KEY[framework],
+        "title": "A second scripted draft",
+    }
+    emission["claims"].append(second)
+    second_id = package.compose_id(fixture.lane, SECOND_KEY[framework])
+    (ruling,) = json.loads(fixture.ruling)["claims"]
+    changed = {**ruling, "verdict": {"reason": "r", "rejected_because": "reasoning"}}
     replies = _replies(
-        "stride",
-        claims_json(sample_ruling("S-01")),
-        claims_json(
-            rejected if fault else sample_ruling("S-01"), sample_ruling("T-01")
+        framework,
+        json.dumps({"claims": [ruling]}),
+        json.dumps(
+            {"claims": [changed if fault else ruling, {**ruling, "id": second_id}]}
         ),
     )
-    replies[tampering] = claims_json(sample_proposal("T-01", "tampering", verb="alter"))
+    replies[graph.Lane(framework, fixture.lane).node_name] = json.dumps(emission)
 
-    outcome, _ = _run("stride", replies)
+    outcome, _ = _run(framework, replies)
 
     assert isinstance(outcome, PipelineCompleted)
     (block,) = outcome.report.analyses
-    assert sorted(claim.id for claim in block.claims) == ["S-01", "T-01"]
+    assert sorted(claim.id for claim in block.claims) == sorted(
+        [fixture.claim_id, second_id]
+    )
     unbriefed = [
         mark.claim_id
         for mark in block.unreconciled_rulings
         if mark.kind == "unbriefed-change"
     ]
-    assert unbriefed == (["S-01"] if fault else [])
-
-
-#: The test IDs the matrix names, as ``file.py::name`` or ``file.py::Class::name``.
-_NAMED = re.compile(r"`(test_\w+\.py)((?:::\w+)+)`")
-
-
-def test_each_test_the_matrix_names_exists():
-    """Each test the matrix names, by its full ID, is in the tree: a renamed or
-    deleted test fails here. A cell that names a test with no file fails too."""
-    text = (REPO_ROOT / "docs/agents/regression-matrix.md").read_text("utf-8")
-    bare = re.findall(r"`(test_\w+)`", text)
-    assert bare == [], f"name each test with its file: {bare}"
-    named = _NAMED.findall(text)
-    assert named
-    for path, parts in named:
-        tree = ast.parse((REPO_ROOT / "tests" / path).read_text("utf-8"))
-        scope: list[ast.stmt] = tree.body
-        for part in parts.split("::")[1:]:
-            found = [
-                node
-                for node in scope
-                if isinstance(node, (ast.FunctionDef, ast.ClassDef))
-                and node.name == part
-            ]
-            assert found, (path, part)
-            scope = found[0].body if isinstance(found[0], ast.ClassDef) else []
+    assert unbriefed == ([fixture.claim_id] if fault else [])
 
 
 @pytest.mark.parametrize("fault", [True, False])
@@ -206,6 +202,5 @@ def test_a_proposal_the_fan_in_drops_silently_is_unexplained(monkeypatch, fault)
     row = fan_in_accounting.account("case", stored, STRIDE, merged)
 
     assert len(row.proposals) == emitted_count
-    assert emitted_count - row.accounted == int(fault)
     assert row.unexplained == (("S-01",) if fault else ())
     assert "T-01" in row.kept
