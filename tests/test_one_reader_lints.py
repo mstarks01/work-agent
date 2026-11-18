@@ -2244,6 +2244,14 @@ class _OneReader:
     within: str
 
 
+def _divides_under_a_guard(node: ast.AST) -> bool:
+    """A conditional whose taken branch divides: ``a / b if b else ...``."""
+    return isinstance(node, ast.IfExp) and any(
+        isinstance(inner, ast.BinOp) and isinstance(inner.op, ast.Div)
+        for inner in ast.walk(node.body)
+    )
+
+
 def _spells_the_silent_causes(node: ast.AST) -> bool:
     """Whether ``node`` is a literal collection of exactly ``place`` and ``unled``."""
     return isinstance(node, (ast.Tuple, ast.List, ast.Set)) and {
@@ -2261,6 +2269,12 @@ def test_the_silent_causes_are_spelled_once():
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "a share over an empty denominator": _OneReader(
+        _divides_under_a_guard,
+        ("evals/harness/scorer.py", "ratio"),
+        {},
+        "evals/harness/",
+    ),
     "the join of a page's scripts": _OneReader(
         lambda node: _calls(node, "client_script"),
         ("webapp/page.py", "client_scripts"),
