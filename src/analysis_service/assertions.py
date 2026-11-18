@@ -3265,9 +3265,10 @@ def contradicted_attributes(
 ) -> frozenset[tuple[str, str]]:
     """Each ``(element_id, attribute)`` a :func:`contradictions` entry names.
 
-    The graph side of a contradiction is no fact against these rows, so the
-    evidence catalog does not offer the attribute as stated absent; the rows
-    carry the question (the maintainer's ruling of 2026-11-18). Every entry
+    The graph side of a contradiction is no fact against these rows, so
+    :func:`held_open_attributes` names the attribute and the evidence catalog
+    does not offer it as stated absent; the rows carry the question (the
+    maintainer's ruling of 2026-11-18). Every entry
     counts, one a submitter's answer drives too, because an answer settles the
     fact even against the sources (:func:`answered`).
     """
@@ -3287,7 +3288,9 @@ def held_open_attributes(
     the evidence catalog offers no ``absent-attribute`` entry for it (the
     maintainer's ruling of 2026-11-18 on #2270). Where a hidden qualification
     holds no open row, as a scoped row or a row a reviewer set aside does, the
-    catalog then offers nothing about the attribute.
+    catalog then offers nothing about the attribute. A loaded report's ground
+    check reads today's catalog, so a stored claim on such an absence fails
+    the load.
     """
     hidden = {
         (projection.element_id, projection.attribute)

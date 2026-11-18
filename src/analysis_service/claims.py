@@ -646,8 +646,8 @@ class Ground(BaseModel):
       attribute's value (the answers alone, where a submitter's answer makes
       it) all state the opposite, or where the rows' projection qualifies
       the field and the field does not show that
-      (:func:`~analysis_service.assertions.held_open_attributes`); those rows
-      are open questions instead.
+      (:func:`~analysis_service.assertions.held_open_attributes`); the open
+      rows behind it, where there are any, carry the question instead.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a
       thing, which no element's free text names. **The only branch whose
       referent is the whole model rather than an element of it**, and the one a

@@ -69,8 +69,9 @@ under it. A row the graph attribute contradicts is open too, and it is in the
 table whatever field it reaches. The attribute it contradicts, or a field
 that hides the qualification its projection writes, is not offered as an
 ``absent-attribute``
-(:func:`~analysis_service.assertions.held_open_attributes`): the rows carry the
-question. An agent may raise a
+(:func:`~analysis_service.assertions.held_open_attributes`): its value is no
+fact, and the open rows behind it, where there are any, carry the question.
+An agent may raise a
 *conditional* claim on an open row exactly as it may on an element attribute
 nobody stated.
 Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
@@ -586,8 +587,9 @@ def _one_ground_issue(
     if held_open_absence:
         return (
             f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
-            f" {ground.element_id!r}, which the assertion rows contradict or leave"
-            " open, so the job's catalog offers no such fact"
+            f" {ground.element_id!r}, which the assertion rows contradict or whose"
+            " qualification the field hides, so the job's catalog offers no such"
+            " fact"
         )
     return (
         f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
