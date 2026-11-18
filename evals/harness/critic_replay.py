@@ -68,11 +68,12 @@ from evals.harness.artifact import (
 )
 from evals.harness.bundle import check_out, finished_file, read_report
 from evals.harness.critic_yield import (
-    FATES,
+    NO_VERDICT_FATES,
     OMITTED,
-    VERDICT_STATUSES,
     CriticFate,
     fate_by_claim,
+    has_verdict,
+    no_verdict_line,
 )
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
@@ -232,9 +233,7 @@ UNRULED: Literal["unruled"] = "unruled"
 ArchivedSide = CriticFate | Literal["unruled"]
 
 #: The archived sides that hold no verdict, in the order the count names them.
-NO_VERDICT_SIDES: tuple[ArchivedSide, ...] = tuple(
-    sorted({*FATES, UNRULED} - VERDICT_STATUSES)
-)
+NO_VERDICT_SIDES: tuple[ArchivedSide, ...] = tuple(sorted({*NO_VERDICT_FATES, UNRULED}))
 
 
 @dataclass(frozen=True)
@@ -274,8 +273,8 @@ def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
 def agreement_lines(rows: Sequence[Agreement]) -> list[str]:
     """Each row marked, then how many archived verdicts the replay repeated.
 
-    A draft whose archived side is not in
-    :data:`~evals.harness.critic_yield.VERDICT_STATUSES` has nothing to agree with, so
+    A draft whose archived side fails
+    :func:`~evals.harness.critic_yield.has_verdict` has nothing to agree with, so
     it is marked ``·`` and counted on its own line, outside the denominator. A
     draft the replay left unruled beside an archived verdict is a verdict that
     did not repeat, so it stays in the denominator.
@@ -290,14 +289,12 @@ def agreement_lines(rows: Sequence[Agreement]) -> list[str]:
     lines.append(f"{same} of {len(with_verdict)} verdicts agree")
     apart = len(rows) - len(with_verdict)
     if apart:
-        drafts = "1 draft has" if apart == 1 else f"{apart} drafts have"
-        *first, last = NO_VERDICT_SIDES
-        lines.append(f"{drafts} no archived verdict ({', '.join(first)} or {last})")
+        lines.append(no_verdict_line(apart, NO_VERDICT_SIDES))
     return lines
 
 
 def _has_verdict(row: Agreement) -> bool:
-    return row.archived in VERDICT_STATUSES
+    return has_verdict(row.archived)
 
 
 def _mark(row: Agreement) -> str:

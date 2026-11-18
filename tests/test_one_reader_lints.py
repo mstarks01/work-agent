@@ -2372,6 +2372,20 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "evals/",
     ),
+    "whether a critic fate holds a verdict": _OneReader(
+        lambda node: (
+            _loads(node, "VERDICT_STATUSES")
+            or _loads_attribute(node, "VERDICT_STATUSES")
+        ),
+        ("evals/harness/critic_yield.py", "has_verdict"),
+        {
+            ("evals/harness/critic_yield.py", MODULE_OWNER): (
+                "the module states the set and the fates outside it, which"
+                " has_verdict and the count's words read"
+            ),
+        },
+        "evals/",
+    ),
     "which statuses answer a finding": _OneReader(
         _reads_an_answer_status,
         ("evals/harness/scorer.py", "review_coverage"),

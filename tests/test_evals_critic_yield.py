@@ -155,7 +155,7 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
         _identity_matcher([kept]),
         votes,
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [promote(kept)], [junk]),
     )
     result = scored.critic_yield
 
@@ -178,7 +178,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
         _identity_matcher([killed]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [], [killed]),
     )
     result = scored.critic_yield
 
@@ -292,7 +292,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         _identity_matcher([kept]),
         _rejecting(case, junk),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [promote(kept)], [junk]),
     ).critic_yield
     small = score_case_with_yield(
         case,
@@ -301,7 +301,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         _identity_matcher([kept]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [promote(kept)], []),
     )
 
     totals = aggregate_yield([big, small.critic_yield])
@@ -325,7 +325,9 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
         9, "tampering", "An attacker edits a table that does not exist."
     )
     analysis = modes.AnalysisRun(
-        report=_report_with(case, [promote(kept)]),
+        report=_report_with(case, [promote(kept)]).model_copy(
+            update={"analyses": [_ruled_block(case, [promote(kept)], [junk])]}
+        ),
         drafts={"stride": (kept, junk)},
     )
     flows = CaseFlows.of_graph(
@@ -463,7 +465,7 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
         _identity_matcher([draft]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [promote(draft)], []),
     ).critic_yield
 
     assert result.killed == ()
