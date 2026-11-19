@@ -27,8 +27,13 @@ adapter never see each other's bodies.
 **The category is an open set at the provider.** A token that matches
 :data:`_CATEGORY` is kept as the provider wrote it. An absent, null or
 malformed value is ``None``, which the error states as
-:data:`CATEGORY_NOT_STATED`. A vendor whose body has no ``stop_details`` states
-no category. The provider's ``explanation`` is prose and is never read.
+:data:`CATEGORY_NOT_STATED`. The provider's ``explanation`` is prose and is
+never read.
+
+**Only Anthropic's shape is read.** A body without a top-level
+``stop_details`` gives ``None``. An OpenAI-shaped body has no category field.
+A Gemini body names a harm category in ``safetyRatings``, and this module does
+not read it, so a Gemini refusal also reads as not stated.
 """
 
 from __future__ import annotations

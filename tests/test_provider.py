@@ -1,7 +1,7 @@
 """The seam a provider call crosses: what goes out, what comes back, and what does not.
 
 ``tests/test_provider_contract.py`` drives the whole path from bytes to reader
-and so proves the seam carries the nine facts. This file asks the narrower
+and so proves the seam carries the ten facts. This file asks the narrower
 questions that path cannot: what the projection *drops*, whether it survives
 being written down, and what the shapes are that a value can legally arrive in.
 
