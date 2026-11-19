@@ -1,0 +1,94 @@
+identity
+run 42b63219 (clean False), run corpus b814eb5b59b5, scored on corpus b814eb5b59b5 at 42b63219
+
+must-finds and cost by case
+case  must-finds  matched  missed  incompatible  cost_usd
+01       8        6       2             0  0.2698
+06      10        8       2             0  0.3836
+08       8        6       2             0  0.3598
+09       9        6       3             0  0.3097
+10       8        5       3             0  0.2456
+11       8        6       2             0  0.3031
+12      10        5       5             0  0.3016
+13       9        5       4             0  0.3376
+all     70       47      23             0  2.5108
+
+must-finds by lane
+lane  matched  missed  incompatible  uncaptured
+spoofing  16  3  0  0
+tampering  8  10  0  0
+repudiation  2  0  0  0
+information-disclosure  12  3  0  0
+denial-of-service  5  2  0  0
+elevation-of-privilege  4  5  0  0
+
+losses by cause (run.py score)
+cause  all_losses  must_find_losses
+verb  29  13
+position  6  6
+unstated  0  0
+merged  0  0
+misfiled  1  0
+critic  0  0
+fan-in  0  0
+place  8  1
+unled  11  3
+all  55  23
+
+must-find losses
+case  reference  lane  must_find  cause  reference_verb  draft_verb  draft  place_relation
+01  3  tampering  True  verb  alter-in-transit  forge  T-02  draft-contains
+01  4  tampering  True  position  alter  alter  T-03  equal
+06  3  tampering  True  position  forge  forge  T-02  equal
+06  15  spoofing  True  unled  forge  None  None  None
+08  0  spoofing  True  place  forge  None  None  None
+08  19  elevation-of-privilege  True  unled  abuse-grant  None  None  None
+09  4  tampering  True  verb  alter  alter-in-transit  T-02  equal
+09  5  tampering  True  position  inject  inject  T-03  equal
+09  18  elevation-of-privilege  True  unled  escalate  None  None  None
+10  0  spoofing  True  verb  use-credential  impersonate  S-03  equal
+10  15  elevation-of-privilege  True  verb  plant  escalate  E-01  equal
+10  17  tampering  True  verb  inject  alter  T-04  reference-contains
+11  4  tampering  True  verb  alter  alter-in-transit  T-03  equal
+11  10  information-disclosure  True  position  read  read  I-08  reference-contains
+12  4  tampering  True  verb  alter-in-transit  plant  T-01  equal
+12  8  information-disclosure  True  position  read  read  I-08  equal
+12  12  denial-of-service  True  verb  disable  exhaust-resources  D-02  equal
+12  14  elevation-of-privilege  True  verb  escalate  abuse-grant  E-01  draft-contains
+12  17  tampering  True  verb  plant  alter  T-04  equal
+13  5  tampering  True  verb  alter-in-transit  inject  T-01  equal
+13  14  denial-of-service  True  position  flood  flood  D-02  equal
+13  16  elevation-of-privilege  True  verb  ride-session  escalate  E-01  equal
+13  19  information-disclosure  True  verb  ride-session  intercept  I-02  equal
+
+verb rows, every reference
+case  reference  lane  must_find  cause  reference_verb  draft_verb  draft  place_relation
+01  3  tampering  True  verb  alter-in-transit  forge  T-02  draft-contains
+01  5  tampering  False  verb  replay  forge  T-01  reference-contains
+06  5  tampering  False  verb  forge  alter  T-05  equal
+06  10  information-disclosure  False  verb  elicit  intercept  I-02  equal
+06  11  information-disclosure  False  verb  abuse-grant  intercept  I-08  equal
+08  3  spoofing  False  verb  forge  use-credential  S-03  draft-contains
+08  5  tampering  False  verb  alter-in-transit  alter  T-03  equal
+08  6  tampering  False  verb  alter-in-transit  alter  T-01  equal
+08  16  denial-of-service  False  verb  disable  exhaust-resources  D-03  reference-contains
+09  2  spoofing  False  verb  forge  impersonate  S-04  equal
+09  4  tampering  True  verb  alter  alter-in-transit  T-02  equal
+09  17  elevation-of-privilege  False  verb  abuse-grant  escalate  E-03  equal
+10  0  spoofing  True  verb  use-credential  impersonate  S-03  equal
+10  14  denial-of-service  False  verb  exhaust-resources  flood  D-03  equal
+10  15  elevation-of-privilege  True  verb  plant  escalate  E-01  equal
+10  17  tampering  True  verb  inject  alter  T-04  reference-contains
+11  4  tampering  True  verb  alter  alter-in-transit  T-03  equal
+11  15  tampering  False  verb  replay  alter-in-transit  T-03  equal
+12  4  tampering  True  verb  alter-in-transit  plant  T-01  equal
+12  12  denial-of-service  True  verb  disable  exhaust-resources  D-02  equal
+12  14  elevation-of-privilege  True  verb  escalate  abuse-grant  E-01  draft-contains
+12  16  tampering  False  verb  replay  alter  T-02  equal
+12  17  tampering  True  verb  plant  alter  T-04  equal
+12  18  denial-of-service  False  verb  flood  exhaust-resources  D-01  equal
+13  5  tampering  True  verb  alter-in-transit  inject  T-01  equal
+13  6  tampering  False  verb  forge  alter  T-05  equal
+13  16  elevation-of-privilege  True  verb  ride-session  escalate  E-01  equal
+13  17  elevation-of-privilege  False  verb  inject  escalate  E-01  equal
+13  19  information-disclosure  True  verb  ride-session  intercept  I-02  equal
