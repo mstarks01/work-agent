@@ -540,8 +540,9 @@ def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
 def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
     monkeypatch, case
 ):
-    """A refusal states at most a category, never what the filter stopped, so
-    its fragment and its category are written beside the state."""
+    """The service reads at most a category from a refusal, never what the
+    filter stopped, so its fragment and its category are written beside the
+    state."""
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
         raise RefusedCompletionError(

@@ -844,8 +844,8 @@ class TestAFilterStopIsRefused:
         assert "refusal category not stated" in str(excinfo.value)
 
     def test_the_message_names_the_node_from_its_adk_label(self):
-        """A provider states at most a category, so the node is the first thing
-        to know."""
+        """The service reads at most a category from a refusal, so the node is
+        the first thing to know."""
         request = LlmRequest(
             contents=_ANY_REQUEST.contents,
             config=types.GenerateContentConfig(
