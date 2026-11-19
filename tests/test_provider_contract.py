@@ -100,6 +100,9 @@ FAKE_KEYS: Mapping[VendorName, dict[str, str]] = {
     "openrouter": secret_env(
         "ANALYSIS_OPENROUTER_API_KEY_FILE", "not-a-real-openrouter-key"
     ),
+    "anthropic": secret_env(
+        vendor_for("anthropic").api_key_var, "not-a-real-anthropic-key"
+    ),
 }
 
 #: The build the provider says answered, deliberately unlike anything requested.
@@ -381,6 +384,98 @@ class TestWhatTheRetryDriverReadsOffAResponse:
         responses = responses_from("openai", answering("openai"))
 
         assert responses[0].finish_reason == "STOP"
+
+
+#: Prose the provider writes beside a refusal category. It must never reach
+#: the error's message.
+REFUSAL_EXPLANATION = "PROVIDER-EXPLANATION-TEXT"
+
+#: The text the model wrote before the filter stopped it.
+REFUSAL_FRAGMENT = '{"claims":[{"title":"FRAGMENT-TEXT'
+
+
+def anthropic_refusal(**stop_details: Any) -> _Provider:
+    """Anthropic's Messages answer when its classifier stops a completion.
+
+    ``stop_details`` is the object Anthropic sends beside ``stop_reason``;
+    pass nothing for a body that carries none.
+    """
+    body: dict[str, Any] = {
+        "id": "msg_test",
+        "type": "message",
+        "role": "assistant",
+        "model": SERVED_BUILD,
+        "content": [{"type": "text", "text": REFUSAL_FRAGMENT}],
+        "stop_reason": "refusal",
+        "stop_sequence": None,
+        "usage": {"input_tokens": 10, "output_tokens": 3},
+    }
+    if stop_details:
+        body["stop_details"] = stop_details
+    return _Provider(lambda: httpx.Response(200, json=body))
+
+
+class TestTheRefusalCategoryReachesTheError:
+    """The category Anthropic states beside a refusal, read off the wire.
+
+    litellm maps ``stop_reason="refusal"`` onto a filter stop and keeps no
+    trace of ``stop_details`` on the response it returns, so these drive the
+    real Anthropic transform rather than a response this file builds.
+    """
+
+    def test_a_stated_category_is_on_the_error_and_in_its_message(self):
+        exc = raised_by(
+            "anthropic",
+            anthropic_refusal(
+                type="refusal", category="cyber", explanation=REFUSAL_EXPLANATION
+            ),
+        )
+
+        assert isinstance(exc, RefusedCompletionError)
+        assert exc.category == "cyber"
+        assert "(finish reason SAFETY, refusal category cyber)" in str(exc)
+
+    def test_the_message_carries_no_provider_prose_and_no_fragment(self):
+        exc = raised_by(
+            "anthropic",
+            anthropic_refusal(
+                type="refusal", category="cyber", explanation=REFUSAL_EXPLANATION
+            ),
+        )
+
+        assert REFUSAL_EXPLANATION not in repr(exc)
+        assert "FRAGMENT-TEXT" not in repr(exc)
+
+    def test_a_refusal_without_details_states_no_category(self):
+        exc = raised_by("anthropic", anthropic_refusal())
+
+        assert isinstance(exc, RefusedCompletionError)
+        assert exc.category is None
+        assert "refusal category not stated" in str(exc)
+
+    @pytest.mark.parametrize(
+        "category",
+        [None, "Cyber", "cyber attack", "cyber-1", "x" * 41, "", 7, ["cyber"]],
+    )
+    def test_a_null_or_malformed_category_is_not_stated(self, category):
+        exc = raised_by(
+            "anthropic", anthropic_refusal(type="refusal", category=category)
+        )
+
+        assert isinstance(exc, RefusedCompletionError)
+        assert exc.category is None
+        assert "refusal category not stated" in str(exc)
+
+    def test_a_vendor_that_states_no_category_is_not_stated(self):
+        """The OpenAI shape has no field for a category."""
+        body = completion_body("openai")
+        body["choices"][0]["finish_reason"] = "content_filter"
+
+        exc = raised_by("openai", _Provider(lambda: httpx.Response(200, json=body)))
+
+        assert isinstance(exc, RefusedCompletionError)
+        assert exc.category is None
+        assert "refusal category not stated" in str(exc)
 
 
 class TestWhatTheRetryDriverReadsOffAnException:

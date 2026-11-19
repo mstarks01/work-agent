@@ -1104,7 +1104,7 @@ def inject_transport(
     decision rather than the registry's: the OpenAI SDK where the provider is
     OpenAI-compatible and it has an SDK for it, and its own ``AsyncHTTPHandler``
     where it composes the request itself — which is the path every OpenRouter
-    call takes. The injection therefore has to know which, and a vendor litellm
+    and every Anthropic call takes. The injection therefore has to know which, and a vendor litellm
     reaches a third way raises here rather than quietly running against nothing.
 
     The seam is the client ADK already exposes for testability, so nothing in
@@ -1129,7 +1129,7 @@ def inject_transport(
     client: Any
     if vendor == "openai":
         client = AsyncOpenAI(api_key=SDK_CLIENT_KEY, http_client=connection)
-    elif vendor == "openrouter":
+    elif vendor in ("openrouter", "anthropic"):
         client = AsyncHTTPHandler()
         client.client = connection
     else:  # pragma: no cover - a vendor reached through neither of those
