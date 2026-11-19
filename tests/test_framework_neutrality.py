@@ -168,6 +168,11 @@ DECLARED: dict[str, str] = {
         " the package whose identity is an action at a place has a rule set"
         " that leads a lane to the elements a reference names."
     ),
+    "evals/experiments/QA-2026-11-19-01/unled_leads.py": (
+        "This code is that framework's. It prices candidate lead rules, and"
+        " only the package whose identity is an action at a place has a rule"
+        " set that leads a lane to the elements a reference names."
+    ),
     "evals/experiments/QA-2026-11-06-02/zones.py": (
         "This code is that framework's. It reads the zone kinds that the"
         " privilege-crossing rule of the package with candidate leads reads."
