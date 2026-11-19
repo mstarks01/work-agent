@@ -14,10 +14,11 @@ import pytest
 from analysis_service.refusal_categories import refusal_category_of
 
 
-def test_a_stated_category_is_kept():
-    body = json.dumps({"stop_details": {"type": "refusal", "category": "bio"}})
+@pytest.mark.parametrize("category", ["bio", "x" * 40])
+def test_a_stated_category_is_kept(category):
+    body = json.dumps({"stop_details": {"type": "refusal", "category": category}})
 
-    assert refusal_category_of(body) == "bio"
+    assert refusal_category_of(body) == category
 
 
 @pytest.mark.parametrize(
@@ -32,7 +33,10 @@ def test_a_stated_category_is_kept():
         json.dumps({"stop_details": "cyber"}),
         json.dumps({"stop_details": ["cyber"]}),
         json.dumps({"stop_details": {"type": "refusal"}}),
-        json.dumps({"stop_details": {"category": "cyber\n"}}),
+        json.dumps({"stop_details": {"category": "cyber"}}),
+        json.dumps({"stop_details": {"type": "other", "category": "cyber"}}),
+        json.dumps({"stop_details": {"type": "refusal", "category": "cyber\n"}}),
+        json.dumps({"stop_details": {"type": "refusal", "category": "x" * 41}}),
     ],
 )
 def test_any_other_shape_states_no_category(body):
@@ -40,7 +44,7 @@ def test_any_other_shape_states_no_category(body):
 
 
 def test_a_category_of_an_unknown_shape_is_logged_without_its_value(caplog):
-    body = json.dumps({"stop_details": {"category": "Cyber-9"}})
+    body = json.dumps({"stop_details": {"type": "refusal", "category": "Cyber-9"}})
 
     assert refusal_category_of(body) is None
     assert "unknown shape" in caplog.text

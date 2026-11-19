@@ -540,7 +540,9 @@ async def _run_mode(
                 if isinstance(outcome.error, UnfinishedCompletionError):
                     failed_states[case.id]["fragment"] = outcome.error.fragment
                 if isinstance(outcome.error, RefusedCompletionError):
-                    failed_states[case.id]["refusal_category"] = outcome.error.category
+                    failed_states[case.id]["refusal_category"] = (
+                        outcome.error.refusal_category
+                    )
             if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
                 # the next case would fail the same way. Stop, but keep what

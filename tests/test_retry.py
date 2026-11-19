@@ -834,13 +834,13 @@ class TestAFilterStopIsRefused:
         stamped.custom_metadata = {REFUSAL_CATEGORY_METADATA_KEY: "bio"}
         with pytest.raises(RefusedCompletionError) as excinfo:
             drive(FakeExecutor(outcomes=[stamped]), policy())
-        assert excinfo.value.category == "bio"
+        assert excinfo.value.refusal_category == "bio"
         assert "(finish reason SAFETY, refusal category bio)" in str(excinfo.value)
 
     def test_an_unstamped_refusal_states_no_category(self):
         with pytest.raises(RefusedCompletionError) as excinfo:
             drive(FakeExecutor(outcomes=[refused()]), policy())
-        assert excinfo.value.category is None
+        assert excinfo.value.refusal_category is None
         assert "refusal category not stated" in str(excinfo.value)
 
     def test_the_message_names_the_node_from_its_adk_label(self):

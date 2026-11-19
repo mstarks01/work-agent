@@ -33,6 +33,7 @@ from analysis_service.provider import (
     ProviderCallFailed,
     ProviderExecutor,
 )
+from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
 from analysis_service.retry import (
     FailureKind,
     ProviderFailure,
@@ -204,6 +205,7 @@ class TestWhatComesBack:
             custom_metadata={
                 CHARGE_METADATA_KEY: 2.54e-06,
                 UPSTREAM_METADATA_KEY: "DeepInfra",
+                REFUSAL_CATEGORY_METADATA_KEY: "cyber",
             },
         )
 
@@ -215,6 +217,7 @@ class TestWhatComesBack:
         assert back.custom_metadata == {
             CHARGE_METADATA_KEY: 2.54e-06,
             UPSTREAM_METADATA_KEY: "DeepInfra",
+            REFUSAL_CATEGORY_METADATA_KEY: "cyber",
         }
 
     def test_the_finish_reason_crosses_as_the_bare_word(self):

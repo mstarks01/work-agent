@@ -185,16 +185,18 @@ class RefusedCompletionError(UnfinishedCompletionError):
     malformed output and a re-ask would ask the same filter again. Not
     retryable, for the reason :class:`TruncatedCompletionError` gives.
 
-    ``category`` is the refusal category the provider stated, such as
+    ``refusal_category`` is the refusal category the provider stated, such as
     ``cyber``, or ``None`` where it stated none. The message names it, or
     says it is not stated. :mod:`analysis_service.refusal_categories` parses
     it from the response body, and the failure record of an eval case keeps it
     as its own field.
     """
 
-    def __init__(self, message: str, fragment: str, category: str | None) -> None:
+    def __init__(
+        self, message: str, fragment: str, refusal_category: str | None
+    ) -> None:
         super().__init__(message, fragment)
-        self.category = category
+        self.refusal_category = refusal_category
 
 
 class RetryBudgetExhausted(RuntimeError):
@@ -800,9 +802,9 @@ def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None
     """Raise if the provider stopped any of ``responses`` at the cap or the filter.
 
     ``node`` is the graph node that asked, and the message names it first.
-    The error carries the text of every response as its ``fragment``, and the
-    first refusal category that a response stopped for that reason carries in
-    its ``custom_metadata``.
+    The error carries the text of every response as its ``fragment``. It also
+    carries the refusal category from the ``custom_metadata`` of the first
+    response that stopped for that reason.
 
     Every response is checked rather than just the last: a non-streaming call
     yields one today, but the collection is a sequence and an unfinished part

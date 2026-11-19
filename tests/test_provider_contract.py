@@ -27,16 +27,17 @@ readers are the shipped ones, imported rather than restated.
 ``tests/test_transport_conformance.py`` is the outbound half of the same idea —
 what this service *sends*. This file is what it **reads**.
 
-## Two routes, because the facts split that way
+## Three routes, because the facts split that way
 
 A direct vendor names no upstream and reports no charge; a gateway vendor
 carries both. So ``openai`` stands for the direct route and ``openrouter`` for
-the gateway one, and each drives the facts it can actually carry. The injection
-seam differs between them because litellm reaches the two through different
-clients — the OpenAI SDK for one, its own HTTP handler for the other — which is
-a fact about the translator rather than about the vendors, and
+the gateway one, and each drives the facts it can actually carry. ``anthropic``
+is the route whose body states a refusal category. The injection seam differs
+between them because litellm reaches them through different clients — the
+OpenAI SDK for ``openai``, its own HTTP handler for the other two — which is a
+fact about the translator rather than about the vendors, and
 :func:`tests.factories.inject_transport` raises rather than defaults when it
-meets a third.
+meets a vendor it does not know.
 """
 
 from __future__ import annotations
@@ -427,7 +428,7 @@ class TestTheRefusalCategoryReachesTheError:
         )
 
         assert isinstance(exc, RefusedCompletionError)
-        assert exc.category == "cyber"
+        assert exc.refusal_category == "cyber"
         assert "(finish reason SAFETY, refusal category cyber)" in str(exc)
 
     def test_the_message_carries_no_provider_prose_and_no_fragment(self):
@@ -445,7 +446,7 @@ class TestTheRefusalCategoryReachesTheError:
         exc = raised_by("anthropic", anthropic_refusal())
 
         assert isinstance(exc, RefusedCompletionError)
-        assert exc.category is None
+        assert exc.refusal_category is None
         assert "refusal category not stated" in str(exc)
 
     @pytest.mark.parametrize(
@@ -458,7 +459,7 @@ class TestTheRefusalCategoryReachesTheError:
         )
 
         assert isinstance(exc, RefusedCompletionError)
-        assert exc.category is None
+        assert exc.refusal_category is None
         assert "refusal category not stated" in str(exc)
 
     def test_a_vendor_that_states_no_category_is_not_stated(self):
@@ -469,7 +470,7 @@ class TestTheRefusalCategoryReachesTheError:
         exc = raised_by("openai", _Provider(lambda: httpx.Response(200, json=body)))
 
         assert isinstance(exc, RefusedCompletionError)
-        assert exc.category is None
+        assert exc.refusal_category is None
         assert "refusal category not stated" in str(exc)
 
     def test_the_category_crosses_the_charge_client_layer(self):
@@ -483,7 +484,7 @@ class TestTheRefusalCategoryReachesTheError:
         exc = raised_by("openrouter", _Provider(lambda: httpx.Response(200, json=body)))
 
         assert isinstance(exc, RefusedCompletionError)
-        assert exc.category == "cyber"
+        assert exc.refusal_category == "cyber"
 
 
 class TestWhatTheRetryDriverReadsOffAnException:

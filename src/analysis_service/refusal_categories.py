@@ -73,8 +73,9 @@ _stated_category: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 def refusal_category_of(body: str) -> str | None:
     """The refusal category a raw response body states, or ``None``.
 
-    ``None`` for a body that is not JSON, has no ``stop_details`` object, or
-    holds a category that is null or does not match :data:`_CATEGORY`.
+    ``None`` for a body that is not JSON, has no ``stop_details`` object of
+    type ``refusal``, or holds a category that is null or does not match
+    :data:`_CATEGORY`.
 
     The one reader of the category a response body states, and the row "the
     refusal category a response body states" of ``ONE_READERS`` in
@@ -85,7 +86,9 @@ def refusal_category_of(body: str) -> str | None:
     except ValueError:
         return None
     details = parsed.get("stop_details") if isinstance(parsed, Mapping) else None
-    category = details.get("category") if isinstance(details, Mapping) else None
+    if not isinstance(details, Mapping) or details.get("type") != "refusal":
+        return None
+    category = details.get("category")
     if isinstance(category, str) and _CATEGORY.fullmatch(category):
         return category
     if category is not None:

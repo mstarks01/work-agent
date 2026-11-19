@@ -266,10 +266,10 @@ class GenerationResult:
     def of(cls, response: LlmResponse) -> Self:
         """One ADK response reduced to the facts that cross.
 
-        The charge and the upstream come off ``custom_metadata`` under the keys
-        :mod:`analysis_service.charges` writes them with, rather than being
-        re-read from a provider object — that module owns both the capture and
-        the rule, and this is a carrier.
+        Every stamped fact comes off ``custom_metadata`` under the key that its
+        module writes it with, rather than being re-read from a provider
+        object. The module that writes a key owns both the capture and the
+        rule, and this is a carrier.
         """
         stamped = response.custom_metadata or {}
         return cls(
