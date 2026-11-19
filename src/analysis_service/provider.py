@@ -48,7 +48,7 @@ There is one implementation, :class:`InProcessExecutor`, and it wraps the
 adapter ``binding`` already built. The seam is proven rather than hypothetical
 because every call the service makes crosses it — the transport tests read the
 bytes a direct adapter call would send, and ``tests/test_provider_contract.py`` reads
-the same nine facts off the other side.
+the same ten facts off the other side.
 """
 
 from __future__ import annotations

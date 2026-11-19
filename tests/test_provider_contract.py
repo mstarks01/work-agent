@@ -2,8 +2,8 @@
 
 ## Why the facts come from the wire
 
-The executor reads five things off an ADK event and the retry driver reads four
-off a response or an exception. Every other offline test supplies these nine
+The executor reads five things off an ADK event and the retry driver reads five
+off a response or an exception. Every other offline test supplies these ten
 facts **itself**: ``tests/factories.ScriptedLlm`` constructs an
 ``LlmResponse`` with a ``model_version`` and a ``usage_metadata`` written by
 hand, and ``tests/test_retry.py`` builds a ``RateLimitError`` with the headers

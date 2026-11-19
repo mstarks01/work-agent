@@ -801,7 +801,8 @@ def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None
 
     ``node`` is the graph node that asked, and the message names it first.
     The error carries the text of every response as its ``fragment``, and the
-    first refusal category a response carries in its ``custom_metadata``.
+    first refusal category that a response stopped for that reason carries in
+    its ``custom_metadata``.
 
     Every response is checked rather than just the last: a non-streaming call
     yields one today, but the collection is a sequence and an unfinished part
@@ -824,7 +825,11 @@ def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None
                 if response.content
                 for part in response.content.parts or ()
             )
-            stamps = [response.custom_metadata or {} for response in responses]
+            stamps = [
+                response.custom_metadata or {}
+                for response in responses
+                if response.finish_reason == reason
+            ]
             category = next(
                 (
                     stamp[REFUSAL_CATEGORY_METADATA_KEY]

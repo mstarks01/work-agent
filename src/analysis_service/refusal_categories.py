@@ -70,6 +70,10 @@ def refusal_category_of(body: str) -> str | None:
 
     ``None`` for a body that is not JSON, has no ``stop_details`` object, or
     holds a category that is null or does not match :data:`_CATEGORY`.
+
+    The one reader of the category a response body states, and the row "the
+    refusal category a response body states" of ``ONE_READERS`` in
+    ``tests/test_one_reader_lints.py`` refuses a second.
     """
     try:
         parsed = json.loads(body)
