@@ -96,10 +96,11 @@ def _cause_lines(losses: list[tuple[str, dict]]) -> list[str]:
 
 
 def _row_lines(losses: list[tuple[str, dict]], causes: tuple[str, ...]) -> list[str]:
-    lines = [
+    header = (
         "case  reference  lane  must_find  cause  reference_verb  draft_verb"
         "  draft  place_relation"
-    ]
+    )
+    lines = [header]
     for case, loss in losses:
         if loss["cause"] in causes:
             lines.append(
