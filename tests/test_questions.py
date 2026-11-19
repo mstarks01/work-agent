@@ -91,13 +91,14 @@ class TestTheRanking:
         states is not an open fact.
         """
         model = report.system_model
+        catalog = None if report.assertions is None else report.assertions.catalog
 
         def open_refs(refs):
             return [
                 ref
                 for ref in refs
                 if fact_kind(ref.key) != "attribute"
-                or open_attribute(model, ref.element_id, ref.attribute)
+                or open_attribute(model, ref.element_id, ref.attribute, catalog)
             ]
 
         waiting = sum(
@@ -935,9 +936,10 @@ class TestAnAnswerBindsToAnOpenFact:
     def test_the_report_does_not_ask_what_it_refuses(self, report):
         """Every attribute question the report lists takes an answer."""
         model = report.system_model
+        catalog = None if report.assertions is None else report.assertions.catalog
         for question in ask(report):
             if question.kind == "attribute":
-                assert open_attribute(model, question.key[0], question.key[1])
+                assert open_attribute(model, question.key[0], question.key[1], catalog)
 
 
 class TestAnUnknownAnswer:

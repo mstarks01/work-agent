@@ -819,11 +819,13 @@ def _placed(facts: Sequence[FactAnswer], model: SystemModel, elements: Sequence[
             yield fact.model_copy(update={"key": with_element(fact.key, element_id)})
 
 
-def _stated_value(model: SystemModel, fact: FactAnswer) -> str | None:
+def _stated_value(
+    model: SystemModel, catalog: AssertionCatalog | None, fact: FactAnswer
+) -> str | None:
     """The value ``model`` states for the fact, or ``None`` where it is open."""
     ref = key_ref(fact.key)
     if fact.kind == "attribute":
-        if open_attribute(model, ref.element_id, ref.attribute):
+        if open_attribute(model, ref.element_id, ref.attribute, catalog):
             return None
         return str(getattr(model.get(ref.element_id), ref.attribute))
     return None
@@ -851,7 +853,7 @@ def control_facts(
             continue
         facts = []
         for fact in _placed(copy.document.facts, model, resolution.element_ids()):
-            stated = _stated_value(prepared, fact)
+            stated = _stated_value(prepared, catalog, fact)
             facts.append(
                 ControlFact(answer=fact, state="written")
                 if stated is None

@@ -186,7 +186,9 @@ class TestWhichFindingsACorrectionReaches:
 
     def reached(self, threat):
         report = sample_report([threat])
-        return corrected_findings(report.analyses, [ANSWER], [self.BACK])
+        return corrected_findings(
+            report.analyses, [ANSWER], [self.BACK], report.system_model, None
+        )
 
     def test_a_finding_that_quotes_the_answer_s_line(self):
         quote = Ground(kind="quote", text=fact_line(ANSWER), source_label=ANSWERS_LABEL)

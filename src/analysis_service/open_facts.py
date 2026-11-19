@@ -17,7 +17,7 @@ it, so it cannot drift from the verdicts it describes.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from analysis_service.analysis import ControlAttribute, control_state
@@ -28,10 +28,14 @@ from analysis_service.assertions import (
     answer,
     answered,
     assertion_id,
+    disputed,
+    held_open_attributes,
     identity_parts,
     parse_predicate,
+    place_identity,
     projected_attribute,
     read_assertion_id,
+    uncontradicted,
 )
 from analysis_service.capabilities import CAPABILITIES, parse_capability_key
 from analysis_service.claims import AttributeGround, UnknownRef
@@ -348,13 +352,21 @@ def gaps(model: SystemModel) -> tuple[Gap, ...]:
     return tuple(Gap(attribute, tuple(unstated[attribute])) for attribute in order)
 
 
-def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
+def open_attribute(
+    model: SystemModel,
+    element_id: str,
+    attribute: str,
+    catalog: AssertionCatalog | None,
+) -> bool:
     """True where this attribute is a fact the model leaves open.
 
     **The one reader of "may this attribute be asked, and answered".** Open is
-    unverified by :func:`~analysis_service.analysis.control_state`, the
-    reading the evidence catalog uses, or a zone the service inferred. The
-    early list, the report list and the answer check all ask it.
+    unverified by :func:`~analysis_service.analysis.control_state`, a zone
+    the service inferred, or an attribute the assertion rows hold open
+    against ``model`` (:func:`~analysis_service.assertions.held_open_attributes`),
+    whose value the evidence catalog does not offer as a fact. The early
+    list, the report list, the answer check, a Control's fact and
+    :func:`source_states` all ask it.
     """
     element = model.get(element_id)
     value = getattr(element, attribute, None)
@@ -362,37 +374,114 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
     assumed = (
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
-    return element is not None and (unverified or assumed)
+    held_open = catalog is not None and (element_id, attribute) in (
+        held_open_attributes(catalog, model)
+    )
+    return element is not None and (unverified or assumed or held_open)
+
+
+def fact_routes(
+    catalog: AssertionCatalog | None, model: SystemModel
+) -> Mapping[str, UnknownRef]:
+    """The fact each open row a finding may name is asked as, by row identity.
+
+    A row the graph contradicts (:func:`~analysis_service.assertions.contradicted`)
+    or another row disputes (:func:`~analysis_service.assertions.disputed`)
+    states a value, so its own identity names no row an answer could write
+    over. Where an unscoped row reaches a graph field, the question is that
+    attribute's, and the attribute path writes the answer; every other
+    unscoped row that reaches the same attribute, an unknown row among them,
+    asks that one fact too, and so does every unscoped row at an attribute
+    the rows hold open
+    (:func:`~analysis_service.assertions.held_open_attributes`), which takes
+    an answer as an attribute (:func:`open_attribute`). Where a row reaches no
+    field, or states a narrower scope than the attribute, the question is its
+    place's
+    (:func:`~analysis_service.assertions.place_identity`), which names the
+    answer's row in every later run too (the maintainer's ruling of
+    2026-11-18 on #2270). ``model`` is read as the lanes read it
+    (:func:`prepared_model`).
+    """
+    if catalog is None:
+        return {}
+    prepared = prepared_model(model, catalog)
+    routes: dict[str, UnknownRef] = {}
+    fields = set(held_open_attributes(catalog, prepared))
+    for row in disputed(catalog):
+        attribute = projected_attribute(row.predicate, row.subject)
+        if attribute and not row.scope:
+            fields.add((row.subject, attribute))
+        else:
+            routes[assertion_id(row)] = UnknownRef(assertion=place_identity(row))
+    for entry in catalog.entries:
+        attribute = projected_attribute(entry.predicate, entry.subject)
+        if not entry.scope and (entry.subject, attribute) in fields:
+            routes[assertion_id(entry)] = UnknownRef(
+                element_id=entry.subject, attribute=attribute
+            )
+    return routes
+
+
+def routed(
+    refs: Iterable[UnknownRef], routes: Mapping[str, UnknownRef]
+) -> list[UnknownRef]:
+    """``refs``, each reference to an open row replaced by its fact.
+
+    The facts are :func:`fact_routes`'s.
+    """
+    return [
+        routes.get(ref.assertion, ref) if ref.kind == "assertion" else ref
+        for ref in refs
+    ]
 
 
 def source_states(
-    model: SystemModel,
-    catalog: AssertionCatalog | None,
-    element_id: str,
-    predicate: PredicateName,
-) -> bool:
-    """True where the sources settle ``predicate`` about this element (ADR 0117).
+    model: SystemModel, catalog: AssertionCatalog | None
+) -> Callable[[str, PredicateName], bool]:
+    """Whether the sources settle a predicate about an element (ADR 0117).
+
+    Returns the check for ``model`` and ``catalog``, which reads the projected
+    model and the uncontradicted rows once, so a writer that asks it of every
+    part of every answer projects the model once.
 
     **The subject rule.** The writer of an answer's rows asks it, and so does
-    the tripwire that measures stated parts. Only a settled, unscoped row about the element itself counts, so a flow's
-    row never answers a question about an element, and a scoped row answers
-    nothing wider. A row an answer wrote is not the sources'. A predicate that
-    projects into an attribute is stated too where ``model`` states the
-    attribute and no answer wrote a row of it here. Any answer row counts
+    the tripwire that measures stated parts. Only a settled, unscoped row about
+    the element itself counts, and only one the graph does not contradict
+    (:func:`~analysis_service.assertions.uncontradicted`, against ``model`` as
+    the lanes read it, :func:`prepared_model`). So a flow's row never answers a
+    question about an element, a scoped row answers nothing wider, and a row
+    the graph contradicts is no statement. A row an answer wrote is not the
+    sources'. A predicate that projects into an attribute is stated too where
+    the attribute is not open (:func:`open_attribute`, which reads the rows
+    that hold it open) and no answer wrote a row of it here. Any answer row counts
     here, not only one that makes the projected value: the question is whether
     the submitter already spoke to this fact, so a later answer may replace
     theirs.
     """
-    held = answer(catalog or AssertionCatalog(), element_id, predicate)
-    if any(not row.scope and not answered(row) for row in held.settled):
-        return True
-    attribute = projected_attribute(predicate, element_id)
-    answer_wrote = any(answered(row) for row in held.rows)
-    return (
-        bool(attribute)
-        and not answer_wrote
-        and not open_attribute(model, element_id, attribute)
+    rows = catalog or AssertionCatalog()
+    prepared = prepared_model(model, catalog)
+    facts = (
+        set()
+        if catalog is None
+        else {assertion_id(row) for row in uncontradicted(catalog, prepared)}
     )
+
+    def states(element_id: str, predicate: PredicateName) -> bool:
+        held = answer(rows, element_id, predicate)
+        if any(
+            not row.scope and not answered(row) and assertion_id(row) in facts
+            for row in held.settled
+        ):
+            return True
+        attribute = projected_attribute(predicate, element_id)
+        answer_wrote = any(answered(row) for row in held.rows)
+        return (
+            bool(attribute)
+            and not answer_wrote
+            and not open_attribute(prepared, element_id, attribute, catalog)
+        )
+
+    return states
 
 
 def stated_capability(model: SystemModel, capability: str) -> str | None:

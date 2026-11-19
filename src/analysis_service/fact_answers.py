@@ -64,6 +64,8 @@ from analysis_service.assertions import (
     PredicateName,
     answered,
     assertion_id,
+    disputed,
+    place_identity,
 )
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import (
@@ -424,24 +426,24 @@ def part_answers(fact: FactAnswer) -> tuple[tuple[PredicateName, str], ...]:
 
 
 def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
-    """The row an answer to the open row ``identity`` writes over, if any.
+    """The row an answer to the open place ``identity`` writes over, if any.
 
-    **The one reader of "which row does this answer settle".** That is the open
-    row itself, or the stated row an earlier answer wrote in its place. The
-    second is the row a resumed job's checkpoint holds, and a later run
-    writes it again, so that its quote reads the answers Source this run
-    composed. A row the sources settled is neither, so no answer names it.
+    **The one reader of "which row does this answer settle".** ``identity``
+    names a place (:func:`~analysis_service.assertions.place_identity`). The
+    row is the open row there, a side of a disagreement there
+    (:func:`~analysis_service.assertions.disputed`), or the stated row an
+    earlier answer wrote there. The last is the row a resumed job's checkpoint
+    holds, and a later run writes it again, so that its quote reads the
+    answers Source this run composed. A row the sources settled is none of
+    these, so no answer names it. The open row or the earlier answer comes
+    before a side of a disagreement, so a later answer writes over the earlier
+    one whatever the catalog order.
     """
-    for entry in catalog.entries:
-        if entry.value == UNKNOWN:
-            reopened = entry
-        elif answered(entry):
-            reopened = entry.model_copy(update={"value": UNKNOWN})
-        else:
-            continue
-        if assertion_id(reopened) == identity:
-            return entry
-    return None
+    sides = {assertion_id(entry) for entry in disputed(catalog)}
+    at_place = [entry for entry in catalog.entries if place_identity(entry) == identity]
+    written = [entry for entry in at_place if entry.value == UNKNOWN or answered(entry)]
+    disagreeing = [entry for entry in at_place if assertion_id(entry) in sides]
+    return next(iter([*written, *disagreeing]), None)
 
 
 def refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:

@@ -178,6 +178,7 @@ __all__ = [
     "offered",
     "parse_predicate",
     "parse_subject_type",
+    "place_identity",
     "project",
     "projected_attribute",
     "projection_fields",
@@ -277,9 +278,9 @@ REGISTRY_VERSION = 9
 #: against the projected model, the last three remain only where the validity
 #: gate refuses it. An issue names a row that states the value. A record of version 7 keeps its own issues, and the
 #: issue re-check on load declines for it. The ground check on load is not
-#: versioned: a claim of such a record on an ``absent-attribute`` the rows now
-#: contradict, or on a row they now hold open, fails the load, as a hard
-#: cutover.
+#: versioned: a claim of such a record on an ``absent-attribute`` in
+#: :func:`held_open_attributes`, or on a row the evidence catalog offers as an
+#: open question, fails the load, as a hard cutover.
 PROJECTION_VERSION = 8
 
 #: The value that says a source stated this fact is **not there**. A positive
@@ -1645,6 +1646,17 @@ def assertion_id(assertion: Assertion) -> str:
     """
     parts = identity_parts(assertion)
     return f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~{parts.value}"
+
+
+def place_identity(assertion: Assertion) -> str:
+    """The identity this row's place takes, whatever value the row states.
+
+    The row's identity with the value :data:`UNKNOWN`: the subject, the
+    predicate and the scope name the place. A Fact Question about a place is
+    asked under this key, so an answer finds the row an earlier answer wrote
+    there, whose value differs from the row the question named.
+    """
+    return assertion_id(assertion.model_copy(update={"value": UNKNOWN}))
 
 
 def read_assertion_id(identity: str) -> IdentityParts | None:

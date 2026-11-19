@@ -23,7 +23,12 @@ from analysis_service.fact_answers import (
     needs_of,
 )
 from analysis_service.grounding import normalize, verify_normalized
-from analysis_service.open_facts import element_names, label_of
+from analysis_service.open_facts import (
+    element_names,
+    fact_routes,
+    label_of,
+    routed,
+)
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import SystemModel
 
@@ -55,9 +60,12 @@ def conditions(
     The card shows the facts the finding waits on
     (:meth:`~analysis_service.claims.RuledClaim.waits_on`), which the
     follow-up's counts and order read too. A ground the critic dismissed is
-    not one (ADR 0094). ``catalog`` words an assertion.
+    not one (ADR 0094). ``catalog`` words an assertion, and a reference to a
+    row the graph contradicts or another row disputes reads as the fact it is
+    asked as (:func:`~analysis_service.open_facts.fact_routes`).
     """
     names = element_names(model)
+    routes = fact_routes(catalog, model)
     said = {answer.key: answer for answer in answered}
     showed, aside = set(shown), set(skipped)
 
@@ -69,7 +77,7 @@ def conditions(
         for claim in block.all_claims():
             if claim.verdict.status != "needs-info":
                 continue
-            cites = claim.waits_on()
+            cites = routed(claim.waits_on(), routes)
             refs = {ref.key: ref for ref in cites}
             wanted = needs_of(cites)
             found[f"{block.framework}/{claim.id}"] = [
@@ -83,6 +91,8 @@ def corrected_findings(
     analyses: Sequence[FrameworkAnalysis],
     earlier: Sequence[FactAnswer],
     corrections: Sequence[FactAnswer],
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
 ) -> tuple[str, ...]:
     """Every finding, as ``framework/claim``, that rests on a fact a correction changed.
 
@@ -91,8 +101,11 @@ def corrected_findings(
     corrected fact where it quotes the fact's line of the answers Source,
     grounds on the same element's attribute, or names the fact as one it waits
     on. A quote matches a line under the grounding ladder, which admitted it
-    (:func:`~analysis_service.grounding.verify_normalized`).
+    (:func:`~analysis_service.grounding.verify_normalized`). A fact is named
+    as it is asked (:func:`~analysis_service.open_facts.fact_routes`), against
+    ``model`` and ``catalog``.
     """
+    routes = fact_routes(catalog, model)
     before = {fact.key: fact for fact in earlier}
     lines = [
         normalize(fact_line(before[fact.key]))
@@ -103,7 +116,10 @@ def corrected_findings(
     attributes = {attribute_place(key) for key in keys if fact_kind(key) == "attribute"}
 
     def rests_on(claim: Any) -> bool:
-        cited = {ref.key for ref in [*claim.unknown_grounds(), *claim.waits_on()]}
+        cited = {
+            ref.key
+            for ref in routed([*claim.unknown_grounds(), *claim.waits_on()], routes)
+        }
         if cited & keys:
             return True
         for ground in claim.grounds:

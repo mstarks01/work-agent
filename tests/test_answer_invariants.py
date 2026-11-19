@@ -326,7 +326,7 @@ def lanes_read_open(held, attribute):
     checks.
     """
     prepared, _, _ = prepared_view(held.system_model, held.assertions.catalog)
-    return open_attribute(prepared, FLOW, attribute)
+    return open_attribute(prepared, FLOW, attribute, held.assertions.catalog)
 
 
 @pytest.mark.parametrize("stated_by_extraction", [False, True])

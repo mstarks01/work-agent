@@ -2670,9 +2670,9 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "",
     ),
-    "the row an answer settles": _OneReader(
+    "a place's identity": _OneReader(
         _opens_an_answered_row,
-        ("src/analysis_service/fact_answers.py", "answered_row"),
+        ("src/analysis_service/assertions.py", "place_identity"),
         {},
         "",
     ),
@@ -3384,9 +3384,14 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
 
 def test_the_attributes_the_rows_hold_open_have_one_reader():
     """``held_open_attributes`` decides which absences the evidence catalog
-    drops, through one caller in the evidence module."""
+    drops, ``open_attribute`` reads the same set as the attributes that take
+    an answer, and ``fact_routes`` asks each row there as that attribute, so a
+    field the catalog does not offer as a fact is one question a submitter
+    may answer."""
     assert _sites(lambda node: _calls(node, "held_open_attributes")) == [
         ("src/analysis_service/evidence.py", "_held_open_attributes"),
+        ("src/analysis_service/open_facts.py", "fact_routes"),
+        ("src/analysis_service/open_facts.py", "open_attribute"),
     ]
 
 
@@ -3449,4 +3454,53 @@ def _calls_settled(node: ast.AST) -> bool:
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "settled"
+    )
+
+
+#: Each reader of a claim's open facts that does not route them, and why. A
+#: reader that asks which fact an answer settles reads ``routed`` instead.
+UNROUTED_FACT_READERS: dict[tuple[str, str], str] = {
+    ("evals/critic_review/replay.py", "score"): (
+        "counts whether a draft cites an open fact, which asks no question"
+    ),
+    ("src/analysis_service/claims.py", "settled_by_grounds"): (
+        "builds the ruling from the draft's grounds, which name rows by identity"
+    ),
+    ("src/analysis_service/critic.py", "complete_rulings"): (
+        "fills the ruling from the draft's grounds, which name rows by identity"
+    ),
+}
+
+
+def test_each_reader_of_waiting_facts_reads_them_as_asked():
+    """A reader of the facts a finding waits on reads them through
+    ``open_facts.routed``, so a contradicted or disputed row is the fact an
+    answer settles at every seam (the maintainer's ruling of 2026-11-18 on
+    #2270). ``UNROUTED_FACT_READERS`` gives each other reader its reason."""
+    readers = {
+        *_sites(lambda node: _calls(node, "waits_on")),
+        *_sites(lambda node: _calls(node, "unknown_grounds")),
+    }
+    assert sorted(readers - set(UNROUTED_FACT_READERS)) == _sites(
+        lambda node: _calls(node, "routed")
+    )
+    assert _sites(lambda node: _calls(node, "fact_routes")) == [
+        ("src/analysis_service/questions.py", "follow_up_needs"),
+        ("src/analysis_service/report_conditions.py", "conditions"),
+        ("src/analysis_service/report_conditions.py", "corrected_findings"),
+    ]
+
+
+def test_the_row_an_answer_settles_has_one_reader():
+    """Only ``answered_row`` matches a key against a row's place, so the
+    admission check, the answer forms and the writer find one row."""
+    assert _sites(_compares_a_place) == [
+        ("src/analysis_service/fact_answers.py", "answered_row"),
+    ]
+
+
+def _compares_a_place(node: ast.AST) -> bool:
+    """Whether ``node`` compares a row's ``place_identity`` with something."""
+    return isinstance(node, ast.Compare) and any(
+        _calls(part, "place_identity") for part in ast.walk(node)
     )

@@ -1312,7 +1312,15 @@ def _corrections_payload(
             row | {"corrected": answer.key in corrected}
             for row, answer in zip(rows, answers, strict=True)
         ],
-        "findings": list(corrected_findings(report.analyses, answered, corrections)),
+        "findings": list(
+            corrected_findings(
+                report.analyses,
+                answered,
+                corrections,
+                report.system_model,
+                None if report.assertions is None else report.assertions.catalog,
+            )
+        ),
         "shares": [share.model_dump(mode="json") for share in shares],
         "revision": revision,
     }

@@ -36,6 +36,7 @@ from analysis_service.assertions import (
     assertion_id,
     conflicts,
     graph_subject_type,
+    place_identity,
     projected_attribute,
     subjects_of,
 )
@@ -151,7 +152,7 @@ def check_fact_answers(
                     f"facts[{at}]: no attribute of that name on that element"
                 )
             if answer.key not in answered_before and not open_attribute(
-                prepared, element_id, attribute
+                prepared, element_id, attribute, catalog
             ):
                 raise ValueError(
                     f"{attribute!r} on {element_id!r} is stated, so it takes no answer"
@@ -370,11 +371,12 @@ def fact_rows(
     """The catalog with each answer written over the rows it settles.
 
     ``spans`` are where each answer's line sits in the answers Source, in the
-    order of ``answers``. An assertion answer replaces the open row it answers,
-    and the stated row keeps the open row's subject, predicate and scope, so it
-    answers exactly what was asked. An answer an earlier run wrote is written again
-    over the row it wrote, so its quote reads this run's answers Source. Each
-    row written here has the origin ``answer``.
+    order of ``answers``. An assertion answer names a place and replaces the
+    open row there, and the stated row keeps the open row's subject, predicate
+    and scope, so it answers exactly what was asked. An answer to a place where
+    the sources disagree is a new row there. An answer an earlier run wrote is
+    written again over the row it wrote, so its quote reads this run's answers
+    Source. Each row written here has the origin ``answer``.
 
     **An attribute answer removes every unscoped row that reaches its
     attribute.** The answer settles the attribute, and such a row left beside it
@@ -386,14 +388,17 @@ def fact_rows(
 
     **A question-kind answer writes a row for each part it answers** (ADR
     0117), about the element it asks of, through :func:`_part_rows`. **An
-    assertion answer or a part row removes each unscoped source row at its
-    place that is open, is set aside, has the answer's identity or disagrees
-    with it**, so
-    the answer settles the fact. A row that can hold beside the answer stays.
-    A ``superseded-by-answer`` issue names each removed row that holds a
-    value.
+    assertion answer or a part row removes each source row at its place, the
+    same subject, predicate and scope, that is open, is set aside, has the
+    answer's identity or disagrees with it**, so the answer settles the fact.
+    A row that can hold beside the answer stays, and so does a row of another
+    scope. A ``superseded-by-answer`` issue names each removed row that holds
+    a value. An assertion answer at an attribute that an
+    attribute answer settles writes nothing, and an ``unmatched-answer`` issue
+    names its place.
     """
     replaced: dict[str, Assertion] = {}
+    placed: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
     attributes = {
         attribute_place(answer.key): (answer, span)
@@ -456,44 +461,83 @@ def fact_rows(
                 )
             )
             continue
-        replaced[assertion_id(row)] = Assertion.model_validate(
+        if row.value == UNKNOWN or answered(row):
+            replaced[assertion_id(row)] = Assertion.model_validate(
+                {
+                    **dict(row),
+                    "value": answer.value,
+                    "basis": "stated",
+                    "origin": "answer",
+                    "reason": None,
+                    "support": [span],
+                }
+            )
+            continue
+        # A side of a disagreement holds a source's value, so the answer is a
+        # new row at the place, and each side at the place goes below with an
+        # issue that names it.
+        placed[assertion] = Assertion(
+            subject=row.subject,
+            predicate=row.predicate,
+            scope=row.scope,
+            value=answer.value,
+            basis="stated",
+            origin="answer",
+            support=[span],
+        )
+
+    # An attribute answer settles every unscoped row at its attribute, so an
+    # assertion answer there writes nothing, and an issue names its place.
+    def at_answered_attribute(row: Assertion) -> bool:
+        return not row.scope and reached(row) in attributes
+
+    issues.extend(
+        CatalogIssue(
+            code="unmatched-answer",
+            message=f"an attribute answer settles the attribute of {place!r}, so"
+            " the answer placed nothing",
+        )
+        for place in sorted(
             {
-                **dict(row),
-                "value": answer.value,
-                "basis": "stated",
-                "origin": "answer",
-                "reason": None,
-                "support": [span],
+                place_identity(row)
+                for row in (*replaced.values(), *placed.values())
+                if at_answered_attribute(row)
             }
         )
-    asked, parts = _part_rows(
-        catalog, model, answers, spans, replaced.values(), attributes.keys()
     )
-    rewritten = {assertion_id(row) for row in replaced.values()}
-    written_here = {
-        **{
-            (row.subject, row.predicate): row
-            for row in replaced.values()
-            if not row.scope
-        },
-        **parts,
+    replaced = {
+        key: row for key, row in replaced.items() if not at_answered_attribute(row)
     }
+    placed = {key: row for key, row in placed.items() if not at_answered_attribute(row)}
+    answer_rows = (*replaced.values(), *placed.values())
+    asked, parts = _part_rows(
+        catalog, model, answers, spans, answer_rows, attributes.keys()
+    )
+    rewritten = {assertion_id(row) for row in answer_rows}
+    written_here = {place_identity(row): row for row in (*answer_rows, *parts.values())}
 
     def answered_over(entry: Assertion) -> bool:
         """An earlier run's part row, or a source row an answer settles now.
 
-        At a place an answer writes, a source row goes where it is open, set
-        aside, the answer's own identity, or where it disagrees with the
-        answer (:func:`~analysis_service.assertions.conflicts`). A row that can
-        hold beside the answer, such as another value of a predicate of many,
-        stays. A row an attribute answer removes is that step's.
+        At the place an answer writes, its subject, predicate and scope
+        (:func:`~analysis_service.assertions.place_identity`), a source row
+        goes where it is open, set aside, the answer's own identity, or where
+        it disagrees with the answer
+        (:func:`~analysis_service.assertions.conflicts`). A row that can hold
+        beside the answer, such as another value of a predicate of many, or a
+        row of a narrower scope, stays. A row an attribute answer removes is
+        that step's.
         """
-        place = (entry.subject, entry.predicate)
-        if entry.scope or assertion_id(entry) in superseded:
+        if assertion_id(entry) in superseded:
             return False
         if answered(entry):
-            return place in asked and assertion_id(entry) not in rewritten
-        written_row = written_here.get(place)
+            place = (entry.subject, entry.predicate)
+            return (
+                not entry.scope
+                and place in asked
+                and assertion_id(entry) not in rewritten
+            )
+        written_row = written_here.get(place_identity(entry))
         if written_row is None or assertion_id(entry) in replaced:
             return False
         return (
@@ -524,6 +568,7 @@ def fact_rows(
             )
             if not answered_over(entry)
         ),
+        *placed.values(),
         *written.values(),
         *parts.values(),
     ]
@@ -567,6 +612,7 @@ def _part_rows(
     }
     asked: set[tuple[str, str]] = set()
     rows: dict[tuple[str, str], Assertion] = {}
+    stated = source_states(model, catalog)
     for fact, span in zip(answers, spans, strict=True):
         element_id = key_ref(fact.key).element_id
         subject_type = graph_subject_type(element_id)
@@ -581,7 +627,7 @@ def _part_rows(
                 value is None
                 or place in answered_places
                 or (element_id, projected_attribute(name, element_id)) in attributes
-                or source_states(model, catalog, element_id, name)
+                or stated(element_id, name)
             ):
                 continue
             rows[place] = Assertion(
