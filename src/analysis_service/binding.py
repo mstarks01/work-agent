@@ -109,6 +109,10 @@ from analysis_service.prompt_cache import (
     cache_write_reporting_llm_class,
 )
 from analysis_service.provider import ExecutedLlm, InProcessExecutor
+from analysis_service.refusal_categories import (
+    refusal_capturing_client_class,
+    refusal_reporting_llm_class,
+)
 from analysis_service.resilience import ResilienceConfig
 from analysis_service.sampling import (
     SamplingConfig,
@@ -430,13 +434,19 @@ def build_tier_adapters(
     # retry loop sits above it in ``ExecutedLlm``, so every attempt it makes
     # passes through the charge layer and the attempt that answered is the one
     # whose figure is carried back.
-    translating = cache_write_reporting_llm_class(charge_reporting_llm_class(LiteLlm))
-    capturing_client = charge_capturing_client_class(LiteLLMClient)
+    translating = cache_write_reporting_llm_class(
+        charge_reporting_llm_class(refusal_reporting_llm_class(LiteLlm))
+    )
+    # The refusal layer is under every tier's client, whatever the vendor. It
+    # reads Anthropic's ``stop_details`` shape, and any other body gives
+    # "refusal category not read" on the error.
+    refusal_client = refusal_capturing_client_class(LiteLLMClient)
+    charge_client = charge_capturing_client_class(refusal_client)
     # The cache layer goes on top of whichever client a tier gets, and only
     # where the vendor row says the tier's model takes the breakpoint.
     marking = {
         client: cache_marking_client_class(client)
-        for client in (capturing_client, LiteLLMClient)
+        for client in (charge_client, refusal_client)
     }
 
     adapters: dict[TierName, ExecutedLlm] = {}
@@ -474,7 +484,7 @@ def build_tier_adapters(
         rungs = rungs_for(vendor, selection.model, tier_sampling, source)
         require_sdk(selection.vendor)
         charged = vendor.reports_charge or not vendor.routes_to_one_provider
-        client_cls = capturing_client if charged else LiteLLMClient
+        client_cls = charge_client if charged else refusal_client
         if vendor.caches_prompt_prefix(selection.model):
             client_cls = marking[client_cls]
 

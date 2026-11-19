@@ -2397,6 +2397,12 @@ def test_the_silent_causes_are_spelled_once():
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "the refusal category a response body states": _OneReader(
+        lambda node: isinstance(node, ast.Constant) and node.value == "stop_details",
+        ("src/analysis_service/refusal_categories.py", "refusal_category_of"),
+        {},
+        "src/",
+    ),
     "whether a refused quote may take the source's span": _OneReader(
         lambda node: _calls(node, "repair_prepared"),
         ("src/analysis_service/grounding.py", "faithful_repair"),
