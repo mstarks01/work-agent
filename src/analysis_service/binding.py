@@ -438,8 +438,8 @@ def build_tier_adapters(
         charge_reporting_llm_class(refusal_reporting_llm_class(LiteLlm))
     )
     # The refusal layer is under every tier's client, whatever the vendor. It
-    # reads Anthropic's ``stop_details`` shape, and any other body gives "not
-    # stated" on the error.
+    # reads Anthropic's ``stop_details`` shape, and any other body gives
+    # "refusal category not read" on the error.
     refusal_client = refusal_capturing_client_class(LiteLLMClient)
     charge_client = charge_capturing_client_class(refusal_client)
     # The cache layer goes on top of whichever client a tier gets, and only
