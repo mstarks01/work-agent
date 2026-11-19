@@ -1,9 +1,10 @@
 """Summarize the scorecard and loss outputs of QA-2026-11-19-01, one run.
 
-Usage: ``python3 -I summary.py <out-dir>``. The directory holds the
+Usage: ``PYTHONPATH=. python summary.py <out-dir>``. The directory holds the
 ``card-<case>.json`` files that ``run.py scorecard --out`` writes and the
 ``score-<case>.json`` files that ``run.py score --out`` writes, one of each
-for each case artifact of the run.
+for each case artifact of the run. It imports the status and cause sets from
+``evals.harness``, so it runs with the checkout on ``PYTHONPATH``.
 """
 
 from __future__ import annotations
@@ -13,18 +14,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-STATUSES = ("matched", "missed", "incompatible", "uncaptured")
-CAUSES = (
-    "verb",
-    "position",
-    "unstated",
-    "merged",
-    "misfiled",
-    "critic",
-    "fan-in",
-    "place",
-    "unled",
-)
+from evals.harness.losses import CAUSES
+from evals.harness.scorecard import STATUSES
 
 
 def _load(out: Path, prefix: str) -> dict[str, dict]:
