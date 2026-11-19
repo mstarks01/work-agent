@@ -543,7 +543,9 @@ def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
     """A refusal names no reason, so its fragment is written beside the state."""
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
-        raise RefusedCompletionError("analyze_stride_spoofing: refused", "S-01 frag")
+        raise RefusedCompletionError(
+            "analyze_stride_spoofing: refused", "S-01 frag", None
+        )
 
     monkeypatch.setattr(fan_in_module, "join_drafts", refuse)
 

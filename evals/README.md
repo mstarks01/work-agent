@@ -433,7 +433,10 @@ at a place can be read against the leads it had.
 A case that fails inside the graph writes `artifact.reports/<case>.failure.json`
 instead of a report. It holds the fault's `repr` under `error`, and under
 `state` every key the graph's nodes wrote before the fault: the drafts, the
-critic's rulings and the marks. The job's source text is not in it. A critic
+critic's rulings and the marks. Where a provider refused at its content
+filter, `error` names the refusal category the provider stated, such as
+`cyber`, or says `refusal category not stated`. The job's source text is not
+in it. A critic
 that fails its gate after its re-ask is a failure of that case only, so the
 sweep records it and runs the next case. `score` and `replay` do not read this
 file.

@@ -26,7 +26,7 @@ the provider side already holds.**
 | --- | --- |
 | out | the route, the turn's contents, the system instruction, the output schema as JSON, the per-call decoding params, the deadline |
 | never out | the credential, the seed, the reasoning effort, the request timeout |
-| back | content parts, the served build, usage, the finish reason, the reported charge, the named upstream |
+| back | content parts, the served build, usage, the finish reason, the refusal category, the reported charge, the named upstream |
 | back, as data | what a failure was — see :func:`~analysis_service.retry.classify` |
 
 The credential is the extreme case of that rule and the reason for it: it is
@@ -77,6 +77,7 @@ from analysis_service.ladder import (
 )
 from analysis_service.offline import refuse_live_inference
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
+from analysis_service.refusals import REFUSAL_CATEGORY_METADATA_KEY
 from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
@@ -253,6 +254,9 @@ class GenerationResult:
     #: ``native``, ``tool`` or ``prompt``, as the executor sent the schema; ``None`` where
     #: the call sent no schema.
     schema_path: SchemaPath | None
+    #: The refusal category the provider stated beside a filter stop, or
+    #: ``None`` where it stated none.
+    refusal_category: str | None
     #: The refusal rule that moved this call down its tier's ladder, or ``None``.
     schema_fallback: SchemaRefusal | None = None
     #: Whether the answer came out of a lone ``answer`` key on the tool path.
@@ -277,6 +281,7 @@ class GenerationResult:
             served_upstream=stamped.get(UPSTREAM_METADATA_KEY),
             cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
             schema_path=stamped.get(SCHEMA_PATH_METADATA_KEY),
+            refusal_category=stamped.get(REFUSAL_CATEGORY_METADATA_KEY),
             schema_fallback=stamped.get(SCHEMA_FALLBACK_METADATA_KEY),
             answer_unwrapped=stamped.get(ANSWER_UNWRAPPED_METADATA_KEY, False),
         )
@@ -315,6 +320,7 @@ class GenerationResult:
             UPSTREAM_METADATA_KEY: self.served_upstream,
             CACHE_WRITE_METADATA_KEY: self.cache_write_tokens,
             SCHEMA_PATH_METADATA_KEY: self.schema_path,
+            REFUSAL_CATEGORY_METADATA_KEY: self.refusal_category,
             SCHEMA_FALLBACK_METADATA_KEY: self.schema_fallback,
             ANSWER_UNWRAPPED_METADATA_KEY: self.answer_unwrapped or None,
         }

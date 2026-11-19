@@ -63,6 +63,7 @@ class _Replies:
                 served_upstream=None,
                 cache_write_tokens=None,
                 schema_path=None,
+                refusal_category=None,
             )
         ]
 

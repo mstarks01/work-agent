@@ -111,6 +111,11 @@ KEPT_DEFAULTS: dict[tuple[str, str, str], str] = {
         "stream",
     ): _ADK_OVERRIDE,
     (
+        "analysis_service.refusals",
+        "refusal_reporting_llm_class.RefusalReportingLlm.generate_content_async",
+        "stream",
+    ): _ADK_OVERRIDE,
+    (
         "analysis_service.provider",
         "ExecutedLlm.generate_content_async",
         "stream",
