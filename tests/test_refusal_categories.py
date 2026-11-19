@@ -39,7 +39,7 @@ def test_a_stated_category_is_kept(category):
         json.dumps({"stop_details": {"type": "refusal", "category": "x" * 41}}),
     ],
 )
-def test_any_other_shape_states_no_category(body):
+def test_any_other_shape_gives_no_category(body):
     assert refusal_category_of(body) is None
 
 

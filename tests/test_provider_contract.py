@@ -453,7 +453,7 @@ class TestTheRefusalCategoryReachesTheError:
         "category",
         [None, "Cyber", "cyber attack", "cyber-1", "x" * 41, "", 7, ["cyber"]],
     )
-    def test_a_null_or_malformed_category_is_not_stated(self, category):
+    def test_a_null_or_malformed_category_gives_no_category(self, category):
         exc = raised_by(
             "anthropic", anthropic_refusal(type="refusal", category=category)
         )
@@ -462,7 +462,7 @@ class TestTheRefusalCategoryReachesTheError:
         assert exc.refusal_category is None
         assert "refusal category not stated" in str(exc)
 
-    def test_a_vendor_that_states_no_category_is_not_stated(self):
+    def test_a_vendor_shape_with_no_category_field_gives_no_category(self):
         """The OpenAI shape has no field for a category."""
         body = completion_body("openai")
         body["choices"][0]["finish_reason"] = "content_filter"

@@ -537,7 +537,7 @@ def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
     assert kind_of(written.name) == "failure"
 
 
-def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
+def test_a_refused_completion_keeps_its_fragment_and_category_in_the_failure_record(
     monkeypatch, case
 ):
     """The service reads at most a category from a refusal, never what the
