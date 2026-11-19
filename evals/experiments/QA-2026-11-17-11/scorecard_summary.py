@@ -80,7 +80,8 @@ def _card_lines(name: str, cards: list[dict]) -> list[str]:
         critic["killed matched references"] += loss["denominator"]
         critic["of them no reported claim took"] += loss["numerator"]
         populations = card["critic"]["populations"]
-        critic["not-real drafts"] += populations["not_real_confirmed"]["denominator"]
+        not_real = populations["not_real_confirmed"]["denominator"]
+        critic["not-real drafts with a verdict"] += not_real
         gaps[populations["not_real_gap"]] += 1
     unknown = set(status) - set(STATUSES)
     if unknown:
