@@ -35,9 +35,12 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import re
 from collections.abc import Mapping
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 #: The ``custom_metadata`` key under which a response carries the refusal
 #: category its provider stated.
@@ -47,7 +50,10 @@ REFUSAL_CATEGORY_METADATA_KEY = "refusal_category"
 #: space, so no token that :data:`_CATEGORY` admits can equal it.
 CATEGORY_NOT_STATED = "not stated"
 
-#: A category as Anthropic spells one: a short lowercase token.
+#: A category as Anthropic spells one: a short lowercase token, such as
+#: ``cyber``, ``bio`` or ``general_harms``. Anthropic's documentation names
+#: categories and states no grammar for them, so this shape is an assumption.
+#: A stated value outside it is logged and reads as not stated.
 _CATEGORY = re.compile(r"[a-z_]{1,40}", re.ASCII)
 
 #: The ``log_event_type`` of the details litellm passes after the provider
@@ -73,6 +79,11 @@ def refusal_category_of(body: str) -> str | None:
     category = details.get("category") if isinstance(details, Mapping) else None
     if isinstance(category, str) and _CATEGORY.fullmatch(category):
         return category
+    if category is not None:
+        logger.warning(
+            "provider stated a refusal category of an unknown shape; reading it"
+            " as not stated"
+        )
     return None
 
 

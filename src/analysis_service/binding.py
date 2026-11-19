@@ -440,12 +440,12 @@ def build_tier_adapters(
     # The refusal layer is under every tier's client, whatever the vendor: a
     # vendor whose body states no category gets "not stated" on the error.
     refusal_client = refusal_capturing_client_class(LiteLLMClient)
-    capturing_client = charge_capturing_client_class(refusal_client)
+    charge_client = charge_capturing_client_class(refusal_client)
     # The cache layer goes on top of whichever client a tier gets, and only
     # where the vendor row says the tier's model takes the breakpoint.
     marking = {
         client: cache_marking_client_class(client)
-        for client in (capturing_client, refusal_client)
+        for client in (charge_client, refusal_client)
     }
 
     adapters: dict[TierName, ExecutedLlm] = {}
@@ -483,7 +483,7 @@ def build_tier_adapters(
         rungs = rungs_for(vendor, selection.model, tier_sampling, source)
         require_sdk(selection.vendor)
         charged = vendor.reports_charge or not vendor.routes_to_one_provider
-        client_cls = capturing_client if charged else refusal_client
+        client_cls = charge_client if charged else refusal_client
         if vendor.caches_prompt_prefix(selection.model):
             client_cls = marking[client_cls]
 

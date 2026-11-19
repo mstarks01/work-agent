@@ -37,3 +37,11 @@ def test_a_stated_category_is_kept():
 )
 def test_any_other_shape_states_no_category(body):
     assert refusal_category_of(body) is None
+
+
+def test_a_category_of_an_unknown_shape_is_logged_without_its_value(caplog):
+    body = json.dumps({"stop_details": {"category": "Cyber-9"}})
+
+    assert refusal_category_of(body) is None
+    assert "unknown shape" in caplog.text
+    assert "Cyber-9" not in caplog.text
