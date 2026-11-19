@@ -472,10 +472,10 @@ class TestTheRefusalCategoryReachesTheError:
         assert exc.category is None
         assert "refusal category not stated" in str(exc)
 
-    def test_the_category_crosses_the_charge_and_cache_layers(self):
-        """A gateway tier's client stacks the charge and cache layers on the
-        refusal layer. The body here is a test shape, not a measured
-        OpenRouter answer: it proves that the stack keeps the category."""
+    def test_the_category_crosses_the_charge_client_layer(self):
+        """A gateway tier's client puts the charge layer on the refusal layer.
+        The body here is a test shape, not a measured OpenRouter answer: it
+        proves that the charge layer keeps the category."""
         body = completion_body("openrouter")
         body["choices"][0]["finish_reason"] = "content_filter"
         body["stop_details"] = {"type": "refusal", "category": "cyber"}

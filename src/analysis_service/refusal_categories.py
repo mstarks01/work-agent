@@ -65,7 +65,7 @@ _CATEGORY = re.compile(r"[a-z_]{1,40}", re.ASCII)
 #: answered. The same ``logger_fn`` also receives the details before the call.
 _POST_CALL = "post_api_call"
 
-_category: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+_stated_category: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "refusal_category", default=None
 )
 
@@ -126,7 +126,7 @@ def refusal_capturing_client_class(client_cls: type) -> type:
                 logger_fn=keep_body,
                 **kwargs,
             )
-            _category.set(refusal_category_of(bodies[-1]) if bodies else None)
+            _stated_category.set(refusal_category_of(bodies[-1]) if bodies else None)
             return response
 
     return RefusalCapturingClient
@@ -144,11 +144,11 @@ def refusal_reporting_llm_class(litellm_cls: type) -> type:
         """One tier's adapter, carrying a refusal category to the error."""
 
         async def generate_content_async(self, llm_request, stream: bool = False):
-            _category.set(None)
+            _stated_category.set(None)
             async for response in super().generate_content_async(llm_request, stream):
-                category = _category.get()
+                category = _stated_category.get()
                 if category is not None:
-                    _category.set(None)
+                    _stated_category.set(None)
                     response.custom_metadata = {
                         **(response.custom_metadata or {}),
                         REFUSAL_CATEGORY_METADATA_KEY: category,
