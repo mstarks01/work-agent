@@ -27,13 +27,13 @@ adapter never see each other's bodies.
 **The category is an open set at the provider.** A token that matches
 :data:`_CATEGORY` is kept as the provider wrote it. An absent, null or
 malformed value is ``None``, which the error states as
-:data:`CATEGORY_NOT_STATED`. The provider's ``explanation`` is prose and is
+:data:`CATEGORY_NOT_READ`. The provider's ``explanation`` is prose and is
 never read.
 
 **Only Anthropic's shape is read.** A body without a top-level
 ``stop_details`` gives ``None``. An OpenAI-shaped body has no category field.
 A Gemini body names a harm category in ``safetyRatings``, and this module does
-not read it, so a Gemini refusal also reads as not stated.
+not read it, so a Gemini refusal also reads as not read.
 """
 
 from __future__ import annotations
@@ -53,12 +53,12 @@ REFUSAL_CATEGORY_METADATA_KEY = "refusal_category"
 
 #: What an error says where the service read no category. It has a
 #: space, so no token that :data:`_CATEGORY` admits can equal it.
-CATEGORY_NOT_STATED = "not stated"
+CATEGORY_NOT_READ = "not read"
 
 #: A category as Anthropic spells one: a short lowercase token, such as
 #: ``cyber``, ``bio`` or ``general_harms``. Anthropic's documentation names
 #: categories and states no grammar for them, so this shape is an assumption.
-#: A stated value outside it is logged and reads as not stated.
+#: A stated value outside it is logged and reads as not read.
 _CATEGORY = re.compile(r"[a-z_]{1,40}", re.ASCII)
 
 #: The ``log_event_type`` of the details litellm passes after the provider
@@ -94,7 +94,7 @@ def refusal_category_of(body: str) -> str | None:
     if category is not None:
         logger.warning(
             "provider stated a refusal category of an unknown shape; reading it"
-            " as not stated"
+            " as not read"
         )
     return None
 

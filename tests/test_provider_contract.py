@@ -442,12 +442,12 @@ class TestTheRefusalCategoryReachesTheError:
         assert REFUSAL_EXPLANATION not in repr(exc)
         assert "FRAGMENT-TEXT" not in repr(exc)
 
-    def test_a_refusal_without_details_states_no_category(self):
+    def test_a_refusal_without_details_gives_no_category(self):
         exc = raised_by("anthropic", anthropic_refusal())
 
         assert isinstance(exc, RefusedCompletionError)
         assert exc.refusal_category is None
-        assert "refusal category not stated" in str(exc)
+        assert "refusal category not read" in str(exc)
 
     @pytest.mark.parametrize(
         "category",
@@ -460,7 +460,7 @@ class TestTheRefusalCategoryReachesTheError:
 
         assert isinstance(exc, RefusedCompletionError)
         assert exc.refusal_category is None
-        assert "refusal category not stated" in str(exc)
+        assert "refusal category not read" in str(exc)
 
     def test_a_vendor_shape_with_no_category_field_gives_no_category(self):
         """The OpenAI shape has no field for a category."""
@@ -471,7 +471,7 @@ class TestTheRefusalCategoryReachesTheError:
 
         assert isinstance(exc, RefusedCompletionError)
         assert exc.refusal_category is None
-        assert "refusal category not stated" in str(exc)
+        assert "refusal category not read" in str(exc)
 
     def test_the_category_crosses_the_charge_client_layer(self):
         """A gateway tier's client puts the charge layer on the refusal layer.

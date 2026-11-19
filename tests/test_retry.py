@@ -837,11 +837,11 @@ class TestAFilterStopIsRefused:
         assert excinfo.value.refusal_category == "bio"
         assert "(finish reason SAFETY, refusal category bio)" in str(excinfo.value)
 
-    def test_an_unstamped_refusal_states_no_category(self):
+    def test_an_unstamped_refusal_gives_no_category(self):
         with pytest.raises(RefusedCompletionError) as excinfo:
             drive(FakeExecutor(outcomes=[refused()]), policy())
         assert excinfo.value.refusal_category is None
-        assert "refusal category not stated" in str(excinfo.value)
+        assert "refusal category not read" in str(excinfo.value)
 
     def test_the_message_names_the_node_from_its_adk_label(self):
         """The service reads at most a category from a refusal, so the node is

@@ -72,7 +72,7 @@ from enum import StrEnum
 
 from analysis_service.ladder import SchemaRefusal, refusal_of
 from analysis_service.refusal_categories import (
-    CATEGORY_NOT_STATED,
+    CATEGORY_NOT_READ,
     REFUSAL_CATEGORY_METADATA_KEY,
 )
 
@@ -187,7 +187,7 @@ class RefusedCompletionError(UnfinishedCompletionError):
 
     ``refusal_category`` is the refusal category the provider stated, such as
     ``cyber``, or ``None`` where the service read none. The message names it, or
-    says it is not stated. :mod:`analysis_service.refusal_categories` parses
+    says it is not read. :mod:`analysis_service.refusal_categories` parses
     it from the response body, and the failure record of an eval case keeps it
     as its own field.
     """
@@ -756,7 +756,8 @@ def _truncation_error(
 #: what makes the error from its message, fragment and refusal category, the
 #: log line, and the error's message. The log line takes the model's name as
 #: its one ``%s``. The message takes it as ``{model}``, and takes the refusal
-#: category, or :data:`~analysis_service.refusal_categories.CATEGORY_NOT_STATED`, as
+#: category, or
+#: :data:`~analysis_service.refusal_categories.CATEGORY_NOT_READ`, as
 #: ``{category}``.
 #:
 #: **Three stops never reach this table.** The pinned litellm maps
@@ -841,5 +842,5 @@ def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None
                 None,
             )
             prefix = f"{node}: " if node else ""
-            text = message.format(model=model, category=category or CATEGORY_NOT_STATED)
+            text = message.format(model=model, category=category or CATEGORY_NOT_READ)
             raise error(prefix + text, fragment, category)
