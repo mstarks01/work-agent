@@ -12,9 +12,9 @@ the script prints:
 - ``places``: the element sets the candidate fires on;
 - ``false leads``: places that share no element with a reference of the
   candidate's lane;
-- ``newly led``: the references of the lane that no shipped rule leads, by the
-  lane-plus-element-overlap test of ``evals/harness/triggers.py``, and that
-  the candidate leads (``*`` marks a must-find);
+- ``newly led``: the references of the lane that no shipped rule leads and
+  that the candidate leads (``*`` marks a must-find). Both read
+  ``evals.harness.triggers.lead_rules``, the lane plus element overlap;
 - ``unled targets``: the newly led references among the 11 ``unled`` losses
   of QA-2026-11-19-01-E2.
 
@@ -26,7 +26,7 @@ the lane it overlaps.
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
 from analysis_service.analysis import (
@@ -35,14 +35,21 @@ from analysis_service.analysis import (
     internet_exposed_elements,
     is_unverified,
 )
-from analysis_service.candidates import generate_candidates
+from analysis_service.candidates import Candidate, CandidateSet, generate_candidates
 from analysis_service.frameworks import package_for
 from analysis_service.system_model import SystemModel
 from evals.harness.bundle import read_report
-from evals.harness.reference import GoldenCase, development_cases, load_corpus
+from evals.harness.reference import (
+    GoldenCase,
+    ReferenceClaim,
+    development_cases,
+    load_corpus,
+)
+from evals.harness.triggers import lead_rules
 
 Place = tuple[str, ...]
 Find = Callable[[SystemModel], Iterator[Place]]
+References = list[tuple[int, ReferenceClaim]]
 
 UNLED_TARGETS = frozenset(
     {
@@ -168,6 +175,29 @@ CANDIDATES: dict[str, tuple[str, Find]] = {
 }
 
 
+def _leads(name: str, lane: str, places: Iterable[Place]) -> CandidateSet:
+    """``places`` as the candidates of one rule, so ``lead_rules`` can read them."""
+    return CandidateSet(
+        lane=lane,
+        candidates=tuple(
+            Candidate(rule_id=name, lane=lane, element_ids=place) for place in places
+        ),
+    )
+
+
+def _led(leads: CandidateSet, references: References) -> References:
+    """The ``references`` that ``leads`` leads, by the overlap of ``lead_rules``."""
+    return [
+        (index, reference)
+        for index, reference in references
+        if lead_rules(leads, reference.affected_element_ids)
+    ]
+
+
+def _star(reference: ReferenceClaim) -> str:
+    return "*" if reference.must_find else ""
+
+
 def _tally(
     case: GoldenCase, model: SystemModel, totals: dict[str, dict[str, list[str]]]
 ) -> None:
@@ -175,7 +205,6 @@ def _tally(
     shipped = generate_candidates(model, package.lanes, package.rules)
     number = case.id[:2]
     for name, (lane, find) in CANDIDATES.items():
-        led = [set(candidate.element_ids) for candidate in shipped[lane].candidates]
         references = [
             (index, reference)
             for index, reference in enumerate(case.references["stride"])
@@ -187,20 +216,13 @@ def _tally(
         )
         for place in places:
             row["places"].append(number)
-            overlaps = (
-                set(place) & set(reference.affected_element_ids)
-                for _, reference in references
-            )
-            if not any(overlaps):
+            if not _led(_leads(name, lane, [place]), references):
                 row["false"].append(number)
-        for index, reference in references:
-            elements = set(reference.affected_element_ids)
-            already = any(elements & lead for lead in led)
-            reached = any(elements & set(place) for place in places)
-            if already or not reached:
+        already = {index for index, _ in _led(shipped[lane], references)}
+        for index, reference in _led(_leads(name, lane, places), references):
+            if index in already:
                 continue
-            mark = "*" if reference.must_find else ""
-            row["led"].append(f"{number}/{index}{mark}")
+            row["led"].append(f"{number}/{index}{_star(reference)}")
             if (number, index) in UNLED_TARGETS:
                 row["targets"].append(f"{number}/{index}")
 
@@ -229,13 +251,13 @@ def main(corpus: Path, run: Path) -> None:
     _print_totals("run models, 8 cases", run_totals)
     print("== corpus places (references of the lane each place overlaps)")
     for case in cases:
+        references = list(enumerate(case.references["stride"]))
         for name, (lane, find) in CANDIDATES.items():
+            in_lane = [(i, ref) for i, ref in references if ref.lane == lane]
             for place in dict.fromkeys(find(case.model)):
                 hits = [
-                    f"{index}{'*' if reference.must_find else ''}"
-                    for index, reference in enumerate(case.references["stride"])
-                    if reference.lane == lane
-                    and set(place) & set(reference.affected_element_ids)
+                    f"{index}{_star(reference)}"
+                    for index, reference in _led(_leads(name, lane, [place]), in_lane)
                 ]
                 print(case.id[:2], name, place, "refs:", ",".join(hits) or "-")
 
