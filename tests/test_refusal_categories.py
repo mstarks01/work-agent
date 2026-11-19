@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from analysis_service.refusals import refusal_category_of
+from analysis_service.refusal_categories import refusal_category_of
 
 
 def test_a_stated_category_is_kept():

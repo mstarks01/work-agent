@@ -96,13 +96,8 @@ VALID_ANSWER = valid_model().model_dump_json()
 #: Key-shaped strings that are visibly not keys. Nothing here authenticates: the
 #: transport answers before anything reads one.
 FAKE_KEYS: Mapping[VendorName, dict[str, str]] = {
-    "openai": secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "not-a-real-openai-key"),
-    "openrouter": secret_env(
-        "ANALYSIS_OPENROUTER_API_KEY_FILE", "not-a-real-openrouter-key"
-    ),
-    "anthropic": secret_env(
-        vendor_for("anthropic").api_key_var, "not-a-real-anthropic-key"
-    ),
+    vendor: secret_env(vendor_for(vendor).api_key_var, f"not-a-real-{vendor}-key")
+    for vendor in ("openai", "openrouter", "anthropic")
 }
 
 #: The build the provider says answered, deliberately unlike anything requested.

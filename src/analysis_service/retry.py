@@ -71,7 +71,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from analysis_service.ladder import SchemaRefusal, refusal_of
-from analysis_service.refusals import (
+from analysis_service.refusal_categories import (
     CATEGORY_NOT_STATED,
     REFUSAL_CATEGORY_METADATA_KEY,
 )
@@ -129,8 +129,9 @@ _SAFETY_FINISH_REASON = "SAFETY"
 # ``graph._TRUNCATION_HINT`` because a run can reach truncation from either
 # direction and both want the operator to turn the same knob. It lives in this
 # module for a mechanical reason: ``retry`` imports only ``ladder`` and
-# ``refusals``, which import nothing from the package when they load, so
-# ``graph`` can import *it* without the cycle the other direction would make.
+# ``refusal_categories``, which import nothing from the package when they
+# load, so ``graph`` can import *it* without the cycle the other direction
+# would make.
 TRUNCATION_REMEDY = (
     "Raise max_output_tokens for this node's tier in config/sampling.toml, or"
     " reduce what the node is asked to produce."
@@ -186,7 +187,9 @@ class RefusedCompletionError(UnfinishedCompletionError):
 
     ``category`` is the refusal category the provider stated, such as
     ``cyber``, or ``None`` where it stated none. The message names it, or
-    says it is not stated. :mod:`analysis_service.refusals` reads it.
+    says it is not stated. :mod:`analysis_service.refusal_categories` parses
+    it from the response body, and the failure record of an eval case keeps it
+    as its own field.
     """
 
     def __init__(self, message: str, fragment: str, category: str | None) -> None:
@@ -740,7 +743,7 @@ def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
     return responses
 
 
-def _truncated(
+def _truncation_error(
     message: str, fragment: str, category: str | None
 ) -> TruncatedCompletionError:
     """A truncation error. A stop at the cap states no refusal category."""
@@ -751,7 +754,7 @@ def _truncated(
 #: what makes the error from its message, fragment and refusal category, the
 #: log line, and the error's message. The log line takes the model's name as
 #: its one ``%s``. The message takes it as ``{model}``, and takes the refusal
-#: category, or :data:`~analysis_service.refusals.CATEGORY_NOT_STATED`, as
+#: category, or :data:`~analysis_service.refusal_categories.CATEGORY_NOT_STATED`, as
 #: ``{category}``.
 #:
 #: **Three stops never reach this table.** The pinned litellm maps
@@ -779,7 +782,7 @@ _UNFINISHED: dict[
         ),
     ),
     _MAX_TOKENS_FINISH_REASON: (
-        _truncated,
+        _truncation_error,
         (
             "%s: completion stopped at max_output_tokens with partial output;"
             " failing the node rather than validating a fragment"

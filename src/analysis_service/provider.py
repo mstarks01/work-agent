@@ -77,7 +77,7 @@ from analysis_service.ladder import (
 )
 from analysis_service.offline import refuse_live_inference
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
-from analysis_service.refusals import REFUSAL_CATEGORY_METADATA_KEY
+from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
 from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
@@ -238,7 +238,7 @@ class GenerationRequest:
 class GenerationResult:
     """What one provider call answered, as the facts this service reads.
 
-    The nine ``tests/test_provider_contract.py`` drives, plus the cache-write
+    The ten ``tests/test_provider_contract.py`` drives, plus the cache-write
     count ``tests/test_prompt_cache.py`` drives, minus the attempt count — that one is the retry loop's own, written above this seam
     on the way back out, because an implementation cannot know how many times
     its caller asked.

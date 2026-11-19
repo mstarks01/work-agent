@@ -1104,8 +1104,9 @@ def inject_transport(
     decision rather than the registry's: the OpenAI SDK where the provider is
     OpenAI-compatible and it has an SDK for it, and its own ``AsyncHTTPHandler``
     where it composes the request itself — which is the path every OpenRouter
-    and every Anthropic call takes. The injection therefore has to know which, and a vendor litellm
-    reaches a third way raises here rather than quietly running against nothing.
+    and every Anthropic call takes. The injection therefore has to know which,
+    and a vendor litellm reaches a third way raises here rather than quietly
+    running against nothing.
 
     The seam is the client ADK already exposes for testability, so nothing in
     ``src/`` learns that a test is running, and the kwargs the adapter was built
@@ -1114,9 +1115,10 @@ def inject_transport(
     **The two routes do not carry the same evidence about a credential.** On the
     OpenAI path the SDK client this builds holds a key of its own, and that key
     is what reaches the header, so nothing there says which key the adapter
-    resolved. On the OpenRouter path litellm composes the request itself from
-    the key it resolved, so the header is evidence. One reader for both, in this
-    file, because two copies of this chain would answer that differently.
+    resolved. On the OpenRouter and Anthropic path litellm composes the request
+    itself from the key it resolved, so the header is evidence. One reader for
+    both, in this file, because two copies of this chain would answer that
+    differently.
     """
     # Deferred, and not a style choice: importing ``litellm`` at module level
     # here would sort above ``analysis_service`` and so could pull the library

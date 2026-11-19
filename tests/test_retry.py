@@ -32,7 +32,7 @@ from analysis_service.provider import (
     GenerationResult,
     ProviderCallFailed,
 )
-from analysis_service.refusals import REFUSAL_CATEGORY_METADATA_KEY
+from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
 from analysis_service.retry import (
     _RATE_LIMIT_CLEARS_WITH_TIME,
     _RETRY_AFTER_CEILING_SECONDS,
@@ -844,7 +844,8 @@ class TestAFilterStopIsRefused:
         assert "refusal category not stated" in str(excinfo.value)
 
     def test_the_message_names_the_node_from_its_adk_label(self):
-        """The provider gives no reason, so the node is the first thing to know."""
+        """A provider states at most a category, so the node is the first thing
+        to know."""
         request = LlmRequest(
             contents=_ANY_REQUEST.contents,
             config=types.GenerateContentConfig(

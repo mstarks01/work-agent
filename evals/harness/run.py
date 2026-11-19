@@ -61,7 +61,7 @@ from analysis_service.identity import build_identity
 from analysis_service.model_tiers import ModelTierConfig, TierSelection
 from analysis_service.questions import question_fallback
 from analysis_service.report import NodeRun, TokenUsage
-from analysis_service.retry import UnfinishedCompletionError
+from analysis_service.retry import RefusedCompletionError, UnfinishedCompletionError
 from evals.harness import (
     assembly,
     assertion_use,
@@ -539,6 +539,8 @@ async def _run_mode(
                 }
                 if isinstance(outcome.error, UnfinishedCompletionError):
                     failed_states[case.id]["fragment"] = outcome.error.fragment
+                if isinstance(outcome.error, RefusedCompletionError):
+                    failed_states[case.id]["refusal_category"] = outcome.error.category
             if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
                 # the next case would fail the same way. Stop, but keep what

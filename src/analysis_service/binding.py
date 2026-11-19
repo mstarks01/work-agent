@@ -109,7 +109,7 @@ from analysis_service.prompt_cache import (
     cache_write_reporting_llm_class,
 )
 from analysis_service.provider import ExecutedLlm, InProcessExecutor
-from analysis_service.refusals import (
+from analysis_service.refusal_categories import (
     refusal_capturing_client_class,
     refusal_reporting_llm_class,
 )

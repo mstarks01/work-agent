@@ -540,11 +540,12 @@ def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
 def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
     monkeypatch, case
 ):
-    """A refusal names no reason, so its fragment is written beside the state."""
+    """A refusal states at most a category, never what the filter stopped, so
+    its fragment and its category are written beside the state."""
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
         raise RefusedCompletionError(
-            "analyze_stride_spoofing: refused", "S-01 frag", None
+            "analyze_stride_spoofing: refused", "S-01 frag", "cyber"
         )
 
     monkeypatch.setattr(fan_in_module, "join_drafts", refuse)
@@ -554,6 +555,7 @@ def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
     captured = run.failed_states[case.id]
     assert captured["error"].startswith("RefusedCompletionError(")
     assert captured["fragment"] == "S-01 frag"
+    assert captured["refusal_category"] == "cyber"
 
 
 class TestCasesInFlight:
