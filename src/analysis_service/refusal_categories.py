@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 #: category its provider stated.
 REFUSAL_CATEGORY_METADATA_KEY = "refusal_category"
 
-#: What an error says where the provider stated no valid category. It has a
+#: What an error says where the service read no category. It has a
 #: space, so no token that :data:`_CATEGORY` admits can equal it.
 CATEGORY_NOT_STATED = "not stated"
 

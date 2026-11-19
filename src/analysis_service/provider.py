@@ -255,7 +255,7 @@ class GenerationResult:
     #: the call sent no schema.
     schema_path: SchemaPath | None
     #: The refusal category the provider stated beside a filter stop, or
-    #: ``None`` where it stated none.
+    #: ``None`` where the service read none.
     refusal_category: str | None
     #: The refusal rule that moved this call down its tier's ladder, or ``None``.
     schema_fallback: SchemaRefusal | None = None

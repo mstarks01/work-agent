@@ -186,7 +186,7 @@ class RefusedCompletionError(UnfinishedCompletionError):
     retryable, for the reason :class:`TruncatedCompletionError` gives.
 
     ``refusal_category`` is the refusal category the provider stated, such as
-    ``cyber``, or ``None`` where it stated none. The message names it, or
+    ``cyber``, or ``None`` where the service read none. The message names it, or
     says it is not stated. :mod:`analysis_service.refusal_categories` parses
     it from the response body, and the failure record of an eval case keeps it
     as its own field.
