@@ -512,7 +512,10 @@ def _drop_zone(subject: str) -> Callable[[dict[str, Any]], None]:
 
 
 def test_a_verb_row_with_its_place_facts_sent_reads_n_of_n(tmp_path):
-    """The unchanged fixture that the negative fixture below edits."""
+    """The capture with no change: each place fact reaches the lane.
+
+    The test below drops one.
+    """
     row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE)))
 
     assert row.place_facts.traces
