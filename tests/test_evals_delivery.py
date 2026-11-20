@@ -626,8 +626,10 @@ def test_a_capture_with_no_shared_model_leaves_the_leads_traced(tmp_path):
     assert row.lane.comparison is not None
     assert row.place_facts.traces
     for fact in row.place_facts.traces:
-        assert fact.stages["lane evidence catalog"].state == "unavailable"
-        assert "no shared system_model" in fact.stages["lane evidence catalog"].reason
+        model = fact.stages["lane system model"]
+        assert model.state == "unavailable"
+        assert "no shared system_model" in model.reason
+        assert "system_model" not in fact.stages["lane evidence catalog"].reason
 
 
 def _case_facts(report, shared, projections=None):
@@ -659,7 +661,7 @@ def test_the_evidence_stage_reads_the_key_the_catalog_filed_the_row_under(
     report, table, state
 ):
     """The table keys the run's own row ID, and a gloss that quotes it is no key."""
-    shared = SharedInput(elements={}, evidence_catalog=table)
+    shared = SharedInput(elements={}, evidence_catalog=table, refused={})
     facts = _case_facts(report, shared)
     catalog = delivery.StageReading("present", "found: assertion:read")
 

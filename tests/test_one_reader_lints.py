@@ -2944,8 +2944,12 @@ ONE_READERS: dict[str, _OneReader] = {
             ("evals/harness/delivery.py", "trace_fact"): (
                 "it asks whether the signed rows settle a graph field, to say"
                 " whether a lane can read a place fact there, and chooses no"
-                " row; a field offered reads as carrying a row reads present"
-                " there, which tests/test_evals_delivery.py holds"
+                " row. Where offered reads a field as carrying a signed row,"
+                " field_reading reads that field present, and"
+                " test_a_field_offered_reads_as_carrying_a_row_reads_present"
+                " in tests/test_evals_delivery.py holds the pair. The other way"
+                " does not hold by design: two free-text values in one state"
+                " are one fact to a lane, and offered still cites the row"
             ),
         },
         "",

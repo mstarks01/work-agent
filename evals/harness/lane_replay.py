@@ -183,39 +183,52 @@ def captured_lane(
 class SharedInput:
     """The shared keys a case's lanes were sent, as the sweep captured them."""
 
-    #: Each element of the captured ``system_model``, by its ID.
-    elements: Mapping[str, Mapping[str, Any]]
-    evidence_catalog: str
+    #: Each element of the captured ``system_model``, by its ID, or ``None``
+    #: where the key is refused.
+    elements: Mapping[str, Mapping[str, Any]] | None
+    #: The captured ``evidence_catalog`` table, or ``None`` where it is refused.
+    evidence_catalog: str | None
+    #: Why each refused key is refused, by its state key.
+    refused: Mapping[str, str]
 
 
 def captured_shared(material: Mapping[str, Any]) -> SharedInput:
-    """The captured ``system_model`` and ``evidence_catalog`` of a case, or a refusal."""
+    """The captured ``system_model`` and ``evidence_catalog`` of a case, each read apart.
+
+    A key the capture lacks, or a model that is not a JSON object, is refused
+    on its own, and the other key is still read.
+    """
     shared = material.get("shared")
     held = shared if isinstance(shared, Mapping) else {}
-    texts = {
-        key: text
-        for key in (STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG)
-        if isinstance(text := held.get(key), str)
-    }
-    missing = sorted({STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG} - set(texts))
-    if missing:
-        raise EvalRunError(f"the capture holds no shared {', '.join(missing)} text")
-    try:
-        model = json.loads(unfence(texts[STATE_SYSTEM_MODEL]))
-    except json.JSONDecodeError as error:
-        raise EvalRunError(
-            f"the captured system model is not JSON: {error.msg}"
-        ) from error
-    if not isinstance(model, dict):
-        raise EvalRunError("the captured system model holds no JSON object")
-    elements = {
-        element["id"]: element
-        for group in ELEMENT_GROUPS
-        if isinstance(collection := model.get(group), list)
-        for element in collection
-        if isinstance(element, dict) and isinstance(element.get("id"), str)
-    }
-    return SharedInput(elements, texts[STATE_EVIDENCE_CATALOG])
+    refused: dict[str, str] = {}
+    texts: dict[str, str] = {}
+    for key in (STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG):
+        if isinstance(text := held.get(key), str):
+            texts[key] = text
+        else:
+            refused[key] = f"the capture holds no shared {key} text"
+    elements = None
+    if STATE_SYSTEM_MODEL in texts:
+        try:
+            model = json.loads(unfence(texts[STATE_SYSTEM_MODEL]))
+        except json.JSONDecodeError as error:
+            model = None
+            refused[STATE_SYSTEM_MODEL] = (
+                f"the captured system model is not JSON: {error.msg}"
+            )
+        if isinstance(model, dict):
+            elements = {
+                element["id"]: element
+                for group in ELEMENT_GROUPS
+                if isinstance(collection := model.get(group), list)
+                for element in collection
+                if isinstance(element, dict) and isinstance(element.get("id"), str)
+            }
+        else:
+            refused.setdefault(
+                STATE_SYSTEM_MODEL, "the captured system model holds no JSON object"
+            )
+    return SharedInput(elements, texts.get(STATE_EVIDENCE_CATALOG), refused)
 
 
 async def compose(

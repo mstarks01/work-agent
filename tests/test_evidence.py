@@ -538,6 +538,17 @@ class TestRenderCatalog:
         assert catalog_refs(rendered) == set(catalog)
         assert assertion_id(row()) in catalog_refs(rendered)
 
+    def test_a_ref_with_an_escaped_bar_reads_back_whole(self):
+        """``_cell`` escapes a ``|``, and the read undoes it."""
+        ref = "unknown:store:a|b:encryption_at_rest"
+        ground = Ground(
+            kind="unknown-attribute",
+            element_id="store:a|b",
+            attribute="encryption_at_rest",
+        )
+
+        assert catalog_refs(render_catalog({ref: ground}, None)) == {ref}
+
     def test_it_is_not_a_list_an_agent_could_pattern_complete(self):
         rendered = render_catalog(evidence_catalog(valid_model()), assertions=None)
 

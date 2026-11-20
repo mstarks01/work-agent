@@ -32,7 +32,7 @@ from typing import Any, Literal, get_args
 from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
-from evals.harness.delivery import FACT_DELIVERIES, PLACE_STANDINGS, Delivery
+from evals.harness.delivery import FACT_DELIVERIES, PLACE_FACT_SETS, Delivery
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.rates import mean, shown_figure
 from evals.harness.replay import (
@@ -329,7 +329,7 @@ def preparation_panel(result: Delivery) -> Panel:
     same_artifacts = Counter(each.same_lane_artifacts for each in compared)
     delivered = Counter(each.delivered for each in compared)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
-    standings = Counter(row.place_facts.standing for row in result.rows)
+    kinds = Counter(row.place_facts.kind for row in result.rows)
     facts = Counter(
         fact.delivered for row in result.rows for fact in row.place_facts.traces
     )
@@ -365,10 +365,7 @@ def preparation_panel(result: Delivery) -> Panel:
                 1 for lane in lanes if lane.archived_lead_rules
             ),
             **{f"place facts {state}": facts[state] for state in FACT_DELIVERIES},
-            **{
-                f"with place facts {standing}": standings[standing]
-                for standing in PLACE_STANDINGS
-            },
+            **{f"with place facts {kind}": kinds[kind] for kind in PLACE_FACT_SETS},
             "with no control": sum(1 for row in result.rows if row.control is None),
             "re-keyed must-finds outside the population": result.re_keyed,
         },

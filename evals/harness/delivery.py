@@ -86,6 +86,8 @@ from analysis_service.assertions import (
 from analysis_service.candidates import CandidateSet, leads
 from analysis_service.evidence import catalog_refs
 from analysis_service.graph import (
+    STATE_EVIDENCE_CATALOG,
+    STATE_SYSTEM_MODEL,
     LaneArtifact,
     unfence,
 )
@@ -296,8 +298,8 @@ ANSWERING_FATES: frozenset[AnsweredFate] = frozenset(
 
 #: How a reference's place facts stand: the case's facts are not read, the
 #: place holds no signed fact, or each fact is traced.
-PlaceStanding = Literal["unread", "none", "traced"]
-PLACE_STANDINGS: tuple[PlaceStanding, ...] = get_args(PlaceStanding)
+PlaceFactSet = Literal["unread", "empty", "traced"]
+PLACE_FACT_SETS: tuple[PlaceFactSet, ...] = get_args(PlaceFactSet)
 
 #: Why an analysis sweep has no raw extraction to read.
 NO_EXTRACTION = "an analysis sweep seeds the blessed model, so no extraction ran"
@@ -382,15 +384,15 @@ class PlaceFacts:
     unread: str
 
     @property
-    def standing(self) -> PlaceStanding:
+    def kind(self) -> PlaceFactSet:
         if self.unread:
             return "unread"
-        return "traced" if self.traces else "none"
+        return "traced" if self.traces else "empty"
 
     def describe(self) -> str:
-        if self.standing == "unread":
+        if self.kind == "unread":
             return f"place facts unavailable: {self.unread}"
-        if self.standing == "none":
+        if self.kind == "empty":
             return "required facts: undefined"
         delivered = Counter(fact.delivered for fact in self.traces)
         shown = f"place facts delivered {delivered['delivered']} of {len(self.traces)}"
@@ -424,7 +426,7 @@ class CaseFacts:
     #: What each graph attribute the signed rows reach would hold, by element
     #: and attribute.
     projections: Mapping[tuple[str, str], Projection]
-    #: ``None`` where the case's shared keys are not read.
+    #: ``None`` where the case's lanes file is refused.
     shared: SharedInput | None
     #: Why ``shared`` is ``None``, or ``""``.
     unshared: str
@@ -509,6 +511,8 @@ def evidence_reading(
     """
     if facts.shared is None:
         return StageReading("unavailable", facts.unshared)
+    if facts.shared.evidence_catalog is None:
+        return StageReading("unavailable", facts.shared.refused[STATE_EVIDENCE_CATALOG])
     if catalog.state == "absent":
         return StageReading("absent", "no catalog row answers the fact")
     if not produced_own:
@@ -516,6 +520,18 @@ def evidence_reading(
     if produced_own in catalog_refs(facts.shared.evidence_catalog):
         return StageReading("present", f"keys {produced_own}")
     return StageReading("absent", f"no key {produced_own}")
+
+
+def sent_model_reading(
+    entry: Assertion, attribute: str, value: str, facts: CaseFacts
+) -> StageReading:
+    """The lane system model stage: the subject's field in the captured model."""
+    if facts.shared is None:
+        return StageReading("unavailable", facts.unshared)
+    if facts.shared.elements is None:
+        return StageReading("unavailable", facts.shared.refused[STATE_SYSTEM_MODEL])
+    held = facts.shared.elements.get(entry.subject, {}).get(attribute)
+    return field_reading(held, value, entry.predicate)
 
 
 def candidate_reading(
@@ -575,14 +591,8 @@ def trace_fact(
         stages["projected model"] = field_reading(
             getattr(element, attribute, None), projection.value, entry.predicate
         )
-        stages["lane system model"] = (
-            StageReading("unavailable", facts.unshared)
-            if facts.shared is None
-            else field_reading(
-                facts.shared.elements.get(entry.subject, {}).get(attribute),
-                projection.value,
-                entry.predicate,
-            )
+        stages["lane system model"] = sent_model_reading(
+            entry, attribute, projection.value, facts
         )
         stages["candidate facts"] = candidate_reading(
             entry.subject, attribute, projection.value, entry.predicate, sent
@@ -728,7 +738,7 @@ def trace(
     )
 
     # A case's lanes are one file, so a lane the trace refuses refuses its case.
-    # The shared keys are read apart: a refusal there leaves the leads traced.
+    # The shared keys are read apart from the lanes and from each other.
     sent: dict[str, dict[str, SentLane]] = {}
     shared: dict[str, SharedInput] = {}
     untraced: dict[str, str] = {}
@@ -747,10 +757,7 @@ def trace(
             }
         except EvalRunError as error:
             untraced[case] = str(error)
-        try:
-            shared[case] = captured_shared(material)
-        except EvalRunError as error:
-            unshared[case] = str(error)
+        shared[case] = captured_shared(material)
     facts_by_case = {
         case: case_facts(
             by_id[case],
