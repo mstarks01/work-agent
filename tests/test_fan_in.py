@@ -964,7 +964,7 @@ class TestSnapDrafts:
         assert snapped.grounds[0].source_label == "System description"
 
     def test_without_labels_a_quote_is_untouched(self):
-        """The in-process engine carries no sources, so there is nothing to snap."""
+        """A caller with no job passes no sources, so there is nothing to snap."""
         draft = sample_draft(
             grounds=[Ground(kind="quote", text="anything", source_label="Whatever")]
         )

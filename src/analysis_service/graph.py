@@ -2020,9 +2020,10 @@ def merge_drafts(
     read an empty view (:data:`ROUTE_REVIEW`).
 
     ``source_texts`` is ``None`` only where the session state holds no
-    sources, which no job's state does: :func:`~analysis_service.execution.seed_state`
-    always writes them. The node function defaults it to an empty map, so the
-    quote check does not run there.
+    sources, which no job's state does, because
+    :func:`~analysis_service.execution.seed_state` always writes them. This
+    function reads ``None`` as an empty map, so the quote check does not run
+    there.
 
     An agent that emitted **nothing** fails the job here, before any of that. A
     framework's lanes are what make its output that framework's method rather
