@@ -2,6 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-16
+- **Amended by**: [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md)
 - **Relates to**: map [#1760](https://github.com/mstarks01/work-agent/issues/1760),
   ticket [#1761](https://github.com/mstarks01/work-agent/issues/1761)
 
@@ -46,6 +47,11 @@ the form. It never validates a value.
   which applies the rule of a secret file through `private_fd`. A variable is
   not a secret because its name ends in `_FILE`: `ANALYSIS_TIERS_FILE` and
   `ANALYSIS_DATABASE_CA_FILE` are not secrets.
+
+  > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+  > The `gcs` loader reads its service account key through `read_secret_file`,
+  > which applies the same permission rule and leaves the content rule to the
+  > loader.
 - The settings that the store loaders read need a restart, as one group. The
   prefixes come from the store loaders' own tuples, not from a new list.
 - A `PASS_FLAGS` table in `deployment.py` maps each optional-pass variable to

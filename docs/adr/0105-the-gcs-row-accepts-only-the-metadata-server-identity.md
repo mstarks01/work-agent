@@ -5,6 +5,8 @@
 - **Map**: [#1991](https://github.com/mstarks01/work-agent/issues/1991), ticket
   [#1995](https://github.com/mstarks01/work-agent/issues/1995)
 - **Relates to**: [ADR 0103](0103-gcs-uses-its-own-row-on-the-native-client.md)
+- **Amended by**: [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md),
+  which gives the row an `api_key` mode
 
 ## Context
 
@@ -30,8 +32,15 @@ that ADC finds, including a key file and a gcloud user login.
 **The `gcs` row has one credential mode, `iam`, and that mode accepts only a
 credential from the metadata server.**
 
+> **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+> The row also has the `api_key` mode.
+
 - `ANALYSIS_OBJECT_CREDENTIALS` stays required. `api_key` stops the startup,
   and the message says that a key file and an HMAC key are out of scope.
+
+  > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+  > `api_key` reads a service account key file.
+
 - A new module, `gcp_identity`, holds `platform_credentials(setting)`. It calls
   `google.auth.default()` with the scope
   `https://www.googleapis.com/auth/devstorage.read_write`. It refuses each
@@ -62,11 +71,15 @@ credential from the metadata server.**
 
 ## Consequences
 
+> **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+> The `gcs` row has a second mode, `api_key`, and a service account key file
+> runs the row in that mode. The `iam` mode keeps the rules of this ADR.
+
 A developer machine with a gcloud login or a key file cannot run the `gcs`
-row. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS` for the Vertex
-row cannot also run the `gcs` row in the same process. The IAM roles on the
-bucket stay the main access control, and the scope only limits a token that
-leaks.
+row in the `iam` mode. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS`
+for the Vertex row cannot also run the `gcs` row in the `iam` mode in the same
+process. The IAM roles on the bucket stay the main access control, and the
+scope only limits a token that leaks.
 
 Google's Knative docs show that the metadata token path accepts a `scopes`
 parameter. Nobody has checked that Cloud Run, GKE Workload Identity and GCE

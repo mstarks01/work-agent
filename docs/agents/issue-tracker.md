@@ -109,13 +109,14 @@ beside it.
   - One `buckets.get` at the startup refuses versioning, soft delete above 0, a retention policy,
     a default event-based hold and Object Retention Lock. It requires enforced public access
     prevention and uniform bucket-level access (ADR 0104).
-  - The row has one credential mode, `iam`. `gcp_identity` accepts only the metadata server
-    credential, with the `devstorage.read_write` scope. The Vertex row keeps the ADC chain
-    (ADR 0105).
+  - The row has two credential modes. `iam` accepts only the metadata server credential
+    through `gcp_identity`, with the `devstorage.read_write` scope, and the Vertex row keeps
+    the ADC chain (ADR 0105). `api_key` reads one service account key file (ADR 0108).
   - `fake-gcs-server` in the "Server lane" of CI runs the contract suite under a `gcs` mark. The
     bucket state and credential refusals run with no server.
-  - The Settings page does not change: the save check runs the row's own `from_env`.
-  - Key files, HMAC keys, Workload Identity Federation, an S3-interop route, a Vertex identity
+  - The save check of the Settings page runs the row's own `from_env`. The page shows the
+    key field only in the `api_key` mode.
+  - HMAC keys, Workload Identity Federation, an S3-interop route, a Vertex identity
     check, Cloud SQL IAM authentication and Azure Blob Storage are out of scope.
 
 - [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a Settings page in the

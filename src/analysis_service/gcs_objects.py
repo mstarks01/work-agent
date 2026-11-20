@@ -20,8 +20,14 @@ The client errors this module handles, and what each one becomes:
   turns each into a :class:`StoreConfigError`, so the startup stops. The 403
   message names the permission and the role that the row needs.
 * **A metadata server that does not answer** while the client reads the
-  universe domain of the credential. :meth:`GcsObjectStore.from_env` turns
-  the ``GoogleAuthError`` into a :class:`StoreConfigError`.
+  universe domain of the credential, **or a metadata server credential of
+  another universe domain.** :meth:`GcsObjectStore.from_env` turns the
+  ``GoogleAuthError`` or the ``ValueError`` into a :class:`StoreConfigError`.
+  ``_service_account`` refuses a key that names another universe domain
+  before the client exists.
+* **A key that cannot sign**, such as an EC key. ``_service_account`` signs
+  one empty message offline, and turns the error into a
+  :class:`StoreConfigError`.
 * **A host that the service cannot reach, or a token it cannot refresh.**
   ``requests`` raises an :class:`OSError`, ``google.auth`` raises a
   ``GoogleAuthError``, and a retry that runs out raises a ``RetryError``.
@@ -36,12 +42,13 @@ credential or the text of a provider's error.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NoReturn
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from google.api_core.exceptions import (
     Forbidden,
     GoogleAPICallError,
@@ -49,14 +56,16 @@ from google.api_core.exceptions import (
     PreconditionFailed,
     RetryError,
 )
-from google.auth.compute_engine import Credentials
+from google.auth.credentials import Credentials
 from google.auth.exceptions import GoogleAuthError
 from google.cloud import storage
+from google.oauth2 import service_account
 
-from analysis_service.gcp_identity import platform_credentials
+from analysis_service.config_files import read_secret_file, refuse_bare_secret
+from analysis_service.gcp_identity import STORAGE_SCOPE, platform_credentials
 from analysis_service.objects import (
+    GCS_KEY_FILE_VAR,
     OBJECT_BUCKET_VAR,
-    OBJECT_CREDENTIALS_VAR,
     credential_mode,
 )
 from analysis_service.store_settings import (
@@ -68,16 +77,22 @@ from analysis_service.vendors import CredentialMode
 #: underscores and dots, with a letter or digit at each end.
 _BUCKET = re.compile(r"[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]")
 
+#: The one universe domain of the store. :data:`ENDPOINT` and
+#: :data:`TOKEN_URI` are hosts in it.
+UNIVERSE_DOMAIN = "googleapis.com"
+
 #: The one host of the store. The client takes it from here, so
 #: ``STORAGE_EMULATOR_HOST`` and ``API_ENDPOINT_OVERRIDE`` cannot move it.
-ENDPOINT = "https://storage.googleapis.com"
+ENDPOINT = f"https://storage.{UNIVERSE_DOMAIN}"
 
 
 def make_client(credentials: Credentials) -> storage.Client:
     """**The one maker of a** ``storage.Client``: the credential that the
     deployment's mode gives, the endpoint :data:`ENDPOINT` and no project.
-    The client reads the universe domain of the credential, which is one
-    request to the metadata server."""
+    The client reads the universe domain of the credential: one request to
+    the metadata server in the ``iam`` mode, or the field of the key in the
+    ``api_key`` mode. A universe domain that is not the one of
+    :data:`ENDPOINT` raises ``ValueError``."""
     return storage.Client(
         project=None,
         credentials=credentials,
@@ -91,18 +106,78 @@ def _platform_identity(env: Mapping[str, str]) -> Credentials:
     return platform_credentials("the iam mode of the gcs object store")
 
 
-def _no_key(env: Mapping[str, str]) -> NoReturn:
-    """``api_key``: the row has no key mode (ADR 0105)."""
-    raise StoreConfigError(
-        "the gcs object store has no api_key mode, because a key file and an"
-        f" HMAC key are out of scope; set {OBJECT_CREDENTIALS_VAR}=iam"
-    )
+#: The most bytes of a key file. A service account key is about 2.4 KB.
+MAX_KEY_BYTES = 16 * 1024
+
+#: The one ``token_uri`` that a key may name. The credential sends its signed
+#: grant to that address.
+TOKEN_URI = f"https://oauth2.{UNIVERSE_DOMAIN}/token"
+
+
+def _service_account(env: Mapping[str, str]) -> Credentials:
+    """``api_key``: the service account key in the file that
+    :data:`~analysis_service.objects.GCS_KEY_FILE_VAR` names (ADR 0108).
+
+    The file passes the permission rule of a secret file. It is UTF-8 JSON of
+    at most :data:`MAX_KEY_BYTES`, and line breaks are allowed. Its ``type``
+    is ``service_account``, because another kind of credential file can name
+    an executable that makes the token. Its ``token_uri`` is :data:`TOKEN_URI`,
+    because the credential sends its grant there, and its ``universe_domain``
+    is absent or :data:`UNIVERSE_DOMAIN`, because each other value, even an
+    empty one, makes the credential sign its own token and skip ``token_uri``.
+    No message repeats the content.
+    """
+    content = read_secret_file(env, GCS_KEY_FILE_VAR, StoreConfigError)
+    if content is None:
+        raise StoreConfigError(
+            f"the api_key mode of the gcs object store needs {GCS_KEY_FILE_VAR};"
+            " it is unset"
+        )
+    if len(content) > MAX_KEY_BYTES:
+        raise StoreConfigError(
+            f"the file that {GCS_KEY_FILE_VAR} names is longer than"
+            f" {MAX_KEY_BYTES:,} bytes"
+        )
+    try:
+        info = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        raise StoreConfigError(
+            f"the file that {GCS_KEY_FILE_VAR} names is not UTF-8 JSON"
+        ) from None
+    if not isinstance(info, dict) or info.get("type") != "service_account":
+        raise StoreConfigError(
+            f"the file that {GCS_KEY_FILE_VAR} names is not a service account"
+            " key; its type must be service_account"
+        )
+    if info.get("token_uri") != TOKEN_URI:
+        raise StoreConfigError(
+            f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
+            f" must have the token_uri {TOKEN_URI}"
+        )
+    if info.get("universe_domain", UNIVERSE_DOMAIN) != UNIVERSE_DOMAIN:
+        raise StoreConfigError(
+            f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
+            f" must have no universe_domain or the universe_domain {UNIVERSE_DOMAIN}"
+        )
+    try:
+        credentials = service_account.Credentials.from_service_account_info(
+            info, scopes=[STORAGE_SCOPE]
+        )
+        # The library loads a key that is not RSA, and it fails only at the
+        # first signature. One offline signature finds that key here.
+        credentials.sign_bytes(b"")
+    except (ValueError, TypeError, UnsupportedAlgorithm) as exc:
+        raise StoreConfigError(
+            f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
+            f" is not usable ({type(exc).__name__})"
+        ) from None
+    return credentials
 
 
 #: The credential of each ``ANALYSIS_OBJECT_CREDENTIALS`` value. The table
 #: answers for every :class:`CredentialMode`.
 CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], Credentials]] = {
-    CredentialMode.API_KEY: _no_key,
+    CredentialMode.API_KEY: _service_account,
     CredentialMode.IAM: _platform_identity,
 }
 
@@ -183,6 +258,7 @@ class GcsObjectStore:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> GcsObjectStore:
+        refuse_bare_secret(env, GCS_KEY_FILE_VAR, StoreConfigError)
         mode = credential_mode(env, "gcs")
         bucket = env.get(OBJECT_BUCKET_VAR, "").strip()
         if not bucket:
@@ -196,6 +272,12 @@ class GcsObjectStore:
             raise StoreConfigError(
                 f"the gcs object store cannot read the universe domain of its"
                 f" credential ({type(error).__name__})"
+            ) from None
+        except ValueError:
+            raise StoreConfigError(
+                "the gcs object store cannot build its client (ValueError); a"
+                f" credential of another universe domain causes this, and the"
+                f" store uses only {ENDPOINT}"
             ) from None
         return cls(client, bucket)
 

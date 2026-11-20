@@ -1630,11 +1630,11 @@ def _reads_a_secret_file(node: ast.AST) -> bool:
 
 
 def test_a_secret_file_has_one_reader():
-    """Each loader of a key or a password asks ``read_secret`` with its own
-    error class, so the mode rule, the newline rule and the secret rule have
-    one reader."""
+    """Each loader of a key or a password asks ``read_secret`` or, for the
+    JSON key of the ``gcs`` row, ``read_secret_file`` with its own error class,
+    so the mode rule of a secret file has one reader."""
     assert _sites(_reads_a_secret_file) == [
-        ("src/analysis_service/config_files.py", "read_secret")
+        ("src/analysis_service/config_files.py", "read_secret_file")
     ]
 
 
@@ -2962,6 +2962,25 @@ ONE_READERS: dict[str, _OneReader] = {
             ),
             ("src/analysis_service/settings_variables.py", "secret_vars"): (
                 "it lists the key files among the settings that hold a secret,"
+                " and refuses nothing"
+            ),
+        },
+        "",
+    ),
+    "a key file of the gcs store": _OneReader(
+        lambda node: _loads(node, "GCS_KEY_FILE_VAR"),
+        ("src/analysis_service/gcs_objects.py", "_service_account"),
+        {
+            ("src/analysis_service/objects.py", MODULE_OWNER): (
+                "the gcs row names the key file as a setting it reads, and as the"
+                " setting that only the api_key mode reads"
+            ),
+            ("src/analysis_service/gcs_objects.py", "from_env"): (
+                "it refuses a key set by its own name beside the key file, and"
+                " leaves the key file in the iam mode to refuse_unread"
+            ),
+            ("src/analysis_service/settings_variables.py", "secret_vars"): (
+                "it lists the key file among the settings that hold a secret,"
                 " and refuses nothing"
             ),
         },
