@@ -41,6 +41,7 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -60,6 +61,7 @@ from analysis_service.graph import (
     FrameworkNodes,
     GraphKeys,
     Lane,
+    LaneArtifact,
     analyze_instruction,
     framework_lane_inputs,
     prepare_analysis,
@@ -124,13 +126,53 @@ def lanes_file(artifact: EvalArtifact, case_id: str) -> Path:
 
 def material_at(path: Path) -> dict[str, Any]:
     """The lane material in one ``<case>.lanes.json``, or a refusal."""
-    material: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        material = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise EvalRunError(f"{path} is not JSON: {error.msg}") from error
+    if not isinstance(material, dict):
+        raise EvalRunError(f"{path} holds no JSON object")
     if material.get("prepared") is None:
         raise EvalRunError(
             f"{path} carries no user turn; a lane's request without the input"
             " prepare handed it is not the request the lane made"
         )
     return material
+
+
+def captured_lane(
+    material: Mapping[str, Any], framework: FrameworkName, lane_name: str
+) -> Mapping[LaneArtifact, str]:
+    """One lane's captured artifacts in ``material``, keyed by placeholder, or a refusal.
+
+    The one reader of a lane's artifacts in a lane capture.
+    The capture holds each :data:`~analysis_service.graph.LANE_ARTIFACTS` key
+    and no other, as :meth:`~analysis_service.graph.Lane.state` requires of
+    what ``prepare`` writes, and each value is text.
+    """
+    lanes = material.get("lanes")
+    framework_lanes = lanes.get(framework) if isinstance(lanes, Mapping) else None
+    held = (
+        framework_lanes.get(lane_name) if isinstance(framework_lanes, Mapping) else None
+    )
+    if not isinstance(held, Mapping):
+        raise EvalRunError(f"the capture holds no {framework} lane {lane_name!r}")
+    try:
+        lane_of(framework, lane_name).state(held)
+    except ValueError as error:
+        raise EvalRunError(
+            f"the {framework} lane {lane_name!r} capture is not a lane's state: {error}"
+        ) from error
+    unrendered = sorted(
+        name for name, text in held.items() if not isinstance(text, str)
+    )
+    if unrendered:
+        raise EvalRunError(
+            f"the {framework} lane {lane_name!r} capture holds"
+            f" {', '.join(unrendered)} as other than text"
+        )
+    artifacts: Mapping[LaneArtifact, str] = held
+    return artifacts
 
 
 async def compose(
@@ -146,10 +188,9 @@ async def compose(
     it, so ``--append`` comes after that.
     """
     lane = lane_of(framework, lane_name)
-    held = material["lanes"][framework][lane_name]
     state = {
         **material["shared"],
-        **{lane.key(name): value for name, value in held.items()},
+        **lane.state(captured_lane(material, framework, lane_name)),
     }
     template = analyze_instruction(
         package_loader, prompt_loader, package_for(framework), lane

@@ -2395,8 +2395,29 @@ def test_the_silent_causes_are_spelled_once():
     ]
 
 
+def _reads_the_lanes_of_a_capture(node: ast.AST) -> bool:
+    """``material["lanes"]`` or ``material.get("lanes")``."""
+    match node:
+        case ast.Subscript(slice=ast.Constant(value="lanes"), ctx=ast.Load()):
+            return True
+    return (
+        _calls(node, "get") and bool(node.args) and _is_constant(node.args[0], "lanes")
+    )
+
+
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "a lane's artifacts in a lane capture": _OneReader(
+        _reads_the_lanes_of_a_capture,
+        ("evals/harness/lane_replay.py", "captured_lane"),
+        {
+            ("evals/harness/lane_replay.py", "fresh_leads"): (
+                "copies the capture's lanes to write one lane's rebuilt"
+                " artifacts into the copy; it reads no lane's artifacts"
+            ),
+        },
+        "evals/harness/",
+    ),
     "the refusal category a response body states": _OneReader(
         lambda node: isinstance(node, ast.Constant) and node.value == "stop_details",
         ("src/analysis_service/refusal_categories.py", "refusal_category_of"),

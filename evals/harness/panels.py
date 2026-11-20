@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, get_args
 
+from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
 from evals.harness.delivery import Delivery
@@ -313,30 +314,46 @@ def preparation_panel(result: Delivery) -> Panel:
     ``rebuilt`` the candidates today's rules write for the archived model. A
     shared element is a structural overlap and not mechanism relevance.
 
-    The path is ``equivalent`` only where every traced lane was captured and
-    today's rules rebuild the same leads, ``known-different`` where a rebuild
-    differs, and ``unverified`` where a lane was not captured.
+    The path is ``known-different`` where a traced lane's captured artifacts
+    differ from the rebuild. The candidates artifact holds the leads, so
+    ``same_leads`` differs only where ``same_lane_artifacts`` differs too.
+    Otherwise it is ``unverified`` and never ``equivalent``: the lane's other
+    inputs have no rebuild from the archive, and the evidence names each of
+    them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
-    capture = Counter(lane.capture for lane in lanes)
-    delivered = Counter(lane.delivered for lane in lanes if lane.delivered is not None)
+    compared = [lane.comparison for lane in lanes if lane.comparison is not None]
+    untraced = len(lanes) - len(compared)
+    same_leads = Counter(each.same_leads for each in compared)
+    same_artifacts = Counter(each.same_lane_artifacts for each in compared)
+    delivered = Counter(each.delivered for each in compared)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
-    fidelity: Fidelity = "unverified"
-    if capture["differs"]:
-        fidelity = "known-different"
-    elif lanes and capture["agrees"] == len(lanes):
-        fidelity = "equivalent"
+    fidelity: Fidelity = (
+        "known-different" if same_artifacts["differs"] else "unverified"
+    )
     evidence = [
         "the delivered candidates are the lane input the archived run sent",
-        "the rebuilt candidates read today's corpus options",
-        *(f"{case}: lane material uncaptured" for case in sorted(result.uncaptured)),
+        "the rebuilt lane artifacts read today's corpus options",
+        "not compared: the case options, which the archive does not record",
+        "not compared: the prepared user turn",
+        "not compared: the lane prompt files at the run's commit",
+        *(f"not compared: the shared key {key}" for key in LANE_SHARED_KEYS),
+        *(
+            f"{case}: lane material untraced: {reason}"
+            for case, reason in sorted(result.untraced.items())
+        ),
     ]
     return Panel(
         node="prepare",
         source=result.run.artifact,
         unit=f"charged must-find miss of cause {' or '.join(sorted(SILENT))}",
         counts={
-            **{f"capture {key}": count for key, count in sorted(capture.items())},
+            **{f"same leads {key}": n for key, n in sorted(same_leads.items())},
+            **{
+                f"same lane artifacts {key}": n
+                for key, n in sorted(same_artifacts.items())
+            },
+            "lane material untraced": untraced,
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
             **{f"rebuilt {key}": count for key, count in sorted(rebuilt.items())},
             "with an archived lead rule": sum(
@@ -344,13 +361,9 @@ def preparation_panel(result: Delivery) -> Panel:
             ),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
-        rates={
-            "lane material captured": Rate(
-                len(lanes) - capture["uncaptured"], len(lanes)
-            )
-        },
+        rates={"lane material traced": Rate(len(compared), len(lanes))},
         means={},
-        unread=capture["uncaptured"],
+        unread=untraced,
         path=ProductionPath(fidelity, tuple(evidence)),
     )
 

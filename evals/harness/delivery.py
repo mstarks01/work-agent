@@ -6,19 +6,31 @@ draft and no proposal sits at the reference's place, and
 This module also reads what the archived lane was sent, and states how the
 closest candidate stands to the reference's place.
 
-For each such row it gives four readings:
+For each such row it gives these readings:
 
 * ``delivered``: the strongest :data:`~evals.harness.losses.Relation` between
   the reference's place and a candidate in the lane's captured
-  ``<case>.lanes.json``, or ``absent``. ``None`` where the sweep captured no
-  lane material.
-* ``rebuilt``: the same reading over the candidates that today's rules write
-  for the archived model and the archived catalog, with the case's options
-  from today's corpus. The archive records no options, so a ``differs`` can
-  come from an options edit as well as from a rule edit.
-* ``capture``: whether the two candidate sets hold the same
-  :func:`~analysis_service.candidates.leads`. A rule's question text is not
-  part of a lead, because a question edit does not move one.
+  ``<case>.lanes.json``, or ``absent``.
+* ``same_leads``: whether the captured and the rebuilt candidate sets hold the
+  same :func:`~analysis_service.candidates.leads`. A lead is a lane, a rule
+  and elements only, so a candidate's facts and a rule's question text are not
+  part of this reading.
+* ``same_lane_artifacts``: whether the lane's captured artifacts (each
+  :data:`~analysis_service.graph.LaneArtifact`) are, byte for byte, the ones
+  that :func:`~evals.harness.triggers.rebuilt_lane_inputs` writes today. A
+  changed fact or question text reads ``differs`` here. The lane's other
+  inputs have no rebuild from the archive, and
+  :func:`~evals.harness.panels.preparation_panel` names each of them.
+
+These three are ``comparison``, which is ``None`` where the sweep captured no
+lane material, or where the capture is refused: a case's reason is in
+``untraced``. The other two readings stand for every traced row:
+
+* ``rebuilt``: the strongest relation over the candidates that today's rules
+  write for the archived model and the archived catalog, with the case's
+  options from today's corpus. The archive records no options, so a captured
+  reading's ``differs`` can come from an options edit as well as from a rule
+  edit.
 * ``archived_lead_rules``: the rules that
   :func:`~evals.harness.triggers.archived_lead_rules` reads as leading to the
   reference, the rule that decides ``place`` against ``unled``. A rule leads
@@ -46,13 +58,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import ValidationError
+
 from analysis_service.candidates import CandidateSet, leads
-from analysis_service.graph import unfence
+from analysis_service.graph import LaneArtifact, unfence
 from analysis_service.report import Report
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
-from evals.harness.lane_replay import lanes_file, material_at
+from evals.harness.lane_replay import captured_lane, lanes_file, material_at
 from evals.harness.losses import RELATIONS, SILENT, Relation, relation
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, flows_by_case
@@ -62,30 +76,54 @@ from evals.harness.scorecard import (
     Scorecard,
     charged_misses,
 )
-from evals.harness.triggers import archived_lead_rules, rebuilt_candidates
+from evals.harness.triggers import archived_lead_rules, rebuilt_lane_inputs
 
 #: How the closest candidate stands to the reference's place, or ``absent``
 #: where no candidate in the lane shares an element with it.
 PlaceRelation = Relation | Literal["absent"]
 
-#: Whether the rebuilt candidates of a lane are the captured ones.
-Capture = Literal["agrees", "differs", "uncaptured"]
+#: Whether a reading of a lane's capture is the same reading of its rebuild.
+Agreement = Literal["agrees", "differs"]
+
+
+@dataclass(frozen=True)
+class LaneComparison:
+    """The readings of a captured lane: what it was sent, against the rebuild."""
+
+    delivered: PlaceRelation
+    same_leads: Agreement
+    same_lane_artifacts: Agreement
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "delivered": self.delivered,
+            "same_leads": self.same_leads,
+            "same_lane_artifacts": self.same_lane_artifacts,
+        }
+
+    def describe(self) -> str:
+        return (
+            f"delivered {self.delivered}, same leads {self.same_leads}, same"
+            f" lane artifacts {self.same_lane_artifacts}"
+        )
 
 
 @dataclass(frozen=True)
 class LaneTrace:
     """One reference's lane, as the archive holds it and as today's rules rebuild it."""
 
-    delivered: PlaceRelation | None
+    #: ``None`` where the sweep captured no lane material for the case, or
+    #: where the trace refused the capture; ``Delivery.untraced`` names why.
+    comparison: LaneComparison | None
     rebuilt: PlaceRelation
-    capture: Capture
     archived_lead_rules: tuple[str, ...]
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "delivered": self.delivered,
+            "comparison": (
+                None if self.comparison is None else self.comparison.to_json()
+            ),
             "rebuilt": self.rebuilt,
-            "capture": self.capture,
             "archived_lead_rules": list(self.archived_lead_rules),
         }
 
@@ -101,36 +139,61 @@ def closest_relation(
     return next((strength for strength in RELATIONS if strength in found), "absent")
 
 
-def sent_candidates(material: Mapping[str, Any], lane: str) -> CandidateSet:
-    """The STRIDE lane's candidates as the sweep sent them, from ``<case>.lanes.json``."""
-    rendered = material["lanes"]["stride"][lane]["candidates"]
-    return CandidateSet.model_validate_json(unfence(rendered))
+@dataclass(frozen=True)
+class SentLane:
+    """One lane's captured artifacts, and the candidates they hold."""
+
+    artifacts: Mapping[LaneArtifact, str]
+    candidates: CandidateSet
+
+
+def sent_lane(material: Mapping[str, Any], lane: str) -> SentLane:
+    """The STRIDE ``lane`` as ``material`` captured it, or a refusal."""
+    artifacts = captured_lane(material, "stride", lane)
+    try:
+        candidates = CandidateSet.model_validate_json(unfence(artifacts["candidates"]))
+    except ValidationError as error:
+        raise EvalRunError(
+            f"the {lane} lane's captured candidates are not a candidate set:"
+            f" {error.error_count()} error(s)"
+        ) from error
+    return SentLane(artifacts, candidates)
+
+
+def _agreement(sent: object, rebuilt: object) -> Agreement:
+    return "agrees" if sent == rebuilt else "differs"
 
 
 def trace_lane(
     reference_ids: Sequence[str],
     lane: str,
     report: Report,
-    sent: CandidateSet | None,
+    sent: SentLane | None,
     flows: CaseFlows,
     options: Mapping[str, object],
 ) -> LaneTrace:
-    """Trace one reference through its lane: ``sent`` is ``None`` where uncaptured.
+    """Trace one reference through its lane: ``sent`` is ``None`` where untraced.
 
-    The rebuild is :func:`~evals.harness.triggers.rebuilt_candidates` over the
-    archived model and catalog with the case's ``options``.
+    The rebuild is
+    :func:`~evals.harness.triggers.rebuilt_lane_inputs` over the archived model
+    and catalog with the case's ``options``.
     """
-    rebuilt = rebuilt_candidates("stride", report, options)[lane]
-    capture: Capture = "uncaptured"
+    inputs = rebuilt_lane_inputs("stride", report, options)
+    rebuilt = inputs.candidates[lane]
+    comparison = None
     if sent is not None:
-        same = leads({lane: sent}) == leads({lane: rebuilt})
-        capture = "agrees" if same else "differs"
+        comparison = LaneComparison(
+            delivered=closest_relation(reference_ids, sent.candidates, flows),
+            same_leads=_agreement(
+                leads({lane: sent.candidates}), leads({lane: rebuilt})
+            ),
+            same_lane_artifacts=_agreement(
+                dict(sent.artifacts), dict(inputs.artifacts[lane])
+            ),
+        )
     return LaneTrace(
-        delivered=None
-        if sent is None
-        else closest_relation(reference_ids, sent, flows),
+        comparison=comparison,
         rebuilt=closest_relation(reference_ids, rebuilt, flows),
-        capture=capture,
         archived_lead_rules=archived_lead_rules(
             rebuilt, reference_ids, stride_block(report).fired_rules
         ),
@@ -163,14 +226,15 @@ class Delivery:
     #: :func:`~evals.harness.scorecard.charged_misses`, and are counted here so
     #: the traced population is read beside them.
     re_keyed: int
-    #: Each case whose lane material the sweep did not capture, and why.
-    uncaptured: Mapping[str, str]
+    #: Each case whose lane material the trace does not read, and why: the
+    #: sweep captured none, or the trace refused the capture.
+    untraced: Mapping[str, str]
 
     def to_json(self) -> dict[str, Any]:
         return {
             "run": self.run.to_json(),
             "re_keyed": self.re_keyed,
-            "uncaptured": dict(self.uncaptured),
+            "untraced": dict(self.untraced),
             "rows": [row.to_json() for row in self.rows],
         }
 
@@ -181,7 +245,8 @@ def trace(
     """Trace each charged miss of ``card`` through the lane material ``artifact`` holds."""
     by_id = {case.id: case for case in cases}
     misses = charged_misses(card.rows)
-    traced_cases = sorted({row.case for row in misses if row.cause in SILENT})
+    silent = [row for row in misses if row.cause in SILENT]
+    traced_cases = sorted({row.case for row in silent})
     reports = {
         case: read_report(_required(finished_file(artifact, case, "report"), case))
         for case in traced_cases
@@ -190,36 +255,41 @@ def trace(
         [by_id[case] for case in traced_cases],
         {case: report.system_model for case, report in reports.items()},
     )
-    material: dict[str, Mapping[str, Any]] = {}
-    uncaptured: dict[str, str] = {}
+
+    # A case's lanes are one file, so a lane the trace refuses refuses its case.
+    sent: dict[str, dict[str, SentLane]] = {}
+    untraced: dict[str, str] = {}
     for case in traced_cases:
         try:
-            material[case] = material_at(lanes_file(artifact, case))
+            material = material_at(lanes_file(artifact, case))
+            sent[case] = {
+                row.lane: sent_lane(material, row.lane)
+                for row in silent
+                if row.case == case
+            }
         except EvalRunError as error:
-            uncaptured[case] = str(error)
-    rows = tuple(
-        DeliveryRow(
-            reference=row,
-            lane=trace_lane(
-                row.elements,
-                row.lane,
-                reports[row.case],
-                sent_candidates(material[row.case], row.lane)
-                if row.case in material
-                else None,
-                flows[row.case],
-                by_id[row.case].declaration("stride").options,
-            )
-            if row.cause in SILENT
-            else None,
+            untraced[case] = str(error)
+    # A row holds a dict, so its case and reference index key it.
+    traces = {
+        (row.case, row.reference_index): trace_lane(
+            row.elements,
+            row.lane,
+            reports[row.case],
+            sent.get(row.case, {}).get(row.lane),
+            flows[row.case],
+            by_id[row.case].declaration("stride").options,
         )
+        for row in silent
+    }
+    rows = tuple(
+        DeliveryRow(reference=row, lane=traces.get((row.case, row.reference_index)))
         for row in misses
     )
     return Delivery(
         run=card.run,
         rows=rows,
         re_keyed=sum(row.compatibility == "re-keyed" for row in card.rows),
-        uncaptured=uncaptured,
+        untraced=untraced,
     )
 
 
@@ -239,16 +309,16 @@ def render(result: Delivery) -> None:
         f" the lane wrote at the place; {result.re_keyed} re-keyed must-find(s)"
         " outside the population"
     )
-    for case, reason in sorted(result.uncaptured.items()):
-        print(f"  lane material uncaptured: {case}: {reason}")
+    for case, reason in sorted(result.untraced.items()):
+        print(f"  lane material untraced: {case}: {reason}")
     for row in traced:
         reference, lane = row.reference, row.lane
         assert lane is not None
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
-            f" {reference.cause} [{reference.compatibility}]: delivered"
-            f" {lane.delivered or '-'}, rebuilt {lane.rebuilt}, capture"
-            f" {lane.capture}; lead rules today"
+            f" {reference.cause} [{reference.compatibility}]:"
+            f" {'untraced' if lane.comparison is None else lane.comparison.describe()},"
+            f" rebuilt {lane.rebuilt}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"
         )

@@ -36,7 +36,7 @@ from evals.harness.ledger import Ledger, cast
 from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
-from evals.harness.triggers import case_trigger_recall, rebuilt_candidates
+from evals.harness.triggers import case_trigger_recall, rebuilt_lane_inputs
 from evals.harness.verbs import same_action
 from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
@@ -114,9 +114,9 @@ def charge(
         flows,
         block,
         proposed=proposed or {},
-        candidates=rebuilt_candidates(
+        candidates=rebuilt_lane_inputs(
             "stride", _report_with(case, []), case.declaration("stride").options
-        ),
+        ).candidates,
     )
 
 
