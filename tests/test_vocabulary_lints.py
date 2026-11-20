@@ -122,6 +122,17 @@ UNIONS = (UnionType, Union)
 #: suppression: the constant still has to stay a subset, which
 #: :func:`test_no_declaration_outlives_its_subset` checks.
 PARTIAL: dict[tuple[str, str], str] = {
+    ("evals.harness.delivery", "ANSWERING_FATES"): (
+        "the replay fates that keep the signed value, which leaves out a wrong"
+        " value and a rescoped row"
+    ),
+    ("evals.harness.delivery", "LANE_INPUT"): (
+        "the stages that are the lane input itself, which a place fact reaches"
+        " after the catalog and the projected model"
+    ),
+    ("evals.harness.delivery", "GRAPH_STAGES"): (
+        "the stages that read a graph field, which a row that reaches none skips"
+    ),
     ("analysis_service.assertions", "_ASKED_SUBJECTS"): (
         "the subject types of the elements an owner is asked about, which are"
         " a component and a flow and never a principal, a credential or a zone"

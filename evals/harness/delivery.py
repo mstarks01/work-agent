@@ -80,6 +80,7 @@ from analysis_service.assertions import (
     assertion_id,
     project,
     projected_attribute,
+    subjects_of,
 )
 from analysis_service.candidates import CandidateSet, leads
 from analysis_service.graph import (
@@ -97,6 +98,7 @@ from evals.harness.losses import RELATIONS, Relation, relation
 from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, flows_by_case
 from evals.harness.replay import (
+    AnsweredFate,
     AssertionReplay,
     SignedReference,
     compares_exactly,
@@ -269,7 +271,9 @@ StageState = Literal["present", "absent", "unavailable"]
 
 #: The replay fates that answer a signed row with its value. ``worded`` and
 #: ``wrong_certainty`` keep the value, and differ in its words or its force.
-ANSWERING_FATES: frozenset[str] = frozenset({"found", "worded", "wrong_certainty"})
+ANSWERING_FATES: frozenset[AnsweredFate] = frozenset(
+    {"found", "worded", "wrong_certainty"}
+)
 
 #: Why an analysis sweep has no raw extraction to read.
 NO_EXTRACTION = "an analysis sweep seeds the blessed model, so no extraction ran"
@@ -312,11 +316,24 @@ class PlaceFactTrace:
 
     @property
     def lost_at(self) -> PlaceStage | None:
-        """The first stage that reads ``absent``, for a fact the lane was not sent."""
+        """Where a fact the lane was not sent was lost.
+
+        The first stage that reads ``absent`` after the last stage, up to the
+        lane input, that reads ``present``. A fact the blessed model carries
+        reaches the lane with no catalog row, so an absent catalog before a
+        present model is not the loss.
+        """
         if self.delivered is not False:
             return None
+        path = PLACE_STAGES[: PLACE_STAGES.index(LANE_INPUT[-1]) + 1]
+        held = [
+            index
+            for index, stage in enumerate(path)
+            if self.stages[stage].state == "present"
+        ]
+        start = held[-1] + 1 if held else 0
         return next(
-            stage for stage in PLACE_STAGES if self.stages[stage].state == "absent"
+            stage for stage in path[start:] if self.stages[stage].state == "absent"
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -372,11 +389,13 @@ class SharedInput:
 def sent_shared(material: Mapping[str, Any]) -> SharedInput:
     """The captured ``system_model`` and ``evidence_catalog`` of a case, or a refusal."""
     shared = material.get("shared")
+    held = shared if isinstance(shared, Mapping) else {}
     texts = {
-        key: shared.get(key) if isinstance(shared, Mapping) else None
+        key: text
         for key in (STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG)
+        if isinstance(text := held.get(key), str)
     }
-    missing = sorted(key for key, text in texts.items() if not isinstance(text, str))
+    missing = sorted({STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG} - set(texts))
     if missing:
         raise EvalRunError(f"the capture holds no shared {', '.join(missing)} text")
     try:
@@ -463,7 +482,8 @@ def holds(held: object, value: str, predicate: str) -> StageReading:
 def _catalog(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
     """The catalog stage, and the produced row's ID where one answers the fact."""
     if facts.replay is None:
-        return StageReading("unavailable", "the report holds no assertion record"), ""
+        # A job that ran no assertion pass kept no catalog to carry the fact.
+        return StageReading("absent", "the report holds no assertion record"), ""
     row = next(row for row in facts.replay.rows if row.reference == fact)
     if row.fate in ANSWERING_FATES:
         return StageReading("present", f"{row.fate}: {row.produced}"), row.produced
@@ -477,8 +497,10 @@ def _evidence(
 ) -> StageReading:
     if shared is None:
         return StageReading("unavailable", untraced)
-    if catalog.state != "present":
-        return StageReading(catalog.state, "no catalog row answers the fact")
+    if catalog.state == "unavailable":
+        return catalog
+    if catalog.state == "absent":
+        return StageReading("absent", "no catalog row answers the fact")
     if not produced:
         return StageReading("unavailable", "the alignment names no produced row")
     if f"`{produced}`" in shared.evidence_catalog:
@@ -527,7 +549,8 @@ def trace_fact(
             GRAPH_STAGES, StageReading("unavailable", "the row reaches no graph field")
         )
     else:
-        alone = AssertionCatalog(entries=[entry], subjects=facts.reference.subjects)
+        labels = {subject.id: subject for subject in facts.reference.subjects}
+        alone = AssertionCatalog(entries=[entry], subjects=subjects_of([entry], labels))
         (projection,) = project(alone)
         model = {
             element.id: element for element in facts.report.system_model.elements()

@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from analysis_service.assertions import AssertionRecord
 from analysis_service.candidates import CandidateSet, generate_candidates
+from analysis_service.evidence import evidence_catalog, prepared_view, render_catalog
 from analysis_service.frameworks import package_for
-from analysis_service.graph import unfence
+from analysis_service.graph import render_model, unfence
 from analysis_service.sources import render_fenced
 from evals.harness import delivery, losses, panels, run
 from evals.harness.artifact import load_artifact
@@ -19,6 +24,7 @@ from evals.harness.lane_replay import captured_lane
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
+from evals.harness.replay import signed_reference
 from evals.harness.scorecard import charged_misses
 from evals.harness.triggers import rebuilt_lane_inputs
 
@@ -237,7 +243,12 @@ def test_an_agreeing_lane_leaves_the_evidence_payload_unverified(
 
 def _one_row(traced: delivery.LaneTrace) -> delivery.Delivery:
     card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
-    row = delivery.DeliveryRow(reference=card.rows[0], lane=traced)
+    row = delivery.DeliveryRow(
+        reference=card.rows[0],
+        lane=traced,
+        facts=delivery.PlaceFacts((), ""),
+        control=None,
+    )
     return delivery.Delivery(run=card.run, rows=(row,), re_keyed=0, untraced={})
 
 
@@ -290,72 +301,99 @@ def _trace(artifact: Path) -> delivery.Delivery:
         run.scorecard_of(artifact, corpus, Ledger()),
         load_artifact(artifact),
         development_cases(load_corpus(corpus)),
+        corpus,
     )
 
 
-def test_each_charged_miss_is_a_row_and_only_place_and_unled_are_traced():
+def test_each_charged_miss_is_a_row_and_a_verb_row_is_traced_too():
+    """A draft at the place does not show that the lane was sent its facts."""
     card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
 
     traced = _trace(BASELINE)
 
     assert [row.reference for row in traced.rows] == list(charged_misses(card.rows))
-    assert {row.reference.cause for row in traced.rows if row.lane is None}.isdisjoint(
-        losses.SILENT
-    )
+    causes = {row.reference.cause for row in traced.rows}
+    assert "verb" in causes and causes - losses.SILENT
     assert all(
-        row.lane is not None
+        row.facts.facts or row.facts.describe() == "required facts: undefined"
         for row in traced.rows
-        if row.reference.cause in losses.SILENT
     )
 
 
 def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
     traced = _trace(BASELINE)
 
-    lanes = [row.lane for row in traced.rows if row.lane is not None]
-    assert lanes
-    assert {lane.comparison for lane in lanes} == {None}
-    assert set(traced.untraced) == {
-        row.reference.case for row in traced.rows if row.lane is not None
+    assert traced.rows
+    assert {row.lane.comparison for row in traced.rows} == {None}
+    assert set(traced.untraced) == {row.reference.case for row in traced.rows}
+    facts = [fact for row in traced.rows for fact in row.facts.facts]
+    assert facts
+    assert {fact.stages["lane system model"].state for fact in facts} <= {"unavailable"}
+    assert {fact.stages["catalog"].reason for fact in facts} == {
+        "the report holds no assertion record"
     }
 
 
 CAPTURED_CASE = "02-iot-fleet-telemetry"
 
 
-def _captured_sweep(tmp_path: Path, extra: dict[str, str]) -> Path:
+def _captured_sweep(
+    tmp_path: Path,
+    extra: dict[str, str],
+    case: str = CAPTURED_CASE,
+    change: Callable[[dict[str, Any]], None] = lambda model: None,
+    signed: bool = False,
+) -> Path:
     """The Baseline with a lane capture of today's rebuild for one case.
 
-    ``extra`` is added to each lane's artifacts.
+    ``extra`` is added to each lane's artifacts, and ``change`` edits the
+    captured system model. ``signed`` gives the case's report the signed
+    reference as its catalog, projected as ``prepare`` projects one.
     """
     shutil.copy(BASELINE, tmp_path / BASELINE.name)
     reports = BASELINE.with_suffix(".reports")
     shutil.copytree(reports, tmp_path / reports.name)
-    report = read_report(reports / f"{CAPTURED_CASE}.report.json")
+    path = tmp_path / reports.name / f"{case}.report.json"
+    report = read_report(path)
     (declared,) = [
-        each
-        for each in load_corpus(REPO_ROOT / "evals/corpus")
-        if each.id == CAPTURED_CASE
+        each for each in load_corpus(REPO_ROOT / "evals/corpus") if each.id == case
     ]
+    held = None
+    model = report.system_model
+    catalog = evidence_catalog(model)
+    if signed:
+        reference = signed_reference(REPO_ROOT / "evals/corpus", declared)
+        assert reference is not None
+        held = reference.catalog
+        model, _, catalog = prepared_view(model, held)
+        report = report.model_copy(
+            update={
+                "system_model": model,
+                "assertions": AssertionRecord(proposed=len(held.entries), catalog=held),
+            }
+        )
+        path.write_text(report.model_dump_json())
     sent = rebuilt_lane_inputs(
         "stride", report, declared.declaration("stride").options
     ).artifacts
+    dumped = model.model_dump(mode="json")
+    change(dumped)
     material = {
         "prepared": {"user": "the input prepare handed the lanes"},
-        "lanes": {"stride": {lane: {**held, **extra} for lane, held in sent.items()}},
+        "shared": {
+            "system_model": render_model(dumped),
+            "evidence_catalog": render_catalog(catalog, held),
+        },
+        "lanes": {"stride": {lane: {**given, **extra} for lane, given in sent.items()}},
     }
-    lanes = tmp_path / reports.name / f"{CAPTURED_CASE}.lanes.json"
+    lanes = tmp_path / reports.name / f"{case}.lanes.json"
     lanes.write_text(json.dumps(material))
     return tmp_path / BASELINE.name
 
 
 def _captured_case_lane(traced: delivery.Delivery) -> delivery.LaneTrace:
     """The one traced lane of :data:`CAPTURED_CASE`."""
-    (lane,) = [
-        row.lane
-        for row in traced.rows
-        if row.reference.case == CAPTURED_CASE and row.lane is not None
-    ]
+    (lane,) = [row.lane for row in traced.rows if row.reference.case == CAPTURED_CASE]
     return lane
 
 
@@ -373,8 +411,8 @@ def test_a_captured_lane_prints_each_reading_once(tmp_path, capsys):
     delivery.render(_trace(_captured_sweep(tmp_path, {})))
 
     assert (
-        ": delivered equal, same leads agrees, same lane artifacts agrees,"
-        " rebuilt equal;" in capsys.readouterr().out
+        ": lead identities delivered equal, same leads agrees, same lane"
+        " artifacts agrees, rebuilt equal;" in capsys.readouterr().out
     )
 
 
@@ -432,3 +470,140 @@ def test_the_re_keyed_must_finds_are_counted_beside_the_rows():
     )
 
     assert _trace(artifact).re_keyed == 12
+
+
+#: A must-find of the Baseline that a draft names at its place: the lane wrote
+#: the target under another action, so the cause is ``verb``.
+VERB_CASE = "12-overclaiming-supplier-portal"
+VERB_INDEX = 17
+
+
+def _verb_row(traced: delivery.Delivery) -> delivery.DeliveryRow:
+    (row,) = [
+        row
+        for row in traced.rows
+        if (row.reference.case, row.reference.reference_index)
+        == (VERB_CASE, VERB_INDEX)
+    ]
+    assert row.reference.cause == "verb"
+    return row
+
+
+def _drop_zone(subject: str) -> Callable[[dict[str, Any]], None]:
+    """Take ``subject``'s ``trust_zone`` out of a dumped model."""
+
+    def change(model: dict[str, Any]) -> None:
+        for collection in model.values():
+            for element in collection if isinstance(collection, list) else ():
+                if isinstance(element, dict) and element.get("id") == subject:
+                    del element["trust_zone"]
+
+    return change
+
+
+def test_a_verb_row_with_its_place_facts_sent_reads_n_of_n(tmp_path):
+    """The control of the negative fixture below: the same capture, unchanged."""
+    row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE)))
+
+    assert row.facts.facts
+    assert {fact.delivered for fact in row.facts.facts} == {True}
+    count = len(row.facts.facts)
+    assert row.facts.describe() == f"place facts delivered {count} of {count}"
+
+
+def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path):
+    """A draft names the target, and the lane was still not sent a fact there."""
+    (tmp_path / "sent").mkdir()
+    (tmp_path / "lost").mkdir()
+    sent = _verb_row(_trace(_captured_sweep(tmp_path / "sent", {}, VERB_CASE)))
+    (zone,) = [f for f in sent.facts.facts if f.predicate == "network-membership"]
+
+    lost = _verb_row(
+        _trace(
+            _captured_sweep(
+                tmp_path / "lost", {}, VERB_CASE, change=_drop_zone(zone.subject)
+            )
+        )
+    )
+
+    (fact,) = [f for f in lost.facts.facts if f.fact == zone.fact]
+    assert fact.delivered is False
+    assert fact.lost_at == "lane system model"
+    assert fact.stages["projected model"].state == "present"
+    others = [f for f in lost.facts.facts if f.fact != zone.fact]
+    assert all(f.delivered for f in others)
+    count = len(lost.facts.facts)
+    assert lost.facts.describe() == (
+        f"place facts delivered {count - 1} of {count} (lost at lane system model)"
+    )
+
+
+def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
+    row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE, signed=True)))
+
+    assert row.facts.facts
+    for fact in row.facts.facts:
+        assert fact.stages["catalog"] == delivery.StageReading(
+            "present", f"found: {fact.fact}"
+        )
+        assert fact.stages["raw extraction"].state == "unavailable"
+        assert fact.delivered is True
+
+
+@pytest.mark.parametrize(
+    ("held", "value", "predicate", "state"),
+    [
+        ("boundary:a", "boundary:a", "network-membership", "present"),
+        ("boundary:b", "boundary:a", "network-membership", "absent"),
+        (None, "boundary:a", "network-membership", "absent"),
+        ("unknown", "TLS", "transport-encryption", "absent"),
+        ("none; plain HTTP", "none", "transport-encryption", "present"),
+        ("HTTP/S", "encrypted", "transport-encryption", "unavailable"),
+    ],
+)
+def test_a_field_states_a_value_exactly_or_by_its_state(held, value, predicate, state):
+    """Two stated free-text values are a reader's question, never a match."""
+    assert delivery.holds(held, value, predicate).state == state
+
+
+def _row(card, **changes):
+    return replace(card.rows[0], **changes)
+
+
+def test_the_control_is_a_matched_row_first_then_an_unstated_row():
+    card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
+    miss = _row(card, reference_index=90, cause="verb")
+    unstated = _row(
+        card, reference_index=91, cause="unstated", compatibility="incompatible"
+    )
+    stages = {stage: True for stage in card.rows[0].stages}
+    matched = _row(
+        card, reference_index=92, cause=None, compatibility="compatible", stages=stages
+    )
+    elsewhere = replace(matched, case="another-case")
+
+    assert delivery.matched_control(miss, [miss, unstated, matched]) == matched
+    assert delivery.matched_control(miss, [miss, unstated]) == unstated
+    assert delivery.matched_control(miss, [miss, elsewhere]) is None
+
+
+def test_a_row_with_no_control_and_no_place_fact_says_so(capsys):
+    traced = _trace(BASELINE)
+    delivery.render(traced)
+    out = capsys.readouterr().out
+
+    assert any(row.control is None for row in traced.rows)
+    assert "    no control\n" in out
+    assert "required facts: undefined" in out
+
+
+def test_a_capture_with_no_shared_model_is_untraced(tmp_path):
+    artifact = _captured_sweep(tmp_path, {})
+    lanes = artifact.with_suffix(".reports") / f"{CAPTURED_CASE}.lanes.json"
+    material = json.loads(lanes.read_text())
+    del material["shared"]["system_model"]
+    lanes.write_text(json.dumps(material))
+
+    traced = _trace(artifact)
+
+    assert "no shared system_model" in traced.untraced[CAPTURED_CASE]

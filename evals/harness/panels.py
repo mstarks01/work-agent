@@ -14,10 +14,10 @@ catalog: ``assert`` reads the signed model, and ``extract`` is the combined
 extraction and assertion head. A combined head's recall is never an
 assertion-only or an extraction-only figure.
 
-**Production path.** Each panel says whether its reading reproduces what a
-job runs today: ``equivalent``, ``known-different`` or ``unverified``, with
-the evidence. A model's archived output is never read as ``equivalent``,
-because the archive does not record every setting a job sends.
+**Production path.** Each panel says how its reading stands to what a job
+runs today: ``known-different`` or ``unverified``, with the evidence. No
+reading shows that it reproduces a job, because the archive does not record
+every setting a job sends.
 """
 
 from __future__ import annotations
@@ -46,7 +46,8 @@ from evals.harness.replay import (
 )
 from evals.harness.scorecard import Rate
 
-Fidelity = Literal["equivalent", "known-different", "unverified"]
+#: How a panel's reading stands to what a job runs today.
+Fidelity = Literal["known-different", "unverified"]
 
 #: The node each panel reads.
 PanelNode = Literal["extract", "capabilities", "assert", "prepare"]
@@ -318,9 +319,8 @@ def preparation_panel(result: Delivery) -> Panel:
     The path is ``known-different`` where a traced lane's captured artifacts
     differ from the rebuild. The candidates artifact holds the leads, so
     ``same_leads`` differs only where ``same_lane_artifacts`` differs too.
-    Otherwise it is ``unverified`` and never ``equivalent``: the lane's other
-    inputs have no rebuild from the archive, and the evidence names each of
-    them.
+    Otherwise it is ``unverified``: the lane's other inputs have no rebuild
+    from the archive, and the evidence names each of them.
     """
     lanes = [row.lane for row in result.rows]
     compared = [lane.comparison for lane in lanes if lane.comparison is not None]
