@@ -127,13 +127,15 @@ class TestAProbeThatCostsNothingFails:
         partial = {name for name, probe in falsify.PROBES.items() if probe.note}
         assert partial == {"identity-and-provenance", "changed-source"}
 
-    def test_only_the_positive_controls_cost_nothing(self) -> None:
-        controls = {name for name, probe in falsify.PROBES.items() if probe.control}
-        assert controls == {"perfect-reading", "valid-inference"}
+    def test_only_the_positive_checks_cost_nothing(self) -> None:
+        positive_checks = {
+            name for name, probe in falsify.PROBES.items() if probe.positive_check
+        }
+        assert positive_checks == {"perfect-reading", "valid-inference"}
 
     def test_every_corruption_costs_some_instrument(self, probed) -> None:
         for name, probe in falsify.PROBES.items():
-            if probe.control:
+            if probe.positive_check:
                 continue
             row = probed[name]
             cost = row.lost or row.refused or row.elements
