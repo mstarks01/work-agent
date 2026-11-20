@@ -92,6 +92,13 @@ def _candidates(sent) -> CandidateSet:
     return CandidateSet.model_validate_json(unfence(sent["candidates"]))
 
 
+def _sent(artifacts) -> delivery.SentLane:
+    """The tampering lane of a capture that holds ``artifacts``."""
+    return delivery.sent_lane(
+        {"lanes": {"stride": {"tampering": dict(artifacts)}}}, "tampering"
+    )
+
+
 def _comparison(traced: delivery.LaneTrace) -> delivery.LaneComparison:
     assert traced.comparison is not None
     return traced.comparison
@@ -131,7 +138,7 @@ def test_a_capture_that_prepare_cannot_write_is_refused(sent, lane, change):
 
 def test_a_capture_the_rebuild_reproduces_agrees(report, sent, flows, options):
     traced = delivery.trace_lane(
-        ("store:message-queue",), "tampering", report, sent, flows, options
+        ("store:message-queue",), "tampering", report, _sent(sent), flows, options
     )
 
     assert _comparison(traced).same_leads == "agrees"
@@ -148,7 +155,7 @@ def test_a_capture_without_a_rebuilt_candidate_differs(
         ("process:background-worker", "store:database"),
         "tampering",
         report,
-        {**sent, "candidates": _rendered(trimmed)},
+        _sent({**sent, "candidates": _rendered(trimmed)}),
         flows,
         options,
     )
@@ -188,7 +195,7 @@ def test_a_changed_candidate_payload_with_the_same_leads_is_not_equivalent(
         ("store:message-queue",),
         "tampering",
         report,
-        {**sent, "candidates": _rendered(changed)},
+        _sent({**sent, "candidates": _rendered(changed)}),
         flows,
         options,
     )
@@ -205,7 +212,7 @@ def test_a_changed_lane_artifact_differs(report, sent, flows, options, artifact)
         ("store:message-queue",),
         "tampering",
         report,
-        {**sent, artifact: sent[artifact] + "\nchanged"},
+        _sent({**sent, artifact: sent[artifact] + "\nchanged"}),
         flows,
         options,
     )
@@ -219,7 +226,7 @@ def test_an_agreeing_lane_leaves_the_evidence_payload_unverified(
 ):
     """The evidence catalog is a shared key, which no rebuild reproduces."""
     traced = delivery.trace_lane(
-        ("store:message-queue",), "tampering", report, sent, flows, options
+        ("store:message-queue",), "tampering", report, _sent(sent), flows, options
     )
     path = panels.preparation_panel(_one_row(traced)).path
 
@@ -379,6 +386,19 @@ def test_a_refused_lane_capture_reads_as_untraced_with_its_reason(
     tmp_path, extra, reason
 ):
     traced = _trace(_captured_sweep(tmp_path, extra))
+
+    assert _captured_case_lane(traced).comparison is None
+    assert reason in traced.untraced[CAPTURED_CASE]
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"), [("not json", "not JSON"), ("[]", "object")]
+)
+def test_a_lanes_file_that_is_not_a_json_object_is_untraced(tmp_path, text, reason):
+    artifact = _captured_sweep(tmp_path, {})
+    (artifact.with_suffix(".reports") / f"{CAPTURED_CASE}.lanes.json").write_text(text)
+
+    traced = _trace(artifact)
 
     assert _captured_case_lane(traced).comparison is None
     assert reason in traced.untraced[CAPTURED_CASE]

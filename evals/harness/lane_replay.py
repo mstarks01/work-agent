@@ -126,7 +126,12 @@ def lanes_file(artifact: EvalArtifact, case_id: str) -> Path:
 
 def material_at(path: Path) -> dict[str, Any]:
     """The lane material in one ``<case>.lanes.json``, or a refusal."""
-    material: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        material = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise EvalRunError(f"{path} is not JSON: {error.msg}") from error
+    if not isinstance(material, dict):
+        raise EvalRunError(f"{path} holds no JSON object")
     if material.get("prepared") is None:
         raise EvalRunError(
             f"{path} carries no user turn; a lane's request without the input"

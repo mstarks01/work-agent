@@ -139,6 +139,27 @@ def closest_relation(
     return next((strength for strength in RELATIONS if strength in found), "absent")
 
 
+@dataclass(frozen=True)
+class SentLane:
+    """One lane's captured artifacts, and the candidates they hold."""
+
+    artifacts: Mapping[LaneArtifact, str]
+    candidates: CandidateSet
+
+
+def sent_lane(material: Mapping[str, Any], lane: str) -> SentLane:
+    """The STRIDE ``lane`` as ``material`` captured it, or a refusal."""
+    artifacts = captured_lane(material, "stride", lane)
+    try:
+        candidates = CandidateSet.model_validate_json(unfence(artifacts["candidates"]))
+    except ValidationError as error:
+        raise EvalRunError(
+            f"the {lane} lane's captured candidates are not a candidate set:"
+            f" {error.error_count()} error(s)"
+        ) from error
+    return SentLane(artifacts, candidates)
+
+
 def _agreement(sent: object, rebuilt: object) -> Agreement:
     return "agrees" if sent == rebuilt else "differs"
 
@@ -147,14 +168,13 @@ def trace_lane(
     reference_ids: Sequence[str],
     lane: str,
     report: Report,
-    sent: Mapping[LaneArtifact, str] | None,
+    sent: SentLane | None,
     flows: CaseFlows,
     options: Mapping[str, object],
 ) -> LaneTrace:
-    """Trace one reference through its lane: ``sent`` is ``None`` where uncaptured.
+    """Trace one reference through its lane: ``sent`` is ``None`` where untraced.
 
-    ``sent`` is :func:`~evals.harness.lane_replay.captured_lane`, which holds
-    a ``candidates`` key. The rebuild is
+    The rebuild is
     :func:`~evals.harness.triggers.rebuilt_lane_inputs` over the archived model
     and catalog with the case's ``options``.
     """
@@ -162,17 +182,14 @@ def trace_lane(
     rebuilt = inputs.candidates[lane]
     comparison = None
     if sent is not None:
-        try:
-            candidates = CandidateSet.model_validate_json(unfence(sent["candidates"]))
-        except ValidationError as error:
-            raise EvalRunError(
-                f"the {lane} lane's captured candidates are not a candidate set:"
-                f" {error.error_count()} error(s)"
-            ) from error
         comparison = LaneComparison(
-            delivered=closest_relation(reference_ids, candidates, flows),
-            same_leads=_agreement(leads({lane: candidates}), leads({lane: rebuilt})),
-            same_lane_artifacts=_agreement(dict(sent), dict(inputs.artifacts[lane])),
+            delivered=closest_relation(reference_ids, sent.candidates, flows),
+            same_leads=_agreement(
+                leads({lane: sent.candidates}), leads({lane: rebuilt})
+            ),
+            same_lane_artifacts=_agreement(
+                dict(sent.artifacts), dict(inputs.artifacts[lane])
+            ),
         )
     return LaneTrace(
         comparison=comparison,
@@ -239,34 +256,31 @@ def trace(
         {case: report.system_model for case, report in reports.items()},
     )
 
-    def traced(row: ReferenceRow, sent: Mapping[LaneArtifact, str] | None) -> LaneTrace:
-        return trace_lane(
-            row.elements,
-            row.lane,
-            reports[row.case],
-            sent,
-            flows[row.case],
-            by_id[row.case].declaration("stride").options,
-        )
-
     # A case's lanes are one file, so a lane the trace refuses refuses its case.
-    # A row holds a dict, so its case and reference index key it.
-    traces: dict[tuple[str, int], LaneTrace] = {}
+    sent: dict[str, dict[str, SentLane]] = {}
     untraced: dict[str, str] = {}
     for case in traced_cases:
-        rows_here = [row for row in silent if row.case == case]
         try:
             material = material_at(lanes_file(artifact, case))
-            here = {
-                (case, row.reference_index): traced(
-                    row, captured_lane(material, "stride", row.lane)
-                )
-                for row in rows_here
+            sent[case] = {
+                row.lane: sent_lane(material, row.lane)
+                for row in silent
+                if row.case == case
             }
         except EvalRunError as error:
             untraced[case] = str(error)
-            here = {(case, row.reference_index): traced(row, None) for row in rows_here}
-        traces.update(here)
+    # A row holds a dict, so its case and reference index key it.
+    traces = {
+        (row.case, row.reference_index): trace_lane(
+            row.elements,
+            row.lane,
+            reports[row.case],
+            sent.get(row.case, {}).get(row.lane),
+            flows[row.case],
+            by_id[row.case].declaration("stride").options,
+        )
+        for row in silent
+    }
     rows = tuple(
         DeliveryRow(reference=row, lane=traces.get((row.case, row.reference_index)))
         for row in misses

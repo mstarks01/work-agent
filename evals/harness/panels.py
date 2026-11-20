@@ -322,11 +322,11 @@ def preparation_panel(result: Delivery) -> Panel:
     them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
-    captured = [lane.comparison for lane in lanes if lane.comparison is not None]
-    untraced = len(lanes) - len(captured)
-    same_leads = Counter(each.same_leads for each in captured)
-    same_artifacts = Counter(each.same_lane_artifacts for each in captured)
-    delivered = Counter(each.delivered for each in captured)
+    compared = [lane.comparison for lane in lanes if lane.comparison is not None]
+    untraced = len(lanes) - len(compared)
+    same_leads = Counter(each.same_leads for each in compared)
+    same_artifacts = Counter(each.same_lane_artifacts for each in compared)
+    delivered = Counter(each.delivered for each in compared)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
     fidelity: Fidelity = (
         "known-different" if same_artifacts["differs"] else "unverified"
@@ -361,7 +361,7 @@ def preparation_panel(result: Delivery) -> Panel:
             ),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
-        rates={"lane material traced": Rate(len(captured), len(lanes))},
+        rates={"lane material traced": Rate(len(compared), len(lanes))},
         means={},
         unread=untraced,
         path=ProductionPath(fidelity, tuple(evidence)),

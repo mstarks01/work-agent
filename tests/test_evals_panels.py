@@ -199,7 +199,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
 
 
 def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
-    """A delivery trace of one row for each captured pair, or ``None`` uncaptured.
+    """A delivery trace of one row for each captured pair, or ``None`` untraced.
 
     A pair is the lane's ``same_leads`` and ``same_lane_artifacts``.
     """
