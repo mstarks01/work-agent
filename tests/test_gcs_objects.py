@@ -19,6 +19,7 @@ from pathlib import Path
 import google.cloud
 import pytest
 import requests
+from cryptography.exceptions import UnsupportedAlgorithm
 from google.api_core.exceptions import Forbidden, NotFound, RetryError
 from google.auth import identity_pool, impersonated_credentials
 from google.auth.exceptions import (
@@ -282,6 +283,24 @@ class TestTheApiKeyMode:
         broken = key_info | {"private_key": "-----BEGIN PRIVATE KEY-----\nhunter2"}
         with pytest.raises(StoreConfigError, match="is not usable") as refused:
             build_object_store(key_env(tmp_path, json.dumps(broken)))
+        assert "hunter2" not in str(refused.value)
+
+    def test_a_key_of_an_unsupported_algorithm_stops_the_startup(
+        self, tmp_path, key_info, monkeypatch
+    ):
+        """``cryptography`` raises ``UnsupportedAlgorithm`` for a key type it
+        cannot load, and that error is not a ``ValueError``."""
+
+        def unsupported(*_, **__):
+            raise UnsupportedAlgorithm("hunter2")
+
+        monkeypatch.setattr(
+            service_account.Credentials, "from_service_account_info", unsupported
+        )
+        with pytest.raises(
+            StoreConfigError, match=r"is not usable \(UnsupportedAlgorithm\)"
+        ) as refused:
+            build_object_store(key_env(tmp_path, json.dumps(key_info)))
         assert "hunter2" not in str(refused.value)
 
     def test_a_key_of_another_universe_stops_the_startup(self, tmp_path, key_info):

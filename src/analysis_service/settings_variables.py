@@ -65,8 +65,8 @@ def secret_vars() -> frozenset[str]:
     through :func:`~analysis_service.config_files.read_secret_file`, which
     applies the permission rule of a secret file. It collects the secret
     credential variables of each vendor and mode, the key files of the ``s3``
-    and ``gcs`` object stores, and the database password file. A ``_FILE`` suffix does not
-    make a secret: ``ANALYSIS_TIERS_FILE`` names a config file, and
+    and ``gcs`` object stores, and the database password file. A ``_FILE``
+    suffix does not make a secret: ``ANALYSIS_TIERS_FILE`` names a config file, and
     ``ANALYSIS_DATABASE_CA_FILE`` names a certificate.
     """
     vendor_secrets = {

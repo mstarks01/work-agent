@@ -43,6 +43,7 @@ from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from google.api_core.exceptions import (
     Forbidden,
     GoogleAPICallError,
@@ -146,7 +147,7 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
         return service_account.Credentials.from_service_account_info(
             info, scopes=[STORAGE_SCOPE]
         )
-    except (ValueError, TypeError, KeyError) as exc:
+    except (ValueError, TypeError, KeyError, UnsupportedAlgorithm) as exc:
         raise StoreConfigError(
             f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
             f" is not usable ({type(exc).__name__})"
