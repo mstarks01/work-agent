@@ -342,7 +342,7 @@ def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():
 
 
 def test_the_fidelity_check_fails_on_material_the_lane_never_had(recorded, case):  # noqa: F811
-    """The negative check for the byte-for-byte test.
+    """The positive check for the byte-for-byte test.
 
     A changed lead is a new request.
     """

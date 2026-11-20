@@ -1706,7 +1706,7 @@ def test_an_unticked_framework_shows_its_options_disabled(page):
     open_frameworks(page)
     level = page.locator('select[data-option="level"]')
     assert not page.is_checked('input[name="framework"][value="asvs"]'), (
-        "a positive check"
+        "a positive check: asvs starts unticked"
     )
     assert level.is_visible()
     assert level.is_disabled()
