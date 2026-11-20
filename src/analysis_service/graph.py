@@ -2015,9 +2015,9 @@ def merge_drafts(
     the agents emitted them and returns one value. This node reads the
     batches out of state, calls it once, parks the drafts, the marks, the
     deferred units, the units a Control row kept from the deferred set and the
-    coverage under this framework's own key, and routes: ``review`` when there is a draft,
-    ``settled`` when there is none, so a critic is never called to read an
-    empty view (:data:`ROUTE_REVIEW`).
+    coverage under this framework's own key, and routes: ``review`` when there
+    is a draft, ``settled`` when there is none, so a critic is never called to
+    read an empty view (:data:`ROUTE_REVIEW`).
 
     ``source_texts`` is ``None`` for the in-process engine, which drives a
     hand-authored model with no job behind it. The node function defaults it,
