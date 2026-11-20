@@ -358,6 +358,15 @@ def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
     assert CAPTURED_CASE not in traced.uncaptured
 
 
+def test_a_captured_lane_prints_each_reading_once(tmp_path, capsys):
+    delivery.render(_trace(_captured_sweep(tmp_path, {})))
+
+    assert (
+        ": delivered equal, same leads agrees, same lane artifacts agrees,"
+        " rebuilt equal;" in capsys.readouterr().out
+    )
+
+
 def test_a_refused_lane_capture_reads_as_uncaptured_with_its_reason(tmp_path):
     traced = _trace(_captured_sweep(tmp_path, {"drafts": "a stray key"}))
 

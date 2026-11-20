@@ -280,7 +280,7 @@ def render(result: Delivery) -> None:
         assert lane is not None
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
-            f" {reference.cause} [{reference.compatibility}]: delivered"
+            f" {reference.cause} [{reference.compatibility}]:"
             f" {_captured(lane.captured)}, rebuilt {lane.rebuilt}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"
