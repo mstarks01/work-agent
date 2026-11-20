@@ -149,10 +149,11 @@ def fan_in(
     ``evals/bench/deterministic.py catalog`` re-derives the two figures.
 
     ``sources`` maps each source's label to its text. Empty means the quote
-    check does not run: the in-process engine drives a hand-authored model with
-    no job behind it, and inventing a set would fail it on a citation that is
-    not wrong. ``ruled_out`` is each unit the package's own rules settled at
-    prepare against the reason; a draft on one is refused here whatever the
+    check does not run: a caller with no job behind it, such as a test that
+    drives a hand-authored model, has no sources, and inventing a set would
+    fail it on a citation that is not wrong. A job always carries sources.
+    ``ruled_out`` is each unit the package's own rules settled at prepare
+    against the reason; a draft on one is refused here whatever the
     agent read in its scope line, because a claim on it would put the same
     unit on the report twice, once as a claim and once as not applicable
     (#443). ``assertions`` is the job's assertion catalog where it ran one:
@@ -432,8 +433,9 @@ def _snapped_ground(
 ) -> Ground:
     """One grounds entry with its branch's reference in canonical spelling."""
     if ground.kind == "quote":
-        # Only when the job carries labels at all: the in-process engine drives a
-        # hand-authored model with none, and an empty known set snaps nothing.
+        # Only when the caller passes labels at all: a caller with no job, such
+        # as a test of a hand-authored model, passes none, and an empty known
+        # set snaps nothing.
         if not labels:
             return ground
         return ground.model_copy(
@@ -944,10 +946,10 @@ def join_drafts(
     of this framework's lanes' drafts, the System Model and the job's sources
     exist together.
 
-    ``sources`` maps each source's label to its text. It is empty for a
-    hand-authored model driven through the in-process engine, because that
-    model has no sources to check against, and an invented set would fail it
-    on a citation that is not wrong. Empty means the text check does not run —
+    ``sources`` maps each source's label to its text. It is empty only for a
+    caller with no job behind it, such as a test that drives a hand-authored
+    model, because that model has no sources to check against, and an
+    invented set would fail it on a citation that is not wrong. Empty means the text check does not run —
     no quote is marked and no claim is dropped on one. ``assertions`` is what
     :func:`fan_in` was handed, so an assertion ground resolves against the
     same catalog the agent selected from.

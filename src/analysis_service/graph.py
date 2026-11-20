@@ -2019,9 +2019,10 @@ def merge_drafts(
     is a draft, ``settled`` when there is none, so a critic is never called to
     read an empty view (:data:`ROUTE_REVIEW`).
 
-    ``source_texts`` is ``None`` for the in-process engine, which drives a
-    hand-authored model with no job behind it. The node function defaults it,
-    so that engine is not failed on a citation that is not wrong.
+    ``source_texts`` is ``None`` only where the session state holds no
+    sources, which no job's state does: :func:`~analysis_service.execution.seed_state`
+    always writes them. The node function defaults it to an empty map, so the
+    quote check does not run there.
 
     An agent that emitted **nothing** fails the job here, before any of that. A
     framework's lanes are what make its output that framework's method rather
