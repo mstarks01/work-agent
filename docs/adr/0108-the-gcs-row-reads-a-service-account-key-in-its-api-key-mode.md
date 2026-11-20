@@ -2,7 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-30
-- **Amends**: [ADR 0105](0105-the-gcs-row-accepts-only-the-metadata-server-identity.md)
+- **Amends**: [ADR 0105](0105-the-gcs-row-accepts-only-the-metadata-server-identity.md),
+  [ADR 0091](0091-the-settings-page-reads-the-loaders-own-rules.md)
 
 ## Context
 
@@ -44,7 +45,9 @@ it accepts no other kind of credential file.**
 - The row reads the file through `read_secret_file`, the one reader of a
   secret file, so the permission rule of a secret file applies. The file is at
   most 16 KiB of UTF-8 JSON, and line breaks are allowed. The JSON must be an
-  object whose `type` is `service_account`. Each other file stops the startup.
+  object whose `type` is `service_account`, and its `token_uri` is
+  `https://oauth2.googleapis.com/token`, because the credential sends its
+  signed grant to that address. Each other file stops the startup.
 - The row builds the credential with
   `service_account.Credentials.from_service_account_info` and the one scope
   `https://www.googleapis.com/auth/devstorage.read_write`, and it gives the
@@ -55,7 +58,9 @@ it accepts no other kind of credential file.**
   does for each secret file.
 - The Settings page shows the key row only in the `api_key` mode of the `gcs`
   row. Its key field writes the key text to a new private file, as it does for
-  the `s3` keys.
+  the `s3` keys. The field takes the key under the rule of each page secret:
+  one line of 4,096 characters or fewer. A browser key field removes the line
+  breaks of a pasted key, and the JSON stays valid.
 
 The `iam` mode keeps the rule of ADR 0105.
 

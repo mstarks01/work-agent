@@ -1177,7 +1177,8 @@ token holds only the scope
   file as Google downloads it. Give the file permissions that only the service
   user can read; the service refuses a file that breaks the
   [permission rule](Configuration.md#file-permissions). The file must be JSON
-  of at most 16 KiB, and its `type` must be `service_account`. Each other kind
+  of at most 16 KiB, its `type` must be `service_account`, and its `token_uri`
+  must be `https://oauth2.googleapis.com/token`. Each other kind
   of credential file stops the startup, because an `external_account` file can
   name a command that the client runs to get a token. This mode does not read
   `GOOGLE_APPLICATION_CREDENTIALS`. No message repeats the content of the file.

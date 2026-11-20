@@ -2967,6 +2967,25 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "",
     ),
+    "a key file of the gcs store": _OneReader(
+        lambda node: _loads(node, "GCS_KEY_FILE_VAR"),
+        ("src/analysis_service/gcs_objects.py", "_service_account"),
+        {
+            ("src/analysis_service/objects.py", MODULE_OWNER): (
+                "the gcs row names the key file as a setting it reads, and as the"
+                " setting that only the api_key mode reads"
+            ),
+            ("src/analysis_service/gcs_objects.py", "from_env"): (
+                "it refuses a key set by its own name beside the key file, and"
+                " leaves the key file in the iam mode to refuse_unread"
+            ),
+            ("src/analysis_service/settings_variables.py", "secret_vars"): (
+                "it lists the key file among the settings that hold a secret,"
+                " and refuses nothing"
+            ),
+        },
+        "",
+    ),
     "a case directory": _OneReader(
         lambda node: _loads(node, "CASE_FILES"),
         ("evals/harness/reference.py", "missing_case_files"),

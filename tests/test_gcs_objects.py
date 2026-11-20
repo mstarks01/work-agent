@@ -21,7 +21,11 @@ import pytest
 import requests
 from google.api_core.exceptions import Forbidden, NotFound, RetryError
 from google.auth import identity_pool, impersonated_credentials
-from google.auth.exceptions import DefaultCredentialsError, RefreshError
+from google.auth.exceptions import (
+    DefaultCredentialsError,
+    GoogleAuthError,
+    RefreshError,
+)
 from google.cloud import storage
 from google.oauth2 import credentials as user_credentials
 from google.oauth2 import service_account
@@ -132,6 +136,18 @@ class TestTheIdentity:
     def test_the_metadata_server_passes_with_the_one_scope(self, env, asked):
         build_object_store(env)
         assert asked == [{"scopes": [STORAGE_SCOPE]}]
+
+    def test_a_universe_domain_it_cannot_read_stops_the_startup(self, env, monkeypatch):
+        """The credential asks the metadata server for its universe domain."""
+
+        def unreachable(credentials):
+            raise GoogleAuthError("metadata server unreachable")
+
+        monkeypatch.setattr("analysis_service.gcs_objects.make_client", unreachable)
+        with pytest.raises(
+            StoreConfigError, match=r"cannot read the universe domain .*GoogleAuthError"
+        ):
+            build_object_store(env)
 
     @pytest.mark.parametrize(
         "kind",
@@ -270,8 +286,24 @@ class TestTheApiKeyMode:
 
     def test_a_key_of_another_universe_stops_the_startup(self, tmp_path, key_info):
         other = key_info | {"universe_domain": "example.com"}
-        with pytest.raises(StoreConfigError, match="cannot use the universe domain"):
+        with pytest.raises(StoreConfigError, match="another universe domain"):
             build_object_store(key_env(tmp_path, json.dumps(other)))
+
+    @pytest.mark.parametrize(
+        "token_uri",
+        [None, "https://hunter2.example/token", "http://oauth2.googleapis.com/token"],
+    )
+    def test_a_key_with_another_token_uri_stops_the_startup(
+        self, tmp_path, key_info, token_uri
+    ):
+        other = {k: v for k, v in key_info.items() if k != "token_uri"}
+        if token_uri is not None:
+            other["token_uri"] = token_uri
+        with pytest.raises(
+            StoreConfigError, match="must have the token_uri"
+        ) as refused:
+            build_object_store(key_env(tmp_path, json.dumps(other)))
+        assert "hunter2" not in str(refused.value)
 
     def test_a_key_that_others_can_read_stops_the_startup(self, tmp_path, key_info):
         with pytest.raises(StoreConfigError, match="lets other users read it"):

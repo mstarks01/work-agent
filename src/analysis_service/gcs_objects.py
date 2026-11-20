@@ -99,6 +99,10 @@ def _platform_identity(env: Mapping[str, str]) -> Credentials:
 #: The most bytes of a key file. A service account key is about 2.4 KB.
 MAX_KEY_BYTES = 16 * 1024
 
+#: The one ``token_uri`` that a key may name. The credential sends its signed
+#: grant to that address.
+TOKEN_URI = "https://oauth2.googleapis.com/token"
+
 
 def _service_account(env: Mapping[str, str]) -> Credentials:
     """``api_key``: the service account key in the file that
@@ -107,7 +111,9 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
     The file passes the permission rule of a secret file. It is UTF-8 JSON of
     at most :data:`MAX_KEY_BYTES`, and line breaks are allowed. Its ``type``
     is ``service_account``, because another kind of credential file can name
-    an executable that makes the token. No message repeats the content.
+    an executable that makes the token. Its ``token_uri`` is :data:`TOKEN_URI`,
+    because the credential sends its grant there. No message repeats the
+    content.
     """
     content = read_secret_file(env, GCS_KEY_FILE_VAR, StoreConfigError)
     if content is None:
@@ -130,6 +136,11 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
         raise StoreConfigError(
             f"the file that {GCS_KEY_FILE_VAR} names is not a service account"
             " key; its type must be service_account"
+        )
+    if info.get("token_uri") != TOKEN_URI:
+        raise StoreConfigError(
+            f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
+            f" must have the token_uri {TOKEN_URI}"
         )
     try:
         return service_account.Credentials.from_service_account_info(
@@ -236,10 +247,16 @@ class GcsObjectStore:
         credentials = CREDENTIALS[mode](env)
         try:
             client = make_client(credentials)
-        except (GoogleAuthError, ValueError) as error:
+        except GoogleAuthError as error:
             raise StoreConfigError(
-                f"the gcs object store cannot use the universe domain of its"
-                f" credential ({type(error).__name__}); it uses only {ENDPOINT}"
+                f"the gcs object store cannot read the universe domain of its"
+                f" credential ({type(error).__name__})"
+            ) from None
+        except ValueError:
+            raise StoreConfigError(
+                "the gcs object store cannot build its client (ValueError); a"
+                f" credential of another universe domain causes this, and the"
+                f" store uses only {ENDPOINT}"
             ) from None
         return cls(client, bucket)
 

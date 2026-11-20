@@ -1144,7 +1144,9 @@ and must have 4,096 characters or fewer. A space, a `\` or a `$` inside a
 secret is allowed. A refusal names the variable and the rule, and never the
 secret. The service account key of `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE`
 is the one exception: it is the JSON file as Google downloads it, with its line
-breaks, and at most 16 KiB.
+breaks, and at most 16 KiB. Its `token_uri` must be
+`https://oauth2.googleapis.com/token`. The Settings page takes the key as one
+line of 4,096 characters or fewer, under the rule of each other secret.
 
 ### Config paths (override where files are read from)
 
