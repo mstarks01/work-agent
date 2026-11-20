@@ -323,10 +323,19 @@ class TestTheApiKeyMode:
             build_object_store(key_env(tmp_path, json.dumps(key_info)))
         assert "hunter2" not in str(refused.value)
 
-    def test_a_key_of_another_universe_stops_the_startup(self, tmp_path, key_info):
-        other = key_info | {"universe_domain": "example.com"}
-        with pytest.raises(StoreConfigError, match="another universe domain"):
+    @pytest.mark.parametrize("universe", ["example.com", "", None, 7])
+    def test_a_key_of_another_universe_stops_the_startup(
+        self, tmp_path, key_info, universe
+    ):
+        """An empty or null domain also makes the credential sign its own
+        token and skip the token_uri."""
+        other = key_info | {"universe_domain": universe}
+        with pytest.raises(StoreConfigError, match="must have no universe_domain"):
             build_object_store(key_env(tmp_path, json.dumps(other)))
+
+    def test_a_key_with_no_universe_domain_passes(self, tmp_path, key_info):
+        other = {k: v for k, v in key_info.items() if k != "universe_domain"}
+        build_object_store(key_env(tmp_path, json.dumps(other)))
 
     @pytest.mark.parametrize(
         "token_uri",

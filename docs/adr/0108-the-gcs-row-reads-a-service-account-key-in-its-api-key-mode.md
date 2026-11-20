@@ -47,7 +47,10 @@ it accepts no other kind of credential file.**
   most 16 KiB of UTF-8 JSON, and line breaks are allowed. The JSON must be an
   object whose `type` is `service_account`, and its `token_uri` is
   `https://oauth2.googleapis.com/token`, because the credential sends its
-  signed grant to that address. Each other file stops the startup.
+  signed grant to that address. Its `universe_domain` is absent or
+  `googleapis.com`: with each other value, even an empty one, the credential
+  signs its own token and does not use `token_uri`. Each other file stops the
+  startup.
 - The row builds the credential with
   `service_account.Credentials.from_service_account_info` and the one scope
   `https://www.googleapis.com/auth/devstorage.read_write`, and it gives the

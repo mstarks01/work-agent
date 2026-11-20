@@ -20,9 +20,11 @@ The client errors this module handles, and what each one becomes:
   turns each into a :class:`StoreConfigError`, so the startup stops. The 403
   message names the permission and the role that the row needs.
 * **A metadata server that does not answer** while the client reads the
-  universe domain of the credential, **or a key that names another universe
-  domain.** :meth:`GcsObjectStore.from_env` turns the ``GoogleAuthError`` or
-  the ``ValueError`` into a :class:`StoreConfigError`.
+  universe domain of the credential, **or a metadata server credential of
+  another universe domain.** :meth:`GcsObjectStore.from_env` turns the
+  ``GoogleAuthError`` or the ``ValueError`` into a :class:`StoreConfigError`.
+  ``_service_account`` refuses a key that names another universe domain
+  before the client exists.
 * **A key that cannot sign**, such as an EC key. ``_service_account`` signs
   one empty message offline, and turns the error into a
   :class:`StoreConfigError`.
@@ -107,6 +109,11 @@ MAX_KEY_BYTES = 16 * 1024
 #: grant to that address.
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
+#: The one ``universe_domain`` that a key may name, the domain of
+#: :data:`ENDPOINT`. A key may leave the field out. With another value, even
+#: an empty one, the credential signs its own token and skips :data:`TOKEN_URI`.
+UNIVERSE_DOMAIN = "googleapis.com"
+
 
 def _service_account(env: Mapping[str, str]) -> Credentials:
     """``api_key``: the service account key in the file that
@@ -116,8 +123,9 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
     at most :data:`MAX_KEY_BYTES`, and line breaks are allowed. Its ``type``
     is ``service_account``, because another kind of credential file can name
     an executable that makes the token. Its ``token_uri`` is :data:`TOKEN_URI`,
-    because the credential sends its grant there. No message repeats the
-    content.
+    because the credential sends its grant there, and its ``universe_domain``
+    is absent or :data:`UNIVERSE_DOMAIN`, because each other value makes the
+    credential skip ``token_uri``. No message repeats the content.
     """
     content = read_secret_file(env, GCS_KEY_FILE_VAR, StoreConfigError)
     if content is None:
@@ -146,6 +154,11 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
             f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
             f" must have the token_uri {TOKEN_URI}"
         )
+    if info.get("universe_domain", UNIVERSE_DOMAIN) != UNIVERSE_DOMAIN:
+        raise StoreConfigError(
+            f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
+            f" must have no universe_domain or the universe_domain {UNIVERSE_DOMAIN}"
+        )
     try:
         credentials = service_account.Credentials.from_service_account_info(
             info, scopes=[STORAGE_SCOPE]
@@ -153,7 +166,7 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
         # The library loads a key that is not RSA, and it fails only at the
         # first signature. One offline signature finds that key here.
         credentials.sign_bytes(b"")
-    except (ValueError, TypeError, KeyError, UnsupportedAlgorithm) as exc:
+    except (ValueError, TypeError, UnsupportedAlgorithm) as exc:
         raise StoreConfigError(
             f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
             f" is not usable ({type(exc).__name__})"
