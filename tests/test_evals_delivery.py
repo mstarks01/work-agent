@@ -93,8 +93,8 @@ def _candidates(sent) -> CandidateSet:
 
 
 def _comparison(traced: delivery.LaneTrace) -> delivery.LaneComparison:
-    assert traced.captured is not None
-    return traced.captured
+    assert traced.comparison is not None
+    return traced.comparison
 
 
 def test_the_captured_candidates_read_back_as_the_lane_was_sent(sent, tampering):
@@ -239,7 +239,7 @@ def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows, options):
         ("store:message-queue",), "tampering", report, None, flows, options
     )
 
-    assert traced.captured is None
+    assert traced.comparison is None
     assert traced.rebuilt == "draft-contains"
 
 
@@ -307,7 +307,7 @@ def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
 
     lanes = [row.lane for row in traced.rows if row.lane is not None]
     assert lanes
-    assert {lane.captured for lane in lanes} == {None}
+    assert {lane.comparison for lane in lanes} == {None}
     assert set(traced.uncaptured) == {
         row.reference.case for row in traced.rows if row.lane is not None
     }
@@ -371,11 +371,17 @@ def test_a_captured_lane_prints_each_reading_once(tmp_path, capsys):
     )
 
 
-def test_a_refused_lane_capture_reads_as_uncaptured_with_its_reason(tmp_path):
-    traced = _trace(_captured_sweep(tmp_path, {"drafts": "a stray key"}))
+@pytest.mark.parametrize(
+    ("extra", "reason"),
+    [({"drafts": "a stray key"}, "drafts"), ({"candidates": "not json"}, "candidate")],
+)
+def test_a_refused_lane_capture_reads_as_uncaptured_with_its_reason(
+    tmp_path, extra, reason
+):
+    traced = _trace(_captured_sweep(tmp_path, extra))
 
-    assert _captured_case_lane(traced).captured is None
-    assert "drafts" in traced.uncaptured[CAPTURED_CASE]
+    assert _captured_case_lane(traced).comparison is None
+    assert reason in traced.uncaptured[CAPTURED_CASE]
 
 
 def test_the_command_writes_the_trace_with_its_record(tmp_path):

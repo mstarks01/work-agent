@@ -22,7 +22,7 @@ For each such row it gives these readings:
   lane templates and the prepared user turn have no rebuild from the archive,
   so this reading does not compare them.
 
-These three are ``captured``, which is ``None`` where the sweep captured no
+These three are ``comparison``, which is ``None`` where the sweep captured no
 lane material, or where the capture is refused: a case's reason is in
 ``uncaptured``. The other two readings stand for every traced row:
 
@@ -57,6 +57,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+
+from pydantic import ValidationError
 
 from analysis_service.candidates import CandidateSet, leads
 from analysis_service.graph import LaneArtifact, unfence
@@ -112,13 +114,15 @@ class LaneTrace:
 
     #: ``None`` where the sweep captured no lane material for the case, or
     #: where the trace refused the capture; ``Delivery.uncaptured`` names why.
-    captured: LaneComparison | None
+    comparison: LaneComparison | None
     rebuilt: PlaceRelation
     archived_lead_rules: tuple[str, ...]
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "captured": None if self.captured is None else self.captured.to_json(),
+            "comparison": (
+                None if self.comparison is None else self.comparison.to_json()
+            ),
             "rebuilt": self.rebuilt,
             "archived_lead_rules": list(self.archived_lead_rules),
         }
@@ -156,16 +160,22 @@ def trace_lane(
     """
     inputs = rebuilt_lane_inputs("stride", report, options)
     rebuilt = inputs.candidates[lane]
-    captured = None
+    comparison = None
     if sent is not None:
-        candidates = CandidateSet.model_validate_json(unfence(sent["candidates"]))
-        captured = LaneComparison(
+        try:
+            candidates = CandidateSet.model_validate_json(unfence(sent["candidates"]))
+        except ValidationError as error:
+            raise EvalRunError(
+                f"the {lane} lane's captured candidates are not a candidate set:"
+                f" {error.error_count()} error(s)"
+            ) from error
+        comparison = LaneComparison(
             delivered=closest_relation(reference_ids, candidates, flows),
             same_leads=_agreement(leads({lane: candidates}), leads({lane: rebuilt})),
             same_lane_artifacts=_agreement(dict(sent), dict(inputs.artifacts[lane])),
         )
     return LaneTrace(
-        captured=captured,
+        comparison=comparison,
         rebuilt=closest_relation(reference_ids, rebuilt, flows),
         archived_lead_rules=archived_lead_rules(
             rebuilt, reference_ids, stride_block(report).fired_rules
@@ -227,32 +237,36 @@ def trace(
         [by_id[case] for case in traced_cases],
         {case: report.system_model for case, report in reports.items()},
     )
-    traced_lanes = {
-        case: {row.lane for row in silent if row.case == case} for case in traced_cases
-    }
-    # A case's lanes are one file, so a lane the trace refuses refuses its case.
-    captured: dict[str, dict[str, Mapping[LaneArtifact, str]]] = {}
-    uncaptured: dict[str, str] = {}
-    for case in traced_cases:
-        try:
-            material = material_at(lanes_file(artifact, case))
-            captured[case] = {
-                lane: captured_lane(material, "stride", lane)
-                for lane in traced_lanes[case]
-            }
-        except EvalRunError as error:
-            uncaptured[case] = str(error)
-    traces = {
-        (row.case, row.reference_index): trace_lane(
+
+    def traced(row: ReferenceRow, sent: Mapping[LaneArtifact, str] | None) -> LaneTrace:
+        return trace_lane(
             row.elements,
             row.lane,
             reports[row.case],
-            captured[row.case][row.lane] if row.case in captured else None,
+            sent,
             flows[row.case],
             by_id[row.case].declaration("stride").options,
         )
-        for row in silent
-    }
+
+    # A case's lanes are one file, so a lane the trace refuses refuses its case.
+    traces: dict[tuple[str, int], LaneTrace] = {}
+    uncaptured: dict[str, str] = {}
+    for case in traced_cases:
+        rows_here = [row for row in silent if row.case == case]
+        try:
+            material = material_at(lanes_file(artifact, case))
+            here = {
+                (row.case, row.reference_index): traced(
+                    row, captured_lane(material, "stride", row.lane)
+                )
+                for row in rows_here
+            }
+        except EvalRunError as error:
+            uncaptured[case] = str(error)
+            here = {
+                (row.case, row.reference_index): traced(row, None) for row in rows_here
+            }
+        traces.update(here)
     rows = tuple(
         DeliveryRow(reference=row, lane=traces.get((row.case, row.reference_index)))
         for row in misses
@@ -289,7 +303,7 @@ def render(result: Delivery) -> None:
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
             f" {reference.cause} [{reference.compatibility}]:"
-            f" {'uncaptured' if lane.captured is None else lane.captured.describe()},"
+            f" {'uncaptured' if lane.comparison is None else lane.comparison.describe()},"
             f" rebuilt {lane.rebuilt}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"

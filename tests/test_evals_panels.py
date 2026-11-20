@@ -189,7 +189,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     assert sum(
         count for name, count in panel.counts.items() if name.startswith("rebuilt ")
     ) == len(lanes)
-    assert panel.unread == sum(lane.captured is None for lane in lanes)
+    assert panel.unread == sum(lane.comparison is None for lane in lanes)
     assert panel.counts["with an archived lead rule"] == sum(
         1 for lane in lanes if lane.archived_lead_rules
     )
@@ -208,7 +208,7 @@ def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
         DeliveryRow(
             reference=reference,
             lane=LaneTrace(
-                captured=None
+                comparison=None
                 if reading is None
                 else LaneComparison(
                     delivered="equal",

@@ -140,6 +140,7 @@ def captured_lane(
 ) -> Mapping[LaneArtifact, str]:
     """One lane's captured artifacts in ``material``, keyed by placeholder, or a refusal.
 
+    The one reader of a lane's artifacts in a lane capture.
     The capture holds each :data:`~analysis_service.graph.LANE_ARTIFACTS` key
     and no other, as :meth:`~analysis_service.graph.Lane.state` requires of
     what ``prepare`` writes, and each value is text.
