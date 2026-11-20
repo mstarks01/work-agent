@@ -14,6 +14,7 @@ from analysis_service.sources import render_fenced
 from evals.harness import delivery, losses, panels, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
+from evals.harness.lane_replay import captured_lane
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.scorecard import charged_misses
@@ -90,7 +91,7 @@ def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
         "lanes": {"stride": {"tampering": {"candidates": _rendered(tampering)}}}
     }
 
-    sent = delivery.sent_input(material, "tampering")
+    sent = captured_lane(material, "stride", "tampering")
 
     assert delivery.sent_candidates(sent) == tampering
 

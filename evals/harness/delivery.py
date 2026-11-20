@@ -59,7 +59,7 @@ from analysis_service.report import Report
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
-from evals.harness.lane_replay import lanes_file, material_at
+from evals.harness.lane_replay import captured_lane, lanes_file, material_at
 from evals.harness.losses import RELATIONS, SILENT, Relation, relation
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, flows_by_case
@@ -110,14 +110,8 @@ def closest_relation(
     return next((strength for strength in RELATIONS if strength in found), "absent")
 
 
-def sent_input(material: Mapping[str, Any], lane: str) -> Mapping[LaneArtifact, str]:
-    """The STRIDE lane's artifacts as the sweep sent them, from ``<case>.lanes.json``."""
-    sent: Mapping[LaneArtifact, str] = material["lanes"]["stride"][lane]
-    return sent
-
-
 def sent_candidates(sent: Mapping[LaneArtifact, str]) -> CandidateSet:
-    """The candidates of one lane's :func:`sent_input`."""
+    """The candidates of one lane's captured artifacts."""
     return CandidateSet.model_validate_json(unfence(sent["candidates"]))
 
 
@@ -227,7 +221,7 @@ def trace(
                 row.elements,
                 row.lane,
                 reports[row.case],
-                sent_input(material[row.case], row.lane)
+                captured_lane(material[row.case], "stride", row.lane)
                 if row.case in material
                 else None,
                 flows[row.case],

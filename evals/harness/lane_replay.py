@@ -41,6 +41,7 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -60,6 +61,7 @@ from analysis_service.graph import (
     FrameworkNodes,
     GraphKeys,
     Lane,
+    LaneArtifact,
     analyze_instruction,
     framework_lane_inputs,
     prepare_analysis,
@@ -133,6 +135,14 @@ def material_at(path: Path) -> dict[str, Any]:
     return material
 
 
+def captured_lane(
+    material: Mapping[str, Any], framework: FrameworkName, lane_name: str
+) -> Mapping[LaneArtifact, str]:
+    """One lane's captured artifacts in ``material``, keyed by placeholder."""
+    held: Mapping[LaneArtifact, str] = material["lanes"][framework][lane_name]
+    return held
+
+
 async def compose(
     material: dict[str, Any],
     framework: FrameworkName,
@@ -146,7 +156,7 @@ async def compose(
     it, so ``--append`` comes after that.
     """
     lane = lane_of(framework, lane_name)
-    held = material["lanes"][framework][lane_name]
+    held = captured_lane(material, framework, lane_name)
     state = {
         **material["shared"],
         **{lane.key(name): value for name, value in held.items()},
