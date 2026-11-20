@@ -1,0 +1,488 @@
+{
+  "record": {
+    "command": "replay",
+    "commit": "60cdbdddc6ebb3db953ec0d65379bfd903e63db4",
+    "clean": false,
+    "table": {
+      "targets": 10,
+      "corpus_digest": "1cf982f5865d1619ed0dceb2863d17a9b6260a75368d9e857d4f1d59b2234f4e"
+    },
+    "inputs": [
+      {
+        "path": "evals/runs/2054-authz/assert-19-r3.json",
+        "sha256": "e7d0342a621c70d6374751cfe874ab98e12e9da844345c1cbb55a10952210bd6",
+        "selections": {}
+      },
+      {
+        "path": "evals/runs/2054-authz/assert-19-r3.reports/19-vet-clinic-records.assertions.json",
+        "sha256": "ea729b4017d464094fb2a7008f3eb1df8f11da4115789961e781f8fb42882e4e",
+        "selections": {}
+      }
+    ]
+  },
+  "arms": [
+    {
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "d2970dbcdec321f92e6662cc733c0e2c9a460d8e63d15f3968f5375f7d821100"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "6ca9d2ce919136425c563082f52eacbeb920495fc2afca6138e8ddc9fc3a70b8",
+        "treatment_by": "rendered_sources"
+      },
+      "extraction": null,
+      "assertions": {
+        "sweeps": 1,
+        "emissions": 1,
+        "fates": {
+          "found": 12,
+          "worded": 1,
+          "wrong_certainty": 0,
+          "wrong_value": 1,
+          "rescoped": 2,
+          "omitted": 8,
+          "silent": 16
+        },
+        "required": 21,
+        "recovered": 11,
+        "found": 12,
+        "relabelled": 0,
+        "basis_overstated": 0,
+        "produced": {
+          "found": 12,
+          "worded": 1,
+          "wrong_certainty": 0,
+          "wrong_value": 1,
+          "rescoped": 2,
+          "misattached": 4,
+          "unreviewed": 11
+        },
+        "rejected": 1,
+        "span_refusals": 1,
+        "rows": 31,
+        "assessed": 0,
+        "targets": [
+          {
+            "row": "19-vet-clinic-records/assertion:authentication-mechanism~flow:entity:clinic-staff>process:clinic-api>manage-records~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "wrong_value": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-grant~principal:clinic-staff~s.f15d7bfd280a~v.aabeeb12b163",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-grant~principal:pet-owners~s.524efd21dd9b~v.df2338eb2b37",
+            "losses": 1,
+            "by_fate": {
+              "rescoped": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-grant~principal:receptionists~s.f920ba234232~v.e04a2a4474bb",
+            "losses": 1,
+            "by_fate": {
+              "rescoped": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-grant~principal:the-apis-database-account~s.ecec8f75a649~v.65ea209c7217",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-scope-checks-each-request~process:lab-results-importer~any~no",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-scope-checks-ownership~process:clinic-api~any~no",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-scope-least-privilege~flow:process:clinic-api>store:records-database>keep-records~any~no",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-scope-least-privilege~flow:process:owner-api>store:records-database>keep-owner-records~any~no",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:authorization-scope-least-privilege~process:billing-service~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "19-vet-clinic-records/assertion:network-membership~entity:clinic-staff~any~boundary:clinic-network",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "sweeps": [
+    {
+      "artifact": "assert-19-r3.json",
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "d2970dbcdec321f92e6662cc733c0e2c9a460d8e63d15f3968f5375f7d821100"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "6ca9d2ce919136425c563082f52eacbeb920495fc2afca6138e8ddc9fc3a70b8",
+        "treatment_by": "rendered_sources"
+      },
+      "repo_commit": {
+        "commit": "60cdbdddc6ebb3db953ec0d65379bfd903e63db4",
+        "clean": false
+      },
+      "corpus_digest": "1cf982f5865d1619ed0dceb2863d17a9b6260a75368d9e857d4f1d59b2234f4e",
+      "extractions": [],
+      "assertions": [
+        {
+          "case": "19-vet-clinic-records",
+          "counts": {
+            "found": 12,
+            "worded": 1,
+            "wrong_certainty": 0,
+            "wrong_value": 1,
+            "rescoped": 2,
+            "omitted": 8,
+            "silent": 16
+          },
+          "basis_overstated": 0,
+          "produced_counts": {
+            "found": 12,
+            "worded": 1,
+            "wrong_certainty": 0,
+            "wrong_value": 1,
+            "rescoped": 2,
+            "misattached": 4,
+            "unreviewed": 11
+          },
+          "required": 21,
+          "recovered": 11,
+          "rejected": 1,
+          "refusals": {
+            "ambiguous-span": 1
+          },
+          "span_refusals": 1,
+          "produced_rows": 31,
+          "assessed_rows": 0,
+          "issues": [
+            "ambiguous-span: source 'System description' holds this quote in more than one place, so these offsets name no one of them; quote enough of the source to say which"
+          ],
+          "rows": [
+            {
+              "reference": "assertion:internet-exposure~process:owner-api~any~internet-facing",
+              "fate": "found",
+              "produced": "assertion:internet-exposure~process:owner-api~any~internet-facing",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:internet-exposure~process:lab-results-importer~any~internet-facing",
+              "fate": "found",
+              "produced": "assertion:internet-exposure~process:lab-results-importer~any~internet-facing",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:owner-api~any~boundary:group-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:owner-api~any~boundary:group-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:clinic-api~any~boundary:group-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:clinic-api~any~boundary:group-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:lab-results-importer~any~boundary:group-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:lab-results-importer~any~boundary:group-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:billing-service~any~boundary:group-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:billing-service~any~boundary:group-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~store:records-database~any~boundary:private-database-network",
+              "fate": "found",
+              "produced": "assertion:network-membership~store:records-database~any~boundary:private-database-network",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:clinic-staff~any~boundary:clinic-network",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:pet-owner~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:partner-lab~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records~any~v.1b6529b17c67",
+              "fate": "worded",
+              "produced": "assertion:authentication-mechanism~flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records~any~v.f362c77dc8d3",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:clinic-staff>process:clinic-api>manage-records~any~unknown",
+              "fate": "wrong_value",
+              "produced": "assertion:authentication-mechanism~flow:entity:clinic-staff>process:clinic-api>manage-records~any~v.d0cd26d29963",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:process:owner-api>store:records-database>keep-owner-records~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:process:clinic-api>store:records-database>keep-records~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:partner-lab>process:lab-results-importer>send-test-results~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:process:lab-results-importer>store:records-database>write-lab-results~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:clinic-staff>process:billing-service>open-invoices~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:process:billing-service>entity:pet-owner>send-invoices~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:clinic-staff~s.f15d7bfd280a~v.aabeeb12b163",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:pet-owners~s.524efd21dd9b~v.df2338eb2b37",
+              "fate": "rescoped",
+              "produced": "assertion:authorization-grant~principal:pet-owners~s.51c09718d118~v.df2338eb2b37",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:receptionists~s.f920ba234232~v.e04a2a4474bb",
+              "fate": "rescoped",
+              "produced": "assertion:authorization-grant~principal:receptionists~s.668da411d522~v.0682822c33a1",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:the-apis-database-account~s.ecec8f75a649~v.65ea209c7217",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:clinic-staff>process:clinic-api>manage-records~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:partner-lab>process:lab-results-importer>send-test-results~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:process:billing-service>entity:pet-owner>send-invoices~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:owner-api~any~yes",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-each-request~process:owner-api~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:owner-api~any~yes",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-ownership~process:owner-api~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:owner-api~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~flow:process:owner-api>store:records-database>keep-owner-records~any~no",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:clinic-api~any~no",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-each-request~process:clinic-api~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:clinic-api~any~no",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-least-privilege~process:clinic-api~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:clinic-api~any~no",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~flow:process:clinic-api>store:records-database>keep-records~any~no",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:lab-results-importer~any~no",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:lab-results-importer~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:lab-results-importer~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:billing-service~any~unknown",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-each-request~process:billing-service~any~unknown",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:billing-service~any~unknown",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:billing-service~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            }
+          ],
+          "produced": {
+            "assertion:authorization-scope-checks-each-request~flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records~any~yes": "misattached",
+            "assertion:authorization-scope-checks-ownership~flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records~any~yes": "misattached",
+            "assertion:credential-presented~principal:pet-owners~any~credential:email-address-and-password": "unreviewed",
+            "assertion:authorization-grant~principal:staff-accounts~s.69b42423a83e~v.14c989362eea": "unreviewed",
+            "assertion:origin-verification~flow:entity:partner-lab>process:lab-results-importer>send-test-results~any~absent": "unreviewed",
+            "assertion:authorization-scope-checks-each-request~flow:entity:partner-lab>process:lab-results-importer>send-test-results~any~no": "misattached",
+            "assertion:authorization-grant~principal:partner-lab~s.85fdd71f94b0~v.fcad9b1d37c7": "unreviewed",
+            "assertion:authorization-scope-checks-each-request~flow:entity:clinic-staff>process:billing-service>open-invoices~any~unknown": "misattached",
+            "assertion:data-classification~store:records-database~any~confidential": "unreviewed",
+            "assertion:credential-presented~flow:process:owner-api>store:records-database>keep-owner-records~any~credential:databases-admin-account": "unreviewed",
+            "assertion:credential-presented~flow:process:clinic-api>store:records-database>keep-records~any~credential:databases-admin-account": "unreviewed",
+            "assertion:credential-sharing~credential:databases-admin-account~any~shared": "unreviewed",
+            "assertion:data-classification~process:owner-api~any~confidential": "unreviewed",
+            "assertion:data-classification~process:lab-results-importer~any~confidential": "unreviewed",
+            "assertion:data-classification~process:billing-service~any~confidential": "unreviewed",
+            "assertion:internet-exposure~process:owner-api~any~internet-facing": "found",
+            "assertion:internet-exposure~process:lab-results-importer~any~internet-facing": "found",
+            "assertion:network-membership~process:owner-api~any~boundary:group-cloud-account": "found",
+            "assertion:network-membership~process:clinic-api~any~boundary:group-cloud-account": "found",
+            "assertion:network-membership~process:lab-results-importer~any~boundary:group-cloud-account": "found",
+            "assertion:network-membership~process:billing-service~any~boundary:group-cloud-account": "found",
+            "assertion:network-membership~store:records-database~any~boundary:private-database-network": "found",
+            "assertion:authentication-mechanism~flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records~any~v.f362c77dc8d3": "worded",
+            "assertion:authentication-mechanism~flow:entity:clinic-staff>process:clinic-api>manage-records~any~v.d0cd26d29963": "wrong_value",
+            "assertion:authorization-grant~principal:pet-owners~s.51c09718d118~v.df2338eb2b37": "rescoped",
+            "assertion:authorization-grant~principal:receptionists~s.668da411d522~v.0682822c33a1": "rescoped",
+            "assertion:authorization-scope-checks-each-request~process:owner-api~any~yes": "found",
+            "assertion:authorization-scope-checks-ownership~process:owner-api~any~yes": "found",
+            "assertion:authorization-scope-checks-each-request~process:clinic-api~any~no": "found",
+            "assertion:authorization-scope-least-privilege~process:clinic-api~any~no": "found",
+            "assertion:authorization-scope-checks-each-request~process:billing-service~any~unknown": "found"
+          },
+          "relabelled": []
+        }
+      ],
+      "skipped": {}
+    }
+  ]
+}
