@@ -1598,6 +1598,7 @@ def command_delivery(args: argparse.Namespace) -> int:
         scorecard_of(artifact, Path(args.corpus), ledger.Ledger()),
         load_artifact(artifact),
         development_cases(load_corpus(args.corpus)),
+        Path(args.corpus),
     )
     delivery.render(result)
     if args.out:
@@ -1629,6 +1630,7 @@ def panels_of(artifact: Path, corpus: Path, ballot: Path | None) -> list[panels.
             scorecard_of(artifact, corpus, ledger.Ledger()),
             loaded,
             development_cases(load_corpus(corpus)),
+            corpus,
         )
         found.append(panels.preparation_panel(result))
     elif mode in replay.ROUTES_OF:
@@ -2888,8 +2890,9 @@ COMMANDS: dict[str, Command] = {
         arguments=_score_arguments,
     ),
     "delivery": Command(
-        help="each charged must-find miss of a finished sweep, traced through"
-        " the candidates its lane was sent (no credentials)",
+        help="each charged must-find miss of a finished sweep and its matched"
+        " control, traced through the leads and the place facts its lane was"
+        " sent (no credentials)",
         run=command_delivery,
         arguments=_sweep_arguments,
     ),

@@ -33,7 +33,6 @@ from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
 from evals.harness.delivery import Delivery
-from evals.harness.losses import SILENT
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.rates import mean, shown_figure
 from evals.harness.replay import (
@@ -308,11 +307,13 @@ def capability_panel(ballot: Path, row: Experiment | None) -> Panel:
 def preparation_panel(result: Delivery) -> Panel:
     """The preparation panel of one sweep's delivery trace.
 
-    One unit is a charged must-find miss of a cause in
-    :data:`~evals.harness.losses.SILENT`, which :mod:`evals.harness.delivery`
-    traces. ``delivered`` reads the candidates the archived lane was sent, and
-    ``rebuilt`` the candidates today's rules write for the archived model. A
-    shared element is a structural overlap and not mechanism relevance.
+    One unit is a charged must-find miss, which :mod:`evals.harness.delivery`
+    traces whatever its cause. ``delivered`` reads the candidates the archived
+    lane was sent, and ``rebuilt`` the candidates today's rules write for the
+    archived model. A shared element is a structural overlap and not mechanism
+    relevance. The place-fact counts read each signed fact at a miss's place,
+    apart from the leads: a lead at the place does not show that its facts
+    arrived.
 
     The path is ``known-different`` where a traced lane's captured artifacts
     differ from the rebuild. The candidates artifact holds the leads, so
@@ -321,13 +322,14 @@ def preparation_panel(result: Delivery) -> Panel:
     inputs have no rebuild from the archive, and the evidence names each of
     them.
     """
-    lanes = [row.lane for row in result.rows if row.lane is not None]
+    lanes = [row.lane for row in result.rows]
     compared = [lane.comparison for lane in lanes if lane.comparison is not None]
     untraced = len(lanes) - len(compared)
     same_leads = Counter(each.same_leads for each in compared)
     same_artifacts = Counter(each.same_lane_artifacts for each in compared)
     delivered = Counter(each.delivered for each in compared)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
+    facts = Counter(fact.delivered for row in result.rows for fact in row.facts.facts)
     fidelity: Fidelity = (
         "known-different" if same_artifacts["differs"] else "unverified"
     )
@@ -346,7 +348,7 @@ def preparation_panel(result: Delivery) -> Panel:
     return Panel(
         node="prepare",
         source=result.run.artifact,
-        unit=f"charged must-find miss of cause {' or '.join(sorted(SILENT))}",
+        unit="charged must-find miss",
         counts={
             **{f"same leads {key}": n for key, n in sorted(same_leads.items())},
             **{
@@ -359,6 +361,13 @@ def preparation_panel(result: Delivery) -> Panel:
             "with an archived lead rule": sum(
                 1 for lane in lanes if lane.archived_lead_rules
             ),
+            "place facts delivered": facts[True],
+            "place facts not delivered": facts[False],
+            "place facts unavailable": facts[None],
+            "with no place fact read": sum(
+                1 for row in result.rows if not row.facts.facts
+            ),
+            "with no control": sum(1 for row in result.rows if row.control is None),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
         rates={"lane material traced": Rate(len(compared), len(lanes))},

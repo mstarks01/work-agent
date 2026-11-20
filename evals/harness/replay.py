@@ -813,7 +813,7 @@ def _state(value: str) -> str:
     return "stated"
 
 
-def _compares_exactly(predicate: str) -> bool:
+def compares_exactly(predicate: str) -> bool:
     """Whether two spellings of a value are two values, for this predicate.
 
     A term is canonical. A reference to a graph-bound subject is an element
@@ -856,7 +856,7 @@ def _row_fate(reference: Assertion, candidate: Assertion) -> AnsweredFate:
     agrees = ours.value == theirs.value
     if not agrees:
         same_state = _state(reference.value) == _state(candidate.value) == "stated"
-        if not same_state or _compares_exactly(reference.predicate):
+        if not same_state or compares_exactly(reference.predicate):
             return "wrong_value"
     if not _same_certainty(reference, candidate):
         return "wrong_certainty"
