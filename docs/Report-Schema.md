@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.4"
+    schema_version: str  # "3.5"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -85,6 +85,7 @@ class FrameworkAnalysis:
     scope: list[ScopeEntry]  # units this framework considered and raised nothing about
     applicability: list[ApplicabilityEntry]  # whether each selected unit applies
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
+    quotes_checked: bool | None  # whether the quote check ran; null before 3.5
     unverified_grounds: list[UnverifiedGround]
     unreconciled_rulings: list[
         UnreconciledRuling
@@ -465,7 +466,10 @@ instead. So an entry in this list means "one citation on an otherwise justified
 finding did not match", which is worth showing a reader and is not grounds for
 hiding the finding. The list is also empty when no source text was available to
 check against, so it is evidence of a *failed* check, never of a check having
-run.
+run. The block's `quotes_checked` says whether the check ran. Where it is
+`false`, no quote in the block was checked, and a quote with no mark is
+unchecked, not verified. It is `null` only on a report written before 3.5. The
+check ran for every such report, because a report names at least one source.
 
 ## `unresolved_evidence` — references the catalog does not hold
 
@@ -1322,4 +1326,11 @@ version before it. Read it when you load an archived report.
   rejection, and `refused_controls` for each row the critic refused. Each block
   carries `returned_claims`. Additive for a consumer that reads only the 3.3
   fields. A route that parses a stored 3.3 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.5:** each block carries `quotes_checked`, which says whether the
+  fan-in ran the quote check. It is `false` where the job's map of source texts
+  is empty, and then `unverified_grounds` is empty because no check ran. It is
+  `null` only on a stored block that holds no value. Additive for a consumer
+  that reads only the 3.4 fields. A route that parses a stored 3.4 job record
+  answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

@@ -104,6 +104,7 @@ from analysis_service.graph import (
     Pipeline,
     Rejected,
     diagram_readings,
+    held_source_texts,
     result_of,
     tier_node_by_graph_node,
 )
@@ -1460,7 +1461,7 @@ def _extraction_result(
     model, issues = parse_extraction(
         raw,
         pipeline.extraction_format or FULL_FORMAT,
-        sources=state.get(STATE_SOURCE_TEXTS, {}),
+        sources=held_source_texts(state.get(STATE_SOURCE_TEXTS)),
         diagrams=diagram_readings(state.get(STATE_DIAGRAM_READINGS)),
     )
     return ExtractionResult(
@@ -1680,7 +1681,7 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     record = AssertionRecord.of(
         CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL]),
         case.model,
-        state.get(STATE_SOURCE_TEXTS, {}),
+        held_source_texts(state.get(STATE_SOURCE_TEXTS)),
     )
     return AssertionResult(
         case_id=case.id,

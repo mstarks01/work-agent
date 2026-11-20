@@ -213,7 +213,9 @@ class CriticRound:
     second reader of one draft (#1082): a critic told once that a quote was
     invented must not read the same quote clean on the second look, and a
     replay must send what the graph sent. ``controls`` is each Control that
-    applies to the job (ADR 0126).
+    applies to the job (ADR 0126). ``quotes_checked`` is
+    :attr:`~analysis_service.fan_in.FanIn.quotes_checked`: where it is false,
+    no quote carries a mark because no check read one.
     """
 
     framework: FrameworkName
@@ -221,6 +223,7 @@ class CriticRound:
     model: SystemModel
     drafts: Sequence[Claim]
     marks: AnalysisMarks
+    quotes_checked: bool
     assertions: AssertionCatalog | None
     controls: Sequence[AppliedControl]
 
@@ -231,6 +234,7 @@ class CriticRound:
         model: SystemModel,
         drafts: Sequence[Claim],
         marks: AnalysisMarks,
+        quotes_checked: bool,
         assertions: AssertionCatalog | None,
         controls: Sequence[AppliedControl],
     ) -> CriticRound:
@@ -241,6 +245,7 @@ class CriticRound:
             model,
             drafts,
             marks,
+            quotes_checked,
             assertions,
             controls,
         )
@@ -267,11 +272,16 @@ class CriticRound:
         ADK hands a node's output to the next node through ``to_user_content``,
         so this dictionary is the critic's user turn. The node returns it, and
         :func:`critic_request` builds the turn from it.
+
+        ``unverified_count`` is ``None`` where no quote check ran, so a count
+        over quotes that no check read never reads as zero.
         """
         return {
             "framework": self.framework,
             "draft_count": len(self.drafts),
-            "unverified_count": len(self.marks.unverified_grounds),
+            "unverified_count": (
+                len(self.marks.unverified_grounds) if self.quotes_checked else None
+            ),
             "unresolved_mention_count": len(self.marks.unresolved_mentions),
         }
 

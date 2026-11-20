@@ -52,7 +52,7 @@ def emitted(*rulings) -> list[dict]:
 
 
 def round_over(*drafts, marks: AnalysisMarks = NO_MARKS) -> CriticRound:
-    return CriticRound.of("stride", valid_model(), list(drafts), marks, None, ())
+    return CriticRound.of("stride", valid_model(), list(drafts), marks, True, None, ())
 
 
 def two_drafts():

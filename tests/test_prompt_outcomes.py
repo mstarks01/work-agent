@@ -300,7 +300,7 @@ def an_omitted_compact_attribute_ends_the_job_with_no_repair(pipeline):  # noqa:
         payload = compact_fixture()
         del payload[owner][0][field]
         event = graph.validate_extraction(
-            FakeContext(), KEYS, payload, None, COMPACT_FORMAT
+            FakeContext(), KEYS, payload, {}, COMPACT_FORMAT
         )
         assert event.actions.route == graph.ROUTE_UNCONVERTIBLE, field
     assert (
@@ -454,7 +454,7 @@ def a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic(pipeline):  # noqa
     unreasoned = sample_ruling(verdict=ProposedVerdict(rejected_because="lane"))
 
     critic_round = CriticRound.of(
-        "stride", valid_model(), [sample_draft("S-01")], AnalysisMarks(), None, ()
+        "stride", valid_model(), [sample_draft("S-01")], AnalysisMarks(), True, None, ()
     )
 
     outcome = critic_round.first([unreasoned.model_dump(mode="json")])

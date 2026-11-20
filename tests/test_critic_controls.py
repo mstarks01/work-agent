@@ -130,7 +130,7 @@ def _with_evidence(line: str) -> AppliedControl:
 
 def _view(drafts, controls: list[AppliedControl], framework="asvs") -> list[dict]:
     critic_round = CriticRound.of(
-        framework, valid_model(), drafts, AnalysisMarks(), None, controls
+        framework, valid_model(), drafts, AnalysisMarks(), True, None, controls
     )
     return critic_round.view()
 
@@ -244,6 +244,7 @@ class TestTheControlsKey:
             valid_model(),
             drafts,
             AnalysisMarks(),
+            True,
             None,
             _applied(_db(_row("V11"))),
         )
@@ -272,7 +273,7 @@ class TestTheControlsKey:
         draft = _asvs_draft("V11.2.1", "store:orders-db")
         controls = _applied(_db(_row("V11")))
         critic_round = CriticRound.of(
-            "asvs", valid_model(), [draft], AnalysisMarks(), None, controls
+            "asvs", valid_model(), [draft], AnalysisMarks(), True, None, controls
         )
 
         assert critic_round.view(only={draft.id}) == critic_round.view()
@@ -284,7 +285,7 @@ ROWS = (_row("V11"), _row("V11.2.1"))
 
 def _round(*copies: CopiedControl) -> CriticRound:
     return CriticRound.of(
-        "asvs", valid_model(), [DRAFT], AnalysisMarks(), None, _applied(*copies)
+        "asvs", valid_model(), [DRAFT], AnalysisMarks(), True, None, _applied(*copies)
     )
 
 
@@ -650,6 +651,7 @@ class TestTheUnDefer:
             valid_model(),
             merged.drafts,
             merged.marks,
+            merged.quotes_checked,
             None,
             _applied(_db(_row("V11.2.1"))),
         )

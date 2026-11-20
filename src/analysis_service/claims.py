@@ -2708,6 +2708,19 @@ def build_block_summary(
     )
 
 
+def quote_check_ran(quotes_checked: bool | None) -> bool:
+    """Whether a check read a fan-in's quotes, for every shape the value takes.
+
+    ``True`` and ``False`` are :attr:`~analysis_service.fan_in.FanIn.quotes_checked`.
+    ``None`` is a record written before the value existed: a report before
+    schema 3.5, or a failure dump of that age. Its check ran.
+    ``InputRef.sources`` holds at least one source, both builders of a report
+    seed the job's state from those same sources, and the fan-in runs the
+    check on any non-empty map of source texts.
+    """
+    return quotes_checked is not False
+
+
 class FrameworkAnalysis(BaseModel):
     """What one framework produced, against the envelope's shared model.
 
@@ -2756,6 +2769,12 @@ class FrameworkAnalysis(BaseModel):
     #: whose precondition refused the model, whose ``scope`` already answers.
     applicability: list[ApplicabilityEntry] = Field(default_factory=list)
     coverage: list[LaneCoverage] = Field(default_factory=list)
+    #: Whether this block's fan-in ran the quote check
+    #: (:attr:`~analysis_service.fan_in.FanIn.quotes_checked`). Where it is
+    #: false, a quote ground carries no mark because no check read it. ``None``
+    #: only on a report written before schema 3.5; read it through
+    #: :func:`quote_check_ran`.
+    quotes_checked: bool | None = None
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     #: See :attr:`AnalysisMarks.unreconciled_rulings`; the marks are flattened
     #: onto the block one field each.

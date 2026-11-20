@@ -17,7 +17,8 @@ from analysis_service.claims import (
     RepairedQuote,
     UnverifiedGround,
 )
-from analysis_service.fan_in import DraftJoinError
+from analysis_service.fan_in import DraftJoinError, fan_in
+from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from evals.harness.grounds import (
     GroundMisShape,
@@ -26,6 +27,9 @@ from evals.harness.grounds import (
     measure_grounds,
 )
 from tests.eval_factories import draft_threat
+from tests.factories import sample_proposal, valid_model
+from tests.test_fan_in import LABEL as DESCRIPTION_LABEL
+from tests.test_fan_in import batches
 
 LABEL = "design-doc"
 
@@ -88,6 +92,7 @@ class TestMeasureGrounds:
             [],
             dropped=(),
             repaired=(),
+            quotes_checked=True,
         )
 
         assert measurement.threat_count == 2
@@ -111,7 +116,7 @@ class TestMeasureGrounds:
         from analysis_service.claims import GroundKind
 
         measurement = measure_grounds(
-            "case-a", "stride", [], [], dropped=(), repaired=()
+            "case-a", "stride", [], [], dropped=(), repaired=(), quotes_checked=True
         )
 
         assert tuple(measurement.kind_counts) == get_args(GroundKind)
@@ -126,6 +131,7 @@ class TestMeasureGrounds:
             [],
             dropped=(),
             repaired=(),
+            quotes_checked=True,
         )
 
         assert measurement.quoteless_count == 1
@@ -141,6 +147,7 @@ class TestMeasureGrounds:
             [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
             dropped=(),
             repaired=(),
+            quotes_checked=True,
         )
 
         assert measurement.quote_count == 2
@@ -158,6 +165,7 @@ class TestMeasureGrounds:
             ],
             dropped=(),
             repaired=(),
+            quotes_checked=True,
         )
 
         by_id = {entry.threat_id: entry for entry in measurement.threats}
@@ -166,7 +174,7 @@ class TestMeasureGrounds:
 
     def test_an_empty_case_reports_unavailable_rather_than_zero(self):
         measurement = measure_grounds(
-            "case-a", "stride", [], [], dropped=(), repaired=()
+            "case-a", "stride", [], [], dropped=(), repaired=(), quotes_checked=True
         )
 
         assert measurement.grounds_per_threat is None
@@ -181,7 +189,13 @@ class TestDroppedClaims:
         dropped = DroppedClaim(claim_id="S-02", title="t", reason="r")
 
         measurement = measure_grounds(
-            "case-a", "stride", [grounded(1, quote())], [], [dropped], repaired=()
+            "case-a",
+            "stride",
+            [grounded(1, quote())],
+            [],
+            [dropped],
+            repaired=(),
+            quotes_checked=True,
         )
 
         assert measurement.threat_count == 1
@@ -204,6 +218,7 @@ class TestRepairedQuotes:
                     claim_id="S-01", index=1, written="w", similarity=0.9, moved=[]
                 )
             ],
+            quotes_checked=True,
         )
 
         assert measurement.repaired_count == 1
@@ -294,7 +309,13 @@ class TestAggregate:
         """A case that drafted one threat must not outweigh one that drafted
         three, which is what a mean of per-case rates would do."""
         small = measure_grounds(
-            "small", "stride", [grounded(1, quote("bad"))], [], dropped=(), repaired=()
+            "small",
+            "stride",
+            [grounded(1, quote("bad"))],
+            [],
+            dropped=(),
+            repaired=(),
+            quotes_checked=True,
         )
         large = measure_grounds(
             "large",
@@ -303,6 +324,7 @@ class TestAggregate:
             [],
             dropped=(),
             repaired=(),
+            quotes_checked=True,
         )
         marked = measure_grounds(
             "small",
@@ -311,6 +333,7 @@ class TestAggregate:
             [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
             dropped=(),
             repaired=(),
+            quotes_checked=True,
         )
 
         totals = aggregate_grounds([marked, large], [])
@@ -333,13 +356,81 @@ class TestAggregate:
     def test_dropped_claims_pool_into_one_rate(self):
         dropped = DroppedClaim(claim_id="S-02", title="t", reason="r")
         kept = measure_grounds(
-            "a", "stride", [grounded(1, quote())], [], [dropped], repaired=()
+            "a",
+            "stride",
+            [grounded(1, quote())],
+            [],
+            [dropped],
+            repaired=(),
+            quotes_checked=True,
         )
         clean = measure_grounds(
-            "b", "stride", [grounded(1, quote())], [], dropped=(), repaired=()
+            "b",
+            "stride",
+            [grounded(1, quote())],
+            [],
+            dropped=(),
+            repaired=(),
+            quotes_checked=True,
         )
 
         totals = aggregate_grounds([kept, clean], [])
 
         assert totals["dropped_claims"] == 1
         assert totals["dropped_rate"] == round(1 / 3, 3)
+
+
+class TestUncheckedQuotes:
+    """A quote that no check read is unchecked, never verified (#2314)."""
+
+    def test_a_fan_in_with_no_source_texts_has_no_unverified_rate(self):
+        proposal = sample_proposal(
+            "S-01",
+            quotes=[
+                {"text": "invented source statement", "source_label": DESCRIPTION_LABEL}
+            ],
+            evidence_refs=[],
+        )
+        merged = fan_in(
+            batches(spoofing=[proposal]), STRIDE, valid_model(), {}, assertions=None
+        )
+
+        measurement = measure_grounds(
+            "case-a",
+            "stride",
+            merged.drafts,
+            merged.marks.unverified_grounds,
+            dropped=merged.marks.dropped_claims,
+            repaired=merged.marks.repaired_quotes,
+            quotes_checked=merged.quotes_checked,
+        )
+
+        assert (measurement.quote_count, measurement.unchecked_count) == (1, 1)
+        assert measurement.unverified_rate is None
+        assert measurement.repaired_rate is None
+        assert measurement.to_json()["counts"]["unchecked_quotes"] == 1
+
+    def test_the_pool_divides_by_the_checked_quotes_only(self):
+        checked = measure_grounds(
+            "a",
+            "stride",
+            [grounded(1, quote("bad"))],
+            [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
+            dropped=(),
+            repaired=(),
+            quotes_checked=True,
+        )
+        unchecked = measure_grounds(
+            "b",
+            "stride",
+            [grounded(1, quote()), grounded(2, quote())],
+            [],
+            dropped=(),
+            repaired=(),
+            quotes_checked=False,
+        )
+
+        totals = aggregate_grounds([checked, unchecked], [])
+
+        assert (totals["quote"], totals["unchecked_quotes"]) == (3, 2)
+        assert totals["unverified_rate"] == 1.0

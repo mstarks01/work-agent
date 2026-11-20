@@ -41,6 +41,7 @@ from analysis_service.claims import (
     FrameworkName,
     Ruling,
     VerdictStatus,
+    quote_check_ran,
 )
 from analysis_service.critic import complete_rulings, review_issues
 from analysis_service.critic_round import CriticRound, critic_request, rulings_of
@@ -90,6 +91,9 @@ class Archived:
     framework: FrameworkName
     drafts: list[Claim]
     marks: AnalysisMarks
+    #: Whether the fan-in ran the quote check, read by
+    #: :func:`~analysis_service.claims.quote_check_ran`.
+    quotes_checked: bool
     #: This framework's block of the case's report, or ``None`` where the case
     #: failed before it wrote one, and the material came from its failure dump.
     block: FrameworkAnalysis | None
@@ -133,6 +137,7 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
         framework=framework,
         drafts=[record.model_validate(draft) for draft in held.get(framework, [])],
         marks=marks,
+        quotes_checked=quote_check_ran(block.quotes_checked),
         block=block,
         shared=shared,
         model=report.system_model,
@@ -162,6 +167,7 @@ def _from_failure(
         framework=framework,
         drafts=[record.model_validate(draft) for draft in state[nodes.key("drafts")]],
         marks=AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
+        quotes_checked=quote_check_ran(state.get(nodes.key("quotes_checked"))),
         block=None,
         shared={
             STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],
@@ -188,6 +194,7 @@ def round_of(archived: Archived, controls: Sequence[AppliedControl]) -> CriticRo
         archived.model,
         archived.drafts,
         archived.marks,
+        archived.quotes_checked,
         None if record is None else record.catalog,
         controls,
     )

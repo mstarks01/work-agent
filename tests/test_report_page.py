@@ -359,6 +359,29 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
 
 
 @pytest.mark.parametrize(
+    ("checked", "unchecked"), [(False, True), (True, False), (None, False)]
+)
+def test_a_quote_no_check_read_is_marked_as_unchecked(checked, unchecked):
+    """A block whose fan-in checked no quote shows its quotes apart (#2314).
+
+    ``null`` is a block from before schema 3.5, and its check ran.
+    """
+    from tests.factories import sample_threat
+
+    threat = sample_threat()
+    report = sample_report([threat])
+    block = report.analyses[0].model_copy(update={"quotes_checked": checked})
+    report = report.model_copy(update={"analyses": [block]})
+    html = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
+    text = run_report_page(html)["analyses"]
+    quote = threat.grounds[0]
+    assert ("the service did not check this quote" in text) is unchecked
+    assert (f"\u201c{quote.text}\u201d" in text) is not unchecked
+
+
+@pytest.mark.parametrize(
     "step", [None, "evidence", "reasoning", "lane", "duplicate", "control"]
 )
 def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):

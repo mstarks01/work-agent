@@ -906,6 +906,10 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     # callback, which answers an empty batch instead of calling the model.
     "idle_lanes",
     "marks",
+    # Whether this framework's fan-in ran the quote check
+    # (:attr:`~analysis_service.fan_in.FanIn.quotes_checked`). Written by the
+    # fan-in, read by the critic round and by ``assemble``.
+    "quotes_checked",
     "precondition",
     "retrieved",
     "reviewed",
@@ -1074,6 +1078,29 @@ class SessionState:
         if key not in self._structured:
             raise UndeclaredStateKey(f"{key!r} is not a structured state key")
         return self._state.get(key)
+
+
+class MissingSourceTexts(KeyError):
+    """The session state holds no :data:`STATE_SOURCE_TEXTS`.
+
+    :func:`~analysis_service.execution.seed_state` writes the key for every
+    job, so its absence is a defect in whatever built the state. An empty map
+    is a different value: it states a job with no source texts.
+    """
+
+
+def held_source_texts(source_texts: Mapping[str, str] | None) -> dict[str, str]:
+    """The job's map of source texts, or :class:`MissingSourceTexts`.
+
+    The one reader of the key's absence. A missing key read as an empty map
+    skips every check against the sources with no sign.
+    """
+    if source_texts is None:
+        raise MissingSourceTexts(
+            f"the session state holds no {STATE_SOURCE_TEXTS!r}, which seed_state"
+            " writes for every job"
+        )
+    return dict(source_texts)
 
 
 class SilentNodeError(RuntimeError):
@@ -1457,6 +1484,7 @@ def validate_extraction(
             f" model to validate. {_TRUNCATION_HINT}"
         )
     state = keys.state(ctx)
+    sources = held_source_texts(source_texts)
     baseline = state.get(STATE_REPAIR_BASELINE)
     if baseline is None:
         # The first gate, on every route out of it: what arrived is kept
@@ -1466,7 +1494,7 @@ def validate_extraction(
     model, issues = parse_extraction(
         extracted_model,
         extraction_format,
-        sources=source_texts or {},
+        sources=sources,
         diagrams=diagrams,
     )
     if model is None and extraction_format != FULL_FORMAT:
@@ -1496,7 +1524,7 @@ def validate_extraction(
             model, issues = parse_and_validate(
                 overlaid,
                 normalize_ids=True,
-                sources=source_texts or {},
+                sources=sources,
                 diagrams=diagrams,
             )
         state.put(STATE_MODEL_REPAIR, repair.model_dump(mode="json"))
@@ -1530,7 +1558,7 @@ def validate_extraction(
     # Logged and nothing else, after the gate has passed the model: a control
     # the source does not echo is a diagnostic and never a route. See
     # :mod:`analysis_service.basis` for why token overlap cannot gate.
-    for flag in unbased_controls(model, source_texts or {}):
+    for flag in unbased_controls(model, sources):
         logger.warning("stated control with no basis in its source: %s", flag)
     model = after_gate(model)
     state.put(STATE_VALID_MODEL, model.model_dump(mode="json"))
@@ -1846,7 +1874,7 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     trusted, so a catalog a lane selects from answered the same rules whichever
     job produced it. There is no path that reaches ``prepare`` ungated.
     """
-    sources = state.get(STATE_SOURCE_TEXTS) or {}
+    sources = held_source_texts(state.get(STATE_SOURCE_TEXTS))
     held = state.get(STATE_ASSERTION_CATALOG)
     if held is not None:
         record = AssertionRecord.model_validate(held)
@@ -2022,8 +2050,8 @@ def merge_drafts(
     ``source_texts`` is ``None`` only where the session state holds no
     sources, which no job's state does, because
     :func:`~analysis_service.execution.seed_state` always writes them. This
-    function reads ``None`` as an empty map, so the quote check does not run
-    there.
+    function raises :class:`MissingSourceTexts` there. An empty map runs no
+    quote check, and the node parks ``quotes_checked`` so the block says so.
 
     An agent that emitted **nothing** fails the job here, before any of that. A
     framework's lanes are what make its output that framework's method rather
@@ -2055,6 +2083,7 @@ def merge_drafts(
             f" nothing ({written}), so those lanes were never analyzed."
             f" {_TRUNCATION_HINT}"
         )
+    sources = held_source_texts(source_texts)
     proposal_batch = nodes.schemas.proposals
     model = SystemModel.model_validate(valid_model)
     controls = held_controls(state)
@@ -2067,7 +2096,7 @@ def merge_drafts(
         },
         nodes.package,
         model,
-        source_texts or {},
+        sources,
         state.get(nodes.key("ruled_out")) or {},
         assertions=held_assertions(state),
         ruled_in=state.get(nodes.key("ruled_in")) or {},
@@ -2079,11 +2108,18 @@ def merge_drafts(
         nodes.key("drafts"), [draft.model_dump(mode="json") for draft in merged.drafts]
     )
     state.put(nodes.key("marks"), merged.marks.model_dump(mode="json"))
+    state.put(nodes.key("quotes_checked"), merged.quotes_checked)
     state.put(
         nodes.key("coverage"), [row.model_dump(mode="json") for row in merged.coverage]
     )
     critic_round = CriticRound.of(
-        nodes.name, model, merged.drafts, merged.marks, held_assertions(state), controls
+        nodes.name,
+        model,
+        merged.drafts,
+        merged.marks,
+        merged.quotes_checked,
+        held_assertions(state),
+        controls,
     )
     state.prompt(nodes.key("draft_view"), render_fenced(critic_round.view()))
     return _routed(
@@ -2207,9 +2243,19 @@ def _parked_round(
         model,
         _drafts_of(state.get(nodes.key("drafts")) if accepted else None, nodes.package),
         AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
+        _quotes_checked(state, nodes),
         held_assertions(state),
         held_controls(state),
     )
+
+
+def _quotes_checked(state: SessionState, nodes: FrameworkNodes) -> bool:
+    """Whether this framework's fan-in ran the quote check.
+
+    The key is absent only where no fan-in ran: a framework its precondition
+    refused. No quote check ran there either.
+    """
+    return bool(state.get(nodes.key("quotes_checked")))
 
 
 def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:
@@ -2597,6 +2643,7 @@ def _framework_block(
             for row in state.get(nodes.key("coverage")) or []
         ],
         returned_claims=returned,
+        quotes_checked=critic_round.quotes_checked,
         fired_rules=list(retrieved.get("fired_rules", [])),
         knowledge_docs=list(retrieved.get("knowledge_docs", [])),
         catalog_leads=retrieved.get("catalog_leads"),
@@ -2950,7 +2997,9 @@ def _stated_node_func(keys: GraphKeys) -> Callable[..., Any]:
             )
         model = SystemModel.model_validate(valid_model)
         updated = with_stated_capabilities(
-            model, CapabilityReading.model_validate(reading), source_texts or {}
+            model,
+            CapabilityReading.model_validate(reading),
+            held_source_texts(source_texts),
         )
         state.put(STATE_VALID_MODEL, updated.model_dump(mode="json"))
         return {"stated": len(updated.capabilities) - len(model.capabilities)}
