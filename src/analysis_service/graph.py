@@ -2012,16 +2012,18 @@ def merge_drafts(
 
     **One of these per selected framework.** The merge itself is
     :func:`~analysis_service.fan_in.fan_in`, which takes the lane batches as
-    the agents emitted them and returns the drafts, the marks, the deferred
-    units and the coverage as one value. This node reads the batches out of
-    state, calls it once, parks each part of what it returns under this
-    framework's own key, and routes: ``review`` when there is a draft,
-    ``settled`` when there is none, so a critic is never called to read an
-    empty view (:data:`ROUTE_REVIEW`).
+    the agents emitted them and returns one value. This node reads the
+    batches out of state, calls it once, parks the drafts, the marks, the
+    deferred units, the units a Control row kept from the deferred set and the
+    coverage under this framework's own key, and routes: ``review`` when there
+    is a draft, ``settled`` when there is none, so a critic is never called to
+    read an empty view (:data:`ROUTE_REVIEW`).
 
-    ``source_texts`` is ``None`` for the in-process engine, which drives a
-    hand-authored model with no job behind it. The node function defaults it,
-    so that engine is not failed on a citation that is not wrong.
+    ``source_texts`` is ``None`` only where the session state holds no
+    sources, which no job's state does, because
+    :func:`~analysis_service.execution.seed_state` always writes them. This
+    function reads ``None`` as an empty map, so the quote check does not run
+    there.
 
     An agent that emitted **nothing** fails the job here, before any of that. A
     framework's lanes are what make its output that framework's method rather

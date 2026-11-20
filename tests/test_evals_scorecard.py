@@ -317,6 +317,7 @@ def _account(case: str, framework: FrameworkName = "stride", **fields) -> FanInA
         quotes_verified=0,
         quotes_repaired=0,
         quotes_refused=0,
+        quotes_unchecked=0,
     )
     return replace(row, **fields)
 

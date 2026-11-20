@@ -97,7 +97,7 @@ def test_a_lone_quote_on_a_source_the_job_lacks_drops_its_draft_only():
     assert row.unexplained == ()
 
 
-def test_quotes_are_counted_verified_repaired_and_refused():
+def test_checked_quotes_count_as_verified_repaired_or_refused_never_unchecked():
     proposal = sample_proposal(
         "S-01",
         quotes=[
@@ -109,7 +109,30 @@ def test_quotes_are_counted_verified_repaired_and_refused():
 
     row = _accounted(batches(spoofing=[proposal]))
 
-    assert (row.quotes_verified, row.quotes_repaired, row.quotes_refused) == (1, 0, 1)
+    assert (
+        row.quotes_verified,
+        row.quotes_repaired,
+        row.quotes_refused,
+        row.quotes_unchecked,
+    ) == (1, 0, 1, 0)
+
+
+def test_a_quote_the_fan_in_did_not_check_is_unchecked_not_verified():
+    proposal = sample_proposal(
+        "S-01",
+        quotes=[{"text": "invented source statement", "source_label": LABEL}],
+        evidence_refs=[],
+    )
+
+    row = _accounted(batches(spoofing=[proposal]), sources={})
+
+    assert row.kept == ("S-01",)
+    assert (
+        row.quotes_verified,
+        row.quotes_repaired,
+        row.quotes_refused,
+        row.quotes_unchecked,
+    ) == (0, 0, 0, 1)
 
 
 def test_an_empty_batch_has_nothing_to_account():

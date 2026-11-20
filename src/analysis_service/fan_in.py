@@ -109,6 +109,7 @@ class FanIn(NamedTuple):
     from ``deferred``, against the kind it would have been deferred for.
     ``deferred_ids`` is the claim ID of each proposal the package deferred,
     once per proposal, because one unit can hold more than one.
+    ``quotes_checked`` is :attr:`JoinedDrafts.quotes_checked`.
     """
 
     drafts: list[Claim]
@@ -117,6 +118,7 @@ class FanIn(NamedTuple):
     coverage: list[LaneCoverage]
     undeferred: dict[str, str]
     deferred_ids: list[str]
+    quotes_checked: bool
 
 
 def fan_in(
@@ -147,10 +149,11 @@ def fan_in(
     ``evals/bench/deterministic.py catalog`` re-derives the two figures.
 
     ``sources`` maps each source's label to its text. Empty means the quote
-    check does not run: the in-process engine drives a hand-authored model with
-    no job behind it, and inventing a set would fail it on a citation that is
-    not wrong. ``ruled_out`` is each unit the package's own rules settled at
-    prepare against the reason; a draft on one is refused here whatever the
+    check does not run: a caller with no job behind it, such as a test that
+    drives a hand-authored model, has no sources, and inventing a set would
+    fail it on a citation that is not wrong. A job always carries sources.
+    ``ruled_out`` is each unit the package's own rules settled at prepare
+    against the reason; a draft on one is refused here whatever the
     agent read in its scope line, because a claim on it would put the same
     unit on the report twice, once as a claim and once as not applicable
     (#443). ``assertions`` is the job's assertion catalog where it ran one:
@@ -323,7 +326,15 @@ def fan_in(
         model,
         package,
     )
-    return FanIn(merged, marks, deferred, coverage, undeferred, deferred_ids)
+    return FanIn(
+        drafts=merged,
+        marks=marks,
+        deferred=deferred,
+        coverage=coverage,
+        undeferred=undeferred,
+        deferred_ids=deferred_ids,
+        quotes_checked=joined.quotes_checked,
+    )
 
 
 class Returned(NamedTuple):
@@ -394,10 +405,15 @@ class JoinedDrafts(NamedTuple):
     checks that decide whether a finding *means* anything fail closed, and
     checks that describe how complete it is are recorded for a reader. The
     fan-in has no re-ask path, so the second kind must never fail a report.
+
+    ``quotes_checked`` says whether the quote check ran. It is false where the
+    map of source texts is empty, and then a quote ground carries no mark
+    because nothing checked it, not because it verified.
     """
 
     drafts: list[Claim]
     marks: AnalysisMarks
+    quotes_checked: bool
 
 
 def _unresolved_mentions(
@@ -417,8 +433,9 @@ def _snapped_ground(
 ) -> Ground:
     """One grounds entry with its branch's reference in canonical spelling."""
     if ground.kind == "quote":
-        # Only when the job carries labels at all: the in-process engine drives a
-        # hand-authored model with none, and an empty known set snaps nothing.
+        # Only when the caller passes labels at all: a caller with no job, such
+        # as a test of a hand-authored model, passes none, and an empty known
+        # set snaps nothing.
         if not labels:
             return ground
         return ground.model_copy(
@@ -897,7 +914,8 @@ def join_drafts(
     composes both — and what this seam adds is the checks that need the whole
     set: element references resolving against the System Model, IDs unique
     across it, and every grounds entry resolving and, for a quote, actually
-    appearing in the source it names.
+    appearing in the source it names where the map of source texts is not
+    empty.
 
     **Whether a draft sits in the right lane is not among them, and cannot be.**
     A draft's lane is stamped from the node by
@@ -928,11 +946,12 @@ def join_drafts(
     of this framework's lanes' drafts, the System Model and the job's sources
     exist together.
 
-    ``sources`` maps each source's label to its text. It is empty for a
-    hand-authored model driven through the in-process engine, because that
-    model has no sources to check against, and an invented set would fail it
-    on a citation that is not wrong. Empty means the text check does not run —
-    no quote is marked and no claim is dropped on one. ``assertions`` is what
+    ``sources`` maps each source's label to its text. It is empty only for a
+    caller with no job behind it, such as a test that drives a hand-authored
+    model, because that model has no sources to check against, and an
+    invented set would fail it on a citation that is not wrong. Empty means
+    the text check does not run — no quote is marked and no claim is dropped
+    on one. ``assertions`` is what
     :func:`fan_in` was handed, so an assertion ground resolves against the
     same catalog the agent selected from.
     """
@@ -957,9 +976,10 @@ def join_drafts(
     bounded = _bound_element_references(referenced.drafts, index, assertions)
     targeted, untargeted = _drop_untargeted(bounded.drafts)
     scoped = _scope_grounds(targeted, index, assertions)
+    quotes_checked = bool(sources)
     checked = (
         _verify_quotes(scoped.drafts, sources)
-        if sources
+        if quotes_checked
         else _QuoteCheck(list(scoped.drafts), [], [], [])
     )
     kept = list(checked.drafts)
@@ -980,4 +1000,5 @@ def join_drafts(
                 *checked.groundless,
             ],
         ).merged_with(package.record.claim_marks(kept)),
+        quotes_checked=quotes_checked,
     )
