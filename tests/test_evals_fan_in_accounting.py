@@ -97,7 +97,7 @@ def test_a_lone_quote_on_a_source_the_job_lacks_drops_its_draft_only():
     assert row.unexplained == ()
 
 
-def test_quotes_are_counted_verified_repaired_and_refused():
+def test_checked_quotes_are_verified_or_refused_and_none_unchecked():
     proposal = sample_proposal(
         "S-01",
         quotes=[
