@@ -16,7 +16,13 @@ from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACTION_DELTAS, PROMPT_BODY_NAMES
 from evals.harness import audit, delivery, panels
 from evals.harness.artifact import load_artifact
-from evals.harness.delivery import Agreement, Delivery, DeliveryRow, LaneTrace
+from evals.harness.delivery import (
+    Agreement,
+    Delivery,
+    DeliveryRow,
+    LaneComparison,
+    LaneTrace,
+)
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, load_corpus
 from evals.harness.replay import pooled_assertions, pooled_extraction
@@ -183,7 +189,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     assert sum(
         count for name, count in panel.counts.items() if name.startswith("rebuilt ")
     ) == len(lanes)
-    assert panel.unread == sum(lane.same_leads == "uncaptured" for lane in lanes)
+    assert panel.unread == sum(lane.captured is None for lane in lanes)
     assert panel.counts["with an archived lead rule"] == sum(
         1 for lane in lanes if lane.archived_lead_rules
     )
@@ -192,21 +198,28 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     )
 
 
-def _delivery(*readings: tuple[Agreement, Agreement]) -> Delivery:
-    """A delivery trace of one row for each pair of leads and lane input."""
+def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
+    """A delivery trace of one row for each captured pair, or ``None`` uncaptured.
+
+    A pair is the lane's ``same_leads`` and ``same_lane_artifacts``.
+    """
     reference = scorecard_of(BASELINE, CORPUS, Ledger()).rows[0]
     rows = tuple(
         DeliveryRow(
             reference=reference,
             lane=LaneTrace(
-                delivered=None if same_leads == "uncaptured" else "equal",
+                captured=None
+                if reading is None
+                else LaneComparison(
+                    delivered="equal",
+                    same_leads=reading[0],
+                    same_lane_artifacts=reading[1],
+                ),
                 rebuilt="equal",
-                same_leads=same_leads,
-                same_lane_input=same_input,
                 archived_lead_rules=(),
             ),
         )
-        for same_leads, same_input in readings
+        for reading in readings
     )
     return Delivery(run=reference.run, rows=rows, re_keyed=0, uncaptured={})
 
@@ -220,7 +233,7 @@ AGREES = ("agrees", "agrees")
         ((AGREES, AGREES), "unverified"),
         ((AGREES, ("agrees", "differs")), "known-different"),
         ((AGREES, ("differs", "differs")), "known-different"),
-        ((AGREES, ("uncaptured", "uncaptured")), "unverified"),
+        ((AGREES, None), "unverified"),
         ((), "unverified"),
     ],
 )

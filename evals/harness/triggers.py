@@ -71,7 +71,6 @@ __all__ = [
     "case_trigger_recall",
     "corpus_recall",
     "lead_rules",
-    "rebuilt_candidates",
     "rebuilt_lane_inputs",
 ]
 
@@ -215,13 +214,6 @@ def rebuilt_lane_inputs(
         report.assertions.catalog if report.assertions else None,
         MarkdownLoader(REPO_ROOT / "frameworks" / framework),
     )
-
-
-def rebuilt_candidates(
-    framework: FrameworkName, report: Report, options: Mapping[str, object]
-) -> Mapping[str, CandidateSet]:
-    """Each lane's candidates of :func:`rebuilt_lane_inputs`."""
-    return rebuilt_lane_inputs(framework, report, options).candidates
 
 
 def archived_lead_rules(

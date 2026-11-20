@@ -10,6 +10,7 @@ import pytest
 
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.frameworks import package_for
+from analysis_service.graph import unfence
 from analysis_service.sources import render_fenced
 from evals.harness import delivery, losses, panels, run
 from evals.harness.artifact import load_artifact
@@ -87,6 +88,15 @@ def _rendered(candidates: CandidateSet) -> str:
     return render_fenced(candidates.model_dump(mode="json"))
 
 
+def _candidates(sent) -> CandidateSet:
+    return CandidateSet.model_validate_json(unfence(sent["candidates"]))
+
+
+def _captured(traced: delivery.LaneTrace) -> delivery.LaneComparison:
+    assert traced.captured is not None
+    return traced.captured
+
+
 def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
     material = {
         "lanes": {"stride": {"tampering": {"candidates": _rendered(tampering)}}}
@@ -94,7 +104,22 @@ def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
 
     sent = captured_lane(material, "stride", "tampering")
 
-    assert delivery.sent_candidates(sent) == tampering
+    assert _candidates(sent) == tampering
+
+
+@pytest.mark.parametrize(
+    ("lane", "held"),
+    [
+        ("tampering", {"scope": "a scope"}),
+        ("tampering", {"candidates": "", "drafts": "a stray key"}),
+        ("spoofing", {"candidates": ""}),
+    ],
+)
+def test_a_capture_with_no_candidates_a_stray_key_or_no_lane_is_refused(lane, held):
+    material = {"lanes": {"stride": {"tampering": held}}}
+
+    with pytest.raises(EvalRunError, match="capture holds"):
+        captured_lane(material, "stride", lane)
 
 
 def test_a_capture_the_rebuild_reproduces_agrees(report, sent, flows, options):
@@ -102,8 +127,9 @@ def test_a_capture_the_rebuild_reproduces_agrees(report, sent, flows, options):
         ("store:message-queue",), "tampering", report, sent, flows, options
     )
 
-    assert traced.same_leads == traced.same_lane_input == "agrees"
-    assert traced.delivered == traced.rebuilt == "draft-contains"
+    assert _captured(traced).same_leads == "agrees"
+    assert _captured(traced).same_lane_artifacts == "agrees"
+    assert _captured(traced).delivered == traced.rebuilt == "draft-contains"
 
 
 def test_a_capture_without_a_rebuilt_candidate_differs(
@@ -120,8 +146,9 @@ def test_a_capture_without_a_rebuilt_candidate_differs(
         options,
     )
 
-    assert traced.same_leads == traced.same_lane_input == "differs"
-    assert traced.delivered == "absent"
+    assert _captured(traced).same_leads == "differs"
+    assert _captured(traced).same_lane_artifacts == "differs"
+    assert _captured(traced).delivered == "absent"
     assert traced.rebuilt == "equal"
 
 
@@ -147,8 +174,8 @@ def test_a_changed_candidate_payload_with_the_same_leads_is_not_equivalent(
     report, sent, flows, options, change
 ):
     """The #2314 reproduction: the same IDs, with other facts or questions."""
-    changed = change(delivery.sent_candidates(sent))
-    assert changed != delivery.sent_candidates(sent)
+    changed = change(_candidates(sent))
+    assert changed != _candidates(sent)
 
     traced = delivery.trace_lane(
         ("store:message-queue",),
@@ -160,8 +187,8 @@ def test_a_changed_candidate_payload_with_the_same_leads_is_not_equivalent(
     )
     path = panels.preparation_panel(_one_row(traced)).path
 
-    assert traced.same_leads == "agrees"
-    assert traced.same_lane_input == "differs"
+    assert _captured(traced).same_leads == "agrees"
+    assert _captured(traced).same_lane_artifacts == "differs"
     assert path is not None and path.fidelity == "known-different"
 
 
@@ -176,8 +203,8 @@ def test_a_changed_lane_artifact_differs(report, sent, flows, options, artifact)
         options,
     )
 
-    assert traced.same_leads == "agrees"
-    assert traced.same_lane_input == "differs"
+    assert _captured(traced).same_leads == "agrees"
+    assert _captured(traced).same_lane_artifacts == "differs"
 
 
 def test_a_lane_artifact_the_capture_lacks_differs(report, sent, flows, options):
@@ -187,16 +214,7 @@ def test_a_lane_artifact_the_capture_lacks_differs(report, sent, flows, options)
         ("store:message-queue",), "tampering", report, held, flows, options
     )
 
-    assert traced.same_lane_input == "differs"
-
-
-def test_a_capture_with_no_candidates_is_refused(report, sent, flows, options):
-    held = {name: text for name, text in sent.items() if name != "candidates"}
-
-    with pytest.raises(EvalRunError, match="holds no candidates"):
-        delivery.trace_lane(
-            ("store:message-queue",), "tampering", report, held, flows, options
-        )
+    assert _captured(traced).same_lane_artifacts == "differs"
 
 
 def test_an_agreeing_lane_leaves_the_evidence_payload_unverified(
@@ -224,8 +242,7 @@ def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows, options):
         ("store:message-queue",), "tampering", report, None, flows, options
     )
 
-    assert traced.same_leads == traced.same_lane_input == "uncaptured"
-    assert traced.delivered is None
+    assert traced.captured is None
     assert traced.rebuilt == "draft-contains"
 
 
@@ -293,39 +310,62 @@ def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
 
     lanes = [row.lane for row in traced.rows if row.lane is not None]
     assert lanes
-    assert {lane.same_leads for lane in lanes} == {"uncaptured"}
-    assert {lane.same_lane_input for lane in lanes} == {"uncaptured"}
-    assert {lane.delivered for lane in lanes} == {None}
+    assert {lane.captured for lane in lanes} == {None}
     assert set(traced.uncaptured) == {
         row.reference.case for row in traced.rows if row.lane is not None
     }
 
 
-def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
+CAPTURED_CASE = "02-iot-fleet-telemetry"
+
+
+def _captured_sweep(tmp_path: Path, extra: dict[str, str]) -> Path:
+    """The Baseline with a lane capture of today's rebuild for one case.
+
+    ``extra`` is added to each lane's artifacts.
+    """
     shutil.copy(BASELINE, tmp_path / BASELINE.name)
     reports = BASELINE.with_suffix(".reports")
     shutil.copytree(reports, tmp_path / reports.name)
-    case = "02-iot-fleet-telemetry"
-    report = read_report(reports / f"{case}.report.json")
+    report = read_report(reports / f"{CAPTURED_CASE}.report.json")
     (declared,) = [
-        each for each in load_corpus(REPO_ROOT / "evals/corpus") if each.id == case
+        each
+        for each in load_corpus(REPO_ROOT / "evals/corpus")
+        if each.id == CAPTURED_CASE
     ]
     sent = rebuilt_lane_inputs(
         "stride", report, declared.declaration("stride").options
     ).artifacts
     material = {
         "prepared": {"user": "the input prepare handed the lanes"},
-        "lanes": {"stride": {lane: dict(held) for lane, held in sent.items()}},
+        "lanes": {"stride": {lane: {**held, **extra} for lane, held in sent.items()}},
     }
-    (tmp_path / reports.name / f"{case}.lanes.json").write_text(json.dumps(material))
+    lanes = tmp_path / reports.name / f"{CAPTURED_CASE}.lanes.json"
+    lanes.write_text(json.dumps(material))
+    return tmp_path / BASELINE.name
 
-    traced = _trace(tmp_path / BASELINE.name)
 
-    (row,) = [row for row in traced.rows if row.reference.case == case and row.lane]
+def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
+    traced = _trace(_captured_sweep(tmp_path, {}))
+
+    (row,) = [
+        row for row in traced.rows if row.reference.case == CAPTURED_CASE and row.lane
+    ]
     assert row.lane is not None
-    assert row.lane.same_leads == row.lane.same_lane_input == "agrees"
-    assert row.lane.delivered == row.lane.rebuilt == "equal"
-    assert case not in traced.uncaptured
+    captured = _captured(row.lane)
+    assert captured.same_leads == captured.same_lane_artifacts == "agrees"
+    assert captured.delivered == row.lane.rebuilt == "equal"
+    assert CAPTURED_CASE not in traced.uncaptured
+
+
+def test_a_refused_lane_capture_reads_as_uncaptured_with_its_reason(tmp_path):
+    traced = _trace(_captured_sweep(tmp_path, {"drafts": "a stray key"}))
+
+    (row,) = [
+        row for row in traced.rows if row.reference.case == CAPTURED_CASE and row.lane
+    ]
+    assert row.lane is not None and row.lane.captured is None
+    assert "drafts" in traced.uncaptured[CAPTURED_CASE]
 
 
 def test_the_command_writes_the_trace_with_its_record(tmp_path):

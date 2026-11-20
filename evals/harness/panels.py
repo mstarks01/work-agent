@@ -316,22 +316,24 @@ def preparation_panel(result: Delivery) -> Panel:
 
     The path is ``known-different`` where a traced lane's captured artifacts
     differ from the rebuild. The candidates artifact holds the leads, so
-    ``same_leads`` differs only where ``same_lane_input`` differs too. Otherwise it is ``unverified`` and
-    never ``equivalent``: the shared keys every lane templates, the prepared
-    user turn and the case options have no rebuild from the archive, and the
-    evidence names each of them.
+    ``same_leads`` differs only where ``same_lane_artifacts`` differs too.
+    Otherwise it is ``unverified`` and never ``equivalent``: the shared keys
+    every lane templates, the prepared user turn and the case options have no
+    rebuild from the archive, and the evidence names each of them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
-    captured = [lane for lane in lanes if lane.same_leads != "uncaptured"]
+    captured = [lane.captured for lane in lanes if lane.captured is not None]
     uncaptured = len(lanes) - len(captured)
-    same_leads = Counter(lane.same_leads for lane in captured)
-    same_input = Counter(lane.same_lane_input for lane in captured)
-    delivered = Counter(lane.delivered for lane in lanes if lane.delivered is not None)
+    same_leads = Counter(each.same_leads for each in captured)
+    same_artifacts = Counter(each.same_lane_artifacts for each in captured)
+    delivered = Counter(each.delivered for each in captured)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
-    fidelity: Fidelity = "known-different" if same_input["differs"] else "unverified"
+    fidelity: Fidelity = (
+        "known-different" if same_artifacts["differs"] else "unverified"
+    )
     evidence = [
         "the delivered candidates are the lane input the archived run sent",
-        "the rebuilt lane input reads today's corpus options",
+        "the rebuilt lane artifacts read today's corpus options",
         "not compared: the case options, which the archive does not record",
         "not compared: the prepared user turn",
         *(f"not compared: the shared key {key}" for key in LANE_SHARED_KEYS),
@@ -343,7 +345,10 @@ def preparation_panel(result: Delivery) -> Panel:
         unit=f"charged must-find miss of cause {' or '.join(sorted(SILENT))}",
         counts={
             **{f"same leads {key}": n for key, n in sorted(same_leads.items())},
-            **{f"same lane input {key}": n for key, n in sorted(same_input.items())},
+            **{
+                f"same lane artifacts {key}": n
+                for key, n in sorted(same_artifacts.items())
+            },
             "lane material uncaptured": uncaptured,
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
             **{f"rebuilt {key}": count for key, count in sorted(rebuilt.items())},

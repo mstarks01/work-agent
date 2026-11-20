@@ -55,6 +55,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.graph import (
+    LANE_ARTIFACTS,
     STATE_ASSERTION_PROPOSAL,
     STATE_FRAMEWORK_OPTIONS,
     STATE_VALID_MODEL,
@@ -138,13 +139,25 @@ def material_at(path: Path) -> dict[str, Any]:
 def captured_lane(
     material: Mapping[str, Any], framework: FrameworkName, lane_name: str
 ) -> Mapping[LaneArtifact, str]:
-    """One lane's captured artifacts in ``material``, keyed by placeholder.
+    """One lane's captured artifacts in ``material``, keyed by placeholder, or a refusal.
 
     A key that ``prepare`` did not write is absent, so the mapping can hold
-    fewer keys than :data:`~analysis_service.graph.LaneArtifact` names.
+    fewer keys than :data:`~analysis_service.graph.LaneArtifact` names. It
+    always holds ``candidates``, and it holds no key outside
+    :data:`~analysis_service.graph.LANE_ARTIFACTS`.
     """
-    held: Mapping[LaneArtifact, str] = material["lanes"][framework][lane_name]
-    return held
+    held = material.get("lanes", {}).get(framework, {}).get(lane_name)
+    if held is None:
+        raise EvalRunError(f"the capture holds no {framework} lane {lane_name!r}")
+    stray = sorted(set(held) - set(LANE_ARTIFACTS))
+    if stray or "candidates" not in held:
+        raise EvalRunError(
+            f"the {framework} lane {lane_name!r} capture holds"
+            f" {', '.join(sorted(held))}: it needs candidates and only"
+            f" {', '.join(LANE_ARTIFACTS)}"
+        )
+    artifacts: Mapping[LaneArtifact, str] = held
+    return artifacts
 
 
 async def compose(

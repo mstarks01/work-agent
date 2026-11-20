@@ -194,7 +194,7 @@ from evals.harness.stability import (
     load_runs,
 )
 from evals.harness.structural import report_issues
-from evals.harness.triggers import rebuilt_candidates
+from evals.harness.triggers import rebuilt_lane_inputs
 from evals.harness.withheld import (
     AnswerFile,
     answers_within_saves,
@@ -743,9 +743,9 @@ def _score_runs(
                 flows_by_case[case.id],
                 block,
                 proposed=runs[case.id].proposals.get("stride", {}),
-                candidates=rebuilt_candidates(
+                candidates=rebuilt_lane_inputs(
                     "stride", report, case.declaration("stride").options
-                ),
+                ).candidates,
             )
         )
     return (
