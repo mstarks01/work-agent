@@ -184,7 +184,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
         CORPUS,
     )
     lanes = [row.lane for row in result.rows]
-    facts = [fact for row in result.rows for fact in row.facts.facts]
+    facts = [fact for row in result.rows for fact in row.place_facts.traces]
 
     panel = panels.preparation_panel(result)
 
@@ -227,7 +227,7 @@ def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
                 rebuilt="equal",
                 archived_lead_rules=(),
             ),
-            facts=PlaceFacts((), ""),
+            place_facts=PlaceFacts((), ""),
             control=None,
         )
         for reading in readings

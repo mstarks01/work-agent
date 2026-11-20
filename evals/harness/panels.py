@@ -329,7 +329,9 @@ def preparation_panel(result: Delivery) -> Panel:
     same_artifacts = Counter(each.same_lane_artifacts for each in compared)
     delivered = Counter(each.delivered for each in compared)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
-    facts = Counter(fact.delivered for row in result.rows for fact in row.facts.facts)
+    facts = Counter(
+        fact.delivered for row in result.rows for fact in row.place_facts.traces
+    )
     fidelity: Fidelity = (
         "known-different" if same_artifacts["differs"] else "unverified"
     )
@@ -363,10 +365,12 @@ def preparation_panel(result: Delivery) -> Panel:
             ),
             **{f"place facts {state}": facts[state] for state in FACT_DELIVERIES},
             "with required facts undefined": sum(
-                1 for row in result.rows if not row.facts.facts and not row.facts.unread
+                1
+                for row in result.rows
+                if not row.place_facts.traces and not row.place_facts.unread
             ),
             "with place facts unread": sum(
-                1 for row in result.rows if row.facts.unread
+                1 for row in result.rows if row.place_facts.unread
             ),
             "with no control": sum(1 for row in result.rows if row.control is None),
             "re-keyed must-finds outside the population": result.re_keyed,

@@ -246,7 +246,7 @@ def _one_row(traced: delivery.LaneTrace) -> delivery.Delivery:
     row = delivery.DeliveryRow(
         reference=card.rows[0],
         lane=traced,
-        facts=delivery.PlaceFacts((), ""),
+        place_facts=delivery.PlaceFacts((), ""),
         control=None,
     )
     return delivery.Delivery(run=card.run, rows=(row,), re_keyed=0, untraced={})
@@ -315,7 +315,8 @@ def test_each_charged_miss_is_a_row_and_a_verb_row_is_traced_too():
     causes = {row.reference.cause for row in traced.rows}
     assert "verb" in causes and causes - losses.SILENT
     assert all(
-        row.facts.facts or row.facts.describe() == "required facts: undefined"
+        row.place_facts.traces
+        or row.place_facts.describe() == "required facts: undefined"
         for row in traced.rows
     )
 
@@ -326,7 +327,7 @@ def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
     assert traced.rows
     assert {row.lane.comparison for row in traced.rows} == {None}
     assert set(traced.untraced) == {row.reference.case for row in traced.rows}
-    facts = [fact for row in traced.rows for fact in row.facts.facts]
+    facts = [fact for row in traced.rows for fact in row.place_facts.traces]
     assert facts
     assert {fact.stages["lane system model"].state for fact in facts} <= {"unavailable"}
     assert {fact.stages["catalog"].reason for fact in facts} == {
@@ -505,10 +506,10 @@ def test_a_verb_row_with_its_place_facts_sent_reads_n_of_n(tmp_path):
     """The control of the negative fixture below: the same capture, unchanged."""
     row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE)))
 
-    assert row.facts.facts
-    assert {fact.delivered for fact in row.facts.facts} == {"delivered"}
-    count = len(row.facts.facts)
-    assert row.facts.describe() == f"place facts delivered {count} of {count}"
+    assert row.place_facts.traces
+    assert {fact.delivered for fact in row.place_facts.traces} == {"delivered"}
+    count = len(row.place_facts.traces)
+    assert row.place_facts.describe() == f"place facts delivered {count} of {count}"
 
 
 def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path):
@@ -516,7 +517,9 @@ def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path
     (tmp_path / "sent").mkdir()
     (tmp_path / "lost").mkdir()
     sent = _verb_row(_trace(_captured_sweep(tmp_path / "sent", {}, VERB_CASE)))
-    (zone,) = [f for f in sent.facts.facts if f.predicate == "network-membership"]
+    (zone,) = [
+        f for f in sent.place_facts.traces if f.predicate == "network-membership"
+    ]
 
     lost = _verb_row(
         _trace(
@@ -526,14 +529,14 @@ def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path
         )
     )
 
-    (fact,) = [f for f in lost.facts.facts if f.fact == zone.fact]
+    (fact,) = [f for f in lost.place_facts.traces if f.fact == zone.fact]
     assert fact.delivered == "not delivered"
     assert fact.lost_at == "lane system model"
     assert fact.stages["projected model"].state == "present"
-    others = [f for f in lost.facts.facts if f.fact != zone.fact]
+    others = [f for f in lost.place_facts.traces if f.fact != zone.fact]
     assert {f.delivered for f in others} <= {"delivered"}
-    count = len(lost.facts.facts)
-    assert lost.facts.describe() == (
+    count = len(lost.place_facts.traces)
+    assert lost.place_facts.describe() == (
         f"place facts delivered {count - 1} of {count} (lost: 1 at lane system model)"
     )
 
@@ -541,8 +544,8 @@ def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path
 def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
     row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE, signed=True)))
 
-    assert row.facts.facts
-    for fact in row.facts.facts:
+    assert row.place_facts.traces
+    for fact in row.place_facts.traces:
         assert fact.stages["catalog"] == delivery.StageReading(
             "present", f"found: {fact.fact}"
         )
@@ -563,7 +566,7 @@ def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
 )
 def test_a_field_states_a_value_exactly_or_by_its_state(held, value, predicate, state):
     """Two stated free-text values are a reader's question, never a match."""
-    assert delivery.holds(held, value, predicate).state == state
+    assert delivery.field_reading(held, value, predicate).state == state
 
 
 def _row(card, **changes):

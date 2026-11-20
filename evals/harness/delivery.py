@@ -5,7 +5,7 @@ every charged miss through its lane, whatever the cause, and states two things
 apart: whether the lane was sent the leads at the reference's place, and
 whether it was sent the signed facts at that place. A draft at the place shows
 neither. A lane can write about the right element without the principal, the
-authority or the control value the finding turns on.
+authority or the protection the finding turns on.
 
 **Lead identities delivered.** For each row, :class:`LaneTrace` gives these
 readings:
@@ -368,32 +368,29 @@ class PlaceFactTrace:
 class PlaceFacts:
     """The signed facts at one reference's place, each traced to the lane."""
 
-    facts: tuple[PlaceFactTrace, ...]
+    traces: tuple[PlaceFactTrace, ...]
     #: Why the case's facts are not read, or ``""`` where they are.
     unread: str
 
     def describe(self) -> str:
         if self.unread:
             return f"place facts unavailable: {self.unread}"
-        if not self.facts:
+        if not self.traces:
             return "required facts: undefined"
-        delivered = Counter(fact.delivered for fact in self.facts)
-        shown = f"place facts delivered {delivered['delivered']} of {len(self.facts)}"
+        delivered = Counter(fact.delivered for fact in self.traces)
+        shown = f"place facts delivered {delivered['delivered']} of {len(self.traces)}"
         if delivered["unavailable"]:
             shown += f", {delivered['unavailable']} unavailable"
-        lost = Counter(fact.lost_at for fact in self.facts if fact.lost_at is not None)
-        if lost:
-            shown += " (lost: {})".format(
-                ", ".join(
-                    f"{count} at {stage}" for stage, count in sorted(lost.items())
-                )
-            )
+        lost = Counter(fact.lost_at for fact in self.traces)
+        named = [f"{lost[stage]} at {stage}" for stage in PLACE_STAGES if lost[stage]]
+        if named:
+            shown += f" (lost: {', '.join(named)})"
         return shown
 
     def to_json(self) -> dict[str, Any]:
         return {
             "unread": self.unread,
-            "facts": [fact.to_json() for fact in self.facts],
+            "facts": [fact.to_json() for fact in self.traces],
         }
 
 
@@ -496,7 +493,7 @@ def case_facts(
     )
 
 
-def holds(held: object, value: str, predicate: str) -> StageReading:
+def field_reading(held: object, value: str, predicate: str) -> StageReading:
     """Whether a field that holds ``held`` states the projected ``value``.
 
     A term and a graph-bound reference compare exactly
@@ -558,7 +555,7 @@ def _candidate_facts(
     if sent is None:
         return StageReading("unavailable", "the lane is untraced")
     readings = [
-        holds(candidate.facts.get(attribute), value, predicate)
+        field_reading(candidate.facts.get(attribute), value, predicate)
         for candidate in sent.candidates.candidates
         if subject in candidate.element_ids and attribute in candidate.facts
     ]
@@ -603,13 +600,13 @@ def trace_fact(
             element.id: element for element in facts.report.system_model.elements()
         }
         element = model.get(entry.subject)
-        stages["projected model"] = holds(
+        stages["projected model"] = field_reading(
             getattr(element, attribute, None), projection.value, entry.predicate
         )
         stages["lane system model"] = (
             StageReading("unavailable", facts.untraced)
             if facts.shared is None
-            else holds(
+            else field_reading(
                 facts.shared.elements.get(entry.subject, {}).get(attribute),
                 projection.value,
                 entry.predicate,
@@ -664,13 +661,13 @@ class TracedReference:
 
     reference: ReferenceRow
     lane: LaneTrace
-    facts: PlaceFacts
+    place_facts: PlaceFacts
 
     def to_json(self) -> dict[str, Any]:
         return {
             "reference": self.reference.to_json(),
             "lane": self.lane.to_json(),
-            "place_facts": self.facts.to_json(),
+            "place_facts": self.place_facts.to_json(),
         }
 
     def describe(self) -> str:
@@ -681,7 +678,7 @@ class TracedReference:
             f" {reference.cause or reference.status} [{reference.compatibility}]:"
             f" {compared}, rebuilt {lane.rebuilt}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
-            f" {', '.join(lane.archived_lead_rules) or '-'}; {self.facts.describe()}"
+            f" {', '.join(lane.archived_lead_rules) or '-'}; {self.place_facts.describe()}"
         )
 
 
@@ -786,7 +783,7 @@ def trace(
                 flows[row.case],
                 by_id[row.case].declaration("stride").options,
             ),
-            facts=place_facts(row.elements, facts_by_case[row.case], lane),
+            place_facts=place_facts(row.elements, facts_by_case[row.case], lane),
         )
 
     rows = []
