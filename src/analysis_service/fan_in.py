@@ -406,8 +406,8 @@ class JoinedDrafts(NamedTuple):
     fan-in has no re-ask path, so the second kind must never fail a report.
 
     ``quotes_checked`` says whether the quote check ran. It is false where the
-    job had no sources, and then a quote ground carries no mark because nothing
-    checked it, not because it verified.
+    map of source texts is empty, and then a quote ground carries no mark
+    because nothing checked it, not because it verified.
     """
 
     drafts: list[Claim]
