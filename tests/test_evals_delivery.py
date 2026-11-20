@@ -612,7 +612,7 @@ def test_a_row_with_no_control_and_no_place_fact_says_so(capsys):
     assert "required facts: undefined" in out
 
 
-def test_a_capture_with_no_shared_model_is_untraced(tmp_path):
+def test_a_capture_with_no_shared_model_leaves_the_leads_traced(tmp_path):
     artifact = _captured_sweep(tmp_path, {})
     lanes = artifact.with_suffix(".reports") / f"{CAPTURED_CASE}.lanes.json"
     material = json.loads(lanes.read_text())
@@ -634,7 +634,6 @@ def _case_facts(report, shared, projections=None):
     return delivery.CaseFacts(
         reference=None,
         unread="",
-        report=report,
         replay=None,
         elements={element.id: element for element in report.system_model.elements()},
         projections=projections or {},

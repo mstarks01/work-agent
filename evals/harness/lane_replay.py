@@ -189,10 +189,7 @@ class SharedInput:
 
 
 def captured_shared(material: Mapping[str, Any]) -> SharedInput:
-    """The captured ``system_model`` and ``evidence_catalog`` of a case, or a refusal.
-
-    The one reader of a lane capture's shared keys as values.
-    """
+    """The captured ``system_model`` and ``evidence_catalog`` of a case, or a refusal."""
     shared = material.get("shared")
     held = shared if isinstance(shared, Mapping) else {}
     texts = {

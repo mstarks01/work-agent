@@ -296,7 +296,7 @@ ANSWERING_FATES: frozenset[AnsweredFate] = frozenset(
 
 #: How a reference's place facts stand: the case's facts are not read, the
 #: place holds no signed fact, or each fact is traced.
-PlaceStanding = Literal["unread", "undefined", "traced"]
+PlaceStanding = Literal["unread", "none", "traced"]
 PLACE_STANDINGS: tuple[PlaceStanding, ...] = get_args(PlaceStanding)
 
 #: Why an analysis sweep has no raw extraction to read.
@@ -385,12 +385,12 @@ class PlaceFacts:
     def standing(self) -> PlaceStanding:
         if self.unread:
             return "unread"
-        return "traced" if self.traces else "undefined"
+        return "traced" if self.traces else "none"
 
     def describe(self) -> str:
         if self.standing == "unread":
             return f"place facts unavailable: {self.unread}"
-        if self.standing == "undefined":
+        if self.standing == "none":
             return "required facts: undefined"
         delivered = Counter(fact.delivered for fact in self.traces)
         shown = f"place facts delivered {delivered['delivered']} of {len(self.traces)}"
@@ -416,7 +416,6 @@ class CaseFacts:
     reference: SignedReference | None
     #: Why ``reference`` is ``None``, or ``""``.
     unread: str
-    report: Report
     #: The report's catalog against the signed reference, or ``None`` where the
     #: report holds no assertion record.
     replay: AssertionReplay | None
@@ -448,7 +447,6 @@ def case_facts(
     return CaseFacts(
         reference=reference,
         unread="" if reference is not None else unsigned_reason(corpus, case),
-        report=report,
         replay=replayed,
         elements={element.id: element for element in report.system_model.elements()},
         projections=(
@@ -472,8 +470,10 @@ def field_reading(held: object, value: str, predicate: str) -> StageReading:
     :func:`~analysis_service.analysis.control_state` first: two states that
     differ are two facts. Two stated free-text values are a reader's question.
     """
-    if not isinstance(held, str):
+    if held is None:
         return StageReading("absent", "the field is not there")
+    if not isinstance(held, str):
+        return StageReading("absent", f"holds {held!r}, not text")
     if held == value:
         return StageReading("present", f"holds {held!r}")
     if compares_exactly(predicate) or control_state(held) != control_state(value):
@@ -500,27 +500,33 @@ def catalog_reading(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
 
 
 def evidence_reading(
-    catalog: StageReading, produced: str, facts: CaseFacts
+    catalog: StageReading, produced_own: str, facts: CaseFacts
 ) -> StageReading:
     """The lane evidence catalog stage: the key the run's own row is filed under.
 
-    ``produced`` is that row's ID before the signed aliases, as
+    ``produced_own`` is that row's ID before the signed aliases, as
     :attr:`~evals.harness.replay.ReferenceRowFate.produced_own` holds it.
     """
     if facts.shared is None:
         return StageReading("unavailable", facts.unshared)
     if catalog.state == "absent":
         return StageReading("absent", "no catalog row answers the fact")
-    if not produced:
+    if not produced_own:
         return StageReading("unavailable", "the alignment names no produced row")
-    if produced in catalog_refs(facts.shared.evidence_catalog):
-        return StageReading("present", f"keys {produced}")
-    return StageReading("absent", f"no key {produced}")
+    if produced_own in catalog_refs(facts.shared.evidence_catalog):
+        return StageReading("present", f"keys {produced_own}")
+    return StageReading("absent", f"no key {produced_own}")
 
 
 def candidate_reading(
     subject: str, attribute: str, value: str, predicate: str, sent: SentLane | None
 ) -> StageReading:
+    """The candidate facts stage: a candidate on the subject that carries the field.
+
+    A candidate's facts are keyed by attribute, not by element, so an
+    attribute fact of a candidate that names the subject is read as the
+    subject's own.
+    """
     if sent is None:
         return StageReading("unavailable", "the lane is untraced")
     readings = [
@@ -543,11 +549,11 @@ def trace_fact(
     """One signed place fact, read at each stage the archive holds."""
     assert facts.reference is not None
     fact_id = assertion_id(entry)
-    catalog, produced = catalog_reading(fact_id, facts)
+    catalog, produced_own = catalog_reading(fact_id, facts)
     stages: dict[PlaceStage, StageReading] = {
         "raw extraction": StageReading("unavailable", NO_EXTRACTION),
         "catalog": catalog,
-        "lane evidence catalog": evidence_reading(catalog, produced, facts),
+        "lane evidence catalog": evidence_reading(catalog, produced_own, facts),
     }
     attribute = projected_attribute(entry.predicate, entry.subject)
     if not attribute:
