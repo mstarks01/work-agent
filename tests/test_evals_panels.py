@@ -202,9 +202,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     assert sum(
         panel.counts[f"place facts {state}"] for state in delivery.FACT_DELIVERIES
     ) == len(facts)
-    assert panel.counts["with no control"] == sum(
-        row.control is None for row in result.rows
-    )
+    assert panel.counts["with no peer"] == sum(row.peer is None for row in result.rows)
 
 
 def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
@@ -228,7 +226,7 @@ def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
                 archived_lead_rules=(),
             ),
             place_facts=PlaceFacts((), ""),
-            control=None,
+            peer=None,
         )
         for reading in readings
     )

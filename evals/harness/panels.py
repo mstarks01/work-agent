@@ -366,7 +366,7 @@ def preparation_panel(result: Delivery) -> Panel:
             ),
             **{f"place facts {state}": facts[state] for state in FACT_DELIVERIES},
             **{f"with place facts {kind}": kinds[kind] for kind in PLACE_FACT_SETS},
-            "with no control": sum(1 for row in result.rows if row.control is None),
+            "with no peer": sum(1 for row in result.rows if row.peer is None),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
         rates={"lane material traced": Rate(len(compared), len(lanes))},
