@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from analysis_service.assertions import (
+    AssertionCatalog,
     AssertionRecord,
     Projection,
     assertion_id,
@@ -27,11 +28,11 @@ from analysis_service.sources import render_fenced
 from evals.harness import delivery, losses, panels, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
-from evals.harness.lane_replay import captured_lane
+from evals.harness.lane_replay import SharedInput, captured_lane
 from evals.harness.ledger import Ledger
-from evals.harness.modes import EvalRunError
+from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
-from evals.harness.replay import signed_reference
+from evals.harness.replay import replay_assertions, signed_reference
 from evals.harness.scorecard import charged_misses
 from evals.harness.triggers import rebuilt_lane_inputs
 
@@ -536,11 +537,11 @@ def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path
         )
     )
 
-    (fact,) = [f for f in lost.place_facts.traces if f.fact == zone.fact]
+    (fact,) = [f for f in lost.place_facts.traces if f.fact_id == zone.fact_id]
     assert fact.delivered == "not delivered"
     assert fact.lost_at == "lane system model"
     assert fact.stages["projected model"].state == "present"
-    others = [f for f in lost.place_facts.traces if f.fact != zone.fact]
+    others = [f for f in lost.place_facts.traces if f.fact_id != zone.fact_id]
     assert {f.delivered for f in others} <= {"delivered"}
     count = len(lost.place_facts.traces)
     assert lost.place_facts.describe() == (
@@ -554,7 +555,7 @@ def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
     assert row.place_facts.traces
     for fact in row.place_facts.traces:
         assert fact.stages["catalog"] == delivery.StageReading(
-            "present", f"found: {fact.fact}"
+            "present", f"found: {fact.fact_id}"
         )
         assert fact.stages["raw extraction"].state == "unavailable"
         assert fact.delivered == "delivered"
@@ -620,19 +621,25 @@ def test_a_capture_with_no_shared_model_is_untraced(tmp_path):
 
     traced = _trace(artifact)
 
-    assert "no shared system_model" in traced.untraced[CAPTURED_CASE]
+    (row,) = [row for row in traced.rows if row.reference.case == CAPTURED_CASE]
+    assert CAPTURED_CASE not in traced.untraced
+    assert row.lane.comparison is not None
+    assert row.place_facts.traces
+    for fact in row.place_facts.traces:
+        assert fact.stages["lane evidence catalog"].state == "unavailable"
+        assert "no shared system_model" in fact.stages["lane evidence catalog"].reason
 
 
-def _case_facts(report, shared, own_ids, projections=None):
+def _case_facts(report, shared, projections=None):
     return delivery.CaseFacts(
         reference=None,
         unread="",
         report=report,
         replay=None,
-        own_ids=own_ids,
+        elements={element.id: element for element in report.system_model.elements()},
         projections=projections or {},
         shared=shared,
-        untraced="",
+        unshared="",
     )
 
 
@@ -652,12 +659,34 @@ def _table(*rows: tuple[str, str]) -> str:
 def test_the_evidence_stage_reads_the_key_the_catalog_filed_the_row_under(
     report, table, state
 ):
-    """The replay reads a row under the signed aliases; the table keys its own ID."""
-    shared = delivery.SharedInput(elements={}, evidence_catalog=table)
-    facts = _case_facts(report, shared, {"assertion:read": ("assertion:own",)})
+    """The table keys the run's own row ID, and a gloss that quotes it is no key."""
+    shared = SharedInput(elements={}, evidence_catalog=table)
+    facts = _case_facts(report, shared)
     catalog = delivery.StageReading("present", "found: assertion:read")
 
-    assert delivery.evidence_reading(catalog, "assertion:read", facts).state == state
+    assert delivery.evidence_reading(catalog, "assertion:own", facts).state == state
+
+
+def test_the_replay_names_the_run_s_own_id_of_a_row_read_under_an_alias():
+    """The evidence table keys the run's ID, never the ID after the aliases."""
+    corpus = REPO_ROOT / "evals/corpus"
+    (golden,) = [
+        each for each in load_corpus(corpus) if each.id == "04-ml-inference-service"
+    ]
+    reference = signed_reference(corpus, golden)
+    assert reference is not None
+    alias, target = next(iter(reference.subject_aliases.items()))
+    entry = next(row for row in reference.entries if row.subject == target.to)
+    produced = entry.model_copy(update={"subject": alias})
+    record = AssertionRecord(proposed=1, catalog=AssertionCatalog(entries=[produced]))
+
+    replayed = replay_assertions(
+        golden, reference, AssertionResult(golden.id, proposal={}, record=record)
+    )
+
+    (row,) = [row for row in replayed.rows if row.reference == assertion_id(entry)]
+    assert row.produced == assertion_id(entry)
+    assert row.produced_own == assertion_id(produced) != row.produced
 
 
 def test_a_projection_the_signed_rows_leave_unsettled_is_unavailable(report, case):
@@ -678,7 +707,7 @@ def test_a_projection_the_signed_rows_leave_unsettled_is_unavailable(report, cas
         rows=(),
     )
     facts = replace(
-        _case_facts(report, None, {}, {(entry.subject, attribute): unsettled}),
+        _case_facts(report, None, {(entry.subject, attribute): unsettled}),
         reference=reference,
     )
 

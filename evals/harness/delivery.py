@@ -65,7 +65,6 @@ each case's lanes are given other material.
 
 from __future__ import annotations
 
-import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -87,17 +86,21 @@ from analysis_service.assertions import (
 from analysis_service.candidates import CandidateSet, leads
 from analysis_service.evidence import catalog_refs
 from analysis_service.graph import (
-    STATE_EVIDENCE_CATALOG,
-    STATE_SYSTEM_MODEL,
     LaneArtifact,
     unfence,
 )
 from analysis_service.report import Report
-from analysis_service.system_model import ELEMENT_GROUPS
+from analysis_service.system_model import Element
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
-from evals.harness.lane_replay import captured_lane, lanes_file, material_at
+from evals.harness.lane_replay import (
+    SharedInput,
+    captured_lane,
+    captured_shared,
+    lanes_file,
+    material_at,
+)
 from evals.harness.losses import RELATIONS, UNREAD_CAUSE, Relation, relation
 from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, flows_by_case
@@ -109,7 +112,6 @@ from evals.harness.replay import (
     replay_assertions,
     required_rows,
     signed_reference,
-    under_aliases,
     unsigned_reason,
 )
 from evals.harness.scorecard import (
@@ -292,6 +294,11 @@ ANSWERING_FATES: frozenset[AnsweredFate] = frozenset(
     {"found", "worded", "wrong_certainty"}
 )
 
+#: How a reference's place facts stand: the case's facts are not read, the
+#: place holds no signed fact, or each fact is traced.
+PlaceStanding = Literal["unread", "undefined", "traced"]
+PLACE_STANDINGS: tuple[PlaceStanding, ...] = get_args(PlaceStanding)
+
 #: Why an analysis sweep has no raw extraction to read.
 NO_EXTRACTION = "an analysis sweep seeds the blessed model, so no extraction ran"
 
@@ -312,7 +319,7 @@ class PlaceFactTrace:
     """One signed place fact, read at each :data:`PlaceStage`."""
 
     #: The signed row's assertion ID.
-    fact: str
+    fact_id: str
     predicate: str
     subject: str
     #: The graph field the row reaches, or ``""`` where it reaches none.
@@ -356,7 +363,7 @@ class PlaceFactTrace:
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "fact": self.fact,
+            "fact_id": self.fact_id,
             "predicate": self.predicate,
             "subject": self.subject,
             "attribute": self.attribute,
@@ -374,10 +381,16 @@ class PlaceFacts:
     #: Why the case's facts are not read, or ``""`` where they are.
     unread: str
 
-    def describe(self) -> str:
+    @property
+    def standing(self) -> PlaceStanding:
         if self.unread:
+            return "unread"
+        return "traced" if self.traces else "undefined"
+
+    def describe(self) -> str:
+        if self.standing == "unread":
             return f"place facts unavailable: {self.unread}"
-        if not self.traces:
+        if self.standing == "undefined":
             return "required facts: undefined"
         delivered = Counter(fact.delivered for fact in self.traces)
         shown = f"place facts delivered {delivered['delivered']} of {len(self.traces)}"
@@ -397,45 +410,6 @@ class PlaceFacts:
 
 
 @dataclass(frozen=True)
-class SharedInput:
-    """The shared keys a case's lanes were sent, as the sweep captured them."""
-
-    #: Each element of the captured ``system_model``, by its ID.
-    elements: Mapping[str, Mapping[str, Any]]
-    evidence_catalog: str
-
-
-def sent_shared(material: Mapping[str, Any]) -> SharedInput:
-    """The captured ``system_model`` and ``evidence_catalog`` of a case, or a refusal."""
-    shared = material.get("shared")
-    held = shared if isinstance(shared, Mapping) else {}
-    texts = {
-        key: text
-        for key in (STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG)
-        if isinstance(text := held.get(key), str)
-    }
-    missing = sorted({STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG} - set(texts))
-    if missing:
-        raise EvalRunError(f"the capture holds no shared {', '.join(missing)} text")
-    try:
-        model = json.loads(unfence(texts[STATE_SYSTEM_MODEL]))
-    except json.JSONDecodeError as error:
-        raise EvalRunError(
-            f"the captured system model is not JSON: {error.msg}"
-        ) from error
-    if not isinstance(model, dict):
-        raise EvalRunError("the captured system model holds no JSON object")
-    elements = {
-        element["id"]: element
-        for group in ELEMENT_GROUPS
-        if isinstance(collection := model.get(group), list)
-        for element in collection
-        if isinstance(element, dict) and isinstance(element.get("id"), str)
-    }
-    return SharedInput(elements, texts[STATE_EVIDENCE_CATALOG])
-
-
-@dataclass(frozen=True)
 class CaseFacts:
     """What one case holds for its place-fact traces."""
 
@@ -446,16 +420,15 @@ class CaseFacts:
     #: The report's catalog against the signed reference, or ``None`` where the
     #: report holds no assertion record.
     replay: AssertionReplay | None
-    #: Each ID the report's catalog gives a row, by the ID the replay reads it
-    #: under: the replay rewrites a row through the signed aliases first.
-    own_ids: Mapping[str, tuple[str, ...]]
+    #: Each element of the report's model, by its ID.
+    elements: Mapping[str, Element]
     #: What each graph attribute the signed rows reach would hold, by element
     #: and attribute.
     projections: Mapping[tuple[str, str], Projection]
-    #: ``None`` where the case's lane material is untraced.
+    #: ``None`` where the case's shared keys are not read.
     shared: SharedInput | None
     #: Why ``shared`` is ``None``, or ``""``.
-    untraced: str
+    unshared: str
 
 
 def case_facts(
@@ -463,25 +436,21 @@ def case_facts(
     corpus: Path,
     report: Report,
     shared: SharedInput | None,
-    untraced: str,
+    unshared: str,
 ) -> CaseFacts:
     """The signed reference and the report's catalog replayed against it."""
     reference = signed_reference(corpus, case)
     replayed = None
-    own_ids: dict[str, tuple[str, ...]] = {}
     if reference is not None and report.assertions is not None:
         # The report keeps no proposal, and the replay reads none.
         result = AssertionResult(case.id, proposal={}, record=report.assertions)
         replayed = replay_assertions(case, reference, result)
-        for entry in report.assertions.catalog.entries:
-            read = assertion_id(under_aliases(entry, reference))
-            own_ids[read] = (*own_ids.get(read, ()), assertion_id(entry))
     return CaseFacts(
         reference=reference,
         unread="" if reference is not None else unsigned_reason(corpus, case),
         report=report,
         replay=replayed,
-        own_ids=own_ids,
+        elements={element.id: element for element in report.system_model.elements()},
         projections=(
             {}
             if reference is None
@@ -491,7 +460,7 @@ def case_facts(
             }
         ),
         shared=shared,
-        untraced=untraced,
+        unshared=unshared,
     )
 
 
@@ -517,14 +486,14 @@ def field_reading(held: object, value: str, predicate: str) -> StageReading:
     )
 
 
-def _catalog(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
-    """The catalog stage, and the produced row's ID where one answers the fact."""
+def catalog_reading(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
+    """The catalog stage, and the ID the run's catalog keys its answering row by."""
     if facts.replay is None:
         # A job that ran no assertion pass kept no catalog to carry the fact.
         return StageReading("absent", "the report holds no assertion record"), ""
     row = next(row for row in facts.replay.rows if row.reference == fact)
     if row.fate in ANSWERING_FATES:
-        return StageReading("present", f"{row.fate}: {row.produced}"), row.produced
+        return StageReading("present", f"{row.fate}: {row.produced}"), row.produced_own
     if fact in facts.replay.aligned:
         return StageReading("present", "aligned under another flow label"), ""
     return StageReading("absent", row.fate), ""
@@ -533,25 +502,23 @@ def _catalog(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
 def evidence_reading(
     catalog: StageReading, produced: str, facts: CaseFacts
 ) -> StageReading:
-    """The lane evidence catalog stage: a key the report's own row is filed under.
+    """The lane evidence catalog stage: the key the run's own row is filed under.
 
-    ``produced`` is the ID the replay read the row under, after the signed
-    aliases, and :attr:`CaseFacts.own_ids` gives the ID the catalog keyed.
+    ``produced`` is that row's ID before the signed aliases, as
+    :attr:`~evals.harness.replay.ReferenceRowFate.produced_own` holds it.
     """
     if facts.shared is None:
-        return StageReading("unavailable", facts.untraced)
+        return StageReading("unavailable", facts.unshared)
     if catalog.state == "absent":
         return StageReading("absent", "no catalog row answers the fact")
     if not produced:
         return StageReading("unavailable", "the alignment names no produced row")
-    keys = catalog_refs(facts.shared.evidence_catalog)
-    found = [ref for ref in facts.own_ids.get(produced, ()) if ref in keys]
-    if found:
-        return StageReading("present", f"keys {found[0]}")
-    return StageReading("absent", f"no key for {produced}")
+    if produced in catalog_refs(facts.shared.evidence_catalog):
+        return StageReading("present", f"keys {produced}")
+    return StageReading("absent", f"no key {produced}")
 
 
-def _candidate_facts(
+def candidate_reading(
     subject: str, attribute: str, value: str, predicate: str, sent: SentLane | None
 ) -> StageReading:
     if sent is None:
@@ -575,8 +542,8 @@ def trace_fact(
 ) -> PlaceFactTrace:
     """One signed place fact, read at each stage the archive holds."""
     assert facts.reference is not None
-    fact = assertion_id(entry)
-    catalog, produced = _catalog(fact, facts)
+    fact_id = assertion_id(entry)
+    catalog, produced = catalog_reading(fact_id, facts)
     stages: dict[PlaceStage, StageReading] = {
         "raw extraction": StageReading("unavailable", NO_EXTRACTION),
         "catalog": catalog,
@@ -598,15 +565,12 @@ def trace_fact(
             ),
         )
     else:
-        model = {
-            element.id: element for element in facts.report.system_model.elements()
-        }
-        element = model.get(entry.subject)
+        element = facts.elements.get(entry.subject)
         stages["projected model"] = field_reading(
             getattr(element, attribute, None), projection.value, entry.predicate
         )
         stages["lane system model"] = (
-            StageReading("unavailable", facts.untraced)
+            StageReading("unavailable", facts.unshared)
             if facts.shared is None
             else field_reading(
                 facts.shared.elements.get(entry.subject, {}).get(attribute),
@@ -614,11 +578,11 @@ def trace_fact(
                 entry.predicate,
             )
         )
-        stages["candidate facts"] = _candidate_facts(
+        stages["candidate facts"] = candidate_reading(
             entry.subject, attribute, projection.value, entry.predicate, sent
         )
     return PlaceFactTrace(
-        fact=fact,
+        fact_id=fact_id,
         predicate=entry.predicate,
         subject=entry.subject,
         attribute=attribute,
@@ -758,28 +722,36 @@ def trace(
     )
 
     # A case's lanes are one file, so a lane the trace refuses refuses its case.
+    # The shared keys are read apart: a refusal there leaves the leads traced.
     sent: dict[str, dict[str, SentLane]] = {}
     shared: dict[str, SharedInput] = {}
     untraced: dict[str, str] = {}
+    unshared: dict[str, str] = {}
     for case in traced_cases:
         try:
             material = material_at(lanes_file(artifact, case))
-            shared[case] = sent_shared(material)
+        except EvalRunError as error:
+            untraced[case] = unshared[case] = str(error)
+            continue
+        try:
             sent[case] = {
                 row.lane: sent_lane(material, row.lane)
                 for row in traced
                 if row.case == case
             }
         except EvalRunError as error:
-            shared.pop(case, None)
             untraced[case] = str(error)
+        try:
+            shared[case] = captured_shared(material)
+        except EvalRunError as error:
+            unshared[case] = str(error)
     facts_by_case = {
         case: case_facts(
             by_id[case],
             corpus,
             reports[case],
             shared.get(case),
-            untraced.get(case, ""),
+            unshared.get(case, ""),
         )
         for case in traced_cases
     }

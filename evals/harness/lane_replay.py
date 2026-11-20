@@ -56,7 +56,9 @@ from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.graph import (
     STATE_ASSERTION_PROPOSAL,
+    STATE_EVIDENCE_CATALOG,
     STATE_FRAMEWORK_OPTIONS,
+    STATE_SYSTEM_MODEL,
     STATE_VALID_MODEL,
     FrameworkNodes,
     GraphKeys,
@@ -65,10 +67,12 @@ from analysis_service.graph import (
     analyze_instruction,
     framework_lane_inputs,
     prepare_analysis,
+    unfence,
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.node_requests import node_request
 from analysis_service.prompts import lane_closing
+from analysis_service.system_model import ELEMENT_GROUPS
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
@@ -173,6 +177,48 @@ def captured_lane(
         )
     artifacts: Mapping[LaneArtifact, str] = held
     return artifacts
+
+
+@dataclass(frozen=True)
+class SharedInput:
+    """The shared keys a case's lanes were sent, as the sweep captured them."""
+
+    #: Each element of the captured ``system_model``, by its ID.
+    elements: Mapping[str, Mapping[str, Any]]
+    evidence_catalog: str
+
+
+def captured_shared(material: Mapping[str, Any]) -> SharedInput:
+    """The captured ``system_model`` and ``evidence_catalog`` of a case, or a refusal.
+
+    The one reader of a lane capture's shared keys as values.
+    """
+    shared = material.get("shared")
+    held = shared if isinstance(shared, Mapping) else {}
+    texts = {
+        key: text
+        for key in (STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG)
+        if isinstance(text := held.get(key), str)
+    }
+    missing = sorted({STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG} - set(texts))
+    if missing:
+        raise EvalRunError(f"the capture holds no shared {', '.join(missing)} text")
+    try:
+        model = json.loads(unfence(texts[STATE_SYSTEM_MODEL]))
+    except json.JSONDecodeError as error:
+        raise EvalRunError(
+            f"the captured system model is not JSON: {error.msg}"
+        ) from error
+    if not isinstance(model, dict):
+        raise EvalRunError("the captured system model holds no JSON object")
+    elements = {
+        element["id"]: element
+        for group in ELEMENT_GROUPS
+        if isinstance(collection := model.get(group), list)
+        for element in collection
+        if isinstance(element, dict) and isinstance(element.get("id"), str)
+    }
+    return SharedInput(elements, texts[STATE_EVIDENCE_CATALOG])
 
 
 async def compose(

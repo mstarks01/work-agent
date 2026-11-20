@@ -1301,7 +1301,7 @@ def _block_of(payload: dict[str, Any]) -> FrameworkAnalysis:
 def unfence(rendered: str) -> str:
     """The body back out of :func:`render_fenced`.
 
-    Three rendered keys are also read back by Python. The parked rejection is
+    Three fenced keys are also read back through this. The parked rejection is
     turned by the driver into the issues a caller is shown. It still ships
     fenced, because the same string is interpolated into ``repair.md`` and a
     key that shipped bare would be the one a body could close. A lane's
