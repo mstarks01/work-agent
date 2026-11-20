@@ -193,7 +193,7 @@ def test_a_pause_whose_questions_left_were_all_skipped_says_so():
     else:
         pytest.fail("the saves never ended")
     assert (asked.held_back, asked.below_floor) == ((), ()), (
-        "a positive check: nothing is held back or below the floor"
+        "a precondition: nothing is held back or below the floor"
     )
     assert asked.summary.skipped > 0
     assert asked.empty_list_reason == "skipped"

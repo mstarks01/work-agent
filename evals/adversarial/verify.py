@@ -71,8 +71,8 @@ def control_issues(cases: Iterable[AdversarialCase]) -> list[str]:
     """At least one case carries no injection.
 
     Without a negative check a service that refused every submission would score
-    perfectly on every attack case, so code checks for one and a convention does
-    not suffice.
+    perfectly on every attack case, so code requires one, and a convention is not
+    sufficient.
     """
     controls = [case for case in cases if case.attack_class == "benign-control"]
     if controls:
