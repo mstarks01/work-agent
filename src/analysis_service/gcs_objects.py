@@ -77,9 +77,13 @@ from analysis_service.vendors import CredentialMode
 #: underscores and dots, with a letter or digit at each end.
 _BUCKET = re.compile(r"[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]")
 
+#: The one universe domain of the store. :data:`ENDPOINT` and
+#: :data:`TOKEN_URI` are hosts in it.
+UNIVERSE_DOMAIN = "googleapis.com"
+
 #: The one host of the store. The client takes it from here, so
 #: ``STORAGE_EMULATOR_HOST`` and ``API_ENDPOINT_OVERRIDE`` cannot move it.
-ENDPOINT = "https://storage.googleapis.com"
+ENDPOINT = f"https://storage.{UNIVERSE_DOMAIN}"
 
 
 def make_client(credentials: Credentials) -> storage.Client:
@@ -107,12 +111,7 @@ MAX_KEY_BYTES = 16 * 1024
 
 #: The one ``token_uri`` that a key may name. The credential sends its signed
 #: grant to that address.
-TOKEN_URI = "https://oauth2.googleapis.com/token"
-
-#: The one ``universe_domain`` that a key may name, the domain of
-#: :data:`ENDPOINT`. A key may leave the field out. With another value, even
-#: an empty one, the credential signs its own token and skips :data:`TOKEN_URI`.
-UNIVERSE_DOMAIN = "googleapis.com"
+TOKEN_URI = f"https://oauth2.{UNIVERSE_DOMAIN}/token"
 
 
 def _service_account(env: Mapping[str, str]) -> Credentials:
@@ -124,8 +123,8 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
     is ``service_account``, because another kind of credential file can name
     an executable that makes the token. Its ``token_uri`` is :data:`TOKEN_URI`,
     because the credential sends its grant there, and its ``universe_domain``
-    is absent or :data:`UNIVERSE_DOMAIN`, because each other value makes the
-    credential skip ``token_uri``. No message repeats the content.
+    is absent or :data:`UNIVERSE_DOMAIN`, because each other value, even an
+    empty one, makes the credential sign its own token and skip ``token_uri``. No message repeats the content.
     """
     content = read_secret_file(env, GCS_KEY_FILE_VAR, StoreConfigError)
     if content is None:

@@ -23,7 +23,7 @@ from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from google.api_core.exceptions import Forbidden, NotFound, RetryError
-from google.auth import identity_pool, impersonated_credentials
+from google.auth import compute_engine, identity_pool, impersonated_credentials
 from google.auth.exceptions import (
     DefaultCredentialsError,
     GoogleAuthError,
@@ -139,6 +139,16 @@ class TestTheIdentity:
     def test_the_metadata_server_passes_with_the_one_scope(self, env, asked):
         build_object_store(env)
         assert asked == [{"scopes": [STORAGE_SCOPE]}]
+
+    def test_a_credential_of_another_universe_stops_the_startup(self, monkeypatch):
+        """The metadata server can give a credential of another universe."""
+        other = compute_engine.Credentials(universe_domain="example.com")
+        monkeypatch.setattr("google.auth.default", lambda **_: (other, None))
+        with pytest.raises(
+            StoreConfigError,
+            match=r"cannot build its client .*another universe domain",
+        ):
+            build_object_store(dict(SETTINGS))
 
     def test_a_universe_domain_it_cannot_read_stops_the_startup(self, env, monkeypatch):
         """The credential asks the metadata server for its universe domain."""
