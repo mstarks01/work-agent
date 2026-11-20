@@ -2491,9 +2491,9 @@ ONE_READERS: dict[str, _OneReader] = {
                 "it reads CriticRound.quotes_checked, a bool every builder sets"
                 " by keyword; no None reaches it"
             ),
-            ("evals/harness/grounds.py", "checked_count"): (
-                "it reads the bool its caller passes to measure_grounds; no"
-                " None reaches it"
+            ("evals/harness/grounds.py", "unchecked_quote_count"): (
+                "it reads a bool, CaseGrounds.quotes_checked or"
+                " FanIn.quotes_checked; no None reaches it"
             ),
         },
         "",

@@ -1329,9 +1329,9 @@ version before it. Read it when you load an archived report.
   fields. A route that parses a stored 3.3 job record answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
 - **Version 3.5:** each block carries `quotes_checked`, which says whether the
-  fan-in ran the quote check. It is `false` where the job's map of source texts
-  is empty, and on a block that no fan-in built: a refused framework or a stub
-  run. Then `unverified_grounds` is empty because no check ran. It is `null`
+  fan-in ran the quote check. It is `false` on a block that no fan-in built: a
+  refused framework or a stub run. A fan-in with an empty map of source texts
+  also gives `false`, and only a caller with no job passes one. Then `unverified_grounds` is empty because no check ran. It is `null`
   only on a block written before 3.5. Additive for a consumer
   that reads only the 3.4 fields. A route that parses a stored 3.4 job record
   answers `409` (see

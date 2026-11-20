@@ -151,6 +151,7 @@ from analysis_service.claims import (
     ProposalBatch,
     Refusal,
     SharedElementName,
+    quote_check_ran,
 )
 from analysis_service.compact import (
     COMPACT_FORMAT,
@@ -2266,9 +2267,9 @@ def parked_quotes_checked(
       :func:`~analysis_service.claims.quote_check_ran` states.
     """
     parked = state.get(nodes.key("quotes_checked"))
-    if parked is None:
-        return state.get(nodes.key("drafts")) is not None
-    return bool(parked)
+    if parked is None and state.get(nodes.key("drafts")) is None:
+        return False
+    return quote_check_ran(parked)
 
 
 def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:

@@ -157,7 +157,7 @@ class _NodeFinish:
 
 
 def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
-    """A session's state without the two keys the executor seeds from the sources.
+    """A session's state without the three keys the executor seeds from the sources.
 
     What the graph's nodes wrote, and any key a caller seeded through
     ``extra_state``. The job's own text is left out, because the caller holds
