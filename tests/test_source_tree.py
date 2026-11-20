@@ -99,7 +99,7 @@ def test_mypy_excludes_every_path_the_lints_skip():
 
 
 def test_the_enumerator_reads_the_source_it_is_asked_for():
-    """A positive control: the skip rules do not empty the scan."""
+    """A positive check: the skip rules do not empty the scan."""
     found = {path.name for path in source_files("src")}
 
     assert {"fan_in.py", "claims.py", "graph.py"} <= found
@@ -237,7 +237,7 @@ def test_each_named_root_holds_a_tracked_file():
 
 
 def test_the_python_set_holds_the_eval_scripts_examples_and_ci_script():
-    """A positive control: the scripts at the top of ``evals/``, the examples and
+    """A positive check: the scripts at the top of ``evals/``, the examples and
     the CI script are in the set the one-reader lints walk."""
     named = _relative(source_files(*PYTHON))
 
@@ -594,7 +594,7 @@ def test_each_data_walk_says_why(key):
 
 
 def test_the_walk_lint_sees_each_walk_of_its_own():
-    """A positive control on :func:`_walks`."""
+    """A positive check on :func:`_walks`."""
     tree = ast.parse(
         "import os\n"
         "from glob import iglob\n"
@@ -613,7 +613,7 @@ def test_the_walk_lint_sees_each_walk_of_its_own():
 
 
 def test_the_walk_lint_sees_a_root_of_its_own():
-    """A positive control on the lint above."""
+    """A positive check on the lint above."""
     tree = ast.parse('source_files("src")\nsource_files(*PYTHON, *TESTS)\n')
 
     assert _own_roots(tree) == [1]

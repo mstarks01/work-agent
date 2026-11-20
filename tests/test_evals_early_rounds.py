@@ -34,7 +34,7 @@ def test_every_answerer_reaches_the_end(name, frameworks):
     found = replay("case", open_controls(), valid_model(), frameworks, name)
 
     assert found.ended
-    assert found.above_floor, "a control: the model has questions at the floor"
+    assert found.above_floor, "a positive check: the model has questions at the floor"
     assert found.asked <= found.above_floor + found.added
 
 
@@ -72,7 +72,9 @@ def test_a_replay_records_what_its_stop_leaves_open():
     bands = found.units["asvs"]
     assert set(bands) == {"level 1", "level 2"}
     assert all("unaskable" in states for states in bands.values())
-    assert found.held_back + found.below_floor > 0, "a control: something stays out"
+    assert found.held_back + found.below_floor > 0, (
+        "a positive check: something stays out"
+    )
     stride = replay("case", valid_model(), valid_model(), STRIDE, "capability-yes")
     assert stride.units == {}
 

@@ -141,7 +141,7 @@ def test_every_declared_holdout_reader_still_loads_the_corpus():
 def test_the_lint_sees_an_unfiltered_call_and_passes_a_filtered_one():
     sites = _loaders()
 
-    # Positive controls: a sweep loads every case, and the sitting modules
+    # Positive checks: a sweep loads every case, and the sitting modules
     # reach the loader through a re-export.
     assert "evals/harness/run.py:command_run" in sites
     assert any(site.startswith("evals/review_submission.py:") for site in sites)

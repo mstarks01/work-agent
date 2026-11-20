@@ -183,14 +183,14 @@ interval are facts this service can read, can keep, can ground and cannot use.
 ## PART 2 — Qualifying the evaluator
 
 #1033 asks that the instrument be qualified before it is used, with positive and
-negative controls, and that a correction be isolated and frozen before any
+negative checks, and that a correction be isolated and frozen before any
 comparison. The instrument is `evals/harness/replay.py`'s matcher.
 
 **It was not fit when #1003's pilot ran, and the corrections are in.** The
 execution audit found five scoring defects; all are fixed and each is driven by
 a test. Reading the contract item by item:
 
-| Contract item | Where it is driven | Control |
+| Contract item | Where it is driven | Check |
 | --- | --- | --- |
 | One produced row answers one reference row | `test_evals_replay.py::TestOneProducedRowAnswersOneReferenceRow` | both |
 | Approved semantic equivalence without identical labels | the six signed-alias tests in `TestEveryReferenceRowTakesOneFate` | both |

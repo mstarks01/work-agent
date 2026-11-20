@@ -2,7 +2,7 @@
 
 Each test runs the real graph over scripted model replies and takes a
 ``fault`` flag: with the fault the graph meets the failure, and without it the
-same run is the valid control. So each test proves the fault is what the
+same run is the comparison arm. So each test proves the fault is what the
 assertion detects, not a snapshot of what the run happens to emit.
 ``docs/agents/regression-matrix.md`` lists each row with its provenance and contract,
 and ``test_doc_reference_lints`` holds each test it names to the tree.

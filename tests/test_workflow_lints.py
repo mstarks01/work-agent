@@ -166,7 +166,7 @@ def test_the_closure_is_not_vacuously_empty():
 
 
 def test_the_walk_skips_a_type_only_import(tmp_path):
-    """Positive control: an import under ``if TYPE_CHECKING:`` is not read, and
+    """Positive check: an import under ``if TYPE_CHECKING:`` is not read, and
     one in its ``else`` branch is."""
     source = tmp_path / "typed.py"
     source.write_text(

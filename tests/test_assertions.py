@@ -1748,7 +1748,7 @@ class TestWhatAProjectionWillNotReach:
         assert project(held) == ()
 
     def test_a_store_predicate_on_a_store_does_reach_its_field(self):
-        """The positive control: the same predicate family, on the type that has it."""
+        """The positive check: the same predicate family, on the type that has it."""
         held = AssertionCatalog(
             subjects=subjects(("store:receipts", "component", "receipts")),
             entries=[

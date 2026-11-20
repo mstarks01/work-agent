@@ -27,7 +27,7 @@ def test_the_instrument_and_the_page_share_one_rule():
         "console.log(JSON.stringify(pairs.map(([a, b]) => shareable(a, b))));"
     )
     assert page == [shareable(a, b) for a, b in pairs]
-    assert True in page and False in page, "a control: both answers occur"
+    assert True in page and False in page, "a positive check: both answers occur"
 
 
 def test_a_stated_attribute_is_made_unknown_and_kept_as_the_truth():
@@ -52,7 +52,7 @@ def test_a_box_of_two_true_values_counts_one_over_claim():
         and box.known
         and box.group.endswith("authentication")
     ]
-    assert found, "a control: the flows' authentication is asked once"
+    assert found, "a positive check: the flows' authentication is asked once"
     [box] = found
     assert box.distinct == 2
     assert box.unlike == 1

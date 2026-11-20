@@ -68,9 +68,9 @@ poison.
    `evals/adversarial/model.py`. The lint fails on a class with no case, which
    is what stops the list becoming aspirational.
 
-## Controls
+## Negative checks
 
-At least one case carries no injection at all. Without a benign control, a
+At least one case carries no injection at all. Without a negative check, a
 service that refused every submission would score perfectly on every attack
 case — which is why `benign-control` is its own attack class and why its
 expectations are the mirror image of the others.

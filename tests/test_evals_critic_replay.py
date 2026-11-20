@@ -66,7 +66,7 @@ def test_the_critic_request_is_rebuilt_byte_for_byte(recorded, case):  # noqa: F
 
 
 def test_changed_drafts_make_a_request_the_critic_never_saw(recorded, case):  # noqa: F811
-    """The control for the byte-for-byte test."""
+    """The positive check for the byte-for-byte test."""
     out, seen = recorded
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
     archived.drafts.pop()

@@ -1,11 +1,11 @@
 """The gain gates: a coverage gain that comes from saying more is caught (#1093).
 
-The negative control is the point of the module. A copy of a sealed Baseline is
+The flooded copy is the point of the module. A copy of a sealed Baseline is
 flooded: every case gains a must-find and also files six more unmatched
 findings that nobody voted on. Coverage rises, and the gates must not let that
-rise through. The positive control gains the same coverage with no added
-volume and every finding answered, and the gates must let it through, or the
-gates refuse everything and the negative control proves nothing.
+rise through. A clean copy gains the same coverage with no added volume
+and every finding answered, and the gates must let it through, or the gates
+refuse everything and the flooded copy proves nothing.
 """
 
 from __future__ import annotations

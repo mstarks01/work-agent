@@ -455,7 +455,9 @@ class TestCapabilityBands:
         asked = early_questions(valid_model(), {"asvs": {"level": 2}}, None)
         capabilities = [q for q in asked if q.kind == "capability"]
         roots = [q for q in capabilities if q.parent is None]
-        assert {top_band(q) for q in capabilities} == {-1, 0}, "a control: two bands"
+        assert {top_band(q) for q in capabilities} == {-1, 0}, (
+            "a positive check: two bands"
+        )
         assert [top_band(q) for q in roots] == sorted(
             map(top_band, roots), reverse=True
         )
@@ -471,7 +473,9 @@ class TestCapabilityBands:
         for question in asked:
             if question.parent is not None:
                 assert order.index(question.parent) < order.index(question.key)
-        assert any(q.parent for q in asked), "a control: some question has a parent"
+        assert any(q.parent for q in asked), (
+            "a positive check: some question has a parent"
+        )
 
 
 def test_a_field_question_ranks_by_its_relevance_per_choice():
@@ -561,7 +565,9 @@ class TestTheFrameworkGates:
         model = _with_interfaces("unknown", protocols="unknown")
         asked = _paused(model, {**LEVEL_2, "stride": {}})
         gated = [bool(q.gates) for q in asked.early]
-        assert gated[0] and not any(gated[1:]), "a control: stride asks after it"
+        assert gated[0] and not any(gated[1:]), (
+            "the gate question comes first, and stride asks after it"
+        )
 
     @pytest.mark.parametrize(
         ("answer", "state"), [("web", "satisfied"), ("non-web", "refuted")]
@@ -652,7 +658,7 @@ class TestTheFrameworkGates:
             _with_interfaces("web", protocols="unknown"), selection, filler
         )
         fields = [q for q in after.early if q.kind != "capability"]
-        assert len(fields) == 1, "a control: one place is left"
+        assert len(fields) == 1, "a positive check: one place is left"
         assert [q.key for q in after.early] == [q.key for q in stated.early]
 
     def test_a_framework_whose_precondition_is_total_asks_no_gate_question(self):

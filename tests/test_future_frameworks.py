@@ -189,7 +189,7 @@ def test_no_selected_package_is_starved_of_the_list(third):
 def test_a_package_with_an_empty_prior_asks_no_field_question(third):
     selection = {THIRD: {"level": 2}}
     asked = _paused(selection, _answer_the_gate(selection))
-    assert asked.early, "a control: its capabilities are asked"
+    assert asked.early, "a positive check: its capabilities are asked"
     assert all(q.kind == "capability" for q in asked.early)
     assert not asked.below_floor or all(
         q.kind == "capability" for q in asked.below_floor
@@ -218,7 +218,7 @@ def test_another_package_s_bands_do_not_move_a_framework_s_floor(third):
     alone = _paused({"asvs": {"level": 1}})
     selection = {"asvs": {"level": 1}, THIRD: {"level": 1}}
     both = _paused(selection, _answer_the_gate(selection))
-    assert len(under(alone)) == 24, "a control: questions sit under the floor"
+    assert len(under(alone)) == 24, "a positive check: questions sit under the floor"
     assert under(both) == under(alone)
     own_low = [q for q in both.below_floor if q.frameworks == (THIRD,)]
     assert not own_low, "the package's own highest band still passes"

@@ -314,7 +314,7 @@ def test_no_docstring_comment_or_guide_narrates_an_earlier_state():
 
 
 def test_the_scan_reads_every_kind_of_prose(tmp_path):
-    """Positive control: a docstring, a wrapped comment, a script comment, a
+    """Positive check: a docstring, a wrapped comment, a script comment, a
     config comment, a shell comment, a diagram comment and a guide paragraph
     are each seen, a comment at the end of a line of code included, and code,
     a quoted marker and a fenced block are not."""
@@ -394,7 +394,7 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
 
 
 def test_the_history_phrases_hold_to_their_history_reading():
-    """Positive control: each phrase matches where it narrates an earlier state,
+    """Positive check: each phrase matches where it narrates an earlier state,
     and the same words that describe run-time data do not."""
     history = (
         "A record naming none behaves exactly as before.",
@@ -602,7 +602,7 @@ def test_no_file_spends_a_choice_a_read_or_a_vote():
 
 
 def test_the_spend_pattern_matches_only_a_metaphor():
-    """Positive control: a spend of a thing that is never money matches, and a
+    """Positive check: a spend of a thing that is never money matches, and a
     spend of money, of quota or of a vendor's budget does not."""
     for text in (
         "Each save spends at least one choice.",
@@ -643,7 +643,7 @@ def test_the_spend_pattern_matches_only_a_metaphor():
 
 
 def test_the_money_words_match_only_the_ruled_out_words():
-    """Positive control: each ruled-out word matches, and a word that holds one
+    """Positive check: each ruled-out word matches, and a word that holds one
     of them inside it does not."""
     for word in ("debt", "Debts", "a clean bill", "owe", "owes", "owed", "owing"):
         assert MONEY.search(word), word
@@ -659,7 +659,7 @@ def test_the_wording_lints_read_model_text():
 
 
 def test_a_hit_in_model_text_that_no_row_holds_fails(tmp_path, monkeypatch):
-    """Positive control: a held phrase frees the hit it covers in its own file,
+    """Positive check: a held phrase frees the hit it covers in its own file,
     and nothing else: not the same words in another file, and not a hit that it
     does not cover."""
     monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)

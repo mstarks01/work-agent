@@ -372,7 +372,7 @@ def test_the_must_find_tier_is_compared_through_one_name():
 
 
 def test_the_tier_comparison_scan_finds_one_when_there_is_one(tmp_path):
-    """The positive control. The tree is clean, so a lint over it passes
+    """The positive check. The tree is clean, so a lint over it passes
     whether or not the scan works at all — a synthetic offender is the only
     thing that says the net has holes in the right size.
 
@@ -475,7 +475,7 @@ def test_no_message_interpolates_a_value_its_own_branch_pinned():
 
 
 def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control, in the shape of the #991 refusal message."""
+    """Positive check, in the shape of the #991 refusal message."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         "def drop(predicate, value):\n"
@@ -581,7 +581,7 @@ def test_every_declared_respelling_is_still_one():
 
 
 def test_the_respelling_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control: a module that spells the landed set out again."""
+    """Positive check: a module that spells the landed set out again."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         "def grounded(row):\n"
@@ -677,7 +677,7 @@ def test_the_qualifiable_set_is_the_free_text_fields():
 
 
 def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control: an exact comparison with ``unknown``, and what is not one."""
+    """Positive check: an exact comparison with ``unknown``, and what is not one."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         "UNKNOWN = 'unknown'\n"
@@ -758,7 +758,7 @@ def _reports_suffix_line() -> int:
 
 
 def test_the_case_name_scan_finds_one_when_there_is_one(tmp_path):
-    """Positive control: a path, a glob and a suffix strip, each spelled out."""
+    """Positive check: a path, a glob and a suffix strip, each spelled out."""
     probe = tmp_path / "probe.py"
     probe.write_text(
         "def read(directory, case, artifact):\n"
@@ -876,7 +876,7 @@ def test_each_declared_word_choice_is_still_one():
 
 
 def test_the_word_choice_scan_finds_one_when_there_is_one():
-    """Positive control, in the shape of the review page's reason kind."""
+    """Positive check, in the shape of the review page's reason kind."""
     probe = (
         'Kind = Literal["substance", "style"]\n'
         "def kind(code) -> Kind:\n"

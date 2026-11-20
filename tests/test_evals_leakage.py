@@ -1,7 +1,7 @@
 """The answer-leak guard over the inputs the audit's diagnostic conditions feed.
 
 A guard that reads clean on the corpus says nothing until it is shown to fail,
-so each detectable shape has a positive control beside the corpus check.
+so each detectable shape has a positive check beside the scan of the corpus.
 """
 
 import json

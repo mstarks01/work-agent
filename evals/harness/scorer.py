@@ -913,8 +913,8 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float | None]:
     subtree precisely so they can be diversified — not a build to break.
 
     "Near" is every architecture the exemplars demonstrate, so the number
-    survives the exemplar set growing: with two worked systems and one corpus
-    control apiece, this asks the one question worth asking, which is
+    survives the exemplar set growing: with two worked systems and one near case in
+    the corpus apiece, this asks the one question worth asking, which is
     whether recall depends on having been shown the architecture. What it
     cannot do is attribute a gap to a *particular* exemplar system — for
     that, read the per-case coverage figures behind it.

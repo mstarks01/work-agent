@@ -1329,7 +1329,7 @@ def test_an_early_row_carries_its_element_s_source_words(tiers):
         element = model.get(row["key"][0])
         assert row["excerpt"] == ("" if element is None else element.source_excerpt)
     assert any(row["excerpt"] for row in shown["early_questions"]), (
-        "a control: some are read"
+        "a positive check: some are read"
     )
 
 
@@ -3469,7 +3469,9 @@ calls.push({{ shown: shown.length }});
     seen = _run_form_script(steps)["calls"]
 
     assert seen[-1]["shown"] == len(capabilities)
-    assert asked.blocked, "a control: a part waits on its parent, apart from the list"
+    assert asked.blocked, (
+        "a positive check: a part waits on its parent, apart from the list"
+    )
 
 
 class TestEarlierAnswers:
