@@ -1,0 +1,436 @@
+{
+  "record": {
+    "command": "replay",
+    "commit": "60cdbdddc6ebb3db953ec0d65379bfd903e63db4",
+    "clean": false,
+    "table": {
+      "targets": 10,
+      "corpus_digest": "1cf982f5865d1619ed0dceb2863d17a9b6260a75368d9e857d4f1d59b2234f4e"
+    },
+    "inputs": [
+      {
+        "path": "evals/runs/2054-authz/assert-20-r3.json",
+        "sha256": "5e2bc6addc63b5e767915e59fa44226b6662571374be2eb3643011df7ad4b332",
+        "selections": {}
+      },
+      {
+        "path": "evals/runs/2054-authz/assert-20-r3.reports/20-school-coursework.assertions.json",
+        "sha256": "657c639ea87a83813f432a462836428c42a56d29d927276d462c781ccdffe5e0",
+        "selections": {}
+      }
+    ]
+  },
+  "arms": [
+    {
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "d2970dbcdec321f92e6662cc733c0e2c9a460d8e63d15f3968f5375f7d821100"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "df272b44909432856580166020ccb6a5872c1d6512abcb6856547d437ea6fc36",
+        "treatment_by": "rendered_sources"
+      },
+      "extraction": null,
+      "assertions": {
+        "sweeps": 1,
+        "emissions": 1,
+        "fates": {
+          "found": 9,
+          "worded": 0,
+          "wrong_certainty": 0,
+          "wrong_value": 3,
+          "rescoped": 0,
+          "omitted": 9,
+          "silent": 11
+        },
+        "required": 16,
+        "recovered": 9,
+        "found": 9,
+        "relabelled": 0,
+        "basis_overstated": 0,
+        "produced": {
+          "found": 9,
+          "worded": 0,
+          "wrong_certainty": 0,
+          "wrong_value": 3,
+          "rescoped": 0,
+          "misattached": 2,
+          "unreviewed": 10
+        },
+        "rejected": 0,
+        "span_refusals": 0,
+        "rows": 24,
+        "assessed": 0,
+        "targets": [
+          {
+            "row": "20-school-coursework/assertion:authentication-mechanism~flow:entity:student>process:coursework-service>hand-in-work~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "wrong_value": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authentication-mechanism~flow:entity:teacher>process:admin-console>open-admin-pages~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "wrong_value": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authentication-mechanism~flow:entity:teacher>process:coursework-service>mark-work~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "wrong_value": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-grant~principal:office-staff~s.f73aca153f68~v.3fc90bcc5fb8",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-grant~principal:students~s.b298a62b5061~v.74b4adef3a5a",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-grant~principal:teachers~s.49d54b2311f4~v.83a3579ac7cb",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-grant~principal:the-coursework-services-database-account~s.2f00b353953d~v.2f7d97cabd22",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-grant~principal:the-grade-exports-database-account~s.8c5a1909455d~unknown",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-scope-least-privilege~flow:process:coursework-service>store:coursework-database>keep-coursework~any~yes",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-scope-least-privilege~flow:process:grade-export>store:coursework-database>read-final-grades~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:authorization-scope-least-privilege~process:admin-console~any~no",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "20-school-coursework/assertion:network-membership~entity:teacher~any~boundary:school-network",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "sweeps": [
+    {
+      "artifact": "assert-20-r3.json",
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "d2970dbcdec321f92e6662cc733c0e2c9a460d8e63d15f3968f5375f7d821100"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "df272b44909432856580166020ccb6a5872c1d6512abcb6856547d437ea6fc36",
+        "treatment_by": "rendered_sources"
+      },
+      "repo_commit": {
+        "commit": "60cdbdddc6ebb3db953ec0d65379bfd903e63db4",
+        "clean": false
+      },
+      "corpus_digest": "1cf982f5865d1619ed0dceb2863d17a9b6260a75368d9e857d4f1d59b2234f4e",
+      "extractions": [],
+      "assertions": [
+        {
+          "case": "20-school-coursework",
+          "counts": {
+            "found": 9,
+            "worded": 0,
+            "wrong_certainty": 0,
+            "wrong_value": 3,
+            "rescoped": 0,
+            "omitted": 9,
+            "silent": 11
+          },
+          "basis_overstated": 0,
+          "produced_counts": {
+            "found": 9,
+            "worded": 0,
+            "wrong_certainty": 0,
+            "wrong_value": 3,
+            "rescoped": 0,
+            "misattached": 2,
+            "unreviewed": 10
+          },
+          "required": 16,
+          "recovered": 9,
+          "rejected": 0,
+          "refusals": {},
+          "span_refusals": 0,
+          "produced_rows": 24,
+          "assessed_rows": 0,
+          "issues": [],
+          "rows": [
+            {
+              "reference": "assertion:internet-exposure~process:coursework-service~any~internet-facing",
+              "fate": "found",
+              "produced": "assertion:internet-exposure~process:coursework-service~any~internet-facing",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:coursework-service~any~boundary:school-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:coursework-service~any~boundary:school-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:grade-export~any~boundary:school-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:grade-export~any~boundary:school-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~store:coursework-database~any~boundary:school-cloud-account",
+              "fate": "found",
+              "produced": "assertion:network-membership~store:coursework-database~any~boundary:school-cloud-account",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:admin-console~any~boundary:school-office-network",
+              "fate": "found",
+              "produced": "assertion:network-membership~process:admin-console~any~boundary:school-office-network",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:teacher~any~boundary:school-network",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:student~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:office-staff~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:district-records-system~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:student>process:coursework-service>hand-in-work~any~unknown",
+              "fate": "wrong_value",
+              "produced": "assertion:authentication-mechanism~flow:entity:student>process:coursework-service>hand-in-work~any~v.98171722e1c8",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:teacher>process:coursework-service>mark-work~any~unknown",
+              "fate": "wrong_value",
+              "produced": "assertion:authentication-mechanism~flow:entity:teacher>process:coursework-service>mark-work~any~v.98171722e1c8",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:teacher>process:admin-console>open-admin-pages~any~unknown",
+              "fate": "wrong_value",
+              "produced": "assertion:authentication-mechanism~flow:entity:teacher>process:admin-console>open-admin-pages~any~v.98171722e1c8",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:process:coursework-service>store:coursework-database>keep-coursework~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:students~s.b298a62b5061~v.74b4adef3a5a",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:teachers~s.49d54b2311f4~v.83a3579ac7cb",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:office-staff~s.f73aca153f68~v.3fc90bcc5fb8",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:the-coursework-services-database-account~s.2f00b353953d~v.2f7d97cabd22",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-grant~principal:the-grade-exports-database-account~s.8c5a1909455d~unknown",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:student>process:coursework-service>hand-in-work~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:process:grade-export>entity:district-records-system>send-final-grades~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:process:admin-console>store:coursework-database>write-classes-and-grades~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:coursework-service~any~yes",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-each-request~process:coursework-service~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:coursework-service~any~yes",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-least-privilege~process:coursework-service~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:coursework-service~any~no",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-ownership~process:coursework-service~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~flow:process:coursework-service>store:coursework-database>keep-coursework~any~yes",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:admin-console~any~no",
+              "fate": "found",
+              "produced": "assertion:authorization-scope-checks-each-request~process:admin-console~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:admin-console~any~no",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:admin-console~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-each-request~process:grade-export~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~process:grade-export~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-least-privilege~flow:process:grade-export>store:coursework-database>read-final-grades~any~unknown",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authorization-scope-checks-ownership~process:grade-export~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            }
+          ],
+          "produced": {
+            "assertion:credential-presented~principal:student~any~credential:school-accounts": "unreviewed",
+            "assertion:credential-presented~principal:teacher~any~credential:school-accounts": "unreviewed",
+            "assertion:authorization-scope-checks-ownership~flow:entity:student>process:coursework-service>hand-in-work~s.011b8e43192b~no": "misattached",
+            "assertion:authorization-grant~principal:student~s.b298a62b5061~v.74b4adef3a5a": "misattached",
+            "assertion:authorization-grant~principal:teacher~s.49d54b2311f4~v.4180e1712bba": "unreviewed",
+            "assertion:authorization-grant~principal:teacher~s.24b4bb253dfb~v.ef3a3a1bc032": "unreviewed",
+            "assertion:administrative-authority~principal:office-staff~any~process:admin-console": "unreviewed",
+            "assertion:authorization-grant~principal:database-account~s.53e2230f1391~v.a4051a848e4d": "unreviewed",
+            "assertion:data-classification~store:coursework-database~any~confidential": "unreviewed",
+            "assertion:data-classification~process:coursework-service~any~confidential": "unreviewed",
+            "assertion:data-classification~process:admin-console~any~confidential": "unreviewed",
+            "assertion:data-classification~process:grade-export~any~confidential": "unreviewed",
+            "assertion:internet-exposure~process:coursework-service~any~internet-facing": "found",
+            "assertion:network-membership~process:coursework-service~any~boundary:school-cloud-account": "found",
+            "assertion:network-membership~process:grade-export~any~boundary:school-cloud-account": "found",
+            "assertion:network-membership~store:coursework-database~any~boundary:school-cloud-account": "found",
+            "assertion:network-membership~process:admin-console~any~boundary:school-office-network": "found",
+            "assertion:authentication-mechanism~flow:entity:student>process:coursework-service>hand-in-work~any~v.98171722e1c8": "wrong_value",
+            "assertion:authentication-mechanism~flow:entity:teacher>process:coursework-service>mark-work~any~v.98171722e1c8": "wrong_value",
+            "assertion:authentication-mechanism~flow:entity:teacher>process:admin-console>open-admin-pages~any~v.98171722e1c8": "wrong_value",
+            "assertion:authorization-scope-checks-each-request~process:coursework-service~any~yes": "found",
+            "assertion:authorization-scope-least-privilege~process:coursework-service~any~yes": "found",
+            "assertion:authorization-scope-checks-ownership~process:coursework-service~any~no": "found",
+            "assertion:authorization-scope-checks-each-request~process:admin-console~any~no": "found"
+          },
+          "relabelled": []
+        }
+      ],
+      "skipped": {}
+    }
+  ]
+}
