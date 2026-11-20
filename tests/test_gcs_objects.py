@@ -20,6 +20,8 @@ import google.cloud
 import pytest
 import requests
 from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from google.api_core.exceptions import Forbidden, NotFound, RetryError
 from google.auth import identity_pool, impersonated_credentials
 from google.auth.exceptions import (
@@ -284,6 +286,24 @@ class TestTheApiKeyMode:
         with pytest.raises(StoreConfigError, match="is not usable") as refused:
             build_object_store(key_env(tmp_path, json.dumps(broken)))
         assert "hunter2" not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "private_key",
+        [ec.generate_private_key(ec.SECP256R1()), ed25519.Ed25519PrivateKey.generate()],
+    )
+    def test_a_key_that_is_not_rsa_stops_the_startup(
+        self, tmp_path, key_info, private_key
+    ):
+        """The library loads the key, and only a signature finds it."""
+        pem = private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ).decode()
+        other = key_info | {"private_key": pem}
+        with pytest.raises(StoreConfigError, match="is not usable") as refused:
+            build_object_store(key_env(tmp_path, json.dumps(other)))
+        assert "PRIVATE KEY" not in str(refused.value)
 
     def test_a_key_of_an_unsupported_algorithm_stops_the_startup(
         self, tmp_path, key_info, monkeypatch

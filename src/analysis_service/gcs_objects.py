@@ -23,6 +23,9 @@ The client errors this module handles, and what each one becomes:
   universe domain of the credential, **or a key that names another universe
   domain.** :meth:`GcsObjectStore.from_env` turns the ``GoogleAuthError`` or
   the ``ValueError`` into a :class:`StoreConfigError`.
+* **A key that cannot sign**, such as an EC key. ``_service_account`` signs
+  one empty message offline, and turns the error into a
+  :class:`StoreConfigError`.
 * **A host that the service cannot reach, or a token it cannot refresh.**
   ``requests`` raises an :class:`OSError`, ``google.auth`` raises a
   ``GoogleAuthError``, and a retry that runs out raises a ``RetryError``.
@@ -144,14 +147,18 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
             f" must have the token_uri {TOKEN_URI}"
         )
     try:
-        return service_account.Credentials.from_service_account_info(
+        credentials = service_account.Credentials.from_service_account_info(
             info, scopes=[STORAGE_SCOPE]
         )
+        # The library loads a key that is not RSA, and it fails only at the
+        # first signature. One offline signature finds that key here.
+        credentials.sign_bytes(b"")
     except (ValueError, TypeError, KeyError, UnsupportedAlgorithm) as exc:
         raise StoreConfigError(
             f"the service account key in the file that {GCS_KEY_FILE_VAR} names"
             f" is not usable ({type(exc).__name__})"
         ) from None
+    return credentials
 
 
 #: The credential of each ``ANALYSIS_OBJECT_CREDENTIALS`` value. The table

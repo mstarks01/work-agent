@@ -32,6 +32,9 @@ that ADC finds, including a key file and a gcloud user login.
 **The `gcs` row has one credential mode, `iam`, and that mode accepts only a
 credential from the metadata server.**
 
+> **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+> The row also has the `api_key` mode.
+
 - `ANALYSIS_OBJECT_CREDENTIALS` stays required. `api_key` stops the startup,
   and the message says that a key file and an HMAC key are out of scope.
 
@@ -68,8 +71,12 @@ credential from the metadata server.**
 
 ## Consequences
 
+> **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+> The `gcs` row has a second mode, `api_key`, and a service account key file
+> runs the row in that mode. The `iam` mode keeps the rules of this ADR.
+
 A developer machine with a gcloud login or a key file cannot run the `gcs`
-row. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS` for the Vertex
+row in the `iam` mode. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS` for the Vertex
 row cannot also run the `gcs` row in the same process. The IAM roles on the
 bucket stay the main access control, and the scope only limits a token that
 leaks.

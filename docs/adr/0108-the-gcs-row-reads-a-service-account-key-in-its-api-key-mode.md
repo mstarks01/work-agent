@@ -51,7 +51,9 @@ it accepts no other kind of credential file.**
 - The row builds the credential with
   `service_account.Credentials.from_service_account_info` and the one scope
   `https://www.googleapis.com/auth/devstorage.read_write`, and it gives the
-  credential to `make_client`. It does not call `google.auth.default()`, so
+  credential to `make_client`. The library loads a key that is not RSA with no
+  error, so the row signs one empty message offline and refuses a key that
+  cannot sign. It does not call `google.auth.default()`, so
   `GOOGLE_APPLICATION_CREDENTIALS` has no effect on this mode.
 - No message repeats the content of the file. A message names the setting and
   the rule that the file breaks. The permission rule names the path, as it
