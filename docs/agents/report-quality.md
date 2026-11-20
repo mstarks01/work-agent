@@ -150,8 +150,8 @@ report; the earlier audit
 `evals/experiments/QA-2026-09-26-01/E1-must-find-matches-by-meaning.csv` (61
 pairs, verdict and note per pair) and
 `evals/experiments/QA-2026-09-26-01/E2-sentence-against-control-by-meaning.csv`
-(40 pairs). The `arm` column, added after the blind ruling, is S for the
-instruction arm and C for the comparison arm.
+(40 pairs). The `arm` column, added after the blind ruling, holds `S1` and `S2`
+for the sentence arm and `C1` and `C2` for the comparison arm.
 
 **Pull requests:** #1230 (`lane-replay --append`), #1232 (holdout mechanism),
 #1233 (holdout cases 14 and 15), #1234, #1235 and #1236 (ledger rows), #1237
