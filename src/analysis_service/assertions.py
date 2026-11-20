@@ -913,16 +913,19 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
             "Does it check each request against what the caller may do?",
             "Checks each request against what the caller may do.",
             protects="yes",
+            extracted=True,
         ),
         "authorization-scope-least-privilege": _facet(
             "Are permissions narrower than full access, such as roles or scopes?",
             "Grants permissions narrower than full access, such as roles or scopes.",
             protects="yes",
+            extracted=True,
         ),
         "authorization-scope-checks-ownership": _facet(
             "Does it check that the caller owns the object it names?",
             "Checks that the caller owns the object it names.",
             protects="yes",
+            extracted=True,
         ),
         "stored-copy-integrity": _yes_no(
             "Are backups, snapshots and restores of {subject} checked"

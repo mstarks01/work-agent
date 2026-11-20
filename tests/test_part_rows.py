@@ -82,6 +82,9 @@ EXTRACTED_PARTS = frozenset(
         "capacity-limits-size",
         "capacity-limits-concurrency",
         "capacity-limits-quota",
+        "authorization-scope-checks-each-request",
+        "authorization-scope-least-privilege",
+        "authorization-scope-checks-ownership",
     }
 )
 
