@@ -180,7 +180,7 @@ def test_no_anchor_is_satisfied_by_naming_the_unknown_alone(fixture):
         assert anchor.lower() not in {*shields, "unknown", "needs-info"}, anchor
 
 
-def test_the_set_keeps_a_positive_check_that_reaches_the_critic_today():
+def test_the_set_keeps_a_negative_row_that_reaches_the_critic_today():
     """One negative row with no unknown ground, so a failure can be localised.
 
     Every other negative fixture is behind the bypass, and if the critic cannot
