@@ -127,8 +127,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         " value and a rescoped row"
     ),
     ("evals.harness.delivery", "LANE_INPUT"): (
-        "the stages that are the lane input itself, which a place fact reaches"
-        " after the catalog and the projected model"
+        "the stages that are the lane input itself: the captured shared keys"
+        " and candidates, which a place fact reaches after the catalog and the"
+        " projected model"
     ),
     ("evals.harness.delivery", "GRAPH_STAGES"): (
         "the stages that read a graph field, which a row that reaches none skips"

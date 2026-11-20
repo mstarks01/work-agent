@@ -199,7 +199,9 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     assert panel.counts["re-keyed must-finds outside the population"] == (
         result.re_keyed
     )
-    assert panel.counts["place facts unavailable"] == len(facts)
+    assert sum(
+        panel.counts[f"place facts {state}"] for state in delivery.FACT_DELIVERIES
+    ) == len(facts)
     assert panel.counts["with no control"] == sum(
         row.control is None for row in result.rows
     )

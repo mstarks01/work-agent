@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from analysis_service.assertions import AssertionRecord
+from analysis_service.assertions import AssertionRecord, Projection, projected_attribute
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.evidence import evidence_catalog, prepared_view, render_catalog
 from analysis_service.frameworks import package_for
@@ -506,7 +506,7 @@ def test_a_verb_row_with_its_place_facts_sent_reads_n_of_n(tmp_path):
     row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE)))
 
     assert row.facts.facts
-    assert {fact.delivered for fact in row.facts.facts} == {True}
+    assert {fact.delivered for fact in row.facts.facts} == {"delivered"}
     count = len(row.facts.facts)
     assert row.facts.describe() == f"place facts delivered {count} of {count}"
 
@@ -527,14 +527,14 @@ def test_a_place_fact_taken_out_of_the_lane_input_is_lost_at_that_stage(tmp_path
     )
 
     (fact,) = [f for f in lost.facts.facts if f.fact == zone.fact]
-    assert fact.delivered is False
+    assert fact.delivered == "not delivered"
     assert fact.lost_at == "lane system model"
     assert fact.stages["projected model"].state == "present"
     others = [f for f in lost.facts.facts if f.fact != zone.fact]
-    assert all(f.delivered for f in others)
+    assert {f.delivered for f in others} <= {"delivered"}
     count = len(lost.facts.facts)
     assert lost.facts.describe() == (
-        f"place facts delivered {count - 1} of {count} (lost at lane system model)"
+        f"place facts delivered {count - 1} of {count} (lost: 1 at lane system model)"
     )
 
 
@@ -547,7 +547,7 @@ def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
             "present", f"found: {fact.fact}"
         )
         assert fact.stages["raw extraction"].state == "unavailable"
-        assert fact.delivered is True
+        assert fact.delivered == "delivered"
 
 
 @pytest.mark.parametrize(
@@ -607,3 +607,69 @@ def test_a_capture_with_no_shared_model_is_untraced(tmp_path):
     traced = _trace(artifact)
 
     assert "no shared system_model" in traced.untraced[CAPTURED_CASE]
+
+
+def _case_facts(report, shared, own_ids, projections=None):
+    return delivery.CaseFacts(
+        reference=None,
+        unread="",
+        report=report,
+        replay=None,
+        own_ids=own_ids,
+        projections=projections or {},
+        shared=shared,
+        untraced="",
+    )
+
+
+def _table(*rows: tuple[str, str]) -> str:
+    cells = "\n".join(f"| `{ref}` | {gloss} |" for ref, gloss in rows)
+    return f"{len(rows)} facts.\n\n| cite this exactly | what it says |\n| --- | --- |\n{cells}\n"
+
+
+@pytest.mark.parametrize(
+    ("table", "state"),
+    [
+        (_table(("assertion:own", "a row")), "present"),
+        (_table(("assertion:other", "a gloss that quotes `assertion:own`")), "absent"),
+        (_table(("assertion:read", "the ID after the aliases")), "absent"),
+    ],
+)
+def test_the_evidence_stage_reads_the_key_the_catalog_filed_the_row_under(
+    report, table, state
+):
+    """The replay reads a row under the signed aliases; the table keys its own ID."""
+    shared = delivery.SharedInput(elements={}, evidence_catalog=table)
+    facts = _case_facts(report, shared, {"assertion:read": ("assertion:own",)})
+    catalog = delivery.StageReading("present", "found: assertion:read")
+
+    assert delivery.evidence_reading(catalog, "assertion:read", facts).state == state
+
+
+def test_a_projection_the_signed_rows_leave_unsettled_is_unavailable(report, case):
+    """Two values under one attribute project to unknown, so no field states one."""
+    reference = signed_reference(REPO_ROOT / "evals/corpus", case)
+    assert reference is not None
+    entry = next(
+        entry
+        for entry in reference.entries
+        if projected_attribute(entry.predicate, entry.subject)
+    )
+    attribute = projected_attribute(entry.predicate, entry.subject)
+    unsettled = Projection(
+        element_id=entry.subject,
+        attribute=attribute,
+        value="unknown",
+        reason="several-values",
+        rows=(),
+    )
+    facts = replace(
+        _case_facts(report, None, {}, {(entry.subject, attribute): unsettled}),
+        reference=reference,
+    )
+
+    traced = delivery.trace_fact(entry, facts, None)
+
+    for stage in delivery.GRAPH_STAGES:
+        assert traced.stages[stage].state == "unavailable"
+        assert "several-values" in traced.stages[stage].reason

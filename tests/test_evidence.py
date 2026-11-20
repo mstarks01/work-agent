@@ -34,6 +34,7 @@ from analysis_service.critic import critic_view
 from analysis_service.evidence import (
     ASSERTION_GLOSSES,
     absent_evidence_ref,
+    catalog_refs,
     crossing_evidence_ref,
     evidence_catalog,
     evidence_ref,
@@ -529,6 +530,13 @@ class TestRenderCatalog:
 
         for ref in catalog:
             assert f"| `{ref}` |" in rendered
+
+    def test_the_refs_read_back_are_the_catalog_keys(self):
+        catalog = evidence_catalog(valid_model(), assertions(row()))
+        rendered = render_catalog(catalog, assertions(row()))
+
+        assert catalog_refs(rendered) == set(catalog)
+        assert assertion_id(row()) in catalog_refs(rendered)
 
     def test_it_is_not_a_list_an_agent_could_pattern_complete(self):
         rendered = render_catalog(evidence_catalog(valid_model()), assertions=None)

@@ -32,7 +32,7 @@ from typing import Any, Literal, get_args
 from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
-from evals.harness.delivery import Delivery
+from evals.harness.delivery import FACT_DELIVERIES, Delivery
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.rates import mean, shown_figure
 from evals.harness.replay import (
@@ -361,11 +361,12 @@ def preparation_panel(result: Delivery) -> Panel:
             "with an archived lead rule": sum(
                 1 for lane in lanes if lane.archived_lead_rules
             ),
-            "place facts delivered": facts[True],
-            "place facts not delivered": facts[False],
-            "place facts unavailable": facts[None],
-            "with no place fact read": sum(
-                1 for row in result.rows if not row.facts.facts
+            **{f"place facts {state}": facts[state] for state in FACT_DELIVERIES},
+            "with required facts undefined": sum(
+                1 for row in result.rows if not row.facts.facts and not row.facts.unread
+            ),
+            "with place facts unread": sum(
+                1 for row in result.rows if row.facts.unread
             ),
             "with no control": sum(1 for row in result.rows if row.control is None),
             "re-keyed must-finds outside the population": result.re_keyed,

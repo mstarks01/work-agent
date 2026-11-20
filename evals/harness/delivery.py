@@ -66,6 +66,7 @@ each case's lanes are given other material.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -75,14 +76,15 @@ from pydantic import ValidationError
 
 from analysis_service.analysis import control_state
 from analysis_service.assertions import (
+    SETTLING_REASONS,
     Assertion,
-    AssertionCatalog,
+    Projection,
     assertion_id,
     project,
     projected_attribute,
-    subjects_of,
 )
 from analysis_service.candidates import CandidateSet, leads
+from analysis_service.evidence import catalog_refs
 from analysis_service.graph import (
     STATE_EVIDENCE_CATALOG,
     STATE_SYSTEM_MODEL,
@@ -94,7 +96,7 @@ from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
 from evals.harness.lane_replay import captured_lane, lanes_file, material_at
-from evals.harness.losses import RELATIONS, Relation, relation
+from evals.harness.losses import RELATIONS, UNREAD_CAUSE, Relation, relation
 from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, flows_by_case
 from evals.harness.replay import (
@@ -105,6 +107,7 @@ from evals.harness.replay import (
     replay_assertions,
     required_rows,
     signed_reference,
+    under_aliases,
     unsigned_reason,
 )
 from evals.harness.scorecard import (
@@ -256,9 +259,13 @@ PlaceStage = Literal[
 PLACE_STAGES: tuple[PlaceStage, ...] = get_args(PlaceStage)
 
 #: The stages of the lane input: a place fact reached the lane where one of
-#: them holds it. The lane system model counts only for a row that reaches a
-#: graph field.
-LANE_INPUT: tuple[PlaceStage, ...] = ("lane system model", "lane evidence catalog")
+#: them holds it. A stage of :data:`GRAPH_STAGES` counts only for a row that
+#: reaches a graph field.
+LANE_INPUT: tuple[PlaceStage, ...] = (
+    "lane system model",
+    "lane evidence catalog",
+    "candidate facts",
+)
 
 #: The stages that read a graph field, which a row that reaches none skips.
 GRAPH_STAGES: tuple[PlaceStage, ...] = (
@@ -267,7 +274,15 @@ GRAPH_STAGES: tuple[PlaceStage, ...] = (
     "candidate facts",
 )
 
-StageState = Literal["present", "absent", "unavailable"]
+#: How a stage stands to a place fact, in the order a reading wins where
+#: several candidates read one stage: one that holds the fact, then one no
+#: reading decides, then one that lacks it.
+StageState = Literal["present", "unavailable", "absent"]
+STATE_PREFERENCE: tuple[StageState, ...] = get_args(StageState)
+
+#: Whether the lane input held a place fact.
+FactDelivery = Literal["delivered", "not delivered", "unavailable"]
+FACT_DELIVERIES: tuple[FactDelivery, ...] = get_args(FactDelivery)
 
 #: The replay fates that answer a signed row with its value. ``worded`` and
 #: ``wrong_certainty`` keep the value, and differ in its words or its force.
@@ -303,37 +318,38 @@ class PlaceFactTrace:
     stages: Mapping[PlaceStage, StageReading]
 
     @property
-    def delivered(self) -> bool | None:
-        """Whether the lane input held the fact, or ``None`` where no reading says."""
+    def delivered(self) -> FactDelivery:
+        """Whether a stage of the lane input held the fact, or no reading says."""
         states = {
             self.stages[stage].state
             for stage in LANE_INPUT
             if self.attribute or stage not in GRAPH_STAGES
         }
         if "present" in states:
-            return True
-        return None if "unavailable" in states else False
+            return "delivered"
+        return "unavailable" if "unavailable" in states else "not delivered"
 
     @property
     def lost_at(self) -> PlaceStage | None:
         """Where a fact the lane was not sent was lost.
 
-        The first stage that reads ``absent`` after the last stage, up to the
-        lane input, that reads ``present``. A fact the blessed model carries
-        reaches the lane with no catalog row, so an absent catalog before a
-        present model is not the loss.
+        The first stage that reads ``absent`` after the last stage that reads
+        ``present``. A fact the blessed model carries reaches the lane with no
+        catalog row, so an absent catalog before a present model is not the
+        loss.
         """
-        if self.delivered is not False:
+        if self.delivered != "not delivered":
             return None
-        path = PLACE_STAGES[: PLACE_STAGES.index(LANE_INPUT[-1]) + 1]
         held = [
             index
-            for index, stage in enumerate(path)
+            for index, stage in enumerate(PLACE_STAGES)
             if self.stages[stage].state == "present"
         ]
         start = held[-1] + 1 if held else 0
         return next(
-            stage for stage in path[start:] if self.stages[stage].state == "absent"
+            stage
+            for stage in PLACE_STAGES[start:]
+            if self.stages[stage].state == "absent"
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -361,13 +377,17 @@ class PlaceFacts:
             return f"place facts unavailable: {self.unread}"
         if not self.facts:
             return "required facts: undefined"
-        delivered = [fact.delivered for fact in self.facts]
-        shown = f"place facts delivered {delivered.count(True)} of {len(self.facts)}"
-        if None in delivered:
-            shown += f", {delivered.count(None)} unavailable"
-        lost = [fact.lost_at for fact in self.facts if fact.lost_at is not None]
+        delivered = Counter(fact.delivered for fact in self.facts)
+        shown = f"place facts delivered {delivered['delivered']} of {len(self.facts)}"
+        if delivered["unavailable"]:
+            shown += f", {delivered['unavailable']} unavailable"
+        lost = Counter(fact.lost_at for fact in self.facts if fact.lost_at is not None)
         if lost:
-            shown += f" (lost at {', '.join(lost)})"
+            shown += " (lost: {})".format(
+                ", ".join(
+                    f"{count} at {stage}" for stage, count in sorted(lost.items())
+                )
+            )
         return shown
 
     def to_json(self) -> dict[str, Any]:
@@ -427,6 +447,12 @@ class CaseFacts:
     #: The report's catalog against the signed reference, or ``None`` where the
     #: report holds no assertion record.
     replay: AssertionReplay | None
+    #: Each ID the report's catalog gives a row, by the ID the replay reads it
+    #: under: the replay rewrites a row through the signed aliases first.
+    own_ids: Mapping[str, tuple[str, ...]]
+    #: What each graph attribute the signed rows reach would hold, by element
+    #: and attribute.
+    projections: Mapping[tuple[str, str], Projection]
     #: ``None`` where the case's lane material is untraced.
     shared: SharedInput | None
     #: Why ``shared`` is ``None``, or ``""``.
@@ -443,15 +469,28 @@ def case_facts(
     """The signed reference and the report's catalog replayed against it."""
     reference = signed_reference(corpus, case)
     replayed = None
+    own_ids: dict[str, tuple[str, ...]] = {}
     if reference is not None and report.assertions is not None:
         # The report keeps no proposal, and the replay reads none.
         result = AssertionResult(case.id, proposal={}, record=report.assertions)
         replayed = replay_assertions(case, reference, result)
+        for entry in report.assertions.catalog.entries:
+            read = assertion_id(under_aliases(entry, reference))
+            own_ids[read] = (*own_ids.get(read, ()), assertion_id(entry))
     return CaseFacts(
         reference=reference,
         unread="" if reference is not None else unsigned_reason(corpus, case),
         report=report,
         replay=replayed,
+        own_ids=own_ids,
+        projections=(
+            {}
+            if reference is None
+            else {
+                (one.element_id, one.attribute): one
+                for one in project(reference.catalog)
+            }
+        ),
         shared=shared,
         untraced=untraced,
     )
@@ -492,20 +531,25 @@ def _catalog(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
     return StageReading("absent", row.fate), ""
 
 
-def _evidence(
-    catalog: StageReading, produced: str, shared: SharedInput | None, untraced: str
+def evidence_reading(
+    catalog: StageReading, produced: str, facts: CaseFacts
 ) -> StageReading:
-    if shared is None:
-        return StageReading("unavailable", untraced)
-    if catalog.state == "unavailable":
-        return catalog
+    """The lane evidence catalog stage: a key the report's own row is filed under.
+
+    ``produced`` is the ID the replay read the row under, after the signed
+    aliases, and :attr:`CaseFacts.own_ids` gives the ID the catalog keyed.
+    """
+    if facts.shared is None:
+        return StageReading("unavailable", facts.untraced)
     if catalog.state == "absent":
         return StageReading("absent", "no catalog row answers the fact")
     if not produced:
         return StageReading("unavailable", "the alignment names no produced row")
-    if f"`{produced}`" in shared.evidence_catalog:
-        return StageReading("present", f"keys {produced}")
-    return StageReading("absent", f"no key {produced}")
+    keys = catalog_refs(facts.shared.evidence_catalog)
+    found = [ref for ref in facts.own_ids.get(produced, ()) if ref in keys]
+    if found:
+        return StageReading("present", f"keys {found[0]}")
+    return StageReading("absent", f"no key for {produced}")
 
 
 def _candidate_facts(
@@ -523,9 +567,7 @@ def _candidate_facts(
             "absent", f"no candidate on the subject carries {attribute}"
         )
     states = {reading.state for reading in readings}
-    state: StageState = next(
-        each for each in ("present", "unavailable", "absent") if each in states
-    )
+    state = next(each for each in STATE_PREFERENCE if each in states)
     return next(reading for reading in readings if reading.state == state)
 
 
@@ -539,19 +581,24 @@ def trace_fact(
     stages: dict[PlaceStage, StageReading] = {
         "raw extraction": StageReading("unavailable", NO_EXTRACTION),
         "catalog": catalog,
-        "lane evidence catalog": _evidence(
-            catalog, produced, facts.shared, facts.untraced
-        ),
+        "lane evidence catalog": evidence_reading(catalog, produced, facts),
     }
     attribute = projected_attribute(entry.predicate, entry.subject)
     if not attribute:
         stages |= dict.fromkeys(
             GRAPH_STAGES, StageReading("unavailable", "the row reaches no graph field")
         )
+    elif (
+        projection := facts.projections[entry.subject, attribute]
+    ).reason not in SETTLING_REASONS:
+        stages |= dict.fromkeys(
+            GRAPH_STAGES,
+            StageReading(
+                "unavailable",
+                f"the signed rows leave {attribute} unsettled: {projection.reason}",
+            ),
+        )
     else:
-        labels = {subject.id: subject for subject in facts.reference.subjects}
-        alone = AssertionCatalog(entries=[entry], subjects=subjects_of([entry], labels))
-        (projection,) = project(alone)
         model = {
             element.id: element for element in facts.report.system_model.elements()
         }
@@ -607,7 +654,7 @@ def matched_control(
     """
     same = [row for row in rows if (row.case, row.lane) == (miss.case, miss.lane)]
     return next((row for row in same if row.status == "matched"), None) or next(
-        (row for row in same if row.cause == "unstated"), None
+        (row for row in same if row.cause == UNREAD_CAUSE), None
     )
 
 
@@ -716,7 +763,7 @@ def trace(
         except EvalRunError as error:
             shared.pop(case, None)
             untraced[case] = str(error)
-    held = {
+    facts_by_case = {
         case: case_facts(
             by_id[case],
             corpus,
@@ -739,7 +786,7 @@ def trace(
                 flows[row.case],
                 by_id[row.case].declaration("stride").options,
             ),
-            facts=place_facts(row.elements, held[row.case], lane),
+            facts=place_facts(row.elements, facts_by_case[row.case], lane),
         )
 
     rows = []
@@ -748,9 +795,7 @@ def trace(
         control = controls[row.case, row.reference_index]
         rows.append(
             DeliveryRow(
-                reference=miss.reference,
-                lane=miss.lane,
-                facts=miss.facts,
+                **vars(miss),
                 control=None if control is None else traced_reference(control),
             )
         )

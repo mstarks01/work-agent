@@ -488,6 +488,9 @@ NEWLINE_SPLITS: dict[Site, str] = {
         "a \\r or a Unicode line separator stays in a settings line, where the"
         " key pattern or the value rule refuses it"
     ),
+    ("src/analysis_service/evidence.py", "catalog_refs"): (
+        "the inverse of the \\n join of render_catalog's rows"
+    ),
     ("src/analysis_service/graph.py", "unfence"): (
         "the inverse of the \\n join of render_fenced"
     ),
@@ -2937,6 +2940,10 @@ ONE_READERS: dict[str, _OneReader] = {
             ("src/analysis_service/assertions.py", "catalog_coverage"): (
                 "it counts the attributes that the catalog settles for a"
                 " coverage figure, and chooses no row"
+            ),
+            ("evals/harness/delivery.py", "trace_fact"): (
+                "it asks whether the signed rows settle a graph field, to say"
+                " whether a field can state a place fact, and chooses no row"
             ),
         },
         "",
