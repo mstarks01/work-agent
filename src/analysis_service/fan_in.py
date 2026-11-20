@@ -326,13 +326,13 @@ def fan_in(
         package,
     )
     return FanIn(
-        merged,
-        marks,
-        deferred,
-        coverage,
-        undeferred,
-        deferred_ids,
-        joined.quotes_checked,
+        drafts=merged,
+        marks=marks,
+        deferred=deferred,
+        coverage=coverage,
+        undeferred=undeferred,
+        deferred_ids=deferred_ids,
+        quotes_checked=joined.quotes_checked,
     )
 
 
