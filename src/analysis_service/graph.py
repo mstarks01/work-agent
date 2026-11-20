@@ -2260,9 +2260,10 @@ def parked_quotes_checked(
     * ``True`` or ``False``: the fan-in's own value.
     * Absent, with no drafts: no fan-in ran (a framework its precondition
       refused), so no check ran.
-    * Absent, with drafts: a dump written before the key existed. Its check
-      ran, for the reason :func:`~analysis_service.claims.quote_check_ran`
-      states.
+    * Absent, with drafts: a failure dump that holds drafts and no
+      ``quotes_checked`` key. Its fan-in had the case's non-empty map of
+      source texts, so its check ran, for the reason
+      :func:`~analysis_service.claims.quote_check_ran` states.
     """
     parked = state.get(nodes.key("quotes_checked"))
     if parked is None:

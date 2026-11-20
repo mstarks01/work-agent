@@ -92,8 +92,9 @@ class Archived:
     framework: FrameworkName
     drafts: list[Claim]
     marks: AnalysisMarks
-    #: Whether the fan-in ran the quote check, read by
-    #: :func:`~analysis_service.claims.quote_check_ran`.
+    #: Whether the fan-in ran the quote check: from the block through
+    #: :func:`~analysis_service.claims.quote_check_ran`, or from a failure
+    #: dump through :func:`~analysis_service.graph.parked_quotes_checked`.
     quotes_checked: bool
     #: This framework's block of the case's report, or ``None`` where the case
     #: failed before it wrote one, and the material came from its failure dump.

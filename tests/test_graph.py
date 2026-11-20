@@ -1717,7 +1717,7 @@ def test_the_block_says_whether_the_quote_check_ran(sources, checked, unverified
         ({"quotes_checked": False, "drafts": []}, False),
         # No fan-in ran: a framework its precondition refused.
         ({}, False),
-        # A failure dump written before the key: the fan-in ran.
+        # A failure dump that holds drafts and no key: the fan-in ran.
         ({"drafts": []}, True),
     ],
 )
