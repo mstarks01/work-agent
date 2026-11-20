@@ -318,8 +318,9 @@ def preparation_panel(result: Delivery) -> Panel:
     differ from the rebuild. The candidates artifact holds the leads, so
     ``same_leads`` differs only where ``same_lane_artifacts`` differs too.
     Otherwise it is ``unverified`` and never ``equivalent``: the shared keys
-    every lane templates, the prepared user turn and the case options have no
-    rebuild from the archive, and the evidence names each of them.
+    every lane templates, the prepared user turn, the lane prompt files at the
+    run's commit and the case options have no rebuild from the archive, and
+    the evidence names each of them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
     captured = [lane.captured for lane in lanes if lane.captured is not None]
@@ -336,6 +337,7 @@ def preparation_panel(result: Delivery) -> Panel:
         "the rebuilt lane artifacts read today's corpus options",
         "not compared: the case options, which the archive does not record",
         "not compared: the prepared user turn",
+        "not compared: the lane prompt files at the run's commit",
         *(f"not compared: the shared key {key}" for key in LANE_SHARED_KEYS),
         *(f"{case}: lane material uncaptured" for case in sorted(result.uncaptured)),
     ]

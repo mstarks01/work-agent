@@ -154,7 +154,9 @@ def captured_lane(
     try:
         lane_of(framework, lane_name).state(held)
     except ValueError as error:
-        raise EvalRunError(f"the capture does not hold a lane's {error}") from error
+        raise EvalRunError(
+            f"the {framework} lane {lane_name!r} capture is not a lane's state: {error}"
+        ) from error
     unrendered = sorted(
         name for name, text in held.items() if not isinstance(text, str)
     )

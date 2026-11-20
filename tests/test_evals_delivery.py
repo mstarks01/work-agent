@@ -92,7 +92,7 @@ def _candidates(sent) -> CandidateSet:
     return CandidateSet.model_validate_json(unfence(sent["candidates"]))
 
 
-def _captured(traced: delivery.LaneTrace) -> delivery.LaneComparison:
+def _comparison(traced: delivery.LaneTrace) -> delivery.LaneComparison:
     assert traced.captured is not None
     return traced.captured
 
@@ -134,9 +134,9 @@ def test_a_capture_the_rebuild_reproduces_agrees(report, sent, flows, options):
         ("store:message-queue",), "tampering", report, sent, flows, options
     )
 
-    assert _captured(traced).same_leads == "agrees"
-    assert _captured(traced).same_lane_artifacts == "agrees"
-    assert _captured(traced).delivered == traced.rebuilt == "draft-contains"
+    assert _comparison(traced).same_leads == "agrees"
+    assert _comparison(traced).same_lane_artifacts == "agrees"
+    assert _comparison(traced).delivered == traced.rebuilt == "draft-contains"
 
 
 def test_a_capture_without_a_rebuilt_candidate_differs(
@@ -153,9 +153,9 @@ def test_a_capture_without_a_rebuilt_candidate_differs(
         options,
     )
 
-    assert _captured(traced).same_leads == "differs"
-    assert _captured(traced).same_lane_artifacts == "differs"
-    assert _captured(traced).delivered == "absent"
+    assert _comparison(traced).same_leads == "differs"
+    assert _comparison(traced).same_lane_artifacts == "differs"
+    assert _comparison(traced).delivered == "absent"
     assert traced.rebuilt == "equal"
 
 
@@ -194,8 +194,8 @@ def test_a_changed_candidate_payload_with_the_same_leads_is_not_equivalent(
     )
     path = panels.preparation_panel(_one_row(traced)).path
 
-    assert _captured(traced).same_leads == "agrees"
-    assert _captured(traced).same_lane_artifacts == "differs"
+    assert _comparison(traced).same_leads == "agrees"
+    assert _comparison(traced).same_lane_artifacts == "differs"
     assert path is not None and path.fidelity == "known-different"
 
 
@@ -210,8 +210,8 @@ def test_a_changed_lane_artifact_differs(report, sent, flows, options, artifact)
         options,
     )
 
-    assert _captured(traced).same_leads == "agrees"
-    assert _captured(traced).same_lane_artifacts == "differs"
+    assert _comparison(traced).same_leads == "agrees"
+    assert _comparison(traced).same_lane_artifacts == "differs"
 
 
 def test_an_agreeing_lane_leaves_the_evidence_payload_unverified(
@@ -342,16 +342,23 @@ def _captured_sweep(tmp_path: Path, extra: dict[str, str]) -> Path:
     return tmp_path / BASELINE.name
 
 
+def _captured_case_lane(traced: delivery.Delivery) -> delivery.LaneTrace:
+    """The one traced lane of :data:`CAPTURED_CASE`."""
+    (lane,) = [
+        row.lane
+        for row in traced.rows
+        if row.reference.case == CAPTURED_CASE and row.lane is not None
+    ]
+    return lane
+
+
 def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
     traced = _trace(_captured_sweep(tmp_path, {}))
 
-    (row,) = [
-        row for row in traced.rows if row.reference.case == CAPTURED_CASE and row.lane
-    ]
-    assert row.lane is not None
-    captured = _captured(row.lane)
+    lane = _captured_case_lane(traced)
+    captured = _comparison(lane)
     assert captured.same_leads == captured.same_lane_artifacts == "agrees"
-    assert captured.delivered == row.lane.rebuilt == "equal"
+    assert captured.delivered == lane.rebuilt == "equal"
     assert CAPTURED_CASE not in traced.uncaptured
 
 
@@ -367,10 +374,7 @@ def test_a_captured_lane_prints_each_reading_once(tmp_path, capsys):
 def test_a_refused_lane_capture_reads_as_uncaptured_with_its_reason(tmp_path):
     traced = _trace(_captured_sweep(tmp_path, {"drafts": "a stray key"}))
 
-    (row,) = [
-        row for row in traced.rows if row.reference.case == CAPTURED_CASE and row.lane
-    ]
-    assert row.lane is not None and row.lane.captured is None
+    assert _captured_case_lane(traced).captured is None
     assert "drafts" in traced.uncaptured[CAPTURED_CASE]
 
 

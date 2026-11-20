@@ -99,6 +99,12 @@ class LaneComparison:
             "same_lane_artifacts": self.same_lane_artifacts,
         }
 
+    def describe(self) -> str:
+        return (
+            f"delivered {self.delivered}, same leads {self.same_leads}, same"
+            f" lane artifacts {self.same_lane_artifacts}"
+        )
+
 
 @dataclass(frozen=True)
 class LaneTrace:
@@ -224,13 +230,15 @@ def trace(
     traced_lanes = {
         case: {row.lane for row in silent if row.case == case} for case in traced_cases
     }
-    material: dict[str, dict[str, Mapping[LaneArtifact, str]]] = {}
+    # A case's lanes are one file, so a lane the trace refuses refuses its case.
+    captured: dict[str, dict[str, Mapping[LaneArtifact, str]]] = {}
     uncaptured: dict[str, str] = {}
     for case in traced_cases:
         try:
-            held = material_at(lanes_file(artifact, case))
-            material[case] = {
-                lane: captured_lane(held, "stride", lane) for lane in traced_lanes[case]
+            material = material_at(lanes_file(artifact, case))
+            captured[case] = {
+                lane: captured_lane(material, "stride", lane)
+                for lane in traced_lanes[case]
             }
         except EvalRunError as error:
             uncaptured[case] = str(error)
@@ -239,7 +247,7 @@ def trace(
             row.elements,
             row.lane,
             reports[row.case],
-            material[row.case][row.lane] if row.case in material else None,
+            captured[row.case][row.lane] if row.case in captured else None,
             flows[row.case],
             by_id[row.case].declaration("stride").options,
         )
@@ -281,16 +289,8 @@ def render(result: Delivery) -> None:
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
             f" {reference.cause} [{reference.compatibility}]:"
-            f" {_captured(lane.captured)}, rebuilt {lane.rebuilt}; lead rules today"
+            f" {'uncaptured' if lane.captured is None else lane.captured.describe()},"
+            f" rebuilt {lane.rebuilt}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"
         )
-
-
-def _captured(captured: LaneComparison | None) -> str:
-    if captured is None:
-        return "uncaptured"
-    return (
-        f"delivered {captured.delivered}, same leads {captured.same_leads}, same"
-        f" lane artifacts {captured.same_lane_artifacts}"
-    )
