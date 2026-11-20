@@ -71,7 +71,7 @@ def test_no_function_body_is_defined_in_two_files():
 
 
 def test_a_copied_body_is_seen_whatever_it_is_called():
-    """Positive control on the key: the name and the docstring do not count."""
+    """Positive check on the key: the name and the docstring do not count."""
     one = ast.parse(
         'def a():\n    """doc"""\n    return {k: (v.x, v.y) for k, v in items.items() if v.z}\n'
     )

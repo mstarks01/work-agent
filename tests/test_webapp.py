@@ -2021,7 +2021,7 @@ def test_a_key_is_read_by_position_only_through_key_fields():
 
 
 def test_the_key_position_lint_sees_a_positional_read():
-    """A positive control on the lint above."""
+    """A positive check on the lint above."""
     reads = "const attribute = row.q.key[1];\nconst [element] = q.key;\n"
 
     assert len(_KEY_BY_POSITION.findall(reads)) == 2

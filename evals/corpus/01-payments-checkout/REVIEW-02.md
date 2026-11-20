@@ -1,9 +1,9 @@
-# Review sitting 02 — is the control case's threat list right?
+# Review sitting 02 — is the comparison arm's threat list right?
 
 `evals/BLESSING.md` step 6, run for the first time, on
 `evals/corpus/01-payments-checkout`.
 
-**Why this case.** It is the control. Every far-domain recall figure in the suite
+**Why this case.** It is the comparison arm. Every far-domain recall figure in the suite
 is a delta against it, so an error in its 21 reference claims moves every
 comparison the corpus exists to make. It is also 242 words of source text, which
 is the shortest path to a first sign-off.
@@ -522,7 +522,7 @@ The point of the sitting. One line each, and say which set you expected it in.
 **Counts first**, kept apart per framework. How many `agree`, `doubt`, `dup` in
 Part 2 and in Part 3, and how many of your own items are missing from either.
 
-- **Few doubts, nothing important missing.** The control case holds. Record the
+- **Few doubts, nothing important missing.** The comparison arm holds. Record the
   sign-off (below) and the suite's recall numbers have a real standard behind
   them for the first time.
 - **A whole class of attack missing from Part 2.** That is the serious outcome.

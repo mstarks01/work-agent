@@ -469,7 +469,7 @@
       ],
       "recommendation_sound": false
     },
-    "rationale": "The replacement for the per-shopper-credentials draft, which asserted a reassurance rather than a threat and so gave a critic a second reason to reject it. This is a genuine threat claim \u2014 a forged receipt breaks the archive's record of what happened \u2014 whose premise its own quote contradicts: the write is authenticated by the order service's service account. It carries no unknown ground on purpose, so it reaches the critic both before and after the change and is the positive control: if it survives, the critic cannot detect contradiction at all, and the bypassed fixtures say nothing about the bypass.",
+    "rationale": "The replacement for the per-shopper-credentials draft, which asserted a reassurance rather than a threat and so gave a critic a second reason to reject it. This is a genuine threat claim \u2014 a forged receipt breaks the archive's record of what happened \u2014 whose premise its own quote contradicts: the write is authenticated by the order service's service account. It carries no unknown ground on purpose, so it reaches the critic both before and after the change and is the positive check: if it survives, the critic cannot detect contradiction at all, and the bypassed fixtures say nothing about the bypass.",
     "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"

@@ -1880,7 +1880,7 @@ def test_extraction_mode_holds_the_model_to_each_diagram_s_structure(case):
 
 
 def test_a_faithful_extraction_still_passes_the_citation_check(case):
-    """The positive control: the blessed model quotes its own sources correctly.
+    """The positive check: the blessed model quotes its own sources correctly.
 
     Without this, a citation check that raised on everything would look exactly
     like one that works.
@@ -2540,7 +2540,7 @@ class TestAStateAgreementIsJoinedToItsBasis:
         assert score.to_json()["state_agrees_unbased"] == score.state_agrees_unbased
 
     def test_the_blessed_model_charges_nothing(self):
-        """A positive control: the reference agrees with itself and is based."""
+        """A positive check: the reference agrees with itself and is based."""
         for case in load_corpus(CORPUS):
             score = self._score(case, case.model)
 

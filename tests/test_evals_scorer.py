@@ -667,7 +667,7 @@ def test_severity_calibration_is_arithmetic(case, no_votes):
 def test_recall_and_artifact_over_the_whole_labelled_set(
     case, labelled_pairs, no_votes
 ):
-    """The full offline pass: every ``match`` fixture for the control case."""
+    """The full offline pass: every ``match`` fixture for the comparison arm."""
     matches = [
         pair
         for pair in labelled_pairs

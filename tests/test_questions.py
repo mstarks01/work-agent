@@ -168,7 +168,7 @@ class TestTheRanking:
         needed = {("stride", "size"): {limits: ("size",)}}
 
         every = set(_by_band(waiting, band, {})[:2])
-        assert every == {audit, subject("B")}, "a control: every facet"
+        assert every == {audit, subject("B")}, "a positive check: every facet"
         assert set(_by_band(waiting, band, needed)[:2]) == {limits, subject("A")}
 
     def test_each_question_names_the_highest_band_that_waits_on_it(self, report):

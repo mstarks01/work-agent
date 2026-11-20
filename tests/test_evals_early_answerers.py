@@ -35,7 +35,7 @@ BASELINE = next(
 @pytest.mark.parametrize("effects", [True, False], ids=["effects", "no-effects"])
 def test_a_walk_takes_at_most_its_budget_one_question_a_save(who, effects):
     walked = walk(valid_model(), LEVEL_2, ANSWERERS[who], effects=effects, budget=10)
-    assert walked.steps, "a control: the list asks something"
+    assert walked.steps, "a positive check: the list asks something"
     taken = [step.choices_so_far for step in walked.steps]
     assert taken == sorted(set(taken)), "each save takes at least one choice"
     assert taken[-1] >= 10 or walked.ended

@@ -91,7 +91,7 @@ def test_stated_parts_stay_rare():
 
 
 def test_a_stated_part_counts():
-    """A positive control: a reader that sees nothing would keep the wire quiet."""
+    """A positive check: a reader that sees nothing would keep the wire quiet."""
     model = valid_model()
     element = model.processes[0]
     element.exposure = "internet-facing"

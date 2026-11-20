@@ -583,7 +583,7 @@ _CONTROL = {
 
 
 def test_the_lint_reports_a_default_every_call_passes():
-    """Positive control: two defaults that every call passes are reported, and
+    """Positive check: two defaults that every call passes are reported, and
     each other shape is passed.
 
     ``unread`` is called through the re-export of its package, and an

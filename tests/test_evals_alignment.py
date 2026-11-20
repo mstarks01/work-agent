@@ -597,7 +597,7 @@ class TestAnAliasReadsANameAndNotAnId:
         assert ruled[alias.element].produced == moved
 
     def test_a_name_no_alias_rules_still_pairs_with_nothing(self):
-        """The negative control: the name decides, so a wrong name pairs nothing."""
+        """The negative check: the name decides, so a wrong name pairs nothing."""
         golden = case("03")
         model = self.produced("process:airflow-s-scheduler", "something else entirely")
 

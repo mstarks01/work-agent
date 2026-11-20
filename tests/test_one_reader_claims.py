@@ -30,7 +30,7 @@ it names a Python site in backticks. The
 owner of a docstring is the function or the class it documents, or the name it
 follows as an attribute docstring. A claim spans line breaks, so a claim
 wrapped across two lines is still found. :data:`CLAIM` skips the words that
-describe a reader or a place and claim nothing, and a negative control holds
+describe a reader or a place and claim nothing, and a negative check holds
 each skip. The skip of "the one reader" before a word in ``-ing`` reads the
 word, so it also skips a claim where the next word is a noun such as
 "string", or a word such as "during".
@@ -551,7 +551,7 @@ def test_each_kept_claim_states_a_reason(key):
 
 
 def test_the_claim_pattern_finds_a_claim_and_skips_a_description():
-    """Positive and negative controls for the words of a claim."""
+    """Positive and negative checks for the words of a claim."""
     claimed = [
         "the one reader of a flow's label",
         "This is the one\n    reader of the cell.",
@@ -593,7 +593,7 @@ def test_the_claim_pattern_finds_a_claim_and_skips_a_description():
 
 
 def test_a_planted_claim_in_each_new_word_fails(tmp_path):
-    """Positive control: a claim in each synonym, on an unheld function,
+    """Positive check: a claim in each synonym, on an unheld function,
     names no guard."""
     words = [
         "is its one reader",
@@ -624,7 +624,7 @@ def test_a_planted_claim_in_each_new_word_fails(tmp_path):
 
 
 def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
-    """Positive and negative controls for the guard.
+    """Positive and negative checks for the guard.
 
     A claim on an unheld function fails. A claim on a ``ONE_READERS`` reader
     in the reader's own file passes, and so does a claim there that names
@@ -657,7 +657,7 @@ def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
 
 
 def test_a_dotted_name_resolves_through_its_module_and_the_imports(tmp_path):
-    """Positive and negative controls for a dotted or imported reference.
+    """Positive and negative checks for a dotted or imported reference.
 
     A dotted reference resolves to a function of the module it names. A bare
     name that the claim's file imports resolves through that import. The
@@ -684,7 +684,7 @@ def test_a_dotted_name_resolves_through_its_module_and_the_imports(tmp_path):
 
 
 def test_a_site_a_row_exempts_guards_nothing(tmp_path):
-    """Negative control: a claim on a site that a row names as no second
+    """Negative check: a claim on a site that a row names as no second
     reader fails, though the lint file spells that site."""
     row = ONE_READERS["a rejection's steps in an eval instrument"]
     (place, name), *_ = row.others
@@ -700,7 +700,7 @@ def test_a_site_a_row_exempts_guards_nothing(tmp_path):
 
 
 def test_a_site_among_several_in_an_assert_guards_nothing():
-    """Negative control: a site that an assert lists beside other sites is no
+    """Negative check: a site that an assert lists beside other sites is no
     one reader, so it guards nothing."""
     assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
     assert ("src/analysis_service/fixes.py", "missing_rows") not in guarded_sites()
@@ -724,7 +724,7 @@ def test_a_comment_inside_a_table_belongs_to_the_table(tmp_path):
 
 
 def test_an_assert_guards_only_where_it_names_one_site_of_the_whole_tree():
-    """Positive and negative controls for the assert path of the guard."""
+    """Positive and negative checks for the assert path of the guard."""
     probe = ast.parse(
         "def test_one():\n"
         "    assert _sites(f) == [('a.py', 'f')]\n"

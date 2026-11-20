@@ -51,7 +51,7 @@ the original denominator and score beside the revised ones. Never remove a
 hard target to raise coverage.
 
 Choose a small diagnostic set: misses with different failure signatures, plus
-cases that succeed, plus a negative control. A set that you chose for its
+cases that succeed, plus a negative check. A set that you chose for its
 misses supports a diagnosis. It does not estimate overall quality. Keep fresh
 cases back for confirmation (#1093).
 
@@ -60,7 +60,7 @@ reference version (`SKILL.md` step 3). A figure from an earlier thread is not a
 baseline.
 
 **Done when** every sampled miss has a frozen argument, the set names its
-negative control, and the baseline names all five identity parts.
+negative check, and the baseline names all five identity parts.
 
 ## 2. Run the three conditions
 
@@ -179,7 +179,7 @@ reads the shipped route on material the change never saw.
 
 **One exception: a gate that isolates one flag.** A gate that holds the signed
 model fixed to compare one switch on and off may read `analysis` mode, because
-the fixed model is its control, and not a claim about the route. The
+the fixed model is its unchanged case, and not a claim about the route. The
 `ANALYSIS_ASSERTIONS` gates in `evals/harness/promotion.py` are such a gate.
 Such a gate decides the flag only. A
 claim that the whole route improved still needs the ordinary pipeline on fresh

@@ -414,7 +414,7 @@ def test_a_holdout_case_is_scored_and_charged_no_losses(case):
     scores, _, charged = score(held)
     assert [score.holdout for score in scores] == [True]
     assert charged == ()
-    # The control: the same case, not held out, is charged.
+    # The comparison arm: the same case, not held out, is charged.
     assert len(score(case)[2]) == 1
 
 

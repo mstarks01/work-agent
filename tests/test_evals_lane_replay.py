@@ -342,7 +342,10 @@ def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():
 
 
 def test_the_fidelity_check_fails_on_material_the_lane_never_had(recorded, case):  # noqa: F811
-    """The control for the byte-for-byte test: a changed lead is a new request."""
+    """The negative check for the byte-for-byte test.
+
+    A changed lead is a new request.
+    """
     out, seen = recorded
     material = load_material(finished(out, case.id), case.id)
     material["lanes"]["stride"]["spoofing"]["candidates"] = "a lead nobody wrote"

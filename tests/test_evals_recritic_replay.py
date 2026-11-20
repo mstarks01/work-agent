@@ -340,7 +340,7 @@ def test_the_re_ask_request_is_rebuilt_byte_for_byte(
 ):
     """The critic drops the spoofing draft, so the graph sends the re-ask.
 
-    The control reads the answer as sent rather than as ADK stores it, and
+    The comparison arm reads the answer as sent rather than as ADK stores it, and
     the graph never sent that request.
     """
     dropped = json.dumps(

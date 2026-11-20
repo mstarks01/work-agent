@@ -731,7 +731,7 @@ def test_the_gate_and_the_run_read_the_set_through_one_rule():
 
 @pytest.mark.parametrize("framework", sorted(PACKAGES))
 def test_every_package_reading_carries_the_two_fields_the_replay_reads(framework):
-    """The positive control on the shape ``_reading`` promises.
+    """The positive check on the shape ``_reading`` promises.
 
     ``score`` reads ``sound`` and ``note`` off whatever a package's ruling
     declares. Typing that ``Any`` checked neither, so a package declaring a

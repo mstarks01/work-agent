@@ -492,7 +492,7 @@ class TestARefusedFramework:
         assert all(entry.reason for entry in block.scope)
 
     def test_a_satisfied_precondition_still_runs_the_whole_subgraph(self, monkeypatch):
-        """The control: the swap itself changes nothing when the answer is yes."""
+        """The unchanged case: the swap changes nothing when the answer is yes."""
         run, visited, _ = self.run(monkeypatch, "satisfied")
         block = graph.result_of(run.final_state).analyses[0]
 

@@ -165,7 +165,7 @@ def test_the_summary_counts_only_the_questions_the_page_presented():
     that waits on its parent cannot be reported as shown (ADR 0078)."""
     asked = _paused(valid_model(), {"asvs": {"level": 2}})
     assert asked.summary.introduced == 0
-    assert asked.blocked, "a control: a part waits on its parent"
+    assert asked.blocked, "a positive check: a part waits on its parent"
     shown = [q.key for q in asked.early[:2]]
     saved = _save(asked, skips=shown, presented=shown)
     after = _paused(
@@ -192,6 +192,6 @@ def test_a_pause_whose_questions_left_were_all_skipped_says_so():
         shown, skipped = admitted.shown, list(admitted.skipped)
     else:
         pytest.fail("the saves never ended")
-    assert (asked.held_back, asked.below_floor) == ((), ()), "a control"
+    assert (asked.held_back, asked.below_floor) == ((), ()), "a positive check"
     assert asked.summary.skipped > 0
     assert asked.empty_list_reason == "skipped"

@@ -328,7 +328,7 @@ def test_no_upstream_sentence_appears_in_an_ungoverned_file(governed, upstream_w
 
 
 def test_the_scan_catches_a_sentence_pasted_in_another_format(tmp_path):
-    """Positive control: a clean tree and a broken scan look identical.
+    """Positive check: a clean tree and a broken scan look identical.
 
     Every other assertion here passes when :func:`leaks` returns nothing, so a
     scan that always returned nothing would leave the suite green and the

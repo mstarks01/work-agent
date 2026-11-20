@@ -861,7 +861,7 @@ def test_a_rekey_preview_finds_the_pool_unmoved_across_a_version(tmp_path, capsy
 
 
 def test_a_rekey_preview_names_a_rule_that_splits_a_finding(tmp_path, capsys):
-    """The positive control: version 6 joins two verbs version 4 keeps apart.
+    """The positive check: version 6 joins two verbs version 4 keeps apart.
 
     Two votes on one place with two equivalent verbs are two findings under
     version 4 and one under the current rule, so the pool's votes move.

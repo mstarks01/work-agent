@@ -881,14 +881,14 @@ def test_the_read_audit_observes_something(figure_reads):
 
     A broken audit hook reports every figure clean, and that reads exactly like
     a clean tree. So the script runs
-    :func:`evals.review_submission.unreviewed_cases` as a control, which reads
-    the submissions by construction, and an empty control means the observation
+    :func:`evals.review_submission.unreviewed_cases` as a positive check, which reads
+    the submissions by construction, and an empty positive check means the observation
     failed rather than that nothing was observed.
     """
     assert figure_reads["control"], (
         "the read audit observed no submission read even from"
         " unreviewed_cases, so it observed nothing at all. Every result below"
-        " is vacuous until audit_figure_reads.py reports the control."
+        " is vacuous until audit_figure_reads.py reports the positive check."
     )
 
 

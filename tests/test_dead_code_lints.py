@@ -446,7 +446,7 @@ def test_no_kept_name_outlives_its_reason():
 
 
 def test_a_public_service_name_only_a_test_reaches_is_reported():
-    """Positive control on the scope: a public name in the service that the
+    """Positive check on the scope: a public name in the service that the
     package root does not export is judged, and one it exports is not."""
     reported = test_only()
 
@@ -457,7 +457,7 @@ def test_a_public_service_name_only_a_test_reaches_is_reported():
 
 
 def test_a_use_in_a_test_is_not_a_production_use():
-    """Positive control on the roots: a name only this file calls is seen by the
+    """Positive check on the roots: a name only this file calls is seen by the
     full walk and not by the production walk."""
     everywhere = _used_names(ignoring=frozenset())
     shipped = _used_names(ignoring=frozenset(), files=PRODUCTION)
@@ -467,7 +467,7 @@ def test_a_use_in_a_test_is_not_a_production_use():
 
 
 def test_a_local_that_shares_a_name_is_not_a_use():
-    """Positive control on the scopes, on the shape that got through:
+    """Positive check on the scopes, on the shape that got through:
     ``structural_issues`` had no caller, and a parameter of that name read as
     one.
 
@@ -588,7 +588,7 @@ def test_no_plain_method_is_unreachable():
 
 
 def test_an_override_is_not_a_use():
-    """Positive control, on the shape that got through: a base method and its
+    """Positive check, on the shape that got through: a base method and its
     override, and no call to either."""
     module = ast.parse(
         "class Base:\n"

@@ -1088,7 +1088,7 @@ class TestWhatTheAssertionLayerBacked:
 
     Every loss row is a reference nothing found. This is the other side: the
     references a catalog row did find. Without it the table has misses and no
-    control, which is why the 2026-09-23 audit could not price the layer.
+    comparison arm, which is why the 2026-09-23 audit could not price the layer.
     """
 
     @staticmethod

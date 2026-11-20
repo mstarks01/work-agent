@@ -192,7 +192,7 @@ def test_every_projection_reason_has_a_shape():
 
 @pytest.mark.parametrize("reason", sorted(SHAPES))
 def test_each_shape_projects_its_reason_without_an_answer(reason):
-    """A control: the fixture holds the shape it is named after."""
+    """A positive check: the fixture holds the shape it is named after."""
     attribute, rows = SHAPES[reason]
     report = resume(checkpoint(rows), given=SOURCES)
 
@@ -375,7 +375,7 @@ def test_the_pause_asks_exactly_what_the_lanes_read_open(reason, stated_by_extra
 
 
 def test_the_pause_table_holds_both_outcomes():
-    """A control: some shape settles the fact at the pause, and some opens it
+    """A positive check: some shape settles the fact at the pause, and some opens it
     over a value extraction stated, so neither branch above is vacuous."""
     settles = set()
     opens = set()

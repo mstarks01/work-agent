@@ -20,7 +20,7 @@ instruments must then say:
 
 A falsification probe that takes nothing away at either instrument is a hole in
 the measurement, and :data:`PROBES` is written so that the suite fails when one
-appears. A **positive control** takes nothing away by design and is declared
+appears. A **positive check** takes nothing away by design and is declared
 with ``loses=0`` and no refusal, so the two are never confused.
 
 **A criterion nothing probes says why**, in :data:`UNPROBED`. #926's acceptance
@@ -67,7 +67,7 @@ from evals.harness.replay import (
     unsigned_reason,
 )
 
-#: Every falsification and positive-control line #926's acceptance list names,
+#: Every falsification and positive-check line #926's acceptance list names,
 #: keyed by the slug :data:`PROBES` and :data:`UNPROBED` answer it under. The
 #: registry the table is compared against: a line here with neither a probe nor
 #: a recorded reason fails ``tests/test_evals_falsification.py``.
@@ -211,7 +211,7 @@ class Probe:
     ``refuses`` is the gate codes the corrupted catalog must raise, and
     ``elements`` the fate of each blessed element the corrupted graph no longer
     holds. A probe declaring none of these and no fate but ``found`` is a
-    positive control, and :attr:`control` is how the suite tells the two apart.
+    positive check, and :attr:`control` is how the suite tells the two apart.
 
     ``credits`` is how many touched rows the looser, label-dropping reading
     answers where the strict one does not (#1015). It is a reading reported
@@ -235,7 +235,7 @@ class Probe:
     def control(self) -> bool:
         """Whether this probe declares a reading that takes nothing away anywhere.
 
-        A positive control, and the only kind of probe allowed to take nothing
+        A positive check, and the only kind of probe allowed to take nothing
         away: no required row lost, no gate refusal, no element missing, and
         every touched row still answered.
         """
@@ -882,7 +882,7 @@ def render(found: Sequence[Outcome]) -> str:
 #: ``absence-inferred`` is not here: its corrupted row carries the true value
 #: under the basis ``inferred``, and reaching a lane labelled as an inference
 #: is what ADR 0036 asks of one. ``paraphrase`` and ``valid-inference`` are
-#: positive controls, and the rest corrupt the graph rather than a fact.
+#: positive checks, and the rest corrupt the graph rather than a fact.
 CriticalProbe = Literal[
     "mfa-enforced",
     "support-copied",

@@ -2,7 +2,7 @@
 
 Run as a script. It prints one JSON object on stdout: every figure in
 ``tests.test_doc_figure_lints.FIGURES``, with the paths it read under
-``evals/review/submissions/``, plus a control that must report some.
+``evals/review/submissions/``, plus a positive check that must report some.
 
 ## Why this is a script and not a test
 
@@ -24,17 +24,17 @@ are all the same event here.
 committed would move a figure that reads it when the regeneration landed rather
 than when the sitting merged. Nothing is generated that way.
 
-## The control is the point
+## The positive check is the point
 
 An audit hook that observes nothing reports every figure clean, and silence
-would look exactly like success. So the control runs
+would look exactly like success. So the positive check runs
 :func:`~evals.review_submission.unreviewed_cases`, which reads the submissions
-by construction, and the reader of this output refuses an empty control.
+by construction, and the reader of this output refuses an empty positive check.
 
-The control proves the hook observes something, not that it observes
+The positive check proves the hook observes something, not that it observes
 everything: the events below overlap, so dropping ``open`` alone still leaves
 ``os.scandir`` reporting the directory. That redundancy is the point. An empty
-control means the hook is dead.
+positive check means the hook is dead.
 """
 
 from __future__ import annotations

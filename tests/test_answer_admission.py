@@ -255,7 +255,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             )
         }
         assert served == self.asked()
-        assert served, "a control: the waiting job asks something"
+        assert served, "a positive check: the waiting job asks something"
 
     @pytest.mark.parametrize(
         "key", ["unasked-kind", ("", "", "", "an invented question", "", "")]
@@ -476,7 +476,7 @@ class TestTheAdaptiveList:
             limit = EARLY_RULES[kind].limit
             assert limit is None or len(shown) <= limit
             assert all(passes_floor(q, listed) for q in shown)
-        assert asked.early, "a control: the waiting job asks something"
+        assert asked.early, "a positive check: the waiting job asks something"
         assert asked.to_json()["policy_version"] == "adaptive-1"
 
     def test_a_question_counts_as_one_whatever_its_facets(self):
@@ -658,7 +658,7 @@ class TestTheAdaptiveList:
                 given.append(FactAnswer(key=question.key, facets={facet: "unknown"}))
             answered = merged_facts(answered, given)
         assert not asked.early
-        assert asked.links, "a control: the link questions still stand"
+        assert asked.links, "a positive check: the link questions still stand"
         assert asked.empty_list_reason is None, (
             "a job that still asks a link has not stopped"
         )
@@ -1286,7 +1286,7 @@ class TestTheListRanksByBandAndUnitsThenByWhatAnAnswerSettles:
                     asked.effects[before.key].potential
                     >= asked.effects[after.key].potential
                 )
-        assert ties, "a control: the model has capabilities that tie"
+        assert ties, "a positive check: the model has capabilities that tie"
 
     def test_the_row_publishes_each_answer_s_effect(self):
         asked = _listed()
@@ -1304,7 +1304,7 @@ class TestTheListRanksByBandAndUnitsThenByWhatAnAnswerSettles:
             q for q in asked.early if asked.effects[q.key].answers["no"].settles
         )
         waiting = {q.key for q, reason in asked.blocked if q.parent == parent.key}
-        assert waiting, "a control: a part waits on the parent"
+        assert waiting, "a positive check: a part waits on the parent"
         assert {reason for _, reason in asked.blocked} == {"parent-undecided"}
         after = _listed([FactAnswer(key=parent.key, value="no")])
         moot = {q.key: reason for q, reason in after.unnecessary}
@@ -1427,7 +1427,7 @@ class TestTheFrameworksTakeTurns:
             for at, question in enumerate(listed)
             if question.parent in place
         ]
-        assert pairs, "a control: the merged list holds a part and its parent"
+        assert pairs, "a positive check: the merged list holds a part and its parent"
         assert all(parent < part for parent, part in pairs)
 
     def test_the_selection_order_changes_nothing(self):
@@ -1439,7 +1439,9 @@ class TestTheFrameworksTakeTurns:
         framework's question next: the list's turns start from what the saved
         answers charged, not from zero (QA-2026-10-12-02-E2)."""
         first = self.list_of(BOTH)[0]
-        assert first.frameworks == ("asvs",), "a control: asvs wins the first tie"
+        assert first.frameworks == ("asvs",), (
+            "a positive check: asvs wins the first tie"
+        )
         after = question_set(
             valid_model(),
             None,
