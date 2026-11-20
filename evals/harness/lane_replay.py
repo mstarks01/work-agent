@@ -55,7 +55,6 @@ from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.graph import (
-    LANE_ARTIFACTS,
     STATE_ASSERTION_PROPOSAL,
     STATE_FRAMEWORK_OPTIONS,
     STATE_VALID_MODEL,
@@ -141,24 +140,28 @@ def captured_lane(
 ) -> Mapping[LaneArtifact, str]:
     """One lane's captured artifacts in ``material``, keyed by placeholder, or a refusal.
 
-    A key that ``prepare`` did not write is absent, so the mapping can hold
-    fewer keys than :data:`~analysis_service.graph.LaneArtifact` names. It
-    always holds ``candidates``, it holds no key outside
-    :data:`~analysis_service.graph.LANE_ARTIFACTS`, and each value is text.
+    The capture holds each :data:`~analysis_service.graph.LANE_ARTIFACTS` key
+    and no other, as :meth:`~analysis_service.graph.Lane.state` requires of
+    what ``prepare`` writes, and each value is text.
     """
-    held = material.get("lanes", {}).get(framework, {}).get(lane_name)
-    if held is None:
+    lanes = material.get("lanes")
+    framework_lanes = lanes.get(framework) if isinstance(lanes, Mapping) else None
+    held = (
+        framework_lanes.get(lane_name) if isinstance(framework_lanes, Mapping) else None
+    )
+    if not isinstance(held, Mapping):
         raise EvalRunError(f"the capture holds no {framework} lane {lane_name!r}")
-    stray = sorted(set(held) - set(LANE_ARTIFACTS))
+    try:
+        lane_of(framework, lane_name).state(held)
+    except ValueError as error:
+        raise EvalRunError(f"the capture does not hold a lane's {error}") from error
     unrendered = sorted(
         name for name, text in held.items() if not isinstance(text, str)
     )
-    if stray or unrendered or "candidates" not in held:
+    if unrendered:
         raise EvalRunError(
             f"the {framework} lane {lane_name!r} capture holds"
-            f" {', '.join(sorted(held))}, with {', '.join(unrendered) or 'none'}"
-            f" not rendered text: it needs candidates and only"
-            f" {', '.join(LANE_ARTIFACTS)}, each as text"
+            f" {', '.join(unrendered)} as other than text"
         )
     artifacts: Mapping[LaneArtifact, str] = held
     return artifacts
@@ -177,10 +180,9 @@ async def compose(
     it, so ``--append`` comes after that.
     """
     lane = lane_of(framework, lane_name)
-    held = captured_lane(material, framework, lane_name)
     state = {
         **material["shared"],
-        **{lane.key(name): value for name, value in held.items()},
+        **lane.state(captured_lane(material, framework, lane_name)),
     }
     template = analyze_instruction(
         package_loader, prompt_loader, package_for(framework), lane

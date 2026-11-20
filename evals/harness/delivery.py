@@ -234,20 +234,19 @@ def trace(
             }
         except EvalRunError as error:
             uncaptured[case] = str(error)
-    rows = tuple(
-        DeliveryRow(
-            reference=row,
-            lane=trace_lane(
-                row.elements,
-                row.lane,
-                reports[row.case],
-                material[row.case][row.lane] if row.case in material else None,
-                flows[row.case],
-                by_id[row.case].declaration("stride").options,
-            )
-            if row in silent
-            else None,
+    traces = {
+        (row.case, row.reference_index): trace_lane(
+            row.elements,
+            row.lane,
+            reports[row.case],
+            material[row.case][row.lane] if row.case in material else None,
+            flows[row.case],
+            by_id[row.case].declaration("stride").options,
         )
+        for row in silent
+    }
+    rows = tuple(
+        DeliveryRow(reference=row, lane=traces.get((row.case, row.reference_index)))
         for row in misses
     )
     return Delivery(

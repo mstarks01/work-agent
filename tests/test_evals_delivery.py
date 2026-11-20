@@ -97,31 +97,35 @@ def _captured(traced: delivery.LaneTrace) -> delivery.LaneComparison:
     return traced.captured
 
 
-def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
-    material = {
-        "lanes": {"stride": {"tampering": {"candidates": _rendered(tampering)}}}
-    }
+def test_the_captured_candidates_read_back_as_the_lane_was_sent(sent, tampering):
+    material = {"lanes": {"stride": {"tampering": sent}}}
 
-    sent = captured_lane(material, "stride", "tampering")
+    held = captured_lane(material, "stride", "tampering")
 
-    assert _candidates(sent) == tampering
+    assert held == sent
+    assert _candidates(held) == tampering
+
+
+def _without(sent, name):
+    return {key: text for key, text in sent.items() if key != name}
 
 
 @pytest.mark.parametrize(
-    ("lane", "held"),
+    ("lane", "change"),
     [
-        ("tampering", {"scope": "a scope"}),
-        ("tampering", {"candidates": "", "drafts": "a stray key"}),
-        ("spoofing", {"candidates": ""}),
-        ("tampering", {"candidates": {"lane": "tampering"}}),
+        ("tampering", lambda sent: _without(sent, "candidates")),
+        ("tampering", lambda sent: _without(sent, "prior_cases")),
+        ("tampering", lambda sent: {**sent, "drafts": "a stray key"}),
+        ("tampering", lambda sent: {**sent, "candidates": {"lane": "tampering"}}),
+        ("tampering", lambda sent: ["not", "an", "object"]),
+        ("spoofing", lambda sent: sent),
     ],
 )
-def test_a_capture_with_no_candidates_a_stray_key_no_lane_or_no_text_is_refused(
-    lane, held
-):
-    material = {"lanes": {"stride": {"tampering": held}}}
+def test_a_capture_that_prepare_cannot_write_is_refused(sent, lane, change):
+    """A missing or stray artifact, a value that is not text, or no such lane."""
+    material = {"lanes": {"stride": {"tampering": change(sent)}}}
 
-    with pytest.raises(EvalRunError, match="capture holds"):
+    with pytest.raises(EvalRunError, match="capture"):
         captured_lane(material, "stride", lane)
 
 
@@ -207,16 +211,6 @@ def test_a_changed_lane_artifact_differs(report, sent, flows, options, artifact)
     )
 
     assert _captured(traced).same_leads == "agrees"
-    assert _captured(traced).same_lane_artifacts == "differs"
-
-
-def test_a_lane_artifact_the_capture_lacks_differs(report, sent, flows, options):
-    held = {name: text for name, text in sent.items() if name != "prior_cases"}
-
-    traced = delivery.trace_lane(
-        ("store:message-queue",), "tampering", report, held, flows, options
-    )
-
     assert _captured(traced).same_lane_artifacts == "differs"
 
 
