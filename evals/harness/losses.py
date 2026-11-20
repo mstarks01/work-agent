@@ -562,7 +562,7 @@ def attribute_case(
     empty mapping means that the lanes proposed nothing.
 
     ``candidates`` is each lane's candidates as today's rules write them for
-    the run's own model, from
+    the run's own model: the ``candidates`` of
     :func:`~evals.harness.triggers.rebuilt_lane_inputs`. A lane it lacks raises
     ``KeyError``: every STRIDE lane has an entry, so a missing one is a defect.
     Beside the block's ``fired_rules``, they decide ``place`` against

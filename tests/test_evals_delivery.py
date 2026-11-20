@@ -113,9 +113,12 @@ def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
         ("tampering", {"scope": "a scope"}),
         ("tampering", {"candidates": "", "drafts": "a stray key"}),
         ("spoofing", {"candidates": ""}),
+        ("tampering", {"candidates": {"lane": "tampering"}}),
     ],
 )
-def test_a_capture_with_no_candidates_a_stray_key_or_no_lane_is_refused(lane, held):
+def test_a_capture_with_no_candidates_a_stray_key_no_lane_or_no_text_is_refused(
+    lane, held
+):
     material = {"lanes": {"stride": {"tampering": held}}}
 
     with pytest.raises(EvalRunError, match="capture holds"):

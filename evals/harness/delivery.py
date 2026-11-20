@@ -104,7 +104,8 @@ class LaneComparison:
 class LaneTrace:
     """One reference's lane, as the archive holds it and as today's rules rebuild it."""
 
-    #: ``None`` where the sweep captured no lane material for the case.
+    #: ``None`` where the sweep captured no lane material for the case, or
+    #: where the trace refused the capture; ``Delivery.uncaptured`` names why.
     captured: LaneComparison | None
     rebuilt: PlaceRelation
     archived_lead_rules: tuple[str, ...]
@@ -210,7 +211,8 @@ def trace(
     """Trace each charged miss of ``card`` through the lane material ``artifact`` holds."""
     by_id = {case.id: case for case in cases}
     misses = charged_misses(card.rows)
-    traced_cases = sorted({row.case for row in misses if row.cause in SILENT})
+    silent = [row for row in misses if row.cause in SILENT]
+    traced_cases = sorted({row.case for row in silent})
     reports = {
         case: read_report(_required(finished_file(artifact, case, "report"), case))
         for case in traced_cases
@@ -220,8 +222,7 @@ def trace(
         {case: report.system_model for case, report in reports.items()},
     )
     traced_lanes = {
-        case: {row.lane for row in misses if row.case == case and row.cause in SILENT}
-        for case in traced_cases
+        case: {row.lane for row in silent if row.case == case} for case in traced_cases
     }
     material: dict[str, dict[str, Mapping[LaneArtifact, str]]] = {}
     uncaptured: dict[str, str] = {}
@@ -244,7 +245,7 @@ def trace(
                 flows[row.case],
                 by_id[row.case].declaration("stride").options,
             )
-            if row.cause in SILENT
+            if row in silent
             else None,
         )
         for row in misses

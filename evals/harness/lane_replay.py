@@ -143,18 +143,22 @@ def captured_lane(
 
     A key that ``prepare`` did not write is absent, so the mapping can hold
     fewer keys than :data:`~analysis_service.graph.LaneArtifact` names. It
-    always holds ``candidates``, and it holds no key outside
-    :data:`~analysis_service.graph.LANE_ARTIFACTS`.
+    always holds ``candidates``, it holds no key outside
+    :data:`~analysis_service.graph.LANE_ARTIFACTS`, and each value is text.
     """
     held = material.get("lanes", {}).get(framework, {}).get(lane_name)
     if held is None:
         raise EvalRunError(f"the capture holds no {framework} lane {lane_name!r}")
     stray = sorted(set(held) - set(LANE_ARTIFACTS))
-    if stray or "candidates" not in held:
+    unrendered = sorted(
+        name for name, text in held.items() if not isinstance(text, str)
+    )
+    if stray or unrendered or "candidates" not in held:
         raise EvalRunError(
             f"the {framework} lane {lane_name!r} capture holds"
-            f" {', '.join(sorted(held))}: it needs candidates and only"
-            f" {', '.join(LANE_ARTIFACTS)}"
+            f" {', '.join(sorted(held))}, with {', '.join(unrendered) or 'none'}"
+            f" not rendered text: it needs candidates and only"
+            f" {', '.join(LANE_ARTIFACTS)}, each as text"
         )
     artifacts: Mapping[LaneArtifact, str] = held
     return artifacts
