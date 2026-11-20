@@ -52,8 +52,11 @@ rule's question is the mechanism the reference describes.
 whose subject is one of the reference's elements. No reference names the facts
 its mechanism needs, so a place fact is a fact at the place, not a required
 fact. :class:`PlaceFacts` reads each one at each :data:`PlaceStage`, and each
-reading is ``present``, ``absent`` or ``unavailable`` with its reason. A row
-with no place fact reads ``required facts: undefined``.
+reading is ``present``, ``absent`` or ``unavailable`` with its reason. A fact
+is delivered where a stage of the lane input holds it. The graph stages count
+only where the signed rows settle the fact's field in one value; elsewhere they
+read ``unavailable``, and the evidence catalog alone decides. A row with no
+place fact reads ``required facts: undefined``.
 
 **The matched control.** Each row carries a must-find of the same case and
 lane that the run answered with the right action at the right place: a
