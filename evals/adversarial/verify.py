@@ -74,8 +74,8 @@ def negative_check_issues(cases: Iterable[AdversarialCase]) -> list[str]:
     perfectly on every attack case, so code requires one, and a convention is not
     sufficient.
     """
-    negative_checks = [case for case in cases if case.attack_class == "benign-control"]
-    if negative_checks:
+    benign_cases = [case for case in cases if case.attack_class == "benign-control"]
+    if benign_cases:
         return []
     return [
         (

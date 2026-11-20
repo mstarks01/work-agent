@@ -40,12 +40,12 @@ from tests.eval_factories import (
 )
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
-NEAR_CASE = CORPUS_DIR / "01-payments-checkout"
+PAYMENTS_CASE = CORPUS_DIR / "01-payments-checkout"
 
 
 @pytest.fixture(scope="module")
 def case():
-    return load_case(NEAR_CASE)
+    return load_case(PAYMENTS_CASE)
 
 
 def _draft_for(case, reference, sequence: int):
