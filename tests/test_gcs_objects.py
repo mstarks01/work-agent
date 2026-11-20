@@ -260,6 +260,8 @@ class TestTheApiKeyMode:
             ("hunter2", "is not UTF-8 JSON"),
             (b"\xff\xfe", "is not UTF-8 JSON"),
             ("[" * 100_000, "is longer than 16,384 bytes"),
+            # Under the bound, but deep enough to raise RecursionError.
+            ("[" * 16_000, "is not UTF-8 JSON"),
             ('["hunter2"]', "its type must be service_account"),
             ('{"private_key": "hunter2"}', "its type must be service_account"),
         ],

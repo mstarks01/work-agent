@@ -76,8 +76,9 @@ credential from the metadata server.**
 > runs the row in that mode. The `iam` mode keeps the rules of this ADR.
 
 A developer machine with a gcloud login or a key file cannot run the `gcs`
-row in the `iam` mode. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS` for the Vertex
-row cannot also run the `gcs` row in the same process. The IAM roles on the
+row in the `iam` mode. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS`
+for the Vertex row cannot also run the `gcs` row in the `iam` mode in the same
+process. The IAM roles on the
 bucket stay the main access control, and the scope only limits a token that
 leaks.
 

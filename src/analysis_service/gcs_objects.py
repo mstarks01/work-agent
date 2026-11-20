@@ -124,7 +124,8 @@ def _service_account(env: Mapping[str, str]) -> Credentials:
     an executable that makes the token. Its ``token_uri`` is :data:`TOKEN_URI`,
     because the credential sends its grant there, and its ``universe_domain``
     is absent or :data:`UNIVERSE_DOMAIN`, because each other value, even an
-    empty one, makes the credential sign its own token and skip ``token_uri``. No message repeats the content.
+    empty one, makes the credential sign its own token and skip ``token_uri``.
+    No message repeats the content.
     """
     content = read_secret_file(env, GCS_KEY_FILE_VAR, StoreConfigError)
     if content is None:

@@ -1176,7 +1176,7 @@ token holds only the scope
   `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` names (ADR 0108). Use the JSON key
   file as Google downloads it. Give the file permissions that only the service
   user can read; the service refuses a file that breaks the
-  [permission rule](Configuration.md#file-permissions). The file must be JSON
+  [permission rule](Configuration.md#file-permissions). The file must be UTF-8 JSON
   of at most 16 KiB, its `type` must be `service_account`, and its `token_uri`
   must be `https://oauth2.googleapis.com/token`. Its `universe_domain` must be
   absent or `googleapis.com`. Each other kind
