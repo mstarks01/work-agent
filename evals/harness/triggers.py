@@ -55,7 +55,7 @@ from dataclasses import dataclass
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
-from analysis_service.graph import FrameworkNodes, framework_lane_inputs
+from analysis_service.graph import FrameworkNodes, LaneInputs, framework_lane_inputs
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -72,6 +72,7 @@ __all__ = [
     "corpus_recall",
     "lead_rules",
     "rebuilt_candidates",
+    "rebuilt_lane_inputs",
 ]
 
 
@@ -196,13 +197,13 @@ def _hit(
     )
 
 
-def rebuilt_candidates(
+def rebuilt_lane_inputs(
     framework: FrameworkName, report: Report, options: Mapping[str, object]
-) -> Mapping[str, CandidateSet]:
-    """Each lane's candidates as today's rules write them for an archived run.
+) -> LaneInputs:
+    """What each lane is given, as today's code writes it for an archived run.
 
     The model and the catalog are the run's own, from ``report``, and
-    ``options`` are the case's. The candidates come from
+    ``options`` are the case's. The inputs come from
     :func:`~analysis_service.graph.framework_lane_inputs`, the reader of what a
     lane is given. A report with no assertion record passes no catalog, as a
     job with no assertion pass does.
@@ -213,7 +214,14 @@ def rebuilt_candidates(
         options,
         report.assertions.catalog if report.assertions else None,
         MarkdownLoader(REPO_ROOT / "frameworks" / framework),
-    ).candidates
+    )
+
+
+def rebuilt_candidates(
+    framework: FrameworkName, report: Report, options: Mapping[str, object]
+) -> Mapping[str, CandidateSet]:
+    """Each lane's candidates of :func:`rebuilt_lane_inputs`."""
+    return rebuilt_lane_inputs(framework, report, options).candidates
 
 
 def archived_lead_rules(

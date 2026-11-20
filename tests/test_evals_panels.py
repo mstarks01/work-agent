@@ -12,10 +12,11 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACTION_DELTAS, PROMPT_BODY_NAMES
 from evals.harness import audit, delivery, panels
 from evals.harness.artifact import load_artifact
-from evals.harness.delivery import Capture, Delivery, DeliveryRow, LaneTrace
+from evals.harness.delivery import Agreement, Delivery, DeliveryRow, LaneTrace
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, load_corpus
 from evals.harness.replay import pooled_assertions, pooled_extraction
@@ -162,7 +163,7 @@ def test_an_analysis_sweep_feeds_only_the_preparation_panel():
         count for name, count in prepare.counts.items() if name.startswith("rebuilt ")
     )
     assert traced == sum(
-        count for name, count in prepare.counts.items() if name.startswith("capture ")
+        count for name, count in prepare.counts.items() if name.startswith("leads ")
     )
 
 
@@ -180,7 +181,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     assert sum(
         count for name, count in panel.counts.items() if name.startswith("rebuilt ")
     ) == len(lanes)
-    assert panel.unread == sum(lane.capture == "uncaptured" for lane in lanes)
+    assert panel.unread == sum(lane.leads == "uncaptured" for lane in lanes)
     assert panel.counts["with an archived lead rule"] == sum(
         1 for lane in lanes if lane.archived_lead_rules
     )
@@ -189,37 +190,56 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     )
 
 
-def _delivery(*captures: Capture) -> Delivery:
-    """A delivery trace of one row for each capture."""
+def _delivery(*readings: tuple[Agreement, Agreement]) -> Delivery:
+    """A delivery trace of one row for each pair of leads and lane input."""
     reference = scorecard_of(BASELINE, CORPUS, Ledger()).rows[0]
     rows = tuple(
         DeliveryRow(
             reference=reference,
             lane=LaneTrace(
-                delivered=None if capture == "uncaptured" else "equal",
+                delivered=None if same_leads == "uncaptured" else "equal",
                 rebuilt="equal",
-                capture=capture,
+                leads=same_leads,
+                lane_input=same_input,
                 archived_lead_rules=(),
             ),
         )
-        for capture in captures
+        for same_leads, same_input in readings
     )
     return Delivery(run=reference.run, rows=rows, re_keyed=0, uncaptured={})
 
 
+AGREES = ("agrees", "agrees")
+
+
 @pytest.mark.parametrize(
-    ("captures", "fidelity"),
+    ("readings", "fidelity"),
     [
-        (("agrees", "agrees"), "equivalent"),
-        (("agrees", "differs"), "known-different"),
-        (("agrees", "uncaptured"), "unverified"),
+        ((AGREES, AGREES), "unverified"),
+        ((AGREES, ("agrees", "differs")), "known-different"),
+        ((AGREES, ("differs", "differs")), "known-different"),
+        ((AGREES, ("uncaptured", "uncaptured")), "unverified"),
         ((), "unverified"),
     ],
 )
-def test_the_preparation_path_reads_each_lane_capture(captures, fidelity):
-    panel = panels.preparation_panel(_delivery(*captures))
+def test_the_preparation_path_reads_each_compared_dimension(readings, fidelity):
+    panel = panels.preparation_panel(_delivery(*readings))
 
     assert panel.path is not None and panel.path.fidelity == fidelity
+
+
+def test_an_agreeing_preparation_path_names_each_dimension_it_does_not_compare():
+    panel = panels.preparation_panel(_delivery(AGREES))
+
+    assert panel.path is not None
+    assert {f"not compared: the shared key {key}" for key in LANE_SHARED_KEYS} <= set(
+        panel.path.evidence
+    )
+    assert "not compared: the prepared user turn" in panel.path.evidence
+    assert (
+        "not compared: the case options, which the archive does not record"
+        in panel.path.evidence
+    )
 
 
 def test_the_command_writes_each_panel_apart(tmp_path: Path):

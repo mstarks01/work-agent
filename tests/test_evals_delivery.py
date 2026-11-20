@@ -11,12 +11,13 @@ import pytest
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.frameworks import package_for
 from analysis_service.sources import render_fenced
-from evals.harness import delivery, losses, run
+from evals.harness import delivery, losses, panels, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.scorecard import charged_misses
+from evals.harness.triggers import rebuilt_lane_inputs
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CASE = "05-cookbook-queue-webapp"
@@ -74,46 +75,137 @@ def test_the_lead_is_the_strongest_relation_of_a_candidate(
     assert delivery.closest_relation(reference, tampering, flows) == expected
 
 
+@pytest.fixture(scope="module")
+def sent(report, options):
+    """The tampering lane's four artifacts, as a capture of today's rebuild."""
+    return dict(rebuilt_lane_inputs("stride", report, options).artifacts["tampering"])
+
+
+def _rendered(candidates: CandidateSet) -> str:
+    return render_fenced(candidates.model_dump(mode="json"))
+
+
 def test_the_captured_candidates_read_back_as_the_lane_was_sent(tampering):
     material = {
-        "lanes": {
-            "stride": {
-                "tampering": {
-                    "candidates": render_fenced(tampering.model_dump(mode="json"))
-                }
-            }
-        }
+        "lanes": {"stride": {"tampering": {"candidates": _rendered(tampering)}}}
     }
 
-    assert delivery.sent_candidates(material, "tampering") == tampering
+    sent = delivery.sent_input(material, "tampering")
+
+    assert delivery.sent_candidates(sent) == tampering
 
 
-def test_a_capture_the_rebuild_reproduces_agrees(report, tampering, flows, options):
+def test_a_capture_the_rebuild_reproduces_agrees(report, sent, flows, options):
     traced = delivery.trace_lane(
-        ("store:message-queue",), "tampering", report, tampering, flows, options
+        ("store:message-queue",), "tampering", report, sent, flows, options
     )
 
-    assert traced.capture == "agrees"
+    assert traced.leads == traced.lane_input == "agrees"
     assert traced.delivered == traced.rebuilt == "draft-contains"
 
 
 def test_a_capture_without_a_rebuilt_candidate_differs(
-    report, tampering, flows, options
+    report, tampering, sent, flows, options
 ):
-    sent = CandidateSet(lane="tampering", candidates=tampering.candidates[:1])
+    trimmed = CandidateSet(lane="tampering", candidates=tampering.candidates[:1])
 
     traced = delivery.trace_lane(
         ("process:background-worker", "store:database"),
         "tampering",
         report,
-        sent,
+        {**sent, "candidates": _rendered(trimmed)},
         flows,
         options,
     )
 
-    assert traced.capture == "differs"
+    assert traced.leads == traced.lane_input == "differs"
     assert traced.delivered == "absent"
     assert traced.rebuilt == "equal"
+
+
+def _no_facts(candidates: CandidateSet) -> CandidateSet:
+    return candidates.model_copy(
+        update={
+            "candidates": tuple(
+                candidate.model_copy(update={"facts": {}})
+                for candidate in candidates.candidates
+            )
+        }
+    )
+
+
+def _inverted_questions(candidates: CandidateSet) -> CandidateSet:
+    return candidates.model_copy(
+        update={"questions": dict.fromkeys(candidates.questions, "INVERTED QUESTION")}
+    )
+
+
+@pytest.mark.parametrize("change", [_no_facts, _inverted_questions])
+def test_a_changed_candidate_payload_with_the_same_leads_is_not_equivalent(
+    report, sent, flows, options, change
+):
+    """The #2314 reproduction: the same IDs, with other facts or questions."""
+    changed = change(delivery.sent_candidates(sent))
+    assert changed != delivery.sent_candidates(sent)
+
+    traced = delivery.trace_lane(
+        ("store:message-queue",),
+        "tampering",
+        report,
+        {**sent, "candidates": _rendered(changed)},
+        flows,
+        options,
+    )
+    path = panels.preparation_panel(_one_row(traced)).path
+
+    assert traced.leads == "agrees"
+    assert traced.lane_input == "differs"
+    assert path is not None and path.fidelity == "known-different"
+
+
+@pytest.mark.parametrize("artifact", ["scope", "reference_notes", "prior_cases"])
+def test_a_changed_lane_artifact_differs(report, sent, flows, options, artifact):
+    traced = delivery.trace_lane(
+        ("store:message-queue",),
+        "tampering",
+        report,
+        {**sent, artifact: sent[artifact] + "\nchanged"},
+        flows,
+        options,
+    )
+
+    assert traced.leads == "agrees"
+    assert traced.lane_input == "differs"
+
+
+def test_a_lane_artifact_the_capture_lacks_differs(report, sent, flows, options):
+    held = {name: text for name, text in sent.items() if name != "prior_cases"}
+
+    traced = delivery.trace_lane(
+        ("store:message-queue",), "tampering", report, held, flows, options
+    )
+
+    assert traced.lane_input == "differs"
+
+
+def test_an_agreeing_lane_leaves_the_evidence_payload_unverified(
+    report, sent, flows, options
+):
+    """The evidence catalog is a shared key, which no rebuild reproduces."""
+    traced = delivery.trace_lane(
+        ("store:message-queue",), "tampering", report, sent, flows, options
+    )
+    path = panels.preparation_panel(_one_row(traced)).path
+
+    assert path is not None and path.fidelity == "unverified"
+    assert "not compared: the shared key evidence_catalog" in path.evidence
+    assert "not compared: the prepared user turn" in path.evidence
+
+
+def _one_row(traced: delivery.LaneTrace) -> delivery.Delivery:
+    card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
+    row = delivery.DeliveryRow(reference=card.rows[0], lane=traced)
+    return delivery.Delivery(run=card.run, rows=(row,), re_keyed=0, uncaptured={})
 
 
 def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows, options):
@@ -121,7 +213,7 @@ def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows, options):
         ("store:message-queue",), "tampering", report, None, flows, options
     )
 
-    assert traced.capture == "uncaptured"
+    assert traced.leads == traced.lane_input == "uncaptured"
     assert traced.delivered is None
     assert traced.rebuilt == "draft-contains"
 
@@ -190,7 +282,8 @@ def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
 
     lanes = [row.lane for row in traced.rows if row.lane is not None]
     assert lanes
-    assert {lane.capture for lane in lanes} == {"uncaptured"}
+    assert {lane.leads for lane in lanes} == {"uncaptured"}
+    assert {lane.lane_input for lane in lanes} == {"uncaptured"}
     assert {lane.delivered for lane in lanes} == {None}
     assert set(traced.uncaptured) == {
         row.reference.case for row in traced.rows if row.lane is not None
@@ -203,19 +296,15 @@ def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
     shutil.copytree(reports, tmp_path / reports.name)
     case = "02-iot-fleet-telemetry"
     report = read_report(reports / f"{case}.report.json")
-    package = package_for("stride")
-    catalog = report.assertions.catalog if report.assertions else None
-    sent = generate_candidates(
-        report.system_model, package.lanes, package.rules, catalog
-    )
+    (declared,) = [
+        each for each in load_corpus(REPO_ROOT / "evals/corpus") if each.id == case
+    ]
+    sent = rebuilt_lane_inputs(
+        "stride", report, declared.declaration("stride").options
+    ).artifacts
     material = {
         "prepared": {"user": "the input prepare handed the lanes"},
-        "lanes": {
-            "stride": {
-                lane: {"candidates": render_fenced(held.model_dump(mode="json"))}
-                for lane, held in sent.items()
-            }
-        },
+        "lanes": {"stride": {lane: dict(held) for lane, held in sent.items()}},
     }
     (tmp_path / reports.name / f"{case}.lanes.json").write_text(json.dumps(material))
 
@@ -223,7 +312,7 @@ def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
 
     (row,) = [row for row in traced.rows if row.reference.case == case and row.lane]
     assert row.lane is not None
-    assert row.lane.capture == "agrees"
+    assert row.lane.leads == row.lane.lane_input == "agrees"
     assert row.lane.delivered == row.lane.rebuilt == "equal"
     assert case not in traced.uncaptured
 

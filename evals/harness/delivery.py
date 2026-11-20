@@ -6,7 +6,7 @@ draft and no proposal sits at the reference's place, and
 This module also reads what the archived lane was sent, and states how the
 closest candidate stands to the reference's place.
 
-For each such row it gives four readings:
+For each such row it gives five readings:
 
 * ``delivered``: the strongest :data:`~evals.harness.losses.Relation` between
   the reference's place and a candidate in the lane's captured
@@ -16,9 +16,16 @@ For each such row it gives four readings:
   for the archived model and the archived catalog, with the case's options
   from today's corpus. The archive records no options, so a ``differs`` can
   come from an options edit as well as from a rule edit.
-* ``capture``: whether the two candidate sets hold the same
-  :func:`~analysis_service.candidates.leads`. A rule's question text is not
-  part of a lead, because a question edit does not move one.
+* ``leads``: whether the two candidate sets hold the same
+  :func:`~analysis_service.candidates.leads`. A lead is a lane, a rule and
+  elements only, so a candidate's facts and a rule's question text are not
+  part of this reading.
+* ``lane_input``: whether the lane's four captured artifacts (candidates,
+  scope, reference notes and prior cases) are, byte for byte, the ones that
+  :func:`~evals.harness.triggers.rebuilt_lane_inputs` writes today. A changed
+  fact or question text reads ``differs`` here. The shared keys every lane
+  templates and the prepared user turn have no rebuild from the archive, so
+  this reading does not compare them.
 * ``archived_lead_rules``: the rules that
   :func:`~evals.harness.triggers.archived_lead_rules` reads as leading to the
   reference, the rule that decides ``place`` against ``unled``. A rule leads
@@ -47,7 +54,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.candidates import CandidateSet, leads
-from analysis_service.graph import unfence
+from analysis_service.graph import LaneArtifact, unfence
 from analysis_service.report import Report
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
@@ -62,14 +69,14 @@ from evals.harness.scorecard import (
     Scorecard,
     charged_misses,
 )
-from evals.harness.triggers import archived_lead_rules, rebuilt_candidates
+from evals.harness.triggers import archived_lead_rules, rebuilt_lane_inputs
 
 #: How the closest candidate stands to the reference's place, or ``absent``
 #: where no candidate in the lane shares an element with it.
 PlaceRelation = Relation | Literal["absent"]
 
-#: Whether the rebuilt candidates of a lane are the captured ones.
-Capture = Literal["agrees", "differs", "uncaptured"]
+#: Whether a reading of a lane's rebuild is the same reading of its capture.
+Agreement = Literal["agrees", "differs", "uncaptured"]
 
 
 @dataclass(frozen=True)
@@ -78,14 +85,16 @@ class LaneTrace:
 
     delivered: PlaceRelation | None
     rebuilt: PlaceRelation
-    capture: Capture
+    leads: Agreement
+    lane_input: Agreement
     archived_lead_rules: tuple[str, ...]
 
     def to_json(self) -> dict[str, Any]:
         return {
             "delivered": self.delivered,
             "rebuilt": self.rebuilt,
-            "capture": self.capture,
+            "leads": self.leads,
+            "lane_input": self.lane_input,
             "archived_lead_rules": list(self.archived_lead_rules),
         }
 
@@ -101,36 +110,50 @@ def closest_relation(
     return next((strength for strength in RELATIONS if strength in found), "absent")
 
 
-def sent_candidates(material: Mapping[str, Any], lane: str) -> CandidateSet:
-    """The STRIDE lane's candidates as the sweep sent them, from ``<case>.lanes.json``."""
-    rendered = material["lanes"]["stride"][lane]["candidates"]
-    return CandidateSet.model_validate_json(unfence(rendered))
+def sent_input(material: Mapping[str, Any], lane: str) -> Mapping[LaneArtifact, str]:
+    """The STRIDE lane's artifacts as the sweep sent them, from ``<case>.lanes.json``."""
+    sent: Mapping[LaneArtifact, str] = material["lanes"]["stride"][lane]
+    return sent
+
+
+def sent_candidates(sent: Mapping[LaneArtifact, str]) -> CandidateSet:
+    """The candidates of one lane's :func:`sent_input`."""
+    return CandidateSet.model_validate_json(unfence(sent["candidates"]))
+
+
+def _agreement(sent: object, rebuilt: object) -> Agreement:
+    return "agrees" if sent == rebuilt else "differs"
 
 
 def trace_lane(
     reference_ids: Sequence[str],
     lane: str,
     report: Report,
-    sent: CandidateSet | None,
+    sent: Mapping[LaneArtifact, str] | None,
     flows: CaseFlows,
     options: Mapping[str, object],
 ) -> LaneTrace:
     """Trace one reference through its lane: ``sent`` is ``None`` where uncaptured.
 
-    The rebuild is :func:`~evals.harness.triggers.rebuilt_candidates` over the
-    archived model and catalog with the case's ``options``.
+    The rebuild is :func:`~evals.harness.triggers.rebuilt_lane_inputs` over
+    the archived model and catalog with the case's ``options``.
     """
-    rebuilt = rebuilt_candidates("stride", report, options)[lane]
-    capture: Capture = "uncaptured"
-    if sent is not None:
-        same = leads({lane: sent}) == leads({lane: rebuilt})
-        capture = "agrees" if same else "differs"
+    inputs = rebuilt_lane_inputs("stride", report, options)
+    rebuilt = inputs.candidates[lane]
+    if sent is None:
+        delivered: PlaceRelation | None = None
+        same_leads: Agreement = "uncaptured"
+        same_input: Agreement = "uncaptured"
+    else:
+        candidates = sent_candidates(sent)
+        delivered = closest_relation(reference_ids, candidates, flows)
+        same_leads = _agreement(leads({lane: candidates}), leads({lane: rebuilt}))
+        same_input = _agreement(dict(sent), dict(inputs.artifacts[lane]))
     return LaneTrace(
-        delivered=None
-        if sent is None
-        else closest_relation(reference_ids, sent, flows),
+        delivered=delivered,
         rebuilt=closest_relation(reference_ids, rebuilt, flows),
-        capture=capture,
+        leads=same_leads,
+        lane_input=same_input,
         archived_lead_rules=archived_lead_rules(
             rebuilt, reference_ids, stride_block(report).fired_rules
         ),
@@ -204,7 +227,7 @@ def trace(
                 row.elements,
                 row.lane,
                 reports[row.case],
-                sent_candidates(material[row.case], row.lane)
+                sent_input(material[row.case], row.lane)
                 if row.case in material
                 else None,
                 flows[row.case],
@@ -247,8 +270,8 @@ def render(result: Delivery) -> None:
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
             f" {reference.cause} [{reference.compatibility}]: delivered"
-            f" {lane.delivered or '-'}, rebuilt {lane.rebuilt}, capture"
-            f" {lane.capture}; lead rules today"
+            f" {lane.delivered or '-'}, rebuilt {lane.rebuilt}, leads"
+            f" {lane.leads}, lane input {lane.lane_input}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"
         )

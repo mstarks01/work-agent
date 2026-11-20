@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, get_args
 
+from analysis_service.graph import LANE_SHARED_KEYS
 from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
 from evals.harness.delivery import Delivery
@@ -313,22 +314,28 @@ def preparation_panel(result: Delivery) -> Panel:
     ``rebuilt`` the candidates today's rules write for the archived model. A
     shared element is a structural overlap and not mechanism relevance.
 
-    The path is ``equivalent`` only where every traced lane was captured and
-    today's rules rebuild the same leads, ``known-different`` where a rebuild
-    differs, and ``unverified`` where a lane was not captured.
+    The path is ``known-different`` where a traced lane's leads or its four
+    lane artifacts differ from the rebuild. Otherwise it is ``unverified`` and
+    never ``equivalent``: the shared keys every lane templates, the prepared
+    user turn and the case options have no rebuild from the archive, and the
+    evidence names each of them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
-    capture = Counter(lane.capture for lane in lanes)
+    same_leads = Counter(lane.leads for lane in lanes)
+    same_input = Counter(lane.lane_input for lane in lanes)
     delivered = Counter(lane.delivered for lane in lanes if lane.delivered is not None)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
-    fidelity: Fidelity = "unverified"
-    if capture["differs"]:
-        fidelity = "known-different"
-    elif lanes and capture["agrees"] == len(lanes):
-        fidelity = "equivalent"
+    fidelity: Fidelity = (
+        "known-different"
+        if same_leads["differs"] or same_input["differs"]
+        else "unverified"
+    )
     evidence = [
         "the delivered candidates are the lane input the archived run sent",
-        "the rebuilt candidates read today's corpus options",
+        "the rebuilt lane input reads today's corpus options",
+        "not compared: the case options, which the archive does not record",
+        "not compared: the prepared user turn",
+        *(f"not compared: the shared key {key}" for key in LANE_SHARED_KEYS),
         *(f"{case}: lane material uncaptured" for case in sorted(result.uncaptured)),
     ]
     return Panel(
@@ -336,7 +343,8 @@ def preparation_panel(result: Delivery) -> Panel:
         source=result.run.artifact,
         unit=f"charged must-find miss of cause {' or '.join(sorted(SILENT))}",
         counts={
-            **{f"capture {key}": count for key, count in sorted(capture.items())},
+            **{f"leads {key}": count for key, count in sorted(same_leads.items())},
+            **{f"lane input {key}": count for key, count in sorted(same_input.items())},
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
             **{f"rebuilt {key}": count for key, count in sorted(rebuilt.items())},
             "with an archived lead rule": sum(
@@ -346,11 +354,11 @@ def preparation_panel(result: Delivery) -> Panel:
         },
         rates={
             "lane material captured": Rate(
-                len(lanes) - capture["uncaptured"], len(lanes)
+                len(lanes) - same_leads["uncaptured"], len(lanes)
             )
         },
         means={},
-        unread=capture["uncaptured"],
+        unread=same_leads["uncaptured"],
         path=ProductionPath(fidelity, tuple(evidence)),
     )
 
