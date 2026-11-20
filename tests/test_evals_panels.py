@@ -22,6 +22,7 @@ from evals.harness.delivery import (
     DeliveryRow,
     LaneComparison,
     LaneTrace,
+    PlaceFacts,
 )
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, load_corpus
@@ -180,8 +181,10 @@ def test_the_preparation_panel_counts_the_delivery_trace():
         scorecard_of(BASELINE, CORPUS, Ledger()),
         load_artifact(BASELINE),
         development_cases(load_corpus(CORPUS)),
+        CORPUS,
     )
-    lanes = [row.lane for row in result.rows if row.lane is not None]
+    lanes = [row.lane for row in result.rows]
+    facts = [fact for row in result.rows for fact in row.place_facts.traces]
 
     panel = panels.preparation_panel(result)
 
@@ -195,6 +198,12 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     )
     assert panel.counts["re-keyed must-finds outside the population"] == (
         result.re_keyed
+    )
+    assert sum(
+        panel.counts[f"place facts {state}"] for state in delivery.FACT_DELIVERIES
+    ) == len(facts)
+    assert panel.counts["with no control"] == sum(
+        row.control is None for row in result.rows
     )
 
 
@@ -218,6 +227,8 @@ def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
                 rebuilt="equal",
                 archived_lead_rules=(),
             ),
+            place_facts=PlaceFacts((), ""),
+            control=None,
         )
         for reading in readings
     )

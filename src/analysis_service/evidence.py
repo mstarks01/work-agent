@@ -659,6 +659,20 @@ def render_catalog(
     )
 
 
+def catalog_refs(table: str) -> frozenset[str]:
+    """The refs a table :func:`render_catalog` wrote, read back from its key column.
+
+    The eval harness reads an archived lane's table with this, to say which
+    facts the lane was sent. A gloss can quote a ref, so a search of the whole
+    text is not this reading.
+    """
+    return frozenset(
+        line[3 : line.index("` |")].replace("\\|", "|")
+        for line in table.split("\n")
+        if line.startswith("| `") and "` |" in line
+    )
+
+
 def ground_gloss(ground: Ground, assertions: AssertionCatalog | None) -> str:
     """What one ground asserts, in the words the evidence table already uses.
 

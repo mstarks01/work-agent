@@ -464,7 +464,10 @@ class ReferenceRowFate:
 
     reference: str
     fate: RowFate
+    #: The produced row's ID under the signed aliases, as the replay read it.
     produced: str = ""
+    #: The same row's ID as the run's catalog keys it, before the aliases.
+    produced_own: str = ""
     #: Which way one ``wrong_certainty`` runs: the reference rules the fact
     #: inferred and the produced row calls it stated. A grant is never stated, a
     #: credential's presentation is implied by its issue (#961 step 3), and a
@@ -477,6 +480,7 @@ class ReferenceRowFate:
             "reference": self.reference,
             "fate": self.fate,
             "produced": self.produced,
+            "produced_own": self.produced_own,
             "basis_overstated": self.basis_overstated,
         }
 
@@ -923,9 +927,12 @@ def replay_assertions(
     without the pair beside it. The strict fates are untouched by it.
     """
     available: dict[tuple[str, str], list[Assertion]] = defaultdict(list)
+    # Each aliased copy is its own object, so its identity finds its row.
+    own: dict[int, str] = {}
     for entry in result.catalog.entries:
         aliased = under_aliases(entry, reference)
         available[aliased.subject, aliased.predicate].append(aliased)
+        own[id(aliased)] = assertion_id(entry)
     assigned = _assigned(reference.entries, available)
     rows = []
     answered: dict[str, ProducedFate] = {}
@@ -945,6 +952,7 @@ def replay_assertions(
                 assertion_id(ours),
                 fate,
                 taken,
+                own[id(theirs)],
                 basis_overstated=(
                     fate == "wrong_certainty"
                     and ours.basis == "inferred"
