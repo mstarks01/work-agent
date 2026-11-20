@@ -11,7 +11,14 @@ from typing import Any
 
 import pytest
 
-from analysis_service.assertions import AssertionRecord, Projection, projected_attribute
+from analysis_service.assertions import (
+    AssertionRecord,
+    Projection,
+    assertion_id,
+    offered,
+    project,
+    projected_attribute,
+)
 from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.evidence import evidence_catalog, prepared_view, render_catalog
 from analysis_service.frameworks import package_for
@@ -577,7 +584,10 @@ def test_the_control_is_a_matched_row_first_then_an_unstated_row():
     card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
     miss = _row(card, reference_index=90, cause="verb")
     unstated = _row(
-        card, reference_index=91, cause="unstated", compatibility="incompatible"
+        card, reference_index=91, cause="unstated", compatibility="position-unstated"
+    )
+    re_keyed = _row(
+        card, reference_index=93, cause="unstated", compatibility="re-keyed"
     )
     stages = {stage: True for stage in card.rows[0].stages}
     matched = _row(
@@ -588,6 +598,7 @@ def test_the_control_is_a_matched_row_first_then_an_unstated_row():
     assert delivery.matched_control(miss, [miss, unstated, matched]) == matched
     assert delivery.matched_control(miss, [miss, unstated]) == unstated
     assert delivery.matched_control(miss, [miss, elsewhere]) is None
+    assert delivery.matched_control(miss, [miss, re_keyed]) is None
 
 
 def test_a_row_with_no_control_and_no_place_fact_says_so(capsys):
@@ -676,3 +687,25 @@ def test_a_projection_the_signed_rows_leave_unsettled_is_unavailable(report, cas
     for stage in delivery.GRAPH_STAGES:
         assert traced.stages[stage].state == "unavailable"
         assert "several-values" in traced.stages[stage].reason
+
+
+def test_a_field_offered_reads_as_carrying_a_row_reads_present(report, case):
+    """``assertions.offered`` leaves out a row the graph carries: that field holds it."""
+    reference = signed_reference(REPO_ROOT / "evals/corpus", case)
+    assert reference is not None
+    model, _, _ = prepared_view(report.system_model, reference.catalog)
+    carried = {assertion_id(row) for row in reference.entries} - {
+        assertion_id(row) for row in offered(reference.catalog, model)
+    }
+    held = {element.id: element for element in model.elements()}
+    checked = 0
+    for projection in project(reference.catalog):
+        element = held.get(projection.element_id)
+        value = getattr(element, projection.attribute, None)
+        if value != projection.value or not set(projection.rows) & carried:
+            continue
+        row = next(r for r in reference.entries if assertion_id(r) in projection.rows)
+        reading = delivery.field_reading(value, projection.value, row.predicate)
+        assert reading.state == "present"
+        checked += 1
+    assert checked

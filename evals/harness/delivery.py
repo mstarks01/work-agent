@@ -78,6 +78,7 @@ from analysis_service.analysis import control_state
 from analysis_service.assertions import (
     SETTLING_REASONS,
     Assertion,
+    ProjectedField,
     Projection,
     assertion_id,
     project,
@@ -92,6 +93,7 @@ from analysis_service.graph import (
     unfence,
 )
 from analysis_service.report import Report
+from analysis_service.system_model import ELEMENT_GROUPS
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
@@ -314,7 +316,7 @@ class PlaceFactTrace:
     predicate: str
     subject: str
     #: The graph field the row reaches, or ``""`` where it reaches none.
-    attribute: str
+    attribute: ProjectedField | Literal[""]
     stages: Mapping[PlaceStage, StageReading]
 
     @property
@@ -425,8 +427,8 @@ def sent_shared(material: Mapping[str, Any]) -> SharedInput:
         raise EvalRunError("the captured system model holds no JSON object")
     elements = {
         element["id"]: element
-        for collection in model.values()
-        if isinstance(collection, list)
+        for group in ELEMENT_GROUPS
+        if isinstance(collection := model.get(group), list)
         for element in collection
         if isinstance(element, dict) and isinstance(element.get("id"), str)
     }
@@ -627,7 +629,12 @@ def trace_fact(
 def place_facts(
     reference_ids: Sequence[str], facts: CaseFacts, sent: SentLane | None
 ) -> PlaceFacts:
-    """The signed facts at the reference's place, each traced to the lane."""
+    """The signed facts at the reference's place, each traced to the lane.
+
+    A place fact's subject is one of the elements the reference names. A cited
+    flow is not resolved to its endpoints, as the lead relation resolves it: a
+    fact about an endpoint is a fact about another element.
+    """
     if facts.reference is None:
         return PlaceFacts((), facts.unread)
     required = set(required_rows(facts.reference))
@@ -647,9 +654,15 @@ def matched_control(
     """A must-find of the miss's case and lane the run answered at its place.
 
     A ``matched`` row first, an ``unstated`` row second, and ``None`` where the
-    case and lane hold neither.
+    case and lane hold neither. A ``re-keyed`` row is never one: its reading
+    rests on an element the run's model did not hold.
     """
-    same = [row for row in rows if (row.case, row.lane) == (miss.case, miss.lane)]
+    same = [
+        row
+        for row in rows
+        if (row.case, row.lane) == (miss.case, miss.lane)
+        and row.compatibility != "re-keyed"
+    ]
     return next((row for row in same if row.status == "matched"), None) or next(
         (row for row in same if row.cause == UNREAD_CAUSE), None
     )
@@ -814,8 +827,9 @@ def _required(path: Path | None, case: str) -> Path:
 def render(result: Delivery) -> None:
     """Print each charged miss, its lane's trace, its control, and the populations."""
     print(
-        f"{len(result.rows)} charged miss(es), each traced;"
-        f" {result.re_keyed} re-keyed must-find(s) outside the population"
+        f"{len(result.rows)} charged miss(es), {len(result.untraced)} case(s) with"
+        f" lane material untraced; {result.re_keyed} re-keyed must-find(s) outside"
+        " the population"
     )
     for case, reason in sorted(result.untraced.items()):
         print(f"  lane material untraced: {case}: {reason}")

@@ -2943,7 +2943,9 @@ ONE_READERS: dict[str, _OneReader] = {
             ),
             ("evals/harness/delivery.py", "trace_fact"): (
                 "it asks whether the signed rows settle a graph field, to say"
-                " whether a field can state a place fact, and chooses no row"
+                " whether a lane can read a place fact there, and chooses no"
+                " row; a field offered reads as carrying a row reads present"
+                " there, which tests/test_evals_delivery.py holds"
             ),
         },
         "",
