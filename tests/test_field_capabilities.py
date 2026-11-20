@@ -252,7 +252,7 @@ def test_the_gate_publishes_the_model_with_its_field_capabilities():
     payload = valid_model().model_dump(mode="json")
     ctx = FakeContext()
     event = graph.validate_extraction(
-        ctx, KEYS, payload, source_texts=None, extraction_format=FULL_FORMAT
+        ctx, KEYS, payload, source_texts={}, extraction_format=FULL_FORMAT
     )
     assert event.actions.route == graph.ROUTE_VALID
     published = ctx.state[graph.STATE_VALID_MODEL]["capabilities"]

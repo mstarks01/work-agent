@@ -48,6 +48,7 @@ from analysis_service.graph import (
     FrameworkNodes,
     GraphKeys,
     held_assertions,
+    seeded_source_texts,
 )
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -158,7 +159,7 @@ def lane_drafts(
         {lane: batch},
         nodes.package,
         SystemModel.model_validate(state[STATE_VALID_MODEL]),
-        state[STATE_SOURCE_TEXTS],
+        seeded_source_texts(state.get(STATE_SOURCE_TEXTS)),
         state.get(nodes.key("ruled_out")) or {},
         assertions=held_assertions(session),
         ruled_in=state.get(nodes.key("ruled_in")) or {},

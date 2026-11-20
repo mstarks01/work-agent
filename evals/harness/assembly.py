@@ -80,6 +80,7 @@ from analysis_service.claims import (
     FrameworkAnalysis,
     FrameworkName,
     Ruling,
+    quote_check_ran,
 )
 from analysis_service.critic_round import CriticRound, Failed
 from analysis_service.errors import error_place
@@ -294,7 +295,13 @@ def replay_case(
     # The block carries no fan-in marks and no catalog a replay of assembly
     # reads: the view is not built here, only the rulings are checked and merged.
     critic_round = CriticRound.of(
-        framework, model, ruled_drafts, AnalysisMarks(), None, ()
+        framework,
+        model,
+        ruled_drafts,
+        AnalysisMarks(),
+        None,
+        (),
+        quotes_checked=quote_check_ran(block.quotes_checked),
     )
     outcome = critic_round.outcome(
         [ruling.model_dump(mode="json") for ruling in rulings]

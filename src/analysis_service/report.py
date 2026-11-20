@@ -207,7 +207,11 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # ``control_row`` and ``refused_controls``, and each block carries
 # ``returned_claims`` (ADR 0126). A stored 3.3 job record gets 409
 # ``UnreadableSchema``.
-SCHEMA_VERSION = "3.4"
+#
+# Version 3.5: each block carries ``quotes_checked``, whether the fan-in ran
+# the quote check, and ``None`` only on a block a run wrote before the field.
+# A stored 3.4 job record gets 409 ``UnreadableSchema``.
+SCHEMA_VERSION = "3.5"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
 # one framework. It does not say "threat model": that is false of a report

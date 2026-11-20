@@ -77,8 +77,16 @@ def critic_round(
     controls = {
         control.id: control for fixture in fixtures for control in fixture.controls
     }
+    # ``quotes_checked`` is what a graph's round holds: every job has sources,
+    # so its fan-in ran the check.
     return CriticRound.of(
-        package.name, model, drafts, AnalysisMarks(), None, list(controls.values())
+        package.name,
+        model,
+        drafts,
+        AnalysisMarks(),
+        None,
+        list(controls.values()),
+        quotes_checked=True,
     )
 
 

@@ -41,6 +41,7 @@ from analysis_service.claims import (
     FrameworkName,
     Ruling,
     VerdictStatus,
+    quote_check_ran,
 )
 from analysis_service.critic import complete_rulings, review_issues
 from analysis_service.critic_round import CriticRound, critic_request, rulings_of
@@ -55,6 +56,7 @@ from analysis_service.graph import (
     STATE_SYSTEM_MODEL,
     STATE_VALID_MODEL,
     FrameworkNodes,
+    parked_quotes_checked,
 )
 from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
@@ -90,6 +92,10 @@ class Archived:
     framework: FrameworkName
     drafts: list[Claim]
     marks: AnalysisMarks
+    #: Whether the fan-in ran the quote check: from the block through
+    #: :func:`~analysis_service.claims.quote_check_ran`, or from a failure
+    #: dump through :func:`~analysis_service.graph.parked_quotes_checked`.
+    quotes_checked: bool
     #: This framework's block of the case's report, or ``None`` where the case
     #: failed before it wrote one, and the material came from its failure dump.
     block: FrameworkAnalysis | None
@@ -133,6 +139,7 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
         framework=framework,
         drafts=[record.model_validate(draft) for draft in held.get(framework, [])],
         marks=marks,
+        quotes_checked=quote_check_ran(block.quotes_checked),
         block=block,
         shared=shared,
         model=report.system_model,
@@ -162,6 +169,7 @@ def _from_failure(
         framework=framework,
         drafts=[record.model_validate(draft) for draft in state[nodes.key("drafts")]],
         marks=AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
+        quotes_checked=parked_quotes_checked(state, nodes),
         block=None,
         shared={
             STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],
@@ -190,6 +198,7 @@ def round_of(archived: Archived, controls: Sequence[AppliedControl]) -> CriticRo
         archived.marks,
         None if record is None else record.catalog,
         controls,
+        quotes_checked=archived.quotes_checked,
     )
 
 

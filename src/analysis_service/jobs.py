@@ -2125,6 +2125,8 @@ class StubPipelineRunner:
             scope=block.scope_entries(
                 lanes=package.lanes, claims=(), options=selection.options
             ),
+            # A stub runs no fan-in, so no quote check ran.
+            quotes_checked=False,
             summary=block.summarize([], []),
             **option_fields(block, selection.options),
         )

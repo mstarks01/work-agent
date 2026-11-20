@@ -64,6 +64,7 @@ from evals.harness.artifact import (
     rendered_sources,
 )
 from evals.harness.bundle import UnreadableReport, finished_file, read_report
+from evals.harness.grounds import unchecked_quote_count
 from evals.harness.modes import REPORTING_MODES, EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
@@ -170,7 +171,7 @@ def account(
     )
     repaired = len(marks.repaired_quotes)
     refused = len(marks.unverified_grounds)
-    unchecked = 0 if merged.quotes_checked else quotes
+    unchecked = unchecked_quote_count(quotes, merged.quotes_checked)
     return FanInAccount(
         case=case_id,
         framework=package.name,

@@ -2379,6 +2379,72 @@ def _maps_label_to_text(node: ast.AST) -> bool:
     )
 
 
+def _keys_quotes_checked(node: ast.AST) -> bool:
+    """``nodes.key("quotes_checked")``."""
+    return _calls(node, "key") and any(
+        isinstance(arg, ast.Constant) and arg.value == "quotes_checked"
+        for arg in node.args
+    )
+
+
+def _gets_parked_quotes_checked(node: ast.AST) -> bool:
+    """A read of the parked key: ``state.get(nodes.key("quotes_checked"))`` or
+    ``state[nodes.key("quotes_checked")]``."""
+    if isinstance(node, ast.Subscript):
+        return _keys_quotes_checked(node.slice) and isinstance(node.ctx, ast.Load)
+    return _calls(node, "get") and any(_keys_quotes_checked(a) for a in node.args)
+
+
+def _is_quotes_checked(node: ast.AST) -> bool:
+    return _is_name(node, "quotes_checked") or (
+        isinstance(node, ast.Attribute) and node.attr == "quotes_checked"
+    )
+
+
+def _tests(node: ast.AST) -> list[ast.AST]:
+    """The expressions ``node`` reads for their truth or compares."""
+    match node:
+        case ast.Compare(left=left, comparators=comparators):
+            return [left, *comparators]
+        case ast.If(test=test) | ast.IfExp(test=test) | ast.While(test=test):
+            return [test]
+        case ast.BoolOp(values=values):
+            return list(values)
+        case ast.UnaryOp(op=ast.Not(), operand=operand):
+            return [operand]
+        case ast.Call(func=ast.Name(id="bool"), args=args):
+            return list(args)
+    return []
+
+
+def _reads_quotes_checked(node: ast.AST) -> bool:
+    """``quotes_checked`` compared or read for its truth, on a name or an
+    attribute: ``is``, ``==``, ``if``, ``... if ... else``, ``and``, ``or``,
+    ``not`` and ``bool()``."""
+    return any(_is_quotes_checked(part) for part in _tests(node))
+
+
+def _reads_absent_source_texts(node: ast.AST) -> bool:
+    """A read that answers for a missing map of source texts.
+
+    ``source_texts`` compared, read for its truth or put first in an ``or``,
+    ``state.get(STATE_SOURCE_TEXTS) or ...`` and
+    ``state.get(STATE_SOURCE_TEXTS, default)``.
+    """
+    match node:
+        case ast.BoolOp(op=ast.Or(), values=[first, *_]) if _gets_source_texts(first):
+            return True
+        case ast.Call(func=ast.Attribute(attr="get"), args=[key, _]):
+            return _is_name(key, "STATE_SOURCE_TEXTS")
+    return any(_is_name(part, "source_texts") for part in _tests(node))
+
+
+def _gets_source_texts(node: ast.AST) -> bool:
+    return _calls(node, "get") and any(
+        _is_name(arg, "STATE_SOURCE_TEXTS") for arg in node.args
+    )
+
+
 def test_a_job_s_source_texts_are_mapped_once():
     """Only ``source_texts`` maps a job's sources to their texts; the service
     and the harness call it."""
@@ -2407,6 +2473,37 @@ def _reads_the_lanes_of_a_capture(node: ast.AST) -> bool:
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "how the parked quotes_checked key reads, absence included": _OneReader(
+        _gets_parked_quotes_checked,
+        ("src/analysis_service/graph.py", "parked_quotes_checked"),
+        {},
+        "",
+    ),
+    "how a block's quotes_checked reads, null included": _OneReader(
+        _reads_quotes_checked,
+        ("src/analysis_service/claims.py", "quote_check_ran"),
+        {
+            ("src/analysis_service/fan_in.py", "join_drafts"): (
+                "it computes the value from the source map and branches on the"
+                " bool it computed; no None reaches it"
+            ),
+            ("src/analysis_service/critic_round.py", "summary"): (
+                "it reads CriticRound.quotes_checked, a bool every builder sets"
+                " by keyword; no None reaches it"
+            ),
+            ("evals/harness/grounds.py", "unchecked_quote_count"): (
+                "it reads a bool, CaseGrounds.quotes_checked or"
+                " FanIn.quotes_checked; no None reaches it"
+            ),
+        },
+        "",
+    ),
+    "a session state that holds no map of source texts": _OneReader(
+        _reads_absent_source_texts,
+        ("src/analysis_service/graph.py", "seeded_source_texts"),
+        {},
+        "",
+    ),
     "a lane's artifacts in a lane capture": _OneReader(
         _reads_the_lanes_of_a_capture,
         ("evals/harness/lane_replay.py", "captured_lane"),
