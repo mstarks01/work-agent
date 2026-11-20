@@ -211,7 +211,8 @@ class Probe:
     ``refuses`` is the gate codes the corrupted catalog must raise, and
     ``elements`` the fate of each blessed element the corrupted graph no longer
     holds. A probe declaring none of these and no fate but ``found`` is a
-    positive check, and :attr:`control` is how the suite tells the two apart.
+    positive check, and :attr:`positive_check` is how the suite tells the two
+    apart.
 
     ``credits`` is how many touched rows the looser, label-dropping reading
     answers where the strict one does not (#1015). It is a reading reported
@@ -232,7 +233,7 @@ class Probe:
     note: str = ""
 
     @property
-    def control(self) -> bool:
+    def positive_check(self) -> bool:
         """Whether this probe declares a reading that takes nothing away anywhere.
 
         A positive check, and the only kind of probe allowed to take nothing
@@ -252,7 +253,7 @@ class Probe:
         cannot see at all moves no recall either. Both are still corruptions,
         and both are caught — by a row fate, an element fate or a gate code.
         """
-        return not self.control and not self.loses
+        return not self.positive_check and not self.loses
 
 
 def _find(

@@ -60,7 +60,7 @@ def _verdicts(readings) -> dict[str, str]:
     return {reading.gate: reading.verdict for reading in readings}
 
 
-class TestTheNegativeControl:
+class TestTheGatesFail:
     def test_a_flooded_gain_fails_on_volume_and_on_review(self):
         readings = gain.read(
             _baseline(),
@@ -105,7 +105,7 @@ class TestTheNegativeControl:
         assert verdicts["rejected-rate"] == "fail"
 
 
-class TestThePositiveControl:
+class TestTheGatesPass:
     def test_a_gain_with_no_added_volume_and_every_finding_answered_passes(self):
         readings = gain.read(
             _baseline(),

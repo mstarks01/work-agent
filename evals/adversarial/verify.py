@@ -67,15 +67,15 @@ def coverage_issues(cases: Iterable[AdversarialCase]) -> list[str]:
     ]
 
 
-def control_issues(cases: Iterable[AdversarialCase]) -> list[str]:
+def negative_check_issues(cases: Iterable[AdversarialCase]) -> list[str]:
     """At least one case carries no injection.
 
     Without a negative check a service that refused every submission would score
     perfectly on every attack case, so code requires one, and a convention is not
     sufficient.
     """
-    controls = [case for case in cases if case.attack_class == "benign-control"]
-    if controls:
+    negative_checks = [case for case in cases if case.attack_class == "benign-control"]
+    if negative_checks:
         return []
     return [
         (
@@ -169,7 +169,7 @@ def fencing_issues(cases: Iterable[AdversarialCase]) -> list[str]:
 CHECKS = (
     digest_issues,
     coverage_issues,
-    control_issues,
+    negative_check_issues,
     retention_issues,
     demand_issues,
     fencing_issues,

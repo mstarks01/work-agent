@@ -52,10 +52,10 @@ def test_loads_every_shipped_case(corpus):
 # the reasoning; the short version is that "near" means "an architecture the
 # exemplars actually demonstrate", so adding an exemplar system without adding
 # its near case leaves the delta measuring the wrong thing.
-NEAR_EXEMPLAR_CONTROLS = ["01-payments-checkout", "02-iot-fleet-telemetry"]
+NEAR_CASES = ["01-payments-checkout", "02-iot-fleet-telemetry"]
 
 
-def test_one_near_exemplar_control_per_exemplar_system(corpus):
+def test_one_near_case_per_exemplar_system(corpus):
     # Without a near case there is nothing to subtract from, and the
     # exemplar-domain-bias delta is unmeasurable.
     near = [
@@ -63,10 +63,10 @@ def test_one_near_exemplar_control_per_exemplar_system(corpus):
         for case in corpus
         if case.declaration("stride").exemplar_proximity == "near"
     ]
-    assert near == NEAR_EXEMPLAR_CONTROLS
+    assert near == NEAR_CASES
 
 
-def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
+def test_the_near_cases_are_outnumbered_by_far_cases(corpus):
     """The delta compares two populations, so neither may be most of the corpus.
 
     A guard on the instrument rather than on the corpus: `far_recall` is what
