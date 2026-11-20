@@ -2012,10 +2012,10 @@ def merge_drafts(
 
     **One of these per selected framework.** The merge itself is
     :func:`~analysis_service.fan_in.fan_in`, which takes the lane batches as
-    the agents emitted them and returns the drafts, the marks, the deferred
-    units and the coverage as one value. This node reads the batches out of
-    state, calls it once, parks each part of what it returns under this
-    framework's own key, and routes: ``review`` when there is a draft,
+    the agents emitted them and returns one value. This node reads the
+    batches out of state, calls it once, parks the drafts, the marks, the
+    deferred units, the units a Control row kept from the deferred set and the
+    coverage under this framework's own key, and routes: ``review`` when there is a draft,
     ``settled`` when there is none, so a critic is never called to read an
     empty view (:data:`ROUTE_REVIEW`).
 

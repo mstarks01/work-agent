@@ -912,7 +912,8 @@ def join_drafts(
     composes both — and what this seam adds is the checks that need the whole
     set: element references resolving against the System Model, IDs unique
     across it, and every grounds entry resolving and, for a quote, actually
-    appearing in the source it names.
+    appearing in the source it names where the map of source texts is not
+    empty.
 
     **Whether a draft sits in the right lane is not among them, and cannot be.**
     A draft's lane is stamped from the node by
