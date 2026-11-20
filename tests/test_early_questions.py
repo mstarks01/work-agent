@@ -565,7 +565,9 @@ class TestTheFrameworkGates:
         model = _with_interfaces("unknown", protocols="unknown")
         asked = _paused(model, {**LEVEL_2, "stride": {}})
         gated = [bool(q.gates) for q in asked.early]
-        assert gated[0] and not any(gated[1:]), "a positive check: stride asks after it"
+        assert gated[0] and not any(gated[1:]), (
+            "the gate question comes first, and stride asks after it"
+        )
 
     @pytest.mark.parametrize(
         ("answer", "state"), [("web", "satisfied"), ("non-web", "refuted")]

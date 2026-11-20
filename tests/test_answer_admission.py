@@ -1439,9 +1439,7 @@ class TestTheFrameworksTakeTurns:
         framework's question next: the list's turns start from what the saved
         answers charged, not from zero (QA-2026-10-12-02-E2)."""
         first = self.list_of(BOTH)[0]
-        assert first.frameworks == ("asvs",), (
-            "a positive check: asvs wins the first tie"
-        )
+        assert first.frameworks == ("asvs",), "a precondition: asvs wins the first tie"
         after = question_set(
             valid_model(),
             None,

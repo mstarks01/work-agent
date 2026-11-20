@@ -67,7 +67,7 @@ from evals.harness.replay import (
     unsigned_reason,
 )
 
-#: Every falsification and positive-check line #926's acceptance list names,
+#: Every line of #926's "Falsification and positive-control fixtures" list,
 #: keyed by the slug :data:`PROBES` and :data:`UNPROBED` answer it under. The
 #: registry the table is compared against: a line here with neither a probe nor
 #: a recorded reason fails ``tests/test_evals_falsification.py``.
