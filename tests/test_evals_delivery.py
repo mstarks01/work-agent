@@ -256,7 +256,7 @@ def _one_row(traced: delivery.LaneTrace) -> delivery.Delivery:
         reference=card.rows[0],
         lane=traced,
         place_facts=delivery.PlaceFacts((), ""),
-        control=None,
+        peer=None,
     )
     return delivery.Delivery(run=card.run, rows=(row,), re_keyed=0, untraced={})
 
@@ -593,7 +593,7 @@ def _row(card, **changes):
     return replace(card.rows[0], **changes)
 
 
-def test_the_control_is_a_matched_row_first_then_an_unstated_row():
+def test_the_peer_is_a_matched_row_first_then_an_unstated_row():
     card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
     miss = _row(card, reference_index=90, cause="verb")
     unstated = _row(
@@ -608,19 +608,20 @@ def test_the_control_is_a_matched_row_first_then_an_unstated_row():
     )
     elsewhere = replace(matched, case="another-case")
 
-    assert delivery.matched_control(miss, [miss, unstated, matched]) == matched
-    assert delivery.matched_control(miss, [miss, unstated]) == unstated
-    assert delivery.matched_control(miss, [miss, elsewhere]) is None
-    assert delivery.matched_control(miss, [miss, re_keyed]) is None
+    assert delivery.matched_peer(miss, [miss, unstated, matched]) == matched
+    assert delivery.matched_peer(miss, [miss, unstated]) == unstated
+    assert delivery.matched_peer(miss, [miss, elsewhere]) is None
+    assert delivery.matched_peer(miss, [miss, re_keyed]) is None
 
 
-def test_a_row_with_no_control_and_no_place_fact_says_so(capsys):
+def test_a_row_with_no_peer_and_no_place_fact_says_so(capsys):
     traced = _trace(BASELINE)
     delivery.render(traced)
     out = capsys.readouterr().out
 
-    assert any(row.control is None for row in traced.rows)
-    assert "    no control\n" in out
+    assert any(row.peer is None for row in traced.rows)
+    assert all("peer" in row.to_json() for row in traced.rows)
+    assert "    no peer\n" in out
     assert "required facts: undefined" in out
 
 

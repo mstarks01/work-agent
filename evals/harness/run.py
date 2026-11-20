@@ -2891,7 +2891,7 @@ COMMANDS: dict[str, Command] = {
     ),
     "delivery": Command(
         help="each charged must-find miss of a finished sweep and its matched"
-        " control, traced through the leads and the place facts its lane was"
+        " peer, traced through the leads and the place facts its lane was"
         " sent (no credentials)",
         run=command_delivery,
         arguments=_sweep_arguments,

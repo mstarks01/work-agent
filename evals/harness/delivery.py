@@ -58,11 +58,11 @@ only where the signed rows settle the fact's field in one value; elsewhere they
 read ``unavailable``, and the evidence catalog alone decides. A row with no
 place fact reads ``required facts: undefined``.
 
-**The matched control.** Each row carries a must-find of the same case and
+**The matched peer.** Each row carries a must-find of the same case and
 lane that the run answered with the right action at the right place: a
-``matched`` row first, an ``unstated`` row second. The control is traced the
-same way as the miss. A row with no such must-find reads ``no control``, and
-its loss stays unresolved. A control never comes from another case, because
+``matched`` row first, an ``unstated`` row second. The peer is traced the
+same way as the miss. A row with no such must-find reads ``no peer``, and
+its loss stays unresolved. A peer never comes from another case, because
 each case's lanes are given other material.
 """
 
@@ -652,7 +652,7 @@ def place_facts(
     )
 
 
-def matched_control(
+def matched_peer(
     miss: ReferenceRow, rows: Sequence[ReferenceRow]
 ) -> ReferenceRow | None:
     """A must-find of the miss's case and lane the run answered at its place.
@@ -701,15 +701,15 @@ class TracedReference:
 
 @dataclass(frozen=True)
 class DeliveryRow(TracedReference):
-    """One charged miss, traced, beside its matched control."""
+    """One charged miss, traced, beside its matched peer."""
 
     #: ``None`` where the case and lane hold no matched or unstated must-find.
-    control: TracedReference | None
+    peer: TracedReference | None
 
     def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
-            "control": None if self.control is None else self.control.to_json(),
+            "peer": None if self.peer is None else self.peer.to_json(),
         }
 
 
@@ -742,15 +742,14 @@ def trace(
     cases: Sequence[GoldenCase],
     corpus: Path,
 ) -> Delivery:
-    """Trace each charged miss of ``card`` and its control through the lane material."""
+    """Trace each charged miss of ``card`` and its peer through the lane material."""
     by_id = {case.id: case for case in cases}
     misses = charged_misses(card.rows)
     # A row holds a dict, so its case and reference index key it.
-    controls = {
-        (row.case, row.reference_index): matched_control(row, card.rows)
-        for row in misses
+    peers = {
+        (row.case, row.reference_index): matched_peer(row, card.rows) for row in misses
     }
-    traced = [*misses, *(row for row in controls.values() if row is not None)]
+    traced = [*misses, *(row for row in peers.values() if row is not None)]
     traced_cases = sorted({row.case for row in traced})
     reports = {
         case: read_report(_required(finished_file(artifact, case, "report"), case))
@@ -811,13 +810,13 @@ def trace(
     rows = []
     for row in misses:
         miss = traced_reference(row)
-        control = controls[row.case, row.reference_index]
+        peer = peers[row.case, row.reference_index]
         rows.append(
             DeliveryRow(
                 reference=miss.reference,
                 lane=miss.lane,
                 place_facts=miss.place_facts,
-                control=None if control is None else traced_reference(control),
+                peer=None if peer is None else traced_reference(peer),
             )
         )
     return Delivery(
@@ -836,7 +835,7 @@ def _required(path: Path | None, case: str) -> Path:
 
 
 def render(result: Delivery) -> None:
-    """Print each charged miss, its lane's trace, its control, and the populations."""
+    """Print each charged miss, its lane's trace, its peer, and the populations."""
     print(
         f"{len(result.rows)} charged miss(es), {len(result.untraced)} case(s) with"
         f" lane material untraced; {result.re_keyed} re-keyed must-find(s) outside"
@@ -846,8 +845,4 @@ def render(result: Delivery) -> None:
         print(f"  lane material untraced: {case}: {reason}")
     for row in result.rows:
         print(f"  {row.describe()}")
-        print(
-            "    no control"
-            if row.control is None
-            else f"    control {row.control.describe()}"
-        )
+        print("    no peer" if row.peer is None else f"    peer {row.peer.describe()}")
