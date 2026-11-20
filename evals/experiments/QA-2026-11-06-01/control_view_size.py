@@ -60,10 +60,10 @@ def rendered_view(drafts: int, text: str) -> str:
         valid_model(),
         items,
         AnalysisMarks(),
-        # No fan-in ran over these drafts, so no quote check read them.
-        False,
         None,
         _applied(_app_control(text)),
+        # No fan-in ran over these drafts, so no quote check read them.
+        quotes_checked=False,
     )
     return render_fenced(critic_round.view())
 

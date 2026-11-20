@@ -468,8 +468,9 @@ hiding the finding. The list is also empty when no source text was available to
 check against, so it is evidence of a *failed* check, never of a check having
 run. The block's `quotes_checked` says whether the check ran. Where it is
 `false`, no quote in the block was checked, and a quote with no mark is
-unchecked, not verified. It is `null` only on a report written before 3.5. The
-check ran for every such report, because a report names at least one source.
+unchecked, not verified. It is `null` only on a block written before 3.5. Read
+such a block as checked: a block holds a quote only where the fan-in ran, and a
+report names at least one source, so the fan-in had a map to check against.
 
 ## `unresolved_evidence` — references the catalog does not hold
 
@@ -1329,8 +1330,9 @@ version before it. Read it when you load an archived report.
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
 - **Version 3.5:** each block carries `quotes_checked`, which says whether the
   fan-in ran the quote check. It is `false` where the job's map of source texts
-  is empty, and then `unverified_grounds` is empty because no check ran. It is
-  `null` only on a stored block that holds no value. Additive for a consumer
+  is empty, and on a block that no fan-in built: a refused framework or a stub
+  run. Then `unverified_grounds` is empty because no check ran. It is `null`
+  only on a block written before 3.5. Additive for a consumer
   that reads only the 3.4 fields. A route that parses a stored 3.4 job record
   answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

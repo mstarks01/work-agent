@@ -2709,14 +2709,16 @@ def build_block_summary(
 
 
 def quote_check_ran(quotes_checked: bool | None) -> bool:
-    """Whether a check read a fan-in's quotes, for every shape the value takes.
+    """Whether a check read a block's quotes, for every shape of the field.
 
-    ``True`` and ``False`` are :attr:`~analysis_service.fan_in.FanIn.quotes_checked`.
-    ``None`` is a record written before the value existed: a report before
-    schema 3.5, or a failure dump of that age. Its check ran.
-    ``InputRef.sources`` holds at least one source, both builders of a report
-    seed the job's state from those same sources, and the fan-in runs the
-    check on any non-empty map of source texts.
+    ``True`` and ``False`` are :attr:`~analysis_service.fan_in.FanIn.quotes_checked`,
+    and a block that no fan-in built (a refused framework, a stub) holds
+    ``False``. ``None`` is a block written before schema 3.5, read as checked.
+    A block holds a quote only where a fan-in ran. A report names at least one
+    source (``InputRef.sources``), the graph seeds the job's state from those
+    same sources, and the fan-in runs the check on any non-empty map of source
+    texts. A block from before 3.5 that no fan-in built holds no quote, so the
+    reading changes no count.
     """
     return quotes_checked is not False
 

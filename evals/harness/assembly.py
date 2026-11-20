@@ -299,9 +299,9 @@ def replay_case(
         model,
         ruled_drafts,
         AnalysisMarks(),
-        quote_check_ran(block.quotes_checked),
         None,
         (),
+        quotes_checked=quote_check_ran(block.quotes_checked),
     )
     outcome = critic_round.outcome(
         [ruling.model_dump(mode="json") for ruling in rulings]

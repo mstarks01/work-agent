@@ -130,7 +130,13 @@ def _with_evidence(line: str) -> AppliedControl:
 
 def _view(drafts, controls: list[AppliedControl], framework="asvs") -> list[dict]:
     critic_round = CriticRound.of(
-        framework, valid_model(), drafts, AnalysisMarks(), True, None, controls
+        framework,
+        valid_model(),
+        drafts,
+        AnalysisMarks(),
+        None,
+        controls,
+        quotes_checked=True,
     )
     return critic_round.view()
 
@@ -244,9 +250,9 @@ class TestTheControlsKey:
             valid_model(),
             drafts,
             AnalysisMarks(),
-            True,
             None,
             _applied(_db(_row("V11"))),
+            quotes_checked=True,
         )
 
         [view] = critic_round.view(only={drafts[1].id})
@@ -273,7 +279,13 @@ class TestTheControlsKey:
         draft = _asvs_draft("V11.2.1", "store:orders-db")
         controls = _applied(_db(_row("V11")))
         critic_round = CriticRound.of(
-            "asvs", valid_model(), [draft], AnalysisMarks(), True, None, controls
+            "asvs",
+            valid_model(),
+            [draft],
+            AnalysisMarks(),
+            None,
+            controls,
+            quotes_checked=True,
         )
 
         assert critic_round.view(only={draft.id}) == critic_round.view()
@@ -285,7 +297,13 @@ ROWS = (_row("V11"), _row("V11.2.1"))
 
 def _round(*copies: CopiedControl) -> CriticRound:
     return CriticRound.of(
-        "asvs", valid_model(), [DRAFT], AnalysisMarks(), True, None, _applied(*copies)
+        "asvs",
+        valid_model(),
+        [DRAFT],
+        AnalysisMarks(),
+        None,
+        _applied(*copies),
+        quotes_checked=True,
     )
 
 
@@ -651,9 +669,9 @@ class TestTheUnDefer:
             valid_model(),
             merged.drafts,
             merged.marks,
-            merged.quotes_checked,
             None,
             _applied(_db(_row("V11.2.1"))),
+            quotes_checked=merged.quotes_checked,
         )
         outcome = critic_round.first([{"id": draft.id, "verdict": verdict}])
         assert isinstance(outcome, Accepted)

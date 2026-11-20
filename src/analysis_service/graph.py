@@ -1089,7 +1089,7 @@ class MissingSourceTexts(KeyError):
     """
 
 
-def held_source_texts(source_texts: Mapping[str, str] | None) -> dict[str, str]:
+def seeded_source_texts(source_texts: Mapping[str, str] | None) -> dict[str, str]:
     """The job's map of source texts, or :class:`MissingSourceTexts`.
 
     The one reader of the key's absence. A missing key read as an empty map
@@ -1484,7 +1484,7 @@ def validate_extraction(
             f" model to validate. {_TRUNCATION_HINT}"
         )
     state = keys.state(ctx)
-    sources = held_source_texts(source_texts)
+    sources = seeded_source_texts(source_texts)
     baseline = state.get(STATE_REPAIR_BASELINE)
     if baseline is None:
         # The first gate, on every route out of it: what arrived is kept
@@ -1874,7 +1874,7 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     trusted, so a catalog a lane selects from answered the same rules whichever
     job produced it. There is no path that reaches ``prepare`` ungated.
     """
-    sources = held_source_texts(state.get(STATE_SOURCE_TEXTS))
+    sources = seeded_source_texts(state.get(STATE_SOURCE_TEXTS))
     held = state.get(STATE_ASSERTION_CATALOG)
     if held is not None:
         record = AssertionRecord.model_validate(held)
@@ -2083,7 +2083,7 @@ def merge_drafts(
             f" nothing ({written}), so those lanes were never analyzed."
             f" {_TRUNCATION_HINT}"
         )
-    sources = held_source_texts(source_texts)
+    sources = seeded_source_texts(source_texts)
     proposal_batch = nodes.schemas.proposals
     model = SystemModel.model_validate(valid_model)
     controls = held_controls(state)
@@ -2117,9 +2117,9 @@ def merge_drafts(
         model,
         merged.drafts,
         merged.marks,
-        merged.quotes_checked,
         held_assertions(state),
         controls,
+        quotes_checked=merged.quotes_checked,
     )
     state.prompt(nodes.key("draft_view"), render_fenced(critic_round.view()))
     return _routed(
@@ -2243,19 +2243,31 @@ def _parked_round(
         model,
         _drafts_of(state.get(nodes.key("drafts")) if accepted else None, nodes.package),
         AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
-        _quotes_checked(state, nodes),
         held_assertions(state),
         held_controls(state),
+        quotes_checked=parked_quotes_checked(state, nodes),
     )
 
 
-def _quotes_checked(state: SessionState, nodes: FrameworkNodes) -> bool:
-    """Whether this framework's fan-in ran the quote check.
+def parked_quotes_checked(
+    state: SessionState | Mapping[str, Any], nodes: FrameworkNodes
+) -> bool:
+    """Whether this framework's fan-in ran the quote check, from parked state.
 
-    The key is absent only where no fan-in ran: a framework its precondition
-    refused. No quote check ran there either.
+    The one reader of the parked key, for a live session and for a failure
+    dump. ``merge`` writes the key beside the drafts, so its shapes are:
+
+    * ``True`` or ``False``: the fan-in's own value.
+    * Absent, with no drafts: no fan-in ran (a framework its precondition
+      refused), so no check ran.
+    * Absent, with drafts: a dump written before the key existed. Its check
+      ran, for the reason :func:`~analysis_service.claims.quote_check_ran`
+      states.
     """
-    return bool(state.get(nodes.key("quotes_checked")))
+    parked = state.get(nodes.key("quotes_checked"))
+    if parked is None:
+        return state.get(nodes.key("drafts")) is not None
+    return bool(parked)
 
 
 def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:
@@ -2999,7 +3011,7 @@ def _stated_node_func(keys: GraphKeys) -> Callable[..., Any]:
         updated = with_stated_capabilities(
             model,
             CapabilityReading.model_validate(reading),
-            held_source_texts(source_texts),
+            seeded_source_texts(source_texts),
         )
         state.put(STATE_VALID_MODEL, updated.model_dump(mode="json"))
         return {"stated": len(updated.capabilities) - len(model.capabilities)}

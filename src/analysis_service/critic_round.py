@@ -234,9 +234,10 @@ class CriticRound:
         model: SystemModel,
         drafts: Sequence[Claim],
         marks: AnalysisMarks,
-        quotes_checked: bool,
         assertions: AssertionCatalog | None,
         controls: Sequence[AppliedControl],
+        *,
+        quotes_checked: bool,
     ) -> CriticRound:
         """The round for one framework, with that framework's own schemas."""
         return cls(

@@ -86,6 +86,15 @@ FailureKind = Literal["other"]
 _KINDS: tuple[GroundKind, ...] = get_args(GroundKind)
 
 
+def checked_quotes(quotes: int, quotes_checked: bool) -> int:
+    """The quotes a check read: every quote, or none where no check ran.
+
+    The quote check reads every quote of a fan-in or none of them, so a quote
+    is unchecked exactly where ``quotes_checked`` is false.
+    """
+    return quotes if quotes_checked else 0
+
+
 @dataclass(frozen=True)
 class ThreatGrounds:
     """One draft's grounds: how many, of which branch, and which did not verify.
@@ -190,8 +199,8 @@ class CaseGrounds:
 
     @property
     def checked_quote_count(self) -> int:
-        """The quotes a check read: every quote, or none where no check ran."""
-        return self.quote_count if self.quotes_checked else 0
+        """The quotes a check read (:func:`checked_quotes`)."""
+        return checked_quotes(self.quote_count, self.quotes_checked)
 
     @property
     def unchecked_count(self) -> int:

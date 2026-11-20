@@ -2379,6 +2379,28 @@ def _maps_label_to_text(node: ast.AST) -> bool:
     )
 
 
+def _gets_parked_quotes_checked(node: ast.AST) -> bool:
+    """``state.get(nodes.key("quotes_checked"))``: a read of the parked key."""
+    return _calls(node, "get") and any(
+        _calls(arg, "key")
+        and any(
+            isinstance(a, ast.Constant) and a.value == "quotes_checked"
+            for a in arg.args
+        )
+        for arg in node.args
+    )
+
+
+def _compares_quotes_checked(node: ast.AST) -> bool:
+    """``quotes_checked is ...`` or ``... == quotes_checked``, on a name or an
+    attribute."""
+    return isinstance(node, ast.Compare) and any(
+        _is_name(part, "quotes_checked")
+        or (isinstance(part, ast.Attribute) and part.attr == "quotes_checked")
+        for part in (node.left, *node.comparators)
+    )
+
+
 def _reads_absent_source_texts(node: ast.AST) -> bool:
     """A read that answers for a missing map of source texts.
 
@@ -2430,9 +2452,21 @@ def _reads_the_lanes_of_a_capture(node: ast.AST) -> bool:
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "how the parked quotes_checked key reads, absence included": _OneReader(
+        _gets_parked_quotes_checked,
+        ("src/analysis_service/graph.py", "parked_quotes_checked"),
+        {},
+        "",
+    ),
+    "how a block's quotes_checked reads, null included": _OneReader(
+        _compares_quotes_checked,
+        ("src/analysis_service/claims.py", "quote_check_ran"),
+        {},
+        "",
+    ),
     "a session state that holds no map of source texts": _OneReader(
         _reads_absent_source_texts,
-        ("src/analysis_service/graph.py", "held_source_texts"),
+        ("src/analysis_service/graph.py", "seeded_source_texts"),
         {},
         "",
     ),

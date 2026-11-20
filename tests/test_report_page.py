@@ -358,15 +358,17 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     assert f"— {ANSWERS_LABEL}" not in text
 
 
-@pytest.mark.parametrize(
-    ("checked", "unchecked"), [(False, True), (True, False), (None, False)]
-)
-def test_a_quote_no_check_read_is_marked_as_unchecked(checked, unchecked):
+@pytest.mark.parametrize("checked", [False, True, None])
+def test_a_quote_no_check_read_is_marked_as_unchecked(checked):
     """A block whose fan-in checked no quote shows its quotes apart (#2314).
 
-    ``null`` is a block from before schema 3.5, and its check ran.
+    The page and :func:`~analysis_service.claims.quote_check_ran` read the
+    field's three shapes alike.
     """
+    from analysis_service.claims import quote_check_ran
     from tests.factories import sample_threat
+
+    unchecked = not quote_check_ran(checked)
 
     threat = sample_threat()
     report = sample_report([threat])
@@ -379,6 +381,28 @@ def test_a_quote_no_check_read_is_marked_as_unchecked(checked, unchecked):
     quote = threat.grounds[0]
     assert ("the service did not check this quote" in text) is unchecked
     assert (f"\u201c{quote.text}\u201d" in text) is not unchecked
+
+
+def test_an_owner_s_answer_keeps_its_label_in_an_unchecked_block():
+    from analysis_service.claims import Ground
+    from analysis_service.fact_answers import fact_line
+    from analysis_service.sources import ANSWERS_LABEL
+    from tests.factories import sample_threat
+
+    answer = FactAnswer(key=ASKED.key, value="TLS 1.3")
+    quote = Ground(kind="quote", text=fact_line(answer), source_label=ANSWERS_LABEL)
+    report = sample_report([sample_threat(grounds=[quote, sample_threat().grounds[1]])])
+    block = report.analyses[0].model_copy(update={"quotes_checked": False})
+    report = report.model_copy(update={"analyses": [block]})
+    html = render_report(
+        report,
+        report_state(report, answered=[answer]),
+        previous=None,
+        parent=None,
+        controls=(),
+    ).html
+    text = run_report_page(html)["analyses"]
+    assert "your answer; the service did not check it" in text
 
 
 @pytest.mark.parametrize(

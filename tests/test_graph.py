@@ -1657,14 +1657,14 @@ def test_merge_refuses_a_state_that_holds_no_source_texts():
     Read as an empty map, it would skip the quote check with no sign.
     """
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01")]))
-    with pytest.raises(KeyError, match="source_texts"):
+    with pytest.raises(graph.MissingSourceTexts):
         graph.merge_drafts(
             valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
         )
 
 
 def test_validate_refuses_a_state_that_holds_no_source_texts():
-    with pytest.raises(KeyError, match="source_texts"):
+    with pytest.raises(graph.MissingSourceTexts):
         graph.validate_extraction(
             FakeContext(),
             KEYS,
@@ -1710,6 +1710,22 @@ def test_the_block_says_whether_the_quote_check_ran(sources, checked, unverified
     assert block.quotes_checked is checked
 
 
+@pytest.mark.parametrize(
+    ("parked", "expected"),
+    [
+        ({"quotes_checked": True, "drafts": []}, True),
+        ({"quotes_checked": False, "drafts": []}, False),
+        # No fan-in ran: a framework its precondition refused.
+        ({}, False),
+        # A failure dump written before the key: the fan-in ran.
+        ({"drafts": []}, True),
+    ],
+)
+def test_the_parked_quote_check_reads_every_shape(parked, expected):
+    state = {NODES.key(artifact): value for artifact, value in parked.items()}
+    assert graph.parked_quotes_checked(state, NODES) is expected
+
+
 def test_merge_joins_drafts_in_canonical_order():
     ctx = FakeContext(
         **analyze_state(
@@ -1738,7 +1754,13 @@ def test_merge_joins_drafts_in_canonical_order():
     assert (
         event.output
         == CriticRound.of(
-            "stride", valid_model(), drafts, marks, True, None, ()
+            "stride",
+            valid_model(),
+            drafts,
+            marks,
+            None,
+            (),
+            quotes_checked=True,
         ).summary()
     )
     # Two drafts on quotes and derived facts are the critic's to rule.

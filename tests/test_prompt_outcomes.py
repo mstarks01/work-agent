@@ -454,7 +454,13 @@ def a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic(pipeline):  # noqa
     unreasoned = sample_ruling(verdict=ProposedVerdict(rejected_because="lane"))
 
     critic_round = CriticRound.of(
-        "stride", valid_model(), [sample_draft("S-01")], AnalysisMarks(), True, None, ()
+        "stride",
+        valid_model(),
+        [sample_draft("S-01")],
+        AnalysisMarks(),
+        None,
+        (),
+        quotes_checked=True,
     )
 
     outcome = critic_round.first([unreasoned.model_dump(mode="json")])

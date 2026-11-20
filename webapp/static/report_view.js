@@ -356,8 +356,8 @@
       // The quotation marks assert a verbatim span the service found. When it
       // did not, or did not look, they come off — the claim they make is the
       // one that failed or that no check read.
-      const unfound = unverified || marks.unchecked;
-      body.textContent = unfound ? ground.text : `\u201c${ground.text}\u201d`;
+      const unconfirmed = unverified || marks.unchecked;
+      body.textContent = unconfirmed ? ground.text : `\u201c${ground.text}\u201d`;
       row.append(body);
       if (ground.text.length > CLAMP_OVER) {
         body.classList.add("clamped");
@@ -374,8 +374,8 @@
       // says so rather than reading like the description.
       const own = ground.source_label === PROVENANCE.answers_label;
       cite.append(unverified ? `\u26a0 not found in ${ground.source_label}`
-        : marks.unchecked ? `\u2014 ${ground.source_label}; the service did not check this quote`
         : own ? "\u2014 your answer; the service did not check it"
+        : marks.unchecked ? `\u2014 ${ground.source_label}; the service did not check this quote`
         : `\u2014 ${ground.source_label}`);
       row.append(cite);
       const repaired = marks.repaired.get(`${claimId}#${index}`);

@@ -56,6 +56,7 @@ from analysis_service.graph import (
     STATE_SYSTEM_MODEL,
     STATE_VALID_MODEL,
     FrameworkNodes,
+    parked_quotes_checked,
 )
 from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
@@ -167,7 +168,7 @@ def _from_failure(
         framework=framework,
         drafts=[record.model_validate(draft) for draft in state[nodes.key("drafts")]],
         marks=AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
-        quotes_checked=quote_check_ran(state.get(nodes.key("quotes_checked"))),
+        quotes_checked=parked_quotes_checked(state, nodes),
         block=None,
         shared={
             STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],
@@ -194,9 +195,9 @@ def round_of(archived: Archived, controls: Sequence[AppliedControl]) -> CriticRo
         archived.model,
         archived.drafts,
         archived.marks,
-        archived.quotes_checked,
         None if record is None else record.catalog,
         controls,
+        quotes_checked=archived.quotes_checked,
     )
 
 

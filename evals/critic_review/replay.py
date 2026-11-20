@@ -85,9 +85,9 @@ def critic_round(
         model,
         drafts,
         AnalysisMarks(),
-        True,
         None,
         list(controls.values()),
+        quotes_checked=True,
     )
 
 
