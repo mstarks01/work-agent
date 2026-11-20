@@ -2379,6 +2379,29 @@ def _maps_label_to_text(node: ast.AST) -> bool:
     )
 
 
+def _reads_absent_source_texts(node: ast.AST) -> bool:
+    """A read that answers for a missing map of source texts.
+
+    ``source_texts is None``, ``source_texts or ...``,
+    ``state.get(STATE_SOURCE_TEXTS) or ...`` and
+    ``state.get(STATE_SOURCE_TEXTS, default)``.
+    """
+    match node:
+        case ast.Compare(left=left, ops=[ast.Is() | ast.IsNot()]):
+            return _is_name(left, "source_texts")
+        case ast.BoolOp(op=ast.Or(), values=[first, *_]):
+            return _is_name(first, "source_texts") or _gets_source_texts(first)
+        case ast.Call(func=ast.Attribute(attr="get"), args=[key, _]):
+            return _is_name(key, "STATE_SOURCE_TEXTS")
+    return False
+
+
+def _gets_source_texts(node: ast.AST) -> bool:
+    return _calls(node, "get") and any(
+        _is_name(arg, "STATE_SOURCE_TEXTS") for arg in node.args
+    )
+
+
 def test_a_job_s_source_texts_are_mapped_once():
     """Only ``source_texts`` maps a job's sources to their texts; the service
     and the harness call it."""
@@ -2407,6 +2430,12 @@ def _reads_the_lanes_of_a_capture(node: ast.AST) -> bool:
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "a session state that holds no map of source texts": _OneReader(
+        _reads_absent_source_texts,
+        ("src/analysis_service/graph.py", "held_source_texts"),
+        {},
+        "",
+    ),
     "a lane's artifacts in a lane capture": _OneReader(
         _reads_the_lanes_of_a_capture,
         ("evals/harness/lane_replay.py", "captured_lane"),
