@@ -1,0 +1,746 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "supplier",
+        "description": "External supplier",
+        "assets": [],
+        "source_excerpt": "n0[\"supplier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "category manager",
+        "description": "External category manager",
+        "assets": [],
+        "source_excerpt": "n1[\"category manager\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:portal-vendor",
+        "name": "portal vendor",
+        "description": "Vendor associated with the supplier portal",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2[\"portal vendor\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-portal",
+        "name": "supplier portal",
+        "description": "Portal receiving supplier uploads and category manager reviews",
+        "assets": [],
+        "source_excerpt": "n3(\"supplier portal\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "supplier master service",
+        "description": "Service loading extracts and writing supplier records",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"supplier master service\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:document-store",
+        "name": "document store",
+        "description": "Store for documents",
+        "assets": [],
+        "source_excerpt": "n5[(\"document store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "Bucket receiving the nightly extract",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n6[(\"landing bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "supplier database",
+        "description": "Database holding supplier records",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"supplier database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "name": "upload documents",
+        "description": "Supplier uploads documents to the supplier portal",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"upload documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:supplier",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "name": "review documents",
+        "description": "Category manager reviews documents in the supplier portal",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"review documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-portal>store:document-store>store-documents",
+        "name": "store documents",
+        "description": "Supplier portal stores documents in the document store",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"store documents\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-portal",
+        "destination": "store:document-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "name": "push nightly extract",
+        "description": "Portal vendor pushes a nightly extract to the landing bucket",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"push nightly extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:portal-vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "name": "load extract",
+        "description": "Supplier master service loads the extract from the landing bucket",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"load extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "extract",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "name": "write supplier records",
+        "description": "Supplier master service writes supplier records to the supplier database",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"write supplier records\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone labelled public internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone labelled corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "name": "vendor platform",
+        "description": "Trust zone labelled vendor platform",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: vendor platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-account",
+        "name": "cloud account",
+        "description": "Trust zone labelled cloud account",
+        "assets": [],
+        "source_excerpt": "subgraph z3[\"Trust zone: cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The supplier is a human external entity.",
+        "element_id": "entity:supplier",
+        "attribute": "kind",
+        "basis": "The diagram names the external entity as a supplier and provides no system or service behavior."
+      },
+      {
+        "assumption": "The category manager is a human external entity.",
+        "element_id": "entity:category-manager",
+        "attribute": "kind",
+        "basis": "The diagram names the external entity as a category manager, a person role."
+      },
+      {
+        "assumption": "The portal vendor is an external system.",
+        "element_id": "entity:portal-vendor",
+        "attribute": "kind",
+        "basis": "The portal vendor initiates a machine-oriented nightly extract push to a bucket."
+      },
+      {
+        "assumption": "The supplier portal presents a web interface.",
+        "element_id": "process:supplier-portal",
+        "attribute": "interface_kind",
+        "basis": "The process is named a portal."
+      },
+      {
+        "assumption": "The public internet zone is a network boundary.",
+        "element_id": "boundary:public-internet",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named public internet, indicating a network location."
+      },
+      {
+        "assumption": "The corporate network zone is a network boundary.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named corporate network, indicating a network location."
+      },
+      {
+        "assumption": "The vendor platform zone is a tenant boundary.",
+        "element_id": "boundary:vendor-platform",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named vendor platform, indicating control by a separate vendor."
+      },
+      {
+        "assumption": "The cloud account zone is a tenant boundary.",
+        "element_id": "boundary:cloud-account",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named cloud account, indicating a separate account or control domain."
+      },
+      {
+        "assumption": "The portal vendor's nightly extract carries business-critical data.",
+        "element_id": "entity:portal-vendor",
+        "attribute": "assets",
+        "basis": "The portal vendor pushes a nightly extract, and the extract is used to populate supplier records."
+      },
+      {
+        "assumption": "The landing bucket holds business-critical data.",
+        "element_id": "store:landing-bucket",
+        "attribute": "assets",
+        "basis": "It receives the nightly extract that is loaded by the supplier master service."
+      },
+      {
+        "assumption": "The supplier master service holds or transforms business-critical data.",
+        "element_id": "process:supplier-master-service",
+        "attribute": "assets",
+        "basis": "It loads the extract and writes supplier records."
+      },
+      {
+        "assumption": "The extract flows carry business-critical data.",
+        "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "attribute": "assets",
+        "basis": "The flow carries the nightly extract used for supplier records."
+      },
+      {
+        "assumption": "The load extract flow carries business-critical data.",
+        "element_id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "attribute": "assets",
+        "basis": "The flow carries the extract used by the supplier master service."
+      },
+      {
+        "assumption": "The write supplier records flow carries business-critical data.",
+        "element_id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "attribute": "assets",
+        "basis": "The flow explicitly carries supplier records."
+      },
+      {
+        "assumption": "The supplier database holds business-critical data.",
+        "element_id": "store:supplier-database",
+        "attribute": "assets",
+        "basis": "The store is explicitly named supplier database and receives supplier records."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "supplier",
+        "description": "External supplier",
+        "assets": [],
+        "source_excerpt": "n0[\"supplier\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "category manager",
+        "description": "External category manager",
+        "assets": [],
+        "source_excerpt": "n1[\"category manager\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:portal-vendor",
+        "name": "portal vendor",
+        "description": "Vendor associated with the supplier portal",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2[\"portal vendor\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-portal",
+        "name": "supplier portal",
+        "description": "Portal receiving supplier uploads and category manager reviews",
+        "assets": [],
+        "source_excerpt": "n3(\"supplier portal\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "supplier master service",
+        "description": "Service loading extracts and writing supplier records",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"supplier master service\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:document-store",
+        "name": "document store",
+        "description": "Store for documents",
+        "assets": [],
+        "source_excerpt": "n5[(\"document store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "Bucket receiving the nightly extract",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n6[(\"landing bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "supplier database",
+        "description": "Database holding supplier records",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"supplier database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "name": "upload documents",
+        "description": "Supplier uploads documents to the supplier portal",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"upload documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:supplier",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "name": "review documents",
+        "description": "Category manager reviews documents in the supplier portal",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"review documents\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-portal>store:document-store>store-documents",
+        "name": "store documents",
+        "description": "Supplier portal stores documents in the document store",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"store documents\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-portal",
+        "destination": "store:document-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "name": "push nightly extract",
+        "description": "Portal vendor pushes a nightly extract to the landing bucket",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"push nightly extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:portal-vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "name": "load extract",
+        "description": "Supplier master service loads the extract from the landing bucket",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"load extract\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "extract",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "name": "write supplier records",
+        "description": "Supplier master service writes supplier records to the supplier database",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"write supplier records\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone labelled public internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone labelled corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "name": "vendor platform",
+        "description": "Trust zone labelled vendor platform",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: vendor platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-account",
+        "name": "cloud account",
+        "description": "Trust zone labelled cloud account",
+        "assets": [],
+        "source_excerpt": "subgraph z3[\"Trust zone: cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The supplier is a human external entity.",
+        "element_id": "entity:supplier",
+        "attribute": "kind",
+        "basis": "The diagram names the external entity as a supplier and provides no system or service behavior."
+      },
+      {
+        "assumption": "The category manager is a human external entity.",
+        "element_id": "entity:category-manager",
+        "attribute": "kind",
+        "basis": "The diagram names the external entity as a category manager, a person role."
+      },
+      {
+        "assumption": "The portal vendor is an external system.",
+        "element_id": "entity:portal-vendor",
+        "attribute": "kind",
+        "basis": "The portal vendor initiates a machine-oriented nightly extract push to a bucket."
+      },
+      {
+        "assumption": "The supplier portal presents a web interface.",
+        "element_id": "process:supplier-portal",
+        "attribute": "interface_kind",
+        "basis": "The process is named a portal."
+      },
+      {
+        "assumption": "The public internet zone is a network boundary.",
+        "element_id": "boundary:public-internet",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named public internet, indicating a network location."
+      },
+      {
+        "assumption": "The corporate network zone is a network boundary.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named corporate network, indicating a network location."
+      },
+      {
+        "assumption": "The vendor platform zone is a tenant boundary.",
+        "element_id": "boundary:vendor-platform",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named vendor platform, indicating control by a separate vendor."
+      },
+      {
+        "assumption": "The cloud account zone is a tenant boundary.",
+        "element_id": "boundary:cloud-account",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named cloud account, indicating a separate account or control domain."
+      },
+      {
+        "assumption": "The portal vendor's nightly extract carries business-critical data.",
+        "element_id": "entity:portal-vendor",
+        "attribute": "assets",
+        "basis": "The portal vendor pushes a nightly extract, and the extract is used to populate supplier records."
+      },
+      {
+        "assumption": "The landing bucket holds business-critical data.",
+        "element_id": "store:landing-bucket",
+        "attribute": "assets",
+        "basis": "It receives the nightly extract that is loaded by the supplier master service."
+      },
+      {
+        "assumption": "The supplier master service holds or transforms business-critical data.",
+        "element_id": "process:supplier-master-service",
+        "attribute": "assets",
+        "basis": "It loads the extract and writes supplier records."
+      },
+      {
+        "assumption": "The extract flows carry business-critical data.",
+        "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "attribute": "assets",
+        "basis": "The flow carries the nightly extract used for supplier records."
+      },
+      {
+        "assumption": "The load extract flow carries business-critical data.",
+        "element_id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "attribute": "assets",
+        "basis": "The flow carries the extract used by the supplier master service."
+      },
+      {
+        "assumption": "The write supplier records flow carries business-critical data.",
+        "element_id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "attribute": "assets",
+        "basis": "The flow explicitly carries supplier records."
+      },
+      {
+        "assumption": "The supplier database holds business-critical data.",
+        "element_id": "store:supplier-database",
+        "attribute": "assets",
+        "basis": "The store is explicitly named supplier database and receives supplier records."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

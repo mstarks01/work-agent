@@ -1,0 +1,9 @@
+tree: 87e4c466ad59a9d4efa6cc64caf94beca466928c, no wt-main/ directory: absent
+PASSED tests/test_doc_command_lints.py::test_every_documented_command_exists
+PASSED tests/test_doc_copy_lints.py::test_each_list_of_diagram_types_is_every_diagram_type
+PASSED tests/test_fan_out_lints.py::test_no_fixed_count_of_lane_agents_outside_a_package
+PASSED tests/test_license_lints.py::test_no_upstream_sentence_appears_in_an_ungoverned_file
+PASSED tests/test_history_prose_lints.py::test_no_docstring_comment_or_guide_narrates_an_earlier_state
+PASSED tests/test_history_prose_lints.py::test_no_file_uses_a_ruled_out_money_word
+PASSED tests/test_history_prose_lints.py::test_no_file_spends_a_choice_a_read_or_a_vote
+7 passed, 5 warnings in 21.95s

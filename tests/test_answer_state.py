@@ -12,7 +12,7 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_sets import NO_ANSWERS
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import (
     AlreadyResumed,
     Answers,
@@ -23,7 +23,11 @@ from analysis_service.answer_state import (
     SourcesOverLimit,
     StaleRevision,
 )
+from analysis_service.controls import Control, ControlDocument
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.job_controls import CopiedControl
 from analysis_service.sources import Source, SourceLimits
+from tests.test_controls import fact
 from tests.test_pause import held
 
 ROOMY = SourceLimits(max_total_bytes=1_000_000, max_sources=10)
@@ -35,6 +39,7 @@ def waiting(**changes) -> AnswerState:
         checkpoint=held(),
         frameworks={"stride": {}},
         analyses=(),
+        asks=True,
         waiting=True,
         final=False,
         sources=(Source(kind="description", label="overview", text="A web app."),),
@@ -139,3 +144,76 @@ def test_only_a_final_report_takes_corrections():
     state = waiting()
     with pytest.raises(ValueError, match="only a final report takes corrections"):
         state.correct([], revision=state.revision)
+
+
+def _copied(document: dict) -> CopiedControl:
+    control = Control.create(
+        owner_id="alice", document=ControlDocument.model_validate(document)
+    )
+    return CopiedControl.of(control, {})
+
+
+ENCRYPTED = {
+    "id": f"control-{'a' * 32}",
+    "name": "Encrypted",
+    "scope": {"type": "store", "name": "Orders DB", "aliases": []},
+    "facts": [fact()],
+    "rows": [],
+    "evidence": [],
+}
+DB_KEY = ("store:orders-db", "encryption_at_rest", "", "", "", "")
+TLS_KEY = (
+    "flow:process:web-app>store:orders-db>store-order",
+    "encryption_in_transit",
+    "",
+    "",
+    "",
+    "",
+)
+
+
+class TestTheRung:
+    """``fact_origin`` names the rung of each held answer (ADR 0125)."""
+
+    def answer(self, key, value: str = "yes") -> FactAnswer:
+        return FactAnswer(key=key, value=value)
+
+    def test_each_rung_is_named(self):
+        state = waiting(
+            controls=(_copied(ENCRYPTED),),
+            corrections=(self.answer(("", "", "", "", "", "oauth")),),
+            draft=SentAnswers(facts=(self.answer(("", "", "", "", "", "cors")),)),
+            answers=AnswerSet(facts=(self.answer(("", "", "", "", "", "cookies")),)),
+            carried_in=AnswerSet(facts=(self.answer(TLS_KEY, "TLS 1.3"),)),
+        )
+        rungs = {
+            key[-1] or key[1]: origin.rung
+            for key in (
+                ("", "", "", "", "", "oauth"),
+                ("", "", "", "", "", "cors"),
+                ("", "", "", "", "", "cookies"),
+                DB_KEY,
+                TLS_KEY,
+            )
+            if (origin := state.fact_origin(key)) is not None
+        }
+        assert rungs == {
+            "oauth": "correction",
+            "cors": "draft",
+            "cookies": "answer",
+            "encryption_at_rest": "control",
+            "encryption_in_transit": "carried",
+        }
+        assert state.fact_origin(DB_KEY).name == "Encrypted"
+        assert state.fact_origin(("", "", "", "", "", "websocket")) is None
+
+    def test_an_own_answer_lies_over_a_control_and_a_control_over_a_carried(self):
+        state = waiting(
+            controls=(_copied(ENCRYPTED),),
+            carried_in=AnswerSet(facts=(self.answer(DB_KEY, "KMS"),)),
+        )
+        assert state.fact_origin(DB_KEY).rung == "control"
+        assert state.held.facts == (self.answer(DB_KEY, "AES-256"),)
+        own = replace(state, answers=AnswerSet(facts=(self.answer(DB_KEY, "CMEK"),)))
+        assert own.fact_origin(DB_KEY).rung == "answer"
+        assert own.held.facts == (self.answer(DB_KEY, "CMEK"),)

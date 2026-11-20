@@ -1,0 +1,11 @@
+material from today's prepare, catalog none; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Authorization codes can be sent to a prefix-matched redirect destination | ['process:authorization-server', 'flow:entity:member>entity:partner-app>return-with-authorization-code', 'entity:partner-app']
+- Identity-database credentials may be readable on the unverified authorization-server connection | ['flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'process:authorization-server', 'store:identity-database']
+- Points-ledger balances may be readable on an unverified API-to-ledger connection | ['flow:process:rewards-api>store:points-ledger>read-and-write-points', 'process:rewards-api', 'store:points-ledger']
+- Bearer tokens may be readable while the API writes request logs | ['flow:process:rewards-api>store:api-log-store>write-request-log', 'process:rewards-api', 'store:api-log-store']
+- Account-closure records may be exposed on an unverified support-console connection | ['flow:process:support-console>store:identity-database>close-accounts', 'process:support-console', 'store:identity-database']
+- A copied identity database exposes credentials if at-rest encryption is absent | ['store:identity-database']
+- A copied points ledger exposes all member reward activity if at-rest encryption is absent | ['store:points-ledger']
+- A copied API log store exposes bearer credentials if at-rest encryption is absent | ['store:api-log-store', 'process:rewards-api']
+spent: $0.0633 reported
+must-finds matched: [8]

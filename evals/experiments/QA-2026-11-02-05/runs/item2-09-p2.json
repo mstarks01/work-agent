@@ -1,0 +1,154 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "53ab865734b686cb35ec04d8c23e91067ecf26be",
+    "clean": false,
+    "table": {
+      "case": "09-cookbook-sokify-retail",
+      "lane": "spoofing",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+    },
+    "inputs": []
+  },
+  "claims": [
+    {
+      "title": "Unauthenticated API traffic could let an attacker place orders as a customer",
+      "description": "`flow:process:mobile-app>process:web-api>api-traffic` is a derived crossing from the customer-device zone to `process:web-api`, although both endpoint placements were inferred, and its `authentication` is unknown. If `process:web-api` does not verify a caller identity on this flow, an attacker operating a modified client or otherwise originating requests from the customer-device side can impersonate `entity:customer` and submit order traffic as that customer. Second-order: `process:web-api` keeps customer records in `store:user-database`, including PII and financial data, and hands placed orders to `process:sims`; the impersonation therefore reaches order processing and customer records rather than only the API boundary. This is conditional on the unresolved authentication state, not an assertion that no authentication exists.",
+      "affected_element_ids": [
+        "entity:customer",
+        "process:mobile-app",
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:mobile-app>process:web-api>api-traffic",
+        "unknown:flow:process:mobile-app>process:web-api>api-traffic:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: `flow:process:mobile-app>process:web-api>api-traffic` crosses into internet-facing `process:web-api`, but its authentication state is only recorded as unknown. Impact is high because `process:web-api` holds `pii`, `financial`, and `business-critical-data` and reaches `store:user-database`, which is confidential and holds PII and financial records."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce verified customer authentication on API traffic",
+          "detail": "Record the authentication mechanism for `flow:process:mobile-app>process:web-api>api-traffic` and, if it is absent or insufficient, require a verifiable customer identity such as short-lived OAuth/OIDC tokens validated by `process:web-api` on every order request."
+        },
+        {
+          "summary": "Bind order actions to the authenticated customer",
+          "detail": "Have `process:web-api` derive the customer identity from the verified credential rather than from client-supplied order fields, and reject requests without a valid identity."
+        }
+      ]
+    },
+    {
+      "title": "Plain HTTP permits a counterfeit Web API to harvest customer order details",
+      "description": "`process:mobile-app` sends customer order details to `process:web-api` through `flow:process:mobile-app>process:web-api>api-traffic`, a derived boundary crossing with `encryption_in_transit` stated absent. An attacker positioned on the customer network path can redirect or answer the HTTP request as `process:web-api`; without TLS server authentication, the mobile app cannot verify that it reached the genuine API. The counterfeit service can collect the customer details sent on the flow and suppress or fabricate the apparent order response. Second-order: the attacker obtains PII handled by `process:mobile-app` and intended for the PII- and financial-data-bearing `process:web-api`.",
+      "affected_element_ids": [
+        "process:mobile-app",
+        "process:web-api",
+        "flow:process:mobile-app>process:web-api>api-traffic"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:mobile-app>process:web-api>api-traffic",
+        "absent:flow:process:mobile-app>process:web-api>api-traffic:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: transport protection is stated absent on the boundary-crossing HTTP flow, but exploitation requires an attacker position able to redirect or observe the customer-to-API path. Impact is medium because the flow carries customer details and `process:mobile-app` and `process:web-api` handle `pii`; the model does not state that payment-card data travels on this flow."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace HTTP with authenticated TLS",
+          "detail": "Change `flow:process:mobile-app>process:web-api>api-traffic` to HTTPS using TLS 1.2+ and require `process:mobile-app` to validate the Web API certificate chain and hostname."
+        },
+        {
+          "summary": "Constrain the API service identity",
+          "detail": "Use certificate pinning or a constrained private/public CA policy where operationally appropriate, so the mobile app accepts only a certificate authorized for `process:web-api`."
+        }
+      ]
+    },
+    {
+      "title": "Unverified spreadsheet identity could let an office attacker issue SQL as Marketing macros",
+      "description": "`flow:process:catalogue-spreadsheet>process:web-api>sql-statements` crosses from the marketing-office zone to `process:web-api` and records `authentication` as unknown. If the Web API does not verify that SQL statements originate from the genuine `process:catalogue-spreadsheet` macros, an attacker with access to the marketing-office network or a compromised marketing laptop can impersonate those macros and submit SQL statements as the approved catalogue updater. Second-order: the stated authority of the macros is to change prices and product copy at `process:web-api`, so the false identity can drive catalogue changes across the customer-facing ordering path. This is conditional on the unresolved flow authentication state.",
+      "affected_element_ids": [
+        "process:catalogue-spreadsheet",
+        "process:web-api",
+        "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+        "unknown:flow:process:catalogue-spreadsheet>process:web-api>sql-statements:authentication",
+        "assertion:authorization-grant~principal:catalogue-spreadsheet-macros~s.d0312626ac9b~v.9c18ae73d5c2"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because authentication on the crossing flow is unknown, while an attacker must first obtain a marketing-office foothold or compromise the marketing laptop. Impact is medium because the inferred macro grant permits writes that change prices and product copy, and the affected catalogue process is tagged `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Give the catalogue updater a verifiable workload identity",
+          "detail": "Require `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` to use a unique mutually authenticated service identity or short-lived audience-bound token, and have `process:web-api` reject unverified callers."
+        },
+        {
+          "summary": "Replace direct SQL submission with a scoped catalogue API",
+          "detail": "Expose an authenticated catalogue-update interface at `process:web-api` that accepts only required catalogue changes, rather than accepting SQL statements from the spreadsheet macros."
+        }
+      ]
+    },
+    {
+      "title": "A counterfeit fax gateway could send fraudulent Sokify confirmations to customers",
+      "description": "`flow:process:fax-gateway>entity:customer>confirmation-fax` crosses from Sokify internal systems to `entity:customer` and has `authentication` recorded as unknown. If customers have no way to authenticate the origin of a confirmation fax, an attacker able to send a fax to the customer can impersonate `process:fax-gateway` and present a fraudulent Sokify order or dispatch confirmation as genuine. The model also states that destination verification is absent on this flow, so the fax channel has an explicit assurance gap about where confirmations arrive. Second-order: a fake confirmation can induce customer action based on a false Sokify identity; this draft is conditional on the unresolved sender-authentication state and does not assert that the gateway currently lacks an authentication mechanism.",
+      "affected_element_ids": [
+        "process:fax-gateway",
+        "entity:customer",
+        "flow:process:fax-gateway>entity:customer>confirmation-fax"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:fax-gateway>entity:customer>confirmation-fax",
+        "unknown:flow:process:fax-gateway>entity:customer>confirmation-fax:authentication",
+        "assertion:destination-verification~flow:process:fax-gateway>entity:customer>confirmation-fax~any~absent"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional: sender authentication is unknown, and an attacker must be able to target a customer's fax destination or otherwise deliver a convincing counterfeit fax. Impact is medium because the confirmation carries the customer's name and address, which are PII, and impersonation can cause the customer to rely on a false Sokify communication."
+      },
+      "mitigations": [
+        {
+          "summary": "Move confirmations to an authenticated customer channel",
+          "detail": "Replace or supplement `flow:process:fax-gateway>entity:customer>confirmation-fax` with a TLS-protected notification channel in which `entity:customer` can authenticate `process:fax-gateway` or the Sokify service identity."
+        },
+        {
+          "summary": "Provide a verifiable order-status reference",
+          "detail": "Include a non-sensitive order reference and direct customers to verify status through an authenticated `process:mobile-app` session rather than treating a fax sender identity as authoritative."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

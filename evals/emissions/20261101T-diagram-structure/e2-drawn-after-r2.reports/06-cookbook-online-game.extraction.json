@@ -1,0 +1,861 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:player",
+        "name": "Player",
+        "description": "Player",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "player[Player]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:players-machine"
+      },
+      {
+        "id": "entity:customer-support-staff",
+        "name": "Customer support staff",
+        "description": "Customer support staff",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support[Customer support staff]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:game-client",
+        "name": "Game client",
+        "description": "Game client",
+        "assets": [],
+        "source_excerpt": "client[Game client]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:players-machine",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lobby",
+        "name": "Lobby",
+        "description": "Lobby",
+        "assets": [],
+        "source_excerpt": "lobby[Lobby]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:game-server",
+        "name": "Game server",
+        "description": "Game server",
+        "assets": [],
+        "source_excerpt": "gs[Game servers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram label is plural: Game servers.",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:moderation-website",
+        "name": "Moderation website",
+        "description": "Moderation website",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "mod[Moderation website]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:player-database",
+        "name": "Player database",
+        "description": "Player database",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "playerdb[(Player database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:stats-database",
+        "name": "Stats database",
+        "description": "Stats database",
+        "assets": [],
+        "source_excerpt": "stats[(Stats database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:player>process:game-client>plays",
+        "name": "plays",
+        "description": "plays",
+        "assets": [],
+        "source_excerpt": "player -->|plays| client",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:player",
+        "destination": "process:game-client",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-client>process:lobby>matchmaking-tcp-1234",
+        "name": "matchmaking (TCP 1234)",
+        "description": "matchmaking",
+        "assets": [],
+        "source_excerpt": "client -->|\"matchmaking (TCP 1234)\"| lobby",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:lobby",
+        "protocol": "TCP 1234",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-client>process:game-server>match-tcp-1235",
+        "name": "match (TCP 1235)",
+        "description": "match",
+        "assets": [],
+        "source_excerpt": "client -->|\"match (TCP 1235)\"| gs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:game-server",
+        "protocol": "TCP 1235",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:lobby>store:player-database>read",
+        "name": "read",
+        "description": "read",
+        "assets": [],
+        "source_excerpt": "lobby -->|read| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:lobby>process:game-server>match-handover",
+        "name": "match handover",
+        "description": "match handover",
+        "assets": [],
+        "source_excerpt": "lobby -->|match handover| gs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "process:game-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-server>store:stats-database>stats",
+        "name": "stats",
+        "description": "stats",
+        "assets": [],
+        "source_excerpt": "gs <-->|stats| stats",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-server",
+        "destination": "store:stats-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "stats",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:stats-database>process:game-server>stats",
+        "name": "stats",
+        "description": "stats",
+        "assets": [],
+        "source_excerpt": "gs <-->|stats| stats",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:stats-database",
+        "destination": "process:game-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "stats",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-server>store:player-database>write",
+        "name": "write",
+        "description": "write",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "gs -->|write| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-server",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:customer-support-staff>process:moderation-website>view-and-act-on-accounts",
+        "name": "view and act on accounts",
+        "description": "view and act on accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support -->|view and act on accounts| mod",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer-support-staff",
+        "destination": "process:moderation-website",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:moderation-website>store:player-database>player-accounts",
+        "name": "player accounts",
+        "description": "player accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "mod <-->|player accounts| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:moderation-website",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:player-database>process:moderation-website>player-accounts",
+        "name": "player accounts",
+        "description": "player accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "mod <-->|player accounts| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:player-database",
+        "destination": "process:moderation-website",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:players-machine",
+        "name": "Player's machine",
+        "description": "Player's machine",
+        "assets": [],
+        "source_excerpt": "subgraph machine[\"Player's machine\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:production-network",
+        "name": "Production network",
+        "description": "Production network",
+        "assets": [],
+        "source_excerpt": "subgraph prod[Production network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph corp[Corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Player's machine is controlled by a different party from the system.",
+        "element_id": "boundary:players-machine",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Player's machine, which denotes a customer's or player's device."
+      },
+      {
+        "assumption": "The Production network is a higher-authority production estate.",
+        "element_id": "boundary:production-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Production network."
+      },
+      {
+        "assumption": "The Corporate network is a network-location boundary under the same authority.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Corporate network."
+      },
+      {
+        "assumption": "The Moderation website presents a web interface.",
+        "element_id": "process:moderation-website",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named a website."
+      },
+      {
+        "assumption": "The Player database contains personally identifiable information.",
+        "element_id": "store:player-database",
+        "attribute": "assets",
+        "basis": "The diagram states that the database carries player accounts."
+      },
+      {
+        "assumption": "The Player database has confidential data classification.",
+        "element_id": "store:player-database",
+        "attribute": "data_classification",
+        "basis": "The database carries player accounts, which identify or describe a person."
+      },
+      {
+        "assumption": "The Game server writes personally identifiable information to the Player database.",
+        "element_id": "flow:process:game-server>store:player-database>write",
+        "attribute": "assets",
+        "basis": "The destination is the Player database, which the diagram also connects to player accounts."
+      },
+      {
+        "assumption": "The Moderation website carries personally identifiable information.",
+        "element_id": "process:moderation-website",
+        "attribute": "assets",
+        "basis": "The diagram states that it handles player accounts."
+      },
+      {
+        "assumption": "The support interaction carries personally identifiable information.",
+        "element_id": "flow:entity:customer-support-staff>process:moderation-website>view-and-act-on-accounts",
+        "attribute": "assets",
+        "basis": "The flow explicitly concerns viewing and acting on accounts."
+      },
+      {
+        "assumption": "The moderation-to-database flow carries personally identifiable information.",
+        "element_id": "flow:process:moderation-website>store:player-database>player-accounts",
+        "attribute": "assets",
+        "basis": "The flow explicitly carries player accounts."
+      },
+      {
+        "assumption": "The database-to-moderation flow carries personally identifiable information.",
+        "element_id": "flow:store:player-database>process:moderation-website>player-accounts",
+        "attribute": "assets",
+        "basis": "The bidirectional flow is explicitly labelled player accounts."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:player",
+        "name": "Player",
+        "description": "Player",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "player[Player]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:players-machine"
+      },
+      {
+        "id": "entity:customer-support-staff",
+        "name": "Customer support staff",
+        "description": "Customer support staff",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support[Customer support staff]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:game-client",
+        "name": "Game client",
+        "description": "Game client",
+        "assets": [],
+        "source_excerpt": "client[Game client]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:players-machine",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lobby",
+        "name": "Lobby",
+        "description": "Lobby",
+        "assets": [],
+        "source_excerpt": "lobby[Lobby]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:game-server",
+        "name": "Game server",
+        "description": "Game server",
+        "assets": [],
+        "source_excerpt": "gs[Game servers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram label is plural: Game servers.",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:moderation-website",
+        "name": "Moderation website",
+        "description": "Moderation website",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "mod[Moderation website]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:player-database",
+        "name": "Player database",
+        "description": "Player database",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "playerdb[(Player database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:stats-database",
+        "name": "Stats database",
+        "description": "Stats database",
+        "assets": [],
+        "source_excerpt": "stats[(Stats database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:player>process:game-client>plays",
+        "name": "plays",
+        "description": "plays",
+        "assets": [],
+        "source_excerpt": "player -->|plays| client",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:player",
+        "destination": "process:game-client",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-client>process:lobby>matchmaking-tcp-1234",
+        "name": "matchmaking (TCP 1234)",
+        "description": "matchmaking",
+        "assets": [],
+        "source_excerpt": "client -->|\"matchmaking (TCP 1234)\"| lobby",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:lobby",
+        "protocol": "TCP 1234",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-client>process:game-server>match-tcp-1235",
+        "name": "match (TCP 1235)",
+        "description": "match",
+        "assets": [],
+        "source_excerpt": "client -->|\"match (TCP 1235)\"| gs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:game-server",
+        "protocol": "TCP 1235",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:lobby>store:player-database>read",
+        "name": "read",
+        "description": "read",
+        "assets": [],
+        "source_excerpt": "lobby -->|read| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:lobby>process:game-server>match-handover",
+        "name": "match handover",
+        "description": "match handover",
+        "assets": [],
+        "source_excerpt": "lobby -->|match handover| gs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "process:game-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-server>store:stats-database>stats",
+        "name": "stats",
+        "description": "stats",
+        "assets": [],
+        "source_excerpt": "gs <-->|stats| stats",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-server",
+        "destination": "store:stats-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "stats",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:stats-database>process:game-server>stats",
+        "name": "stats",
+        "description": "stats",
+        "assets": [],
+        "source_excerpt": "gs <-->|stats| stats",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:stats-database",
+        "destination": "process:game-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "stats",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:game-server>store:player-database>write",
+        "name": "write",
+        "description": "write",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "gs -->|write| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-server",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:customer-support-staff>process:moderation-website>view-and-act-on-accounts",
+        "name": "view and act on accounts",
+        "description": "view and act on accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support -->|view and act on accounts| mod",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer-support-staff",
+        "destination": "process:moderation-website",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:moderation-website>store:player-database>player-accounts",
+        "name": "player accounts",
+        "description": "player accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "mod <-->|player accounts| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:moderation-website",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:player-database>process:moderation-website>player-accounts",
+        "name": "player accounts",
+        "description": "player accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "mod <-->|player accounts| playerdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:player-database",
+        "destination": "process:moderation-website",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:players-machine",
+        "name": "Player's machine",
+        "description": "Player's machine",
+        "assets": [],
+        "source_excerpt": "subgraph machine[\"Player's machine\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:production-network",
+        "name": "Production network",
+        "description": "Production network",
+        "assets": [],
+        "source_excerpt": "subgraph prod[Production network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph corp[Corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Player's machine is controlled by a different party from the system.",
+        "element_id": "boundary:players-machine",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Player's machine, which denotes a customer's or player's device."
+      },
+      {
+        "assumption": "The Production network is a higher-authority production estate.",
+        "element_id": "boundary:production-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Production network."
+      },
+      {
+        "assumption": "The Corporate network is a network-location boundary under the same authority.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Corporate network."
+      },
+      {
+        "assumption": "The Moderation website presents a web interface.",
+        "element_id": "process:moderation-website",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named a website."
+      },
+      {
+        "assumption": "The Player database contains personally identifiable information.",
+        "element_id": "store:player-database",
+        "attribute": "assets",
+        "basis": "The diagram states that the database carries player accounts."
+      },
+      {
+        "assumption": "The Player database has confidential data classification.",
+        "element_id": "store:player-database",
+        "attribute": "data_classification",
+        "basis": "The database carries player accounts, which identify or describe a person."
+      },
+      {
+        "assumption": "The Game server writes personally identifiable information to the Player database.",
+        "element_id": "flow:process:game-server>store:player-database>write",
+        "attribute": "assets",
+        "basis": "The destination is the Player database, which the diagram also connects to player accounts."
+      },
+      {
+        "assumption": "The Moderation website carries personally identifiable information.",
+        "element_id": "process:moderation-website",
+        "attribute": "assets",
+        "basis": "The diagram states that it handles player accounts."
+      },
+      {
+        "assumption": "The support interaction carries personally identifiable information.",
+        "element_id": "flow:entity:customer-support-staff>process:moderation-website>view-and-act-on-accounts",
+        "attribute": "assets",
+        "basis": "The flow explicitly concerns viewing and acting on accounts."
+      },
+      {
+        "assumption": "The moderation-to-database flow carries personally identifiable information.",
+        "element_id": "flow:process:moderation-website>store:player-database>player-accounts",
+        "attribute": "assets",
+        "basis": "The flow explicitly carries player accounts."
+      },
+      {
+        "assumption": "The database-to-moderation flow carries personally identifiable information.",
+        "element_id": "flow:store:player-database>process:moderation-website>player-accounts",
+        "attribute": "assets",
+        "basis": "The bidirectional flow is explicitly labelled player accounts."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [
+    {
+      "code": "diagram-node-missing",
+      "message": "node 'Game servers' on line 8 of 'System diagram' is not an element; model it as an External Entity, a Process or a Data Store named 'Game servers'",
+      "element_id": null,
+      "field": null
+    }
+  ],
+  "repair": null
+}

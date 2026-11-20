@@ -32,6 +32,7 @@ from analysis_service.provider import (
     GenerationResult,
     ProviderCallFailed,
 )
+from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
 from analysis_service.retry import (
     _RATE_LIMIT_CLEARS_WITH_TIME,
     _RETRY_AFTER_CEILING_SECONDS,
@@ -374,7 +375,7 @@ class TestRetryAfter:
         """The provider has answered the question a retry exists to ask.
 
         Sleeping an hour would park a paid job on a third party's number, and
-        sleeping less and asking anyway spends an attempt and a budget token to
+        sleeping less and asking anyway uses an attempt and a budget token to
         reach the same refusal.
         """
         pol = policy()
@@ -816,7 +817,9 @@ class TestAFilterStopIsRefused:
         assert base.calls == 1
 
     def test_it_is_not_transient(self):
-        assert not _is_transient(RefusedCompletionError("stopped at the filter", ""))
+        assert not _is_transient(
+            RefusedCompletionError("stopped at the filter", "", "cyber")
+        )
 
     def test_the_message_names_the_model_and_the_finish_reason(self):
         base = FakeExecutor(model="anthropic/claude-opus-5-5", outcomes=[refused()])
@@ -826,8 +829,23 @@ class TestAFilterStopIsRefused:
         assert "anthropic/claude-opus-5-5" in message
         assert "SAFETY" in message
 
+    def test_the_message_names_a_stamped_refusal_category(self):
+        stamped = refused()
+        stamped.custom_metadata = {REFUSAL_CATEGORY_METADATA_KEY: "bio"}
+        with pytest.raises(RefusedCompletionError) as excinfo:
+            drive(FakeExecutor(outcomes=[stamped]), policy())
+        assert excinfo.value.refusal_category == "bio"
+        assert "(finish reason SAFETY, refusal category bio)" in str(excinfo.value)
+
+    def test_an_unstamped_refusal_gives_no_category(self):
+        with pytest.raises(RefusedCompletionError) as excinfo:
+            drive(FakeExecutor(outcomes=[refused()]), policy())
+        assert excinfo.value.refusal_category is None
+        assert "refusal category not read" in str(excinfo.value)
+
     def test_the_message_names_the_node_from_its_adk_label(self):
-        """The provider gives no reason, so the node is the first thing to know."""
+        """The service reads at most a category from a refusal, so the node is
+        the first thing to know."""
         request = LlmRequest(
             contents=_ANY_REQUEST.contents,
             config=types.GenerateContentConfig(

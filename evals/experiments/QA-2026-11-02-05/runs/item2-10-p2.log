@@ -1,0 +1,10 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- HTTP asset delivery lets an on-path attacker pose as the CDN | ['entity:reader', 'entity:cdn', 'flow:entity:reader>entity:cdn>asset-fetch']
+- An unverified CDN publishing identity could let an attacker publish as the web server | ['process:web-server', 'store:cdn-bucket', 'flow:process:web-server>store:cdn-bucket>asset-publish']
+- An unverified CDN endpoint could impersonate the publishing bucket to the web server | ['process:web-server', 'store:cdn-bucket', 'flow:process:web-server>store:cdn-bucket>asset-publish']
+- An attacker could pose as the MySQL database to the remote administrator | ['entity:admin', 'store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration']
+- An unverified database login could let an internet attacker act as the administrator | ['entity:admin', 'store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration']
+- An unverified MySQL endpoint could impersonate the database to the web server | ['process:web-server', 'store:mysql-database', 'flow:process:web-server>store:mysql-database>cms-data']
+- An unverified CMS database identity could let a hosted-network attacker act as the web server | ['process:web-server', 'store:mysql-database', 'flow:process:web-server>store:mysql-database>cms-data']
+spent: $0.0310 reported
+must-finds matched: [1]

@@ -1,0 +1,22 @@
+architecture-beta
+    group z0(cloud)[Trust zone field network]
+    group z1(cloud)[Trust zone ingest edge]
+    group z2(cloud)[Trust zone analytics core]
+    group z3(cloud)[Trust zone corporate network]
+    service n0(internet)[sensor node] in z0
+    service n1(internet)[field technician] in z0
+    service n2(internet)[fleet operator] in z3
+    service n3(server)[device gateway] in z1
+    service n4(server)[telemetry normalizer] in z2
+    service n5(database)[device registry] in z1
+    service n6(database)[telemetry lake] in z2
+    service n7(database)[firmware bucket] in z1
+    service n8(database)[Pub/Sub] in z1
+    n0:R --> L:n3
+    n3:R --> L:n5
+    n4:R --> L:n6
+    n0:R --> L:n7
+    n1:R --> L:n0
+    n2:R --> L:n6
+    n3:R --> L:n8
+    n4:R --> L:n8

@@ -57,6 +57,7 @@ ActionVerb = Literal[
     "ride-session",
     # What did the attacker take away?
     "flood",
+    "exhaust-resources",
     "disable",
     # What did the attacker reach that they were not entitled to?
     "escalate",
@@ -66,7 +67,7 @@ ActionVerb = Literal[
 ]
 
 #: The same set at runtime, derived from the type rather than spelled twice.
-ACTION_VERBS: frozenset[str] = frozenset(get_args(ActionVerb))
+ACTION_VERBS: frozenset[ActionVerb] = frozenset(get_args(ActionVerb))
 
 #: The grouping a reader and a prompt use, keyed by the question each family
 #: answers. Nothing dispatches on a family — a family is a description of the
@@ -77,7 +78,7 @@ FAMILIES: dict[str, tuple[ActionVerb, ...]] = {
     "credential": ("recover-credential", "guess-credential", "use-credential"),
     "integrity": ("alter", "alter-in-transit", "inject", "plant", "delete"),
     "identity": ("impersonate", "forge", "replay", "ride-session"),
-    "availability": ("flood", "disable"),
+    "availability": ("flood", "exhaust-resources", "disable"),
     "authorization": ("escalate", "abuse-grant"),
     "attribution": ("unattributable",),
 }
@@ -103,6 +104,7 @@ GLOSS: dict[str, str] = {
     "replay": "re-sends a genuine message the system accepts a second time",
     "ride-session": "acts through a principal's own authenticated session",
     "flood": "exhausts a resource with volume until it stops serving",
+    "exhaust-resources": "sends work whose cost, not its volume, exhausts a resource",
     "disable": "stops a component, or destroys what it depends on to run",
     "escalate": "reaches a privilege or a zone their position does not carry",
     "abuse-grant": "uses a grant they legitimately hold, beyond its purpose",
@@ -153,7 +155,7 @@ def menu() -> str:
     to spell the options to make them enforceable. What the prompt has to supply
     is the shape of the choice, which is the family split: an agent that knows
     disclosure is three verbs deep looks for which one, where an agent given a
-    flat list of twenty picks the first that reads plausibly.
+    flat list of twenty-one picks the first that reads plausibly.
 
     ``frameworks/stride/output.md`` carries a copy of this text, and
     ``tests/test_prompt_lints.py`` compares the two line by line, because a verb

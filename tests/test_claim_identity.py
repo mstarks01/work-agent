@@ -59,7 +59,7 @@ from evals.harness.reference import GoldenCase, ReferenceThreat, load_corpus
 #: different question over a different population: within one case and one lane,
 #: how often do the two shipped readers of "one place" disagree, whoever is
 #: right. Recorded exactly, for the reason ``FRONTIER`` records its rows.
-MATCHER_WIDER_THAN_FINGERPRINT = 2
+MATCHER_WIDER_THAN_FINGERPRINT = 8
 
 #: Reference claims the existing fields cannot tell apart, each with the reason
 #: the corpus is right to carry both. An entry says two distinct findings share
@@ -138,9 +138,9 @@ def identity_key(case: GoldenCase, claim: ReferenceThreat) -> str:
     them.** A read of raw ``affected_element_ids`` answers about a key nothing
     uses: a claim citing a flow and a claim citing the process at its end land
     on two keys there and on one in
-    :func:`~evals.harness.fingerprint.components_for`. That read finds **one**
-    collision where the shipped fold finds **six**, so it hides five pairs this
-    file exists to surface, and one of them is the pair the ledger merges.
+    :func:`~evals.harness.fingerprint.components_for`. That read finds **five**
+    collisions where the shipped fold finds **fifteen**, so it hides ten keys
+    this file exists to surface.
     Resolving here is not a relaxation of the equality rule
     above; it is the same rule over the same spelling of a place.
     """

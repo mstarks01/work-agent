@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.2"
+    schema_version: str  # "3.5"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -85,6 +85,7 @@ class FrameworkAnalysis:
     scope: list[ScopeEntry]  # units this framework considered and raised nothing about
     applicability: list[ApplicabilityEntry]  # whether each selected unit applies
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
+    quotes_checked: bool | None  # whether the quote check ran; null before 3.5
     unverified_grounds: list[UnverifiedGround]
     unreconciled_rulings: list[
         UnreconciledRuling
@@ -95,6 +96,7 @@ class FrameworkAnalysis:
     unresolved_evidence: list[UnresolvedEvidence]
     unknown_claim_identities: list[UnknownClaimIdentity]
     dropped_claims: list[DroppedClaim]
+    returned_claims: list[ReturnedClaim]  # kept against every Control row, unit deferred
     fired_rules: list[str]  # this package's deterministic rules that matched
     knowledge_docs: list[str]  # local-corpus documents those rules retrieved
     catalog_leads: int | None  # leads only the assertion catalog gave; null with no pass
@@ -158,13 +160,17 @@ require at least one.
 ```python
 class Threat(RuledClaim):
     category: StrideCategory  # spoofing | tampering | repudiation | ...
+    attacker_position: AttackerPosition | None  # outside | on-path | ...
     severity: Severity
     mitigations: list[Mitigation]  # {summary, detail}
     confidence: Rating | None  # low | medium | high (critic-calibrated)
     recommendation: RecommendationReading | None  # {sound, note}
 ```
 
-Five fields, and nothing else. `confidence` is `null` only on a threat that
+Six fields, and nothing else. `attacker_position` is where the attacker stands
+when it acts: `outside`, `on-path`, `storage-copy`, `in-component` or
+`authorized-principal`. It is `null` only on a stored threat that holds no
+position. `confidence` is `null` only on a threat that
 code rejected for its lane, because nobody rated it. `recommendation` is the
 critic's reading of the threat's `mitigations`. It is `null` where the critic
 made none, and on every rejected threat.
@@ -210,7 +216,7 @@ an empty list where STRIDE narrows it.
 
 **An ASVS claim never reports a pass.** `confirmed` means the requirement applies
 and the input does not show it satisfied; `needs-info` means the input does not
-settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
+settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; `control` means the owner states that a Control covers it, which the service did not verify; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
 source code, configuration and the people who built the system, and a job here
 carries prose. See
 [ADR 0013](adr/0013-asvs-rules-applicability-and-never-a-pass.md).
@@ -303,9 +309,9 @@ carries guarantees it was never written under. So an old report is readable by
 the version that wrote it and by nothing else, and a reader who needs both keeps
 both.
 
-That is also the whole answer for the assertion layer. It is part of 3.0, 3.0
-has never shipped, and so no report exists that predates it — `assertions:
-null` means a deployment that ran no pass, never a file older than the field.
+That is also the whole answer for the assertion layer. It is part of 3.0, so
+each 3.0 report carries the field — `assertions: null` means a deployment that
+ran no pass, never a file with no such field.
 
 [Schema versions](#schema-versions), at the end of this page, states what each
 version holds.
@@ -377,18 +383,21 @@ class Ground:
 | --- | --- | --- |
 | `quote` | `text` + `source_label` | the submitter's own words said this |
 | `unknown-attribute` | `element_id` + `attribute` | this fact was never stated, so the threat stands unrefuted |
-| `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
+| `absent-attribute` | `element_id` + `attribute` | the input states this control is not there, unless the unscoped assertion rows that state its value (the answers alone, where a submitter's answer makes it) all state the opposite, or the rows' projection qualifies it while the field still states a value |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
-| `assertion` | `assertion` | the sources state this fact, which the model has no field for |
-| `unknown-assertion` | `assertion` | the sources were asked this and left it open, and the model has no field for it |
+| `assertion` | `assertion` | the sources state this fact, and the model does not carry it in a field: it has no field for it, or the row is scoped, one of two compatible values, or a row whose value the model does not hold, unless the model's attribute states the opposite of the rows that state its value and no submitter's answer makes that value |
+| `unknown-assertion` | `assertion` | an open row: the sources left it open, or another row disputes it, where the model has no field for it or where its projection qualifies the field and the field still states a value; or the model's attribute states the opposite of the rows that state its value, and no submitter's answer makes that value |
 
 **What the assertion pass reached.** A reader of `assertions` has no way to tell
 a system with few stated facts from a pass that asked few questions, and the two
 look identical. `Report.assertion_coverage` answers it, derived from the rows and
 the model rather than stored beside them: `reachable` is the element attributes
 some predicate could speak to on *this* model, `settled` is how many the catalog
-answers, `open` counts the questions the sources raised and left unanswered, and
+answers and the model does not contradict (a contradicted value that a
+submitter's answer makes still counts), `open` counts the questions the
+sources raised and left unanswered and the settled rows the model
+contradicts (a disputed row is in neither count), and
 `own_subjects` counts the facts about a principal or a credential that the graph
 has no place for at all. `None` on a job that ran no pass.
 
@@ -402,9 +411,11 @@ row's subject, predicate, value, basis, scope and support spans are read there.
 On load the report checks the row is one the catalog *settles* — it holds a
 value rather than `unknown`, its basis is support of some kind, no assessment
 set it aside, and no other row disagrees at its subject, predicate and scope —
-and refuses the report otherwise. A report whose `assertions` is `None` settles
-nothing, so a claim citing one is refused the way a claim citing a crossing the
-model does not derive is.
+and that the embedded model's attribute does not state the opposite of the
+rows that state its value, unless a submitter's answer makes that value, and
+refuses the report otherwise. A
+report whose `assertions` is `None` settles nothing, so a claim citing one is
+refused the way a claim citing a crossing the model does not derive is.
 
 **One flat model, not a discriminated union.** Fields belonging to the other
 kinds are empty strings, and a record carrying a field its own kind does not
@@ -455,7 +466,11 @@ instead. So an entry in this list means "one citation on an otherwise justified
 finding did not match", which is worth showing a reader and is not grounds for
 hiding the finding. The list is also empty when no source text was available to
 check against, so it is evidence of a *failed* check, never of a check having
-run.
+run. The block's `quotes_checked` says whether the check ran. Where it is
+`false`, no quote in the block was checked, and a quote with no mark is
+unchecked, not verified. It is `null` only on a block written before 3.5. Read
+such a block as checked: a block holds a quote only where the fan-in ran, and a
+report names at least one source, so the fan-in had a map to check against.
 
 ## `unresolved_evidence` — references the catalog does not hold
 
@@ -503,23 +518,41 @@ class RepairedQuote:
 ```
 
 The ladder refused what the agent wrote, and the repair rung
-(`analysis_service.grounding.repair_prepared`) found a window of the named source
-near enough to hand back. The ground now carries that window — the submitter's
-words, whitespace collapsed — and this mark carries the agent's, so the
-substitution is on the record. A repaired quote verifies, so an entry here is
-never also in `unverified_grounds`.
+(`analysis_service.grounding.faithful_repair`) found a window of the named
+source near enough to hand back, with no negation or number changed. The ground
+carries that window — the submitter's words, whitespace collapsed — and this
+mark carries the agent's, so the substitution is on the record. A repaired quote
+verifies, so an entry here is never also in `unverified_grounds`.
 
-The rung never accepts the agent's words: it replaces them. What can go wrong
-is a replacement that says something different from what the claim rests on.
+The rung never accepts the agent's words: it replaces them. What can go wrong is
+a replacement that says something different from what the claim rests on.
 `moved` is the mechanical part of that: the negation tokens and the number
-tokens of the two texts, compared as multisets, so a span that put a "not"
-back or changed a figure is named as such. It is computed from `written` and
-the ground's text and checked against them on load. `similarity` says how
-near the span was and never whether it supports the claim. The critic reads
-the replaced span with `written` and `moved` beside it, and the viewer shows
-the difference to a reader. `scan_complete` is `False` where the work budget
-or a deadline stopped the scan before every window was ranked, so the span is
-the best found by then. See [ADR 0018](adr/0018-the-repair-rung.md).
+tokens of the two texts, compared as multisets. The rung refuses a span that
+moves either, so the fan-in writes an empty `moved`, and an archived report can
+carry `negation` or `number` (ADR 0130). It is computed from `written` and the
+ground's text and checked against them on load. `similarity` says how near the
+span was and never whether it supports the claim. The critic reads the replaced
+span with `written` and `moved` beside it, and the viewer shows the difference
+to a reader. `scan_complete` is `False` where the work budget or a deadline
+stopped the scan before every window was ranked, so the span is the best found
+by then. See [ADR 0018](adr/0018-the-repair-rung.md) and [ADR
+0130](adr/0130-a-quote-repair-that-moves-a-negation-or-a-number-is-refused.md).
+
+## `returned_claims` — claims a Control row kept that went back to the deferred set
+
+```python
+class ReturnedClaim:
+    claim_id: str  # the claim the critic kept against every Control row
+    unit: str  # the unit, now listed needs-other-evidence
+    needs: str  # the kind of evidence the unit needs
+    refused_controls: list[RefusedControl]  # the critic's refusal of each row
+```
+
+A Control row keeps a unit that the job cannot settle from the deferred set,
+so the critic can judge the row (ADR 0126). Where the critic keeps the draft
+against every row, the job still carries no evidence of the kind the unit
+needs. The claim leaves `claims`, the unit is listed `needs-other-evidence`
+with its kind, and this entry keeps the critic's refusals.
 
 ## `dropped_claims` — claims the service dropped for a fault in one entry
 
@@ -594,7 +627,7 @@ unfindable quote is: merge has no re-ask path, and a whole report is too much to
 trade for a mistyped ID in a sentence.
 
 The mark is worth more than typo-catching. The analyze prompt is built around a
-single worked exemplar system and spends a section telling the agent never to
+single worked exemplar system and uses a section to tell the agent never to
 cite that system's IDs. A description arguing about `process:web-api` in a job
 whose model has no such element is that contamination reaching the one field a
 reader reads as ordinary analysis.
@@ -648,7 +681,7 @@ every `ValidationIssue` is fatal, and an empty list *is* the definition of
 ready-for-analysis the graph routes on — and this does not deserve that,
 because it is not always wrong. A system can legitimately run a process and
 keep a store of the same name. Failing extraction on the pair would reject a
-valid model, and would spend `repair`'s single pass telling a transcriber to
+valid model, and would use `repair`'s single pass to tell a transcriber to
 rename something correct. So it is reported to the reader and to nobody else:
 it never reaches `repair`, which is told to change nothing the issues do not
 cite.
@@ -682,7 +715,7 @@ restored from the model the issues were computed against, with its ID in
 `restored`. When an issue named no element, a fault over the whole object,
 `scope` is `whole` and nothing is restored, because no narrower patch could
 answer it. A report whose `nodes` name the repair node and carry `None` here
-predates the field.
+holds no record of the repair.
 
 ## `coverage` — what each lane was offered
 
@@ -911,7 +944,9 @@ class Verdict:
     reason: str  # required unless confirmed
     related_unknowns: list[UnknownRef]  # required iff needs-info
     immaterial_unknowns: list[UnknownRef]  # unknown grounds the critic dismissed
-    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | None
+    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | "control" | None
+    control_row: ControlRowRef | None  # {control, unit}; exactly on a control rejection
+    refused_controls: list[RefusedControl]  # {control, unit, reason}; rows that do not cover it
 ```
 
 - `confirmed` — grounded in the model's facts.
@@ -1249,12 +1284,15 @@ version before it. Read it when you load an archived report.
     reader of which kinds make a claim conditional, and both `unknown` kinds
     are in it.
   - `assertions[].projection_version` names the rules that turn the catalog's
-    rows into graph attributes. It has its own number, not the catalog's
+    rows into graph attributes, and which rows `contradictions` compares with
+    an attribute. It has its own number, not the catalog's
     `registry_version`, because the projection's loss rules live in `project`
     and can change with no registry change. It lets a loaded report be
-    re-checked for contradictions against the rules that produced it, and a
-    record from another version is left alone. `assertions.issues` can say
-    `graph-contradiction`: the one code that refuses no row. It reports that a
+    re-checked for contradictions against the rules that produced it; the
+    issue re-check declines for a record from another version. The ground
+    check on load reads every record's grounds against today's evidence
+    catalog, whatever its version. `assertions.issues` can say
+    `graph-contradiction`, a code that refuses no row. It reports that a
     graph attribute and the rows authoritative for it state opposite things.
 
   **There is no version gate and none is needed.** `Report` forbids unknown
@@ -1276,4 +1314,25 @@ version before it. Read it when you load an archived report.
   quotes the answers Source, and no span of another row quotes it. Additive
   for a consumer that reads only the 3.1 fields. A route that parses a stored
   3.1 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.3:** each STRIDE threat carries `attacker_position`, where the
+  attacker stands when it acts: `outside`, `on-path`, `storage-copy`,
+  `in-component` or `authorized-principal`. It is `null` only on a stored
+  threat that holds no position. Additive for a consumer that reads only
+  the 3.2 fields. A route that parses a stored 3.2 job record answers `409`
+  (see [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.4:** `rejected_because` holds `control`: a row of the owner's
+  Control covers the claim's unit, as the owner states it, and the service
+  verified nothing. A verdict carries `control_row` exactly on a `control`
+  rejection, and `refused_controls` for each row the critic refused. Each block
+  carries `returned_claims`. Additive for a consumer that reads only the 3.3
+  fields. A route that parses a stored 3.3 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.5:** each block carries `quotes_checked`, which says whether the
+  fan-in ran the quote check. It is `false` on a block that no fan-in built: a
+  refused framework or a stub run. A fan-in with an empty map of source texts
+  also gives `false`, and only a caller with no job passes one. Then `unverified_grounds` is empty because no check ran. It is `null`
+  only on a block written before 3.5. Additive for a consumer
+  that reads only the 3.4 fields. A route that parses a stored 3.4 job record
+  answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

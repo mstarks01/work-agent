@@ -1,0 +1,12 @@
+material from today's prepare, catalog none; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Authorization codes can be sent to attacker-controlled prefix-matching redirect URIs | ['process:authorization-server', 'flow:entity:member>entity:partner-app>return-with-authorization-code', 'entity:partner-app']
+- Partner applications can read member rewards data beyond their business need | ['entity:partner-app', 'flow:entity:partner-app>process:rewards-api>call-rewards-api', 'process:rewards-api']
+- Identity-database traffic may expose passwords and refresh tokens on the internal path | ['flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'process:authorization-server', 'store:identity-database']
+- Rewards ledger traffic may disclose member balances and transactions | ['flow:process:rewards-api>store:points-ledger>read-and-write-points', 'process:rewards-api', 'store:points-ledger']
+- API request logs may expose bearer tokens while being shipped to the log store | ['flow:process:rewards-api>store:api-log-store>write-request-log', 'process:rewards-api', 'store:api-log-store']
+- Account-closure traffic may reveal member account information on an unverified internal connection | ['flow:process:support-console>store:identity-database>close-accounts', 'process:support-console', 'store:identity-database']
+- Identity-database copies may disclose member credentials and PII if encryption at rest is absent | ['store:identity-database']
+- Points-ledger copies may expose all member balances if encryption at rest is absent | ['store:points-ledger']
+- API log-store copies may reveal reusable bearer tokens if encryption at rest is absent | ['store:api-log-store', 'flow:process:rewards-api>store:api-log-store>write-request-log']
+spent: $0.0590 reported
+must-finds matched: [4]

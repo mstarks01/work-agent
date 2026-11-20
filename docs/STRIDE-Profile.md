@@ -34,7 +34,7 @@ published taxonomy, and each lane walks the elements its category can apply to.
 Each of these is a choice with a reason. None is required by STRIDE, and a
 different tool may reasonably choose otherwise.
 
-**A closed set of 20 action verbs.** A finding names one attacker action from
+**A closed set of 21 action verbs.** A finding names one attacker action from
 `analysis_service.actions.ACTION_VERBS`, grouped into families. STRIDE names
 categories, not actions. The vocabulary exists so two spellings of one attack
 compare equal without a model call — it is half of what
@@ -80,9 +80,13 @@ two known zones that are equal is not; either end unplaced is an *undecidable*
 crossing, which carries `decided: false`. An undecidable crossing establishes
 nothing — not that a crossing occurred, not that a control is missing. It makes
 the flow eligible for analysis and no more, so a rule keyed on the crossing
-fires on one and says so, while the privilege-zone rule, which turns on what
-the two zones *are*, skips it. It is not in the evidence catalog either: the
-two unplaced zones offer their own `unknown` entries instead.
+fires on one and says so. The privilege-zone rule reads the kind of the zone
+it names: it fires on a flow into a placed privilege or tenant zone whatever
+the source's placement, and on a flow out of a tenant zone only when the
+crossing is decided
+([ADR 0128](adr/0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md)).
+An undecidable crossing is not in the evidence catalog either: each unplaced
+end publishes an `unknown` entry for its `trust_zone` instead.
 
 **Flow direction is who initiates.** A data flow records the initiator, not a
 one-directional movement of bytes. A service reading a store and a service

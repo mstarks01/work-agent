@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -27,17 +28,20 @@ from analysis_service.assertions import (
 )
 from analysis_service.sources import text_digest
 from evals.harness import promotion
-from evals.harness.reference import load_corpus
+from evals.harness.ledger import Ledger
+from evals.harness.reference import load_case, load_corpus
 from evals.harness.replay import signed_reference
 from evals.harness.run import COMMANDS
+from evals.harness.scorer import score_case
+from tests.eval_factories import ScriptedMatcher
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLOW = "flow:entity:shopper>process:storefront-api>place-order"
 #: A sealed Baseline: `analysis` mode, scored, with its reports beside it. It
-#: predates `AssertionBacking`, which is what makes it the right artifact to
-#: hold the readers against — a gate must survive an artifact older than itself.
+#: carries no `assertion_backed` field, which makes it the right artifact to
+#: hold the readers against — a gate must read an artifact with no such field.
 SEALED = (
     REPO_ROOT
     / "evals"
@@ -91,7 +95,7 @@ class TestEveryGateReadsARealArtifact:
 class TestTheTwoKindsOfGate:
     """A ratio one pair answers, and a difference no single pair can."""
 
-    def artifact(self, charge: float, coverage: float) -> dict:
+    def artifact(self, charge: float, coverage: float | None) -> dict:
         return {
             "node_charges": {"one": charge},
             "node_latency": {"one": {"total_ms": 1000}},
@@ -120,6 +124,26 @@ class TestTheTwoKindsOfGate:
 
         assert reading.verdict == "inconclusive"
         assert reading.measured == 0.0
+
+    def test_a_coverage_with_no_value_is_unread_rather_than_zero(self) -> None:
+        """A case with no must-find writes no coverage, and the gate cannot read it.
+
+        The score block comes from the scorer, which wrote 0.0 here before an
+        empty denominator read as no value; the gate then failed on that zero.
+        """
+        corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
+        payments = load_case(corpus / "01-payments-checkout")
+        score = replace(
+            score_case(payments, [], ScriptedMatcher(), Ledger()), must_find_total=0
+        )
+        held = self.artifact(0.1, None)
+        held["scores"] = [score.to_json()]
+
+        reading = promotion.read_gate("must-find-coverage", held, {}, spread=0.1)
+
+        assert score.to_json()["metrics"]["must_find_coverage"] is None
+        assert reading.verdict == "inconclusive"
+        assert reading.measured is None
 
     def test_a_spread_gives_the_limit_its_scale(self) -> None:
         held = self.artifact(0.1, promotion.BASELINE["must_find_coverage"] - 0.05)
@@ -152,7 +176,7 @@ class TestAnAbsentFigureIsNotAZero:
     """The rule the table rests on, and the one an artifact can break quietly."""
 
     def test_an_artifact_without_the_backing_field_is_unread(self, sealed) -> None:
-        """The sealed Baseline predates `AssertionBacking`, so it backs nothing."""
+        """The sealed Baseline carries no `assertion_backed` field, so it backs nothing."""
         artifact, report = sealed
         reading = promotion.read_gate("backs-claims", artifact, report, spread=None)
 

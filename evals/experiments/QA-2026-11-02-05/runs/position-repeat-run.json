@@ -1,0 +1,7 @@
+{
+  "command": "position_ballot.py record, run a second time on the recorded corpus",
+  "refusal": "CorpusError: 01-payments-checkout: rulings.json position ruling 8 rules a second position on one claim",
+  "corpus_digest_before": "296b1e44aae80214dc1fe2e419cf581f5fe4e688786116c51e611b055fddac8e",
+  "corpus_digest_after": "296b1e44aae80214dc1fe2e419cf581f5fe4e688786116c51e611b055fddac8e",
+  "restored": true
+}

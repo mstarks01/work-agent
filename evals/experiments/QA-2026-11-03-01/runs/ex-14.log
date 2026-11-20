@@ -1,0 +1,15 @@
+material from today's prepare, catalog none; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Authorization-code prefix matching can disclose a member authorization code to an attacker-controlled redirect | ['process:authorization-server', 'flow:entity:member>entity:partner-app>return-with-authorization-code', 'flow:entity:partner-app>process:authorization-server>token-requests']
+- A stolen mobile refresh token remains a long-lived source of bearer access | ['process:mobile-app', 'flow:process:mobile-app>process:authorization-server>token-requests', 'process:authorization-server']
+- Unverified transport to the identity database may expose password hashes and refresh tokens | ['flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'process:authorization-server', 'store:identity-database']
+- Unverified rewards-API-to-ledger transport may expose member balances and transactions | ['flow:process:rewards-api>store:points-ledger>read-and-write-points', 'process:rewards-api', 'store:points-ledger']
+- Unverified transport to the API log store may expose captured bearer tokens | ['flow:process:rewards-api>store:api-log-store>write-request-log', 'process:rewards-api', 'store:api-log-store']
+- Unverified support-console database transport may disclose account-closure data | ['flow:process:support-console>store:identity-database>close-accounts', 'process:support-console', 'store:identity-database']
+- An identity-database snapshot may disclose passwords and refresh tokens if at-rest encryption is absent | ['store:identity-database']
+- A points-ledger copy may disclose the full member rewards history if encryption at rest is absent | ['store:points-ledger']
+- An API-log-store copy may disclose replayable bearer tokens if encryption at rest is absent | ['store:api-log-store']
+- Logging Authorization headers discloses bearer tokens to log readers | ['process:rewards-api', 'flow:process:rewards-api>store:api-log-store>write-request-log', 'store:api-log-store']
+- Compromise of the authorization server may disclose the entire identity database through its reader access | ['process:authorization-server', 'flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'store:identity-database']
+- Compromise of the rewards API may disclose the full points ledger through its existing reader access | ['process:rewards-api', 'flow:process:rewards-api>store:points-ledger>read-and-write-points', 'store:points-ledger']
+spent: $0.0729 reported
+must-finds matched: [4, 8]

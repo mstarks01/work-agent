@@ -1,0 +1,572 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[colleague] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      },
+      {
+        "id": "entity:store-manager",
+        "name": "store manager",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[store manager] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      },
+      {
+        "id": "entity:payroll-system",
+        "name": "payroll system",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(internet)[payroll system] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-payroll-team-environment"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:scheduling-web-app",
+        "name": "scheduling web app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[scheduling web app] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:scheduling-service",
+        "name": "scheduling service",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[scheduling service] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:rota-database",
+        "name": "rota database",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[rota database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:file-share",
+        "name": "file share",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n6(database)[file share] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>process:scheduling-web-app>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:store-manager>process:scheduling-web-app>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:store-manager",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-web-app>process:scheduling-service>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-web-app",
+        "destination": "process:scheduling-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:rota-database>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:rota-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:file-share>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:payroll-system>store:file-share>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:payroll-system",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-public-internet",
+        "name": "Trust zone public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-internal-network",
+        "name": "Trust zone internal network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone internal network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-payroll-team-environment",
+        "name": "Trust zone payroll team environment",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone payroll team environment]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The node named 'colleague' is a human external entity.",
+        "element_id": "entity:colleague",
+        "attribute": "kind",
+        "basis": "The diagram labels the node 'colleague'."
+      },
+      {
+        "assumption": "The node named 'store manager' is a human external entity.",
+        "element_id": "entity:store-manager",
+        "attribute": "kind",
+        "basis": "The diagram labels the node 'store manager'."
+      },
+      {
+        "assumption": "The node named 'payroll system' is an external system.",
+        "element_id": "entity:payroll-system",
+        "attribute": "kind",
+        "basis": "The diagram labels the node 'payroll system' and places it in the separate payroll team environment."
+      },
+      {
+        "assumption": "The scheduling web app presents a web interface.",
+        "element_id": "process:scheduling-web-app",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named 'scheduling web app'."
+      },
+      {
+        "assumption": "The public internet trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-public-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone public internet'."
+      },
+      {
+        "assumption": "The internal network trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-internal-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone internal network'."
+      },
+      {
+        "assumption": "The payroll team environment is a network boundary.",
+        "element_id": "boundary:trust-zone-payroll-team-environment",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone payroll team environment'; no different party or authority level is stated."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[colleague] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      },
+      {
+        "id": "entity:store-manager",
+        "name": "store manager",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[store manager] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      },
+      {
+        "id": "entity:payroll-system",
+        "name": "payroll system",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(internet)[payroll system] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-payroll-team-environment"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:scheduling-web-app",
+        "name": "scheduling web app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[scheduling web app] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:scheduling-service",
+        "name": "scheduling service",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[scheduling service] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:rota-database",
+        "name": "rota database",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[rota database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:file-share",
+        "name": "file share",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n6(database)[file share] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-internal-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>process:scheduling-web-app>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:store-manager>process:scheduling-web-app>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:store-manager",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-web-app>process:scheduling-service>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-web-app",
+        "destination": "process:scheduling-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:rota-database>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:rota-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:file-share>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:payroll-system>store:file-share>unspecified-interaction",
+        "name": "unspecified interaction",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:payroll-system",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-public-internet",
+        "name": "Trust zone public internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-internal-network",
+        "name": "Trust zone internal network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone internal network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-payroll-team-environment",
+        "name": "Trust zone payroll team environment",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone payroll team environment]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The node named 'colleague' is a human external entity.",
+        "element_id": "entity:colleague",
+        "attribute": "kind",
+        "basis": "The diagram labels the node 'colleague'."
+      },
+      {
+        "assumption": "The node named 'store manager' is a human external entity.",
+        "element_id": "entity:store-manager",
+        "attribute": "kind",
+        "basis": "The diagram labels the node 'store manager'."
+      },
+      {
+        "assumption": "The node named 'payroll system' is an external system.",
+        "element_id": "entity:payroll-system",
+        "attribute": "kind",
+        "basis": "The diagram labels the node 'payroll system' and places it in the separate payroll team environment."
+      },
+      {
+        "assumption": "The scheduling web app presents a web interface.",
+        "element_id": "process:scheduling-web-app",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named 'scheduling web app'."
+      },
+      {
+        "assumption": "The public internet trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-public-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone public internet'."
+      },
+      {
+        "assumption": "The internal network trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-internal-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone internal network'."
+      },
+      {
+        "assumption": "The payroll team environment is a network boundary.",
+        "element_id": "boundary:trust-zone-payroll-team-environment",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone payroll team environment'; no different party or authority level is stated."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -28,6 +28,7 @@ from analysis_service.skills import (
     split_sections,
 )
 from analysis_service.token_caps import TOKEN_CAPS, covered_assets
+from tests.source_tree import MODEL_TEXT, held_files
 
 pytestmark = pytest.mark.lint
 
@@ -59,15 +60,6 @@ PACK_SECTION_HEADINGS = ("When this applies", "What to look for", "Guardrails")
 
 domain_loader = MarkdownLoader(DOMAINS_DIR)
 domain_packs = sorted(domain_loader.names())
-
-
-@pytest.mark.parametrize("framework", sorted(PACKAGES))
-def test_lane_directories_match_the_packages_declared_lanes(framework):
-    """The tree and the declaration are one list, in one order."""
-    dirs = sorted(
-        path.name for path in (FRAMEWORKS_DIR / framework / "lanes").iterdir()
-    )
-    assert dirs == sorted(PACKAGES[framework].lanes)
 
 
 @pytest.mark.parametrize("framework,lane", LANE_SKILLS)
@@ -163,8 +155,13 @@ def test_the_shared_domains_root_carries_nothing_but_packs():
     ``domains/`` would be loadable by every framework rather than by the one
     that wrote it.
     """
-    entries = [path for path in DOMAINS_DIR.iterdir() if not path.name.startswith(".")]
-    assert all(path.suffix == ".md" for path in entries)
+    entries = [
+        path
+        for path in held_files(*MODEL_TEXT)
+        if path.is_relative_to(DOMAINS_DIR) and not path.name.startswith(".")
+    ]
+    assert entries
+    assert all(path.parent == DOMAINS_DIR and path.suffix == ".md" for path in entries)
 
 
 @pytest.mark.parametrize("name", sorted(PACKAGES))

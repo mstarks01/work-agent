@@ -75,7 +75,10 @@ def refuse_unread(
 
     **The one reader of a stray store setting.** A setting that the selected
     backend does not read would otherwise do nothing, and the operator would
-    think it applies. ``backend`` names the backend, for the message.
+    think it applies. ``read`` holds only the settings of the selected
+    credential mode, so a key file of another mode is stray too. ``backend``
+    names the backend, for the message, which names each setting and never
+    its value.
     """
     stray = sorted(
         name

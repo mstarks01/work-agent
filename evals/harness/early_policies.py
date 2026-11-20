@@ -30,6 +30,10 @@ of a list once for every element it lists (ADR 0081): one charge for the
 group's parts answers each of its rows. A capability question is charged on
 its own, because every capability shares one group.
 
+``element-count`` is the shipped list ranked by the score the floor reads,
+where every candidate on an element counts toward each of its fields, and not
+only a candidate whose rule reads the field (ADR 0115).
+
 The ``no-to-the-rest`` policies keep each capability question at its place
 and answer "yes" to some of them, each on its own; one choice then answers
 "no" to every capability question of the list left. The walk does not know
@@ -49,7 +53,9 @@ from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
+import analysis_service.early_questions as early_module
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import passes_floor, question_set, whose_turn
 from analysis_service.claims import FrameworkName, UnknownKey
@@ -62,7 +68,9 @@ from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness import audit
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
 from evals.harness.early_rounds import MAX_SAVES, dont_know
+from evals.harness.run_record import run_record
 
 #: The frameworks a job selects, each with its options.
 Selection = Mapping[FrameworkName, Mapping[str, Any]]
@@ -149,6 +157,7 @@ def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion
             None,
             frameworks,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=tuple(answered)),
             final=False,
@@ -218,6 +227,15 @@ def _merge(
                 charged[holder] += question.decisions
 
 
+def _element_count(model: SystemModel, chosen: Selection) -> list[Charge]:
+    """The shipped list ranked by the score, as the floor reads it: every
+    candidate on an element counts toward each of its fields (ADR 0115)."""
+    with mock.patch.object(
+        early_module, "reads", lambda candidate, informed_by, field: True
+    ):
+        return _each(_shipped_list(model, chosen))
+
+
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
     "shipped-list": lambda model, chosen: _each(_shipped_list(model, chosen)),
@@ -226,6 +244,7 @@ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
     ),
     "grouped-merge": lambda model, chosen: _each(_merge(model, chosen, grouped=True)),
     "group-question": _group_question,
+    "element-count": _element_count,
     **{
         f"no-to-the-rest-{name}": partial(_group_question, yes_share=share)
         for name, share in YES_SHARES.items()
@@ -233,23 +252,25 @@ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
 }
 
 
-def _spend(order: Sequence[Charge], budget: int | None) -> tuple[set[UnknownKey], int]:
+def _answer_within(
+    order: Sequence[Charge], budget: int | None
+) -> tuple[set[UnknownKey], int]:
     """The questions a submitter answers before ``budget`` choices run out,
-    and the choices spent."""
-    spent = 0
+    and the choices they take."""
+    choices = 0
     answered: set[UnknownKey] = set()
     for charge in order:
-        if budget is not None and spent + charge.choices > budget:
+        if budget is not None and choices + charge.choices > budget:
             break
-        spent += charge.choices
+        choices += charge.choices
         answered |= charge.keys
-    return answered, spent
+    return answered, choices
 
 
 def _prefix(order: Sequence[EarlyQuestion], budget: int | None) -> set[UnknownKey]:
     """The questions a submitter answers before ``budget`` choices run out,
     each question charged on its own."""
-    return _spend(_each(order), budget)[0]
+    return _answer_within(_each(order), budget)[0]
 
 
 @dataclass(frozen=True)
@@ -321,7 +342,7 @@ def readings(
         for selected, frameworks in selections.items():
             order = build(report.system_model, frameworks)
             for budget in (*BUDGETS, None):
-                answered, spent = _spend(order, budget)
+                answered, choices = _answer_within(order, budget)
                 capabilities = {key_ref(key).capability for key in answered} - {""}
                 done = [
                     band for band, keys in needs.findings.values() if keys <= answered
@@ -334,7 +355,7 @@ def readings(
                         policy=policy,
                         selected=selected,
                         budget=budget,
-                        choices=spent,
+                        choices=choices,
                         findings=len(needs.findings),
                         completed=len(done),
                         finding_bands=dict(bands),
@@ -373,7 +394,7 @@ def paired(root: Path) -> list[Paired]:
         case = path.name.removesuffix(case_suffix("report"))
         if case in held:
             continue
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         if len(report.job.frameworks) == 1:
             by_case[case].append((path, report))
     found = []
@@ -391,11 +412,11 @@ def paired(root: Path) -> list[Paired]:
     return found
 
 
-def sweep(root: Path) -> list[Reading]:
-    """Every policy's reading on every :func:`paired` report, under both selections."""
+def sweep(pairs: Sequence[Paired]) -> list[Reading]:
+    """Every policy's reading on each of ``pairs``, under both selections."""
     return [
         reading
-        for one in paired(root)
+        for one in pairs
         for reading in readings(one.case, str(one.path), one.report, one.selections)
     ]
 
@@ -433,13 +454,16 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="the directory whose archived *.report.json files are read",
     )
     parser.add_argument(
-        "--out", type=Path, help="write the summary, and one for each case, as JSON"
+        "--out",
+        type=Path,
+        help="write the run record, the summary, and one for each case, as JSON",
     )
 
 
 def command_early_policies(args: argparse.Namespace) -> int:
     """Read every policy on every paired archived report, and print the sums."""
-    found = sweep(args.root)
+    pairs = paired(args.root)
+    found = sweep(pairs)
     if not found:
         print("no case has archived reports of two frameworks", file=sys.stderr)
         return 1
@@ -449,6 +473,11 @@ def command_early_policies(args: argparse.Namespace) -> int:
         args.out.write_text(
             json.dumps(
                 {
+                    "record": run_record(
+                        "early-policies",
+                        {"policies": list(POLICIES), "budgets": BUDGETS},
+                        {one.path: one.selections for one in pairs},
+                    ),
                     "summary": table,
                     "by_case": {
                         case: summary([one for one in found if one.case == case])

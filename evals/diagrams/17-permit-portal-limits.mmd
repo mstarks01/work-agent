@@ -1,0 +1,27 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: internet"]
+        n0["applicant"]
+        n2("permit gateway")
+    end
+    subgraph z1["Trust zone: city cloud account"]
+        n3("permit service")
+        n4("plan upload service")
+        n5("plan renderer")
+        n6[("permit database")]
+        n7[("plan store")]
+    end
+    subgraph z2["Trust zone: city network"]
+        n1["inspector"]
+    end
+    n0 -->|"submit applications"| n2
+    n2 -->|"forward application requests"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"keep applications and decisions"| n6
+    n0 -->|"upload plan drawings"| n4
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n4 -->|"save plan files"| n7
+    n4 -->|"hand over plan files"| n5
+    n5 -->|"write image tiles"| n7
+    n1 -->|"review and decide"| n3
+    linkStyle 7 stroke:#c0392b,stroke-width:2px

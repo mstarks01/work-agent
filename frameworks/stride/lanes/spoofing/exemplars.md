@@ -1,6 +1,6 @@
 # Spoofing Exemplars
 
-Four drafts against the exemplar system, showing the shape and the reasoning. Follow the reasoning, not the wording.
+Five drafts against the exemplar systems, showing the shape and the reasoning. The last one also shows a near-duplicate that is not a draft. Follow the reasoning, not the wording.
 
 ## Canonical: password-only customer identity
 
@@ -19,6 +19,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
     "flow:entity:customer>process:web-api>submit-payment"
   ],
   "verb": "guess-credential",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
@@ -61,6 +62,7 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     "flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
   "verb": "use-credential",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
@@ -103,6 +105,7 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     "flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "verb": "forge",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:payments-provider>process:web-api>settlement-webhook",
     "unknown:flow:entity:payments-provider>process:web-api>settlement-webhook:authentication"
@@ -139,6 +142,7 @@ Lane contrast: altering an instruction the web API sent is tampering, and reachi
     "process:ledger-service"
   ],
   "verb": "impersonate",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:process:web-api>process:ledger-service>post-transfer",
     "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication"
@@ -157,3 +161,40 @@ Lane contrast: altering an instruction the web API sent is tampering, and reachi
   ]
 }
 ```
+
+## Same verb, same place, another control: a fake ledger the web API never checks
+
+This draft shares its verb and its elements with the one above, and it is still a second threat. Draft 4 rests on the ledger never checking its caller (`authentication`). This one rests on the web API never checking the server it reached (`encryption_in_transit: none`, so no certificate proves which endpoint answered). The impersonated party is the other end, and the fix is at the other end: caller authentication at the ledger does not stop a fake ledger. Cite each draft's own control, and keep both.
+
+```json
+{
+  "sequence": 5,
+  "title": "A dmz foothold can answer the web API as the ledger",
+  "description": "`process:web-api` sends transfer instructions over `flow:process:web-api>process:ledger-service>post-transfer`, which crosses from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`, so no certificate tells the web API which endpoint it reached. An attacker with a foothold in `boundary:dmz` who can redirect that call (a poisoned name lookup, or a neighbour that takes the ledger's address) poses as `process:ledger-service` and receives each instruction in its place. Second-order: the attacker collects the customer IDs and transfer details in every instruction, and the transfers it swallows never reach `store:accounts-db`, although the web API sent them.",
+  "affected_element_ids": [
+    "process:web-api",
+    "flow:process:web-api>process:ledger-service>post-transfer",
+    "process:ledger-service"
+  ],
+  "verb": "impersonate",
+  "attacker_position": "on-path",
+  "evidence_refs": [
+    "crossing:flow:process:web-api>process:ledger-service>post-transfer",
+    "absent:flow:process:web-api>process:ledger-service>post-transfer:encryption_in_transit"
+  ],
+  "quotes": [],
+  "severity": {
+    "likelihood": "medium",
+    "impact": "medium",
+    "justification": "Likelihood is medium: the attacker needs a position in `boundary:dmz` and a way to redirect the call, but nothing on the flow lets the web API detect the substitute. Impact is medium: the attacker reads transfer instructions with customer IDs and drops transfers bound for `process:ledger-service`, which carries `financial`, but it cannot move money through the real ledger by this action alone."
+  },
+  "mitigations": [
+    {
+      "summary": "Have the web API verify the ledger",
+      "detail": "Protect `flow:process:web-api>process:ledger-service>post-transfer` with TLS, and have `process:web-api` validate a certificate bound to the ledger's service identity, so it refuses an endpoint that cannot prove it is `process:ledger-service`."
+    }
+  ]
+}
+```
+
+**A near-duplicate is one draft, not two.** A third candidate at the same place reads: "a compromised host in `boundary:core` sends transfers to the ledger as the web API". The attacker starts somewhere else, but the verb, the elements, the failed control (`authentication` on `post-transfer`) and the fix (the ledger refuses a caller it cannot verify) are all draft 4's. It is draft 4 again. Do not file it with a new `sequence`: name the second starting point in draft 4's `description`, beside the dmz foothold.

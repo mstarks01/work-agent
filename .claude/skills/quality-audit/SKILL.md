@@ -127,6 +127,9 @@ procedure: state the ceiling in must-finds, read off the archived misses in
 the fix's own class. A ceiling inside the run-to-run band gets no run; batch
 it. Any other outcome — applicability, false certainty, question effort,
 provider compatibility — is measured on its own terms, not in must-finds.
+Before you price a change to a prompt, read the rows of
+`.github/scripts/held_wording.toml` for that file: each held phrase waits for
+a measured change, so fold it into the change or say why it stays.
 
 **8. Execute the lowest-cost test that is sufficient for the claim.**
 `references/experiment-protocol.md` holds the ladder. Stop at the rung the

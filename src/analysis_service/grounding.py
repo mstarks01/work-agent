@@ -13,8 +13,8 @@ matched against bytes a caller submitted, and this module interprets neither as
 anything but text. It compiles no regular expression from either side, so the
 ladder proper cannot cost more than the quote's length times the source's.
 
-The repair rung is where cost has to be bounded on purpose, because it is the
-one place both lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
+The repair rung is where cost has to be bounded on purpose, because there both
+lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
 bound, and the constant carries the measurements behind it. It is a budget the
 scan spends, not a size it is refused for: what costs the time is how many
 windows survive pruning, and no function of the two lengths can see that.
@@ -123,8 +123,8 @@ _REPAIR_WIDTH_SLACK = 2
 #: character multiset. No constant over the input can admit the first and refuse
 #: the second, because the first is the larger number.
 #:
-#: So the loop spends this budget as it goes, and it charges for **both** kinds
-#: of work at **different rates**.
+#: So the loop counts its work against this budget as it goes, and it counts
+#: **both** kinds of work at **different rates**.
 #:
 #: A charge for only the comparisons that survive the prune would read zero on
 #: the input where the prune itself is the cost: the join and ``quick_ratio``
@@ -602,13 +602,14 @@ def meaning_moved(written: str, span: str) -> tuple[MovedKind, ...]:
 
     A repair inside :data:`REPAIR_THRESHOLD` can still flip what a quote
     asserts: "does not encrypt" and "does encrypt" are three characters apart
-    on a forty-character quote. The substitution is right — the span is the
-    submitter's words — and the reader of the result has to be told that the
-    words changed what the claim rests on. This is the minimum mechanical
-    safeguard and not an entailment check: it compares the negation tokens and
-    the number tokens of the two texts as multisets, folded through
-    :func:`normalize`, and names each class that differs. A changed principal or
-    a changed control term is a judgement and stays with the critic.
+    on a forty-character quote. :func:`faithful_repair` reads this to refuse
+    such a span, the fan-in writes the ``moved`` mark from it, and the load
+    check of a stored repair mark reads it again. This
+    is the minimum mechanical safeguard and not an entailment check: it
+    compares the negation tokens and the number tokens of the two texts as
+    multisets, folded through :func:`normalize`, and names each class that
+    differs. A changed principal or a changed control term is a judgement and
+    stays with the critic.
     """
     moved: list[MovedKind] = []
     written_tokens = _tokens(written)
@@ -714,6 +715,23 @@ def repair_prepared(
                 if ratio >= _CERTAIN:
                     return best
     return best
+
+
+def faithful_repair(
+    written: str, source: PreparedSource, deadline: float
+) -> Repair | None:
+    """The span :func:`repair_prepared` finds, or ``None`` where it moves meaning.
+
+    **The one reader of whether a refused quote may take the source's span.** A
+    span that changes a negation or a number (:func:`meaning_moved`) states a
+    different fact from the one the writer cited, so the quote stays refused.
+    A guard, not proof of meaning: it compares those two token classes only,
+    and a changed principal or control term passes it.
+    """
+    repair = repair_prepared(written, source, deadline)
+    if repair is None or meaning_moved(written, repair.span):
+        return None
+    return repair
 
 
 def _truncated(best: Repair | None) -> Repair | None:

@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Job messages may be readable across the web-to-backend queue link | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Worker queue consumption may expose job messages on an unverified internal channel | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Database records may be readable on the worker-to-database connection | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be intercepted while the web application reads configuration | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be intercepted while the worker reads configuration | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- A queue storage copy may disclose queued jobs if encryption at rest is absent | ['store:message-queue']
+- A database storage copy may disclose application and log records if unencrypted | ['store:database']
+- A copied web configuration store may reveal queue credentials | ['store:web-application-config']
+- A copied worker configuration store may reveal database credentials | ['store:worker-config']
+- Compromised worker access may disclose queued jobs beyond the worker's purpose | ['store:message-queue', 'process:background-worker-process', 'flow:process:background-worker-process>store:message-queue>consume-job']
+- Compromised worker access may disclose database and log records beyond required scope | ['store:database', 'process:background-worker-process', 'flow:process:background-worker-process>store:database>read-write-records']
+- Code in the internet-facing web application may recover queue credentials | ['store:web-application-config', 'process:web-application', 'flow:process:web-application>store:web-application-config>read-configuration']
+- Code in the worker may recover database credentials from worker configuration | ['store:worker-config', 'process:background-worker-process', 'flow:process:background-worker-process>store:worker-config>read-configuration']
+spent: $0.0567 reported
+must-finds matched: [6, 7]

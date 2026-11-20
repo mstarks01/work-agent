@@ -1,0 +1,18 @@
+{
+  "actor": "a manager, as a user of the payroll product",
+  "capability_scope": "the payroll product's own sign-in, which the rota app does not take part in",
+  "note": "The payroll product authenticates its own users; its factors give the rota app nothing.",
+  "reading": {
+    "capabilities": [
+      {
+        "capability": "file-upload",
+        "source_label": "System description",
+        "quote": "Each night the rota app imports a CSV export of shifts from a hosted payroll product that the clinic buys"
+      }
+    ]
+  },
+  "rule_break_quote": "Managers sign in to the payroll product with a password and a code from a hardware security key",
+  "expected": {
+    "V6.4.4": "unknown"
+  }
+}

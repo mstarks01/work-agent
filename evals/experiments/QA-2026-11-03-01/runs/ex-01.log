@@ -1,0 +1,11 @@
+material from today's prepare, catalog signed; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Shopper order data may be intercepted if public order transport is not encrypted | ['flow:entity:shopper>process:storefront-api>place-order', 'entity:shopper', 'process:storefront-api']
+- Settlement details may be intercepted if the processor webhook transport is unprotected | ['flow:entity:card-processor>process:storefront-api>settlement-webhook', 'entity:card-processor', 'process:storefront-api']
+- Order contents may be intercepted on the unverified DMZ-to-core gRPC channel | ['flow:process:storefront-api>process:order-service>submit-order', 'process:storefront-api', 'process:order-service']
+- Order database traffic may expose shopper records if its transport protection is absent | ['flow:process:order-service>store:orders-db>read-write-orders', 'process:order-service', 'store:orders-db']
+- A copied orders database may disclose confidential records if encryption at rest is absent | ['store:orders-db']
+- Compromise of the order service exposes the orders database through its broad application grant | ['process:order-service', 'flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db']
+- A recovered order-service database password enables direct bulk reading of orders | ['store:orders-db', 'flow:process:order-service>store:orders-db>read-write-orders', 'process:order-service']
+- The worker environment can disclose a standing database credential | ['process:order-service', 'flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db']
+spent: $0.0577 reported
+must-finds matched: [10, 11]

@@ -1,0 +1,197 @@
+{
+  "claims": [
+    {
+      "title": "Credential stuffing can create shopper sessions without MFA",
+      "description": "An internet attacker can replay breached or phished passwords against `flow:entity:shopper>process:storefront-api>place-order` and be accepted as `entity:shopper`, because the stated authentication is email-and-password login followed by a session cookie and MFA is stated absent. The resulting session lets the attacker place orders through `process:storefront-api`. Second-order, submitted orders are forwarded over `flow:process:storefront-api>process:order-service>submit-order` and reach `store:orders-db`, which holds shopper PII and financial order data.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "guess-credential",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "assertion:credential-presented~principal:shopper-accounts~any~credential:session-cookie",
+        "assertion:mfa-requirement~principal:shopper-accounts~any~absent",
+        "assertion:mfa-requirement~flow:entity:shopper>process:storefront-api>place-order~any~absent"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because `flow:entity:shopper>process:storefront-api>place-order` is a crossing from the public-internet zone and the catalog states that shopper authentication uses a session cookie while MFA is absent. Impact is high because a successful shopper session can submit financial orders that reach `store:orders-db`, which is tagged `pii` and `financial` and classified confidential."
+      },
+      "mitigations": [
+        {
+          "summary": "Require phishing-resistant shopper MFA",
+          "detail": "Add WebAuthn/passkey authentication to `flow:entity:shopper>process:storefront-api>place-order` so a password alone cannot establish a shopper session."
+        },
+        {
+          "summary": "Harden password-login abuse controls",
+          "detail": "Screen for breached passwords and enforce account- and source-aware rate limits and monitoring at `process:storefront-api`."
+        }
+      ]
+    },
+    {
+      "title": "A stolen shopper session can be replayed as the shopper",
+      "description": "An attacker who obtains a session cookie issued for `entity:shopper` can present it on `flow:entity:shopper>process:storefront-api>place-order` and act as that shopper at `process:storefront-api`. The later answers state that cookies are Secure, HttpOnly, and SameSite, reducing browser-delivery avenues, but they do not state session binding, expiry, rotation, or revocation behavior; this draft is conditional on those session controls not preventing replay of a stolen cookie. Second-order, the replayed session can submit orders that `process:storefront-api` forwards to `process:order-service` and records in `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "use-credential",
+      "evidence_refs": [
+        "assertion:credential-presented~principal:shopper-accounts~any~credential:session-cookie",
+        "crossing:flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "quotes": [
+        {
+          "text": "Are its cookies set Secure, HttpOnly and SameSite? yes",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because exploitation requires first obtaining a shopper session cookie and the answers state Secure, HttpOnly, and SameSite cookie attributes; the remaining replay-control state is unstated. Impact is high because the session crosses into `process:storefront-api` as a shopper identity and can submit financial orders reaching confidential `store:orders-db`, tagged `pii` and `financial`."
+      },
+      "mitigations": [
+        {
+          "summary": "Bind, expire, and revoke shopper sessions",
+          "detail": "Bind cookies on `flow:entity:shopper>process:storefront-api>place-order` to appropriate client context, use short idle and absolute expirations, rotate identifiers on authentication changes, and provide server-side revocation."
+        },
+        {
+          "summary": "Detect replayed session use",
+          "detail": "Monitor `process:storefront-api` for anomalous session reuse, such as concurrent geography or device changes, and require reauthentication for high-risk order actions."
+        }
+      ]
+    },
+    {
+      "title": "A counterfeit storefront endpoint could harvest shopper credentials if transport authenticity is absent",
+      "description": "`flow:entity:shopper>process:storefront-api>place-order` has both `protocol` and `encryption_in_transit` recorded as unknown. If those unknowns resolve to a connection without validated server TLS, an on-path attacker can impersonate `process:storefront-api` to `entity:shopper`, collect the shopper's password or session material, and then use it to place orders. The model derives this as a public-internet-to-DMZ crossing, but its endpoint zone placement is inferred rather than source-stated; this is therefore conditional both on the unresolved transport attributes and on that derived reachability. Second-order, a harvested session reaches order submission and the PII and financial data in `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:protocol",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: the flow is derived as crossing from the public-internet zone, but its protocol and in-transit encryption are both unstated, so a capable attacker would additionally need a network-position or name-resolution opportunity if server authentication is absent. Impact is high because impersonating the login endpoint can expose shopper credentials that authorize order submission and access to confidential PII and financial order data in `store:orders-db`."
+      },
+      "mitigations": [
+        {
+          "summary": "Make verified TLS explicit for shopper traffic",
+          "detail": "Set `flow:entity:shopper>process:storefront-api>place-order` to TLS 1.2+ or later with full certificate-chain and hostname validation, and record the verified protocol and transport control in the model."
+        },
+        {
+          "summary": "Constrain storefront certificate issuance",
+          "detail": "Use managed certificate controls and monitoring appropriate to `process:storefront-api` so an attacker cannot readily obtain a look-alike endpoint certificate."
+        }
+      ]
+    },
+    {
+      "title": "Conflicting gRPC identity evidence may let a DMZ foothold impersonate the storefront API",
+      "description": "The System Model states that `flow:process:storefront-api>process:order-service>submit-order` crosses from the storefront DMZ into core services with `authentication: none`, so an attacker with a foothold capable of reaching the order-service interface can send order instructions as `process:storefront-api` without holding that process's credential. However, the later answers also say that `process:order-service` checks who sent what it receives, which conflicts with the explicitly stated absence of authentication; this draft is conditional on resolving that conflict in favor of the model's stated unauthenticated gRPC flow. Second-order, accepted instructions cause `process:order-service` to read and write orders in `store:orders-db` using its full-read/write application account.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it",
+          "source_label": "System description"
+        },
+        {
+          "text": "Does it check who sent what it takes, such as by a signature or an authenticated sender? yes",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium: the catalog states authentication is absent on a DMZ-to-core crossing, but an attacker must first obtain a position that can reach the internal interface and the later source answer claims sender checking. Impact is high because accepted impersonated requests reach `store:orders-db`, which contains confidential PII and financial data, through the order-service account with full read/write authority."
+      },
+      "mitigations": [
+        {
+          "summary": "Resolve and enforce workload identity on the gRPC flow",
+          "detail": "Verify the contradictory evidence, then require mTLS or workload-issued audience-bound tokens on `flow:process:storefront-api>process:order-service>submit-order`; `process:order-service` should reject every caller whose identity is not verified."
+        },
+        {
+          "summary": "Constrain the order-service trust boundary",
+          "detail": "Restrict network reachability to authenticated storefront workloads, while treating that restriction as defense in depth rather than caller authentication."
+        }
+      ]
+    },
+    {
+      "title": "A recovered order-service database password can be used as the service identity",
+      "description": "`flow:process:order-service>store:orders-db>read-write-orders` authenticates with one application account and a password supplied to `process:order-service` through an environment variable. An attacker who recovers that password can present it to `store:orders-db` as the order service, because possession of the password is the stated database identity. The catalog records that the account has full read/write authority, so second-order reach includes the whole orders dataset, including shopper addresses and card last-four, rather than only one order operation. The later answers say secrets are kept in a secret store rather than code or files, but they do not establish short-lived, caller-bound database credentials or eliminate the stated environment-variable custody path.",
+      "affected_element_ids": [
+        "process:order-service",
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders"
+      ],
+      "verb": "use-credential",
+      "evidence_refs": [
+        "assertion:credential-custody~credential:order-service-database-password~any~v.c4f5cadf8e5c",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "The password comes from an environment variable on the worker.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Are its secrets kept in a secret store, not in code or files? yes",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because an attacker must first recover the database password, and the answers state that secrets are kept in a secret store rather than code or files. Impact is high because the catalog states the resulting application identity has full read/write access to `store:orders-db`, which contains confidential PII and financial data."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace the database password with workload-bound credentials",
+          "detail": "Use workload identity federation or per-workload mTLS for `flow:process:order-service>store:orders-db>read-write-orders`, with short-lived credentials bound to `process:order-service`."
+        },
+        {
+          "summary": "Reduce the application account's authority",
+          "detail": "Replace the full read/write application account with least-privilege roles limited to the order-service operations and data it actually needs, and rotate any retained password."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

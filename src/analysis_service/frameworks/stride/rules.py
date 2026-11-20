@@ -63,11 +63,12 @@ from analysis_service.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
+    PredicateName,
     answer,
 )
-from analysis_service.candidates import Fact, Match, Rule, clip_fact
+from analysis_service.candidates import Fact, Match, Rule, clip_fact, with_rule_tables
 from analysis_service.frameworks import NoRule, PredicateReader
-from analysis_service.system_model import DataFlow, SystemModel
+from analysis_service.system_model import BoundaryKind, DataFlow, SystemModel
 
 __all__ = [
     "ENTERED_ZONE_KINDS",
@@ -87,7 +88,7 @@ SHARED_DEPENDENCY_MIN = 2
 # network hop. ``network`` and ``other`` are excluded: every boundary crossing
 # is already surfaced to every agent, and a rule that fires on all of them adds
 # no attention anywhere.
-ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
+ENTERED_ZONE_KINDS: frozenset[BoundaryKind] = frozenset({"privilege", "tenant"})
 
 # The zone kind a crossing *leaves* to be one as well, and the asymmetry is the
 # point. Entering a ``privilege`` zone is the transition and leaving it is not:
@@ -96,7 +97,7 @@ ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
 # authority to a party we do not control, and outward is a party we do not
 # control reaching a zone we do. That second direction is the multi-tenancy
 # escape, and reading only the destination makes it invisible.
-LEFT_ZONE_KINDS = frozenset({"tenant"})
+LEFT_ZONE_KINDS: frozenset[BoundaryKind] = frozenset({"tenant"})
 
 _clip = clip_fact
 
@@ -196,7 +197,7 @@ def _principals_of(catalog: AssertionCatalog, element_id: str) -> tuple[str, ...
     whose own gate rule refuses a basis this service inferred. So a wrong lead
     needs a source that states the wrong thing, rather than a rule that decided
     two names looked alike. Every rule that places a fact about a principal
-    asks this, so the identification has one reader.
+    asks this.
     """
     return tuple(
         subject.id
@@ -490,6 +491,10 @@ def _store_at_rest_unverified(
         )
 
 
+#: The operations that prove a caller reads a store.
+_READS = frozenset({"read", "read-write"})
+
+
 def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
     """A store holding a graded asset, with every element that reads it.
 
@@ -501,30 +506,39 @@ def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Ma
     the readers, so the lane can ask what one of them, or a grant like theirs,
     exposes.
 
-    A reader is the initiator of a flow into the store whose ``operations``
-    is ``read``, ``read-write`` or ``unknown``; a flow stating ``write`` only
-    is skipped, for the reason :func:`_unverified_write_to_store` skips a read.
+    **A caller's status comes from all of its flows into the store.** A
+    caller with one flow stating ``read`` or ``read-write`` is a reader, and
+    the fact ``readers`` names it. A caller whose flows state ``unknown`` and
+    never a read may or may not read, so ``callers_of_unknown_operation``
+    names it and the question asks the lane to settle the operation first. A
+    caller that only writes supplies no lead, for the reason
+    :func:`_unverified_write_to_store` skips a read. Each caller appears once,
+    at the strongest status its flows support (#2105).
     """
     for store in model.data_stores:
         assets = sensitive_assets(store)
         if not assets:
             continue
+        operations: dict[str, set[str]] = {}
+        for flow in inbound_flows(model, store.id):
+            operations.setdefault(flow.source, set()).add(flow.operations)
         readers = sorted(
-            {
-                flow.source
-                for flow in inbound_flows(model, store.id)
-                if flow.operations != "write"
-            }
+            caller for caller, stated in operations.items() if stated & _READS
         )
-        if not readers:
+        unknown = sorted(
+            caller
+            for caller, stated in operations.items()
+            if "unknown" in stated and not stated & _READS
+        )
+        if not readers and not unknown:
             continue
-        yield (
-            (store.id, *readers),
-            {
-                "readers": _clip(", ".join(readers)),
-                "assets": ", ".join(assets),
-            },
-        )
+        facts: dict[str, Fact] = {}
+        if readers:
+            facts["readers"] = _clip(", ".join(readers))
+        if unknown:
+            facts["callers_of_unknown_operation"] = _clip(", ".join(unknown))
+        facts["assets"] = ", ".join(assets)
+        yield (store.id, *readers, *unknown), facts
 
 
 # --- Denial of service ------------------------------------------------------
@@ -596,20 +610,18 @@ def _privilege_zone_crossing(
     # do. A flow that somehow does not resolve yields no candidate instead.
     flows = {flow.id: flow for flow in model.data_flows}
     for crossing in model.boundary_crossings():
-        # The one crossing-keyed rule that skips an undecidable crossing, and
-        # its premise is why: this rule fires on what the two zones *are*, and
-        # an unknown zone has no kind to read. An undecidable crossing confers
-        # eligibility for analysis and never a privilege transition, so firing
-        # here would assert the authority change the crossing cannot establish
-        # (ADR 0039 rule 4). Stated rather than left to the empty kind that
-        # falls through both sets below.
-        if not crossing.decided:
-            continue
+        # This rule fires on what the zones *are*, so it reads the kind of the
+        # zone it names. A flow into a privilege or tenant zone fires on that
+        # zone's kind, also where no source places the other endpoint: the
+        # crossing stays undecided in the facts, so the lead confers
+        # eligibility for analysis and no transition (ADR 0039 rule 4, ADR
+        # 0128). A flow out of a tenant zone fires only on a decided crossing,
+        # because an unplaced destination may sit in the same zone.
         source_kind = kinds.get(crossing.source_zone, "")
         destination_kind = kinds.get(crossing.destination_zone, "")
         if destination_kind in ENTERED_ZONE_KINDS:
             zone, direction = crossing.destination_zone, "into"
-        elif source_kind in LEFT_ZONE_KINDS:
+        elif crossing.decided and source_kind in LEFT_ZONE_KINDS:
             zone, direction = crossing.source_zone, "out-of"
         else:
             continue
@@ -657,7 +669,7 @@ def _inbound_from_exposed_process(
         )
 
 
-RULES: tuple[Rule, ...] = (
+_RULES: tuple[Rule, ...] = (
     Rule(
         rule_id="spoofing-unverified-boundary-auth",
         lane="spoofing",
@@ -813,9 +825,11 @@ RULES: tuple[Rule, ...] = (
         rule_id="information-disclosure-store-readers",
         lane="information-disclosure",
         question=(
-            "These elements read this store through access they already hold."
-            " Who else holds a grant like theirs, and what does compromising one"
-            " of these readers expose?"
+            "Each element under `readers` reads this store through access it"
+            " already holds. Each element under `callers_of_unknown_operation`"
+            " sends this store a flow whose operation the sources do not state,"
+            " so it is a reader only if that flow reads. Who else holds a grant"
+            " like a reader's, and what does compromising one of them expose?"
         ),
         find=_store_readers,
     ),
@@ -863,6 +877,202 @@ RULES: tuple[Rule, ...] = (
 )
 
 
+#: What an answer about a fact each rule reads informs, as the early list shows
+#: it to the owner.
+EFFECTS: Mapping[str, str] = MappingProxyType(
+    {
+        "spoofing-unverified-boundary-auth": (
+            "Informs whether the analysis reports that a caller across this "
+            "boundary can pose as another party."
+        ),
+        "spoofing-unverified-external-caller": (
+            "Informs whether the analysis reports that someone can pose as this"
+            " external system."
+        ),
+        "spoofing-second-factor-stated-absent": (
+            "Informs whether the analysis reports what a holder of one sign-in "
+            "factor can do."
+        ),
+        "spoofing-origin-stated-unverified": (
+            "Informs whether the analysis reports that another party can supply"
+            " what this receiver takes."
+        ),
+        "spoofing-standing-credential": (
+            "Informs whether the analysis reports the risk of a credential that"
+            " stays valid."
+        ),
+        "tampering-unprotected-transit-crossing": (
+            "Informs whether the analysis reports that an attacker on the path "
+            "can change this flow."
+        ),
+        "tampering-unverified-write-to-store": (
+            "Informs whether the analysis reports writes to this store that no "
+            "caller check stops."
+        ),
+        "tampering-signature-stated-unverified": (
+            "Informs whether the analysis reports that someone can replace what"
+            " this receiver runs or trusts."
+        ),
+        "tampering-content-stated-unvalidated": (
+            "Informs whether the analysis reports false values that pass the "
+            "format check."
+        ),
+        "repudiation-unattributable-action": (
+            "Informs whether the analysis reports actions that no record ties "
+            "to an actor."
+        ),
+        "repudiation-shared-credential": (
+            "Informs whether the analysis reports actions that a shared "
+            "credential hides."
+        ),
+        "repudiation-record-names-intermediary": (
+            "Informs whether the analysis reports records that name only the "
+            "component in between."
+        ),
+        "information-disclosure-unprotected-sensitive-transit": (
+            "Informs whether the analysis reports that an observer can read this flow."
+        ),
+        "information-disclosure-destination-stated-unverified": (
+            "Informs whether the analysis reports delivery to the wrong party."
+        ),
+        "information-disclosure-store-at-rest-unverified": (
+            "Informs whether the analysis reports access to the storage beneath"
+            " this store."
+        ),
+        "information-disclosure-store-readers": (
+            "Informs whether the analysis reports what the readers of this "
+            "store expose."
+        ),
+        "denial-of-service-internet-exposed-process": (
+            "Informs whether the analysis reports that requests from the "
+            "internet can exhaust this process."
+        ),
+        "denial-of-service-shared-dependency": (
+            "Informs whether the analysis reports failures that spread from "
+            "this shared element."
+        ),
+        "elevation-of-privilege-privilege-zone-crossing": (
+            "Informs whether the analysis reports privilege gained across this "
+            "boundary."
+        ),
+        "elevation-of-privilege-inbound-from-exposed-process": (
+            "Informs whether the analysis reports the authority an attacker "
+            "gets from this process."
+        ),
+    }
+)
+
+
+#: The predicates whose fact bears on each rule's finding (ADR 0117). The early
+#: list ranks a question kind on an element by the rules here that name one of
+#: its parts (:func:`~analysis_service.early_questions.reads`).
+INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
+    {
+        "spoofing-unverified-boundary-auth": frozenset(
+            {"provenance-sender", "reachability-named-callers"}
+        ),
+        "spoofing-unverified-external-caller": frozenset(
+            {"provenance-sender", "reachability-named-callers"}
+        ),
+        "spoofing-second-factor-stated-absent": frozenset(),
+        "spoofing-origin-stated-unverified": frozenset({"provenance-sender"}),
+        "spoofing-standing-credential": frozenset(
+            {"security-configuration-secret-store"}
+        ),
+        "tampering-unprotected-transit-crossing": frozenset({"provenance-integrity"}),
+        "tampering-unverified-write-to-store": frozenset(
+            {"authorization-scope-checks-each-request"}
+        ),
+        "tampering-signature-stated-unverified": frozenset(
+            {"provenance-sender", "provenance-integrity"}
+        ),
+        "tampering-content-stated-unvalidated": frozenset(
+            {"content-validation-validates", "content-validation-encodes"}
+        ),
+        "repudiation-unattributable-action": frozenset(
+            {"record-attribution", "audit-evidence-record-protected"}
+        ),
+        "repudiation-shared-credential": frozenset({"record-attribution"}),
+        "repudiation-record-names-intermediary": frozenset(
+            {"audit-evidence-record-protected"}
+        ),
+        "information-disclosure-unprotected-sensitive-transit": frozenset(
+            {
+                "security-configuration-cookies",
+                "security-configuration-headers",
+                "security-configuration-cross-origin",
+                "data-exposure-minimal-fields",
+            }
+        ),
+        "information-disclosure-destination-stated-unverified": frozenset(
+            {"destination"}
+        ),
+        "information-disclosure-store-at-rest-unverified": frozenset(
+            {
+                "stored-copy-access-encrypted",
+                "stored-copy-access-restricted",
+                "stored-copy-integrity",
+                "physical-access",
+            }
+        ),
+        "information-disclosure-store-readers": frozenset(
+            {"data-exposure-restricted-readers", "data-exposure-clean-logs"}
+        ),
+        "denial-of-service-internet-exposed-process": frozenset(
+            {
+                "capacity-limits-rate",
+                "capacity-limits-size",
+                "capacity-limits-concurrency",
+                "capacity-limits-quota",
+                "internet-exposure",
+                "reachability-named-callers",
+            }
+        ),
+        "denial-of-service-shared-dependency": frozenset(
+            {
+                "capacity-limits-rate",
+                "capacity-limits-size",
+                "capacity-limits-concurrency",
+                "capacity-limits-quota",
+                "failure-handling-fails-closed",
+                "failure-handling-alerts",
+                "failure-handling-recovers",
+            }
+        ),
+        "elevation-of-privilege-privilege-zone-crossing": frozenset(
+            {
+                "authorization-scope-checks-each-request",
+                "authorization-scope-least-privilege",
+                "authorization-scope-checks-ownership",
+            }
+        ),
+        "elevation-of-privilege-inbound-from-exposed-process": frozenset(
+            {
+                "authorization-scope-least-privilege",
+                "code-execution",
+                "update-process-scheduled",
+                "update-process-vulnerability-alerts",
+                "update-process-tested",
+                "internet-exposure",
+            }
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_rule_tables(_RULES, EFFECTS, INFORMED_BY)
+
+
+#: Why no rule here fires on a part of a question kind (ADR 0117). An owner's
+#: answer, a Control or, for a part it extracts, the assertion pass writes such
+#: a row, and the lane reads it as evidence. Each rule that the fact informs
+#: names the part in :data:`INFORMED_BY`.
+_QUESTION_KIND_PART = NoRule(
+    "an owner's answer, a Control or, for a part it extracts, the assertion"
+    " pass writes the row, and the lane reads it as evidence; each rule the"
+    " fact informs names it in INFORMED_BY"
+)
+
+
 #: Every assertion predicate with no graph field, and the rule here that reads
 #: it or why none does. A fact of these kinds reaches a lane as an evidence row
 #: whatever this table says; an entry decides only whether it is also a lead.
@@ -906,5 +1116,37 @@ PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
             "it identifies the element a principal is, and the rules read it"
             " to place every other fact about that principal"
         ),
+        "capacity-limits-rate": _QUESTION_KIND_PART,
+        "capacity-limits-size": _QUESTION_KIND_PART,
+        "capacity-limits-concurrency": _QUESTION_KIND_PART,
+        "capacity-limits-quota": _QUESTION_KIND_PART,
+        "audit-evidence-record-protected": _QUESTION_KIND_PART,
+        "authorization-scope-checks-each-request": _QUESTION_KIND_PART,
+        "authorization-scope-least-privilege": _QUESTION_KIND_PART,
+        "authorization-scope-checks-ownership": _QUESTION_KIND_PART,
+        "stored-copy-integrity": _QUESTION_KIND_PART,
+        "stored-copy-access-encrypted": _QUESTION_KIND_PART,
+        "stored-copy-access-restricted": _QUESTION_KIND_PART,
+        "reachability-named-callers": _QUESTION_KIND_PART,
+        "provenance-sender": _QUESTION_KIND_PART,
+        "provenance-integrity": _QUESTION_KIND_PART,
+        "code-execution": _QUESTION_KIND_PART,
+        "physical-access": _QUESTION_KIND_PART,
+        "content-validation-validates": _QUESTION_KIND_PART,
+        "content-validation-encodes": _QUESTION_KIND_PART,
+        "destination": _QUESTION_KIND_PART,
+        "security-configuration-cookies": _QUESTION_KIND_PART,
+        "security-configuration-headers": _QUESTION_KIND_PART,
+        "security-configuration-cross-origin": _QUESTION_KIND_PART,
+        "security-configuration-secret-store": _QUESTION_KIND_PART,
+        "failure-handling-fails-closed": _QUESTION_KIND_PART,
+        "failure-handling-alerts": _QUESTION_KIND_PART,
+        "failure-handling-recovers": _QUESTION_KIND_PART,
+        "update-process-scheduled": _QUESTION_KIND_PART,
+        "update-process-vulnerability-alerts": _QUESTION_KIND_PART,
+        "update-process-tested": _QUESTION_KIND_PART,
+        "data-exposure-minimal-fields": _QUESTION_KIND_PART,
+        "data-exposure-clean-logs": _QUESTION_KIND_PART,
+        "data-exposure-restricted-readers": _QUESTION_KIND_PART,
     }
 )

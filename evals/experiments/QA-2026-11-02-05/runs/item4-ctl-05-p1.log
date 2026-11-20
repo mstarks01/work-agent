@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from f453772fa9638aa38ecb88c970ce9c2660ddbc63
+- Job messages may be intercepted between the web tier and queue | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Worker queue-consumption traffic may expose job data | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Worker database traffic may disclose application and log records | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be intercepted while the web application reads configuration | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be intercepted while the worker reads configuration | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- Queued jobs may be readable from storage copies if queue encryption at rest is absent | ['store:message-queue']
+- Database records may be readable from storage copies if encryption at rest is absent | ['store:database']
+- Queue credentials may be recovered from unencrypted web-application configuration storage | ['store:web-application-config']
+- Database credentials may be recovered from unencrypted worker configuration storage | ['store:worker-config']
+- An unverified queue read path may disclose queued job messages | ['store:message-queue', 'flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process']
+- An unverified database read path may disclose application records | ['store:database', 'flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process']
+- An unverified configuration read path may disclose queue credentials | ['store:web-application-config', 'flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application']
+- An unverified configuration read path may disclose database credentials | ['store:worker-config', 'flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process']
+spent: $0.0510 reported
+must-finds matched: [6, 7]

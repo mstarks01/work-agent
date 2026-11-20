@@ -52,9 +52,10 @@ whatever order the submission listed.** The maintainer ruled this on
 
 - One rule, one reader, one test file for the order and for the steps of a
   submission. The route tests hold only the status each refusal takes.
-- The in-process engine holds no Deployment, so it holds a selection to the
-  registry of packages this build carries, and the same reader orders it by
-  that registry.
+- The in-process `Engine` takes the carried frameworks as an argument, and
+  the same reader orders its selection by them. An `Engine` built on a
+  Deployment takes the frameworks that the Deployment carries, and looks up
+  its graph by its own ordered selection.
 - The construction of a `JobAnswers` from a Deployment stays in two places:
   `create_app` of the `/v1` service, which takes each bound as an injectable
   setting, and `Startup.current` of the first-run app, which attaches the

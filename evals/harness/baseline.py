@@ -68,6 +68,7 @@ from typing import Any, NamedTuple, get_args, get_type_hints
 
 from analysis_service.model_tiers import TierName
 from analysis_service.parsing import non_negative, strings
+from analysis_service.sources import text_digest
 from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
@@ -120,8 +121,8 @@ class BaselineIdentity:
     endpoints — ``openai/flex`` and ``openai`` both report ``OpenAI`` while
     differing 2.1x in price and 46% in latency. Without the pin those two
     sweeps compute one identity and pool into one directory. Read from the
-    ``models`` block, which records the declaration per tier, so a sweep taken
-    before that was recorded carries no pin and keeps the identity it had.
+    ``models`` block, which records the declaration per tier, so a sweep with
+    no declaration there carries no pin and keeps its identity.
     """
 
     repo_commit: str
@@ -223,9 +224,7 @@ class BaselineIdentity:
 
     @property
     def hash(self) -> str:
-        return hashlib.sha256(
-            json.dumps(self.to_json(), sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        return text_digest(json.dumps(self.to_json(), sort_keys=True))
 
     @property
     def name(self) -> str:
@@ -264,9 +263,10 @@ def recorded_upstreams(
 ) -> dict[str, tuple[str, ...]]:
     """Every upstream the record names, per tier on an aggregator route.
 
-    The one reader of the question "which provider served this tier", for the
-    identity and for the rule that refuses a tier it cannot answer. Keyed only
-    by the tiers whose vendor does not route to one provider: a direct vendor
+    The reader of the question "which provider served this tier" for the
+    identity and for the rule that refuses a tier it cannot answer.
+    :meth:`~evals.harness.provenance.RunProvenance.tier_identities` folds the
+    same field for the artifact's tier summary. Keyed only by the tiers whose vendor does not route to one provider: a direct vendor
     is its own upstream, names none in its responses, and has nothing here to
     read. An aggregator tier whose executions name no upstream maps to an
     empty tuple rather than being absent, so the rule can tell "the record is
@@ -291,8 +291,8 @@ def declared_pins(
     The one reader of the recorded pin. Keyed like
     :func:`recorded_upstreams`, by the tiers whose vendor reaches more than one
     provider, because only those have an endpoint to choose. A tier whose
-    record carries no declaration is absent rather than empty: a sweep taken
-    before the pin was recorded does not know what it ran under, and reading
+    record carries no declaration is absent rather than empty: a sweep with
+    no declaration does not state what it ran under, and reading
     that as "the gateway chose" would give it an identity it cannot support.
     """
     recorded = _tiers_recorded(artifact)
@@ -790,6 +790,23 @@ def _git(root: Path, *args: str) -> str | None:
         return None
 
 
+def holds_commit(root: Path, commit: str) -> bool:
+    """Whether the clone at ``root`` holds ``commit`` as a commit."""
+    return _git(root, "cat-file", "-e", f"{commit}^{{commit}}") is not None
+
+
+def is_shallow(root: Path) -> bool:
+    """Whether the clone at ``root`` is shallow, so an ancestry it reads can
+    stop at a cut it does not know about; true where git cannot answer."""
+    return _git(root, "rev-parse", "--is-shallow-repository") != "false\n"
+
+
+def is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
+    """Whether ``ancestor`` is an ancestor of ``descendant`` in the clone at
+    ``root``; false where git cannot answer."""
+    return _git(root, "merge-base", "--is-ancestor", ancestor, descendant) is not None
+
+
 def corpus_digest_at(commit: str, root: Path) -> str | None:
     """The corpus digest recomputed from a commit's tree, not the checkout's.
 
@@ -1027,8 +1044,8 @@ def verify(directory: Path, root: Path, base_ref: str) -> list[str]:
     # The identity keeps the ID it was sealed with; a history rewrite renames
     # the commit, and the git checks read it at the ID it has now.
     commit = current_commit(identity.repo_commit)
-    if _git(root, "cat-file", "-e", f"{commit}^{{commit}}") is not None:
-        if _git(root, "merge-base", "--is-ancestor", commit, base_ref) is None:
+    if holds_commit(root, commit):
+        if not is_ancestor(root, commit, base_ref):
             problems.append(
                 f"{identity.repo_commit[:12]}: not an ancestor of {base_ref};"
                 " a fork-only commit is refused because the identity names a"

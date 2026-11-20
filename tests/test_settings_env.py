@@ -23,6 +23,7 @@ from analysis_service.config_files import (
     SETTINGS_DIR_VAR,
     SettingsFileError,
     create_private,
+    data_dir,
     read_settings,
     read_settings_env,
     settings_dir,
@@ -181,6 +182,16 @@ class TestTheSettingsDirectory:
     def test_it_falls_back_to_dot_config(self, xdg):
         env = {} if xdg is None else {"XDG_CONFIG_HOME": xdg}
         assert settings_dir(env) == Path.home() / ".config" / "work-agent"
+
+
+class TestTheDataDirectory:
+    def test_it_sits_under_an_absolute_xdg_data_home(self, tmp_path):
+        assert data_dir({"XDG_DATA_HOME": str(tmp_path)}) == tmp_path / "work-agent"
+
+    @pytest.mark.parametrize("xdg", [None, "", "relative/data"])
+    def test_it_falls_back_to_dot_local_share(self, xdg):
+        env = {} if xdg is None else {"XDG_DATA_HOME": xdg}
+        assert data_dir(env) == Path.home() / ".local" / "share" / "work-agent"
 
 
 class TestTheReader:

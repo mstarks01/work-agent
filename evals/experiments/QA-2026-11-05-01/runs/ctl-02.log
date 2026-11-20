@@ -1,0 +1,15 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Sensor readings may be intercepted between field nodes and the internet-facing gateway | ['flow:entity:sensor-node>process:device-gateway>publish-readings', 'entity:sensor-node', 'process:device-gateway']
+- Device-registry key material may be readable on the gateway lookup path | ['flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway', 'store:device-registry']
+- Telemetry loading may disclose customer-site data on the normalizer-to-lake path | ['flow:process:telemetry-normalizer>store:telemetry-lake>load-readings', 'process:telemetry-normalizer', 'store:telemetry-lake']
+- Operator dashboard queries may expose telemetry across the corporate-to-analytics boundary | ['flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'entity:fleet-operator', 'store:telemetry-lake']
+- Gateway-to-Pub/Sub telemetry may be intercepted if the forwarding channel is unprotected | ['flow:process:device-gateway>store:pub-sub>forward-readings', 'process:device-gateway', 'store:pub-sub']
+- Telemetry may be intercepted while the normalizer consumes Pub/Sub messages | ['flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer', 'store:pub-sub']
+- A storage copy could reveal all fleet pre-shared keys if the device registry is unencrypted at rest | ['store:device-registry']
+- A telemetry-lake export could disclose occupancy data if encryption at rest is absent | ['store:telemetry-lake']
+- Retained Pub/Sub messages could disclose sensor PII if storage encryption is absent | ['store:pub-sub']
+- Compromise of the internet-facing gateway could expose fleet credentials through its registry read path | ['process:device-gateway', 'flow:process:device-gateway>store:device-registry>look-up-device', 'store:device-registry']
+- An over-authorized fleet operator could elicit cross-customer telemetry from the lake | ['entity:fleet-operator', 'flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'store:telemetry-lake']
+- An unauthorized Pub/Sub subscriber could read telemetry if subscription authentication is ineffective | ['store:pub-sub', 'flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer']
+spent: $0.0663 reported
+must-finds matched: [7]

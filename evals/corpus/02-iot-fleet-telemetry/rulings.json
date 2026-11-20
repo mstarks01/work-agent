@@ -66,5 +66,103 @@
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 1: 02-iot-fleet-telemetry T-02"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:entity:sensor-node>process:device-gateway>publish-readings",
+          "entity:sensor-node"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 9"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:entity:field-technician>entity:sensor-node>local-service-session",
+          "entity:sensor-node"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 10"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:telemetry-lake"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 13"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "intercept",
+        "affected_element_ids": [
+          "flow:entity:sensor-node>process:device-gateway>publish-readings"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 14"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "process:device-gateway",
+          "flow:entity:sensor-node>process:device-gateway>publish-readings"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 15"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:firmware-bucket",
+          "entity:sensor-node"
+        ]
+      },
+      "ruling": "Bucket write access is required. The finding does not specify how the writer obtained or exercised it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 11"
+    },
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "entity:sensor-node",
+          "store:telemetry-lake"
+        ]
+      },
+      "ruling": "The shared fleet key defeats per-device attribution regardless of who disputes the reading.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 12"
+    }
   ]
 }

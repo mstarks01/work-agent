@@ -180,7 +180,7 @@ def test_no_anchor_is_satisfied_by_naming_the_unknown_alone(fixture):
         assert anchor.lower() not in {*shields, "unknown", "needs-info"}, anchor
 
 
-def test_the_set_keeps_a_control_that_reaches_the_critic_today():
+def test_the_set_keeps_a_negative_row_that_reaches_the_critic_today():
     """One negative row with no unknown ground, so a failure can be localised.
 
     Every other negative fixture is behind the bypass, and if the critic cannot
@@ -343,8 +343,8 @@ def test_the_cli_resolves_its_critic_tier_through_the_one_reader():
 
     Two spellings name this node: the graph's ``critic_<framework>`` and the
     tiers file's ``critic/<framework>``.
-    :meth:`~analysis_service.deployment.Deployment.tier_of` is documented as the
-    one place that walk is written, and asking ``tiers.resolve_tier`` with the
+    :meth:`~analysis_service.deployment.Deployment.tier_of` walks the graph
+    spelling to a tier, and asking ``tiers.resolve_tier`` with the
     graph spelling raises ``unknown LLM node`` — so the run dies at its first
     line, after a reader has already paid for nothing.
 

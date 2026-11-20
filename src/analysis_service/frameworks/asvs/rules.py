@@ -62,8 +62,8 @@ from analysis_service.analysis import (
     names_term,
     states_a_protocol,
 )
-from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import Match, Rule, clip_fact
+from analysis_service.assertions import AssertionCatalog, PredicateName
+from analysis_service.candidates import Match, Rule, clip_fact, with_rule_tables
 from analysis_service.claims import UnknownRef
 from analysis_service.frameworks import NoRule, PreconditionResult, PredicateReader
 from analysis_service.protocol_defaults import NEGATED
@@ -764,9 +764,189 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
 )
 
 
-RULES: tuple[Rule, ...] = (
-    *(_rule_of(test) for test in PRESENCE_TESTS),
-    *STRUCTURAL_RULES,
+#: What an answer about a fact each rule reads informs, as the early list shows
+#: it to the owner.
+EFFECTS: Mapping[str, str] = MappingProxyType(
+    {
+        "encoding-and-sanitization-database": (
+            "Informs whether the checks for queries built from input apply."
+        ),
+        "encoding-and-sanitization-rich-text-input": (
+            "Informs whether the checks for text that users author apply."
+        ),
+        "encoding-and-sanitization-xml-parser": (
+            "Informs whether the checks for unsafe XML parsing apply."
+        ),
+        "validation-and-business-logic-client-side-code": (
+            "Informs whether the checks for validation on an untrusted side apply."
+        ),
+        "validation-and-business-logic-multi-step-flow": (
+            "Informs whether the checks for steps taken out of order apply."
+        ),
+        "web-frontend-security-browser-frontend": (
+            "Informs whether the checks for browser headers and origin rules apply."
+        ),
+        "web-frontend-security-cookies": (
+            "Informs whether the checks for cookie attributes apply."
+        ),
+        "web-frontend-security-cors": (
+            "Informs whether the checks for cross-origin access apply."
+        ),
+        "api-and-web-service-websocket": (
+            "Informs whether the checks for WebSocket connections apply."
+        ),
+        "file-handling-file-upload": (
+            "Informs whether the checks for uploaded files apply."
+        ),
+        "authentication-authentication": (
+            "Informs whether the authentication checks apply."
+        ),
+        "authentication-password-auth": ("Informs whether the password checks apply."),
+        "session-management-sessions": ("Informs whether the session checks apply."),
+        "self-contained-tokens-self-contained-tokens": (
+            "Informs whether the checks for self-contained tokens apply."
+        ),
+        "oauth-and-oidc-oauth": (
+            "Informs whether the OAuth and OpenID Connect checks apply."
+        ),
+        "cryptography-encryption": (
+            "Informs whether the encryption and key checks apply."
+        ),
+        "data-protection-browser-frontend": (
+            "Informs whether the checks for sensitive data kept in a browser apply."
+        ),
+        "authorization-privileged-role": (
+            "Informs whether the checks for access to functions and records apply."
+        ),
+        "secure-communication-transport": (
+            "Informs whether the checks for channel protection apply."
+        ),
+        "configuration-secret-material": (
+            "Informs whether the checks for secrets and configuration apply."
+        ),
+        "secure-coding-and-architecture-third-party-component": (
+            "Informs whether the checks for third-party components apply."
+        ),
+        "security-logging-and-error-handling-log-or-audit-trail": (
+            "Informs whether the logging and alert checks apply."
+        ),
+        "webrtc-real-time-media": (
+            "Informs whether the checks for real-time media apply."
+        ),
+        "secure-communication-unverified-transit": (
+            "Informs which checks for channel protection stay open."
+        ),
+        "authorization-shared-account": (
+            "Informs whether the checks for one credential that all callers "
+            "share apply."
+        ),
+        "data-protection-classified-store": (
+            "Informs whether the checks for classified data in this store apply."
+        ),
+        "security-logging-and-error-handling-write-with-no-record": (
+            "Informs whether the checks for writes that no record names apply."
+        ),
+        "validation-and-business-logic-crossing-from-an-entity": (
+            "Informs whether the checks for input from an outside party apply."
+        ),
+    }
+)
+
+#: The predicates whose fact bears on whether each rule's requirements apply
+#: (ADR 0117). The early list ranks a question kind by the rules that name one
+#: of its parts (:func:`~analysis_service.early_questions.reads`), but this
+#: framework's prior names no question kind, so these rows do not move the
+#: early order. ``tests/test_rule_informed_by.py`` holds each lane to at least
+#: one predicate.
+INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
+    {
+        "encoding-and-sanitization-database": frozenset({"content-validation-encodes"}),
+        "encoding-and-sanitization-rich-text-input": frozenset(
+            {"content-validation-encodes"}
+        ),
+        "encoding-and-sanitization-xml-parser": frozenset(
+            {"content-validation-encodes", "code-execution"}
+        ),
+        "validation-and-business-logic-client-side-code": frozenset(
+            {"content-validation-validates"}
+        ),
+        "validation-and-business-logic-multi-step-flow": frozenset(
+            {"authorization-scope-checks-each-request"}
+        ),
+        "validation-and-business-logic-crossing-from-an-entity": frozenset(
+            {
+                "content-validation-validates",
+                "capacity-limits-rate",
+                "capacity-limits-quota",
+            }
+        ),
+        "web-frontend-security-browser-frontend": frozenset(
+            {"security-configuration-headers"}
+        ),
+        "web-frontend-security-cookies": frozenset({"security-configuration-cookies"}),
+        "web-frontend-security-cors": frozenset(
+            {"security-configuration-cross-origin"}
+        ),
+        "api-and-web-service-websocket": frozenset(
+            {"security-configuration-cross-origin", "capacity-limits-size"}
+        ),
+        "file-handling-file-upload": frozenset(
+            {"capacity-limits-size", "code-execution", "content-validation-validates"}
+        ),
+        "authentication-authentication": frozenset({"capacity-limits-rate"}),
+        "authentication-password-auth": frozenset({"capacity-limits-rate"}),
+        "session-management-sessions": frozenset({"security-configuration-cookies"}),
+        "authorization-privileged-role": frozenset(
+            {
+                "authorization-scope-checks-each-request",
+                "authorization-scope-least-privilege",
+                "authorization-scope-checks-ownership",
+            }
+        ),
+        "authorization-shared-account": frozenset({"record-attribution"}),
+        "self-contained-tokens-self-contained-tokens": frozenset(
+            {"provenance-sender", "provenance-integrity"}
+        ),
+        "oauth-and-oidc-oauth": frozenset({"destination", "provenance-sender"}),
+        "cryptography-encryption": frozenset(
+            {"stored-copy-access-encrypted", "security-configuration-secret-store"}
+        ),
+        "secure-communication-transport": frozenset({"transport-encryption"}),
+        "secure-communication-unverified-transit": frozenset({"transport-encryption"}),
+        "configuration-secret-material": frozenset(
+            {"security-configuration-secret-store"}
+        ),
+        "data-protection-browser-frontend": frozenset({"data-exposure-minimal-fields"}),
+        "data-protection-classified-store": frozenset(
+            {"data-exposure-restricted-readers", "stored-copy-access-restricted"}
+        ),
+        "secure-coding-and-architecture-third-party-component": frozenset(
+            {
+                "update-process-scheduled",
+                "update-process-vulnerability-alerts",
+                "update-process-tested",
+            }
+        ),
+        "security-logging-and-error-handling-log-or-audit-trail": frozenset(
+            {
+                "audit-evidence-record-protected",
+                "data-exposure-clean-logs",
+                "failure-handling-alerts",
+            }
+        ),
+        "security-logging-and-error-handling-write-with-no-record": frozenset(
+            {"record-attribution"}
+        ),
+        "webrtc-real-time-media": frozenset(
+            {"capacity-limits-rate", "capacity-limits-size"}
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_rule_tables(
+    (*(_rule_of(test) for test in PRESENCE_TESTS), *STRUCTURAL_RULES),
+    EFFECTS,
+    INFORMED_BY,
 )
 
 
@@ -913,11 +1093,13 @@ def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
     )
 
 
-#: Why no ASVS candidate rule reads an assertion predicate. The rules here find
-#: where a requirement applies, by a technology or a structure the graph shows,
-#: and a requirement is a control the lane checks rather than a weakness it is
-#: led to. So a stated fact changes how a lane rules a requirement, never which
-#: requirements it is shown, and the lane reads the settled row as evidence.
+#: Why no ASVS candidate rule fires on an assertion predicate. The rules here
+#: find where a requirement applies, by a technology or a structure the graph
+#: shows, and a requirement is a control the lane checks rather than a weakness
+#: it is led to. So a stated fact changes how a lane rules a requirement, never
+#: which requirements it is shown, and the lane reads the settled row as
+#: evidence. Each rule that a fact informs names its predicate in
+#: :data:`INFORMED_BY`.
 _RULED_AS_EVIDENCE = NoRule(
     "a candidate rule of this framework selects requirements by what the graph"
     " shows is present; a stated fact bears on how a lane rules a requirement,"
@@ -930,20 +1112,52 @@ _RULED_AS_EVIDENCE = NoRule(
 PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
     {
         "administrative-authority": _RULED_AS_EVIDENCE,
+        "audit-evidence-record-protected": _RULED_AS_EVIDENCE,
         "authorization-grant": _RULED_AS_EVIDENCE,
+        "authorization-scope-checks-each-request": _RULED_AS_EVIDENCE,
+        "authorization-scope-checks-ownership": _RULED_AS_EVIDENCE,
+        "authorization-scope-least-privilege": _RULED_AS_EVIDENCE,
+        "capacity-limits-concurrency": _RULED_AS_EVIDENCE,
+        "capacity-limits-quota": _RULED_AS_EVIDENCE,
+        "capacity-limits-rate": _RULED_AS_EVIDENCE,
+        "capacity-limits-size": _RULED_AS_EVIDENCE,
+        "code-execution": _RULED_AS_EVIDENCE,
         "content-validation": _RULED_AS_EVIDENCE,
+        "content-validation-encodes": _RULED_AS_EVIDENCE,
+        "content-validation-validates": _RULED_AS_EVIDENCE,
         "credential-custody": _RULED_AS_EVIDENCE,
         "credential-expiry": _RULED_AS_EVIDENCE,
         "credential-lifetime": _RULED_AS_EVIDENCE,
         "credential-revocation": _RULED_AS_EVIDENCE,
         "credential-rotation": _RULED_AS_EVIDENCE,
         "credential-sharing": _RULED_AS_EVIDENCE,
+        "data-exposure-clean-logs": _RULED_AS_EVIDENCE,
+        "data-exposure-minimal-fields": _RULED_AS_EVIDENCE,
+        "data-exposure-restricted-readers": _RULED_AS_EVIDENCE,
+        "destination": _RULED_AS_EVIDENCE,
         "destination-verification": _RULED_AS_EVIDENCE,
+        "failure-handling-alerts": _RULED_AS_EVIDENCE,
+        "failure-handling-fails-closed": _RULED_AS_EVIDENCE,
+        "failure-handling-recovers": _RULED_AS_EVIDENCE,
         "mfa-requirement": _RULED_AS_EVIDENCE,
         "origin-verification": _RULED_AS_EVIDENCE,
+        "physical-access": _RULED_AS_EVIDENCE,
+        "provenance-integrity": _RULED_AS_EVIDENCE,
+        "provenance-sender": _RULED_AS_EVIDENCE,
+        "reachability-named-callers": _RULED_AS_EVIDENCE,
         "record-attribution": _RULED_AS_EVIDENCE,
         "represented-by": _RULED_AS_EVIDENCE,
+        "security-configuration-cookies": _RULED_AS_EVIDENCE,
+        "security-configuration-cross-origin": _RULED_AS_EVIDENCE,
+        "security-configuration-headers": _RULED_AS_EVIDENCE,
+        "security-configuration-secret-store": _RULED_AS_EVIDENCE,
         "signature-verification": _RULED_AS_EVIDENCE,
+        "stored-copy-access-encrypted": _RULED_AS_EVIDENCE,
+        "stored-copy-access-restricted": _RULED_AS_EVIDENCE,
+        "stored-copy-integrity": _RULED_AS_EVIDENCE,
         "tenant-ownership": _RULED_AS_EVIDENCE,
+        "update-process-scheduled": _RULED_AS_EVIDENCE,
+        "update-process-tested": _RULED_AS_EVIDENCE,
+        "update-process-vulnerability-alerts": _RULED_AS_EVIDENCE,
     }
 )

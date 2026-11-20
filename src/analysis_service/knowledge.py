@@ -100,7 +100,7 @@ def select_documents(
     exists.** Ties are common: over the whole corpus, all 39 selections tie at
     one matched rule. Declaration order alone would send every one to the
     first-declared document, so ``seen`` breaks a tie toward material this job
-    has not sent. That spends the same budget on more of the corpus, and a
+    has not sent. The same budget then covers more of the corpus, and a
     better-matched document still wins outright.
 
     ``seen`` is per job and per table, never global: a note and a worked case

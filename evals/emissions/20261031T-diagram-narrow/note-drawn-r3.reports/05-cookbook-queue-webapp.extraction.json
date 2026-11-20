@@ -1,0 +1,580 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "Browser",
+        "description": "A browser outside the system interacting with the web application.",
+        "assets": [],
+        "source_excerpt": "browser[Browser]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "Web application",
+        "description": "The web application in the Web tier.",
+        "assets": [
+          "business-critical-data",
+          "credentials"
+        ],
+        "source_excerpt": "app[Web application]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker",
+        "name": "Background worker",
+        "description": "The background worker in the Backend tier.",
+        "assets": [
+          "business-critical-data",
+          "credentials"
+        ],
+        "source_excerpt": "worker[Background worker]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "Message queue",
+        "description": "A message queue in the Backend tier.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "queue[Message queue]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "Database",
+        "description": "A database in the Backend tier.",
+        "assets": [],
+        "source_excerpt": "db[(Database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "Web application config",
+        "description": "Configuration for the web application, including settings and queue credentials.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "webcfg[(Web application config)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "Worker config",
+        "description": "Configuration for the worker, including settings and database credentials.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "workercfg[(Worker config)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>http-s",
+        "name": "HTTP/S",
+        "description": "Browser interaction with the web application over HTTP/S.",
+        "assets": [],
+        "source_excerpt": "browser -->|\"HTTP/S\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>jobs",
+        "name": "jobs",
+        "description": "Jobs sent from the web application to the message queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "app -->|jobs| queue",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:message-queue>process:background-worker>jobs",
+        "name": "jobs",
+        "description": "Jobs sent from the message queue to the background worker.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "queue -->|jobs| worker",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:message-queue",
+        "destination": "process:background-worker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker>store:database>data-log-records",
+        "name": "data, log records",
+        "description": "Data and log records sent from the background worker to the database.",
+        "assets": [],
+        "source_excerpt": "worker <-->|\"data, log records\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "data, log records",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:database>process:background-worker>data-log-records",
+        "name": "data, log records",
+        "description": "Data and log records sent from the database to the background worker.",
+        "assets": [],
+        "source_excerpt": "worker <-->|\"data, log records\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:database",
+        "destination": "process:background-worker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "data, log records",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:web-application-config>process:web-application>settings-queue-credentials",
+        "name": "settings, queue credentials",
+        "description": "Settings and queue credentials sent from the web application config to the web application.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "webcfg -->|\"settings, queue credentials\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:web-application-config",
+        "destination": "process:web-application",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings, queue credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:worker-config>process:background-worker>settings-database-credentials",
+        "name": "settings, database credentials",
+        "description": "Settings and database credentials sent from the worker config to the background worker.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "workercfg -->|\"settings, database credentials\"| worker",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:worker-config",
+        "destination": "process:background-worker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings, database credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:web-tier",
+        "name": "Web tier",
+        "description": "The Web tier subgraph.",
+        "assets": [],
+        "source_excerpt": "subgraph web[Web tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "Backend tier",
+        "description": "The Backend tier subgraph.",
+        "assets": [],
+        "source_excerpt": "subgraph backend[Backend tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web application config is confidential because it contains queue credentials.",
+        "element_id": "store:web-application-config",
+        "attribute": "data_classification",
+        "basis": "The diagram labels a flow from the web application config as carrying \u201csettings, queue credentials\u201d."
+      },
+      {
+        "assumption": "The worker config is confidential because it contains database credentials.",
+        "element_id": "store:worker-config",
+        "attribute": "data_classification",
+        "basis": "The diagram labels a flow from the worker config as carrying \u201csettings, database credentials\u201d."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "Browser",
+        "description": "A browser outside the system interacting with the web application.",
+        "assets": [],
+        "source_excerpt": "browser[Browser]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "Web application",
+        "description": "The web application in the Web tier.",
+        "assets": [
+          "business-critical-data",
+          "credentials"
+        ],
+        "source_excerpt": "app[Web application]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker",
+        "name": "Background worker",
+        "description": "The background worker in the Backend tier.",
+        "assets": [
+          "business-critical-data",
+          "credentials"
+        ],
+        "source_excerpt": "worker[Background worker]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "Message queue",
+        "description": "A message queue in the Backend tier.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "queue[Message queue]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "Database",
+        "description": "A database in the Backend tier.",
+        "assets": [],
+        "source_excerpt": "db[(Database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "Web application config",
+        "description": "Configuration for the web application, including settings and queue credentials.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "webcfg[(Web application config)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "Worker config",
+        "description": "Configuration for the worker, including settings and database credentials.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "workercfg[(Worker config)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>http-s",
+        "name": "HTTP/S",
+        "description": "Browser interaction with the web application over HTTP/S.",
+        "assets": [],
+        "source_excerpt": "browser -->|\"HTTP/S\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>jobs",
+        "name": "jobs",
+        "description": "Jobs sent from the web application to the message queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "app -->|jobs| queue",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:message-queue>process:background-worker>jobs",
+        "name": "jobs",
+        "description": "Jobs sent from the message queue to the background worker.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "queue -->|jobs| worker",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:message-queue",
+        "destination": "process:background-worker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker>store:database>data-log-records",
+        "name": "data, log records",
+        "description": "Data and log records sent from the background worker to the database.",
+        "assets": [],
+        "source_excerpt": "worker <-->|\"data, log records\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "data, log records",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:database>process:background-worker>data-log-records",
+        "name": "data, log records",
+        "description": "Data and log records sent from the database to the background worker.",
+        "assets": [],
+        "source_excerpt": "worker <-->|\"data, log records\"| db",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:database",
+        "destination": "process:background-worker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "data, log records",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:web-application-config>process:web-application>settings-queue-credentials",
+        "name": "settings, queue credentials",
+        "description": "Settings and queue credentials sent from the web application config to the web application.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "webcfg -->|\"settings, queue credentials\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:web-application-config",
+        "destination": "process:web-application",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings, queue credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:worker-config>process:background-worker>settings-database-credentials",
+        "name": "settings, database credentials",
+        "description": "Settings and database credentials sent from the worker config to the background worker.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "workercfg -->|\"settings, database credentials\"| worker",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:worker-config",
+        "destination": "process:background-worker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings, database credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:web-tier",
+        "name": "Web tier",
+        "description": "The Web tier subgraph.",
+        "assets": [],
+        "source_excerpt": "subgraph web[Web tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "Backend tier",
+        "description": "The Backend tier subgraph.",
+        "assets": [],
+        "source_excerpt": "subgraph backend[Backend tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web application config is confidential because it contains queue credentials.",
+        "element_id": "store:web-application-config",
+        "attribute": "data_classification",
+        "basis": "The diagram labels a flow from the web application config as carrying \u201csettings, queue credentials\u201d."
+      },
+      {
+        "assumption": "The worker config is confidential because it contains database credentials.",
+        "element_id": "store:worker-config",
+        "attribute": "data_classification",
+        "basis": "The diagram labels a flow from the worker config as carrying \u201csettings, database credentials\u201d."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -105,7 +105,7 @@ def client(runs, tmp_path):
         ledger_path=tmp_path / "votes",
         configs={"01-payments-checkout": "engine-1.2.3"},
     )
-    # A loopback base URL, because the app now refuses any other Host: the
+    # A loopback base URL, because the app refuses any other Host: the
     # default ``testserver`` is exactly the shape a DNS-rebound request wears.
     # The same-origin header rides on the client for the same reason — a real
     # browser sets it on every request the page makes, and the tests that care
@@ -635,3 +635,21 @@ def test_an_item_whose_mechanism_names_long_flows_can_take_a_vote():
     )[0]
 
     assert VoteBody(fingerprint=item.key, verdict="up").fingerprint == item.key
+
+
+def test_a_422_names_the_place_and_never_what_was_sent(client):
+    """A body the schema refuses gets one line of places and rules."""
+    app, _ = client
+    marker = "sk_ant_api03_EchoMarker7f3a9"
+
+    response = app.post(
+        "/api/vote",
+        json={"fingerprint": "abc", "verdict": "up", "note": marker * 40, marker: 1},
+    )
+
+    assert response.status_code == 422, response.text
+    assert "echomarker" not in response.text.lower(), response.text
+    assert response.json()["detail"] == (
+        "body.note: String should have at most 1000 characters;"
+        " body: Extra inputs are not permitted"
+    )

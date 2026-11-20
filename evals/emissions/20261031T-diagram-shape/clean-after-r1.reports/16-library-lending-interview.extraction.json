@@ -1,0 +1,634 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0[\"member\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:internet"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "desk staff",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1[\"desk staff\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:library-app",
+        "name": "library app",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"library app\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internet",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "self-service kiosk",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"self-service kiosk\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lending-api",
+        "name": "lending API",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"lending API\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "loans database",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5[(\"loans database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app>borrow-renew-reserve",
+        "name": "borrow renew reserve",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"borrow, renew and reserve\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:library-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
+        "name": "loan and reservation requests",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"loan and reservation requests\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:library-app",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loan and reservation requests",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "name": "record loans and returns",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"record loans and returns\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans and returns",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>change-loans",
+        "name": "change loans",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1 -->|\"change loans by hand\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "name": "read and write loans",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"read and write loans\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "Trust zone: internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:branch-network",
+        "name": "branch network",
+        "description": "Trust zone: branch network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: branch network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "council data centre",
+        "description": "Trust zone: council data centre",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: council data centre\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The node is named \"member\", which denotes a person."
+      },
+      {
+        "assumption": "Desk staff are human external entities.",
+        "element_id": "entity:desk-staff",
+        "attribute": "kind",
+        "basis": "The node is named \"desk staff\", which denotes people."
+      },
+      {
+        "assumption": "The internet zone is a network trust boundary.",
+        "element_id": "boundary:internet",
+        "attribute": "kind",
+        "basis": "The zone is named \"internet\", a network location."
+      },
+      {
+        "assumption": "The branch network zone is a network trust boundary.",
+        "element_id": "boundary:branch-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"branch network\"."
+      },
+      {
+        "assumption": "The council data centre zone is a network trust boundary.",
+        "element_id": "boundary:council-data-centre",
+        "attribute": "kind",
+        "basis": "The zone is named \"council data centre\", a network location."
+      },
+      {
+        "assumption": "The desk staff carry business-critical operating records because they change loans.",
+        "element_id": "entity:desk-staff",
+        "attribute": "assets",
+        "basis": "The diagram states that desk staff \"change loans by hand\"; loans are operating records."
+      },
+      {
+        "assumption": "The library app handles business-critical operating records because it sends loan and reservation requests.",
+        "element_id": "process:library-app",
+        "attribute": "assets",
+        "basis": "The diagram states that the library app sends \"loan and reservation requests\"."
+      },
+      {
+        "assumption": "The self-service kiosk handles business-critical operating records because it records loans and returns.",
+        "element_id": "process:self-service-kiosk",
+        "attribute": "assets",
+        "basis": "The diagram states that the kiosk \"record[s] loans and returns\"."
+      },
+      {
+        "assumption": "The lending API handles business-critical operating records because it reads and writes loans.",
+        "element_id": "process:lending-api",
+        "attribute": "assets",
+        "basis": "The diagram states that the lending API \"read[s] and write[s] loans\"."
+      },
+      {
+        "assumption": "The loans database holds business-critical operating records because it stores loans read and written by the lending API.",
+        "element_id": "store:loans-database",
+        "attribute": "assets",
+        "basis": "The diagram states that the lending API \"read[s] and write[s] loans\" to the loans database."
+      },
+      {
+        "assumption": "The library app to lending API flow carries business-critical operating records because it carries loan and reservation requests.",
+        "element_id": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"loan and reservation requests\"."
+      },
+      {
+        "assumption": "The self-service kiosk to lending API flow carries business-critical operating records because it records loans and returns.",
+        "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"record loans and returns\"."
+      },
+      {
+        "assumption": "The desk staff to lending API flow carries business-critical operating records because it changes loans.",
+        "element_id": "flow:entity:desk-staff>process:lending-api>change-loans",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"change loans by hand\"."
+      },
+      {
+        "assumption": "The lending API to loans database flow carries business-critical operating records because it reads and writes loans.",
+        "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"read and write loans\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0[\"member\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:internet"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "desk staff",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1[\"desk staff\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:library-app",
+        "name": "library app",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"library app\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internet",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "self-service kiosk",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"self-service kiosk\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lending-api",
+        "name": "lending API",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"lending API\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "loans database",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5[(\"loans database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app>borrow-renew-reserve",
+        "name": "borrow renew reserve",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"borrow, renew and reserve\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:library-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
+        "name": "loan and reservation requests",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"loan and reservation requests\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:library-app",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loan and reservation requests",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "name": "record loans and returns",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"record loans and returns\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans and returns",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>change-loans",
+        "name": "change loans",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1 -->|\"change loans by hand\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "name": "read and write loans",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"read and write loans\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loans",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "Trust zone: internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:branch-network",
+        "name": "branch network",
+        "description": "Trust zone: branch network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: branch network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "council data centre",
+        "description": "Trust zone: council data centre",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: council data centre\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The node is named \"member\", which denotes a person."
+      },
+      {
+        "assumption": "Desk staff are human external entities.",
+        "element_id": "entity:desk-staff",
+        "attribute": "kind",
+        "basis": "The node is named \"desk staff\", which denotes people."
+      },
+      {
+        "assumption": "The internet zone is a network trust boundary.",
+        "element_id": "boundary:internet",
+        "attribute": "kind",
+        "basis": "The zone is named \"internet\", a network location."
+      },
+      {
+        "assumption": "The branch network zone is a network trust boundary.",
+        "element_id": "boundary:branch-network",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"branch network\"."
+      },
+      {
+        "assumption": "The council data centre zone is a network trust boundary.",
+        "element_id": "boundary:council-data-centre",
+        "attribute": "kind",
+        "basis": "The zone is named \"council data centre\", a network location."
+      },
+      {
+        "assumption": "The desk staff carry business-critical operating records because they change loans.",
+        "element_id": "entity:desk-staff",
+        "attribute": "assets",
+        "basis": "The diagram states that desk staff \"change loans by hand\"; loans are operating records."
+      },
+      {
+        "assumption": "The library app handles business-critical operating records because it sends loan and reservation requests.",
+        "element_id": "process:library-app",
+        "attribute": "assets",
+        "basis": "The diagram states that the library app sends \"loan and reservation requests\"."
+      },
+      {
+        "assumption": "The self-service kiosk handles business-critical operating records because it records loans and returns.",
+        "element_id": "process:self-service-kiosk",
+        "attribute": "assets",
+        "basis": "The diagram states that the kiosk \"record[s] loans and returns\"."
+      },
+      {
+        "assumption": "The lending API handles business-critical operating records because it reads and writes loans.",
+        "element_id": "process:lending-api",
+        "attribute": "assets",
+        "basis": "The diagram states that the lending API \"read[s] and write[s] loans\"."
+      },
+      {
+        "assumption": "The loans database holds business-critical operating records because it stores loans read and written by the lending API.",
+        "element_id": "store:loans-database",
+        "attribute": "assets",
+        "basis": "The diagram states that the lending API \"read[s] and write[s] loans\" to the loans database."
+      },
+      {
+        "assumption": "The library app to lending API flow carries business-critical operating records because it carries loan and reservation requests.",
+        "element_id": "flow:process:library-app>process:lending-api>loan-and-reservation-requests",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"loan and reservation requests\"."
+      },
+      {
+        "assumption": "The self-service kiosk to lending API flow carries business-critical operating records because it records loans and returns.",
+        "element_id": "flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"record loans and returns\"."
+      },
+      {
+        "assumption": "The desk staff to lending API flow carries business-critical operating records because it changes loans.",
+        "element_id": "flow:entity:desk-staff>process:lending-api>change-loans",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"change loans by hand\"."
+      },
+      {
+        "assumption": "The lending API to loans database flow carries business-critical operating records because it reads and writes loans.",
+        "element_id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "attribute": "assets",
+        "basis": "The flow is labelled \"read and write loans\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -30,8 +30,8 @@ arithmetic over records rather than a re-run.
 
 The measurement half reads :data:`~evals.harness.instruments.INSTRUMENTS` and
 walks each entry's declared ``keys``. An instrument added to that table appears
-here with no edit, and one whose package a sweep did not run is absent from both
-sides, rather than reported as a change to zero.
+here with no edit. A block that one sweep does not carry is named as absent and
+not compared, rather than reported as a change to zero.
 """
 
 from __future__ import annotations
@@ -46,6 +46,8 @@ from typing import Any
 
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.instruments import INSTRUMENTS
+from evals.harness.rates import rounded_figure, shown_figure
+from evals.harness.run_record import run_record
 
 #: What an instruction row is keyed by. The pair is unique within a sweep —
 #: :func:`~evals.harness.instruction.collect` raises if one node was built twice
@@ -93,11 +95,14 @@ class MeasurementDelta:
 
     instrument: str
     path: str
-    before: float
-    after: float
+    before: float | None
+    after: float | None
 
     @property
-    def delta(self) -> float:
+    def delta(self) -> float | None:
+        """``after - before``, or ``None`` where either side has no value."""
+        if self.before is None or self.after is None:
+            return None
         return self.after - self.before
 
     def to_json(self) -> dict[str, Any]:
@@ -106,7 +111,7 @@ class MeasurementDelta:
             "path": self.path,
             "before": self.before,
             "after": self.after,
-            "delta": round(self.delta, 4),
+            "delta": rounded_figure(self.delta, 4),
         }
 
 
@@ -142,8 +147,11 @@ def node_deltas(before: EvalArtifact, after: EvalArtifact) -> list[NodeDelta]:
     return rows
 
 
-def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float]]:
+def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float | None]]:
     """Every numeric leaf of one artifact block, with its path.
+
+    A ``null`` leaf is a figure with no value, so it is a leaf too: a figure
+    that moves between a value and none has moved.
 
     Generic because an aggregate's shape is the instrument's own business. A
     reader comparing two sweeps wants every number that moved, and enumerating
@@ -152,7 +160,9 @@ def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float]]:
     """
     if isinstance(value, bool):
         return
-    if isinstance(value, int | float):
+    if value is None:
+        yield prefix, None
+    elif isinstance(value, int | float):
         yield prefix, float(value)
     elif isinstance(value, Mapping):
         for key, item in value.items():
@@ -162,37 +172,58 @@ def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float]]:
             yield from _numbers(item, f"{prefix}[{index}]")
 
 
+def _measurement_keys() -> list[tuple[str, str]]:
+    """Each instrument's declared keys but the ``instruction`` instrument's, as
+    ``(instrument, key)``.
+
+    The ``instruction`` keys are the independent variable, reported by
+    :func:`node_deltas` in the shape a reader can use rather than as flattened
+    leaves beside the scores.
+    """
+    return [
+        (name, key)
+        for name, instrument in INSTRUMENTS.items()
+        if name != "instruction"
+        for key in instrument.keys
+    ]
+
+
+def absent_blocks(before: EvalArtifact, after: EvalArtifact) -> list[str]:
+    """Each measurement block that one of the sweeps does not carry, as
+    ``path: key``. :func:`measurement_deltas` compares none of its numbers."""
+    return [
+        f"{sweep.path}: {key}"
+        for _, key in _measurement_keys()
+        for sweep in (before, after)
+        if not sweep.carries(key)
+    ]
+
+
 def measurement_deltas(
     before: EvalArtifact, after: EvalArtifact
 ) -> list[MeasurementDelta]:
-    """Every instrument number that differs between the two sweeps.
-
-    The ``instruction`` instrument's own keys are skipped: they are the
-    independent variable, reported by :func:`node_deltas` in the shape a reader
-    can use rather than as flattened leaves beside the scores.
-    """
-    rows = []
-    for name, instrument in INSTRUMENTS.items():
-        if name == "instruction":
+    """Every instrument number that differs between the two sweeps, in the
+    blocks that both sweeps carry (:func:`absent_blocks` names the rest)."""
+    rows: list[MeasurementDelta] = []
+    for name, key in _measurement_keys():
+        if not (before.carries(key) and after.carries(key)):
             continue
-        for key in instrument.keys:
-            first = dict(_numbers(before.block(key), key))
-            second = dict(_numbers(after.block(key), key))
-            for path in sorted(set(first) & set(second)):
-                if first[path] != second[path]:
-                    rows.append(
-                        MeasurementDelta(
-                            instrument=name,
-                            path=path,
-                            before=first[path],
-                            after=second[path],
-                        )
-                    )
+        first = dict(_numbers(before.block(key), key))
+        second = dict(_numbers(after.block(key), key))
+        rows.extend(
+            MeasurementDelta(
+                instrument=name, path=path, before=first[path], after=second[path]
+            )
+            for path in sorted(set(first) & set(second))
+            if first[path] != second[path]
+        )
     return rows
 
 
 def render(
-    nodes: Sequence[NodeDelta], measurements: Sequence[MeasurementDelta]
+    nodes: Sequence[NodeDelta],
+    measurements: Sequence[MeasurementDelta],
+    absent: Sequence[str],
 ) -> None:
     """The instruction change, then everything that moved beside it.
 
@@ -208,13 +239,15 @@ def render(
         print(f"instruction delta: {len(changed)} of {len(nodes)} nodes moved")
         print(f"  {'framework':10} {'node':50} {'before':>7} {'after':>7} {'delta':>7}")
         for row in sorted(changed, key=lambda item: -abs(item.delta or 0)):
-            before = "—" if row.before is None else f"{row.before:,}"
-            after = "—" if row.after is None else f"{row.after:,}"
-            delta = "—" if row.delta is None else f"{row.delta:+,}"
+            before = shown_figure(row.before, ",")
+            after = shown_figure(row.after, ",")
+            delta = shown_figure(row.delta, "+,")
             print(
                 f"  {row.framework:10} {row.node:50} {before:>7} {after:>7} {delta:>7}"
             )
 
+    for block in absent:
+        print(f"measurement delta: not compared, because {block} is absent")
     if not measurements:
         print("measurement delta: nothing an instrument reports moved")
         return
@@ -223,7 +256,8 @@ def render(
     for moved_number in measurements:
         print(
             f"  {moved_number.instrument:16} {moved_number.path:46}"
-            f" {moved_number.before:9.3f} {moved_number.after:9.3f}"
+            f" {shown_figure(moved_number.before, '.3f'):>9}"
+            f" {shown_figure(moved_number.after, '.3f'):>9}"
         )
     print(
         "measurement delta: a change smaller than the run-to-run spread"
@@ -233,13 +267,16 @@ def render(
 
 
 def artifact(
-    nodes: Sequence[NodeDelta], measurements: Sequence[MeasurementDelta]
+    nodes: Sequence[NodeDelta],
+    measurements: Sequence[MeasurementDelta],
+    absent: Sequence[str],
 ) -> dict[str, Any]:
     """The comparison as a record, for a reader that wants it in a file."""
     return {
         "instruction_delta": [row.to_json() for row in nodes if row.moved],
         "instruction_nodes": len(nodes),
         "measurement_delta": [row.to_json() for row in measurements],
+        "absent_blocks": list(absent),
     }
 
 
@@ -255,17 +292,21 @@ def command_compare(args: argparse.Namespace) -> int:
     try:
         before = load_artifact(args.before)
         after = load_artifact(args.after)
+        nodes = node_deltas(before, after)
     except (ProvenanceError, ValueError) as error:
         print(f"cannot compare: {error}", file=sys.stderr)
         return 1
 
-    nodes = node_deltas(before, after)
     measurements = measurement_deltas(before, after)
-    render(nodes, measurements)
+    absent = absent_blocks(before, after)
+    render(nodes, measurements, absent)
     if args.out:
-        record = artifact(nodes, measurements)
-        record["before"] = str(before.path)
-        record["after"] = str(after.path)
-        Path(args.out).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        record = run_record(
+            "compare",
+            {"before": str(before.path), "after": str(after.path)},
+            {before.path: {}, after.path: {}},
+        )
+        written = {"record": record, **artifact(nodes, measurements, absent)}
+        Path(args.out).write_text(json.dumps(written, indent=2), encoding="utf-8")
         print(f"wrote {args.out}")
     return 0

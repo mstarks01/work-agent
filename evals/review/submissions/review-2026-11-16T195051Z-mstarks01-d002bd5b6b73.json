@@ -1,0 +1,56 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-11-16T195051Z",
+  "cases": {
+    "16-library-lending-interview": {
+      "own_list": [
+        "An attacker who obtains the password taped under a branch desk can impersonate desk staff using the shared circulation login and make unauthorized loan extensions, clear account blocks or mark unreturned books as returned. The same credential is used at every branch.",
+        "A dishonest desk worker can deliberately mark a book returned when it was not, clear a justified account block or grant an improper extension through the circulation page, corrupting loan records using their existing staff access.",
+        "A desk worker can deny making a fraudulent manual return, and investigators cannot attribute it to a person or branch: all staff share one account and the history records only that the loan was closed by hand.",
+        "An internet attacker could submit borrowing, renewal or reservation requests without a valid member identity if the lending API fails to authenticate requests or accepts invalid sign-in credentials. The API is internet-facing; Priya could not confirm what authentication it actually enforces, so this threat is conditional.",
+        "An authenticated member could change the member identifier in an app request to renew another member's loans or place reservations in their name if the API does not bind the requested member to the authenticated identity. Requests explicitly supply both book and member; checking loan rules does not establish this authorization check.",
+        "A member or unauthenticated caller could invoke staff-only manual-return, block-clearing or extension operations directly on the lending API if it fails to enforce staff authorization on those operations. The same API serves the circulation page and internet app traffic; endpoint access restrictions and role checks are not described.",
+        "A person using another member's borrowed, stolen or copied library card could borrow books against that member's account at a self-service kiosk if scanning the card is sufficient to establish identity. Card scanning is stated, but any additional identity check is unknown.",
+        "An attacker able to reach the kiosk-facing API operations could forge kiosk loan or return submissions, including falsely recording a return, if the API does not authenticate kiosks and authorize their operations. Kiosk-to-API authentication is unknown; branch-network placement alone does not establish a trusted caller.",
+        "An attacker could flood the internet-facing lending API with requests and exhaust its capacity, preventing borrowing and returns across phones and branches. Ordinary challenge-launch traffic has already taken the single service down twice, and there is no queue in front of it; the effectiveness of any rate limits is unknown.",
+        "An attacker positioned on a service communication path could capture member information or circulation credentials if that connection lacks effective transport encryption. Member, kiosk, staff and database connections have unknown transport protection; this is a conditional disclosure threat, not a claim that the service uses plaintext.",
+        "An attacker who obtains readable loans-database storage could disclose members' names, email addresses, home addresses and full borrowing histories if effective at-rest protection is absent. Storage encryption is unknown, so this is conditional on both storage access and missing protection.",
+        "model: process:lending-api exposure should be internet-facing, not unknown. Priya explicitly identifies the old internal-only statement as wrong and says phones now call the API directly over the internet. The note itself directs readers to her more recent account. This is an explicit correction, not an unresolved disagreement based only on recency.",
+        "model: store:loans-database data_classification is unknown even though the transcript explicitly identifies names, email addresses, home addresses and full borrowing histories, and the model itself already assigns the pii asset. Record the supported personal-data classification; an exact local sensitivity tier remains unspecified."
+      ],
+      "marks": {
+        "v5:5cba32c5c7825572": "agree",
+        "v5:2e8cdb516a1aefcb": "agree",
+        "v5:b1415388f722cd15": "agree",
+        "v5:97955e1f6a02208f": "agree",
+        "v6:4b106583f5a1a4e5": "agree",
+        "v6:75832fb12e79111f": "agree",
+        "v6:d0bafae796f9a1d7": "agree",
+        "v6:c12b9172e40511ba": "agree",
+        "v6:a2506d963f9ea70b": "agree",
+        "v6:6eef83bea1ccfc50": "agree",
+        "v5:6b106dfad813aa26": "agree",
+        "v5:982b91e50f170fbf": "agree",
+        "v5:2e2ac850137a110c": "agree",
+        "v6:43611ef59e949638": "agree",
+        "v6:b1b64873088d879f": "agree",
+        "v6:f5ec18a8ae0e9ba2": "agree",
+        "v6:efc2b4d2cd862582": "agree",
+        "v6:06758bfca6f81eb1": "agree",
+        "v6:d03f0ec5e16b6953": "agree",
+        "v6:ae6837be9bc7bb5d": "agree"
+      },
+      "missing": [],
+      "notes": "Confirming sitting on the claim that #2262 rewrote, ruled in conversation.\nThe own list is the reader's own list of review-2026-11-16T190503Z-mstarks01-41c8c58dac3e.json, reused unchanged.\nThe reader read the rewritten claim and its notes, the only changed fields of claims/stride.json, through the one-row ballot.\n\nRow 1 (v6:75832fb12e79111f, tampering): agree. The rewrite resolves the objection of the sitting of 2026-11-16.\n\nEvery other finding carries the reader's mark of review-2026-11-16T190503Z-mstarks01-41c8c58dac3e.json.",
+      "opened_digests": {
+        "source.md": "8bc51704b4514584c02f95f04048086a70f43a3dbb2c40af53afe13b3f79e6a9",
+        "transcript.md": "c48f8b9e53090b42971ffb548ed2302d0021a8c2b8539552973211c21df3f765",
+        "model.json": "36e77e5be6f65329a5ec73af880699c362dd140910c4163803f69f1ae508a0f7",
+        "claims/asvs.json": "fca11a83b2576dc3b365da4924e21967e01c8c71cd55f1ac5ce6ebde6518e504",
+        "claims/stride.json": "42b100c0ca56d7dcda8907c53f9abccd58957d0eeede0fbc6bf7403955e0827b"
+      }
+    }
+  }
+}

@@ -1,11 +1,11 @@
 """Critic yield, offline, with zero provider calls.
 
-The instrument has one job: say what the critic killed *and* what killing it
-lost. These tests hold the two halves apart — a critic that kills a rejected
-draft and a critic that kills a must-find draft must never produce the same
-number — and pin the two properties the whole measurement rests on: the scored
-claim is the same string on both sides, and the post-critic score is exactly
-what the scorer alone would have said.
+The instrument has one job: say what left the report across the critic pass
+*and* what losing it cost. These tests hold the two halves apart — a critic
+that rejects a down-voted draft and a critic that rejects a must-find draft
+must never produce the same number — and pin the two properties the whole
+measurement rests on: the scored claim is the same string on both sides, and
+the post-critic score is exactly what the scorer alone would have said.
 """
 
 from __future__ import annotations
@@ -15,28 +15,45 @@ from pathlib import Path
 import pytest
 
 from analysis_service.claim_identity import NO_ROWS
-from analysis_service.claims import Verdict
+from analysis_service.claims import ReturnedClaim, Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
-from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
+from evals.harness.critic_yield import (
+    CriticAudit,
+    CriticPopulations,
+    aggregate_yield,
+    score_case_with_yield,
+)
 from evals.harness.fingerprint import components_for, version_for
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
+from evals.harness.rates import Rate
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
-from tests.eval_factories import ScriptedMatcher, cast, draft_threat, promote
+from evals.harness.triggers import rebuilt_lane_inputs
+from tests.eval_factories import (
+    ScriptedMatcher,
+    cast,
+    draft_threat,
+    promote,
+    ruled_position,
+)
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
-CONTROL_CASE = CORPUS_DIR / "01-payments-checkout"
+PAYMENTS_CASE = CORPUS_DIR / "01-payments-checkout"
 
 
 @pytest.fixture(scope="module")
 def case():
-    return load_case(CONTROL_CASE)
+    return load_case(PAYMENTS_CASE)
 
 
-def _draft_for(reference, sequence: int):
-    """A draft aimed squarely at one reference, claiming it verbatim."""
+def _draft_for(case, reference, sequence: int):
+    """A draft aimed squarely at one reference, claiming it verbatim.
+
+    It states the position the case ruled on the reference, as a live lane
+    states one.
+    """
     return draft_threat(
         sequence,
         reference.category,
@@ -44,6 +61,7 @@ def _draft_for(reference, sequence: int):
         element_ids=reference.affected_element_ids,
         likelihood=reference.severity.likelihood,
         impact=reference.severity.impact,
+        attacker_position=ruled_position(case, reference),
     )
 
 
@@ -124,7 +142,7 @@ def test_a_ruled_needs_info_threat_is_keyed_too(case):
 
 
 def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
-    kept = _draft_for(_must_find(case), 1)
+    kept = _draft_for(case, _must_find(case), 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -137,7 +155,7 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
         _identity_matcher([kept]),
         votes,
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [kept], [junk]),
     )
     result = scored.critic_yield
 
@@ -145,13 +163,13 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
     assert result.killed[0].outcome == "rejected"
     assert result.rejected_killed == 1
     assert result.matched_killed == 0
-    assert result.kill_precision == 1.0
-    assert result.rejected_kill_rate == 1.0
+    assert result.rates["kill_precision"].value == 1.0
+    assert result.rates["rejected_kill_rate"].value == 1.0
 
 
 def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
 
     scored = score_case_with_yield(
         case,
@@ -160,7 +178,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
         _identity_matcher([killed]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [], [killed]),
     )
     result = scored.critic_yield
 
@@ -169,14 +187,14 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     assert result.rejected_killed == 0
     assert result.matched_killed == 1
     assert result.must_find_killed == 1
-    assert result.matched_kill_rate == 1.0
+    assert result.rates["matched_kill_rate"].value == 1.0
     assert result.killed[0].outcome == "matched-must-find"
     assert result.must_find_before == 1 and result.must_find_after == 0
 
 
 def test_expected_tier_kills_are_separated_from_must_find(case):
     reference = _expected(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
 
     result = score_case_with_yield(
         case,
@@ -185,7 +203,7 @@ def test_expected_tier_kills_are_separated_from_must_find(case):
         _identity_matcher([killed]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [], [killed]),
     ).critic_yield
 
     assert result.matched_killed == 1
@@ -195,7 +213,7 @@ def test_expected_tier_kills_are_separated_from_must_find(case):
 
 def test_the_post_critic_score_is_the_scorer_verbatim(case):
     reference = _must_find(case)
-    kept = _draft_for(reference, 1)
+    kept = _draft_for(case, reference, 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -219,7 +237,7 @@ def test_the_post_critic_score_is_the_scorer_verbatim(case):
 
 def test_the_scored_claim_is_the_same_string_on_both_sides(case):
     reference = _must_find(case)
-    draft = _draft_for(reference, 1)
+    draft = _draft_for(case, reference, 1)
     matcher = _identity_matcher([draft])
 
     score_case_with_yield(
@@ -241,7 +259,7 @@ def test_a_critic_edit_to_the_title_is_a_real_second_question(case):
     # ruled on the rewrite rather than silently credited with the draft's
     # ruling.
     reference = _must_find(case)
-    draft = _draft_for(reference, 1)
+    draft = _draft_for(case, reference, 1)
     reworded = promote(draft.model_copy(update={"title": "Reworded by the critic."}))
     matcher = _identity_matcher([draft])
 
@@ -262,7 +280,7 @@ def test_a_critic_edit_to_the_title_is_a_real_second_question(case):
 
 def test_aggregate_pools_counts_rather_than_averaging_rates(case):
     reference = _must_find(case)
-    kept = _draft_for(reference, 1)
+    kept = _draft_for(case, reference, 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -274,7 +292,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         _identity_matcher([kept]),
         _rejecting(case, junk),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [kept], [junk]),
     ).critic_yield
     small = score_case_with_yield(
         case,
@@ -283,7 +301,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         _identity_matcher([kept]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [kept], []),
     )
 
     totals = aggregate_yield([big, small.critic_yield])
@@ -302,12 +320,14 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     from evals.harness import modes, run
 
     reference = _must_find(case)
-    kept = _draft_for(reference, 1)
+    kept = _draft_for(case, reference, 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
     analysis = modes.AnalysisRun(
-        report=_report_with(case, [promote(kept)]),
+        report=_report_with(case, [promote(kept)]).model_copy(
+            update={"analyses": [_ruled_block(case, [kept], [junk])]}
+        ),
         drafts={"stride": (kept, junk)},
     )
     flows = CaseFlows.of_graph(
@@ -325,8 +345,14 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     assert [score.case_id for score in scores] == [case.id]
     assert yields[0].rejected_killed == 1
     printed = capsys.readouterr().out
-    assert "killed-rejected 1/1" in printed
-    assert "killed-real 0/1" in printed
+    assert (
+        f"{case.id:<26} critic 2->1  rejected_kill_rate 1/1 (100%)"
+        "  matched_kill_rate 0/1 (0%)"
+    ) in printed
+    assert (
+        "critic yield: kill_rate 1/2 (50%), rejected_kill_rate 1/1 (100%),"
+        " matched_kill_rate 0/1 (0%);"
+    ) in printed
 
 
 def test_a_case_with_no_stride_proposal_is_charged_as_proposing_nothing(case):
@@ -337,7 +363,7 @@ def test_a_case_with_no_stride_proposal_is_charged_as_proposing_nothing(case):
     """
     from evals.harness import modes, run
 
-    kept = _draft_for(_must_find(case), 1)
+    kept = _draft_for(case, _must_find(case), 1)
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]),
         drafts={"stride": (kept,)},
@@ -368,7 +394,7 @@ def test_a_holdout_case_is_scored_and_charged_no_losses(case):
     held = dataclasses.replace(
         case, meta=case.meta.model_copy(update={"holdout": True})
     )
-    kept = _draft_for(_must_find(case), 1)
+    kept = _draft_for(case, _must_find(case), 1)
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]), drafts={"stride": (kept,)}
     )
@@ -388,7 +414,7 @@ def test_a_holdout_case_is_scored_and_charged_no_losses(case):
     scores, _, charged = score(held)
     assert [score.holdout for score in scores] == [True]
     assert charged == ()
-    # The control: the same case, not held out, is charged.
+    # The comparison arm: the same case, not held out, is charged.
     assert len(score(case)[2]) == 1
 
 
@@ -435,8 +461,34 @@ def _report_with(case, threats):
     )
 
 
+def _ruled_block(case, kept, rejected):
+    """The STRIDE block of a critic that kept ``kept`` and rejected ``rejected``.
+
+    Both lists hold drafts, and the helper rules on each.
+    """
+    return (
+        _report_with(case, [promote(draft) for draft in kept])
+        .analyses[0]
+        .model_copy(
+            update={
+                "rejected_claims": [
+                    promote(
+                        draft,
+                        verdict=Verdict(
+                            status="rejected",
+                            reason="does not follow",
+                            rejected_because="reasoning",
+                        ),
+                    )
+                    for draft in rejected
+                ]
+            }
+        )
+    )
+
+
 def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
-    draft = _draft_for(_must_find(case), 1)
+    draft = _draft_for(case, _must_find(case), 1)
 
     result = score_case_with_yield(
         case,
@@ -445,21 +497,28 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
         _identity_matcher([draft]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [draft], []),
     ).critic_yield
 
     assert result.killed == ()
-    assert result.kill_rate == 0.0
-    assert result.rejected_kill_rate == 0.0
-    assert result.matched_kill_rate == 0.0
+    assert result.rates["kill_rate"].value == 0.0
+    assert result.rates["matched_kill_rate"].value == 0.0
+    # No draft carried a substance down-vote and nothing was killed: the two
+    # rates over those inputs are unavailable, never a zero.
+    assert result.rates["rejected_kill_rate"].value is None
+    assert result.rates["kill_precision"].value is None
+    totals = aggregate_yield([result])
+    assert totals["rejected_kill_rate"] is None
+    assert totals["kill_precision"] is None
+    assert result.to_json()["metrics"]["kill_precision"] is None
     assert result.to_json()["counts"]["drafts_in"] == 1
 
 
 def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
     """Two drafts at one reference; the critic kills one; the reference survives."""
     reference = _must_find(case)
-    first = _draft_for(reference, 1)
-    second = _draft_for(reference, 2)
+    first = _draft_for(case, reference, 1)
+    second = _draft_for(case, reference, 2)
     result = score_case_with_yield(
         case,
         [first, second],
@@ -467,7 +526,7 @@ def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
         _identity_matcher([first, second]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [second], [first]),
     ).critic_yield
 
     assert result.kill_count == 1
@@ -479,7 +538,7 @@ def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
 
 def test_a_kill_nothing_made_good_is_lost(case):
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
     result = score_case_with_yield(
         case,
         [killed],
@@ -487,7 +546,7 @@ def test_a_kill_nothing_made_good_is_lost(case):
         _identity_matcher([killed]),
         Ledger(),
         rows=NO_ROWS,
-        block=_report_with(case, []).analyses[0],
+        block=_ruled_block(case, [], [killed]),
     ).critic_yield
 
     assert (result.matched_killed, result.matched_lost) == (1, 1)
@@ -495,9 +554,13 @@ def test_a_kill_nothing_made_good_is_lost(case):
 
 
 def test_the_critic_stated_cause_rides_on_the_kill(case):
-    """Read off the block's own verdict; every kill without one is ``unstated``."""
+    """The cause is read off the block's own verdict.
+
+    A rejection that names no step is ``unstated``, and a kill with no verdict
+    is counted under its fate.
+    """
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
     rejected = promote(
         killed,
         verdict=Verdict(
@@ -519,7 +582,23 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
     }
     assert aggregate_yield([result])["killed_by_cause"]["lane"]["must_find"] == 1
 
+    unstated = rejected.model_copy(
+        update={"verdict": Verdict(status="rejected", reason="not this lane")}
+    )
     without = score_case_with_yield(
+        case,
+        [killed],
+        [],
+        _identity_matcher([killed]),
+        Ledger(),
+        block.model_copy(update={"rejected_claims": [unstated]}),
+        rows=NO_ROWS,
+    ).critic_yield
+    assert without.killed_by_cause == {
+        "unstated": {"killed": 1, "matched": 1, "must_find": 1}
+    }
+
+    omitted = score_case_with_yield(
         case,
         [killed],
         [],
@@ -528,8 +607,8 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
         rows=NO_ROWS,
         block=_report_with(case, []).analyses[0],
     ).critic_yield
-    assert without.killed_by_cause == {
-        "unstated": {"killed": 1, "matched": 1, "must_find": 1}
+    assert omitted.killed_by_cause == {
+        "omitted": {"killed": 1, "matched": 1, "must_find": 1}
     }
 
 
@@ -541,8 +620,8 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
     from tests.test_evals_applicability import Block
 
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
-    saved = _draft_for(_expected(case), 2)
+    killed = _draft_for(case, reference, 1)
+    saved = _draft_for(case, _expected(case), 2)
     flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     matcher = SubsetVerbIdentity({case.id: flows})
     produced = [promote(saved)]
@@ -563,6 +642,9 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         flows,
         Block(produced),
         proposed={},
+        candidates=rebuilt_lane_inputs(
+            "stride", _report_with(case, []), case.declaration("stride").options
+        ).candidates,
     )
 
     critic_rows = [loss for loss in charged.losses if loss.cause == "critic"]
@@ -570,3 +652,194 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         1 for loss in critic_rows if loss.must_find
     )
     assert scored.critic_yield.matched_lost == len(critic_rows)
+
+
+def test_the_populations_split_each_label_by_what_the_critic_did(case):
+    """Rejection, qualification and retention each read their own denominator."""
+    must_find = _draft_for(case, _must_find(case), 1)
+    expected = _draft_for(case, _expected(case), 2)
+    junk = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    asked = promote(
+        expected,
+        verdict=Verdict(
+            status="needs-info",
+            reason="authentication on this flow is unknown",
+            related_unknowns=[
+                {
+                    "element_id": expected.affected_element_ids[0],
+                    "attribute": "authentication",
+                }
+            ],
+        ),
+    )
+    killed = promote(
+        must_find,
+        verdict=Verdict(
+            status="rejected", reason="does not follow", rejected_because="reasoning"
+        ),
+    )
+    block = (
+        _report_with(case, [asked, promote(junk)])
+        .analyses[0]
+        .model_copy(update={"rejected_claims": [killed]})
+    )
+
+    result = score_case_with_yield(
+        case,
+        [must_find, expected, junk],
+        [asked, promote(junk)],
+        _identity_matcher([must_find, expected]),
+        _rejecting(case, junk),
+        block,
+        rows=NO_ROWS,
+    ).critic_yield
+    populations = CriticPopulations.pooled([result])
+
+    assert populations.counts == {
+        ("matched-must-find", "rejected"): 1,
+        ("matched-expected", "needs-info"): 1,
+        ("rejected", "confirmed"): 1,
+    }
+    assert populations.rates["real_rejected"] == Rate(1, 2)
+    assert populations.rates["real_needs_info"] == Rate(1, 2)
+    assert populations.rates["not_real_confirmed"] == Rate(1, 1)
+    assert populations.rates["not_real_needs_info"] == Rate(0, 1)
+
+
+def test_an_empty_population_reads_unavailable_and_names_its_stale_drafts(case, capsys):
+    """A vote cast on a reported claim reads stale on its draft (ADR 0029)."""
+    draft = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    reported = promote(draft)
+    votes = _rejecting(case, reported)
+
+    result = score_case_with_yield(
+        case,
+        [draft],
+        [reported],
+        ScriptedMatcher(),
+        votes,
+        _report_with(case, [reported]).analyses[0],
+        rows=NO_ROWS,
+    ).critic_yield
+    populations = CriticPopulations.pooled([result])
+
+    assert populations.counts == {("stale", "confirmed"): 1}
+    assert populations.rates["not_real_confirmed"] == Rate(0, 0)
+    assert populations.rates["not_real_confirmed"].value is None
+    assert populations.to_json()["not_real_confirmed"]["value"] is None
+    CriticAudit.of([result]).render()
+    shown = capsys.readouterr().out
+    assert "not_real_confirmed       0/0 (unavailable)" in shown
+    assert "not-real rates unavailable (stale-drafts, stale drafts: 1)" in shown
+    assert populations.not_real_gap == "stale-drafts"
+    assert populations.to_json()["stale_drafts"] == 1
+    for current in ("pooled", "open", "unvoted"):
+        empty = CriticPopulations({(current, "confirmed"): 1})
+        assert empty.not_real_gap == "no-down-vote"
+
+
+def test_a_population_rate_counts_a_draft_with_no_verdict_apart(capsys):
+    """An omitted or returned draft is in no population's denominator."""
+    populations = CriticPopulations(
+        {
+            ("matched-expected", "rejected"): 1,
+            ("matched-must-find", "omitted"): 1,
+            ("matched-expected", "returned"): 1,
+            ("rejected", "omitted"): 1,
+        }
+    )
+
+    assert populations.rates["real_rejected"] == Rate(1, 1)
+    assert populations.rates["real_needs_info"] == Rate(0, 1)
+    assert populations.rates["not_real_confirmed"] == Rate(0, 0)
+    assert populations.no_verdict == 3
+    assert populations.not_real_gap == "no-verdict"
+    assert populations.to_json()["no_verdict"] == 3
+    CriticAudit(populations, Rate(0, 0)).render()
+    shown = capsys.readouterr().out
+    assert "3 drafts have no archived verdict (omitted or returned)" in shown
+    assert "not-real rates unavailable (no-verdict," in shown
+
+
+def test_a_yield_rate_counts_an_omitted_draft_apart(case, capsys):
+    """A draft the block does not carry left the report with no verdict."""
+    kept = _draft_for(case, _expected(case), 1)
+    down_voted = draft_threat(
+        9, "tampering", "An attacker edits a table that does not exist."
+    )
+    lost = _draft_for(case, _must_find(case), 2)
+
+    result = score_case_with_yield(
+        case,
+        [kept, down_voted, lost],
+        [promote(kept)],
+        _identity_matcher([kept, lost]),
+        _rejecting(case, down_voted),
+        _ruled_block(case, [kept], []),
+        rows=NO_ROWS,
+    ).critic_yield
+
+    assert result.rates == {
+        "kill_rate": Rate(0, 1),
+        "rejected_kill_rate": Rate(0, 0),
+        "matched_kill_rate": Rate(0, 1),
+        "kill_precision": Rate(0, 0),
+    }
+    assert {draft.fate for draft in result.killed} == {"omitted"}
+    assert result.kill_count == 2
+    assert result.populations.no_verdict == 2
+    # The kill counts keep each draft that left the report, as the loss
+    # instrument charges each one to the critic.
+    assert (result.matched_killed, result.matched_lost) == (1, 1)
+    assert CriticAudit.of([result]).reference_loss == Rate(1, 1)
+    assert result.killed_by_cause == {
+        "omitted": {"killed": 2, "matched": 1, "must_find": 1}
+    }
+    totals = aggregate_yield([result])
+    assert totals["no_verdict"] == 2
+    assert totals["kill_rate"] == 0.0
+    critic_yield.render([result])
+    shown = capsys.readouterr().out
+    assert shown.count("rejected_kill_rate 0/0 (unavailable)") == 2
+    assert shown.count("2 drafts have no archived verdict (omitted or returned)") == 2
+    assert totals["rates"]["kill_rate"] == Rate(0, 1).to_json()
+    assert result.to_json()["rates"]["kill_precision"] == Rate(0, 0).to_json()
+
+
+def test_a_returned_draft_is_a_kill_counted_under_its_fate(case):
+    """A returned claim left the report with no archived verdict."""
+    kept = _draft_for(case, _expected(case), 1)
+    returned = _draft_for(case, _must_find(case), 2)
+    block = _ruled_block(case, [kept], []).model_copy(
+        update={
+            "returned_claims": [
+                ReturnedClaim(claim_id=returned.id, unit="S-unit", needs="config")
+            ]
+        }
+    )
+
+    result = score_case_with_yield(
+        case,
+        [kept, returned],
+        [promote(kept)],
+        _identity_matcher([kept, returned]),
+        Ledger(),
+        block,
+        rows=NO_ROWS,
+    ).critic_yield
+
+    assert [draft.fate for draft in result.killed] == ["returned"]
+    assert result.killed_by_cause == {
+        "returned": {"killed": 1, "matched": 1, "must_find": 1}
+    }
+    assert result.populations.no_verdict == 1
+    assert result.rates["matched_kill_rate"] == Rate(0, 1)
+
+
+@pytest.mark.parametrize("rate", [Rate(0, 0), Rate(3, 7)])
+def test_a_written_rate_reads_back_as_the_same_rate(rate):
+    assert Rate.from_json(rate.to_json()) == rate

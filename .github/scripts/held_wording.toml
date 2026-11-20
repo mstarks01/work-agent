@@ -1,0 +1,123 @@
+# The wording in model text that breaks a wording rule and stays, by ruling.
+#
+# Model text is text a model reads: the prompts, each framework package's own
+# text, the Domain Packs, and the Python strings that reach a model, such as a
+# `CapabilityStatement.basis`. A change to it changes model input, so the
+# maintainer rules that it changes only with a measured prompt change. Until
+# that change lands, the wording is held, and this file is the one record of it.
+#
+# Three readers read it. `.github/scripts/five_class_read.py` asks a pull
+# request that changes a file with a held row to name each held row of that
+# file in its `## Prompt read`. The SPEND and MONEY lints in
+# `tests/test_history_prose_lints.py` read model text and skip only the held
+# rows of their own rule. A review round reads this file and reports no held
+# row as a finding (docs/agents/code-review.md). `tests/test_five_class_read.py`
+# holds each row to the tree, and `tests/test_one_reader_lints.py` refuses a
+# held phrase spelled in any other Python file.
+#
+# `[[held]]` rows each hold one phrase.
+#   file     the file, relative to the repository root
+#   phrase   the exact phrase, as the file spells it on one line. A row whose
+#            phrase is gone fails, so the row goes in the pull request that
+#            lands the measured change.
+#   rule     the rule the phrase breaks: a key of `RULES` in five_class_read.py,
+#            which states what each rule is
+#   reason   why the phrase is held
+
+# --- Ruled held on 2026-11-02, from the reviewed/2026-11-01 round --------------
+
+[[held]]
+file = "prompts/analyze.md"
+phrase = "Spend your effort on recall"
+rule = "spend"
+reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+[[held]]
+file = "prompts/critic.md"
+phrase = "Never spend a judgement on them"
+rule = "spend"
+reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+[[held]]
+file = "prompts/critic.md"
+phrase = "so spend nothing on it"
+rule = "spend"
+reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+[[held]]
+file = "prompts/extract.md"
+phrase = "spends your one repair pass"
+rule = "spend"
+reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+# --- Ruled held on 2026-11-02 ----------------------------------------------------
+
+[[held]]
+file = "src/analysis_service/field_capabilities.py"
+phrase = "two parts of the application talk over a TLS-family protocol"
+rule = "element-term"
+reason = """a model reads the basis through the System Model, so an edit changes
+model input; change it with a measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/field_capabilities.py"
+phrase = "two parts of the application talk over an HTTP-family protocol"
+rule = "element-term"
+reason = """a model reads the basis through the System Model, so an edit changes
+model input; change it with a measured prompt change"""
+
+# --- Ruled held on 2026-11-02, found when the MONEY lint read model text -------
+
+[[held]]
+file = "frameworks/stride/critic.md"
+phrase = "is not a clean bill of health"
+rule = "money"
+reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+[[held]]
+file = "prompts/recritic.md"
+phrase = "a `rejected` ruling owes its reader"
+rule = "money"
+reason = "a prompt edit changes model input; change it with a measured prompt change"
+
+# --- Ruled held on 2026-11-10, from the reviewed/2026-11-10 round ---
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "This flow crosses a privilege or tenant boundary"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "This flow crosses a trust boundary and states no verified caller"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "This flow crosses a trust boundary with no verified transport"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/stride/rules.py"
+phrase = "An internet-facing process exercises authority across a boundary"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""
+
+[[held]]
+file = "src/analysis_service/frameworks/asvs/rules.py"
+phrase = "A party outside the system's control submits this flow across a"
+rule = "boundary-term"
+reason = """a model reads the rule question with each candidate, also with one
+whose crossing is undecided, so an edit changes model input; change it with a
+measured prompt change"""

@@ -1,0 +1,549 @@
+{
+  "rows": [
+    {
+      "case": "01-payments-checkout",
+      "arm": "signed",
+      "proposals": 6,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 6,
+      "positions_stated": {
+        "on-path": 4,
+        "storage-copy": 1,
+        "outside": 1
+      },
+      "references": [
+        {
+          "reference": 10,
+          "ruled": "storage-copy",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 11,
+          "ruled": "on-path",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "on-path"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        10,
+        11
+      ],
+      "must_finds_without_rule": [
+        10,
+        11
+      ]
+    },
+    {
+      "case": "02-iot-fleet-telemetry",
+      "arm": "signed",
+      "proposals": 6,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 6,
+      "positions_stated": {
+        "on-path": 3,
+        "storage-copy": 3
+      },
+      "references": [
+        {
+          "reference": 6,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": false,
+          "stated": [
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 7,
+          "ruled": "on-path",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "on-path"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        7
+      ],
+      "must_finds_without_rule": [
+        6,
+        7
+      ]
+    },
+    {
+      "case": "03-batch-data-pipeline",
+      "arm": "signed",
+      "proposals": 11,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 11,
+      "positions_stated": {
+        "on-path": 5,
+        "storage-copy": 3,
+        "in-component": 2,
+        "authorized-principal": 1
+      },
+      "references": [
+        {
+          "reference": 8,
+          "ruled": "authorized-principal",
+          "reached": false,
+          "agrees": false,
+          "stated": []
+        },
+        {
+          "reference": 9,
+          "ruled": "storage-copy",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        9
+      ],
+      "must_finds_without_rule": [
+        9
+      ]
+    },
+    {
+      "case": "04-ml-inference-service",
+      "arm": "signed",
+      "proposals": 12,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 12,
+      "positions_stated": {
+        "on-path": 6,
+        "storage-copy": 3,
+        "in-component": 2,
+        "outside": 1
+      },
+      "references": [
+        {
+          "reference": 8,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": false,
+          "stated": [
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 9,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": false,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [],
+      "must_finds_without_rule": [
+        8,
+        9
+      ]
+    },
+    {
+      "case": "05-cookbook-queue-webapp",
+      "arm": "signed",
+      "proposals": 13,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 13,
+      "positions_stated": {
+        "on-path": 5,
+        "storage-copy": 4,
+        "in-component": 4
+      },
+      "references": [
+        {
+          "reference": 6,
+          "ruled": "in-component",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 7,
+          "ruled": "in-component",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        6,
+        7
+      ],
+      "must_finds_without_rule": [
+        6,
+        7
+      ]
+    },
+    {
+      "case": "06-cookbook-online-game",
+      "arm": "signed",
+      "proposals": 13,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 13,
+      "positions_stated": {
+        "on-path": 9,
+        "storage-copy": 2,
+        "in-component": 2
+      },
+      "references": [
+        {
+          "reference": 8,
+          "ruled": "storage-copy",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 9,
+          "ruled": "on-path",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "on-path"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        8,
+        9
+      ],
+      "must_finds_without_rule": [
+        8,
+        9
+      ]
+    },
+    {
+      "case": "09-cookbook-sokify-retail",
+      "arm": "signed",
+      "proposals": 12,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 12,
+      "positions_stated": {
+        "on-path": 8,
+        "outside": 2,
+        "storage-copy": 2
+      },
+      "references": [
+        {
+          "reference": 10,
+          "ruled": "on-path",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "on-path"
+          ]
+        },
+        {
+          "reference": 11,
+          "ruled": "storage-copy",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "storage-copy"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        10,
+        11,
+        13
+      ],
+      "must_finds_without_rule": [
+        10,
+        11,
+        13
+      ]
+    },
+    {
+      "case": "10-cookbook-generic-cms",
+      "arm": "signed",
+      "proposals": 5,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 5,
+      "positions_stated": {
+        "on-path": 2,
+        "storage-copy": 1,
+        "outside": 1,
+        "in-component": 1
+      },
+      "references": [
+        {
+          "reference": 9,
+          "ruled": "on-path",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "on-path"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        9
+      ],
+      "must_finds_without_rule": [
+        9
+      ]
+    },
+    {
+      "case": "11-sparse-shift-scheduling",
+      "arm": "signed",
+      "proposals": 10,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 10,
+      "positions_stated": {
+        "on-path": 6,
+        "storage-copy": 2,
+        "in-component": 2
+      },
+      "references": [
+        {
+          "reference": 9,
+          "ruled": "storage-copy",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 10,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": false,
+          "stated": [
+            "storage-copy"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        9
+      ],
+      "must_finds_without_rule": [
+        9,
+        10
+      ]
+    },
+    {
+      "case": "12-overclaiming-supplier-portal",
+      "arm": "signed",
+      "proposals": 10,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 10,
+      "positions_stated": {
+        "on-path": 6,
+        "storage-copy": 3,
+        "in-component": 1
+      },
+      "references": [
+        {
+          "reference": 8,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": false,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [],
+      "must_finds_without_rule": [
+        8
+      ]
+    },
+    {
+      "case": "13-dispatch-control-plane",
+      "arm": "signed",
+      "proposals": 9,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 9,
+      "positions_stated": {
+        "on-path": 6,
+        "storage-copy": 2,
+        "in-component": 1
+      },
+      "references": [
+        {
+          "reference": 10,
+          "ruled": "on-path",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "on-path"
+          ]
+        },
+        {
+          "reference": 11,
+          "ruled": "storage-copy",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "in-component",
+            "storage-copy"
+          ]
+        },
+        {
+          "reference": 19,
+          "ruled": "outside",
+          "reached": false,
+          "agrees": false,
+          "stated": []
+        }
+      ],
+      "must_finds_with_rule": [
+        10,
+        11
+      ],
+      "must_finds_without_rule": [
+        10,
+        11
+      ]
+    },
+    {
+      "case": "14-loyalty-oauth-platform",
+      "arm": "none",
+      "proposals": 10,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 10,
+      "positions_stated": {
+        "on-path": 4,
+        "storage-copy": 3,
+        "in-component": 2,
+        "outside": 1
+      },
+      "references": [
+        {
+          "reference": 4,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "outside"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        4
+      ],
+      "must_finds_without_rule": [
+        4
+      ]
+    },
+    {
+      "case": "15-multitenant-invoicing",
+      "arm": "none",
+      "proposals": 15,
+      "invalid": 0,
+      "invalid_for_position": 0,
+      "drafts": 15,
+      "positions_stated": {
+        "authorized-principal": 2,
+        "outside": 1,
+        "storage-copy": 2,
+        "on-path": 8,
+        "in-component": 2
+      },
+      "references": [
+        {
+          "reference": 5,
+          "ruled": "outside",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "outside"
+          ]
+        },
+        {
+          "reference": 6,
+          "ruled": "authorized-principal",
+          "reached": true,
+          "agrees": true,
+          "stated": [
+            "authorized-principal"
+          ]
+        }
+      ],
+      "must_finds_with_rule": [
+        5,
+        6
+      ],
+      "must_finds_without_rule": [
+        5,
+        6
+      ]
+    }
+  ],
+  "totals": {
+    "calls": 13,
+    "proposals": 132,
+    "invalid_for_position": 0,
+    "ruled_references": 24,
+    "reached": 22,
+    "agreeing": 17,
+    "agreement": 0.7727272727272727,
+    "by_position": {
+      "storage-copy": {
+        "reached": 6,
+        "agrees": 6
+      },
+      "on-path": {
+        "reached": 6,
+        "agrees": 6
+      },
+      "outside": {
+        "reached": 7,
+        "agrees": 2
+      },
+      "in-component": {
+        "reached": 2,
+        "agrees": 2
+      },
+      "authorized-principal": {
+        "reached": 1,
+        "agrees": 1
+      }
+    },
+    "must_finds_with_rule": 18,
+    "must_finds_without_rule": 23,
+    "falsifier": "agreement under 70%"
+  }
+}

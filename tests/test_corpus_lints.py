@@ -22,6 +22,7 @@ from analysis_service.system_model import ELEMENT_GROUPS
 from analysis_service.validation import parse_and_validate, validate
 from evals import build_review_docs, verify_corpus
 from tests.factories import valid_model
+from tests.source_tree import PYTHON, source_files
 
 pytestmark = pytest.mark.lint
 
@@ -280,6 +281,40 @@ def test_a_case_declaring_a_framework_its_model_does_not_satisfy_is_caught():
     )
 
 
+def test_a_pending_entry_whose_precondition_no_longer_holds_is_caught(monkeypatch):
+    """A named gap for a framework the case no longer runs names nothing.
+
+    The batch pipeline refutes ASVS's precondition, so an entry that says the
+    case still needs an ASVS set would outlive the gap that it describes.
+    """
+    case_dir = next(
+        path for path in verify_corpus.case_dirs() if path.name.endswith("pipeline")
+    )
+    model, _ = parse_and_validate(verify_corpus._load_json(case_dir / "model.json"))
+    assert model is not None
+    monkeypatch.setattr(
+        verify_corpus, "PENDING_REFERENCE_SETS", {case_dir.name: frozenset({"asvs"})}
+    )
+
+    problems = list(verify_corpus.framework_issues(case_dir, {"frameworks": []}, model))
+
+    assert any(
+        "PENDING_REFERENCE_SETS lists 'asvs'" in problem
+        and "precondition answers refuted" in problem
+        for problem in problems
+    )
+
+
+def test_a_pending_entry_for_no_case_is_caught(monkeypatch):
+    monkeypatch.setattr(
+        verify_corpus, "PENDING_REFERENCE_SETS", {"99-nowhere": frozenset({"asvs"})}
+    )
+
+    (problem,) = verify_corpus._stale_pending_entries({"01-payments-checkout"})
+
+    assert "99-nowhere" in problem
+
+
 def test_each_declared_source_digests_to_what_it_claims():
     for case_dir in verify_corpus.case_dirs():
         meta = verify_corpus._load_json_object(case_dir / "case.json")
@@ -503,7 +538,9 @@ def test_the_harness_table_names_every_module():
     to anything that only asks whether named things exist.
     """
     documented = set(HARNESS_ROW.findall(README.read_text(encoding="utf-8")))
-    actual = {path.name for path in HARNESS_DIR.glob("*.py")} - {"__init__.py"}
+    actual = {
+        path.name for path in source_files(*PYTHON) if path.parent == HARNESS_DIR
+    } - {"__init__.py"}
 
     assert documented == actual, (
         "evals/README.md's harness table and evals/harness/ disagree: undocumented"

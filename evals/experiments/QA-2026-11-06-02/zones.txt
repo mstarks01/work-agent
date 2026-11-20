@@ -1,0 +1,42 @@
+12-overclaiming-supplier-portal 1 spoofing
+  signed zones: {'boundary:public-internet': 'network', 'boundary:corporate-network': 'network', 'boundary:vendor-platform': 'tenant', 'boundary:cloud-account': 'network'}
+  signed flow:entity:category-manager>process:supplier-portal>review-documents ('boundary:corporate-network', 'network', '->', 'boundary:vendor-platform', 'tenant', 'decided')
+   after-r1.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:category-manager>process:portal>review-and-approve ('boundary:corporate-network', 'network', '->', 'boundary:vendor-hosting', 'tenant', 'decided')
+   after-r2.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:category-managers>process:portal>review-and-approve ('boundary:corporate-network', 'network', '->', 'boundary:vendor-hosting', 'tenant', 'decided')
+   after-r3.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:our-cloud-account': 'network'}
+      flow:entity:category-managers>process:supplier-document-portal>review-paperwork ('boundary:corporate-network', 'network', '->', 'boundary:vendor-hosting', 'tenant', 'decided')
+   after-r4.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:category-manager>process:supplier-portal>review-and-approve ('boundary:corporate-network', 'network', '->', 'boundary:vendor-hosting', 'tenant', 'decided')
+   after-r5.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:category-managers>process:portal>review-and-approve ('boundary:corporate-network', 'network', '->', 'boundary:vendor-hosting', 'tenant', 'decided')
+
+12-overclaiming-supplier-portal 13 elevation-of-privilege
+  signed zones: {'boundary:public-internet': 'network', 'boundary:corporate-network': 'network', 'boundary:vendor-platform': 'tenant', 'boundary:cloud-account': 'network'}
+  signed flow:entity:supplier>process:supplier-portal>upload-documents ('boundary:public-internet', 'network', '->', 'boundary:vendor-platform', 'tenant', 'decided')
+   after-r1.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:supplier>process:portal>upload-compliance-paperwork ('unknown', None, '->', 'boundary:vendor-hosting', 'tenant', 'undecided')
+   after-r2.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:suppliers>process:portal>upload-compliance-paperwork ('unknown', None, '->', 'boundary:vendor-hosting', 'tenant', 'undecided')
+   after-r3.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:our-cloud-account': 'network'}
+      flow:entity:suppliers>process:supplier-document-portal>upload-paperwork ('unknown', None, '->', 'boundary:vendor-hosting', 'tenant', 'undecided')
+   after-r4.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:supplier>process:supplier-portal>upload-paperwork ('unknown', None, '->', 'boundary:vendor-hosting', 'tenant', 'undecided')
+   after-r5.json zones: {'boundary:vendor-hosting': 'tenant', 'boundary:corporate-network': 'network', 'boundary:cloud-account': 'network'}
+      flow:entity:suppliers>process:portal>upload-paperwork ('unknown', None, '->', 'boundary:vendor-hosting', 'tenant', 'undecided')
+
+13-dispatch-control-plane 16 elevation-of-privilege
+  signed zones: {'boundary:corporate-network': 'network', 'boundary:production-control-plane': 'privilege', 'boundary:scheduling-partner-platform': 'tenant'}
+  signed flow:process:dispatch-console>process:dispatch-api>dispatch-requests ('boundary:corporate-network', 'network', '->', 'boundary:production-control-plane', 'privilege', 'decided')
+   after-r1.json zones: {'boundary:corporate-network': 'network', 'boundary:production-control-plane': 'privilege', 'boundary:scheduling-partner': 'tenant'}
+      flow:process:dispatch-console>process:dispatch-api>call-api ('unknown', None, '->', 'boundary:production-control-plane', 'privilege', 'undecided')
+   after-r2.json zones: {'boundary:corporate-network': 'network', 'boundary:production-control-plane': 'privilege', 'boundary:scheduling-partner': 'tenant'}
+      flow:process:dispatch-console>process:dispatch-api>call-api ('unknown', None, '->', 'boundary:production-control-plane', 'privilege', 'undecided')
+   after-r3.json zones: {'boundary:corporate-network': 'network', 'boundary:production-control-plane': 'privilege', 'boundary:scheduling-partner': 'tenant'}
+      flow:process:dispatch-console>process:dispatch-api>call-api ('unknown', None, '->', 'boundary:production-control-plane', 'privilege', 'undecided')
+   after-r4.json zones: {'boundary:corporate-network': 'network', 'boundary:production-control-plane': 'privilege', 'boundary:scheduling-partner': 'tenant'}
+      flow:process:dispatch-console>process:dispatch-api>call-api ('unknown', None, '->', 'boundary:production-control-plane', 'privilege', 'undecided')
+   after-r5.json zones: {'boundary:corporate-network': 'network', 'boundary:production-control-plane': 'privilege', 'boundary:scheduling-partner': 'tenant'}
+      flow:process:dispatch-console>process:dispatch-api>call-api ('unknown', None, '->', 'boundary:production-control-plane', 'privilege', 'undecided')
+

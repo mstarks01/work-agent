@@ -1,0 +1,6 @@
+signed: 'unknown'
+after-r1.json flow:entity:category-manager>process:portal>review-and-approve 'fully authenticated'
+after-r2.json flow:entity:category-managers>process:portal>review-and-approve 'fully authenticated access'
+after-r3.json flow:entity:category-managers>process:supplier-document-portal>review-paperwork 'fully authenticated'
+after-r4.json flow:entity:category-manager>process:supplier-portal>review-and-approve 'fully authenticated'
+after-r5.json flow:entity:category-managers>process:portal>review-and-approve 'fully authenticated'

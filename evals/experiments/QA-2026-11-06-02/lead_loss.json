@@ -1,0 +1,192 @@
+{
+ "totals": {
+  "unled-on-signed": 90,
+  "kept": 479,
+  "unfired": 18,
+  "unaligned": 8
+ },
+ "lost": [
+  {
+   "sweep": "after-r1.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 1,
+   "lane": "spoofing",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r1.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 13,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r1.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 16,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r2.json",
+   "case": "09-cookbook-sokify-retail",
+   "reference": 13,
+   "lane": "information-disclosure",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r2.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 1,
+   "lane": "spoofing",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r2.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 13,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r2.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 16,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r2.json",
+   "case": "14-loyalty-oauth-platform",
+   "reference": 7,
+   "lane": "repudiation",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r2.json",
+   "case": "14-loyalty-oauth-platform",
+   "reference": 12,
+   "lane": "elevation-of-privilege",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r3.json",
+   "case": "08-sso-identity-broker",
+   "reference": 2,
+   "lane": "spoofing",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r3.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 1,
+   "lane": "spoofing",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r3.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 13,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r3.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 10,
+   "lane": "information-disclosure",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r3.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 16,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r3.json",
+   "case": "14-loyalty-oauth-platform",
+   "reference": 12,
+   "lane": "elevation-of-privilege",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "08-sso-identity-broker",
+   "reference": 8,
+   "lane": "repudiation",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 1,
+   "lane": "spoofing",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 12,
+   "lane": "denial-of-service",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 13,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 10,
+   "lane": "information-disclosure",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 16,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r4.json",
+   "case": "14-loyalty-oauth-platform",
+   "reference": 12,
+   "lane": "elevation-of-privilege",
+   "fate": "unaligned"
+  },
+  {
+   "sweep": "after-r5.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 1,
+   "lane": "spoofing",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r5.json",
+   "case": "12-overclaiming-supplier-portal",
+   "reference": 13,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r5.json",
+   "case": "13-dispatch-control-plane",
+   "reference": 16,
+   "lane": "elevation-of-privilege",
+   "fate": "unfired"
+  },
+  {
+   "sweep": "after-r5.json",
+   "case": "14-loyalty-oauth-platform",
+   "reference": 12,
+   "lane": "elevation-of-privilege",
+   "fate": "unaligned"
+  }
+ ]
+}

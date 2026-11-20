@@ -1,0 +1,809 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "bee48c8e0e5a5d370156020b52e22496d5bff33f",
+    "clean": true,
+    "table": {
+      "case": "15-multitenant-invoicing",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "none",
+      "corpus_digest": "cf3fd3442d9a29ea5ca935978e4f32735bcad935281744cdaa5d6f8d567cb976"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "7605b8bc22968a87d5bf509b415d974629bec5bf49a41449471f804739c24da8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Unauthenticated invoice-number links disclose payer invoice details",
+      "description": "An outside attacker can enumerate invoice numbers and send requests through `flow:entity:payer>process:billing-app>open-payment-page` to elicit other companies' invoices from `process:billing-app`: the payment page requires no sign-in and the link ends in an invoice number, while invoice numbers count upward across tenants. The response includes the invoice, company name, and payout bank details. Second-order, the disclosed bank and customer information enables targeted payment fraud and profiling.",
+      "affected_element_ids": [
+        "flow:entity:payer>process:billing-app>open-payment-page",
+        "process:billing-app"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "absent:flow:entity:payer>process:billing-app>open-payment-page:authentication",
+        "crossing:flow:entity:payer>process:billing-app>open-payment-page"
+      ],
+      "quotes": [
+        {
+          "text": "Each invoice email sends the payer a link that ends in the invoice number. The payment page shows the invoice, the company's name and its bank details, and it asks the payer to sign in to nothing.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Invoice numbers count up from 1000 across all companies.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because `flow:entity:payer>process:billing-app>open-payment-page` crosses from the internet and has stated absent authentication, while sequential invoice numbers make requests straightforward. Impact is high because the response exposes financial and PII-bearing invoice and payout-bank-detail data across tenants."
+      },
+      "mitigations": [
+        {
+          "summary": "Require an unguessable, scoped payment capability",
+          "detail": "Replace invoice-number-only payment links with high-entropy, single-purpose tokens bound to one invoice and expire or revoke them after use."
+        },
+        {
+          "summary": "Authorize invoice retrieval server-side",
+          "detail": "Make `process:billing-app` enforce an invoice-specific access decision before returning payment-page fields, and minimize the bank and customer fields shown to a payer."
+        }
+      ]
+    },
+    {
+      "title": "A customer user may elicit another tenant's invoices if ownership checks are absent",
+      "description": "A legitimate company user can request invoice numbers through `flow:entity:company-user>process:billing-app>manage-invoices`; `process:billing-app` loads invoices by number, but the source leaves open whether it verifies that the invoice belongs to the caller's company. If that check is absent, a user who guesses sequential cross-tenant invoice numbers elicits invoices, customers, and payout bank details belonging to other companies. Second-order, those records provide financial and identity data useful for targeting payers and companies.",
+      "affected_element_ids": [
+        "flow:entity:company-user>process:billing-app>manage-invoices",
+        "process:billing-app"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "crossing:flow:entity:company-user>process:billing-app>manage-invoices"
+      ],
+      "quotes": [
+        {
+          "text": "When a user opens an invoice, the billing app loads it by its invoice number. Nobody wrote down whether it also checks that the invoice belongs to the user's company. Invoice numbers count up from 1000 across all companies.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "authorized-principal",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unstated ownership check: the attacker needs an ordinary company-user account but can use predictable invoice numbers across companies. Impact is high because `process:billing-app` handles financial and PII data and a successful enumeration can expose multiple tenants' invoices and payout details."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce tenant ownership on every invoice read",
+          "detail": "Have `process:billing-app` derive the company scope from the authenticated session and reject an invoice whose company ID differs, rather than trusting an invoice number alone."
+        },
+        {
+          "summary": "Add database-enforced tenant isolation",
+          "detail": "Enable row-level security or equivalent tenant-scoped database roles for `store:tenant-database` so an application query omission cannot return another company's records."
+        }
+      ]
+    },
+    {
+      "title": "Arbitrary PDF requests can disclose cross-tenant invoice PDFs",
+      "description": "An authorized company user can request PDFs through `process:billing-app`, and the source states that any user may request a PDF for any invoice repeatedly. This lets a user elicit invoice PDFs belonging to other companies from the shared PDF path, exposing the financial and PII content carried by `flow:process:billing-app>store:pdf-bucket>fetch-pdfs`. Second-order, harvested invoices reveal company and payer details that can support targeted fraud.",
+      "affected_element_ids": [
+        "process:billing-app",
+        "flow:process:billing-app>store:pdf-bucket>fetch-pdfs",
+        "store:pdf-bucket"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "unknown:flow:process:billing-app>store:pdf-bucket>fetch-pdfs:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Any user can ask for a PDF of any invoice, as often as they like. The billing app fetches PDFs from the bucket with one service credential for all companies.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "authorized-principal",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because the source expressly permits any user to request PDFs for any invoice repeatedly. Impact is high because `store:pdf-bucket` holds financial and PII-bearing PDFs for every company, enabling bulk cross-tenant disclosure."
+      },
+      "mitigations": [
+        {
+          "summary": "Authorize PDF generation and retrieval per invoice",
+          "detail": "Require `process:billing-app` to verify the caller's company and entitlement for the specific invoice before queuing, generating, or fetching its PDF."
+        },
+        {
+          "summary": "Constrain the bucket credential",
+          "detail": "Replace the single all-company service credential on `flow:process:billing-app>store:pdf-bucket>fetch-pdfs` with narrowly scoped, tenant- and object-bound access."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy of the tenant database exposes all companies if encryption at rest is absent",
+      "description": "`store:tenant-database` holds every company's invoices, customers, and payout bank details, but its `encryption_at_rest` attribute is unknown. If that unknown resolves to unencrypted storage, an attacker holding a disk, backup, snapshot, or decommissioned storage copy can read the multi-tenant database without using `process:billing-app`. Second-order, one copied artifact exposes the entire financial and PII corpus rather than one tenant's records.",
+      "affected_element_ids": [
+        "store:tenant-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:tenant-database:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket, or how the database and the bucket are protected at rest.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:store:tenant-database:encryption_at_rest`: obtaining an operational copy requires storage-layer access, but no verified encryption control is recorded. Impact is high because the shared database contains every company's financial, PII, and business-critical records."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for the tenant database",
+          "detail": "Use KMS-backed encryption for `store:tenant-database`, with controls explicitly covering backups, snapshots, replicas, exports, and decommissioned media."
+        },
+        {
+          "summary": "Restrict storage-copy and key access",
+          "detail": "Separate backup/export readers from application principals and limit decrypt or key-use permissions to the minimum operational roles."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy of the PDF bucket exposes invoice records if encryption at rest is absent",
+      "description": "`store:pdf-bucket` stores invoice PDFs for every company and has `encryption_at_rest: unknown`. If the bucket or its operational copies are not encrypted at rest, a party who obtains an object-store export, backup, or other storage copy can read financial and PII-bearing PDFs without passing through `process:billing-app` authorization. Second-order, invoice PDFs provide durable customer, company, and payment-context information for fraud targeting.",
+      "affected_element_ids": [
+        "store:pdf-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:pdf-bucket:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket, or how the database and the bucket are protected at rest.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:store:pdf-bucket:encryption_at_rest`, since a storage copy must be obtained but encryption is unverified. Impact is high because a shared bucket copy can disclose financial and PII invoice PDFs for all companies."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt bucket objects and all operational copies",
+          "detail": "Require KMS-backed encryption at rest for `store:pdf-bucket`, including versioned objects, backups, exports, and replicas."
+        },
+        {
+          "summary": "Limit object and export access",
+          "detail": "Use deny-by-default bucket policies and separate, least-privileged roles for application reads, backup operations, and export administration."
+        }
+      ]
+    },
+    {
+      "title": "A render-queue storage copy can reveal invoice identifiers if encryption at rest is absent",
+      "description": "`store:render-queue` has unverified encryption at rest and holds jobs containing a company ID and invoice number. If unencrypted operational copies exist, a storage-copy attacker can read those identifiers. The identifiers can then be used against the unauthenticated invoice-number payment page in `process:billing-app`, potentially eliciting the corresponding invoice and bank details. This is conditional on `unknown:store:render-queue:encryption_at_rest`; it does not assert that the queue is unencrypted.",
+      "affected_element_ids": [
+        "store:render-queue"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:render-queue:encryption_at_rest",
+        "absent:flow:entity:payer>process:billing-app>open-payment-page:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The job carries a company ID and an invoice number.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Each invoice email sends the payer a link that ends in the invoice number. The payment page shows the invoice, the company's name and its bank details, and it asks the payer to sign in to nothing.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the queue's unknown at-rest protection because the attacker must obtain a storage copy. Impact is high because queue identifiers can be used with the stated unauthenticated payment page to retrieve financial and PII invoice data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the render queue and retained message copies",
+          "detail": "Establish and enforce encryption at rest for `store:render-queue`, including retained messages, backups, and dead-letter storage."
+        },
+        {
+          "summary": "Use opaque render references",
+          "detail": "Replace raw invoice-number references in queued jobs with short-lived opaque identifiers that cannot be replayed against public invoice retrieval paths."
+        }
+      ]
+    },
+    {
+      "title": "An on-path observer may read billing-app database traffic if transport encryption is absent",
+      "description": "`flow:process:billing-app>store:tenant-database>read-and-write-tenant-data` carries every company's invoices, customers, and payout bank details, but its protocol and `encryption_in_transit` are unknown. If the unverified transport protection is absent, an attacker able to observe the cloud-platform path can intercept those records between `process:billing-app` and `store:tenant-database`. Second-order, captured payout and customer data enables targeted fraud across the tenant corpus.",
+      "affected_element_ids": [
+        "flow:process:billing-app>store:tenant-database>read-and-write-tenant-data",
+        "process:billing-app",
+        "store:tenant-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:billing-app>store:tenant-database>read-and-write-tenant-data:protocol",
+        "unknown:flow:process:billing-app>store:tenant-database>read-and-write-tenant-data:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the unknown transport protection because an attacker must first gain a position on the internal cloud-platform path. Impact is high because the flow carries financial, PII, and business-critical data for every company."
+      },
+      "mitigations": [
+        {
+          "summary": "Require mutually authenticated TLS for database traffic",
+          "detail": "Set `encryption_in_transit` on `flow:process:billing-app>store:tenant-database>read-and-write-tenant-data` to verified TLS or mTLS and reject plaintext connections."
+        }
+      ]
+    },
+    {
+      "title": "An on-path observer may read renderer database traffic if transport encryption is absent",
+      "description": "`flow:process:pdf-renderer>store:tenant-database>read-invoice` carries invoice data with financial and PII content, while its protocol, authentication, and `encryption_in_transit` are all unknown. If transport encryption is not actually present, an observer on that internal path can intercept invoices as `process:pdf-renderer` reads them. Second-order, the captures provide invoice and customer information for subsequent fraud or tenant targeting.",
+      "affected_element_ids": [
+        "flow:process:pdf-renderer>store:tenant-database>read-invoice",
+        "process:pdf-renderer",
+        "store:tenant-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:pdf-renderer>store:tenant-database>read-invoice:protocol",
+        "unknown:flow:process:pdf-renderer>store:tenant-database>read-invoice:authentication",
+        "unknown:flow:process:pdf-renderer>store:tenant-database>read-invoice:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the unverified internal transport because the attacker needs an on-path foothold. Impact is high because intercepted invoice reads expose financial and PII data from the shared tenant database."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate renderer database connections",
+          "detail": "Require TLS with server validation and workload identity or mTLS on `flow:process:pdf-renderer>store:tenant-database>read-invoice`."
+        }
+      ]
+    },
+    {
+      "title": "Unverified render-job transport can expose invoice identifiers",
+      "description": "The two queue paths, `flow:process:billing-app>store:render-queue>queue-render-job` and `flow:process:pdf-renderer>store:render-queue>take-render-jobs`, carry company IDs and invoice numbers but have unknown protocol, authentication, and transport encryption. If encryption is absent, an internal on-path observer can intercept render-job identifiers in either direction. Those identifiers can be used against the invoice-number payment page to elicit the associated invoice and bank details.",
+      "affected_element_ids": [
+        "flow:process:billing-app>store:render-queue>queue-render-job",
+        "flow:process:pdf-renderer>store:render-queue>take-render-jobs",
+        "store:render-queue"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:billing-app>store:render-queue>queue-render-job:protocol",
+        "unknown:flow:process:billing-app>store:render-queue>queue-render-job:authentication",
+        "unknown:flow:process:billing-app>store:render-queue>queue-render-job:encryption_in_transit",
+        "unknown:flow:process:pdf-renderer>store:render-queue>take-render-jobs:protocol",
+        "unknown:flow:process:pdf-renderer>store:render-queue>take-render-jobs:authentication",
+        "unknown:flow:process:pdf-renderer>store:render-queue>take-render-jobs:encryption_in_transit",
+        "absent:flow:entity:payer>process:billing-app>open-payment-page:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The job carries a company ID and an invoice number.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on unknown encryption because interception requires an internal on-path position. Impact is high because the intercepted identifiers can be combined with the payment page's stated absent authentication to obtain financial and PII invoice details."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect both render-queue channels with TLS",
+          "detail": "Require authenticated TLS or mTLS for both queue flows and reject clients that cannot negotiate encrypted transport."
+        },
+        {
+          "summary": "Avoid reusable invoice identifiers in jobs",
+          "detail": "Queue a short-lived opaque render reference rather than a raw invoice number, and validate it server-side before retrieval."
+        }
+      ]
+    },
+    {
+      "title": "An on-path observer may read invoice PDFs while the renderer writes them",
+      "description": "`flow:process:pdf-renderer>store:pdf-bucket>write-pdf` carries rendered invoice PDFs containing financial and PII data, but protocol, authentication, and `encryption_in_transit` are unknown. If this internal transport is plaintext, an on-path attacker can intercept a PDF as `process:pdf-renderer` writes it to `store:pdf-bucket`. Second-order, the captured document can expose company, payer, and payment details outside the normal application access path.",
+      "affected_element_ids": [
+        "flow:process:pdf-renderer>store:pdf-bucket>write-pdf",
+        "process:pdf-renderer",
+        "store:pdf-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:pdf-renderer>store:pdf-bucket>write-pdf:protocol",
+        "unknown:flow:process:pdf-renderer>store:pdf-bucket>write-pdf:authentication",
+        "unknown:flow:process:pdf-renderer>store:pdf-bucket>write-pdf:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on unknown internal transport encryption because an on-path foothold is required. Impact is high because the flow transports financial and PII-bearing invoice PDFs."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt renderer-to-bucket traffic",
+          "detail": "Require TLS with endpoint validation or mTLS on `flow:process:pdf-renderer>store:pdf-bucket>write-pdf` and disable plaintext object-store access."
+        }
+      ]
+    },
+    {
+      "title": "An on-path observer may read invoice PDFs fetched by the billing app",
+      "description": "`flow:process:billing-app>store:pdf-bucket>fetch-pdfs` returns invoice PDFs of every company using one service credential, but protocol and `encryption_in_transit` are unknown. If encryption is absent, an attacker observing this internal path can intercept PDF contents as `process:billing-app` fetches them. Second-order, the attacker accumulates financial and PII records without needing the shared bucket credential.",
+      "affected_element_ids": [
+        "flow:process:billing-app>store:pdf-bucket>fetch-pdfs",
+        "process:billing-app",
+        "store:pdf-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:billing-app>store:pdf-bucket>fetch-pdfs:protocol",
+        "unknown:flow:process:billing-app>store:pdf-bucket>fetch-pdfs:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The billing app fetches PDFs from the bucket with one service credential for all companies.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 11,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the unknown transport protection because the attacker must observe an internal path. Impact is high because the shared PDF bucket contains financial and PII records for every company."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted bucket retrieval",
+          "detail": "Set `encryption_in_transit` on `flow:process:billing-app>store:pdf-bucket>fetch-pdfs` to TLS with certificate validation and prohibit plaintext endpoints."
+        }
+      ]
+    },
+    {
+      "title": "An on-path observer may capture support-agent credentials",
+      "description": "`flow:entity:support-agent>process:admin-console>use-admin-console` crosses from the support office network into the cloud platform and carries the agent's sign-in, but its protocol and `encryption_in_transit` are unknown. If encryption is absent, an observer on the support-office path can intercept credentials or one-time-code material used to access `process:admin-console`. Second-order, captured access enables entry to the console that can open billing-app sessions as arbitrary customer users.",
+      "affected_element_ids": [
+        "flow:entity:support-agent>process:admin-console>use-admin-console",
+        "entity:support-agent",
+        "process:admin-console"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:support-agent>process:admin-console>use-admin-console",
+        "unknown:flow:entity:support-agent>process:admin-console>use-admin-console:protocol",
+        "unknown:flow:entity:support-agent>process:admin-console>use-admin-console:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The admin console is reachable only from there, and each agent signs in to it with their own account and a one-time code. From the admin console an agent can open a session in the billing app as any customer user.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 12,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on unknown encryption because an attacker needs access to the support-office-to-cloud path. Impact is high because the intercepted credential material can unlock an admin console able to open sessions as any customer user."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce TLS for support-console access",
+          "detail": "Require HTTPS with modern TLS, HSTS, and certificate validation for `flow:entity:support-agent>process:admin-console>use-admin-console`; ensure one-time codes cannot be replayed."
+        }
+      ]
+    },
+    {
+      "title": "An on-path observer may capture customer sessions issued by the admin console",
+      "description": "`flow:process:admin-console>process:billing-app>open-session-as-customer-user` carries a session as a chosen customer user, but protocol, authentication, and `encryption_in_transit` are unknown. If unencrypted, an internal on-path attacker can intercept that session material and read the selected customer's financial and PII data through `process:billing-app`. Second-order, the captured session provides the attacker the chosen user's application reach.",
+      "affected_element_ids": [
+        "flow:process:admin-console>process:billing-app>open-session-as-customer-user",
+        "process:admin-console",
+        "process:billing-app"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:admin-console>process:billing-app>open-session-as-customer-user:protocol",
+        "unknown:flow:process:admin-console>process:billing-app>open-session-as-customer-user:authentication",
+        "unknown:flow:process:admin-console>process:billing-app>open-session-as-customer-user:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "From the admin console an agent can open a session in the billing app as any customer user.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 13,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on unknown encryption because the attacker needs an internal on-path position. Impact is high because the flow carries a customer-user session into a process handling financial, PII, and business-critical tenant data."
+      },
+      "mitigations": [
+        {
+          "summary": "Use authenticated encrypted service-to-service transport",
+          "detail": "Require mTLS for `flow:process:admin-console>process:billing-app>open-session-as-customer-user` and bind any resulting session artifact to a protected server-side exchange rather than exposing a reusable bearer value."
+        }
+      ]
+    },
+    {
+      "title": "A compromised billing app can read the entire tenant database through its shared account",
+      "description": "`process:billing-app` is internet-facing and uses one database account for all companies on `flow:process:billing-app>store:tenant-database>read-and-write-tenant-data`; the database has no row-level security. An attacker running code in the billing app can use that existing database authority to read invoices, customers, and payout bank details across all tenants, rather than being limited to the requester's company. Second-order, corpus-scale financial and PII disclosure supports targeted fraud against every customer company.",
+      "affected_element_ids": [
+        "process:billing-app",
+        "flow:process:billing-app>store:tenant-database>read-and-write-tenant-data",
+        "store:tenant-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:billing-app>store:tenant-database>read-and-write-tenant-data:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The billing app adds the company filter to each query itself, and the database has no row-level security. The app connects with one database account for all companies.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 14,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because `process:billing-app` is internet-facing, though this scenario requires code execution or host control in that component. Impact is high because its single database account reaches the shared store containing every company's financial, PII, and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce tenant isolation in the database",
+          "detail": "Enable row-level security or tenant-scoped database roles on `store:tenant-database` so the application account cannot read every company's rows by default."
+        },
+        {
+          "summary": "Use narrowly scoped workload identities",
+          "detail": "Replace the single shared database account with short-lived, least-privileged credentials scoped to the service operation and tenant context where feasible."
+        }
+      ]
+    },
+    {
+      "title": "A compromised billing app can read every tenant's PDFs through the shared bucket credential",
+      "description": "`process:billing-app` fetches PDFs through `flow:process:billing-app>store:pdf-bucket>fetch-pdfs` using one service credential for all companies. An attacker controlling the billing-app component can use that credential to read invoice PDFs across the shared `store:pdf-bucket`, bypassing the per-user application path. Second-order, the PDFs disclose financial and PII details at cross-tenant scale and provide material for fraud targeting.",
+      "affected_element_ids": [
+        "process:billing-app",
+        "flow:process:billing-app>store:pdf-bucket>fetch-pdfs",
+        "store:pdf-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:billing-app>store:pdf-bucket>fetch-pdfs:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The billing app fetches PDFs from the bucket with one service credential for all companies.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 15,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because exploiting this path requires control of the internet-facing `process:billing-app`. Impact is high because the one credential reads invoice PDFs containing financial and PII data for every company."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace the shared bucket credential with scoped access",
+          "detail": "Issue short-lived workload credentials restricted to the specific object and tenant required for each PDF retrieval."
+        },
+        {
+          "summary": "Authorize PDF objects independently of the app credential",
+          "detail": "Apply tenant-aware object policies or a signed, object-specific retrieval service so compromise of `process:billing-app` does not grant bucket-wide reads."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

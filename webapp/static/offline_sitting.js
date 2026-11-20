@@ -20,24 +20,31 @@ const written = id => answers[id] && typed(answers[id].own_list) >= DATA.min_own
 const marked = id => BY_ID[id].targets.length > 0
   && BY_ID[id].targets.every(t => t.fingerprint in answers[id].marks);
 
+// The row state of a case, in the vocabulary of the rail (RowState). The
+// payload carries the words for each state (DATA.review_labels). An own list
+// and nothing else is not a review, as in _review_state of the app.
+// `tests/test_offline_sitting.py` runs one table of answers through both. The
+// accepted limit: `trim` here and `strip` there read six characters apart
+// (NOTES_READ_APART of that test).
+const reviewStarted = held => Object.keys(held.marks).length > 0
+  || held.missing.length > 0
+  || held.notes.trim() !== "";
 function state(id) {
-  if (!answers[id]) return ["", "to do"];
-  if (marked(id)) return ["finished", "every record marked"];
-  return ["draft", "in progress"];
+  if (!answers[id] || !reviewStarted(answers[id])) return "todo";
+  return marked(id) ? "finished" : "draft";
 }
 
 function rail() {
   const box = document.getElementById("rows");
   box.textContent = "";
   for (const c of DATA.cases) {
-    const [cls, label] = state(c.case);
     const b = el("button", "row");
     b.setAttribute("aria-current", c.case === current);
     const t = el("div", "t");
-    t.appendChild(el("span", "dot " + cls));
+    t.appendChild(el("span", "dot " + state(c.case)));
     t.appendChild(el("span", null, c.number + "  " + c.title));
     b.appendChild(t);
-    b.appendChild(el("div", "s", label));
+    b.appendChild(el("div", "s", DATA.review_labels[state(c.case)]));
     b.onclick = () => { current = c.case; draw(); };
     box.appendChild(b);
   }
@@ -219,7 +226,7 @@ function draw() {
 // finding it read, so a case still in progress may be saved and may not be
 // published — the same split the app makes between a draft and the stage.
 function finished() {
-  return Object.keys(answers).filter(id => state(id)[0] === "finished");
+  return Object.keys(answers).filter(id => state(id) === "finished");
 }
 
 function envelope(only) {
@@ -341,8 +348,15 @@ function restore(text) {
     alert("That file was written for a different version of this page.");
     return;
   }
-  for (const [id, a] of Object.entries(held.cases || {})) {
-    if (!BY_ID[id]) continue;
+  const offered = Object.entries(isRecord(held.cases) ? held.cases : {})
+    .filter(([id]) => Object.hasOwn(BY_ID, id));
+  // The whole file is refused before an answer changes, so a file with one
+  // bad case leaves the page as it was.
+  if (!isRecord(held.cases) || !offered.every(([, a]) => readableCase(a))) {
+    alert("That file holds an answer that this page cannot read.");
+    return;
+  }
+  for (const [id, a] of offered) {
     // A key is read through the aliases the server sent, as the merge reads
     // it (current_marks). A key that names no finding is not carried, because
     // the merge refuses it (check_marks). Two keys of one finding that
@@ -354,18 +368,40 @@ function restore(text) {
     }
     const marks = {};
     const disputed = new Set();
-    for (const [key, mark] of Object.entries(a.marks || {})) {
+    for (const [key, mark] of Object.entries(a.marks ?? {})) {
       const finding = current.get(key);
       if (finding === undefined) continue;
       if (finding in marks && marks[finding] !== mark) disputed.add(finding);
       marks[finding] = mark;
     }
     for (const finding of disputed) delete marks[finding];
-    answers[id] = {own_list: a.own_list || [], marks,
-                   missing: a.missing || [], notes: a.notes || "",
-                   opened_digests: a.opened_digests || BY_ID[id].digests};
+    answers[id] = {own_list: a.own_list, marks,
+                   missing: a.missing ?? [], notes: a.notes ?? "",
+                   opened_digests: a.opened_digests ?? BY_ID[id].digests};
   }
   draw();
+}
+
+// The shapes of one case of a saved file, held to the shapes that the merge
+// accepts (CaseAnswers of evals.harness.envelope). The own list is required
+// and holds a line. Each other field can be absent, and `null` is no value
+// for a field. `tests/test_offline_sitting.py` runs one table of shapes
+// through this block and through CaseAnswers.
+const isRecord = v => v !== null && typeof v === "object" && !Array.isArray(v);
+const isLines = v => Array.isArray(v) && v.every(s => typeof s === "string");
+const isRecordOf = (v, holds) => isRecord(v) && Object.values(v).every(holds);
+const absentOr = (v, holds) => v === undefined || holds(v);
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const CASE_FIELDS = ["own_list", "marks", "missing", "notes", "opened_digests"];
+function readableCase(a) {
+  return isRecord(a)
+    && Object.keys(a).every(key => CASE_FIELDS.includes(key))
+    && isLines(a.own_list) && a.own_list.length > 0
+    && absentOr(a.marks, v => isRecordOf(v, mark => DATA.marks.includes(mark)))
+    && absentOr(a.missing, isLines)
+    && absentOr(a.notes, v => typeof v === "string")
+    && absentOr(a.opened_digests, v => isRecordOf(v,
+      digest => typeof digest === "string" && SHA256_HEX.test(digest)));
 }
 
 const picker = el("input");

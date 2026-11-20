@@ -1,6 +1,6 @@
 """Read which **Data Flow** identity version a graph spells, and lift old IDs (#989).
 
-ADR 0037 changes what a flow ID is built from: version 1 dropped the endpoints'
+ADR 0037 changes what a flow ID is built from: version 1 omits the endpoints'
 type prefixes, so an entity and a process sharing one name derived one flow ID.
 Version 2 carries both endpoints' full **Element ID**s. Rule 4 keeps version 1
 computable, because an archived artifact spells its flows the way the version it

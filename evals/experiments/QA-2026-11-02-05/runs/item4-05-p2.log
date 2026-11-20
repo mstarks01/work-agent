@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- Job messages may be readable on the unverified web-tier-to-queue channel | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Queued jobs may be readable on the worker-to-queue channel | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Application and log records may be readable on the worker-to-database channel | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be recovered from the unverified configuration-read channel | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be recovered from the unverified worker configuration channel | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- Queued job data may be readable from storage copies if queue encryption at rest is absent | ['store:message-queue']
+- Database records may be readable from storage copies if database encryption at rest is absent | ['store:database']
+- Queue credentials may be recovered from unencrypted web-application configuration storage | ['store:web-application-config']
+- Database credentials may be recovered from unencrypted worker configuration storage | ['store:worker-config']
+- Unauthenticated or weakly authenticated queue reads could expose queued jobs | ['store:message-queue', 'flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process']
+- Unauthenticated or weakly authenticated database reads could expose application records | ['store:database', 'flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process']
+- Weak configuration-store authentication could expose queue credentials | ['store:web-application-config', 'flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application']
+- Weak configuration-store authentication could expose database credentials | ['store:worker-config', 'flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process']
+spent: $0.0388 reported
+must-finds matched: [6, 7]

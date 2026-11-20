@@ -1,10 +1,10 @@
 """A skip is the submitter's own act, of a question the page presented (#1542 F4).
 
-At 2fae7d3 the page kept a part hidden under its parent in the list's rows,
-so "Skip the rest" sent its key as a skip, and the service admitted it. With
-the parent answered "I don't know" and later changed to "yes", the part stayed
-in the skipped list and out of the list. These tests drive the shipped page
-script and production admission over the same payload.
+A question the page hides under its parent in the list's rows is not
+presented, so "Skip the rest" sends no skip for it, and the service refuses a
+skip of a question the page did not present. A part the owner never saw is
+asked once its parent is "yes". These tests drive the shipped page script and
+production admission over the same payload.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ def _paused(answers=(), skipped=(), shown=()):
         None,
         LEVEL_2,
         (),
+        asks=True,
         waiting=True,
         answered=AnswerSet(facts=tuple(answers)),
         final=False,
@@ -148,7 +149,7 @@ class TestTheServiceDecidesWhatWasPresented:
             if child.key in {q.key for q in after.early}:
                 return
             assert not after.done, "the list ended without asking the part"
-            # A later list: skip what it shows, which spends no limit.
+            # A later list: skip what it shows, which counts toward no limit.
             saved = _save(after, held, skips=[q.key for q in after.early])
             held, skipped, shown = saved.answers.facts, saved.skipped, saved.shown
         pytest.fail("the part never came to the list")
@@ -165,6 +166,7 @@ def test_a_resumed_job_carries_the_skips_its_report_reads():
         checkpoint=Checkpoint(system_model=valid_model(), assertions=None),
         frameworks=LEVEL_2,
         analyses=(),
+        asks=True,
         waiting=True,
         final=False,
         sources=(),

@@ -66,11 +66,15 @@ import asyncio
 import logging
 import math
 import random
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 from analysis_service.ladder import SchemaRefusal, refusal_of
+from analysis_service.refusal_categories import (
+    CATEGORY_NOT_READ,
+    REFUSAL_CATEGORY_METADATA_KEY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +128,10 @@ _SAFETY_FINISH_REASON = "SAFETY"
 # The remedy half of every truncation message, shared with
 # ``graph._TRUNCATION_HINT`` because a run can reach truncation from either
 # direction and both want the operator to turn the same knob. It lives in this
-# module for a mechanical reason: ``retry`` imports only ``ladder``, which
-# imports nothing from the package when it loads, so ``graph`` can import
-# *it* without the cycle the other direction would make.
+# module for a mechanical reason: ``retry`` imports only ``ladder`` and
+# ``refusal_categories``, which import nothing from the package when they
+# load, so ``graph`` can import *it* without the cycle the other direction
+# would make.
 TRUNCATION_REMEDY = (
     "Raise max_output_tokens for this node's tier in config/sampling.toml, or"
     " reduce what the node is asked to produce."
@@ -136,10 +141,10 @@ TRUNCATION_REMEDY = (
 class UnfinishedCompletionError(RuntimeError):
     """A completion the provider stopped before its answer was whole.
 
-    ``fragment`` is the text the provider sent before the stop. A refusal
-    names no reason, so the fragment is the only evidence of what the filter
-    stopped. The message never carries it: the fragment is model output about
-    a submitter's system, and a message reaches logs and the job's error.
+    ``fragment`` is the text the provider sent before the stop. It is the only
+    evidence of what the provider stopped. The message never carries it: the
+    fragment is model output about a submitter's system, and a message reaches
+    logs and the job's error.
     """
 
     def __init__(self, message: str, fragment: str) -> None:
@@ -179,11 +184,23 @@ class RefusedCompletionError(UnfinishedCompletionError):
     The text before the stop is a fragment, so a validator would report it as
     malformed output and a re-ask would ask the same filter again. Not
     retryable, for the reason :class:`TruncatedCompletionError` gives.
+
+    ``refusal_category`` is the refusal category the provider stated, such as
+    ``cyber``, or ``None`` where the service read none. The message names it, or
+    says it is not read. :mod:`analysis_service.refusal_categories` parses
+    it from the response body, and the failure record of an eval case keeps it
+    as its own field.
     """
+
+    def __init__(
+        self, message: str, fragment: str, refusal_category: str | None
+    ) -> None:
+        super().__init__(message, fragment)
+        self.refusal_category = refusal_category
 
 
 class RetryBudgetExhausted(RuntimeError):
-    """A retry was refused because the process had spent its retry budget.
+    """A retry was refused because the process had used up its retry budget.
 
     Raised in place of the transient error that would have been retried, so the
     job fails naming the budget rather than the 429 — a run that dies here died
@@ -250,7 +267,7 @@ _LOWEST_SERVER_STATUS_CODE = 500
 #: Whether a stated rate-limit dimension clears on the timescale a retry waits.
 #: **Not every 429 is a moment.** A request-per-minute ceiling is one, and a
 #: spend cap is not: asking again in eight seconds reaches the same refusal,
-#: having spent an attempt, a budget token and the wall-clock of a paid job.
+#: having used an attempt, a budget token and the wall-clock time of a paid job.
 #:
 #: The pinned translator states the dimension on the exception. Measured on
 #: litellm 1.104.0: every ``RateLimitError`` carries ``category`` (defaulting to
@@ -326,8 +343,8 @@ def _clears_with_time(exc: BaseException) -> bool:
     """Whether the limit this error names is one that reopens on its own.
 
     ``True`` where the provider named no dimension, which is the ordinary case
-    and the safe one: an unstated limit is judged by its status code exactly as
-    before, and a genuine throttle must survive a vocabulary this table has not
+    and the safe one: an unstated limit is judged by its status code alone,
+    and a genuine throttle must survive a vocabulary this table has not
     met.
 
     The value arrives as an enum member or as its string — litellm ships
@@ -425,11 +442,11 @@ def _asks_a_longer_wait_than_we_take(failure: ProviderFailure) -> bool:
     Read as evidence rather than as a delay. A provider that says "come back in
     an hour" has answered the question a retry exists to ask — will asking again
     shortly work — and the answer is no. Sleeping the hour would park a paid job
-    on a third party's number; sleeping less and asking anyway spends an attempt
+    on a third party's number; sleeping less and asking anyway uses an attempt
     and a budget token to reach the same refusal.
 
     Only a stated hint decides this. A failure carrying none is judged by its
-    ``retryable`` as before, because an absent header says nothing about how
+    ``retryable`` alone, because an absent header says nothing about how
     long capacity will take to return.
     """
     stated = failure.retry_after_seconds
@@ -518,9 +535,9 @@ class ProviderFailure:
 def classify(exc: BaseException) -> ProviderFailure:
     """One provider failure as a value, read off the exception exactly once.
 
-    The single place this module turns a third party's object into facts. Every
-    other reader takes the :class:`ProviderFailure`, so the rules keep the one
-    reader each that they have, and a caller on the far side of a process
+    Here this module turns a third party's object into facts. Every
+    other reader takes the :class:`ProviderFailure`, so each rule keeps its own
+    reader, and a caller on the far side of a process
     boundary gets the same answer without the object.
     """
     retryable = _is_transient(exc)
@@ -537,8 +554,8 @@ def classify(exc: BaseException) -> ProviderFailure:
 def _kind_of(exc: BaseException, retryable: bool) -> FailureKind:
     """Name what this failure was, having already decided whether to retry it.
 
-    Takes ``retryable`` rather than asking again: the decision has one reader
-    and this is a label on its answer. A 429 splits on the same dimension
+    Takes ``retryable`` rather than asking again: this is a label on the
+    answer :func:`classify` already decided. A 429 splits on the same dimension
     :data:`_RATE_LIMIT_CLEARS_WITH_TIME` reads — a window that reopens is a
     throttle, a cap that does not is a spent quota — so the two meanings of one
     status code stay distinguishable in a record.
@@ -637,7 +654,7 @@ class RetryPolicy:
         failure never spends a token it was never going to benefit from.
 
         Called **once** per failed attempt, because the last branch mutates:
-        :meth:`RetryBudget.withdraw` spends the token this answer grants.
+        :meth:`RetryBudget.withdraw` withdraws the token this answer grants.
         """
         if attempt >= self.attempts:
             return RetryRefusal.ATTEMPTS_SPENT
@@ -728,16 +745,30 @@ def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
     return responses
 
 
+def _truncation_error(
+    message: str, fragment: str, category: str | None
+) -> TruncatedCompletionError:
+    """A truncation error. A stop at the cap states no refusal category."""
+    return TruncatedCompletionError(message, fragment)
+
+
 #: Each finish reason that leaves a fragment, in the order they are checked:
-#: the error it raises, the log line, and the error's message. The log line
-#: takes the model's name as its one ``%s``, and the message as ``{model}``.
+#: what makes the error from its message, fragment and refusal category, the
+#: log line, and the error's message. The log line takes the model's name as
+#: its one ``%s``. The message takes it as ``{model}``, and takes the refusal
+#: category, or
+#: :data:`~analysis_service.refusal_categories.CATEGORY_NOT_READ`, as
+#: ``{category}``.
 #:
 #: **Three stops never reach this table.** The pinned litellm maps
 #: ``model_context_window_exceeded`` and ``pause_turn``, which it does not
 #: know, and ``error`` to ``stop``. So an answer cut off for one of them reads
 #: as finished, keeps no fragment, and fails at the schema instead.
 #: ``tests/test_retry.py`` pins that map.
-_UNFINISHED: dict[str, tuple[type[UnfinishedCompletionError], str, str]] = {
+_UNFINISHED: dict[
+    str,
+    tuple[Callable[[str, str, str | None], UnfinishedCompletionError], str, str],
+] = {
     _SAFETY_FINISH_REASON: (
         RefusedCompletionError,
         (
@@ -746,14 +777,15 @@ _UNFINISHED: dict[str, tuple[type[UnfinishedCompletionError], str, str]] = {
         ),
         (
             "{model} refused the request: the provider stopped the completion"
-            f" at its content filter (finish reason {_SAFETY_FINISH_REASON}),"
-            " so what it emitted is a fragment rather than an answer."
+            f" at its content filter (finish reason {_SAFETY_FINISH_REASON},"
+            " refusal category {category}), so what it emitted is a fragment"
+            " rather than an answer."
             " The same request stops the same way again; use another model"
             " for this node's tier."
         ),
     ),
     _MAX_TOKENS_FINISH_REASON: (
-        TruncatedCompletionError,
+        _truncation_error,
         (
             "%s: completion stopped at max_output_tokens with partial output;"
             " failing the node rather than validating a fragment"
@@ -771,7 +803,9 @@ def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None
     """Raise if the provider stopped any of ``responses`` at the cap or the filter.
 
     ``node`` is the graph node that asked, and the message names it first.
-    The error carries the text of every response as its ``fragment``.
+    The error carries the text of every response as its ``fragment``. It also
+    carries the refusal category from the ``custom_metadata`` of the first
+    response that stopped for that reason.
 
     Every response is checked rather than just the last: a non-streaming call
     yields one today, but the collection is a sequence and an unfinished part
@@ -794,5 +828,19 @@ def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None
                 if response.content
                 for part in response.content.parts or ()
             )
+            stamps = [
+                response.custom_metadata or {}
+                for response in responses
+                if response.finish_reason == reason
+            ]
+            category = next(
+                (
+                    stamp[REFUSAL_CATEGORY_METADATA_KEY]
+                    for stamp in stamps
+                    if REFUSAL_CATEGORY_METADATA_KEY in stamp
+                ),
+                None,
+            )
             prefix = f"{node}: " if node else ""
-            raise error(prefix + message.format(model=model), fragment)
+            text = message.format(model=model, category=category or CATEGORY_NOT_READ)
+            raise error(prefix + text, fragment, category)

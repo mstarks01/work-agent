@@ -1,0 +1,89 @@
+{
+  "claims": [
+    {
+      "title": "A foothold in the storefront tier can invoke the core order service without authority",
+      "description": "An attacker who compromises `process:storefront-api`, the internet-exposed entry point, or otherwise obtains network reach within `boundary:storefront-dmz`, can send arbitrary order-capture requests over `flow:process:storefront-api>process:order-service>submit-order`. That flow crosses into `boundary:core-services` and has no authentication, so `process:order-service` accepts the request based on reachability rather than a verified caller identity. This is an escalation from DMZ foothold to the order-capture authority of `process:order-service`. Second-order, the order service persists those requests through `flow:process:order-service>store:orders-db>read-write-orders`, reaching orders, shopper addresses, and card last-four in `store:orders-db`.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service"
+      ],
+      "verb": "escalate",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "It is the only thing we expose to the\ninternet.",
+          "source_label": "System description"
+        },
+        {
+          "text": "There is no auth on that gRPC call \u2014 the order service\naccepts anything that can reach it",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because `process:storefront-api` is internet-exposed, but the attacker must first compromise it or otherwise gain a DMZ network position; `flow:process:storefront-api>process:order-service>submit-order` then requires no credential. Impact is high because the reached `process:order-service` writes `store:orders-db`, which holds `pii` and `financial` assets and is classified confidential."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and authorize every call into the order service",
+          "detail": "Require `process:order-service` to verify a workload identity on `flow:process:storefront-api>process:order-service>submit-order` and authorize the requested operation rather than trusting DMZ network position."
+        },
+        {
+          "summary": "Constrain core-service ingress",
+          "detail": "Restrict network reachability to `process:order-service` to the specific authenticated storefront workload, so a compromise elsewhere in the DMZ cannot directly invoke order capture."
+        }
+      ]
+    },
+    {
+      "title": "The order service can lend its database-wide write grant to an untrusted caller",
+      "description": "`process:order-service` uses the single application account on `flow:process:order-service>store:orders-db>read-write-orders`, whose stated grant is full read/write on `store:orders-db`. It also accepts any request that reaches it through unauthenticated `flow:process:storefront-api>process:order-service>submit-order`. If the order service does not independently bind each requested order or shopper identifier to an authenticated original caller, an attacker reaching the service can cause it to exercise its standing database authority over other shoppers' order rows. This is conditional on the unstated per-request and object-level authorization check: the model establishes the broad grant and unauthenticated service hop, but does not state whether the worker re-verifies shopper authority. The terminal capability is alteration of the full confidential order corpus, including shopper addresses and card last-four, through the service's own database identity.",
+      "affected_element_ids": [
+        "process:order-service",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "store:orders-db"
+      ],
+      "verb": "abuse-grant",
+      "evidence_refs": [
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "the order service reads and writes with a single\napplication account that has full read/write.",
+          "source_label": "System description"
+        },
+        {
+          "text": "There is no auth on that gRPC call \u2014 the order service\naccepts anything that can reach it",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unstated object-level authorization: exploiting the deputy requires a foothold that can reach `process:order-service`, but `flow:process:storefront-api>process:order-service>submit-order` presents no authentication barrier. Impact is high because the stated full read/write grant covers `store:orders-db`, a confidential store tagged `pii` and `financial`."
+      },
+      "mitigations": [
+        {
+          "summary": "Propagate and re-authorize the original shopper identity",
+          "detail": "Have `process:storefront-api` pass a verifiable caller identity or token to `process:order-service`, and require the worker to enforce server-side ownership and authorization checks for every order operation."
+        },
+        {
+          "summary": "Reduce the order-service database grant",
+          "detail": "Replace the full read/write application account on `flow:process:order-service>store:orders-db>read-write-orders` with narrowly scoped, short-lived database permissions limited to the required tables and operations."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

@@ -1,0 +1,6669 @@
+{
+  "record": {
+    "command": "early-policies",
+    "commit": "9f1665514afdd628c8439cb05bae4c9348275930",
+    "clean": true,
+    "table": {
+      "policies": [
+        "shipped-list",
+        "framework-merge",
+        "grouped-merge",
+        "group-question",
+        "element-count",
+        "no-to-the-rest-none",
+        "no-to-the-rest-third",
+        "no-to-the-rest-all"
+      ],
+      "budgets": [
+        5,
+        10,
+        15,
+        20,
+        30,
+        45,
+        60
+      ]
+    },
+    "inputs": [
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "3e528ebdbb050e885ba3649a194497573b3411bf06673dfe8657c88e836bdbdf",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "6e1f3b13aa70f27e19aed3fd01152693bfc02710942971bc2723145efca994f4",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/04-ml-inference-service.report.json",
+        "sha256": "36c043092ab3e47858bdd3fc38a8d9033a01aa8cf94b38113b4c28bcb65ca7c7",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "483130ab4ca5655824fb97807717181b2ebfa664266baeabca1a49eb40976c40",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/06-cookbook-online-game.report.json",
+        "sha256": "6cfdb2cdcd5e67b4b7e8670748cbf89d4e3628218ea5181ee0f5946a41b05415",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/08-sso-identity-broker.report.json",
+        "sha256": "e81ced31aad62977795ed5dfdeca5f0ffcbdd68c44cfd5dc494dce213be858d2",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "9d71b1c420f6c0e1b6c370aabcbe270893f010eb4f3de453a6ae1134f87013cd",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "6273deb7a3bac97b762aeb222cfa8a845ff56ef202d8c4b65a1223c3924a02cf",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "33e1f12e118783ae9fe9408ef749b1433e593a0af29670eb44359c1b85b22fb0",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "698ef96486342469cc53a316969a3cb096c1032beff5d68c55f6ea9aff3ebe8b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260822T210958Z-luna/analysis-stride.reports/13-dispatch-control-plane.report.json",
+        "sha256": "84ac28d72df52ff3ec380685f9b974f8db9b5376fc5eac8209da2c239cf6b258",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs-terra.reports/01-payments-checkout.report.json",
+        "sha256": "0f6404176cc7040aef1927cb6d8284a369c39a779be5539f95060a6af2967e44",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "4aa6f017a0a334d659bdb0245c747826030097acf633c08db3f6415cf42726ca",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "c3acc396285bc1bb05b93ffdc4902d0cae4a97607aecd2f571b6268be165e956",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/04-ml-inference-service.report.json",
+        "sha256": "9745a50767cf8c2fa70d2000079ce1512a84470560dc71071a841bea32b8a268",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "9b7884b1f2f111cbc02258dad50a7f83201380fe2350497f74f09a54eefffffd",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/06-cookbook-online-game.report.json",
+        "sha256": "bf59329ea23567600e1db615f6e485d1b1e92e4d99511e49177db30854cc8283",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/08-sso-identity-broker.report.json",
+        "sha256": "e132477b9c76e645ee3c1945eeaf067fb459e9b7a73ad2a9ad76e6ff6bd86f34",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "f27891867cfcb9d23ebd6c2c81e60b18c67122099127d6b825359d2ad8f58ba5",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "fcfcd2836e58e39ff2e39f12b86e1d86acda19593005ab93402d89fd77c50798",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "bfaf161ea65793abe98276b9efb461aa41eef1c96b0d86f3b7d5fad18da2dfe1",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "b31ec86511c1aff26b3e2edfc132f232b06ddd213ac0dd0fdd3b9d98fa61a0a2",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/13-dispatch-control-plane.report.json",
+        "sha256": "1d208853abbb2faf1e553da3937e9bc3d54696e9fde689b7f8dfc185a22952c2",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "86b8a66b880565e513cb764816b8a806f40803b29ffd606f646f3507de24e79a",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "66452eef3cd05f3604ee934d680b4538b13f83803f39c543d601eea49693347d",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/04-ml-inference-service.report.json",
+        "sha256": "17cef11a17e8844c73bf2411c9a27cb00ec564c87c8ac69583abd00ae29bc32d",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "fe36dc7330f8f5d28df4a7a31ec5d939309958b9e51d969eef5ea3bb24f51d87",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/06-cookbook-online-game.report.json",
+        "sha256": "1e3646f13266003c1cb2ddf4bfc51f007f8561ad375514e8ab0770d0b87251d7",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/08-sso-identity-broker.report.json",
+        "sha256": "4581bee78bee3ffa242798bf8f1df72d6b2b3ed070b6f9ab4841dd1b070adb80",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "7ad5f114294800a9d15ece5c8256536a330ed18b01a7c87775a9c51f229698f1",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "2210a6b97853ee845a13dd528414ed8e77e0b290ca1a468a7d1df852c02d2e9e",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "0965b728e0fd44bc69e0c313fa35549345d1bc0b72781d59357bb942a4ccb08d",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "06059a01f1a2c24fddf2328adb2bd3dc2372c446a0f21e521fe0732d6f4c9682",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.reports/13-dispatch-control-plane.report.json",
+        "sha256": "272c2dd047eeec9451174b6e2098ffdee94039daafd6b032840aea55f4ab652a",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 1
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260908T192331Z-asvs-preflight-01/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "dd1a3b26d562b67d2362672b3ae2641255ccf573fbfca2c9e92e63acbb58d788",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260908T194349Z-asvs-spread-01-r1/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "dc388f955a3436efdf56c5ca0c5768754b0a937a1781a9caacbf1c90079f0048",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260908T194706Z-asvs-spread-01-r2/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "24c97ff89a0294c8073a6495a2c380eccdcb61cb227ed69957d785006146eb5c",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260908T195023Z-asvs-spread-01-r3/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "ddd66d9616e727779783d70547670f8a7fa96acd3868e22ceeaf6762d366a86d",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260908T195358Z-asvs-spread-01-r4/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "630e63a5ece41b88a01d599076e2c13eab6b496fd70a3e86a1cd30b967446112",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260908T195629Z-asvs-spread-01-r5/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "cd323d1c6fc730fcbf7813212024692c2da16a1e8b61ba7ced4165ca6a47385b",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T010412Z-stride-preflight-01/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "4cfad637675cfbf01f9a770858d53cbe625966fd8398002b4460330e974143c7",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T152707Z-stride-spread-01-r1/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "107e6dfe111d18f8d9db05af1ed8d6f7915288feb942fb97c31d3e651898605f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T152856Z-stride-spread-01-r2/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "fcd786d796a4caec4694402e8309af8cf46e5527d91c579f43bb29866be78c6e",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T153048Z-stride-spread-01-r3/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "01148738eb3e7da2e005977d3a0089bff64dfd666054d581bceb327e1be3a8c1",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T153224Z-stride-spread-01-r4/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "7daf37cb1325876eb6c39086c6eae9b448ce1c359dd5add504aa7a8c05fccaaa",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T153442Z-stride-spread-01-r5/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "797310d4a32332739d1e3d5ee7c33a97e66817b7fe828a8f6fa6f9ebf5590e28",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "3197247e2975e6cfdbb4a864afbe0a441b8601c58e4a00d8953f3b91f43b04f6",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "978c6f8b49fd87d02b71535ba84be0a8e65b30eda182299a07381a60ae24966d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/04-ml-inference-service.report.json",
+        "sha256": "f9b06eb0a154237e25aaf9ca2c5f8bf432912327d10597e350f0a7ac877835b2",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "76660196d0aaab65c054f33f933fb93647ba6e04ab41d9dcf874edca5edbd959",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/06-cookbook-online-game.report.json",
+        "sha256": "7fa1734c0d10880df579cc75b37aaf9241ee11ff34c047b4764528926f5a6ccc",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/08-sso-identity-broker.report.json",
+        "sha256": "d583f0a8cd570490889520e7cba74a6aaafadac32d1403670bc7f5cdc98f56dd",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "ac1ec137f4b382242974cf240788afe208c988446e62fa421785376321e18b24",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "f6d389d1809dc9653350c095057a4f5d7980a07fa4787163d8bff437bcb7f332",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "7c743d9630d0e2113906702128a5912fc445a9c4966d519938f8abb1b8cb368a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "7e5b580b032807604860101c337c72a4b20d3b20fdc958659fe2ae6b7f9e3f20",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T161416Z-stride-sweep/analysis-stride.reports/13-dispatch-control-plane.report.json",
+        "sha256": "27168dae29de18768b0582894d96ef3ee6f5507bd5e5c671121cc49895741b01",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260909T223842Z-asvs-adr28-01/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "a384fb87569454559b41f547dd1635fe0f0feb89d791b10874de726453fd8dfb",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260910T000008Z-asvs-adr28b-01/analysis-asvs.reports/01-payments-checkout.report.json",
+        "sha256": "6ae8aa396c557b05a808096e1b588a40fffe242558dc3520efd05e4215abac8d",
+        "selections": {
+          "alone": {
+            "asvs": {
+              "level": 2
+            }
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/01-payments-checkout.report.json",
+        "sha256": "55fdf9ad1f01579fadd21d0a8549245e81fccc13e493a4f326de76949fe555f5",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "b90151525bbcd617ef490171c936d43c138c82ceb130014984efd082dc34f3be",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/04-ml-inference-service.report.json",
+        "sha256": "f8d35d9addce45a276a01b6c6ee2953cad5b669edf30707e6accf59588a0c2ae",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "aa054eaad949a0aca8a7fab7c036823f85b0f23ddce08021e0ceea624e4e1912",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/06-cookbook-online-game.report.json",
+        "sha256": "ad0d3168e8849fb1698a2351b6948738bea74429d7ad69606e4c00aade087285",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/08-sso-identity-broker.report.json",
+        "sha256": "9f7f7c378bb187aafe177b268754fb8cb9b876bfeb539bee4514f081d0f89307",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "22a3fd86fa0858b57b8580cf67659715ba577e16f7bcc3651f3c5b290eb3cd19",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "4dd86ca94a2e0ace96bc9e583b7e20723b3b6e7004eccccc1e3ef34cf9cebe69",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "83397025fe5a760e129fbf7a56a1dea785b2396910b27058cff8e317a34bf69f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "98f20657500a6893213dd240f82196a4c1b63fee77db5a6e99877beb8affa50a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912-stride-730-flex/analysis-stride.reports/13-dispatch-control-plane.report.json",
+        "sha256": "591f888f2f74fdd27c0c8050b73984eb39154ca5e497f2dee5a7f26f21777f4d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/band/13-r1.reports/13-dispatch-control-plane.report.json",
+        "sha256": "bdd3efadd468706b6870fe5ef2888ab61aefc36ab315317412cbcce8f19d2ed6",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/band/13-r2.reports/13-dispatch-control-plane.report.json",
+        "sha256": "c4ebf970c2b882bab5448b273badeb1f5d899779a3d1e332d76d6b3b8d03be27",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/band/13-r3.reports/13-dispatch-control-plane.report.json",
+        "sha256": "9c1a3d08a2f4635e56bd28750fa8973b73b555757395ef3c6235b5f90c00eb38",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/band/13-r4.reports/13-dispatch-control-plane.report.json",
+        "sha256": "7b7ace4c638ecfff6fc6471be4bac301d6543fd250cad4d530fcdbb7909df60d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/band/13-r5.reports/13-dispatch-control-plane.report.json",
+        "sha256": "d572a2c7630e5bd918254057c81096ced8ead5a36c4f44a09050ad33b6cf3233",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/case09-r1.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "cff2d6a3037374c63e72381d33edce49175cf0686b9a4fd1c73b85b1be69d6e6",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/case09-r2.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "e39d79da4ca139e7d80dc0c199fec8b9b21ecfd4522706a6e25897736715261f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/case09-r3.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "61b8b41c7df21574e2fafd47383c8f10516a746f696d75c09d9aa74598c01f28",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/case09-r4.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "99647566111a1d3f4b60178dd44a69bd9162ae312e1c69ca8514aef941a27c5a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/case09-r5.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "95dee0a4797402c07dac84d9ceb96a51f7ba37d9b580f7b371b4ffce1e28b235",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/01-payments-checkout.report.json",
+        "sha256": "ba4d689c81a2f19bc1150a3ee6750f28cda55b0fd45d1c6967ca967d448513aa",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "7e2f0cd6ac332c4fa02984e11a03d49cb7c32364436d81d09363d9da646ea419",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/04-ml-inference-service.report.json",
+        "sha256": "d6bde641357984a77390e9c568c939507e89e882182565f8156bd9a46ca3d649",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "e9872fe24f88e0f5fe656b10fb8773351675f769817ce9d482bd1e1f8d5d358d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/06-cookbook-online-game.report.json",
+        "sha256": "20fcad5051d6dce136e01b98fc563393901e924ee695f51c68e65875dc86321c",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/08-sso-identity-broker.report.json",
+        "sha256": "80a918320eef51ce47dcc8d748bd8703adf1c7fea0a217267f639a9256d5863c",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "f5629157196def823be7ef805f49d5cd46045c49fa114b156340d7fb157b6ab8",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "67b1043c1ee772321283cf7322df1de0c4849e428ee10e95bf681e097b222d74",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "23c99c1ba337b0c3060f070bab79215d1e3d0713b7602f90869de0f99e4964f3",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "ee69894140007eb692b194338dedc438e80cf1dade46bb5bf01237041b26912b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/pair/analysis.reports/13-dispatch-control-plane.report.json",
+        "sha256": "f37dd83985f6cdae944c5f929c32a9c245e1640da26482b624fb6b69a36a9f98",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/01-payments-checkout.report.json",
+        "sha256": "149d68fbab507e634d2f4c4e102e00bbb1eee33def242aa345922dc0131c8c17",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "495303bddc0786f75d8b7fc36eaafa0bdd951f5cee69f758bc967fca49c0a5e9",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/04-ml-inference-service.report.json",
+        "sha256": "314f88496abbccbbcb781da476af9430c3ab2c8fead719349cfe7dc4011c9530",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "51f92a9028670e612d57e738bb8d377fcbbd35a7cbe0f7789b1515a64e3dd38e",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/06-cookbook-online-game.report.json",
+        "sha256": "649c662e261510b474268b94faadbc666403ccc9f75a9dff50a036f77301590d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/08-sso-identity-broker.report.json",
+        "sha256": "1768b12de8886649a9a0e6482389c6b481a7759eaca1b727546dacfe1c0930e4",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "766c5773a44c32156bac2143f81445e98aeddc5849b4e1644dbfd0af7567cb92",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "a8ea2f28916c409bad5ef3a7331fa4f6215fb9472ee0c7bf7978e9d1afa74600",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "1f178352b1e74fc17bfc221cf3ebd7d1f0d36e5e632901d6f57c108e0577d44a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "2bd06be5644238cfb843ee23c5d2044d295b4cbb3271bab674209207e9ebd16d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/sweep.reports/13-dispatch-control-plane.report.json",
+        "sha256": "e7ea6e33e3ff4dc6e4964ddf434ce7683fda6e22271fb66b5600c39ecba33b65",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/01-payments-checkout.report.json",
+        "sha256": "aafb9f0e02bc8f173385584c2a934e26b923e1a5382d790dd7b489ceef666f09",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "219f2f2b7edec1c3e3800391afbb408b8b93b1aa6a5ce0e0ea75271524d93977",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/04-ml-inference-service.report.json",
+        "sha256": "25947e6cc372a0765dfc488501d91033607c026cb12eca7d08e5516b8023ad6a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "2c09c43aa796ac4dfd1e031812ccbdfdb9841507a4bfd31aae90cdba6e934005",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/06-cookbook-online-game.report.json",
+        "sha256": "ba3da67f0270201aed614403fe5aa3a0cf45a83c809768c194f8375b35791c38",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/08-sso-identity-broker.report.json",
+        "sha256": "4f118ea8dafa28296aed404a5ea321f5aad27862e1787f7ea632800d5970451f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "827dac3a459320d6db6c3c70d55710b4c2f993aab4f93df1498495f0e1d99b3d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "6b8ec3d3de99a18b50a50ed23dc2e910158b0f3abb35cd5308870f30c4d5f65f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "0a085ae2308eee1c68b1342c4b6dcd9c07c8f94b3a7ff802307c01f734e62390",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "a93e63c8b733a34813aeb4d08e42589ea68dff100b77531a8194aa2fc544f6e7",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260912T192510Z-stride-verb-batch/verb/before.reports/13-dispatch-control-plane.report.json",
+        "sha256": "f1de2fceca34871f1668ba09c94d839482ae4bf60f6407a71018851f23d766ea",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-openrouter-preflight-03/analysis.reports/01-payments-checkout.report.json",
+        "sha256": "39ed2da45af08e9e2b23518ca5f0c37dd89ffa11329b4ac4ca7d8a7fb2fc34db",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/01-payments-checkout.report.json",
+        "sha256": "bdc86382ae594ea4b1148f885caecf7ef4add4aa9f8f92c1086a63f0b00a60c9",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "8ce196a1115854195b8e120d182abb6d659eadafd8824191ed5b93150e9aca12",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/04-ml-inference-service.report.json",
+        "sha256": "ff1697d6ac12d5aebe682c9c849bc56f8595ed0603abe3cd100131011c05248c",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "497202ab032be7c533113324a5c417e2f4bfcc7a7e9a702ee43f16bab3d2e854",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/06-cookbook-online-game.report.json",
+        "sha256": "187153bae3b58f7e9bb6fedb5d0351cd149cb2fe2f62ba4b2aef96358ca4f450",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/08-sso-identity-broker.report.json",
+        "sha256": "32f94fc7f99372236d73ca2ec06329d784dd72559e533a6d2bf0a0ac31bc35df",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "7d58afa4ef16945322ddf9b081567cb5d54b988c30106d502a6c9795cdfa8a3f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "023181ccc53e265516d90bf59e96c50b8966aba9a41095d0f31b9c8b6855538a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "d9d88179f279a22d6fb5067105e0d0b3e235efea7372733e8a1b0e18e51a6d9a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "a2fce8ee45ea99a388f9ebdf87e19d7d6d4222dd9e8ca144a9cc3110c6f1c0df",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260920T-stride-baseline-01/analysis.reports/13-dispatch-control-plane.report.json",
+        "sha256": "63e7ff911c86aab0b9e693ace8f1118b0ea1f9569b886aef84abc42dde4d31a1",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260921T-stride-1110-case02/analysis.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "539834161cf01586d77579c96c58b4bd2bee30ddd6d9ac9f42852415c1f37c0b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260921T-stride-1110-case06/analysis.reports/06-cookbook-online-game.report.json",
+        "sha256": "59fd370ab5d375b16669fa853d21c2b9b295761e2c4d1aae39fb712e7c646329",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260923T-assertions-ab/off.reports/01-payments-checkout.report.json",
+        "sha256": "9b7293142afb1d4eec20b14acff79fb8a0007b1ddb15aaa18cd976dec49f54f8",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260924T-direct-facts-pair/corrected.reports/01-payments-checkout.report.json",
+        "sha256": "52aefcf70d98cda345bffc4212cbdb0a2e203bafea3717c93074520ac6cc6289",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260924T-preflight-926/off.reports/01-payments-checkout.report.json",
+        "sha256": "330ec9d70af868eed06c46068b41e47c8c110c21956b3b6bd822a98b1405169b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-closing/02-iot-fleet-telemetry.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "fa6b9a74cf7f237ed24342bfafd52f413c354e175e417b56cb8b7d9f8749395a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-closing/05-cookbook-queue-webapp.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "f96ddcfdc105dda8edab293ececb79345d531507bf61f58200b2cad7e0051e92",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-closing/10-cookbook-generic-cms.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "0bf97d555b2d73471391a72706b4804eb08184885262198cca22d00eafa0a965",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-confirm/a.reports/01-payments-checkout.report.json",
+        "sha256": "856290602961208410bfebb6b64e293c29400689e1f99842af06e7a4191f6086",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-confirm/a.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "899d8606d37ae528a95f8cbc86df1782c93fd63d9dfd9aea52cda7333acc7f3e",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-confirm/b.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "ad69e6ad1a22fcc9a0b6ef11506a3dfc2bb25e14981820a71e7da50a43c34265",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-adr0030-confirm/b.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "350977aa6e0c55925e9ee056d8209ba120b143153e3b2a06da59d1b400801d87",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/a-case01.reports/01-payments-checkout.report.json",
+        "sha256": "9bba9ff48c83b5f85a017db628794d379f5090af1f43af1b0035272e08d8f4d8",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/b-cases02-08.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "c32fef7a7e7fe340f7431de4b5a64cc1abafdebac3ad78dfa5b5dbe55f5325ae",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/b-cases02-08.reports/04-ml-inference-service.report.json",
+        "sha256": "f935df58c5cc845be2300c9f29089a03ff7ee19cf5c6ed2873db1d8604659b4e",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/b-cases02-08.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "6b21f5bcf5797450ce18810b573b02cde194c2d6d2b887612ceabd59de225d6b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/b-cases02-08.reports/06-cookbook-online-game.report.json",
+        "sha256": "89966f35f44e46c7a555f21759e46e96c93f88677b99d8ae745016f76e23a765",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/b-cases02-08.reports/08-sso-identity-broker.report.json",
+        "sha256": "5d6c7f065c9b77b59de60d4b131dca53c46044bf25655961095409d7ae45b023",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/c-cases09-15.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "5ca873fd12fca3a33d409a46b88fb9f97027fc2b73b164de5c512ff04d22ecbe",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/c-cases09-15.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "93419258bdff4b07f7c57eaeadbd5d5bea35b59de13ee9d708528360d8e53cef",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/c-cases09-15.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "9b26e41c2aea84c55dd8bb3e555bf6fce77422afa9b84cb3927ca9fd9955f662",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/c-cases09-15.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "f8b40f279d286a6c327862496e1c9626dc08fbd61de935ebe53742e86f1b0f0f",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260926T-sweep-b/c-cases09-15.reports/13-dispatch-control-plane.report.json",
+        "sha256": "cf6ef24c4b36be6d0e33e5cfa1b828ed87490d9562cf77011809d17d2f6718bc",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260927T-answers-pair-06/none-1.reports/06-cookbook-online-game.report.json",
+        "sha256": "9f6baaf5172a8ea2de53b3b43c4b825b3fe043b13d34b63984bee2ff21731d50",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/analysis-1.reports/01-payments-checkout.report.json",
+        "sha256": "b45cb383395a49757b68a122eed0efe9cfb69f38efdd6330bcf6d3509275c635",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/analysis-2.reports/01-payments-checkout.report.json",
+        "sha256": "311a0b73e6774fad4b842654db93cb2c6667c4356f09d7bbad6f18e7b839788a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/analysis-3.reports/01-payments-checkout.report.json",
+        "sha256": "ab611fee132d5b2a34a77b43802c082b05423f77466475cc978002f538a8ef6a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/analysis-4.reports/01-payments-checkout.report.json",
+        "sha256": "78540fb5e1f1180d377176b3cfdbc71854f57f832e473f9e207304e646740c90",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/analysis-5.reports/01-payments-checkout.report.json",
+        "sha256": "fef0ee431afb8d628d935cd5795e90d1b07f2743facfff3e2d00ef5613e26506",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/answered-1.reports/01-payments-checkout.report.json",
+        "sha256": "3775f5f6c1093be29b6f8d6e4c1816ab21be5d483c4d320e4ffaa56b29efb883",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/answered-2.reports/01-payments-checkout.report.json",
+        "sha256": "bcaf680f6084b6efd5853a4357c85d65ca7b0988ea2c5c881ede229e8576a949",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/answered-3.reports/01-payments-checkout.report.json",
+        "sha256": "3500585a0df7a82c56fa2714da1bbc090e136b25d28265f53011db1658d72fde",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/answered-4.reports/01-payments-checkout.report.json",
+        "sha256": "7e4301ccbe75ab48d40fc601b4ba80a16ee606a6983239b72ff5e22b557fd34d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/answered-5.reports/01-payments-checkout.report.json",
+        "sha256": "0e6a05f68ff2d6897d3675eed81605a55fc2ef54391d95195aa1ccd3bcd5ce03",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/withheld-1.reports/01-payments-checkout.report.json",
+        "sha256": "7d0d2ca9fe540bbaa168ecb9c759d6b7b59248f787e0596a274afe22c246196b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/withheld-2.reports/01-payments-checkout.report.json",
+        "sha256": "8af5cd6f6fe8056cf97de9b9faeb3869ea0db57929bfc85a4608fbfbeed3545b",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/withheld-3.reports/01-payments-checkout.report.json",
+        "sha256": "ec8ba1ea4c47a498e235f5f706166a7dd40de12e5daae47097b29fbcda0a5bd4",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/withheld-4.reports/01-payments-checkout.report.json",
+        "sha256": "7c66847b36f3efc829e13ff60dae301f62136116edba13eadff78a96dca61ebe",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260928T-withheld-01/withheld-5.reports/01-payments-checkout.report.json",
+        "sha256": "f0506f1d2ee74903be6bb7d14a1fc4f3a6497d068aad13176a2f305f6a31bb71",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20260930T-answer-rounds-01/round1-1.reports/01-payments-checkout.report.json",
+        "sha256": "d04803e91d156b4413a7df6eeb87c05c7505f8241a93a59050cbf759fb3a24a4",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261002T-1413-preflight/01-native.reports/01-payments-checkout.report.json",
+        "sha256": "233c394b9ecd20a5c6ac4a56500d1aa6c55a246237ae7d569e83bccacd935411",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261002T-1413-preflight/01-tool.reports/01-payments-checkout.report.json",
+        "sha256": "33ae118808b74477f4b1406822e4677b6da48b7c489dbc2687adaf72f15db296",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261003T-1075-case10-e2e/run.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "fbdde777e61c53fc8448dd9d296cb2eda53bcb045aa54954b391ad20d1cce357",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261020T-claude-tiers/opus55-medium-01/e2e-01.reports/01-payments-checkout.report.json",
+        "sha256": "1970f7d5a434732c33abf452747a34bfe348a5634442d5263a66f7b7bbbfb908",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261020T-claude-tiers/sonnet5-high-01/e2e-01.reports/01-payments-checkout.report.json",
+        "sha256": "dae3fc5922c1dba0e1cbee9c2d7f05956e706425ca4ecc7f42cc02b0743e35f8",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261020T-claude-tiers/sonnet5-medium-01/e2e-01.reports/01-payments-checkout.report.json",
+        "sha256": "84c5d2aadfc402458470a9cd9f3973118ee177702377f1b54a6e71b1e4f919d0",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/native-r1.reports/01-payments-checkout.report.json",
+        "sha256": "56ba347634fba513fae5aea1b21144bdb6120c61eea3e2dd73118ca485622fb6",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/native-r2.reports/01-payments-checkout.report.json",
+        "sha256": "3664b909e26cf21dae2aebd389f9f82865dcd86c21a5457fc07ac96cf0b764e9",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/native-r3.reports/01-payments-checkout.report.json",
+        "sha256": "e49a19abe550d67b5766073216cb5731e34fd24d394432145c15c4648018d6f8",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/native-r4.reports/01-payments-checkout.report.json",
+        "sha256": "ccf04ec2e6bb3510089d2f474d23dd2982186223cdfaadd806ab7bbe4c58b8d9",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/native-r5.reports/01-payments-checkout.report.json",
+        "sha256": "8c916c5e7f2fb94be57aa480e59309d7e7dd057da729b4b7b19a810373c1e629",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-fixed-r1.reports/01-payments-checkout.report.json",
+        "sha256": "e6004c10d114fded4a2061dc5c3e59cb5573f14b25620e43ae28d5a0d42e8f72",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-fixed-r2.reports/01-payments-checkout.report.json",
+        "sha256": "69cbb0a87a515005702fc27361a61867734aeb22423f2db647d5d8e8e7499891",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-fixed-r3.reports/01-payments-checkout.report.json",
+        "sha256": "6b1895be6d58f078027f8facc1021e09c0906532262b14f9f3fa26ce0c4c94d5",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-fixed-r5.reports/01-payments-checkout.report.json",
+        "sha256": "843ec5c6fa1f39c3e6a40c50676784eb15f75042c55fb7256422353b78aea680",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-r2.reports/01-payments-checkout.report.json",
+        "sha256": "64124f897b4487c5514373af416c9aaa1faa9351c58271fd75fd44b2ab7e2d20",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-r3.reports/01-payments-checkout.report.json",
+        "sha256": "e36e8408b40cfb940ad8d654bea065713cd267259fbe9b744e7f51c7c33764f3",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-r4.reports/01-payments-checkout.report.json",
+        "sha256": "379a542c01073baf830ea301603f2dd60931ee5c00c23a8516e387712283a6e9",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261021T-1413-tool-vs-native/tool-r5.reports/01-payments-checkout.report.json",
+        "sha256": "b2bc673b63b033d149b71240a705d52321edbb42c98aed3b3886cc5465a4f62d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/02-iot-fleet-telemetry.reports/02-iot-fleet-telemetry.report.json",
+        "sha256": "8ecf627e102b3466549172ca53beaf2643418e3a7741166e6617d06c24e1bb3e",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/04-ml-inference-service.reports/04-ml-inference-service.report.json",
+        "sha256": "850af786bd4d47652e32b7f823fab86407e04ddac22b171a801a746b15c4e57a",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/05-cookbook-queue-webapp.reports/05-cookbook-queue-webapp.report.json",
+        "sha256": "2d6fb7fae5a5c09bcfbaff7e991358b5335d2a52d405be415180db3fa252d204",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/06-cookbook-online-game.reports/06-cookbook-online-game.report.json",
+        "sha256": "beb2dc38b1fdc233672279493e7fb1fdfc34238fc150c04797d017a34ca71158",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/08-sso-identity-broker.reports/08-sso-identity-broker.report.json",
+        "sha256": "3710887d3acf211ab75d33a1d95f0dc0aac4fd1f0d0c43038f4db8b8ed1f735d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 2
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/09-cookbook-sokify-retail.reports/09-cookbook-sokify-retail.report.json",
+        "sha256": "928bd5020f7d0f11243211a6abdf52c8f02612212c46e0c44f4b878d3eaa472d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/10-cookbook-generic-cms.reports/10-cookbook-generic-cms.report.json",
+        "sha256": "e6b8d4c270200c326af1b4ae7ef6fabc7a6329a5fb143486691148bc53592f37",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/11-sparse-shift-scheduling.reports/11-sparse-shift-scheduling.report.json",
+        "sha256": "dd4f0729555ce77b6f0218188ab050d66648bf54372ad16d08d72edfd2e428d7",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/12-overclaiming-supplier-portal.reports/12-overclaiming-supplier-portal.report.json",
+        "sha256": "ac9372af2e5faee7f3061c8f4214457a1759d178de8c1a1ddae386048cadf552",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "evals/runs/20261024T-sonnet-medium-sweep/13-dispatch-control-plane.reports/13-dispatch-control-plane.report.json",
+        "sha256": "ba70df2790e7c7174f90be0e855429bcb3d1323a6b8d04e1215869385a90197d",
+        "selections": {
+          "alone": {
+            "stride": {}
+          },
+          "all": {
+            "stride": {},
+            "asvs": {
+              "level": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "summary": {
+    "stride / alone": {
+      "shipped-list @ 5": {
+        "choices": 814,
+        "completed": 1048,
+        "completed critical": 92,
+        "completed high": 542,
+        "completed low": 42,
+        "completed medium": 372,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 10": {
+        "choices": 1571,
+        "completed": 1557,
+        "completed critical": 99,
+        "completed high": 770,
+        "completed low": 70,
+        "completed medium": 618,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 15": {
+        "choices": 2273,
+        "completed": 1844,
+        "completed critical": 110,
+        "completed high": 888,
+        "completed low": 118,
+        "completed medium": 728,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 20": {
+        "choices": 3178,
+        "completed": 1914,
+        "completed critical": 116,
+        "completed high": 921,
+        "completed low": 124,
+        "completed medium": 753,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 30": {
+        "choices": 4704,
+        "completed": 1949,
+        "completed critical": 128,
+        "completed high": 936,
+        "completed low": 124,
+        "completed medium": 761,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 45": {
+        "choices": 6532,
+        "completed": 1962,
+        "completed critical": 130,
+        "completed high": 942,
+        "completed low": 126,
+        "completed medium": 764,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 60": {
+        "choices": 8004,
+        "completed": 1970,
+        "completed critical": 131,
+        "completed high": 947,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ all": {
+        "choices": 9470,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 5": {
+        "choices": 814,
+        "completed": 1078,
+        "completed critical": 90,
+        "completed high": 545,
+        "completed low": 47,
+        "completed medium": 396,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 10": {
+        "choices": 1568,
+        "completed": 1561,
+        "completed critical": 99,
+        "completed high": 771,
+        "completed low": 71,
+        "completed medium": 620,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 15": {
+        "choices": 2363,
+        "completed": 1857,
+        "completed critical": 111,
+        "completed high": 896,
+        "completed low": 118,
+        "completed medium": 732,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 20": {
+        "choices": 3118,
+        "completed": 1910,
+        "completed critical": 118,
+        "completed high": 917,
+        "completed low": 124,
+        "completed medium": 751,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 30": {
+        "choices": 4718,
+        "completed": 1945,
+        "completed critical": 126,
+        "completed high": 936,
+        "completed low": 124,
+        "completed medium": 759,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 45": {
+        "choices": 6573,
+        "completed": 1963,
+        "completed critical": 130,
+        "completed high": 945,
+        "completed low": 126,
+        "completed medium": 762,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 60": {
+        "choices": 7985,
+        "completed": 1968,
+        "completed critical": 130,
+        "completed high": 947,
+        "completed low": 126,
+        "completed medium": 765,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ all": {
+        "choices": 9470,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 5": {
+        "choices": 814,
+        "completed": 1048,
+        "completed critical": 92,
+        "completed high": 542,
+        "completed low": 42,
+        "completed medium": 372,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 10": {
+        "choices": 1571,
+        "completed": 1557,
+        "completed critical": 99,
+        "completed high": 770,
+        "completed low": 70,
+        "completed medium": 618,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 15": {
+        "choices": 2273,
+        "completed": 1844,
+        "completed critical": 110,
+        "completed high": 888,
+        "completed low": 118,
+        "completed medium": 728,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 20": {
+        "choices": 3178,
+        "completed": 1914,
+        "completed critical": 116,
+        "completed high": 921,
+        "completed low": 124,
+        "completed medium": 753,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 30": {
+        "choices": 4704,
+        "completed": 1949,
+        "completed critical": 128,
+        "completed high": 936,
+        "completed low": 124,
+        "completed medium": 761,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 45": {
+        "choices": 6532,
+        "completed": 1962,
+        "completed critical": 130,
+        "completed high": 942,
+        "completed low": 126,
+        "completed medium": 764,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 60": {
+        "choices": 8004,
+        "completed": 1970,
+        "completed critical": 131,
+        "completed high": 947,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ all": {
+        "choices": 9470,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 5": {
+        "choices": 777,
+        "completed": 1835,
+        "completed critical": 101,
+        "completed high": 865,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 10": {
+        "choices": 1422,
+        "completed": 1910,
+        "completed critical": 118,
+        "completed high": 915,
+        "completed low": 124,
+        "completed medium": 753,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 15": {
+        "choices": 2364,
+        "completed": 1969,
+        "completed critical": 132,
+        "completed high": 949,
+        "completed low": 125,
+        "completed medium": 763,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 20": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 30": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 45": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 60": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ all": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 5": {
+        "choices": 808,
+        "completed": 1037,
+        "completed critical": 86,
+        "completed high": 532,
+        "completed low": 34,
+        "completed medium": 385,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 10": {
+        "choices": 1609,
+        "completed": 1418,
+        "completed critical": 95,
+        "completed high": 705,
+        "completed low": 63,
+        "completed medium": 555,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 15": {
+        "choices": 2392,
+        "completed": 1655,
+        "completed critical": 108,
+        "completed high": 830,
+        "completed low": 80,
+        "completed medium": 637,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 20": {
+        "choices": 3190,
+        "completed": 1856,
+        "completed critical": 116,
+        "completed high": 900,
+        "completed low": 115,
+        "completed medium": 725,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 30": {
+        "choices": 4769,
+        "completed": 1946,
+        "completed critical": 127,
+        "completed high": 933,
+        "completed low": 125,
+        "completed medium": 761,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 45": {
+        "choices": 6509,
+        "completed": 1960,
+        "completed critical": 130,
+        "completed high": 939,
+        "completed low": 126,
+        "completed medium": 765,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 60": {
+        "choices": 8068,
+        "completed": 1965,
+        "completed critical": 131,
+        "completed high": 942,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ all": {
+        "choices": 9470,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 5": {
+        "choices": 777,
+        "completed": 1835,
+        "completed critical": 101,
+        "completed high": 865,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 10": {
+        "choices": 1422,
+        "completed": 1910,
+        "completed critical": 118,
+        "completed high": 915,
+        "completed low": 124,
+        "completed medium": 753,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 15": {
+        "choices": 2364,
+        "completed": 1969,
+        "completed critical": 132,
+        "completed high": 949,
+        "completed low": 125,
+        "completed medium": 763,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 20": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 30": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 45": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 60": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ all": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 5": {
+        "choices": 777,
+        "completed": 1835,
+        "completed critical": 101,
+        "completed high": 865,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 10": {
+        "choices": 1422,
+        "completed": 1910,
+        "completed critical": 118,
+        "completed high": 915,
+        "completed low": 124,
+        "completed medium": 753,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 15": {
+        "choices": 2364,
+        "completed": 1969,
+        "completed critical": 132,
+        "completed high": 949,
+        "completed low": 125,
+        "completed medium": 763,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 20": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 30": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 45": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 60": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ all": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 5": {
+        "choices": 777,
+        "completed": 1835,
+        "completed critical": 101,
+        "completed high": 865,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 10": {
+        "choices": 1422,
+        "completed": 1910,
+        "completed critical": 118,
+        "completed high": 915,
+        "completed low": 124,
+        "completed medium": 753,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 15": {
+        "choices": 2364,
+        "completed": 1969,
+        "completed critical": 132,
+        "completed high": 949,
+        "completed low": 125,
+        "completed medium": 763,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 20": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 30": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 45": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 60": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ all": {
+        "choices": 2782,
+        "completed": 1974,
+        "completed critical": 132,
+        "completed high": 950,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      }
+    },
+    "stride / all": {
+      "shipped-list @ 5": {
+        "choices": 815,
+        "completed": 929,
+        "completed critical": 85,
+        "completed high": 471,
+        "completed low": 36,
+        "completed medium": 337,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 10": {
+        "choices": 1630,
+        "completed": 1466,
+        "completed critical": 100,
+        "completed high": 738,
+        "completed low": 68,
+        "completed medium": 560,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 15": {
+        "choices": 2366,
+        "completed": 1752,
+        "completed critical": 101,
+        "completed high": 838,
+        "completed low": 112,
+        "completed medium": 701,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 20": {
+        "choices": 3120,
+        "completed": 1875,
+        "completed critical": 111,
+        "completed high": 897,
+        "completed low": 122,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 30": {
+        "choices": 4819,
+        "completed": 1918,
+        "completed critical": 116,
+        "completed high": 921,
+        "completed low": 124,
+        "completed medium": 757,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 45": {
+        "choices": 7160,
+        "completed": 1951,
+        "completed critical": 128,
+        "completed high": 937,
+        "completed low": 124,
+        "completed medium": 762,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ 60": {
+        "choices": 9682,
+        "completed": 1964,
+        "completed critical": 130,
+        "completed high": 942,
+        "completed low": 126,
+        "completed medium": 766,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "shipped-list @ all": {
+        "choices": 13101,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 5": {
+        "choices": 815,
+        "completed": 807,
+        "completed critical": 74,
+        "completed high": 380,
+        "completed low": 30,
+        "completed medium": 323,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 10": {
+        "choices": 1616,
+        "completed": 1289,
+        "completed critical": 92,
+        "completed high": 637,
+        "completed low": 59,
+        "completed medium": 501,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 15": {
+        "choices": 2411,
+        "completed": 1576,
+        "completed critical": 97,
+        "completed high": 795,
+        "completed low": 69,
+        "completed medium": 615,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 20": {
+        "choices": 3236,
+        "completed": 1732,
+        "completed critical": 107,
+        "completed high": 860,
+        "completed low": 94,
+        "completed medium": 671,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 30": {
+        "choices": 4805,
+        "completed": 1891,
+        "completed critical": 118,
+        "completed high": 911,
+        "completed low": 118,
+        "completed medium": 744,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 45": {
+        "choices": 7217,
+        "completed": 1931,
+        "completed critical": 124,
+        "completed high": 925,
+        "completed low": 124,
+        "completed medium": 758,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ 60": {
+        "choices": 9697,
+        "completed": 1961,
+        "completed critical": 128,
+        "completed high": 944,
+        "completed low": 126,
+        "completed medium": 763,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "framework-merge @ all": {
+        "choices": 15445,
+        "completed": 1978,
+        "completed critical": 132,
+        "completed high": 952,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 5": {
+        "choices": 815,
+        "completed": 50,
+        "completed critical": 1,
+        "completed high": 30,
+        "completed low": 3,
+        "completed medium": 16,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 10": {
+        "choices": 1630,
+        "completed": 116,
+        "completed critical": 1,
+        "completed high": 66,
+        "completed low": 5,
+        "completed medium": 44,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 15": {
+        "choices": 2439,
+        "completed": 314,
+        "completed critical": 17,
+        "completed high": 143,
+        "completed low": 14,
+        "completed medium": 140,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 20": {
+        "choices": 3254,
+        "completed": 686,
+        "completed critical": 49,
+        "completed high": 305,
+        "completed low": 40,
+        "completed medium": 292,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 30": {
+        "choices": 4871,
+        "completed": 1037,
+        "completed critical": 51,
+        "completed high": 424,
+        "completed low": 90,
+        "completed medium": 472,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 45": {
+        "choices": 7191,
+        "completed": 1061,
+        "completed critical": 52,
+        "completed high": 429,
+        "completed low": 96,
+        "completed medium": 484,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ 60": {
+        "choices": 9684,
+        "completed": 1237,
+        "completed critical": 74,
+        "completed high": 524,
+        "completed low": 98,
+        "completed medium": 541,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "grouped-merge @ all": {
+        "choices": 15445,
+        "completed": 1978,
+        "completed critical": 132,
+        "completed high": 952,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 5": {
+        "choices": 815,
+        "completed": 1803,
+        "completed critical": 99,
+        "completed high": 842,
+        "completed low": 124,
+        "completed medium": 738,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 10": {
+        "choices": 1609,
+        "completed": 1845,
+        "completed critical": 101,
+        "completed high": 875,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 15": {
+        "choices": 2381,
+        "completed": 1897,
+        "completed critical": 115,
+        "completed high": 908,
+        "completed low": 124,
+        "completed medium": 750,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 20": {
+        "choices": 3112,
+        "completed": 1918,
+        "completed critical": 119,
+        "completed high": 918,
+        "completed low": 124,
+        "completed medium": 757,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 30": {
+        "choices": 4718,
+        "completed": 1975,
+        "completed critical": 132,
+        "completed high": 949,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 45": {
+        "choices": 6098,
+        "completed": 1979,
+        "completed critical": 132,
+        "completed high": 953,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ 60": {
+        "choices": 6308,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "group-question @ all": {
+        "choices": 6308,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 5": {
+        "choices": 809,
+        "completed": 912,
+        "completed critical": 87,
+        "completed high": 473,
+        "completed low": 37,
+        "completed medium": 315,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 10": {
+        "choices": 1630,
+        "completed": 1372,
+        "completed critical": 95,
+        "completed high": 674,
+        "completed low": 62,
+        "completed medium": 541,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 15": {
+        "choices": 2429,
+        "completed": 1710,
+        "completed critical": 100,
+        "completed high": 825,
+        "completed low": 99,
+        "completed medium": 686,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 20": {
+        "choices": 3177,
+        "completed": 1855,
+        "completed critical": 110,
+        "completed high": 885,
+        "completed low": 121,
+        "completed medium": 739,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 30": {
+        "choices": 4799,
+        "completed": 1920,
+        "completed critical": 117,
+        "completed high": 920,
+        "completed low": 125,
+        "completed medium": 758,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 45": {
+        "choices": 7205,
+        "completed": 1950,
+        "completed critical": 127,
+        "completed high": 936,
+        "completed low": 125,
+        "completed medium": 762,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ 60": {
+        "choices": 9668,
+        "completed": 1963,
+        "completed critical": 130,
+        "completed high": 940,
+        "completed low": 126,
+        "completed medium": 767,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "element-count @ all": {
+        "choices": 13101,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 5": {
+        "choices": 702,
+        "completed": 1830,
+        "completed critical": 101,
+        "completed high": 863,
+        "completed low": 124,
+        "completed medium": 742,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 10": {
+        "choices": 1405,
+        "completed": 1866,
+        "completed critical": 105,
+        "completed high": 887,
+        "completed low": 124,
+        "completed medium": 750,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 15": {
+        "choices": 2222,
+        "completed": 1948,
+        "completed critical": 122,
+        "completed high": 937,
+        "completed low": 125,
+        "completed medium": 764,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 20": {
+        "choices": 3094,
+        "completed": 1978,
+        "completed critical": 132,
+        "completed high": 952,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 30": {
+        "choices": 3173,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 45": {
+        "choices": 3173,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ 60": {
+        "choices": 3173,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-none @ all": {
+        "choices": 3173,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 5": {
+        "choices": 815,
+        "completed": 1803,
+        "completed critical": 99,
+        "completed high": 842,
+        "completed low": 124,
+        "completed medium": 738,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 10": {
+        "choices": 1553,
+        "completed": 1845,
+        "completed critical": 101,
+        "completed high": 875,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 15": {
+        "choices": 2343,
+        "completed": 1908,
+        "completed critical": 118,
+        "completed high": 912,
+        "completed low": 124,
+        "completed medium": 754,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 20": {
+        "choices": 3123,
+        "completed": 1931,
+        "completed critical": 122,
+        "completed high": 926,
+        "completed low": 125,
+        "completed medium": 758,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 30": {
+        "choices": 4251,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 45": {
+        "choices": 4269,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ 60": {
+        "choices": 4269,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-third @ all": {
+        "choices": 4269,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 5": {
+        "choices": 815,
+        "completed": 1803,
+        "completed critical": 99,
+        "completed high": 842,
+        "completed low": 124,
+        "completed medium": 738,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 10": {
+        "choices": 1609,
+        "completed": 1845,
+        "completed critical": 101,
+        "completed high": 875,
+        "completed low": 124,
+        "completed medium": 745,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 15": {
+        "choices": 2381,
+        "completed": 1897,
+        "completed critical": 115,
+        "completed high": 908,
+        "completed low": 124,
+        "completed medium": 750,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 20": {
+        "choices": 3112,
+        "completed": 1918,
+        "completed critical": 119,
+        "completed high": 918,
+        "completed low": 124,
+        "completed medium": 757,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 30": {
+        "choices": 4718,
+        "completed": 1975,
+        "completed critical": 132,
+        "completed high": 949,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 45": {
+        "choices": 6098,
+        "completed": 1979,
+        "completed critical": 132,
+        "completed high": 953,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ 60": {
+        "choices": 6308,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      },
+      "no-to-the-rest-all @ all": {
+        "choices": 6308,
+        "completed": 1980,
+        "completed critical": 132,
+        "completed high": 954,
+        "completed low": 126,
+        "completed medium": 768,
+        "findings": 2729,
+        "findings critical": 220,
+        "findings high": 1264,
+        "findings low": 198,
+        "findings medium": 1047,
+        "reports": 163,
+        "settled": 0,
+        "units": 0
+      }
+    },
+    "asvs / alone": {
+      "shipped-list @ 5": {
+        "choices": 145,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 746,
+        "units": 4520
+      },
+      "shipped-list @ 10": {
+        "choices": 290,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1196,
+        "units": 4520
+      },
+      "shipped-list @ 15": {
+        "choices": 435,
+        "completed": 9,
+        "completed level 1": 9,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1383,
+        "units": 4520
+      },
+      "shipped-list @ 20": {
+        "choices": 580,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1584,
+        "units": 4520
+      },
+      "shipped-list @ 30": {
+        "choices": 780,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "shipped-list @ 45": {
+        "choices": 882,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "shipped-list @ 60": {
+        "choices": 882,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "shipped-list @ all": {
+        "choices": 882,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "framework-merge @ 5": {
+        "choices": 145,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 864,
+        "units": 4520
+      },
+      "framework-merge @ 10": {
+        "choices": 290,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1489,
+        "units": 4520
+      },
+      "framework-merge @ 15": {
+        "choices": 435,
+        "completed": 1,
+        "completed level 1": 1,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "framework-merge @ 20": {
+        "choices": 576,
+        "completed": 10,
+        "completed level 1": 10,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1959,
+        "units": 4520
+      },
+      "framework-merge @ 30": {
+        "choices": 764,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2129,
+        "units": 4520
+      },
+      "framework-merge @ 45": {
+        "choices": 1019,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2554,
+        "units": 4520
+      },
+      "framework-merge @ 60": {
+        "choices": 1274,
+        "completed": 14,
+        "completed level 1": 11,
+        "completed level 2": 3,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "framework-merge @ all": {
+        "choices": 1355,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "grouped-merge @ 5": {
+        "choices": 145,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 864,
+        "units": 4520
+      },
+      "grouped-merge @ 10": {
+        "choices": 290,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1489,
+        "units": 4520
+      },
+      "grouped-merge @ 15": {
+        "choices": 435,
+        "completed": 1,
+        "completed level 1": 1,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "grouped-merge @ 20": {
+        "choices": 576,
+        "completed": 10,
+        "completed level 1": 10,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1959,
+        "units": 4520
+      },
+      "grouped-merge @ 30": {
+        "choices": 764,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2129,
+        "units": 4520
+      },
+      "grouped-merge @ 45": {
+        "choices": 1019,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2554,
+        "units": 4520
+      },
+      "grouped-merge @ 60": {
+        "choices": 1274,
+        "completed": 14,
+        "completed level 1": 11,
+        "completed level 2": 3,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "grouped-merge @ all": {
+        "choices": 1355,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "group-question @ 5": {
+        "choices": 145,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 746,
+        "units": 4520
+      },
+      "group-question @ 10": {
+        "choices": 290,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1196,
+        "units": 4520
+      },
+      "group-question @ 15": {
+        "choices": 435,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1511,
+        "units": 4520
+      },
+      "group-question @ 20": {
+        "choices": 548,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1636,
+        "units": 4520
+      },
+      "group-question @ 30": {
+        "choices": 718,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "group-question @ 45": {
+        "choices": 758,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "group-question @ 60": {
+        "choices": 758,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "group-question @ all": {
+        "choices": 758,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "element-count @ 5": {
+        "choices": 145,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 746,
+        "units": 4520
+      },
+      "element-count @ 10": {
+        "choices": 290,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1196,
+        "units": 4520
+      },
+      "element-count @ 15": {
+        "choices": 435,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1383,
+        "units": 4520
+      },
+      "element-count @ 20": {
+        "choices": 580,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1584,
+        "units": 4520
+      },
+      "element-count @ 30": {
+        "choices": 780,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "element-count @ 45": {
+        "choices": 882,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "element-count @ 60": {
+        "choices": 882,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "element-count @ all": {
+        "choices": 882,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 5": {
+        "choices": 117,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1782,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 10": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 15": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 20": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 30": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 45": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 60": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ all": {
+        "choices": 133,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 5": {
+        "choices": 145,
+        "completed": 3,
+        "completed level 1": 3,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 890,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 10": {
+        "choices": 290,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1356,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 15": {
+        "choices": 351,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 20": {
+        "choices": 351,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 30": {
+        "choices": 351,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 45": {
+        "choices": 351,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 60": {
+        "choices": 351,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ all": {
+        "choices": 351,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 5": {
+        "choices": 145,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 746,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 10": {
+        "choices": 290,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1196,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 15": {
+        "choices": 435,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1511,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 20": {
+        "choices": 548,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1636,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 30": {
+        "choices": 718,
+        "completed": 11,
+        "completed level 1": 11,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 45": {
+        "choices": 758,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 60": {
+        "choices": 758,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ all": {
+        "choices": 758,
+        "completed": 114,
+        "completed level 1": 50,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      }
+    },
+    "asvs / all": {
+      "shipped-list @ 5": {
+        "choices": 155,
+        "completed": 100,
+        "completed level 1": 36,
+        "completed level 2": 64,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 155,
+        "units": 4520
+      },
+      "shipped-list @ 10": {
+        "choices": 310,
+        "completed": 126,
+        "completed level 1": 43,
+        "completed level 2": 83,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 176,
+        "units": 4520
+      },
+      "shipped-list @ 15": {
+        "choices": 436,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 513,
+        "units": 4520
+      },
+      "shipped-list @ 20": {
+        "choices": 604,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 689,
+        "units": 4520
+      },
+      "shipped-list @ 30": {
+        "choices": 920,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1112,
+        "units": 4520
+      },
+      "shipped-list @ 45": {
+        "choices": 1363,
+        "completed": 131,
+        "completed level 1": 46,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1341,
+        "units": 4520
+      },
+      "shipped-list @ 60": {
+        "choices": 1846,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1551,
+        "units": 4520
+      },
+      "shipped-list @ all": {
+        "choices": 2447,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "framework-merge @ 5": {
+        "choices": 155,
+        "completed": 81,
+        "completed level 1": 26,
+        "completed level 2": 55,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 234,
+        "units": 4520
+      },
+      "framework-merge @ 10": {
+        "choices": 299,
+        "completed": 123,
+        "completed level 1": 40,
+        "completed level 2": 83,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 601,
+        "units": 4520
+      },
+      "framework-merge @ 15": {
+        "choices": 441,
+        "completed": 125,
+        "completed level 1": 42,
+        "completed level 2": 83,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 910,
+        "units": 4520
+      },
+      "framework-merge @ 20": {
+        "choices": 618,
+        "completed": 125,
+        "completed level 1": 42,
+        "completed level 2": 83,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1299,
+        "units": 4520
+      },
+      "framework-merge @ 30": {
+        "choices": 921,
+        "completed": 127,
+        "completed level 1": 42,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1681,
+        "units": 4520
+      },
+      "framework-merge @ 45": {
+        "choices": 1375,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1960,
+        "units": 4520
+      },
+      "framework-merge @ 60": {
+        "choices": 1846,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2088,
+        "units": 4520
+      },
+      "framework-merge @ all": {
+        "choices": 2936,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "grouped-merge @ 5": {
+        "choices": 155,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 864,
+        "units": 4520
+      },
+      "grouped-merge @ 10": {
+        "choices": 310,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1489,
+        "units": 4520
+      },
+      "grouped-merge @ 15": {
+        "choices": 463,
+        "completed": 0,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "grouped-merge @ 20": {
+        "choices": 620,
+        "completed": 3,
+        "completed level 1": 3,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1959,
+        "units": 4520
+      },
+      "grouped-merge @ 30": {
+        "choices": 930,
+        "completed": 4,
+        "completed level 1": 4,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2129,
+        "units": 4520
+      },
+      "grouped-merge @ 45": {
+        "choices": 1367,
+        "completed": 10,
+        "completed level 1": 10,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2554,
+        "units": 4520
+      },
+      "grouped-merge @ 60": {
+        "choices": 1848,
+        "completed": 85,
+        "completed level 1": 37,
+        "completed level 2": 48,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "grouped-merge @ all": {
+        "choices": 2936,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 2996,
+        "units": 4520
+      },
+      "group-question @ 5": {
+        "choices": 155,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 232,
+        "units": 4520
+      },
+      "group-question @ 10": {
+        "choices": 299,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 735,
+        "units": 4520
+      },
+      "group-question @ 15": {
+        "choices": 455,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1031,
+        "units": 4520
+      },
+      "group-question @ 20": {
+        "choices": 597,
+        "completed": 130,
+        "completed level 1": 45,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1222,
+        "units": 4520
+      },
+      "group-question @ 30": {
+        "choices": 900,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1538,
+        "units": 4520
+      },
+      "group-question @ 45": {
+        "choices": 1183,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1795,
+        "units": 4520
+      },
+      "group-question @ 60": {
+        "choices": 1218,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "group-question @ all": {
+        "choices": 1218,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "element-count @ 5": {
+        "choices": 155,
+        "completed": 110,
+        "completed level 1": 39,
+        "completed level 2": 71,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 155,
+        "units": 4520
+      },
+      "element-count @ 10": {
+        "choices": 310,
+        "completed": 126,
+        "completed level 1": 43,
+        "completed level 2": 83,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 176,
+        "units": 4520
+      },
+      "element-count @ 15": {
+        "choices": 452,
+        "completed": 127,
+        "completed level 1": 43,
+        "completed level 2": 84,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 527,
+        "units": 4520
+      },
+      "element-count @ 20": {
+        "choices": 588,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 689,
+        "units": 4520
+      },
+      "element-count @ 30": {
+        "choices": 918,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1068,
+        "units": 4520
+      },
+      "element-count @ 45": {
+        "choices": 1373,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1321,
+        "units": 4520
+      },
+      "element-count @ 60": {
+        "choices": 1846,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1543,
+        "units": 4520
+      },
+      "element-count @ all": {
+        "choices": 2447,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 5": {
+        "choices": 126,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1638,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 10": {
+        "choices": 290,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1638,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 15": {
+        "choices": 441,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1638,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 20": {
+        "choices": 577,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1766,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 30": {
+        "choices": 593,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 45": {
+        "choices": 593,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ 60": {
+        "choices": 593,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-none @ all": {
+        "choices": 593,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 5": {
+        "choices": 155,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 232,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 10": {
+        "choices": 289,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 879,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 15": {
+        "choices": 447,
+        "completed": 130,
+        "completed level 1": 45,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1075,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 20": {
+        "choices": 597,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1352,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 30": {
+        "choices": 807,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 45": {
+        "choices": 811,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ 60": {
+        "choices": 811,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-third @ all": {
+        "choices": 811,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 5": {
+        "choices": 155,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 232,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 10": {
+        "choices": 299,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 735,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 15": {
+        "choices": 455,
+        "completed": 128,
+        "completed level 1": 43,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1031,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 20": {
+        "choices": 597,
+        "completed": 130,
+        "completed level 1": 45,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1222,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 30": {
+        "choices": 900,
+        "completed": 136,
+        "completed level 1": 51,
+        "completed level 2": 85,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1538,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 45": {
+        "choices": 1183,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1795,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ 60": {
+        "choices": 1218,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      },
+      "no-to-the-rest-all @ all": {
+        "choices": 1218,
+        "completed": 138,
+        "completed level 1": 52,
+        "completed level 2": 86,
+        "findings": 680,
+        "findings level 1": 273,
+        "findings level 2": 402,
+        "findings level 3": 5,
+        "reports": 31,
+        "settled": 1806,
+        "units": 4520
+      }
+    }
+  }
+}

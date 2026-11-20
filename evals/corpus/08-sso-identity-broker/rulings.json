@@ -64,6 +64,138 @@
       "ruling": "Replacing the trusted signing key introduces a different attack and prerequisite from minting tokens with a compromised existing key; shared downstream consequences do not make this only a filing difference.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01-near-miss-ballot-1 row 11: flag-on run T-03"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
+          "entity:colleague"
+        ]
+      },
+      "reading": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "entity:colleague",
+          "process:store-admin-console",
+          "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "E-01 is a missing store scope check that a current store manager uses. The reference is a revocation delay that a leaver uses. A fix for one leaves the other open.",
+      "reviewed_by": "mstarks01",
+      "source": "near-miss-ballot-08 row 1: 08-sso-identity-broker E-01"
+    }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "store:key-store",
+          "process:identity-broker"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 52"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:entity:colleague>process:identity-broker>sign-in",
+          "process:store-admin-console"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 53"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:store-admin-console",
+          "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 58"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
+          "entity:colleague"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 59"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:directory",
+          "process:identity-broker"
+        ]
+      },
+      "ruling": "A directory write is required, but the route by which the attacker changes the group is unspecified.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 54"
+    },
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
+          "store:audit-log"
+        ]
+      },
+      "ruling": "The logging gap applies to the franchise sign-in regardless of who initiated it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 55"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "recover-credential",
+        "affected_element_ids": [
+          "store:key-store"
+        ]
+      },
+      "ruling": "The private key must be extractable. The claim does not establish whether the attacker calls a store interface, controls a reader or obtains the stored bytes.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 56"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "process:identity-broker"
+        ]
+      },
+      "ruling": "The claim specifies the broker outage but gives no mechanism for causing it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 57"
     }
   ]
 }

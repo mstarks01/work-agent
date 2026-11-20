@@ -5,8 +5,9 @@ Every surface that shows such a fact words it here, so the early list, the
 report, ``/v1`` and a refusal ask it alike: :func:`label_of` for the question,
 :func:`group_of` for the group a page lists it in. This module also names the
 elements and references a report writes (:func:`reference_labels`), lists the
-attributes the model leaves unstated (:func:`gaps`), and decides which
-attribute may be asked (:func:`open_attribute`).
+attributes the model leaves unstated (:func:`gaps`), decides which
+attribute may be asked (:func:`open_attribute`), and which part of a question
+kind the sources state (:func:`source_states`).
 
 **Deterministic, and derived from the report alone.** No model is asked, and
 nothing here is stored on the report: it is computed wherever a reader needs
@@ -16,22 +17,33 @@ it, so it cannot drift from the verdicts it describes.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
-from analysis_service.analysis import control_state
+from analysis_service.analysis import ControlAttribute, control_state
 from analysis_service.assertions import (
     REGISTRY,
     AssertionCatalog,
+    PredicateName,
+    answer,
+    answered,
     assertion_id,
+    disputed,
+    held_open_attributes,
     identity_parts,
+    parse_predicate,
+    place_identity,
+    projected_attribute,
     read_assertion_id,
+    uncontradicted,
 )
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import UnknownRef
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
+from analysis_service.claims import AttributeGround, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.parsing import table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.system_model import (
+    UNKNOWN,
     ZONE_ATTRIBUTE,
     DataFlow,
     SystemModel,
@@ -78,7 +90,10 @@ def element_names(model: SystemModel) -> Mapping[str, str]:
 
 
 #: How a reader sees each attribute state the evidence catalog offers.
-_GROUND_STATE = {"unknown-attribute": "unstated", "absent-attribute": "stated absent"}
+_GROUND_STATE: dict[AttributeGround, str] = {
+    "unknown-attribute": "unstated",
+    "absent-attribute": "stated absent",
+}
 
 
 def reference_labels(
@@ -134,7 +149,7 @@ def _assertion_statement(
     """
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     row = next(entry for entry in catalog.entries if assertion_id(entry) == identity)
-    predicate = REGISTRY[row.predicate]
+    predicate = table_entry(REGISTRY, row.predicate)
     subject = subjects.get(row.subject) or names.get(row.subject, row.subject)
     value = row.value
     if predicate.value == "reference":
@@ -145,7 +160,7 @@ def _assertion_statement(
 #: The question an attribute asks where the plain form reads badly: of one
 #: element, and of each element its group lists. Each of these attributes
 #: belongs to one element type: a flow is in transit and a store is at rest.
-_ATTRIBUTE_QUESTIONS = {
+_ATTRIBUTE_QUESTIONS: dict[ControlAttribute, tuple[str, str]] = {
     "encryption_in_transit": (
         "Is the connection {element} encrypted?",
         "Is each connection encrypted? If so, how?",
@@ -159,10 +174,12 @@ _ATTRIBUTE_QUESTIONS = {
 
 def _attribute_questions(attribute: str) -> tuple[str, str]:
     """The question an attribute asks of one element, and of each one listed."""
+    if attribute in _ATTRIBUTE_QUESTIONS:
+        return _ATTRIBUTE_QUESTIONS[attribute]
     name = attribute_words(attribute)
-    return _ATTRIBUTE_QUESTIONS.get(
-        attribute,
-        (f"What is the {name} for {{element}}?", f"What is the {name} for each part?"),
+    return (
+        f"What is the {name} for {{element}}?",
+        f"What is the {name} for each part?",
     )
 
 
@@ -194,12 +211,13 @@ def assertion_label(
         return UNWORDED_ASSERTION
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     for entry in catalog.entries:
-        if entry.predicate not in REGISTRY:
+        name = parse_predicate(entry.predicate)
+        if name is None:
             continue
         if identity_parts(entry)[:3] != asked[:3]:
             continue
         subject = subjects.get(entry.subject) or names.get(entry.subject, entry.subject)
-        question = REGISTRY[entry.predicate].question.format(subject=subject)
+        question = REGISTRY[name].question.format(subject=subject)
         if not entry.scope:
             return question
         scope = "; ".join(f"{each.kind}: {each.value}" for each in entry.scope)
@@ -245,17 +263,25 @@ def label_of(
                     return f"What does {source} do when it connects to {destination}?"
     match ref.kind:
         case "capability":
-            capability = CAPABILITIES.get(ref.capability)
-            return capability.question if capability else ref.capability
+            key = parse_capability_key(ref.capability)
+            return ref.capability if key is None else CAPABILITIES[key].question
         case "question":
-            kind = QUESTION_KINDS.get(ref.question)
-            return kind.template.format(element=where) if kind else ref.question
+            name = parse_question_kind(ref.question)
+            if name is None:
+                return ref.question
+            return QUESTION_KINDS[name].template.format(element=where)
         case "assertion":
             return assertion_label(ref.assertion, names, catalog)
         case "attribute":
             return _attribute_questions(ref.attribute)[0].format(element=where)
         case "subject":
             return ref.subject
+
+
+def kind_words(template: str) -> str:
+    """A Question Kind's question about no one element: "it" for the
+    element."""
+    return template.replace("{element}'s", "its").replace("{element}", "it")
 
 
 def group_of(ref: UnknownRef) -> tuple[str, str]:
@@ -277,10 +303,8 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
             return "assertions", "What the description leaves open"
         case "subject":
             return "subjects", "Other questions"
-        case "question" if ref.question in QUESTION_KINDS:
-            template = QUESTION_KINDS[ref.question].template
-            heading = template.replace("{element}'s", "its").replace("{element}", "it")
-            return ref.question, heading
+        case "question" if (name := parse_question_kind(ref.question)) is not None:
+            return ref.question, kind_words(QUESTION_KINDS[name].template)
         case "attribute":
             return ref.attribute, _attribute_questions(ref.attribute)[1]
     label = label_of(ref, {})
@@ -328,13 +352,21 @@ def gaps(model: SystemModel) -> tuple[Gap, ...]:
     return tuple(Gap(attribute, tuple(unstated[attribute])) for attribute in order)
 
 
-def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
+def open_attribute(
+    model: SystemModel,
+    element_id: str,
+    attribute: str,
+    catalog: AssertionCatalog | None,
+) -> bool:
     """True where this attribute is a fact the model leaves open.
 
     **The one reader of "may this attribute be asked, and answered".** Open is
-    unverified by :func:`~analysis_service.analysis.control_state`, the
-    reading the evidence catalog uses, or a zone the service inferred. The
-    early list, the report list and the answer check all ask it.
+    unverified by :func:`~analysis_service.analysis.control_state`, a zone
+    the service inferred, or an attribute the assertion rows hold open
+    against ``model`` (:func:`~analysis_service.assertions.held_open_attributes`),
+    whose value the evidence catalog does not offer as a fact. The early
+    list, the report list, the answer check, a Control's fact and
+    :func:`source_states` all ask it.
     """
     element = model.get(element_id)
     value = getattr(element, attribute, None)
@@ -342,7 +374,127 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
     assumed = (
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
-    return element is not None and (unverified or assumed)
+    held_open = catalog is not None and (element_id, attribute) in (
+        held_open_attributes(catalog, model)
+    )
+    return element is not None and (unverified or assumed or held_open)
+
+
+def fact_routes(
+    catalog: AssertionCatalog | None, model: SystemModel
+) -> Mapping[str, UnknownRef]:
+    """The fact each open row a finding may name is asked as, by row identity.
+
+    A row the graph contradicts (:func:`~analysis_service.assertions.contradicted`)
+    or another row disputes (:func:`~analysis_service.assertions.disputed`)
+    states a value, so its own identity names no row an answer could write
+    over. Where an unscoped row reaches a graph field, the question is that
+    attribute's, and the attribute path writes the answer; every other
+    unscoped row that reaches the same attribute, an unknown row among them,
+    asks that one fact too, and so does every unscoped row at an attribute
+    the rows hold open
+    (:func:`~analysis_service.assertions.held_open_attributes`), which takes
+    an answer as an attribute (:func:`open_attribute`). Where a row reaches no
+    field, or states a narrower scope than the attribute, the question is its
+    place's
+    (:func:`~analysis_service.assertions.place_identity`), which names the
+    answer's row in every later run too (the maintainer's ruling of
+    2026-11-18 on #2270). ``model`` is read as the lanes read it
+    (:func:`prepared_model`).
+    """
+    if catalog is None:
+        return {}
+    prepared = prepared_model(model, catalog)
+    routes: dict[str, UnknownRef] = {}
+    fields = set(held_open_attributes(catalog, prepared))
+    for row in disputed(catalog):
+        attribute = projected_attribute(row.predicate, row.subject)
+        if attribute and not row.scope:
+            fields.add((row.subject, attribute))
+        else:
+            routes[assertion_id(row)] = UnknownRef(assertion=place_identity(row))
+    for entry in catalog.entries:
+        attribute = projected_attribute(entry.predicate, entry.subject)
+        if not entry.scope and (entry.subject, attribute) in fields:
+            routes[assertion_id(entry)] = UnknownRef(
+                element_id=entry.subject, attribute=attribute
+            )
+    return routes
+
+
+def routed(
+    refs: Iterable[UnknownRef], routes: Mapping[str, UnknownRef]
+) -> list[UnknownRef]:
+    """``refs``, each reference to an open row replaced by its fact.
+
+    The facts are :func:`fact_routes`'s.
+    """
+    return [
+        routes.get(ref.assertion, ref) if ref.kind == "assertion" else ref
+        for ref in refs
+    ]
+
+
+def source_states(
+    model: SystemModel, catalog: AssertionCatalog | None
+) -> Callable[[str, PredicateName], bool]:
+    """Whether the sources settle a predicate about an element (ADR 0117).
+
+    Returns the check for ``model`` and ``catalog``, which reads the projected
+    model and the uncontradicted rows once, so a writer that asks it of every
+    part of every answer projects the model once.
+
+    **The subject rule.** The writer of an answer's rows asks it, and so does
+    the tripwire that measures stated parts. Only a settled, unscoped row about
+    the element itself counts, and only one the graph does not contradict
+    (:func:`~analysis_service.assertions.uncontradicted`, against ``model`` as
+    the lanes read it, :func:`prepared_model`). So a flow's row never answers a
+    question about an element, a scoped row answers nothing wider, and a row
+    the graph contradicts is no statement. A row an answer wrote is not the
+    sources'. A predicate that projects into an attribute is stated too where
+    the attribute is not open (:func:`open_attribute`, which reads the rows
+    that hold it open) and no answer wrote a row of it here. Any answer row counts
+    here, not only one that makes the projected value: the question is whether
+    the submitter already spoke to this fact, so a later answer may replace
+    theirs.
+    """
+    rows = catalog or AssertionCatalog()
+    prepared = prepared_model(model, catalog)
+    facts = (
+        set()
+        if catalog is None
+        else {assertion_id(row) for row in uncontradicted(catalog, prepared)}
+    )
+
+    def states(element_id: str, predicate: PredicateName) -> bool:
+        held = answer(rows, element_id, predicate)
+        if any(
+            not row.scope and not answered(row) and assertion_id(row) in facts
+            for row in held.settled
+        ):
+            return True
+        attribute = projected_attribute(predicate, element_id)
+        answer_wrote = any(answered(row) for row in held.rows)
+        return (
+            bool(attribute)
+            and not answer_wrote
+            and not open_attribute(prepared, element_id, attribute, catalog)
+        )
+
+    return states
+
+
+def stated_capability(model: SystemModel, capability: str) -> str | None:
+    """The state ``model`` gives the capability, or ``None`` where the
+    capability is open: no statement names it, or the statements disagree.
+
+    The answer check and a Control's fact both ask it, so a Control writes a
+    capability exactly where an answer may.
+    """
+    known = model.capability_facts().get(capability)
+    if known is None or known.state == UNKNOWN:
+        return None
+    return known.state
 
 
 def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> SystemModel:

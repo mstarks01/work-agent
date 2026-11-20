@@ -1,7 +1,7 @@
 """The ASVS package: what it declares, what it refuses, and what it rules.
 
 Four seams, and each is one the ticket names. The **package gate** covers all
-thirteen members and the disk layout. The **catalog** is this package's own private
+fifteen members and the disk layout. The **catalog** is this package's own private
 data, so its own module checks it and this checks the roster the lane skills
 publish against it. The **block** carries ASVS's own scope answer and its own
 completeness check. The **precondition** is the first one in this repo that can
@@ -35,7 +35,7 @@ from analysis_service.claims import (
     UnknownRef,
     Verdict,
 )
-from analysis_service.engine import Engine, EngineInputError
+from analysis_service.engine import EngineInputError
 from analysis_service.evidence import (
     evidence_catalog,
     known_proposals,
@@ -55,12 +55,12 @@ from analysis_service.frameworks.asvs.catalog import (
     CHAPTERS,
     LANES,
     REQUIREMENTS,
+    AsvsChapter,
     AsvsLevel,
     requirements_for,
 )
 from analysis_service.frameworks.asvs.record import (
     AsvsAnalysis,
-    AsvsChapter,
     AsvsOptions,
     DraftRequirementRuling,
     RequirementProposal,
@@ -68,6 +68,7 @@ from analysis_service.frameworks.asvs.record import (
     requirement_of,
 )
 from analysis_service.frameworks.asvs.roster import replace_roster, roster_block
+from analysis_service.jobs import StubPipelineRunner
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.report import (
     FrameworkSelection,
@@ -76,7 +77,12 @@ from analysis_service.report import (
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
 from analysis_service.system_model import CapabilityStatement, Process, SystemModel
-from tests.factories import PROJECT_ROOT, sample_draft, valid_model
+from tests.factories import (
+    PROJECT_ROOT,
+    asvs_draft,
+    stand_in_engine,
+    valid_model,
+)
 
 ASVS = PACKAGES["asvs"]
 STRIDE = PACKAGES["stride"]
@@ -96,7 +102,7 @@ def corpus_model(case_id: str) -> SystemModel:
 
 
 def test_the_shipped_package_passes_the_gate():
-    """A second package earns no exemption: the same gate, the same thirteen members."""
+    """A second package earns no exemption: the same gate, the same fifteen members."""
     validate_package(ASVS, ASVS_ROOT)
 
 
@@ -146,8 +152,8 @@ def test_the_engine_refuses_a_selection_missing_an_option_it_needs():
     would otherwise fail after the provider billed every node.
     """
     with pytest.raises(EngineInputError) as caught:
-        Engine(
-            runner=None,
+        stand_in_engine(
+            StubPipelineRunner(),
             limits=SourceLimits(max_total_bytes=1, max_sources=1),
             deadline_seconds=1.0,
             frameworks=[FrameworkSelection(name="asvs")],
@@ -177,8 +183,6 @@ def test_the_catalog_is_the_published_standard():
 def test_one_lane_is_one_chapter_in_the_standards_own_order():
     assert ASVS.lanes == LANES
     assert [chapter.id for chapter in CHAPTERS] == [f"V{n}" for n in range(1, 18)]
-    dirs = sorted(path.name for path in (ASVS_ROOT / "lanes").iterdir())
-    assert dirs == sorted(LANES)
 
 
 @pytest.mark.parametrize("lane", LANES)
@@ -948,10 +952,10 @@ class TestAJobDefersWhatItsInputCannotSettle:
     """The split a lane agent makes, and where each half lands.
 
     **Driven through ``PACKAGES["asvs"].record``, which is what the fan-in
-    calls.** The first version of these tests called the override directly on
-    the block class, so they passed while the graph resolved the neutral default
-    and deferred nothing across two live runs. A test that names a class the
-    caller never reaches proves the method works and not that it runs.
+    calls.** A test that calls the override directly on the block class passes
+    even while the graph resolves the neutral default and defers nothing. A
+    test that names a class the caller never reaches proves the method works
+    and not that it runs.
 
     A requirement whose substance needs source code is not a question a
     submitter can answer by writing more. Recorded as a **Scope Entry** rather
@@ -973,7 +977,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
     def test_a_kind_the_job_carries_is_kept(self):
         """`prose` survives: the description was thin, which is answerable."""
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
-            [self._proposal("2.5", "prose")], "encoding-and-sanitization", ["prose"]
+            [self._proposal("2.5", "prose")], "encoding-and-sanitization", ["prose"], ()
         )
 
         assert len(kept) == 1
@@ -981,7 +985,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
 
     def test_a_kind_the_job_does_not_carry_is_deferred(self):
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
-            [self._proposal("2.4", "code")], "encoding-and-sanitization", ["prose"]
+            [self._proposal("2.4", "code")], "encoding-and-sanitization", ["prose"], ()
         )
 
         assert kept == []
@@ -990,9 +994,9 @@ class TestAJobDefersWhatItsInputCannotSettle:
         assert deferred == {"V1.2.4": "code"}
 
     def test_a_ruled_proposal_is_kept(self):
-        """Empty means the agent ruled, and the critic judges it as before."""
+        """Empty means the agent ruled, and the critic judges it."""
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
-            [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"]
+            [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"], ()
         )
 
         assert len(kept) == 1
@@ -1004,15 +1008,28 @@ class TestAJobDefersWhatItsInputCannotSettle:
         proposals = [self._proposal("2.4", "code")]
 
         _, prose_only = PACKAGES["asvs"].record.partition_proposals(
-            proposals, "encoding-and-sanitization", ["prose"]
+            proposals, "encoding-and-sanitization", ["prose"], ()
         )
         kept, with_code = PACKAGES["asvs"].record.partition_proposals(
-            proposals, "encoding-and-sanitization", ["prose", "code"]
+            proposals, "encoding-and-sanitization", ["prose", "code"], ()
         )
 
         assert prose_only
         assert with_code == {}
         assert len(kept) == 1
+
+    def test_a_unit_a_control_row_covers_is_kept_whatever_its_kind(self):
+        """A Control row un-defers its unit, and the critic judges the draft
+        against the row (ADR 0126)."""
+        kept, deferred = PACKAGES["asvs"].record.partition_proposals(
+            [self._proposal("2.4", "config")],
+            "encoding-and-sanitization",
+            ["prose"],
+            {"V1.2.4"},
+        )
+
+        assert len(kept) == 1
+        assert deferred == {}
 
     def test_a_deferred_requirement_reaches_scope_with_its_reason(self):
         entries = AsvsAnalysis.scope_entries(
@@ -1046,7 +1063,7 @@ def test_a_package_that_defers_nothing_inherits_the_neutral_default():
     """STRIDE's claims rest on the system's own shape, so it defers none."""
     from analysis_service.frameworks.stride.record import DraftThreat
 
-    assert DraftThreat.partition_proposals(["a", "b"], "spoofing", ["prose"]) == (
+    assert DraftThreat.partition_proposals(["a", "b"], "spoofing", ["prose"], ()) == (
         ["a", "b"],
         {},
     )
@@ -1169,18 +1186,7 @@ class TestThisPackageCarriesNoActionVerb:
 
 def test_the_unit_of_a_draft_is_its_requirement():
     """The fan-in refuses a draft on a ruled-out unit through this hook (#443)."""
-    from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-    draft = DraftRequirementRuling.model_validate(
-        {
-            **sample_draft("S-01").model_dump(
-                exclude={"category", "verb", "severity", "mitigations"}
-            ),
-            "id": "v5.0.0-6.2.1",
-            "chapter": "authentication",
-        }
-    )
-    assert DraftRequirementRuling.unit_of(draft) == "V6.2.1"
+    assert DraftRequirementRuling.unit_of(asvs_draft()) == "V6.2.1"
 
 
 class TestNothingIsRuledOutByVocabulary:
@@ -1591,7 +1597,9 @@ def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
     ]
 
     known, marks = known_proposals(proposals, ASVS, "authentication")
-    kept, deferred = ASVS.record.partition_proposals(known, "authentication", ["prose"])
+    kept, deferred = ASVS.record.partition_proposals(
+        known, "authentication", ["prose"], ()
+    )
 
     assert known == [] and kept == [] and deferred == {}
     assert [mark.claim_id for mark in marks.unknown_claim_identities] == [
@@ -1706,7 +1714,13 @@ class TestADraftStatesItsDirection:
         (draft,) = resolution.drafts
         assert draft.direction == "excluded"
         (view,) = critic_view(
-            [draft], only=None, repaired=(), unverified=(), assertions=None
+            [draft],
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert view["direction"] == "excluded"
 

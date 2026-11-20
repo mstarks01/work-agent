@@ -1,0 +1,580 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "browser",
+        "description": "browser",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[browser] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "web application",
+        "assets": [],
+        "source_excerpt": "service n1(server)[web application] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "background worker process",
+        "assets": [],
+        "source_excerpt": "service n2(server)[background worker process] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "message queue",
+        "assets": [],
+        "source_excerpt": "service n3(database)[message queue] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "database",
+        "assets": [],
+        "source_excerpt": "service n4(database)[database] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "web application config",
+        "assets": [],
+        "source_excerpt": "service n5(database)[web application config] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-web-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "worker config",
+        "assets": [],
+        "source_excerpt": "service n6(database)[worker config] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>data-flow",
+        "name": "data flow",
+        "description": "browser to web application interaction",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>data-flow",
+        "name": "data flow",
+        "description": "web application to message queue interaction",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:message-queue>data-flow",
+        "name": "data flow",
+        "description": "background worker process to message queue interaction",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>data-flow",
+        "name": "data flow",
+        "description": "background worker process to database interaction",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:web-application-config>data-flow",
+        "name": "data flow",
+        "description": "web application to web application config interaction",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:worker-config>data-flow",
+        "name": "data flow",
+        "description": "background worker process to worker config interaction",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-public-internet",
+        "name": "Trust zone public internet",
+        "description": "Trust zone public internet",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-web-tier",
+        "name": "Trust zone web tier",
+        "description": "Trust zone web tier",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone web tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-backend-tier",
+        "name": "Trust zone backend tier",
+        "description": "Trust zone backend tier",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone backend tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The browser is an external system rather than a human actor.",
+        "element_id": "entity:browser",
+        "attribute": "kind",
+        "basis": "The element is named 'browser' and is outside the application and backend tiers."
+      },
+      {
+        "assumption": "The web application presents a web interface.",
+        "element_id": "process:web-application",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named 'web application'."
+      },
+      {
+        "assumption": "The web application is internet-facing.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "The diagram places it in the web tier and shows an initiating flow from a browser in the public internet zone."
+      },
+      {
+        "assumption": "The background worker process presents a non-web interface.",
+        "element_id": "process:background-worker-process",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named 'background worker process', which describes a worker rather than a web interface."
+      },
+      {
+        "assumption": "The public internet, web tier, and backend tier are network trust zones.",
+        "element_id": "boundary:trust-zone-public-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone public internet', indicating a network location."
+      },
+      {
+        "assumption": "The web tier is a network trust zone.",
+        "element_id": "boundary:trust-zone-web-tier",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone web tier', indicating a network tier."
+      },
+      {
+        "assumption": "The backend tier is a network trust zone.",
+        "element_id": "boundary:trust-zone-backend-tier",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone backend tier', indicating a network tier."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:browser",
+        "name": "browser",
+        "description": "browser",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[browser] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "web application",
+        "assets": [],
+        "source_excerpt": "service n1(server)[web application] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "background worker process",
+        "assets": [],
+        "source_excerpt": "service n2(server)[background worker process] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "message queue",
+        "assets": [],
+        "source_excerpt": "service n3(database)[message queue] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "database",
+        "assets": [],
+        "source_excerpt": "service n4(database)[database] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "web application config",
+        "assets": [],
+        "source_excerpt": "service n5(database)[web application config] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-web-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "worker config",
+        "assets": [],
+        "source_excerpt": "service n6(database)[worker config] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:browser>process:web-application>data-flow",
+        "name": "data flow",
+        "description": "browser to web application interaction",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:browser",
+        "destination": "process:web-application",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>data-flow",
+        "name": "data flow",
+        "description": "web application to message queue interaction",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:message-queue>data-flow",
+        "name": "data flow",
+        "description": "background worker process to message queue interaction",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>data-flow",
+        "name": "data flow",
+        "description": "background worker process to database interaction",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:web-application-config>data-flow",
+        "name": "data flow",
+        "description": "web application to web application config interaction",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:worker-config>data-flow",
+        "name": "data flow",
+        "description": "background worker process to worker config interaction",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-public-internet",
+        "name": "Trust zone public internet",
+        "description": "Trust zone public internet",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-web-tier",
+        "name": "Trust zone web tier",
+        "description": "Trust zone web tier",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone web tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-backend-tier",
+        "name": "Trust zone backend tier",
+        "description": "Trust zone backend tier",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone backend tier]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The browser is an external system rather than a human actor.",
+        "element_id": "entity:browser",
+        "attribute": "kind",
+        "basis": "The element is named 'browser' and is outside the application and backend tiers."
+      },
+      {
+        "assumption": "The web application presents a web interface.",
+        "element_id": "process:web-application",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named 'web application'."
+      },
+      {
+        "assumption": "The web application is internet-facing.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "The diagram places it in the web tier and shows an initiating flow from a browser in the public internet zone."
+      },
+      {
+        "assumption": "The background worker process presents a non-web interface.",
+        "element_id": "process:background-worker-process",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named 'background worker process', which describes a worker rather than a web interface."
+      },
+      {
+        "assumption": "The public internet, web tier, and backend tier are network trust zones.",
+        "element_id": "boundary:trust-zone-public-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone public internet', indicating a network location."
+      },
+      {
+        "assumption": "The web tier is a network trust zone.",
+        "element_id": "boundary:trust-zone-web-tier",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone web tier', indicating a network tier."
+      },
+      {
+        "assumption": "The backend tier is a network trust zone.",
+        "element_id": "boundary:trust-zone-backend-tier",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone backend tier', indicating a network tier."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

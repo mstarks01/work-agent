@@ -1,0 +1,9 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Shopper order data may be readable on the public-to-storefront path | ['flow:entity:shopper>process:storefront-api>place-order', 'entity:shopper', 'process:storefront-api']
+- Settlement callback contents may be exposed in transit from the card processor | ['flow:entity:card-processor>process:storefront-api>settlement-webhook', 'entity:card-processor', 'process:storefront-api']
+- Order details may be intercepted between the storefront and order service | ['flow:process:storefront-api>process:order-service>submit-order', 'process:storefront-api', 'process:order-service']
+- Order database traffic may expose shopper records to an internal path observer | ['flow:process:order-service>store:orders-db>read-write-orders', 'process:order-service', 'store:orders-db']
+- A storage copy could reveal all orders if orders-db encryption at rest is absent | ['store:orders-db']
+- A database password recovered from the order-service environment can expose all orders | ['process:order-service', 'flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db']
+spent: $0.0485 reported
+must-finds matched: [10, 11]

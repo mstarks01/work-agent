@@ -64,14 +64,14 @@ from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.parsing import Sha256Hex, is_version
 from analysis_service.report import NodeRun
 
-# The manifest schema version. Keyed by tier, with no compatibility shim for
-# older files.
+# The manifest schema version. Keyed by tier, with no compatibility shim for a
+# file of another version.
 #
-# Version 3 is the execution-identity cutover (#504). Every fingerprint a
-# version-2 manifest holds was computed over ``(served route, sampling)`` and
-# means nothing against a payload that now also binds the requested route, the
-# instruction digest and the build versions. A stale file is refused rather than
-# compared across schemas, because the failure of comparing is a run reported
+# A version 3 fingerprint binds the served route, the sampling, the requested
+# route, the instruction digest and the build versions (#504). A version-2
+# fingerprint covers only ``(served route, sampling)``, so it means nothing
+# against a version 3 payload. A stale file is refused rather than compared
+# across schemas, because the failure of comparing is a run reported
 # certified against a hash of a different thing.
 MANIFEST_VERSION = 3
 

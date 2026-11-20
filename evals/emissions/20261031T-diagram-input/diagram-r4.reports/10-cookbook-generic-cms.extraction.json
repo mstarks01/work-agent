@@ -1,0 +1,454 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "Reader",
+        "description": "Reader",
+        "assets": [],
+        "source_excerpt": "Reader",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "Admin",
+        "assets": [],
+        "source_excerpt": "Admin",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-server",
+        "name": "Web server",
+        "description": "Web server",
+        "assets": [],
+        "source_excerpt": "Web server",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:cdn",
+        "name": "CDN",
+        "description": "CDN",
+        "assets": [],
+        "source_excerpt": "CDN",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "MySQL database",
+        "assets": [],
+        "source_excerpt": "MySQL database",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "CDN bucket",
+        "assets": [],
+        "source_excerpt": "CDN bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader>process:web-server>page-requests",
+        "name": "Page requests",
+        "description": "Page requests",
+        "assets": [],
+        "source_excerpt": "Page requests (HTTPS)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:reader>process:cdn>asset-fetch",
+        "name": "Asset fetch",
+        "description": "Asset fetch",
+        "assets": [],
+        "source_excerpt": "Asset fetch (HTTP)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:cdn",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "asset",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:web-server>store:mysql-database>cms-data",
+        "name": "CMS data",
+        "description": "CMS data",
+        "assets": [],
+        "source_excerpt": "CMS data (MySQL)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "CMS data",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+        "name": "Asset publish",
+        "description": "Asset publish",
+        "assets": [],
+        "source_excerpt": "Asset publish",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "asset",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database>direct-administration",
+        "name": "Direct administration",
+        "description": "Direct administration",
+        "assets": [],
+        "source_excerpt": "Direct administration (MySQL)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "Public internet",
+        "description": "Trust zone: Public internet",
+        "assets": [],
+        "source_excerpt": "Trust zone: Public internet",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "Trust zone: Hosted network",
+        "assets": [],
+        "source_excerpt": "Trust zone: Hosted network",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cdn",
+        "name": "CDN",
+        "description": "Trust zone: CDN",
+        "assets": [],
+        "source_excerpt": "Trust zone: CDN",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Reader is a human actor because the diagram names it as a reader role rather than a system component.",
+        "element_id": "entity:reader",
+        "attribute": "kind",
+        "basis": "The node is labelled \"Reader\" and initiates page and asset requests."
+      },
+      {
+        "assumption": "Admin is a human actor because the diagram names it as an administrator role rather than a system component.",
+        "element_id": "entity:admin",
+        "attribute": "kind",
+        "basis": "The node is labelled \"Admin\" and initiates direct administration."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "Reader",
+        "description": "Reader",
+        "assets": [],
+        "source_excerpt": "Reader",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:admin",
+        "name": "Admin",
+        "description": "Admin",
+        "assets": [],
+        "source_excerpt": "Admin",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-server",
+        "name": "Web server",
+        "description": "Web server",
+        "assets": [],
+        "source_excerpt": "Web server",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:cdn",
+        "name": "CDN",
+        "description": "CDN",
+        "assets": [],
+        "source_excerpt": "CDN",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "MySQL database",
+        "assets": [],
+        "source_excerpt": "MySQL database",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "CDN bucket",
+        "assets": [],
+        "source_excerpt": "CDN bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cdn",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader>process:web-server>page-requests",
+        "name": "Page requests",
+        "description": "Page requests",
+        "assets": [],
+        "source_excerpt": "Page requests (HTTPS)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:reader>process:cdn>asset-fetch",
+        "name": "Asset fetch",
+        "description": "Asset fetch",
+        "assets": [],
+        "source_excerpt": "Asset fetch (HTTP)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:cdn",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "asset",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:web-server>store:mysql-database>cms-data",
+        "name": "CMS data",
+        "description": "CMS data",
+        "assets": [],
+        "source_excerpt": "CMS data (MySQL)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "CMS data",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-server>store:cdn-bucket>asset-publish",
+        "name": "Asset publish",
+        "description": "Asset publish",
+        "assets": [],
+        "source_excerpt": "Asset publish",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "asset",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database>direct-administration",
+        "name": "Direct administration",
+        "description": "Direct administration",
+        "assets": [],
+        "source_excerpt": "Direct administration (MySQL)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "Public internet",
+        "description": "Trust zone: Public internet",
+        "assets": [],
+        "source_excerpt": "Trust zone: Public internet",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:hosted-network",
+        "name": "Hosted network",
+        "description": "Trust zone: Hosted network",
+        "assets": [],
+        "source_excerpt": "Trust zone: Hosted network",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cdn",
+        "name": "CDN",
+        "description": "Trust zone: CDN",
+        "assets": [],
+        "source_excerpt": "Trust zone: CDN",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Reader is a human actor because the diagram names it as a reader role rather than a system component.",
+        "element_id": "entity:reader",
+        "attribute": "kind",
+        "basis": "The node is labelled \"Reader\" and initiates page and asset requests."
+      },
+      {
+        "assumption": "Admin is a human actor because the diagram names it as an administrator role rather than a system component.",
+        "element_id": "entity:admin",
+        "attribute": "kind",
+        "basis": "The node is labelled \"Admin\" and initiates direct administration."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

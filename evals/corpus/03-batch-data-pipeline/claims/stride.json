@@ -188,7 +188,7 @@
       "impact": "medium"
     },
     "notes": "The batch shape is the vulnerability: a missed window is a lost day, not a slow request.",
-    "verb": "flood"
+    "verb": "exhaust-resources"
   },
   {
     "category": "denial-of-service",

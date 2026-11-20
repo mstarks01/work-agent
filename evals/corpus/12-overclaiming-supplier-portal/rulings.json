@@ -153,5 +153,145 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01-near-miss-ballot-3 row 1: mstarks01-e32ad9c5 T-02"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "entity:supplier"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 85"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "entity:category-manager"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 86"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+          "store:landing-bucket"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 87"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 89"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:landing-bucket"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 90"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 92"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "process:supplier-portal"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 93"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:supplier-database",
+          "flow:process:supplier-master-service>store:supplier-database>write-supplier-records"
+        ]
+      },
+      "position": "in-component",
+      "ruling": "The ballot proposed in-component, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 94"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "flow:process:supplier-master-service>store:landing-bucket>load-extract"
+        ]
+      },
+      "ruling": "The loaded file must be altered. The claim does not specify a writer identity or an access path.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 88"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:supplier-master-service"
+        ]
+      },
+      "ruling": "The claim depends on a missed load and gives no mechanism for stopping it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 91"
+    }
   ]
 }

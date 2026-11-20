@@ -1,0 +1,859 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n0[\"Customer\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:customer-device"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1(\"Mobile app\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:customer-device",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:web-api",
+        "name": "Web API",
+        "description": "unknown",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"Web API\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims",
+        "name": "SIMS",
+        "description": "unknown",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"SIMS\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "Fax gateway",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"Fax gateway\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "User database",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n6[(\"User database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "name": "Delivery address flat file",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n7[(\"Delivery address flat file\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:catalogue-spreadsheet",
+        "name": "Catalogue spreadsheet",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5[(\"Catalogue spreadsheet\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:marketing-office",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer>process:mobile-app>browse-and-order",
+        "name": "Browse and order",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"Browse and order\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>api-traffic-http",
+        "name": "API traffic (HTTP)",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"API traffic (HTTP)\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "API traffic",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:catalogue-spreadsheet>process:web-api>sql-statements-sql-statements-over-an-unstated-transport",
+        "name": "SQL statements (SQL statements over an unstated transport)",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5 -->|\"SQL statements (SQL statements over an unstated transport)\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "store:catalogue-spreadsheet",
+        "destination": "process:web-api",
+        "protocol": "SQL",
+        "authentication": "unknown",
+        "data_description": "SQL statements",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>store:user-database>customer-records",
+        "name": "Customer records",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n2 -->|\"Customer records\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Customer records",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>process:sims>order-handover",
+        "name": "Order handover",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"Order handover\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "process:sims",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Order handover",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims>store:delivery-address-flat-file>address-write",
+        "name": "Address write",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n3 -->|\"Address write\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "store:delivery-address-flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:sims>process:fax-gateway>dispatch-note",
+        "name": "Dispatch note",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"Dispatch note\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Dispatch note",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:fax-gateway>entity:customer>confirmation-fax-fax",
+        "name": "Confirmation fax (fax)",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"Confirmation fax (fax)\"| n0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "fax",
+        "authentication": "unknown",
+        "data_description": "Confirmation fax",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-device",
+        "name": "Customer device",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: Customer device\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:sokify-internal-systems",
+        "name": "Sokify internal systems",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: Sokify internal systems\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:marketing-office",
+        "name": "Marketing office",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: Marketing office\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Customer is an individual and therefore carries personally identifiable information.",
+        "element_id": "entity:customer",
+        "attribute": "assets",
+        "basis": "The element is named Customer."
+      },
+      {
+        "assumption": "The Web API presents a web interface.",
+        "element_id": "process:web-api",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named Web API."
+      },
+      {
+        "assumption": "The Web API handles personally identifiable information and operating records.",
+        "element_id": "process:web-api",
+        "attribute": "assets",
+        "basis": "It carries customer records and order handover."
+      },
+      {
+        "assumption": "SIMS handles personally identifiable information and operating records.",
+        "element_id": "process:sims",
+        "attribute": "assets",
+        "basis": "It writes delivery addresses and sends dispatch notes."
+      },
+      {
+        "assumption": "The fax gateway handles operating records.",
+        "element_id": "process:fax-gateway",
+        "attribute": "assets",
+        "basis": "It sends confirmation faxes containing confirmation information."
+      },
+      {
+        "assumption": "The user database contains personally identifiable information.",
+        "element_id": "store:user-database",
+        "attribute": "assets",
+        "basis": "It is named User database and receives customer records."
+      },
+      {
+        "assumption": "The user database is confidential because it contains customer records.",
+        "element_id": "store:user-database",
+        "attribute": "data_classification",
+        "basis": "The flow into it is labelled Customer records."
+      },
+      {
+        "assumption": "The delivery address flat file contains personally identifiable information.",
+        "element_id": "store:delivery-address-flat-file",
+        "attribute": "assets",
+        "basis": "It is named Delivery address flat file and receives an address write."
+      },
+      {
+        "assumption": "The delivery address flat file is confidential because it contains delivery addresses.",
+        "element_id": "store:delivery-address-flat-file",
+        "attribute": "data_classification",
+        "basis": "The store is explicitly named Delivery address flat file."
+      },
+      {
+        "assumption": "The catalogue spreadsheet contains business-critical operating records.",
+        "element_id": "store:catalogue-spreadsheet",
+        "attribute": "assets",
+        "basis": "It is explicitly named Catalogue spreadsheet and sends catalogue-related SQL statements."
+      },
+      {
+        "assumption": "The SQL statements flow carries business-critical catalogue records.",
+        "element_id": "flow:store:catalogue-spreadsheet>process:web-api>sql-statements-sql-statements-over-an-unstated-transport",
+        "attribute": "assets",
+        "basis": "The source endpoint is the Catalogue spreadsheet."
+      },
+      {
+        "assumption": "The order handover flow carries business-critical operating records.",
+        "element_id": "flow:process:web-api>process:sims>order-handover",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled Order handover."
+      },
+      {
+        "assumption": "The dispatch note flow carries business-critical operating records.",
+        "element_id": "flow:process:sims>process:fax-gateway>dispatch-note",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled Dispatch note."
+      },
+      {
+        "assumption": "The confirmation fax flow carries business-critical operating records.",
+        "element_id": "flow:process:fax-gateway>entity:customer>confirmation-fax-fax",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled Confirmation fax."
+      },
+      {
+        "assumption": "The Customer device zone is controlled by a different party from Sokify.",
+        "element_id": "boundary:customer-device",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Customer device."
+      },
+      {
+        "assumption": "Sokify internal systems and Marketing office are separate network locations under the same organisational control.",
+        "element_id": "boundary:sokify-internal-systems",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Sokify internal systems."
+      },
+      {
+        "assumption": "Sokify internal systems and Marketing office are separate network locations under the same organisational control.",
+        "element_id": "boundary:marketing-office",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Marketing office."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n0[\"Customer\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:customer-device"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1(\"Mobile app\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:customer-device",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:web-api",
+        "name": "Web API",
+        "description": "unknown",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"Web API\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims",
+        "name": "SIMS",
+        "description": "unknown",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"SIMS\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "Fax gateway",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"Fax gateway\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "User database",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n6[(\"User database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "name": "Delivery address flat file",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n7[(\"Delivery address flat file\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:catalogue-spreadsheet",
+        "name": "Catalogue spreadsheet",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5[(\"Catalogue spreadsheet\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:marketing-office",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer>process:mobile-app>browse-and-order",
+        "name": "Browse and order",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"Browse and order\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>api-traffic-http",
+        "name": "API traffic (HTTP)",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"API traffic (HTTP)\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "API traffic",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:catalogue-spreadsheet>process:web-api>sql-statements-sql-statements-over-an-unstated-transport",
+        "name": "SQL statements (SQL statements over an unstated transport)",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5 -->|\"SQL statements (SQL statements over an unstated transport)\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "store:catalogue-spreadsheet",
+        "destination": "process:web-api",
+        "protocol": "SQL",
+        "authentication": "unknown",
+        "data_description": "SQL statements",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>store:user-database>customer-records",
+        "name": "Customer records",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n2 -->|\"Customer records\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Customer records",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>process:sims>order-handover",
+        "name": "Order handover",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"Order handover\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "process:sims",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Order handover",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims>store:delivery-address-flat-file>address-write",
+        "name": "Address write",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n3 -->|\"Address write\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "store:delivery-address-flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:sims>process:fax-gateway>dispatch-note",
+        "name": "Dispatch note",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"Dispatch note\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Dispatch note",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:fax-gateway>entity:customer>confirmation-fax-fax",
+        "name": "Confirmation fax (fax)",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"Confirmation fax (fax)\"| n0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "fax",
+        "authentication": "unknown",
+        "data_description": "Confirmation fax",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-device",
+        "name": "Customer device",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: Customer device\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:sokify-internal-systems",
+        "name": "Sokify internal systems",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: Sokify internal systems\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:marketing-office",
+        "name": "Marketing office",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: Marketing office\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Customer is an individual and therefore carries personally identifiable information.",
+        "element_id": "entity:customer",
+        "attribute": "assets",
+        "basis": "The element is named Customer."
+      },
+      {
+        "assumption": "The Web API presents a web interface.",
+        "element_id": "process:web-api",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named Web API."
+      },
+      {
+        "assumption": "The Web API handles personally identifiable information and operating records.",
+        "element_id": "process:web-api",
+        "attribute": "assets",
+        "basis": "It carries customer records and order handover."
+      },
+      {
+        "assumption": "SIMS handles personally identifiable information and operating records.",
+        "element_id": "process:sims",
+        "attribute": "assets",
+        "basis": "It writes delivery addresses and sends dispatch notes."
+      },
+      {
+        "assumption": "The fax gateway handles operating records.",
+        "element_id": "process:fax-gateway",
+        "attribute": "assets",
+        "basis": "It sends confirmation faxes containing confirmation information."
+      },
+      {
+        "assumption": "The user database contains personally identifiable information.",
+        "element_id": "store:user-database",
+        "attribute": "assets",
+        "basis": "It is named User database and receives customer records."
+      },
+      {
+        "assumption": "The user database is confidential because it contains customer records.",
+        "element_id": "store:user-database",
+        "attribute": "data_classification",
+        "basis": "The flow into it is labelled Customer records."
+      },
+      {
+        "assumption": "The delivery address flat file contains personally identifiable information.",
+        "element_id": "store:delivery-address-flat-file",
+        "attribute": "assets",
+        "basis": "It is named Delivery address flat file and receives an address write."
+      },
+      {
+        "assumption": "The delivery address flat file is confidential because it contains delivery addresses.",
+        "element_id": "store:delivery-address-flat-file",
+        "attribute": "data_classification",
+        "basis": "The store is explicitly named Delivery address flat file."
+      },
+      {
+        "assumption": "The catalogue spreadsheet contains business-critical operating records.",
+        "element_id": "store:catalogue-spreadsheet",
+        "attribute": "assets",
+        "basis": "It is explicitly named Catalogue spreadsheet and sends catalogue-related SQL statements."
+      },
+      {
+        "assumption": "The SQL statements flow carries business-critical catalogue records.",
+        "element_id": "flow:store:catalogue-spreadsheet>process:web-api>sql-statements-sql-statements-over-an-unstated-transport",
+        "attribute": "assets",
+        "basis": "The source endpoint is the Catalogue spreadsheet."
+      },
+      {
+        "assumption": "The order handover flow carries business-critical operating records.",
+        "element_id": "flow:process:web-api>process:sims>order-handover",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled Order handover."
+      },
+      {
+        "assumption": "The dispatch note flow carries business-critical operating records.",
+        "element_id": "flow:process:sims>process:fax-gateway>dispatch-note",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled Dispatch note."
+      },
+      {
+        "assumption": "The confirmation fax flow carries business-critical operating records.",
+        "element_id": "flow:process:fax-gateway>entity:customer>confirmation-fax-fax",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled Confirmation fax."
+      },
+      {
+        "assumption": "The Customer device zone is controlled by a different party from Sokify.",
+        "element_id": "boundary:customer-device",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Customer device."
+      },
+      {
+        "assumption": "Sokify internal systems and Marketing office are separate network locations under the same organisational control.",
+        "element_id": "boundary:sokify-internal-systems",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Sokify internal systems."
+      },
+      {
+        "assumption": "Sokify internal systems and Marketing office are separate network locations under the same organisational control.",
+        "element_id": "boundary:marketing-office",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named Marketing office."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [
+    {
+      "code": "unverifiable-excerpt",
+      "message": "source_excerpt 'n5[(\"Catalogue spreadsheet\")]' is not found in the source it cites, 'System diagram'",
+      "element_id": "store:catalogue-spreadsheet",
+      "field": "source_excerpt"
+    }
+  ],
+  "repair": null
+}

@@ -51,15 +51,33 @@ attribute a rule could read. A row whose projection the graph holds stays
 cited through that attribute: one fact, one reader (ADR 0036). Which rows those
 are is :func:`~analysis_service.assertions.offered`'s one rule, and which rows
 settle is :func:`~analysis_service.assertions.settled`'s, so a conflict or an
-unsupported row is never in the table, and a claim can never rest on one.
+unsupported row is never in the table as an ``assertion``, and a claim can
+never rest on one as a fact. A settled row the graph attribute contradicts
+(:func:`~analysis_service.assertions.contradicted`) is not offered as an
+``assertion`` either.
 
-An **unknown** row is in the table and is a different thing. It is offered under
-the same identity and a ``unknown-assertion`` ground, because the sources were
-asked about that fact and left it open, and an agent may raise a *conditional*
-claim on it exactly as it may on an element attribute nobody stated. Which of
-the two an entry is, is the entry's own ``Ground.kind``, so a claim that grounds
-a settled row on an open question — or the reverse — is refused by comparing
-its kind against the table rather than by a second reading of ``settled``.
+An **open** row is in the table and is a different thing. It is offered under
+the same identity and a ``unknown-assertion`` ground. A row is open where the
+sources were asked about the fact and left it open, or where another row
+disputes it. Such a row is in the table where it reaches no graph field, or
+where its projection qualifies the field and the field states a value
+(:func:`~analysis_service.assertions.hidden_qualifications`): the validity gate refused
+the projected model, so the field keeps what extraction wrote. Otherwise the
+field it reaches shows what
+:data:`~analysis_service.assertions.PROJECTION_EFFECT` writes for the rows
+under it. A row the graph attribute contradicts is open too, and it is in the
+table whatever field it reaches. The attribute it contradicts, or a field
+that hides the qualification its projection writes, is not offered as an
+``absent-attribute``
+(:func:`~analysis_service.assertions.held_open_attributes`): its value is no
+fact, and the open rows behind it, where there are any, carry the question.
+An agent may raise a
+*conditional* claim on an open row exactly as it may on an element attribute
+nobody stated.
+Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
+that grounds a settled row on an open question — or the reverse — is refused
+by comparing its kind against the table rather than by a second reading of
+``settled``.
 
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
 and never parsed, interpolated, or matched by a pattern compiled from it, so the
@@ -91,9 +109,13 @@ from analysis_service.assertions import (
     Subject,
     apply_projection,
     assertion_id,
+    contradicted,
     disputed,
+    held_open_attributes,
+    hidden_qualifications,
     offered,
     projected_attribute,
+    states_missing,
 )
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
@@ -104,6 +126,7 @@ from analysis_service.claims import (
     Claim,
     DroppedClaim,
     Ground,
+    GroundKind,
     InvalidProposal,
     Proposal,
     UnknownClaimIdentity,
@@ -233,16 +256,23 @@ def evidence_catalog(
     rule 4 says a crossing the model could not decide establishes nothing — not
     that a crossing occurred, not that a control is missing. It confers
     eligibility for analysis, which the crossing block and the candidate rules
-    already carry. The zones behind it are unstated on their own elements, so
-    each publishes its own ``unknown`` entry above and the fact a reader needs
-    is offered there, in the words that say it is a question.
+    already carry. Each unplaced endpoint publishes an ``unknown`` entry for
+    its ``trust_zone`` above, and the fact a reader needs is offered there, in
+    the words that say it is a question.
 
-    A third enumeration follows where the job carried an assertion pass:
-    every row :func:`~analysis_service.assertions.offered` returns — settled,
-    and not already carried by the attribute its projection wrote — in the
-    catalog's own order. ``None`` is a job that ran no such pass, and it is the same catalog
-    as before the layer existed; an empty catalog is a pass that settled
-    nothing, which offers the same rows and says so on the report.
+    The assertion rows follow where the job carried an assertion pass. The
+    settled rows are a third enumeration: every row
+    :func:`~analysis_service.assertions.offered` returns — settled, not
+    contradicted by the graph, and not already carried by the attribute its
+    projection wrote — in the catalog's own order. The open rows come after
+    them as ``unknown-assertion`` entries: an unknown or disputed row that
+    reaches no graph field, or whose projection qualifies a field that still
+    states a value, and every contradicted row. An attribute in
+    :func:`~analysis_service.assertions.held_open_attributes` is never an
+    ``absent-attribute`` entry. ``None`` is a job that
+    ran no such pass, and its catalog holds only the first two enumerations;
+    an empty catalog is a pass that settled nothing, which offers the same rows
+    and says so on the report.
 
     Only the *type-specific* attributes are eligible
     (:func:`~analysis_service.system_model.attribute_names`). ``notes`` holding
@@ -260,11 +290,17 @@ def evidence_catalog(
     dangling flow endpoint would offer agents evidence about a system nobody
     described.
     """
+    # A field the rows hold open is no stated absence: the rows behind it state
+    # the opposite, or its qualification is hidden.
+    held_open = _held_open_attributes(model, assertions)
     catalog: EvidenceCatalog = dict(
         entry
         for element in model.elements()
         for attribute in attribute_names(element)
         if (entry := _attribute_entry(element, attribute)) is not None
+        and not (
+            entry[1].kind == "absent-attribute" and (element.id, attribute) in held_open
+        )
     )
     catalog.update(
         {
@@ -283,25 +319,37 @@ def evidence_catalog(
             }
         )
         # The open questions, after the settled rows and never merged with
-        # them. A row reaches here when its value is the unknown sentinel and
-        # it reaches no graph field: the one class of fact that no other offer
-        # reaches, because the attribute enumeration above walks elements
-        # and this row's subject may be a principal.
-        # A row in a conflict is a question too, and one with no graph field
-        # reaches a lane nowhere else: the model shows a disputed attribute as
-        # a qualified unknown, but a principal's second factor has no
-        # attribute to qualify.
-        open_rows = (
-            *(row for row in assertions.entries if row.value == UNKNOWN),
-            *disputed(assertions),
-        )
+        # them. An unknown row, or a row in a conflict, reaches here when it
+        # reaches no graph field, or when its projection qualifies the field
+        # and the field still states a value. An applied projection shows a disputed
+        # attribute as a qualified unknown, which the attribute enumeration
+        # above offers, but a principal's second factor has no attribute to
+        # qualify. Where the validity gate refuses the projected model, the
+        # field keeps what extraction wrote, so only this offer carries the
+        # question.
+        hidden_question_rows = {
+            row
+            for projection in hidden_qualifications(assertions, model)
+            for row in projection.rows
+        }
+        unprojected = [
+            row
+            for row in (
+                *(row for row in assertions.entries if row.value == UNKNOWN),
+                *disputed(assertions),
+            )
+            if not projected_attribute(row.predicate, row.subject)
+            or assertion_id(row) in hidden_question_rows
+        ]
+        # A row the graph attribute contradicts reaches a graph field, and that
+        # field states the opposite rather than an unknown, so only this offer
+        # carries the question.
         catalog.update(
             {
                 assertion_id(row): Ground(
                     kind="unknown-assertion", assertion=assertion_id(row)
                 )
-                for row in open_rows
-                if not projected_attribute(row.predicate, row.subject)
+                for row in (*unprojected, *contradicted(assertions, model))
             }
         )
     return catalog
@@ -353,7 +401,7 @@ def lead_topics(
             found.add(f"{ground.element_id}.{ground.attribute}")
         elif ref in rows and (
             ground.kind == "unknown-assertion"
-            or (ground.kind == "assertion" and rows[ref].value == ABSENT)
+            or (ground.kind == "assertion" and states_missing(rows[ref]))
         ):
             row = rows[ref]
             found.add(f"{row.subject}.{row.predicate}")
@@ -433,13 +481,23 @@ def ground_issues(
     catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
     text = model_text(model)
+    held_open = _held_open_attributes(model, assertions)
     issues = []
     for claim in claims:
         for ground in claim.grounds:
-            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text)
+            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text, held_open)
             if issue:
                 issues.append(issue)
     return issues
+
+
+def _held_open_attributes(
+    model: SystemModel, assertions: AssertionCatalog | None
+) -> frozenset[tuple[str, str]]:
+    """The attributes whose absence is no fact, or none without a pass."""
+    if assertions is None:
+        return frozenset()
+    return held_open_attributes(assertions, model)
 
 
 def _one_ground_issue(
@@ -448,8 +506,14 @@ def _one_ground_issue(
     catalog: EvidenceCatalog,
     by_id: Mapping[str, Element],
     text: ModelText,
+    held_open: frozenset[tuple[str, str]],
 ) -> str:
-    """Why one catalogued ground is not in this model's catalog, or ``""``."""
+    """Why one catalogued ground is not in this model's catalog, or ``""``.
+
+    ``held_open`` holds the attributes the assertion rows contradict, or whose
+    qualification the field hides
+    (:func:`~analysis_service.assertions.held_open_attributes`).
+    """
     if ground.kind == "quote":
         return ""
     if ground.kind == "absent-element":
@@ -515,6 +579,18 @@ def _one_ground_issue(
     if ref in catalog:
         return ""
     state = control_state(getattr(element, ground.attribute))
+    held_open_absence = (
+        ground.kind == "absent-attribute"
+        and state == "absent"
+        and (ground.element_id, ground.attribute) in held_open
+    )
+    if held_open_absence:
+        return (
+            f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
+            f" {ground.element_id!r}, which the assertion rows contradict or whose"
+            " qualification the field hides, so the job's catalog offers no such"
+            " fact"
+        )
     return (
         f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
         f" {ground.element_id!r}, which the system model reads as {state}"
@@ -580,6 +656,20 @@ def render_catalog(
         f"{len(catalog)} facts, and this table is all of them.\n\n"
         "| cite this exactly | what it says |\n| --- | --- |\n"
         f"{rows}\n"
+    )
+
+
+def catalog_refs(table: str) -> frozenset[str]:
+    """The refs a table :func:`render_catalog` wrote, read back from its key column.
+
+    The eval harness reads an archived lane's table with this, to say which
+    facts the lane was sent. A gloss can quote a ref, so a search of the whole
+    text is not this reading.
+    """
+    return frozenset(
+        line[3 : line.index("` |")].replace("\\|", "|")
+        for line in table.split("\n")
+        if line.startswith("| `") and "` |" in line
     )
 
 
@@ -696,7 +786,7 @@ def _gloss(
 
 
 def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
-    """One row the sources left open, in the words that say it is a question.
+    """One open row, in the words that say it is a question.
 
     It names the ``reason`` rather than the value, because the value is the
     unknown sentinel and carries nothing: what an agent needs is whether the
@@ -705,8 +795,11 @@ def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str
     stated* and *stated absent*, at the seam where the fact has no attribute.
 
     A row with a value is open because another row disputes it
-    (:func:`~analysis_service.assertions.disputed`), so the gloss says the
-    sources disagree and names this side's value.
+    (:func:`~analysis_service.assertions.disputed`) or the graph attribute
+    contradicts it (:func:`~analysis_service.assertions.contradicted`). The
+    gloss says the sources disagree and names this side's value. For a
+    contradicted row the other side is the graph attribute, which extraction
+    read from the same sources or inferred.
     """
     about = _about(row, subjects)
     if row.value != UNKNOWN:
@@ -770,13 +863,13 @@ def _reviewed(row: Assertion) -> str:
 #: raises here, where a branch would let it fall through to the attribute
 #: sentence below and gloss a resolved row as an unstated attribute.
 #: ``tests/test_evidence.py`` compares the keys against the set.
-ASSERTION_GLOSSES: Mapping[str, Callable[[Assertion, Mapping[str, Subject]], str]] = (
-    MappingProxyType(
-        {
-            "assertion": _assertion_gloss,
-            "unknown-assertion": _open_question_gloss,
-        }
-    )
+ASSERTION_GLOSSES: Mapping[
+    GroundKind, Callable[[Assertion, Mapping[str, Subject]], str]
+] = MappingProxyType(
+    {
+        "assertion": _assertion_gloss,
+        "unknown-assertion": _open_question_gloss,
+    }
 )
 
 
@@ -809,10 +902,10 @@ def _grounds_of(
     Quotes first, then evidence, then absences, and the order is fixed rather
     than incidental: :class:`~analysis_service.claims.UnverifiedGround` marks a
     quote by its *index* into the finished list, so a reader following a mark
-    back to the quote it is about depends on this being the one place the order
-    is set. The fan-in's scope check later removes the grounds about none of a
-    claim's elements, keeping the order of the rest, and it runs before the
-    quote check takes any mark. Quotes lead because they are the submitter's
+    back to the quote it is about depends on the order this sets. The fan-in's
+    scope check later removes the grounds about none of a claim's elements,
+    keeping the order of the rest, and it runs before the quote check takes
+    any mark. Quotes lead because they are the submitter's
     own words, which is what a reader looks for first.
 
     A ref is stripped of surrounding whitespace before lookup — which spelling
@@ -895,10 +988,9 @@ def resolve_proposals(
     package could break. Three things are the service's here and none of them is
     a judgement: the grounds, the claim ID, and the lane.
 
-    The catalog is the sole source of truth for evidence: a resolved ground is
-    the entry itself, so it carries the branch and the fields that branch
-    requires, and the claim this returns cannot be mis-shaped whatever an agent
-    emitted.
+    A resolved ground is its catalog entry itself, so it carries the branch and
+    the fields that branch requires, and the claim this returns cannot be
+    mis-shaped whatever an agent emitted.
 
     ``lane`` is the lane being resolved, and it arrives as an argument because
     that is where the fact lives — the graph builds one node per

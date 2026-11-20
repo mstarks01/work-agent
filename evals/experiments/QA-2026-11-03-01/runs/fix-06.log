@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Player-local client traffic may expose player data to malware on unmanaged devices | ['flow:entity:player>process:game-client>launch-and-play', 'entity:player', 'process:game-client']
+- Unverified matchmaking transport may reveal player match participation | ['flow:process:game-client>process:lobby>matchmaking', 'process:game-client', 'process:lobby']
+- Gameplay state may be readable across the player-to-server boundary | ['flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-client', 'process:game-server']
+- Unverified lobby-to-server transport may expose player identifiers and match composition | ['flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server']
+- Player-record reads may be exposed on the lobby database connection | ['flow:process:lobby>store:player-database>read-players', 'process:lobby', 'store:player-database']
+- Unverified stats-database transport may disclose match statistics | ['flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server', 'store:stats-database']
+- Player progression updates may disclose PII on the game-server database connection | ['flow:process:game-server>store:player-database>update-players', 'process:game-server', 'store:player-database']
+- Support-account actions may expose PII across the corporate-to-production boundary | ['flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'entity:customer-support-staff', 'process:moderation-website']
+- Moderation-site database traffic may expose player-account records | ['flow:process:moderation-website>store:player-database>read-write-players', 'process:moderation-website', 'store:player-database']
+- A copied player-database volume could expose player records if at-rest encryption is absent | ['store:player-database']
+- A copied statistics database could disclose match data if at-rest encryption is absent | ['store:stats-database']
+- Compromised player-record readers could disclose the player database through their existing access | ['store:player-database', 'process:lobby', 'process:moderation-website', 'flow:process:lobby>store:player-database>read-players', 'flow:process:moderation-website>store:player-database>read-write-players']
+- Compromised game servers could disclose statistics through their database access | ['store:stats-database', 'process:game-server', 'flow:process:game-server>store:stats-database>read-write-stats']
+spent: $0.0697 reported
+must-finds matched: [8, 9]

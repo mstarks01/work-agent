@@ -20,7 +20,7 @@ from analysis_service.answer_forms import (
     answer_form,
     answer_suggestions,
 )
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.assertions import (
     UNKNOWN,
@@ -52,7 +52,6 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.open_facts import open_attribute
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import _by_band, fact_questions
 from analysis_service.report import Report
@@ -62,6 +61,7 @@ from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
 from tests import test_open_facts
 from tests.factories import (
     DESCRIPTION_TEXT,
+    adk_runner,
     sample_analysis,
     sample_selection,
     sample_threat,
@@ -91,13 +91,14 @@ class TestTheRanking:
         states is not an open fact.
         """
         model = report.system_model
+        catalog = None if report.assertions is None else report.assertions.catalog
 
         def open_refs(refs):
             return [
                 ref
                 for ref in refs
                 if fact_kind(ref.key) != "attribute"
-                or open_attribute(model, ref.element_id, ref.attribute)
+                or open_attribute(model, ref.element_id, ref.attribute, catalog)
             ]
 
         waiting = sum(
@@ -128,7 +129,7 @@ class TestTheRanking:
         }
         waiting.update({("stride", f"S-{i}"): {key("D")} for i in range(9)})
 
-        order = _by_band(waiting, dict.fromkeys(waiting, 0))
+        order = _by_band(waiting, dict.fromkeys(waiting, 0), {})
 
         assert order[0] == key("D")
         assert order[1:] == [key("A"), key("B"), key("C")]
@@ -140,7 +141,7 @@ class TestTheRanking:
         waiting.update({("stride", f"L-{i}"): {key("Y")} for i in range(3)})
         band = {finding: 0 for finding in waiting} | {("stride", "C-1"): 3}
 
-        assert _by_band(waiting, band) == [key("X"), key("Y")]
+        assert _by_band(waiting, band, {}) == [key("X"), key("Y")]
 
     def test_with_nothing_to_complete_the_highest_band_s_facts_come_first(self):
         key = lambda name: ("", "", "", name, "", "")
@@ -151,7 +152,24 @@ class TestTheRanking:
         }
         band = {("stride", "low"): 0, ("stride", "high"): 2, ("stride", "also-high"): 2}
 
-        assert _by_band(waiting, band)[:1] == [key("B")]
+        assert _by_band(waiting, band, {})[:1] == [key("B")]
+
+    def test_the_nearest_finding_counts_only_the_facets_it_needs(self):
+        """A finding that needs one facet of a four-facet kind is nearer than
+        one that waits on a whole two-facet kind (ADR 0073, ADR 0112)."""
+        subject = lambda name: ("", "", "", name, "", "")
+        limits = ("store:orders-db", "", "", "", "capacity-limits", "")
+        audit = ("store:orders-db", "", "", "", "audit-evidence", "")
+        waiting = {
+            ("stride", "size"): {limits, subject("A")},
+            ("stride", "audit"): {audit, subject("B")},
+        }
+        band = dict.fromkeys(waiting, 0)
+        needed = {("stride", "size"): {limits: ("size",)}}
+
+        every = set(_by_band(waiting, band, {})[:2])
+        assert every == {audit, subject("B")}, "a positive check: every facet"
+        assert set(_by_band(waiting, band, needed)[:2]) == {limits, subject("A")}
 
     def test_each_question_names_the_highest_band_that_waits_on_it(self, report):
         from analysis_service.frameworks import PACKAGES
@@ -412,6 +430,7 @@ class TestTheResumedRunWithoutACatalog:
             key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="TLS 1.3"
         )
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="idp|user-1",
             sources=with_link_answers([DESCRIPTION], [], [answer]),
             frameworks=sample_selection(),
@@ -428,7 +447,7 @@ class TestTheResumedRunWithoutACatalog:
         async def on_node(node: str) -> None:
             return None
 
-        outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+        outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
 
         assert isinstance(outcome, PipelineCompleted)
         assert outcome.report.system_model.data_flows[0].encryption_in_transit == (
@@ -444,8 +463,13 @@ class TestTheRoutes:
         from tests.factories import asking_threat, sample_report
         from tests.test_api import admit
 
+        # An analysis that asks: only its report offers follow-up questions.
         record = JobRecord.create(
-            owner_id="alice", sources=[DESCRIPTION], frameworks=sample_selection()
+            assertion_pass=True,
+            owner_id="alice",
+            sources=[DESCRIPTION],
+            frameworks=sample_selection(),
+            ask_questions=True,
         )
         record.transition("running")
         asked = UnknownRef(
@@ -526,6 +550,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     """One resumed job on the real graph from ``prepare``, and its report."""
     sources, links, answered = resumed_sources(list(given), [], [], earlier, facts)
     job = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
@@ -540,7 +565,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     async def on_node(node: str) -> None:
         del node
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(job, on_node))
+    outcome = asyncio.run(adk_runner(pipeline).run(job, on_node))
     assert isinstance(outcome, PipelineCompleted)
     return outcome.report
 
@@ -642,6 +667,7 @@ def resume_links(checkpoint, links, earlier=()):
         [DESCRIPTION], earlier, links, parent_facts=(), facts=()
     )
     job = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=sources,
         frameworks=sample_selection(),
@@ -656,7 +682,7 @@ def resume_links(checkpoint, links, earlier=()):
     async def on_node(node: str) -> None:
         del node
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(job, on_node))
+    outcome = asyncio.run(adk_runner(pipeline).run(job, on_node))
     assert isinstance(outcome, PipelineCompleted)
     return outcome.report
 
@@ -844,6 +870,7 @@ class TestTheAdmissionCheck:
             catalog,
             {},
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(),
             final=False,
@@ -854,7 +881,7 @@ class TestTheAdmissionCheck:
             questions.admit(
                 sources=[],
                 earlier=NO_ANSWERS,
-                given=AnswerSet(links=(link,)),
+                given=SentAnswers(links=(link,)),
             )
 
     def test_an_earlier_link_answer_may_be_answered_again(self):
@@ -909,9 +936,10 @@ class TestAnAnswerBindsToAnOpenFact:
     def test_the_report_does_not_ask_what_it_refuses(self, report):
         """Every attribute question the report lists takes an answer."""
         model = report.system_model
+        catalog = None if report.assertions is None else report.assertions.catalog
         for question in ask(report):
             if question.kind == "attribute":
-                assert open_attribute(model, question.key[0], question.key[1])
+                assert open_attribute(model, question.key[0], question.key[1], catalog)
 
 
 class TestAnUnknownAnswer:
@@ -1219,6 +1247,7 @@ def test_a_report_question_says_what_became_of_it_at_the_pause(report):
         catalog,
         {},
         report.analyses,
+        asks=True,
         waiting=False,
         answered=AnswerSet(),
         final=False,

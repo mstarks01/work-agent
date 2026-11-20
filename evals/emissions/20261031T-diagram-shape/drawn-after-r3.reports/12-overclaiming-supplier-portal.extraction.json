@@ -1,0 +1,644 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:supplier-document-portal",
+        "name": "Supplier document portal",
+        "description": "Portal for supplier documents.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal[Supplier document portal]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform-saas"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "Category manager",
+        "description": "Corporate user interacting with the supplier document portal.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "catmgr(Category manager)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:supplier-master-service",
+        "name": "Supplier master service",
+        "description": "Service loading supplier data and writing supplier records.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master[Supplier master service]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:our-cloud-account"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier",
+        "name": "Supplier",
+        "description": "Supplier sending documents and contact details to the supplier document portal.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier(Supplier)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "Bucket receiving the nightly supplier data extract.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "Supplier database",
+        "description": "Database containing supplier records.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supdb[(Supplier database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:supplier>entity:supplier-document-portal>insurance-certificates-food-safety-audits-staff-contact-details",
+        "name": "insurance certificates, food safety audits, staff contact details",
+        "description": "Supplier sends insurance certificates, food safety audits, and staff contact details to the portal.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier -->|\"insurance certificates, food safety audits, staff contact details\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier",
+        "destination": "entity:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "insurance certificates, food safety audits, staff contact details",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:category-manager>entity:supplier-document-portal>review-approve-or-reject",
+        "name": "review, approve or reject",
+        "description": "Category manager reviews, approves, or rejects supplier documents in the portal.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "catmgr -->|\"review, approve or reject\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:category-manager",
+        "destination": "entity:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "review, approve or reject",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:supplier-document-portal>store:landing-bucket>nightly-supplier-data-extract-csv",
+        "name": "nightly supplier data extract (CSV)",
+        "description": "Portal sends a nightly supplier data extract to the landing bucket.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal -->|\"nightly supplier data extract (CSV)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier-document-portal",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly supplier data extract (CSV)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:supplier-master-service>store:landing-bucket>load-file",
+        "name": "load file",
+        "description": "Supplier master service loads a file from the landing bucket.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|load file| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "load file",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:supplier-master-service>store:supplier-database>supplier-records",
+        "name": "supplier records",
+        "description": "Supplier master service sends supplier records to the supplier database.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|supplier records| supdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:vendor-platform-saas",
+        "name": "Vendor platform (SaaS)",
+        "description": "Vendor-hosted SaaS platform zone.",
+        "assets": [],
+        "source_excerpt": "subgraph vendor[\"Vendor platform (SaaS)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network zone.",
+        "assets": [],
+        "source_excerpt": "subgraph corp[\"Corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Cloud account zone.",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The landing bucket contains confidential data because it receives supplier data extracts containing staff contact details.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The diagram states that the bucket receives a \"nightly supplier data extract (CSV)\" and the extract originates from supplier data including staff contact details."
+      },
+      {
+        "assumption": "The supplier database contains confidential data because it stores supplier records that include staff contact details.",
+        "element_id": "store:supplier-database",
+        "attribute": "data_classification",
+        "basis": "The diagram states that the supplier master service writes \"supplier records\" and the supplier data is stated to include staff contact details."
+      },
+      {
+        "assumption": "The supplier document portal carries business-critical supplier records and personally identifiable information.",
+        "element_id": "entity:supplier-document-portal",
+        "attribute": "assets",
+        "basis": "The portal receives insurance certificates, food safety audits, and staff contact details."
+      },
+      {
+        "assumption": "The category manager carries business-critical supplier records.",
+        "element_id": "entity:category-manager",
+        "attribute": "assets",
+        "basis": "The category manager reviews, approves, or rejects supplier documents."
+      },
+      {
+        "assumption": "The supplier master service carries business-critical supplier records and personally identifiable information.",
+        "element_id": "entity:supplier-master-service",
+        "attribute": "assets",
+        "basis": "The service loads supplier data and writes supplier records."
+      },
+      {
+        "assumption": "The supplier process carries business-critical supplier records and personally identifiable information.",
+        "element_id": "process:supplier",
+        "attribute": "assets",
+        "basis": "The supplier sends insurance certificates, food safety audits, and staff contact details."
+      },
+      {
+        "assumption": "The landing bucket carries business-critical supplier records and personally identifiable information.",
+        "element_id": "store:landing-bucket",
+        "attribute": "assets",
+        "basis": "The bucket receives a nightly supplier data extract containing supplier data and staff contact details."
+      },
+      {
+        "assumption": "The supplier database carries business-critical supplier records and personally identifiable information.",
+        "element_id": "store:supplier-database",
+        "attribute": "assets",
+        "basis": "The database receives supplier records derived from supplier data that includes staff contact details."
+      },
+      {
+        "assumption": "The supplier-to-portal flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:process:supplier>entity:supplier-document-portal>insurance-certificates-food-safety-audits-staff-contact-details",
+        "attribute": "assets",
+        "basis": "The flow carries insurance certificates, food safety audits, and staff contact details."
+      },
+      {
+        "assumption": "The category-manager-to-portal flow carries business-critical supplier records.",
+        "element_id": "flow:entity:category-manager>entity:supplier-document-portal>review-approve-or-reject",
+        "attribute": "assets",
+        "basis": "The flow carries review, approval, and rejection actions for supplier documents."
+      },
+      {
+        "assumption": "The portal-to-bucket flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:entity:supplier-document-portal>store:landing-bucket>nightly-supplier-data-extract-csv",
+        "attribute": "assets",
+        "basis": "The flow carries a nightly supplier data extract from supplier data that includes staff contact details."
+      },
+      {
+        "assumption": "The master-to-bucket flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:entity:supplier-master-service>store:landing-bucket>load-file",
+        "attribute": "assets",
+        "basis": "The flow carries the supplier data file loaded by the supplier master service."
+      },
+      {
+        "assumption": "The master-to-database flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:entity:supplier-master-service>store:supplier-database>supplier-records",
+        "attribute": "assets",
+        "basis": "The flow carries supplier records."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:supplier-document-portal",
+        "name": "Supplier document portal",
+        "description": "Portal for supplier documents.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal[Supplier document portal]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform-saas"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "Category manager",
+        "description": "Corporate user interacting with the supplier document portal.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "catmgr(Category manager)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:supplier-master-service",
+        "name": "Supplier master service",
+        "description": "Service loading supplier data and writing supplier records.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master[Supplier master service]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:our-cloud-account"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier",
+        "name": "Supplier",
+        "description": "Supplier sending documents and contact details to the supplier document portal.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier(Supplier)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "Bucket receiving the nightly supplier data extract.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "Supplier database",
+        "description": "Database containing supplier records.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supdb[(Supplier database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:supplier>entity:supplier-document-portal>insurance-certificates-food-safety-audits-staff-contact-details",
+        "name": "insurance certificates, food safety audits, staff contact details",
+        "description": "Supplier sends insurance certificates, food safety audits, and staff contact details to the portal.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier -->|\"insurance certificates, food safety audits, staff contact details\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier",
+        "destination": "entity:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "insurance certificates, food safety audits, staff contact details",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:category-manager>entity:supplier-document-portal>review-approve-or-reject",
+        "name": "review, approve or reject",
+        "description": "Category manager reviews, approves, or rejects supplier documents in the portal.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "catmgr -->|\"review, approve or reject\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:category-manager",
+        "destination": "entity:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "review, approve or reject",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:supplier-document-portal>store:landing-bucket>nightly-supplier-data-extract-csv",
+        "name": "nightly supplier data extract (CSV)",
+        "description": "Portal sends a nightly supplier data extract to the landing bucket.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal -->|\"nightly supplier data extract (CSV)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier-document-portal",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly supplier data extract (CSV)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:supplier-master-service>store:landing-bucket>load-file",
+        "name": "load file",
+        "description": "Supplier master service loads a file from the landing bucket.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|load file| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "load file",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:supplier-master-service>store:supplier-database>supplier-records",
+        "name": "supplier records",
+        "description": "Supplier master service sends supplier records to the supplier database.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|supplier records| supdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:vendor-platform-saas",
+        "name": "Vendor platform (SaaS)",
+        "description": "Vendor-hosted SaaS platform zone.",
+        "assets": [],
+        "source_excerpt": "subgraph vendor[\"Vendor platform (SaaS)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network zone.",
+        "assets": [],
+        "source_excerpt": "subgraph corp[\"Corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Cloud account zone.",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The landing bucket contains confidential data because it receives supplier data extracts containing staff contact details.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The diagram states that the bucket receives a \"nightly supplier data extract (CSV)\" and the extract originates from supplier data including staff contact details."
+      },
+      {
+        "assumption": "The supplier database contains confidential data because it stores supplier records that include staff contact details.",
+        "element_id": "store:supplier-database",
+        "attribute": "data_classification",
+        "basis": "The diagram states that the supplier master service writes \"supplier records\" and the supplier data is stated to include staff contact details."
+      },
+      {
+        "assumption": "The supplier document portal carries business-critical supplier records and personally identifiable information.",
+        "element_id": "entity:supplier-document-portal",
+        "attribute": "assets",
+        "basis": "The portal receives insurance certificates, food safety audits, and staff contact details."
+      },
+      {
+        "assumption": "The category manager carries business-critical supplier records.",
+        "element_id": "entity:category-manager",
+        "attribute": "assets",
+        "basis": "The category manager reviews, approves, or rejects supplier documents."
+      },
+      {
+        "assumption": "The supplier master service carries business-critical supplier records and personally identifiable information.",
+        "element_id": "entity:supplier-master-service",
+        "attribute": "assets",
+        "basis": "The service loads supplier data and writes supplier records."
+      },
+      {
+        "assumption": "The supplier process carries business-critical supplier records and personally identifiable information.",
+        "element_id": "process:supplier",
+        "attribute": "assets",
+        "basis": "The supplier sends insurance certificates, food safety audits, and staff contact details."
+      },
+      {
+        "assumption": "The landing bucket carries business-critical supplier records and personally identifiable information.",
+        "element_id": "store:landing-bucket",
+        "attribute": "assets",
+        "basis": "The bucket receives a nightly supplier data extract containing supplier data and staff contact details."
+      },
+      {
+        "assumption": "The supplier database carries business-critical supplier records and personally identifiable information.",
+        "element_id": "store:supplier-database",
+        "attribute": "assets",
+        "basis": "The database receives supplier records derived from supplier data that includes staff contact details."
+      },
+      {
+        "assumption": "The supplier-to-portal flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:process:supplier>entity:supplier-document-portal>insurance-certificates-food-safety-audits-staff-contact-details",
+        "attribute": "assets",
+        "basis": "The flow carries insurance certificates, food safety audits, and staff contact details."
+      },
+      {
+        "assumption": "The category-manager-to-portal flow carries business-critical supplier records.",
+        "element_id": "flow:entity:category-manager>entity:supplier-document-portal>review-approve-or-reject",
+        "attribute": "assets",
+        "basis": "The flow carries review, approval, and rejection actions for supplier documents."
+      },
+      {
+        "assumption": "The portal-to-bucket flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:entity:supplier-document-portal>store:landing-bucket>nightly-supplier-data-extract-csv",
+        "attribute": "assets",
+        "basis": "The flow carries a nightly supplier data extract from supplier data that includes staff contact details."
+      },
+      {
+        "assumption": "The master-to-bucket flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:entity:supplier-master-service>store:landing-bucket>load-file",
+        "attribute": "assets",
+        "basis": "The flow carries the supplier data file loaded by the supplier master service."
+      },
+      {
+        "assumption": "The master-to-database flow carries business-critical supplier records and personally identifiable information.",
+        "element_id": "flow:entity:supplier-master-service>store:supplier-database>supplier-records",
+        "attribute": "assets",
+        "basis": "The flow carries supplier records."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

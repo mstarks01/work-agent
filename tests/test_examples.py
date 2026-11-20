@@ -21,13 +21,12 @@ from pathlib import Path
 import pytest
 
 from analysis_service import (
-    Engine,
     PipelineRejected,
     SourceLimits,
     StubPipelineRunner,
 )
 from analysis_service.validation import ValidationIssue
-from tests.factories import sample_selection
+from tests.factories import sample_selection, stand_in_engine
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
@@ -86,7 +85,7 @@ TEST_DEADLINE = 30.0
 
 
 def test_the_example_reports_a_completed_run(example, capsys):
-    engine = Engine(
+    engine = stand_in_engine(
         StubPipelineRunner(),
         limits=EXAMPLE_LIMITS,
         deadline_seconds=TEST_DEADLINE,
@@ -98,7 +97,7 @@ def test_the_example_reports_a_completed_run(example, capsys):
 
 def test_the_example_handles_a_rejection_without_raising(example, capsys):
     """The bug this whole mechanism exists to catch: silence on rejection."""
-    engine = Engine(
+    engine = stand_in_engine(
         RejectingRunner(),
         limits=EXAMPLE_LIMITS,
         deadline_seconds=TEST_DEADLINE,
@@ -116,7 +115,7 @@ def test_the_example_handles_a_rejection_without_raising(example, capsys):
 
 def test_the_example_lets_an_internal_failure_propagate(example):
     """Fail closed: nothing partial is invented on the way out."""
-    engine = Engine(
+    engine = stand_in_engine(
         ExplodingRunner(),
         limits=EXAMPLE_LIMITS,
         deadline_seconds=TEST_DEADLINE,

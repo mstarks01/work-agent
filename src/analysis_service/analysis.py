@@ -40,7 +40,7 @@ import re
 from collections.abc import Collection, Iterable, Iterator, Mapping
 from functools import cache
 from types import MappingProxyType
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -48,6 +48,7 @@ from analysis_service.system_model import (
     CONTROL_VALUE_MAX_CHARS,
     ELEMENT_ID_MAX_CHARS,
     UNKNOWN,
+    AssetTag,
     BoundaryCrossing,
     DataFlow,
     Element,
@@ -98,13 +99,14 @@ ABSENT_WORD = "none"
 # schema because "is a control" is a fact about what the attribute means, not
 # about its type: ``protocol`` and ``technology`` are strings too, and neither
 # is a control whose absence is a finding.
-CONTROL_ATTRIBUTES: tuple[str, ...] = (
+ControlAttribute = Literal[
     "authentication",
     "encryption_in_transit",
     "encryption_at_rest",
     "exposure",
     "data_classification",
-)
+]
+CONTROL_ATTRIBUTES: tuple[ControlAttribute, ...] = get_args(ControlAttribute)
 
 #: Asset tags whose exposure is a confidentiality loss on its own.
 #:
@@ -113,7 +115,7 @@ CONTROL_ATTRIBUTES: tuple[str, ...] = (
 #: set so that a tag added to the vocabulary needs a reading here.
 #: ``test_analysis.py`` holds the two together, so a core tag added without a
 #: reading fails.
-SENSITIVE_ASSET_TAGS = frozenset(
+SENSITIVE_ASSET_TAGS: frozenset[AssetTag] = frozenset(
     {"credentials", "pii", "financial", "health", "secrets", "business-critical-data"}
 )
 
@@ -375,9 +377,9 @@ def zone_kinds(model: SystemModel) -> dict[str, str]:
     rule, or the unknown sentinel for a component the sources place nowhere
     (ADR 0039 rule 1). So this is the one lookup that turns "these zones
     differ" into "this crossing is a *privilege* transition", and an unplaced
-    endpoint reaches it as a key the map does not hold. A caller reads
-    ``BoundaryCrossing.decided`` before asking, because a missing kind is the
-    answer to a question this rule cannot put.
+    endpoint reaches it as a key the map does not hold. A caller reads the kind
+    of a placed endpoint's zone only, and reads ``BoundaryCrossing.decided``
+    before it claims anything about the other end.
     """
     return {boundary.id: boundary.kind for boundary in model.trust_boundaries}
 

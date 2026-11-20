@@ -1,0 +1,14 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Sensor readings may be intercepted between field nodes and the internet-facing gateway | ['flow:entity:sensor-node>process:device-gateway>publish-readings', 'entity:sensor-node', 'process:device-gateway']
+- Device registry key material may be intercepted on the gateway lookup path | ['flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway', 'store:device-registry']
+- Telemetry records may be intercepted while the normalizer loads BigQuery | ['flow:process:telemetry-normalizer>store:telemetry-lake>load-readings', 'process:telemetry-normalizer', 'store:telemetry-lake']
+- Fleet dashboard results may be intercepted across the corporate-to-analytics boundary | ['flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'entity:fleet-operator', 'store:telemetry-lake']
+- Gateway-to-Pub/Sub telemetry may be exposed in transit | ['flow:process:device-gateway>store:pub-sub>forward-readings', 'process:device-gateway', 'store:pub-sub']
+- Telemetry may be intercepted while the normalizer consumes Pub/Sub messages | ['flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer', 'store:pub-sub']
+- A copied device registry could disclose fleet authentication keys | ['store:device-registry']
+- A copied telemetry lake could disclose customer occupancy patterns | ['store:telemetry-lake']
+- A copied Pub/Sub retention artifact could expose telemetry messages | ['store:pub-sub']
+- Unauthenticated registry access could reveal fleet key material | ['store:device-registry', 'flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway']
+- An unverified Pub/Sub subscription could disclose normalized telemetry | ['store:pub-sub', 'flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer']
+spent: $0.0673 reported
+must-finds matched: [7]

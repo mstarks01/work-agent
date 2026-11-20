@@ -37,7 +37,7 @@ def readings(*a, **k):
 
 
 ep.readings = readings
-found = ep.sweep(Path("evals"))
+found = ep.sweep(ep.paired(Path("evals")))
 Path(sys.argv[1]).write_text(
     json.dumps(
         {

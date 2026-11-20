@@ -141,6 +141,7 @@ class Block:
         unreconciled_rulings=(),
         dropped_claims=(),
         unresolved_references=(),
+        fired_rules=(),
     ):
         self.claims = list(claims)
         self.scope = list(scope)
@@ -148,6 +149,7 @@ class Block:
         self.unreconciled_rulings = list(unreconciled_rulings)
         self.dropped_claims = list(dropped_claims)
         self.unresolved_references = list(unresolved_references)
+        self.fired_rules = list(fired_rules)
 
     #: The real readers, bound onto the fake rather than reimplemented here. A
     #: second copy of "which problems name this claim" is exactly the shape
@@ -322,7 +324,7 @@ def test_a_rejected_ruling_is_not_an_applied_one(read_case):
     assert score.matched == ()
     assert set(score.missed) == set(expected)
     assert set(score.rejected) == set(expected)
-    assert score.precision == 0.0
+    assert score.precision is None
 
 
 def test_needs_info_asserts_the_requirement_applies():
@@ -624,7 +626,7 @@ def test_the_critic_pair_reads_both_sides(case):
     """A rejection count alone reads as the critic working or breaking things.
 
     So the instrument reports `earned` and `destroyed` together, the way
-    `critic_yield` reports `unsupported_killed` beside `matched_killed`.
+    `critic_yield` reports `rejected_kill_rate` beside `matched_kill_rate`.
     """
     from evals.harness.applicability import score_yield
 
@@ -651,8 +653,8 @@ def test_the_critic_pair_reads_both_sides(case):
     assert critic.earned == ()
     assert critic.unlisted == (unexpected,)
     assert critic.confirmed == (expected[0],)
-    assert critic.rejection_rate == pytest.approx(2 / 3)
-    assert critic.destroyed_rate == 0.5
+    assert critic.rates["rejection_rate"].value == pytest.approx(2 / 3)
+    assert critic.rates["destroyed_rate"].value == 0.5
 
 
 def test_a_lane_or_duplicate_rejection_neither_destroys_nor_earns(case):
@@ -705,7 +707,7 @@ def test_the_split_comes_from_the_list_a_claim_sits_in(case):
     assert critic.confirmed == ()
 
 
-def test_a_critic_that_rejected_nothing_reports_zero_rather_than_dividing(case):
+def test_a_critic_that_rejected_nothing_reads_unavailable_rather_than_zero(case):
     from evals.harness.applicability import aggregate_yield, score_yield
 
     expected = [reference.requirement for reference in case.references["asvs"]]
@@ -714,8 +716,9 @@ def test_a_critic_that_rejected_nothing_reports_zero_rather_than_dividing(case):
     )
 
     assert critic.rejected == ()
-    assert critic.destroyed_rate == 0.0
-    assert aggregate_yield([critic])["destroyed_rate"] == 0.0
+    assert critic.rates["destroyed_rate"].value is None
+    assert critic.to_json()["destroyed_rate"] is None
+    assert aggregate_yield([critic])["destroyed_rate"] is None
 
 
 def test_pooling_the_yield_weights_by_draft_and_not_by_case(case):
@@ -1021,7 +1024,7 @@ class TestWhatTheRoutingScoreExcludes:
         score = score_dispositions(case, DispositionBlock(), carried=("prose",))
 
         assert score.judged == ()
-        assert score.accuracy == 0.0
+        assert score.accuracy is None
         assert len(score.unreached) == len(case.references["asvs"])
 
     def test_an_unjudged_record_is_counted_rather_than_scored(self, case):

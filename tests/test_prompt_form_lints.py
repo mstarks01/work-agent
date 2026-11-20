@@ -49,7 +49,7 @@ def test_every_list_of_the_forms_names_them_all():
 
 
 def test_the_shared_critic_prompt_lists_the_forms():
-    """The positive control: the lint reads the list it exists for."""
+    """The positive check: the lint reads the list it exists for."""
     assert any(
         path.name == "critic.md" and path.parent.name == "prompts"
         for path, _ in _lists()

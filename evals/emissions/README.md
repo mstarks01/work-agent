@@ -14,6 +14,15 @@ on the day. The artifact records the commit, whether the tree was clean, the
 corpus digest, the models and the instruction digest of the node, so the
 replay places each sweep on an arm from the record rather than from its name.
 
+An arm is also the input that the route read. A sweep today records the digest
+of each case's rendered Sources in `rendered_sources`, and the replay pools the
+sweeps whose digests agree. No sweep in this archive records that block. The
+commit does not identify the input either, because one commit ran several
+input sets here. So the replay pools none of these sweeps by itself, and it
+prints `NOT POOLED` with the names. To pool sweeps that read one input, name
+their arm with `--arm LABEL=GLOB`, where the glob matches the artifact file
+names. Repeat the option for each arm.
+
 Replay them with:
 
 ```sh
@@ -45,13 +54,18 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20261016T-rulings-two-sentences` | extraction | two corrected sentences for the console and the third-party rulings on top of #1749, all 16 cases, three runs and a case 14 pre-flight on luna through OpenAI (QA-2026-10-15-03-E2, refuted, never merged); `20261015T-rule4-app-process` is its before side, on another route |
 | `20261016T-rulings-exclusion` | extraction | the two corrected sentences plus the exclusion for a hosted service that is the described system, all 16 cases, five runs and a case 12 pre-flight on luna through OpenRouter flex (QA-2026-10-15-03-E3, null, never merged); `20261015T-rule4-app-process` is its before side for losses, on the same route, and `20261015T-rule6-bcd` for the tag |
 | `20261017T-1813-name-rule` | extraction | the rule 3 sentence of #1813 (a `name` needs a Latin letter or digit, and the text's own spelling goes in `notes`), all 16 cases, five runs on each side on luna through OpenRouter flex: `before-r*` at `bbe33ef8`, `after-r*` at `7cc94c19` (QA-2026-10-17-01-E1, inconclusive) |
+| `20261031T-diagram-input` | extraction | a `diagram` source against the description, all 16 cases, four sweeps on each side and a case 01 pre-flight on luna through OpenRouter at `ab7dc98d`: `description-r*` over `evals/corpus`, `diagram-r*` over the corpus `QA-2026-10-31-03/build_corpus.py` writes (QA-2026-10-31-03-E1, supported) |
+| `20261031T-diagram-shape` | extraction | the shape-states-type register sentence (candidate `98ac260b`, not merged): `clean-after-r*` over the export diagrams at the candidate, `drawn-before-r*` at `47e995b4` and `drawn-after-r*` at the candidate over the drawn set in `QA-2026-10-31-04/drawn`, all 16 cases, four and three sweeps, and a drawn pre-flight on case 01 (QA-2026-10-31-04-E1, refuted); `20261031T-diagram-input/diagram-r*` is the clean before side |
+| `20261031T-diagram-narrow` | extraction | two narrower register candidates, neither merged: `cylinder-*` at `07134ed8` (a cylinder states a data store) and `note-*` at `2c703c76` (the export states its shape convention in a comment), each over the clean diagrams and the drawn set, all 16 cases, and an E2 pre-flight on case 10 (QA-2026-10-31-05-E1 refuted, E2 inconclusive) |
+| `20261101T-diagram-note-confirm` | extraction | the shape-convention comment (candidate `2c703c76`): `note-clean-r4` completes the four clean sweeps begun in `20261031T-diagram-narrow`, and `drawn-before-r*` at `f921e691` and `drawn-after-r*` at the candidate ran in turn, five each, over `QA-2026-10-31-04/drawn` (QA-2026-10-31-06-E1, supported) |
 
 `20261017T-1813-name-rule/after-r*` ran `extract.md` as it stands at `7cc94c19`.
 To price a later `extract.md` change, replay that arm as the before side if the
 prompt has not moved since, and say so in the experiment row:
 
 ```sh
-python -m evals.harness.run replay evals/emissions/20261017T-1813-name-rule/after-r*.json
+python -m evals.harness.run replay evals/emissions/20261017T-1813-name-rule/after-r*.json \
+  --arm 'after=after-r*'
 ```
 
 The heads sweep reads through `extract` and `assert` and keeps the catalog its
@@ -67,8 +81,9 @@ one the directory does. The corpus moved between them, so replay both sides
 rather than reading a recorded figure off either:
 
 ```sh
-python -m evals.harness.run replay evals/emissions/20260919T-naming-rule/r*.json
-python -m evals.harness.run replay evals/emissions/20260918T-placement-rule/after-r*.json
+python -m evals.harness.run replay evals/emissions/20260919T-naming-rule/r*.json --arm 'naming=r*'
+python -m evals.harness.run replay evals/emissions/20260918T-placement-rule/after-r*.json \
+  --arm 'placement=after-r*'
 ```
 
 Read on 2026-09-19, `found` per sweep goes 114.8 to 128.3, which is 6.6 sd on

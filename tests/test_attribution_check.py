@@ -90,7 +90,7 @@ def test_an_ai_author_with_an_unlisted_address_is_refused(repo):
     ],
 )
 def test_a_human_commit_passes(repo, message):
-    """A control: the ordinary words among the names do not refuse a commit."""
+    """A negative check: the ordinary words among the names do not refuse a commit."""
     commit(repo, message, author=("Devin Smith", "devin@example.test"))
     assert check(repo, "HEAD~1..HEAD") == 0
 

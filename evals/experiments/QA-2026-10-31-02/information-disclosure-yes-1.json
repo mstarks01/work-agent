@@ -1,0 +1,213 @@
+{
+  "claims": [
+    {
+      "title": "Shopper order details may be intercepted on the unverified public ingress link",
+      "description": "`flow:entity:shopper>process:storefront-api>place-order` crosses from `boundary:public-internet` to `boundary:storefront-dmz` carrying order contents, shipping addresses, and card last-four values, but its `protocol` and `encryption_in_transit` are unverified. If transport encryption is absent or incorrectly terminated, an attacker able to observe the public path can intercept shoppers' PII and financial order data before it reaches `process:storefront-api`. The disclosed shopper identifiers and order details can then be used to target accounts and correlate later orders; this is conditional on resolving the flow's unverified transport protection.",
+      "affected_element_ids": [
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "entity:shopper",
+        "process:storefront-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:protocol",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `flow:entity:shopper>process:storefront-api>place-order` crosses the public-internet boundary but its protocol and `encryption_in_transit` are unknown, so a capable observer needs a network-path position. Impact is high because the flow carries `pii` and `financial` data including shipping addresses and card last-four values."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce TLS for shopper order submission",
+          "detail": "Set and continuously validate TLS 1.2+ for `flow:entity:shopper>process:storefront-api>place-order`, including certificate validation and secure termination at `process:storefront-api`."
+        },
+        {
+          "summary": "Reduce sensitive values carried on the public flow",
+          "detail": "Use payment-provider references rather than transmitting payment-related values beyond the fields required to place the order."
+        }
+      ]
+    },
+    {
+      "title": "Settlement details may be intercepted on the unverified processor webhook path",
+      "description": "`flow:entity:card-processor>process:storefront-api>settlement-webhook` crosses from `boundary:public-internet` to `boundary:storefront-dmz`, carries financial settlement confirmations, and has unverified `protocol` and `encryption_in_transit`. If the webhook is not protected in transit, an on-path attacker can intercept payment-settlement details sent by `entity:card-processor` to `process:storefront-api`. The information reveals which orders have been paid and can support targeted shopper or payment fraud; this draft is conditional on the unresolved transport configuration.",
+      "affected_element_ids": [
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "entity:card-processor",
+        "process:storefront-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:protocol",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the processor webhook crosses the public-internet boundary and its transport protection is unknown, while interception still requires a path-observation position. Impact is medium because the flow is tagged `financial` and exposes settlement status, but the model describes a confirmation rather than the full order corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated HTTPS for processor callbacks",
+          "detail": "Configure and verify TLS 1.2+ with certificate validation on `flow:entity:card-processor>process:storefront-api>settlement-webhook`; document the resulting `protocol` and `encryption_in_transit` values."
+        },
+        {
+          "summary": "Minimize settlement payload content",
+          "detail": "Send an opaque payment or order reference and resolve any additional details only within trusted services."
+        }
+      ]
+    },
+    {
+      "title": "Order data may be intercepted between the storefront API and order service",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` crosses from `boundary:storefront-dmz` to `boundary:core-services` and carries shopper identifiers, shipping addresses, order contents, and financial data. It has no authentication and its `encryption_in_transit` is unknown. If encryption is absent, a compromised node, service-mesh component, or network observer on that inter-zone path can intercept the complete order payload before `process:order-service` persists it. The disclosure enables correlation of shoppers to orders and exposes data later stored in `store:orders-db`; this is conditional on confirming the unverified transport setting.",
+      "affected_element_ids": [
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:storefront-api",
+        "process:order-service"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication",
+        "unknown:flow:process:storefront-api>process:order-service>submit-order:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: the flow crosses the DMZ-to-core boundary and has unverified encryption, but an attacker must obtain a position able to observe that internal path. Impact is high because the flow carries both `pii` and `financial` order data for submitted orders."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and mutually authenticate the gRPC hop",
+          "detail": "Require mTLS for `flow:process:storefront-api>process:order-service>submit-order`, setting verified `encryption_in_transit` and authenticating `process:storefront-api` to `process:order-service`."
+        },
+        {
+          "summary": "Use opaque order references where feasible",
+          "detail": "Avoid forwarding unnecessary shopper identifiers or address fields when `process:order-service` can retrieve narrowly scoped data through a protected path."
+        }
+      ]
+    },
+    {
+      "title": "Order database traffic may expose confidential order records if its transport is unencrypted",
+      "description": "`flow:process:order-service>store:orders-db>read-write-orders` transfers order rows, shipping addresses, and card last-four values between `process:order-service` and confidential `store:orders-db`, but both its `protocol` and `encryption_in_transit` are unknown. If the database connection is unencrypted, an attacker with an internal network foothold can intercept read or write traffic and read PII and financial records in transit. The captured records reveal the same sensitive fields held in `store:orders-db` and can be accumulated across requests; this draft is conditional on the unknown connection transport state.",
+      "affected_element_ids": [
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "process:order-service",
+        "store:orders-db"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:order-service>store:orders-db>read-write-orders:protocol",
+        "unknown:flow:process:order-service>store:orders-db>read-write-orders:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the connection's protocol and encryption are unknown, though exploitation requires an internal network-observation foothold. Impact is high because `store:orders-db` is confidential and the flow carries `pii` and `financial` order records."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted PostgreSQL connections",
+          "detail": "Enforce TLS with certificate validation between `process:order-service` and `store:orders-db`, and record the concrete protocol and `encryption_in_transit` setting."
+        },
+        {
+          "summary": "Restrict database network reachability",
+          "detail": "Allow database connections only from the workload identity and network path used by `process:order-service`, reducing the set of observers able to reach the connection."
+        }
+      ]
+    },
+    {
+      "title": "A storage-layer copy could disclose all orders if orders-db lacks encryption at rest",
+      "description": "`store:orders-db` is classified confidential and holds shopper addresses and card last-four values tagged `pii` and `financial`, while its `encryption_at_rest` value is unknown. If that unknown resolves to no effective encryption at rest, an attacker or over-privileged operator who obtains a database volume, decommissioned media, or other storage-layer copy can read the order corpus without using the application's authorization path. The resulting dataset can be correlated with the order traffic handled by `process:order-service`; this is explicitly conditional and does not assert that `store:orders-db` is currently unencrypted. The submitter confirms backups and snapshots are encrypted and restricted, so the unresolved question is the primary store's at-rest posture and any operational copies covered by it.",
+      "affected_element_ids": [
+        "store:orders-db"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:orders-db:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Are its backups and snapshots encrypted? yes; Can only named operators get its disks, backups or snapshots? yes",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:store:orders-db:encryption_at_rest`: obtaining storage-layer access is a prerequisite, but the model does not verify the control. Impact is high because `store:orders-db` is confidential and contains corpus-scale `pii` and `financial` order data."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce encryption at rest for orders-db",
+          "detail": "Verify the current state, then require managed encryption with controlled keys for `store:orders-db` and explicitly cover disks, backups, snapshots, replicas, and decommissioned media."
+        },
+        {
+          "summary": "Limit storage-layer key and export access",
+          "detail": "Separate database, backup, export, and key-management roles so no routine application or support principal can obtain both a raw copy and decryption authority."
+        }
+      ]
+    },
+    {
+      "title": "An environment-held database password can expose the entire orders database",
+      "description": "The database credential used on `flow:process:order-service>store:orders-db>read-write-orders` is stated to be held in an environment variable on `process:order-service`, and the associated application account has full read/write access to `store:orders-db`. An attacker who recovers that password from the worker's runtime environment, diagnostic output, or another disclosure path can query the confidential database and read all order rows, shipping addresses, and card last-four values rather than only one shopper's records. This is corpus-scale second-order reach through the broad database grant. The later answers assert that secrets are kept in a secret store, which conflicts with the modeled environment-variable custody; resolve that contradiction and rotate the password if it has ever been environment-exposed.",
+      "affected_element_ids": [
+        "process:order-service",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "store:orders-db"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "assertion:credential-custody~credential:order-service-database-password~any~v.c4f5cadf8e5c",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "Are its secrets kept in a secret store, not in code or files? yes",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the stated credential custody is an environment variable on `process:order-service`, although the later secret-store answer creates a control-state contradiction that must be resolved. Impact is high because the stated application-account grant is full read/write on confidential `store:orders-db`, which holds `pii` and `financial` data."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace the environment password with short-lived workload credentials",
+          "detail": "Use workload identity or dynamically issued database credentials from a dedicated secret manager, and remove the password from the `process:order-service` environment."
+        },
+        {
+          "summary": "Reduce database-account scope",
+          "detail": "Replace the single full-read/write application account with narrowly scoped identities, grants, rows, and columns needed by `process:order-service`; rotate the current password after migration."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

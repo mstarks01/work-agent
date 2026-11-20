@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Colleague shift responses may be readable across the public-to-app path | ['flow:entity:colleague>process:scheduling-web-app>view-shifts', 'entity:colleague', 'process:scheduling-web-app']
+- Store rota updates may be readable across the manager-to-app path | ['flow:entity:store-manager>process:scheduling-web-app>build-rota', 'entity:store-manager', 'process:scheduling-web-app']
+- Rota requests between the web app and service may expose colleague data | ['flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-web-app', 'process:scheduling-service']
+- Database traffic may disclose rota records on the internal network | ['flow:process:scheduling-service>store:rota-database>read-write-rotas', 'process:scheduling-service', 'store:rota-database']
+- Payroll export writes may be exposed on the service-to-share hop | ['flow:process:scheduling-service>store:file-share>write-payroll-export', 'process:scheduling-service', 'store:file-share']
+- Payroll exports may be intercepted while collected by the external payroll system | ['flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system', 'store:file-share']
+- A copied rota database may reveal colleague records if at-rest encryption is absent | ['store:rota-database']
+- A copied payroll file share may reveal exports if at-rest encryption is absent | ['store:file-share']
+- An unverified database read path may expose the full rota corpus | ['store:rota-database', 'flow:process:scheduling-service>store:rota-database>read-write-rotas', 'process:scheduling-service']
+- An unverified payroll-share read path may disclose weekly exports | ['store:file-share', 'flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system']
+spent: $0.0539 reported
+must-finds matched: [9, 10]

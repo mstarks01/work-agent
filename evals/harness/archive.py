@@ -80,9 +80,20 @@ def _sorted_utf8(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
+#: Each kind of file ``bundle`` writes per case, named ``<case>.<kind>.json``.
+#: ``bundle.case_file`` names each one, and ``bundle.check_sweep_out`` checks
+#: each one before a sweep spends.
+CaseKind = Literal[
+    "report", "drafts", "proposals", "lanes", "extraction", "assertions", "failure"
+]
+
+#: Each kind of file an archive holds: a case file, a sweep's artifact, or a
+#: Baseline's manifest.
+ArchiveKind = Literal[CaseKind, "artifact", "manifest"]
+
 #: One entry per producer, keyed by the kind of file it writes. A writer names
 #: its own kind, so nothing infers a spelling from a path.
-ARCHIVE_SPELLINGS: dict[str, Callable[[Any], str]] = {
+ARCHIVE_SPELLINGS: dict[ArchiveKind, Callable[[Any], str]] = {
     "report": _utf8,
     "drafts": _escaped,
     "proposals": _escaped,
@@ -97,14 +108,7 @@ ARCHIVE_SPELLINGS: dict[str, Callable[[Any], str]] = {
 #: The kinds a **reader** recognises by a filename's whole name. A manifest is
 #: named ``baseline.json`` exactly, and matching it as a suffix would read any
 #: stray file whose name merely ends that way as one, and sort every key in it.
-KIND_NAMES: dict[str, str] = {"baseline.json": "manifest"}
-
-#: Each kind of file ``bundle`` writes per case, named ``<case>.<kind>.json``.
-#: ``bundle.case_file`` names each one, and ``bundle.check_sweep_out`` checks
-#: each one before a sweep spends.
-CaseKind = Literal[
-    "report", "drafts", "proposals", "lanes", "extraction", "assertions", "failure"
-]
+KIND_NAMES: dict[str, ArchiveKind] = {"baseline.json": "manifest"}
 
 
 def case_suffix(kind: CaseKind) -> str:
@@ -118,14 +122,16 @@ def case_suffix(kind: CaseKind) -> str:
 #: the only honest answer for one is the name a Baseline manifest records in its
 #: ``artifact`` field. A reader that guessed instead would hand the artifact's
 #: spelling to every unrelated file it walked past.
-KIND_SUFFIXES: dict[str, str] = {case_suffix(kind): kind for kind in get_args(CaseKind)}
+KIND_SUFFIXES: dict[str, CaseKind] = {
+    case_suffix(kind): kind for kind in get_args(CaseKind)
+}
 
 
 class UnknownArchiveKind(LookupError):
     """A file whose producer this table does not declare."""
 
 
-def kind_of(name: str) -> str | None:
+def kind_of(name: str) -> ArchiveKind | None:
     """Which kind ``name`` is, or ``None`` where the filename cannot say.
 
     ``None`` is a real answer and not a failure: a sweep artifact and a file

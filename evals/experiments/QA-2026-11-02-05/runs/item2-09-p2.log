@@ -1,0 +1,7 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- Unauthenticated API traffic could let an attacker place orders as a customer | ['entity:customer', 'process:mobile-app', 'process:web-api', 'flow:process:mobile-app>process:web-api>api-traffic']
+- Plain HTTP permits a counterfeit Web API to harvest customer order details | ['process:mobile-app', 'process:web-api', 'flow:process:mobile-app>process:web-api>api-traffic']
+- Unverified spreadsheet identity could let an office attacker issue SQL as Marketing macros | ['process:catalogue-spreadsheet', 'process:web-api', 'flow:process:catalogue-spreadsheet>process:web-api>sql-statements']
+- A counterfeit fax gateway could send fraudulent Sokify confirmations to customers | ['process:fax-gateway', 'entity:customer', 'flow:process:fax-gateway>entity:customer>confirmation-fax']
+spent: $0.0224 reported
+must-finds matched: [0, 1]

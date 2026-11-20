@@ -1,0 +1,20 @@
+architecture-beta
+    group z0(cloud)[Trust zone corporate network]
+    group z1(cloud)[Trust zone outside corporate network]
+    group z2(cloud)[Trust zone franchise partner]
+    service n0(internet)[colleague] in z1
+    service n1(internet)[franchise identity provider] in z2
+    service n2(internet)[HR system] in z1
+    service n3(server)[identity broker] in z0
+    service n4(server)[store admin console] in z0
+    service n5(database)[directory] in z0
+    service n6(database)[key store] in z0
+    service n7(database)[audit log] in z0
+    n0:R --> L:n3
+    n1:R --> L:n3
+    n0:R --> L:n4
+    n4:R --> L:n3
+    n3:R --> L:n2
+    n3:R --> L:n5
+    n3:R --> L:n6
+    n3:R --> L:n7

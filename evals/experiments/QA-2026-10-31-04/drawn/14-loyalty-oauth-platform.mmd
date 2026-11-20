@@ -1,0 +1,32 @@
+flowchart LR
+    subgraph phone["Member's phone"]
+        app[Mobile app]
+    end
+    browser("Member's browser")
+
+    subgraph partner["Partner servers"]
+        papp["Partner app (e.g. meal-planning service)"]
+    end
+
+    subgraph cloud["Our cloud account"]
+        authz[Authorization server]
+        rewards[Rewards API]
+        support[Support console]
+        iddb[("Identity database: accounts, emails, password hashes, codes, refresh tokens, consents")]
+        ledger[("Points ledger: balances, transactions")]
+        logs[(API log store)]
+    end
+
+    app -->|"sign in, authorization code flow (HTTPS)"| authz
+    authz -->|"access token, refresh token"| app
+    app -->|"requests with access token (HTTPS)"| rewards
+    browser -->|"sign-in, consent (HTTPS)"| authz
+    browser -->|"redirect with authorization code"| papp
+    papp -->|"token requests (HTTPS)"| authz
+    papp -->|"requests with access token (HTTPS)"| rewards
+    authz <-->|"accounts, codes, tokens, consents"| iddb
+    rewards -->|public key download at start| authz
+    rewards <-->|"points, gift card redemptions"| ledger
+    rewards -->|"every request, with headers"| logs
+    authz -->|access tokens| support
+    support -->|close account| iddb

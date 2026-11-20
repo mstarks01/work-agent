@@ -2,12 +2,17 @@
 
 The pre-merge review reads a diff against the five defect classes of
 ``docs/agents/code-review.md`` and puts the result in the pull request body,
-under the heading :data:`HEADING`, with one entry for each class.
+under the heading :data:`HEADING`, with one entry for each class. The author
+also reads the classes that come back in fixes before the code exists. The
+author puts the answers under the heading :data:`BEFORE_HEADING`, with one
+entry for each class of :data:`RECURRING`.
 ``.github/workflows/five-class.yml`` runs this over each pull request.
 
 A change to a module that decides what a prompt says the code does also needs
 a prompt read: the heading :data:`PROMPT_HEADING`, with one entry for each
-prompt that the table :data:`TABLE` pairs with the module.
+prompt that the table :data:`TABLE` pairs with the module. A change to a file
+with a row in the table :data:`HELD` names each held phrase of that file in
+the same section.
 
     five_class_read.py <base sha> <head sha>   reads the body from PR_BODY
 """
@@ -23,24 +28,41 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
 
 HEADING = "## Five-class read"
 
 #: The five defect classes, as the class table of ``docs/agents/code-review.md``
 #: names them, in its order.
-CLASSES = (
+DefectClass = Literal[
     "One rule, two readers",
     "A table with a hole",
     "A shape not listed",
     "A bound predicted, not measured",
     "A fact with no reader",
-)
+]
+CLASSES: tuple[DefectClass, ...] = get_args(DefectClass)
+
+BEFORE_HEADING = "## Before the code"
+
+#: A class that comes back in fixes, as the table "The classes that come back
+#: in fixes" of ``docs/agents/code-review.md`` names it.
+RecurringClass = Literal[
+    "A second reader",
+    "A claim with no guard",
+    "A closed set with no `Literal`",
+    "A default only a test omits",
+    "A type that says the wrong thing",
+    "A name for the wrong thing",
+]
+
+#: Each class that comes back in fixes, in the order of its table.
+RECURRING: tuple[RecurringClass, ...] = get_args(RecurringClass)
 
 #: The paths that hold code or model content, as ``fnmatch`` patterns, where
 #: ``*`` also matches ``/``. ``tests/`` is one: the lints and gates live there,
-#: and a test can pass on broken code (#1824). ``config/`` and ``domains/`` are
-#: read by the analysis, and each path that a live workflow sweeps must be one
+#: and a test can pass on broken code (#1824). ``config/``, ``domains/`` and
+#: ``diagram_reader/`` are read by the analysis, and each path that a live workflow sweeps must be one
 #: (``tests/test_five_class_read.py`` holds them together). A change to any
 #: other path, such as a doc or a ledger row, needs no five-class read.
 CODE_PATHS = (
@@ -52,6 +74,7 @@ CODE_PATHS = (
     "frameworks/*",
     "domains/*",
     "config/*",
+    "diagram_reader/*",
     "tests/*",
     ".githooks/*",
     ".github/workflows/*",
@@ -64,14 +87,34 @@ PROMPT_HEADING = "## Prompt read"
 
 #: The table that pairs each prompt with the modules that decide what it says,
 #: beside this script. :func:`main` reads the base branch's copy, as the
-#: workflow runs the base branch's copy of this script, and falls back to this
-#: one where the base holds none.
+#: workflow runs the base branch's copy of this script.
 TABLE = Path(__file__).with_name("prompt_outcomes.toml")
 
 #: The placeholder in a module pattern or a prompt path that stands for a
 #: framework package's directory name. A changed path fills it, so a package
 #: that lands later is paired with its own text with no edit to the table.
 PACKAGE = "{package}"
+
+#: The table of held wording in model text, beside this script. :func:`main`
+#: reads the base branch's copy, as it does for :data:`TABLE`.
+HELD = Path(__file__).with_name("held_wording.toml")
+
+#: A rule that a held row may name.
+HeldRule = Literal["spend", "money", "element-term", "boundary-term"]
+
+#: Each rule a held row may name, against what the rule is.
+RULES: dict[HeldRule, str] = {
+    "spend": "the SPEND lint of tests/test_history_prose_lints.py",
+    "money": "the MONEY lint of tests/test_history_prose_lints.py",
+    "element-term": (
+        "the GLOSSARY.md Element entry: code and model text say element, and"
+        " only page copy says part"
+    ),
+    "boundary-term": (
+        "the GLOSSARY.md Boundary Crossing entry: an undecidable crossing does"
+        " not establish that a flow crosses a boundary"
+    ),
+}
 
 
 def readers(table: Mapping[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -123,6 +166,12 @@ def prompts_to_read(
     )
 
 
+def held_phrases(paths: Iterable[str], table: Mapping[str, Any]) -> list[str]:
+    """Each phrase that a held row of ``table`` holds in a file in ``paths``."""
+    changed = set(paths)
+    return [row["phrase"] for row in table.get("held", ()) if row["file"] in changed]
+
+
 #: An HTML comment, closed or open to the end of the body. GitHub does not
 #: render it.
 _COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.DOTALL)
@@ -144,7 +193,9 @@ def rendered(body: str) -> list[str]:
     fenced code block."""
     lines = []
     fence = None
-    for line in _COMMENT.sub("", body.replace("\r\n", "\n")).split("\n"):
+    # CommonMark ends a line at "\n", "\r\n" or "\r", and at nothing else.
+    text = body.replace("\r\n", "\n").replace("\r", "\n")
+    for line in _COMMENT.sub("", text).split("\n"):
         opener = _FENCE.match(line)
         if fence is None and opener:
             fence = opener.group(1)
@@ -178,14 +229,15 @@ def missing(
     """What the body lacks: the heading, each name its section does not name,
     and each name with no text between it and the next entry.
 
-    Asterisks are dropped from the section and from each name, because
-    Markdown uses them for bold text and a prompt path uses them for a glob.
+    Asterisks and backticks are dropped from the section and from each name,
+    because Markdown uses them for bold text and for code, and a prompt path
+    uses an asterisk for a glob.
     """
     names = tuple(names)
     text = section(body, heading)
     if text is None:
         return [heading]
-    folded = " ".join(text.replace("*", "").casefold().split())
+    folded = " ".join(_folded(text).split())
     found = sorted(
         (folded.find(_folded(name)), name) for name in names if _folded(name) in folded
     )
@@ -205,9 +257,10 @@ def missing(
     ]
 
 
-def _folded(name: str) -> str:
-    """``name`` as :func:`missing` searches the section for it."""
-    return name.replace("*", "").casefold()
+def _folded(text: str) -> str:
+    """``text`` with no asterisk and no backtick, casefolded, as :func:`missing`
+    compares a section and a name."""
+    return text.replace("*", "").replace("`", "").casefold()
 
 
 def changed_paths(base: str, head: str) -> list[str]:
@@ -222,16 +275,22 @@ def changed_paths(base: str, head: str) -> list[str]:
     return [path for path in listed.split("\0") if path]
 
 
-def table_text(base: str) -> str:
-    """The text of :data:`TABLE` at ``base``, or of this script's own copy where
-    ``base`` holds none."""
+def table_text(base: str, table: Path) -> str:
+    """The text of ``table`` at ``base``. A base that holds no copy stops the
+    check with an error that names the table."""
+    path = f".github/scripts/{table.name}"
     shown = subprocess.run(
-        ["git", "show", f"{base}:.github/scripts/{TABLE.name}"],
+        ["git", "show", f"{base}:{path}"],
         capture_output=True,
         text=True,
         check=False,
     )
-    return shown.stdout if shown.returncode == 0 else TABLE.read_text(encoding="utf-8")
+    if shown.returncode:
+        raise SystemExit(
+            f"The base commit {base} holds no {path}, so the check"
+            f" cannot read it: {shown.stderr.strip()}"
+        )
+    return shown.stdout
 
 
 def main(argv: list[str]) -> int:
@@ -254,19 +313,36 @@ def main(argv: list[str]) -> int:
         status = 1
     else:
         print("The body holds a five-class read.")
-    prompts = prompts_to_read(paths, readers(tomllib.loads(table_text(base))))
-    unread = missing(body, PROMPT_HEADING, prompts) if prompts else []
-    if unread:
+    unasked = missing(body, BEFORE_HEADING, RECURRING)
+    if unasked:
         print(
-            "The pull request changes a module that decides what a prompt says,"
-            " and its body lacks: "
-            + "; ".join(unread)
-            + f". Add a {PROMPT_HEADING!r} section with one entry for each of"
-            f" {', '.join(prompts)}.",
+            "The pull request changes a code path, and its body lacks: "
+            + "; ".join(unasked)
+            + f". Add a {BEFORE_HEADING!r} section with one entry for each class"
+            ' of "The classes that come back in fixes" in'
+            " docs/agents/code-review.md: the search you ran and its result.",
             file=sys.stderr,
         )
         status = 1
-    elif prompts:
+    else:
+        print("The body holds the step before the code.")
+    to_read = prompts_to_read(
+        paths, readers(tomllib.loads(table_text(base, TABLE)))
+    ) + held_phrases(paths, tomllib.loads(table_text(base, HELD)))
+    unread = missing(body, PROMPT_HEADING, to_read) if to_read else []
+    if unread:
+        print(
+            "The pull request changes a module that decides what a prompt says,"
+            " or a file with held wording, and its body lacks: "
+            + "; ".join(unread)
+            + f". Add a {PROMPT_HEADING!r} section with one entry for each of"
+            f" {', '.join(to_read)}. The entry for a held phrase says what the"
+            " pull request did with it: changed it by a measured change, with"
+            f" the ledger row, or kept it ({HELD.name}).",
+            file=sys.stderr,
+        )
+        status = 1
+    elif to_read:
         print("The body holds a prompt read.")
     return status
 

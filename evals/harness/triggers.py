@@ -49,21 +49,29 @@ which is why it can gate on every pull request while the LLM metrics cannot.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from analysis_service.candidates import generate_candidates
+from analysis_service.candidates import CandidateSet, generate_candidates
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
+from analysis_service.graph import FrameworkNodes, LaneInputs, framework_lane_inputs
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.provenance import REPO_ROOT
+from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
 
 __all__ = [
     "CaseTriggerRecall",
     "TriggerHit",
+    "archived_lead_rules",
     "by_framework",
     "case_trigger_recall",
     "corpus_recall",
+    "lead_rules",
+    "rebuilt_lane_inputs",
 ]
 
 
@@ -178,29 +186,70 @@ def _hit(
     # meaningful inside that package.
     package = package_for(framework)
     fired = generate_candidates(model, package.lanes, package.rules).get(reference.lane)
-    targets = set(reference.affected_element_ids)
-    rule_ids: tuple[str, ...] = ()
-    if fired is not None:
-        rule_ids = tuple(
-            sorted(
-                {
-                    candidate.rule_id
-                    for candidate in fired.candidates
-                    if targets & set(candidate.element_ids)
-                }
-            )
-        )
     return TriggerHit(
         claim=reference.claim,
         framework=framework,
         lane=reference.lane,
         tier=reference.tier,
         element_ids=reference.affected_element_ids,
-        rule_ids=rule_ids,
+        rule_ids=lead_rules(fired, reference.affected_element_ids),
     )
 
 
-def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int]:
+def rebuilt_lane_inputs(
+    framework: FrameworkName, report: Report, options: Mapping[str, object]
+) -> LaneInputs:
+    """What each lane is given, as today's code writes it for an archived run.
+
+    The model and the catalog are the run's own, from ``report``, and
+    ``options`` are the case's. The inputs come from
+    :func:`~analysis_service.graph.framework_lane_inputs`, the reader of what a
+    lane is given. A report with no assertion record passes no catalog, as a
+    job with no assertion pass does.
+    """
+    return framework_lane_inputs(
+        FrameworkNodes(framework),
+        report.system_model,
+        options,
+        report.assertions.catalog if report.assertions else None,
+        MarkdownLoader(REPO_ROOT / "frameworks" / framework),
+    )
+
+
+def archived_lead_rules(
+    fired: CandidateSet | None, targets: Iterable[str], archived: Iterable[str]
+) -> tuple[str, ...]:
+    """The :func:`lead_rules` of ``fired`` that the archived run also fired.
+
+    ``archived`` is the run's ``fired_rules``. That record holds rule IDs only,
+    so today's rule code over the run's own model says which elements each
+    rule fired on, and the record says whether the run fired it at all.
+    """
+    held = set(archived)
+    return tuple(rule for rule in lead_rules(fired, targets) if rule in held)
+
+
+def lead_rules(fired: CandidateSet | None, targets: Iterable[str]) -> tuple[str, ...]:
+    """The rules of ``fired`` with a candidate on any element of ``targets``, sorted.
+
+    The lane plus element overlap that :func:`_hit` matches on. ``None`` is a
+    lane the package does not declare, which leads nowhere.
+    """
+    if fired is None:
+        return ()
+    held = set(targets)
+    return tuple(
+        sorted(
+            {
+                candidate.rule_id
+                for candidate in fired.candidates
+                if held & set(candidate.element_ids)
+            }
+        )
+    )
+
+
+def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int | None]:
     """Totals over the results given, for a report line or a CI threshold.
 
     **Filter to one framework before calling this.** Pooling two packages would
@@ -219,18 +268,16 @@ def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int]:
         # `overlap`, never `recall`. The numerator counts claims whose lane
         # fired a rule on an element they name, which is not the same fact as
         # the claim being recognised -- see this module's opening.
-        "overlap": round(triggered / total, 4) if total else 0.0,
+        "overlap": rounded_figure(ratio(triggered, total), 4),
         "must_find_references": must_total,
         "must_find_triggered": must_triggered,
-        "must_find_overlap": round(must_triggered / must_total, 4)
-        if must_total
-        else 0.0,
+        "must_find_overlap": rounded_figure(ratio(must_triggered, must_total), 4),
     }
 
 
 def by_framework(
     results: Sequence[CaseTriggerRecall],
-) -> dict[FrameworkName, dict[str, float | int]]:
+) -> dict[FrameworkName, dict[str, float | int | None]]:
     """One :func:`summarize` per framework the results carry."""
     frameworks = sorted({result.framework for result in results})
     return {

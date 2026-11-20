@@ -56,6 +56,7 @@ from analysis_service.graph import (
 from analysis_service.grounding import verify_quote
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
+from analysis_service.sources import Source
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     UNKNOWN,
@@ -67,6 +68,7 @@ from analysis_service.system_model import (
     normalize_element_ids,
 )
 from analysis_service.validation import validate
+from tests.eval_factories import ruled_position
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     EVAL_MODEL,
@@ -143,6 +145,9 @@ def scripted_proposal(case, category) -> dict:
         # Taken from the reference the scripted draft is standing in for, so a
         # mode test grades the pipeline rather than this file's verb-picking.
         "verb": reference.verb,
+        # The position the case ruled on that reference, for the same reason;
+        # a lane must state one, so an unruled reference takes ``outside``.
+        "attacker_position": ruled_position(case, reference) or "outside",
         "evidence_refs": reaching_refs(case, reference.affected_element_ids),
         "severity": Severity(
             likelihood=reference.severity.likelihood,
@@ -347,8 +352,8 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     purpose: every field an :class:`~analysis_service.graph.Analysis` and a
     :class:`~analysis_service.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
-    is exactly how ``coverage`` came to be computed at the fan-in for a sweep
-    that then read an empty list for it.
+    can be computed at the fan-in for a sweep that then reads an empty list
+    for it.
 
     The marks are pinned through
     :class:`~analysis_service.claims.AnalysisMarks`, which is the one field
@@ -914,7 +919,7 @@ def test_an_extraction_that_produced_nothing_compares_no_attributes(case):
     score = score_of(case, None)
 
     assert score.attributes == ()
-    assert score.scored_field_agreement == 0.0
+    assert score.scored_field_agreement is None
     assert score.crossings_match is False
 
 
@@ -1235,9 +1240,9 @@ class TestTheEndpointReadingOfAnExtraction:
 
         assert s.recall == s.endpoint_recall
 
-    def test_an_empty_score_reads_zero_on_both(self):
-        assert self.score().recall == 0.0
-        assert self.score().endpoint_recall == 0.0
+    def test_an_empty_score_reads_unavailable_on_both(self):
+        assert self.score().recall is None
+        assert self.score().endpoint_recall is None
 
 
 class TestTheNameFreeReadingOfCrossings:
@@ -1290,9 +1295,9 @@ class TestTheNameFreeReadingOfCrossings:
         assert s.crossings_derivable is False
         assert s.crossings_recall == 0.0
 
-    def test_a_case_with_no_blessed_crossing_reads_zero(self):
-        """No denominator, so no rate — never a silent 1.0."""
-        assert self.score(blessed=(), extracted=()).crossings_recall == 0.0
+    def test_a_case_with_no_blessed_crossing_reads_unavailable(self):
+        """No denominator, so no rate: never a silent 1.0 and never a 0.0."""
+        assert self.score(blessed=(), extracted=()).crossings_recall is None
 
     def test_the_flow_label_is_folded_here_too(self):
         """Keyed by ``_endpoint_key``, so #293's fold reaches crossings.
@@ -1430,7 +1435,7 @@ class TestTheInitiatorReadingOfAnExtraction:
         assert score.initiator_recall == 0.5
         assert score.initiators_missing == frozenset({"process:store-server"})
 
-    def test_a_case_with_no_initiator_reads_zero(self):
+    def test_a_case_with_no_initiator_reads_unavailable(self):
         """An empty denominator is never a silent 1.00, as everywhere else here."""
         score = modes.ExtractionScore(
             case_id="x",
@@ -1441,7 +1446,7 @@ class TestTheInitiatorReadingOfAnExtraction:
             attributes=(),
         )
 
-        assert score.initiator_recall == 0.0
+        assert score.initiator_recall is None
 
     def test_every_corpus_case_has_an_initiator_to_measure(self):
         """Guards the guard: a metric with no denominator anywhere measures nothing."""
@@ -1859,8 +1864,23 @@ def test_extraction_mode_checks_excerpts_against_the_sources(case):
     assert result.issues[0].element_id == case.model.processes[0].id
 
 
+def test_extraction_mode_holds_the_model_to_each_diagram_s_structure(case):
+    """The diagram half of the gate runs here as it runs in a job (ADR 0121):
+    a node the extraction does not model is an issue on the score."""
+    diagram = Source(
+        kind="diagram",
+        label="Diagram",
+        text="flowchart LR\n  a[Payment Gateway] --> b[Ledger]\n",
+    )
+    drawn = replace(case, sources=(*case.sources, diagram))
+
+    result = _extraction_of(drawn, case.model)
+
+    assert [issue.code for issue in result.issues] == ["diagram-node-missing"] * 2
+
+
 def test_a_faithful_extraction_still_passes_the_citation_check(case):
-    """The positive control: the blessed model quotes its own sources correctly.
+    """The positive check: the blessed model quotes its own sources correctly.
 
     Without this, a citation check that raised on everything would look exactly
     like one that works.
@@ -2323,7 +2343,7 @@ class TestThePartitionFigureIsReadThreeWays:
 
         score = self.score(case, model)
 
-        assert score.same_zone_recall == 0.0
+        assert score.same_zone_recall is None
         assert score.zone_pair_coverage == 0.0
         assert score.zone_pairs is not None
         assert score.zone_pairs.compared == 0
@@ -2362,14 +2382,14 @@ class TestThePartitionFigureIsReadThreeWays:
         assert payload["different_zone_agreement"] == 1.0
         assert payload["zone_pair_coverage"] == 1.0
 
-    def test_no_extraction_reads_zero_on_every_reading(self):
+    def test_no_extraction_reads_unavailable_on_every_reading(self):
         score = modes.ExtractionScore("x", (), (), (), False, ())
 
         assert score.zone_pairs is None
-        assert score.zone_partition_agreement == 0.0
-        assert score.same_zone_recall == 0.0
-        assert score.different_zone_agreement == 0.0
-        assert score.zone_pair_coverage == 0.0
+        assert score.zone_partition_agreement is None
+        assert score.same_zone_recall is None
+        assert score.different_zone_agreement is None
+        assert score.zone_pair_coverage is None
 
 
 class TestWhatNoFigureHereReaches:
@@ -2520,7 +2540,7 @@ class TestAStateAgreementIsJoinedToItsBasis:
         assert score.to_json()["state_agrees_unbased"] == score.state_agrees_unbased
 
     def test_the_blessed_model_charges_nothing(self):
-        """A positive control: the reference agrees with itself and is based."""
+        """A positive check: the reference agrees with itself and is based."""
         for case in load_corpus(CORPUS):
             score = self._score(case, case.model)
 

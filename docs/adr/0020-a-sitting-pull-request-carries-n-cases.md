@@ -66,7 +66,8 @@ edit. The reader pays for a rule that no record ever justified.
 unfinished work, and the working tree is the wrong place for it: an own list in the tree is
 a file the reader can commit, and an own list that reaches a pull request before the reader
 signs it destroys the evidence the method rests on. So a **Draft Sitting** lives at
-`~/.local/state/work-agent/sittings/<login>/<case-id>.json`, it is never committed, and it
+`$XDG_STATE_HOME/work-agent/sittings/<login>/<case-id>.json` (`~/.local/state` where
+`XDG_STATE_HOME` is unset), it is never committed, and it
 cannot reach a pull request.
 [Issue #370](https://github.com/mstarks01/work-agent/issues/370) holds its shape.
 

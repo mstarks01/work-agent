@@ -91,6 +91,13 @@ def node_call(
     return call
 
 
+def spent_line(spent: list[float | None]) -> str:
+    """The line a replay prints of what its calls cost, as the provider reported."""
+    charged = [charge for charge in spent if charge is not None]
+    missing = "" if len(charged) == len(spent) else "; the provider reported no charge"
+    return f"spent: ${sum(charged):.4f} reported{missing}"
+
+
 def answer_text(response: LlmResponse) -> str:
     """The text of a response's answer parts, without its thought parts.
 

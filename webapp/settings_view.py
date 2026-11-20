@@ -32,16 +32,19 @@ withheld.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Literal, get_args
+from types import MappingProxyType
+from typing import Any, Literal, TypedDict, get_args
 
 from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import (
+    MAX_VALUE_CHARS,
     SETTINGS_FILE,
     SettingsFileError,
     SettingsLine,
+    data_dir,
     read_settings,
     read_toml,
     settings_dir,
@@ -60,14 +63,18 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     upstreams_env_var_for,
 )
-from analysis_service.objects import object_reads
+from analysis_service.objects import OBJECT_ROOT_VAR, OBJECT_STORE_VAR, object_reads
 from analysis_service.sampling import ReasoningEffort
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import (
     CLOSED_SETTINGS,
     JOB_STORE_VAR,
     JOB_STORES,
+    MAX_RETENTION_DAYS,
+    MIN_RETENTION_DAYS,
     RETENTION_DAYS_VAR,
+    JobStore,
+    build_store,
     job_store_name,
 )
 from analysis_service.store_backends import (
@@ -90,22 +97,86 @@ from webapp.settings_page import (
     tier_setting_key,
 )
 
-#: The value of each store setting that this app gives where no source sets
-#: it: a first run keeps its jobs in memory.
-STORE_DEFAULTS = {JOB_STORE_VAR: "memory"}
-
 #: Where a row's value comes from. ``refused`` is a file the loader refuses,
 #: which a row shows in place of a value. ``settings.js`` shows each one.
 ValueOrigin = Literal["process", "page", "file", "refused", "default"]
 
+#: The words ``settings.js`` shows for each source. A value from a file shows
+#: the path of the file in their place.
+ORIGIN_WORDS: Mapping[ValueOrigin, str | None] = MappingProxyType(
+    {
+        "process": "process environment",
+        "page": "this page",
+        "file": None,
+        "refused": "refused",
+        "default": "default",
+    }
+)
 
-def with_store_defaults(env: Mapping[str, str]) -> dict[str, str]:
-    """``env`` over :data:`STORE_DEFAULTS`: the settings that this app's store
-    is built from.
+#: The numbers a numeric row takes. ``settings.js`` checks each one.
+Numeric = Literal["integer", "decimal"]
+
+
+def store_defaults(env: Mapping[str, str]) -> dict[str, str]:
+    """The value of each store setting that this app gives where ``env`` sets
+    none (ADR 0111).
+
+    A first run keeps its jobs in a ``sql`` store on SQLite, with a
+    ``filesystem`` object root, both in the :func:`data_dir`. A default
+    applies only where ``env`` selects the row that reads it, so the app never
+    gives a setting that the selected rows refuse.
 
     **The one reader of the app's store defaults.**
     """
-    return {**STORE_DEFAULTS, **env}
+    directory = data_dir(env)
+    chosen = dict(env)
+    chosen.setdefault(JOB_STORE_VAR, "sql")
+    if chosen[JOB_STORE_VAR] == "sql":
+        chosen.setdefault(DATABASE_URL_VAR, _default_database(directory))
+        chosen.setdefault(OBJECT_STORE_VAR, "filesystem")
+        if chosen[OBJECT_STORE_VAR] == "filesystem":
+            chosen.setdefault(OBJECT_ROOT_VAR, str(_default_root(directory)))
+    return {var: value for var, value in chosen.items() if var not in env}
+
+
+def _default_database(directory: Path) -> str:
+    return f"sqlite+aiosqlite:///{directory / 'jobs.db'}"
+
+
+def _default_root(directory: Path) -> Path:
+    return directory / "objects"
+
+
+def with_store_defaults(env: Mapping[str, str]) -> dict[str, str]:
+    """``env`` over :func:`store_defaults`: the settings that this app's store
+    is built from."""
+    return {**store_defaults(env), **env}
+
+
+def build_app_store(env: Mapping[str, str]) -> JobStore:
+    """The job store of this app, from ``env`` over its defaults.
+
+    **The one builder of this app's store**, at its startup and in the check
+    of a Settings save. Where the store uses the default data directory or
+    object root, it makes each one that does not exist with mode ``0700``,
+    and a directory that it cannot make stops the startup with a
+    :class:`StoreConfigError`. Then it builds the store with its first-run
+    step (ADR 0110, ADR 0111).
+    """
+    store_env = with_store_defaults(env)
+    directory = data_dir(env)
+    root = _default_root(directory)
+    in_root = store_env.get(OBJECT_ROOT_VAR) == str(root)
+    try:
+        if in_root or store_env.get(DATABASE_URL_VAR) == _default_database(directory):
+            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if in_root:
+            root.mkdir(mode=0o700, exist_ok=True)
+    except OSError as exc:
+        raise StoreConfigError(
+            f"the app cannot make its data directory {directory}: {exc.strerror}"
+        ) from None
+    return build_store(store_env, first_run=True)
 
 
 def settings_view(
@@ -124,7 +195,7 @@ def settings_view(
     merged = _merged(process_env, page, {})
     files = _Files(merged)
     values = {
-        key: _value(setting, process_env, page, files)
+        key: _value(setting, process_env, page, files, store_defaults(merged))
         for key, setting in SETTINGS.items()
     }
     owners = _vendor_rows()
@@ -143,7 +214,8 @@ def settings_view(
             "mark": setting.mark,
             "reason": setting.reason,
             "note": setting.note,
-            "restart": var in stores,
+            # A store setting decides which store rows show, and it takes
+            # effect after a restart.
             "store": var in stores,
             "example": EXAMPLES.get(key),
             **_CONTROLS.get(key, {}),
@@ -163,6 +235,8 @@ def settings_view(
             if var not in page
         ],
         "rows": rows,
+        # The longest value the value rule and the secret rule take.
+        "value_chars": MAX_VALUE_CHARS,
         "store_shown": _store_keys(merged),
         "modes": {
             vendor: [mode.value for mode in VENDORS[vendor].credential_modes]
@@ -240,7 +314,26 @@ def _store_keys(merged: Mapping[str, str]) -> list[str]:
     return [key for key, setting in SETTINGS.items() if setting.variable in shown]
 
 
-def _controls() -> dict[str, dict[str, Any]]:
+def _numeric(parser: Callable[[str], float]) -> Numeric:
+    return "integer" if parser is int else "decimal"
+
+
+class NumericEntry(TypedDict):
+    """A numeric setting's control: its kind and the range the loader takes.
+    ``above`` is an exclusive floor."""
+
+    numeric: Numeric
+    min: float | None
+    above: float | None
+    max: float | None
+
+
+def _resilience_entry(field: str, parser: Callable[[str], float]) -> NumericEntry:
+    least, above, most = resilience.numeric_bounds(field)
+    return {"numeric": _numeric(parser), "min": least, "above": above, "max": most}
+
+
+def _controls() -> dict[str, Mapping[str, object]]:
     """The closed set of each Deployment Setting whose loader holds one, from
     that loader's table, so the page offers a choice in place of free text.
     ``multiple`` marks a list of names separated by commas. A tier's model row
@@ -269,11 +362,16 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in CLOSED_SETTINGS
         },
     }
-    numeric = {
-        f"resilience.{field}": {"numeric": "integer" if parser is int else "decimal"}
+    numeric: dict[str, NumericEntry] = {
+        f"resilience.{field}": _resilience_entry(field, parser)
         for field, (_, parser) in resilience.ENV_OVERRIDES.items()
     }
-    numeric["store.retention_days"] = {"numeric": "integer"}
+    numeric["store.retention_days"] = {
+        "numeric": "integer",
+        "min": MIN_RETENTION_DAYS,
+        "above": None,
+        "max": MAX_RETENTION_DAYS,
+    }
     return {
         **numeric,
         **{
@@ -339,19 +437,21 @@ def _value(
     process_env: Mapping[str, str],
     page: Mapping[str, SettingsLine],
     files: _Files,
+    defaults: Mapping[str, str],
 ) -> dict[str, Any]:
     """The value of one setting and its source, with the shipped value where
-    ``settings.env`` sets it."""
+    ``settings.env`` sets it. ``defaults`` are the store defaults of the
+    settings as merged."""
     var = setting.variable
     if var is not None and var in process_env:
         return _sourced("process", _withheld(process_env[var]), variable=var)
-    base = _base(setting, files)
+    base = _base(setting, files, defaults)
     if var is not None and var in page:
         return _sourced("page", _withheld(page[var].value), shipped=base["value"])
     return base
 
 
-def _base(setting: Setting, files: _Files) -> dict:
+def _base(setting: Setting, files: _Files, defaults: Mapping[str, str]) -> dict:
     """The value of a setting with no override: from its TOML file, else the
     default, else ``None``. Where the loader refuses the file, the value is the
     refusal."""
@@ -367,7 +467,7 @@ def _base(setting: Setting, files: _Files) -> dict:
     if var in PASS_FLAGS:
         default = _override_form(PASS_FLAGS[var])
     elif var is not None:
-        default = STORE_DEFAULTS.get(var)
+        default = defaults.get(var)
     return _sourced("default", default)
 
 
@@ -375,7 +475,12 @@ def _sourced(
     source: ValueOrigin, value: str | None, **detail: str | None
 ) -> dict[str, Any]:
     """A row's value, where it comes from, and the detail that source shows."""
-    return {"value": value, "source": source, **detail}
+    return {
+        "value": value,
+        "source": source,
+        "source_text": ORIGIN_WORDS[source],
+        **detail,
+    }
 
 
 def _override_form(value: object) -> str:

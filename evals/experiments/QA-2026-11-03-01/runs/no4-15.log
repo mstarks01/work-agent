@@ -1,0 +1,18 @@
+material from today's prepare, catalog none; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Unauthenticated invoice-number links disclose payer invoice details | ['flow:entity:payer>process:billing-app>open-payment-page', 'process:billing-app']
+- A customer user may elicit another tenant's invoices if ownership checks are absent | ['flow:entity:company-user>process:billing-app>manage-invoices', 'process:billing-app']
+- Arbitrary PDF requests can disclose cross-tenant invoice PDFs | ['process:billing-app', 'flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'store:pdf-bucket']
+- A storage copy of the tenant database exposes all companies if encryption at rest is absent | ['store:tenant-database']
+- A storage copy of the PDF bucket exposes invoice records if encryption at rest is absent | ['store:pdf-bucket']
+- A render-queue storage copy can reveal invoice identifiers if encryption at rest is absent | ['store:render-queue']
+- An on-path observer may read billing-app database traffic if transport encryption is absent | ['flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'process:billing-app', 'store:tenant-database']
+- An on-path observer may read renderer database traffic if transport encryption is absent | ['flow:process:pdf-renderer>store:tenant-database>read-invoice', 'process:pdf-renderer', 'store:tenant-database']
+- Unverified render-job transport can expose invoice identifiers | ['flow:process:billing-app>store:render-queue>queue-render-job', 'flow:process:pdf-renderer>store:render-queue>take-render-jobs', 'store:render-queue']
+- An on-path observer may read invoice PDFs while the renderer writes them | ['flow:process:pdf-renderer>store:pdf-bucket>write-pdf', 'process:pdf-renderer', 'store:pdf-bucket']
+- An on-path observer may read invoice PDFs fetched by the billing app | ['flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'process:billing-app', 'store:pdf-bucket']
+- An on-path observer may capture support-agent credentials | ['flow:entity:support-agent>process:admin-console>use-admin-console', 'entity:support-agent', 'process:admin-console']
+- An on-path observer may capture customer sessions issued by the admin console | ['flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:admin-console', 'process:billing-app']
+- A compromised billing app can read the entire tenant database through its shared account | ['process:billing-app', 'flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'store:tenant-database']
+- A compromised billing app can read every tenant's PDFs through the shared bucket credential | ['process:billing-app', 'flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'store:pdf-bucket']
+spent: $0.0727 reported
+must-finds matched: [5, 6]

@@ -72,7 +72,7 @@ function askStoreRows() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ changes: sent }),
   })
-    .then((response) => (response.ok ? response.json() : null))
+    .then((response) => (response.ok ? jsonOf(response) : null))
     .then((payload) => {
       if (asked !== storeAsked || !payload) return;
       storeShown = new Set(payload.shown);
@@ -113,7 +113,10 @@ function change(row, value) {
 
 function textControl(row) {
   const placeholder = row.example ? `e.g. ${row.example}` : "Not set";
-  const attrs = { type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder };
+  const attrs = {
+    type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder,
+    maxlength: String(SETTINGS.value_chars),
+  };
   if (suggests(row)) attrs.list = `models-${suggests(row)}`;
   const input = h("input", attrs);
   input.addEventListener("input", () => change(row, input.value));
@@ -125,12 +128,27 @@ function textControl(row) {
   return input;
 }
 
+// The server states each bound, and the save refuses a value outside it.
+// A row has an inclusive floor (min), an exclusive floor (above) or neither.
+function rangeError(row, number) {
+  const low = row.min ?? -Infinity;
+  const high = row.max ?? Infinity;
+  const aboveFloor = row.above == null || number > row.above;
+  if (number >= low && number <= high && aboveFloor) return null;
+  if (row.above != null) {
+    return `Enter a number over ${row.above.toLocaleString()} and up to ${row.max.toLocaleString()}.`;
+  }
+  if (row.min == null) return `Enter a number of ${row.max.toLocaleString()} or less.`;
+  return `Enter a number from ${row.min.toLocaleString()} to ${row.max.toLocaleString()}.`;
+}
+
 function numberError(row, value) {
   if (row.numeric === "integer") {
     return /^-?\d+$/.test(value) && Number.isSafeInteger(Number(value))
-      ? null : "Enter a whole number.";
+      ? rangeError(row, Number(value)) : "Enter a whole number.";
   }
-  return value !== "" && Number.isFinite(Number(value)) ? null : "Enter a number.";
+  return value !== "" && Number.isFinite(Number(value))
+    ? rangeError(row, Number(value)) : "Enter a number.";
 }
 
 function markNumber(row, input, note) {
@@ -149,6 +167,8 @@ function numberControl(row) {
     inputmode: row.numeric === "integer" ? "numeric" : "decimal",
     step: row.numeric === "integer" ? "1" : "any",
   };
+  if (row.min != null) attrs.min = String(row.min);
+  if (row.max != null) attrs.max = String(row.max);
   if (row.example) attrs.placeholder = `e.g. ${row.example}`;
   const input = h("input", attrs);
   const note = h("small", { class: "field-error", id: `error-${row.key.replaceAll(".", "-")}` });
@@ -246,6 +266,7 @@ function keyControl(row) {
     type: "password",
     "aria-label": row.label,
     autocomplete: "off",
+    maxlength: String(SETTINGS.value_chars),
     placeholder: row.key_saved ? "Type a key to replace the saved key" : "Type the key",
   });
   input.value = changes.get(row.key) ?? "";
@@ -299,20 +320,21 @@ function notes(row) {
     resetButton(row),
     modelNote(row),
     thinkingNote(row),
-    row.restart ? hint("Takes effect after a restart.") : null,
+    row.store ? hint("Takes effect after a restart.") : null,
     row.mark === "shows" ? hint(`Shown only. ${row.reason}`) : null,
     row.note ? hint(row.note) : null,
     row.source === "process" ? hint("Unset the variable to change this here.") : null,
   ];
 }
 
-// One entry for each source that settings_view.ValueOrigin names.
+// One entry for each source that settings_view.ValueOrigin names. The words
+// of a source come with its row (settings_view.ORIGIN_WORDS).
 const sources = {
-  "process": (row) => [h("span", { class: "tag outside" }, "process environment"), hint(h("code", {}, row.variable))],
-  "page": () => h("span", { class: "tag" }, "this page"),
+  "process": (row) => [h("span", { class: "tag outside" }, row.source_text), hint(h("code", {}, row.variable))],
+  "page": (row) => h("span", { class: "tag" }, row.source_text),
   "file": (row) => h("code", {}, row.file),
-  "refused": (row) => [h("span", { class: "tag outside" }, "refused"), hint(h("code", {}, row.refusal))],
-  "default": () => h("span", { class: "tag" }, "default"),
+  "refused": (row) => [h("span", { class: "tag outside" }, row.source_text), hint(h("code", {}, row.refusal))],
+  "default": (row) => h("span", { class: "tag" }, row.source_text),
 };
 
 function source(row) {
@@ -488,7 +510,11 @@ async function save() {
       showErrors([{ message: "The app did not answer. Check that it runs, then try again." }]);
       return;
     }
-    const payload = await response.json().catch(() => ({}));
+    const payload = await jsonOf(response);
+    if (response.ok && !payload) {
+      showErrors([{ message: "The page could not read the answer of the app. Reload the page to see whether the save landed." }]);
+      return;
+    }
     if (response.ok) {
       SETTINGS = payload.settings;
       for (const key of sentChanges.keys()) changes.delete(key);
@@ -499,7 +525,7 @@ async function save() {
       showSaved(payload.restart);
       return;
     }
-    showErrors(payload.errors ?? [{ message: payload.message ?? `The save failed with status ${response.status}.` }]);
+    showErrors(payload?.errors ?? [{ message: payload?.message ?? `The save failed with status ${response.status}.` }]);
   } finally {
     saving = false;
     layout.inert = false;

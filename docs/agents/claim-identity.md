@@ -22,9 +22,9 @@ what?**
 | lane | the block, from the field its package's `id_rule` declares (`lane_field`) | v4, v5, v6 |
 | targets | `affected_element_ids`, endpoint-resolved | v4, v5, v6 |
 | scope | the case ID, which names the **System Model** the claim was reached in | v4, v5, v6 |
-| action verb, as written | `analysis_service.actions`, a closed set of 20 | v4 only |
+| action verb, as written | `analysis_service.actions`, a closed set of 21 | v4 only |
 | catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v5 only |
-| action verb, read through `evals.harness.verbs.EQUIVALENT` | `analysis_service.actions`, a closed set of 20 | v6 only |
+| action verb, read through `evals.harness.verbs.EQUIVALENT` | `analysis_service.actions`, a closed set of 21 | v6 only |
 
 `SUPPORTED_VERSIONS` in `evals/harness/fingerprint.py` holds the versions the
 code computes, and `EXTRA_COMPONENT` holds the part each version reads beside
@@ -65,24 +65,24 @@ the last colon gives a wrong label for a typed endpoint.
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
 of being wrong — false splits over the 169 labelled match pairs, false merges
-over the 92 scored candidate negatives, and 2 false merges over the 365
+over the 92 scored candidate negatives, and 8 false merges over the 484
 within-lane reference pairs:
 
-| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 365) |
+| Rule | False splits (of 169) | Candidate merges (of 92) | Reference merges (of 484) |
 |---|---|---|---|
 | equality | 72 | 20 | 5 |
-| endpoint subset | 12 | 69 | 42 |
-| **endpoint subset + verb** | **13** | **2** | **2** |
-| overlap | 3 | 66 | 58 |
-| endpoint overlap | 1 | 81 | 187 |
+| endpoint subset | 12 | 69 | 55 |
+| **endpoint subset + verb** | **15** | **2** | **8** |
+| overlap | 3 | 66 | 83 |
+| endpoint overlap | 1 | 81 | 225 |
 
 No element-only row is usable: the tightest loses 72 paraphrases and the loosest
-destroys 187 findings. **The verb row is the first one that is.**
+destroys 225 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
-`endpoint subset` merges 42 of 365 and looks survivable. On the candidate
+`endpoint subset` merges 55 of 484 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **69 of 92** — it is barely a
-rule. The verb takes that to 2, and it costs one split to do it — 12 becomes 13,
+rule. The verb takes that to 2, and the splits it adds are its cost — 12 becomes 15,
 which is the whole price in the first column. The candidate column rests on
 the element and verb assignments that
 [#511](https://github.com/mstarks01/work-agent/issues/511) gives the negative
@@ -116,7 +116,7 @@ Scored on the shared scoreboard, through `measure_agreement`:
 | Rule | Agreement with the recorded labels |
 |---|---|
 | `MechanicalIdentity` (element equality) | 169/261 = 64.8% |
-| `SubsetVerbIdentity` | **246/261 = 94.3%** |
+| `SubsetVerbIdentity` | **244/261 = 93.5%** |
 
 **This is an admission gate, not a quality statement.** It clears the 90% bar,
 and the bar exists to price a *candidate* rule — one nobody has measured, which
@@ -131,9 +131,13 @@ is the measurement #201's third bullet asks for: that the rule is not obviously
 worse than a model judge. It is not a claim about accuracy, and
 nothing downstream should quote it as one.
 
-**The two merges the verb does not break** are in `verbs.UNSEPARATED`, each
-with the reason. Neither is a gap in the vocabulary: one is a repudiation lane
-where no attacker acts so no verb applies, and one is a corpus wording gap.
+**The eight merges the verb does not break** are in `verbs.UNSEPARATED`, as
+five entries, each with the reason. In case 08, one is a repudiation lane where
+no attacker acts so no verb applies, and one is a corpus wording gap. In cases
+17 and 18, five pairs of `flood` findings share elements and exhaust different
+resources; the verb names the exhaustion, and no field names the resource. In
+case 17, two `read` findings reach the plan store, one directly and one through
+a tile-serving check that the source names no component for.
 Review 02 labels the disputed case-13 "writes"/"alters" pair `unclear` rather
 than forcing it to move either the rule or the score.
 
@@ -147,8 +151,8 @@ answered it: a direction is not available, and it would not pay if it were.
 **A direction is not a field.** `affected_element_ids` is a list whose order no
 rule reads, so a claim naming two processes says nothing about which way the
 attacker moves between them. Only a claim naming a **Data Flow** states a
-direction, through that flow's endpoints. 194 of the 285 corpus claims name
-exactly one flow; 9 name several and 82 name none, and neither of those yields
+direction, through that flow's endpoints. 252 of the 359 corpus claims name
+exactly one flow; 11 name several and 96 name none, and neither of those yields
 the single direction a comparison needs.
 
 #652's ruling rests on the priced reading below, not on one pair.
@@ -156,14 +160,14 @@ the single direction a comparison needs.
 **Neither reading of an absent direction is usable.** Both are priced over the
 labelled pairs the shipped rule merges today:
 
-| An absent direction read as | New false splits, of the 156 merged correctly | Candidate merges recovered, of 2 |
+| An absent direction read as | New false splits, of the 154 merged correctly | Candidate merges recovered, of 2 |
 |---|---:|---:|
 | a mismatch | 71 | 1 |
 | a wildcard | 0 | 0 |
 
 Read as a mismatch, a direction destroys half of what the rule gets right. Read
-as a wildcard it changes nothing, because in both surviving merges the
-coarser side cites no flow. `tests/test_evals_identity.py` asserts both numbers
+as a wildcard it changes nothing, because one candidate merge has a side that
+cites no flow and the other runs the same way on both sides. `tests/test_evals_identity.py` asserts both numbers
 and the flow-citation counts, so a blessing pass that re-cites claims against
 flows reopens the question by failing.
 
@@ -263,9 +267,9 @@ and `Vote.joins_the_pool` are the two booleans that carry it.
 
 `needs-evidence` is not a verdict about the finding at all. It says the reviewer
 cannot answer from what they were shown — an ungrounded finding demands more
-evidence, not a vote. So it moves no number and it is not spent: it holds for
+evidence, not a vote. So it moves no number and it is not kept: it holds for
 its own sitting, and a later one asks again over whatever evidence exists by
-then. Every other verdict is spent once and kept for ever.
+then. Every other verdict is cast once and kept for ever.
 
 ### Two mechanisms under one key are two findings
 
@@ -289,6 +293,17 @@ is one place with that flow, and `identity.channels` reads the siblings that
 A cited assertion row adds its control too: the attribute its predicate
 projects into, or the predicate's own name. With the assertion pass on, a
 stated control reaches the mechanism through its row (ADR 0062).
+
+A draft's **Attacker Position** is not part of the key or the mechanism. Two
+drafts at one key with two positions are one finding to a vote unless their
+mechanisms are apart. The position rule has one reader in the evals,
+`scorer.position_fate`. The scorer gate calls it through `holds_position` to
+match a reference with a ruled position only to a draft that states it. The
+loss report calls it to charge a miss to `position`, or to `unstated` where no
+draft at the place states a position. A `ONE_READERS` row in
+`tests/test_one_reader_lints.py` refuses a comparison of a draft's position, a
+ruled position or a position reader in any other function; a local name that
+holds a position, or a position reader, under another name is not seen.
 
 ### A vote also records what it judged
 
@@ -347,7 +362,7 @@ reader's reasoning may be about a mechanism the new claim does not use (#1135).
 
 ## What this buys, in reviewer minutes
 
-A vote is spent once and kept forever, because it hangs on a fingerprint rather
+A vote is cast once and kept forever, because it hangs on a fingerprint rather
 than on a run. So `evals/harness/queue.py` shows only what nobody has answered:
 
 - first sitting over a corpus — everything, a few hundred findings
@@ -396,7 +411,7 @@ no reviewer sees it go. So every package carries a collision rule, and
 
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
-| `stride` | 365 | 2 |
+| `stride` | 484 | 8 |
 | `asvs` | 100 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
@@ -423,8 +438,8 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
-model. The rule's known error costs are the record above: 13 of 169 labelled
-matches split, 2 of 92 candidate negatives merged, 2 of 365 reference pairs
+model. The rule's known error costs are the record above: 15 of 169 labelled
+matches split, 2 of 92 candidate negatives merged, 8 of 484 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.

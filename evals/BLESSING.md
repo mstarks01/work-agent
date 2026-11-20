@@ -10,10 +10,14 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **A person has read every case.** All 16 cases in
+> **Every case has a current sitting.** All 20 cases in
 > `evals/corpus/` were written by an agent. On 2026-09-21 a single **Case
 > Sitting** cleared the first 13, and sittings on 2026-10-03 and 2026-10-04
-> cleared the two holdout cases, and two on 2026-10-10 cleared case 16. The first sitting wrote 130 own-list threats blind, then
+> cleared the two holdout cases, and two on 2026-10-10 cleared case 16.
+> Sittings from 2026-11-14 to 2026-11-16 cleared cases 17 and 18, and a
+> sitting on 2026-11-16 cleared case 16 with its rewritten alter-in-transit
+> claim. A sitting on 2026-11-17 cleared cases 19 and 20. The first sitting wrote 130 own-list
+> threats blind, then
 > marked all 344 recorded claims: 233 `agree`, 61 `unsure`, 26 `reject`, 24 `duplicate`. Two
 > calibration reviews read the pairs step 5 produces:
 > [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md) on
@@ -21,9 +25,8 @@ bookkeeping around it.
 > [`calibration_labels/REVIEW-02.md`](calibration_labels/REVIEW-02.md) on
 > 2026-09-02. Step 6 is the step that clears a case: a **Case Sitting** merges
 > as one JSON file under `evals/review/submissions/`, and
-> `tests/test_case_review.py` derives the count from that directory — so this
-> sentence and the gate cannot disagree. Read the count off
-> `uv run python webapp/sitting.py --list` rather than from prose here. Case
+> `uv run python webapp/sitting.py --list` reads that directory to name each
+> case that waits for one. Case
 > `01-payments-checkout` carries a reading document one person filled on
 > 2026-08-23,
 > [`corpus/01-payments-checkout/REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md),
@@ -324,8 +327,8 @@ In the same sitting, give each candidate threat pair one primary disposition:
 cannot decide it** — that is a real answer, it leaves the denominator rather
 than counting against either side, and it is better than a binary the evidence
 does not support. Check the bullet below on specificity first: review sitting
-01 returned four `unclear` answers and all four had one cause that bullet now
-settles. A pair that carries candidate element IDs carries a candidate
+01 returned four `unclear` answers and all four had one cause, which that
+bullet settles. A pair that carries candidate element IDs carries a candidate
 **verb** beside them, assigned from the candidate sentence's own words — never
 by reading the reference's, which would make every pair agree by construction
 and the measurement worthless. These are what the **false-split count** is measured over, and what lets the
@@ -451,9 +454,10 @@ keep its name. `--list` prints the cases nobody has read.
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing
 list and your notes in it as you write them. It lives at
-`~/.local/state/work-agent/sittings/<login>/<case-id>.json`, outside this
-repository, and it never merges — that is what keeps an unsigned own list out
-of a pull request. Close the browser, run the command again tomorrow, and the
+`$XDG_STATE_HOME/work-agent/sittings/<login>/<case-id>.json`, or under
+`~/.local/state` where `XDG_STATE_HOME` is unset, outside this repository.
+It never merges — that is what keeps an unsigned own list out of a pull
+request. Close the browser, run the command again tomorrow, and the
 case comes back where you left it. A successful submit deletes every draft it
 carried, and a case you dropped keeps its own. *Discard this draft* on the
 case throws one away and puts that case back on the list to do. A draft the
@@ -462,7 +466,7 @@ is yours, so repair it or delete it, and every other case still walks.
 
 The rest of this section is what it writes.
 
-**This step is now enforced.** The act is a **Case Sitting** (see `GLOSSARY.md`),
+**This step is enforced.** The act is a **Case Sitting** (see `GLOSSARY.md`),
 and it is recorded as **one JSON file** under `evals/review/submissions/`:
 
 ```json
@@ -731,11 +735,11 @@ the second one. A merged submission is never removed, so sit it again.
 
 `tests/test_case_review.py` fails on a new case that arrives with no submission
 clearing it, and its `UNREVIEWED` table says what each unread case leaves
-unchecked. Cases that shipped before this was enforced are still unread, and
-`uv run python webapp/sitting.py --list` names them. The table is not the
+unchecked. `uv run python webapp/sitting.py --list` names each case that no
+submission clears. The table is not the
 count — `evals.review_submission` derives that from the corpus and the merged
-submissions, so no list can disagree with it — and an entry for a case somebody
-has since read is spent and can be deleted.
+submissions, so no list can disagree with it — and an entry for a case that a
+submission clears can be deleted.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A
@@ -751,9 +755,9 @@ sitting measures nothing.
 
 Take the shape from it and the mark names from a generated `REVIEW.md`. That
 document is a merged reader's own words, so a vocabulary sweep stops at it, and
-it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`,
-`duplicate` and `unsure` — `MARKS` in `evals/harness/sitting.py` — and the app
-and the import both refuse anything else.
+its mark names `doubt` and `dup` are not in the set. The set is `agree`,
+`reject`, `duplicate` and `unsure` — `MARKS` in `evals/harness/sitting.py` — and
+the app and the import both refuse anything else.
 
 Merge checklist:
 

@@ -60,6 +60,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.assertions import EXTRACTED, REGISTRY
 from analysis_service.frameworks import widest_fan_out
 from evals import verify_corpus
 from evals.harness.calibration import (
@@ -134,6 +135,7 @@ def _calibration() -> Mapping[str, object]:
     pairs = load_pairs()
     result = measure_agreement(matcher, pairs)
     floor = measure_agreement(MechanicalIdentity(), pairs)
+    assert result.agreement is not None and floor.agreement is not None
     return {
         "agreed": result.agreements,
         "total": result.total,
@@ -262,6 +264,7 @@ def _exemplar_verbs() -> Mapping[str, object]:
         "first": by_verb.most_common(1)[0][1],
         "second": by_verb.most_common(2)[1][1],
         "third": by_verb.most_common(3)[2][1],
+        "fifth": by_verb.most_common(5)[4][1],
         "widest_lane": widest,
         "widest_count": widest_count,
     }
@@ -342,6 +345,16 @@ def _collisions() -> Mapping[str, object]:
     }
 
 
+def _unprojected() -> Mapping[str, object]:
+    """How many predicates project into no graph field, of all and of extracted."""
+    return {
+        "registered": len(REGISTRY),
+        "unprojected": sum(not p.projects_into for p in REGISTRY.values()),
+        "extracted": len(EXTRACTED),
+        "extracted_unprojected": sum(not p.projects_into for p in EXTRACTED.values()),
+    }
+
+
 def _signed_facts() -> Mapping[str, object]:
     """How many cases carry a facts file with every row signed."""
     corpus_dir = verify_corpus.CORPUS_DIR
@@ -390,6 +403,22 @@ FIGURES: tuple[Figure, ...] = (
         ),
     ),
     Figure(
+        name="the predicates with no graph field",
+        compute=_unprojected,
+        claims=(
+            (
+                "GLOSSARY.md",
+                (
+                    "{unprojected} of the {registered} registered predicates project"
+                    " into no graph field at all. Of the {extracted} that the"
+                    " assertion pass extracts, {extracted_unprojected} project into no"
+                    " graph field"
+                ),
+                1,
+            ),
+        ),
+    ),
+    Figure(
         name="the cases with signed reference facts",
         compute=_signed_facts,
         claims=(
@@ -422,18 +451,28 @@ FIGURES: tuple[Figure, ...] = (
                 "{cand_merges} false merges over {cand_of} candidate",
                 1,
             ),
-            ("evals/README.md", "{merges} false merges over {merge_of}", 1),
+            (
+                "evals/README.md",
+                "{merges} false merges over {merge_of}\ndistinct reference pairs.",
+                1,
+            ),
             (
                 "evals/README.md",
                 (
-                    "{splits} false splits of {split_of}, {cand_merges} false"
+                    "**{splits} false splits of {split_of}, {cand_merges} false"
                     " merges of {cand_of} and {merges} false merges of"
-                    " {merge_of}"
+                    " {merge_of}.**"
                 ),
-                # Two: the headline sentence and the harness table's row. A
-                # template that does not span the wrap cannot see the headline,
-                # because the wrap splits the rendered string across two lines.
-                2,
+                1,
+            ),
+            (
+                "evals/README.md",
+                (
+                    "has {splits} false splits of {split_of}, {cand_merges} false"
+                    " merges of {cand_of} and {merges} false merges of"
+                    " {merge_of} with no model call."
+                ),
+                1,
             ),
             (
                 "evals/TUNING.md",
@@ -549,8 +588,8 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "docs/agents/claim-identity.md",
                 (
-                    "The verb takes that to {cand_merges}, and it costs one"
-                    " split to do it \u2014 {floor_splits} becomes {splits}"
+                    "The verb takes that to {cand_merges}, and the splits it adds"
+                    " are its cost \u2014 {floor_splits} becomes {splits}"
                 ),
                 1,
             ),
@@ -593,6 +632,7 @@ FIGURES: tuple[Figure, ...] = (
         compute=_calibration,
         claims=(
             ("evals/README.md", "A rule at {percent}%", 1),
+            ("evals/README.md", "agrees with {agreed}\nof them.", 1),
             (
                 "docs/agents/claim-identity.md",
                 "| `SubsetVerbIdentity` | **{agreed}/{total} = {percent}%** |",
@@ -674,8 +714,9 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "evals/harness/exemplar_verbs.py",
                 (
-                    "``disable`` accounts for {first} of them, and ``plant``"
-                    " and ``replay`` for {second}\n  each."
+                    "``disable`` accounts for {first} of them, ``plant`` for"
+                    " {second}, ``replay`` and\n  ``elicit`` for {third} each, and"
+                    " ``exhaust-resources`` for {fifth}."
                 ),
                 1,
             ),
@@ -840,14 +881,14 @@ def test_the_read_audit_observes_something(figure_reads):
 
     A broken audit hook reports every figure clean, and that reads exactly like
     a clean tree. So the script runs
-    :func:`evals.review_submission.unreviewed_cases` as a control, which reads
-    the submissions by construction, and an empty control means the observation
+    :func:`evals.review_submission.unreviewed_cases` as a positive check, which reads
+    the submissions by construction, and an empty positive check means the observation
     failed rather than that nothing was observed.
     """
     assert figure_reads["control"], (
         "the read audit observed no submission read even from"
         " unreviewed_cases, so it observed nothing at all. Every result below"
-        " is vacuous until audit_figure_reads.py reports the control."
+        " is vacuous until audit_figure_reads.py reports the positive check."
     )
 
 

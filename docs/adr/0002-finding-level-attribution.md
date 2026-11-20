@@ -87,7 +87,7 @@ about its own honesty.
 
 The ladder itself is pinned, and stops one rung short of punctuation-blindness.
 Whitespace collapse carries the entire result (78.2% false rejections to 1.0%);
-punctuation-blindness recovers nothing the markdown rung does not and spends
+punctuation-blindness recovers nothing the markdown rung does not and loses
 real precision. It is not a similarity threshold: best-window similarity puts
 the lowest accepted quote at 0.986 and the highest rejected one at 0.963 —
 separable by 2.3 points, fitted to a single negative example — and every
@@ -109,8 +109,8 @@ sources. The check is mechanical and already runs for free one node earlier.
 And putting the source text into the critic gives the node that holds **verdict
 power** a second, competing evidence base — while widening the graph's largest
 prompt-injection surface (OWASP LLM01) to the node whose output decides what
-ships. `critic.md`'s own rule against re-spending judgement on a check code has
-run applies here to the letter.
+ships. `critic.md`'s own rule that the critic does not judge again a check that
+code has run applies here to the letter.
 
 The same argument holds one node over for the eval judge: its `unsupported`
 bucket is defined **model-relative** — a threat asserting a fact the System

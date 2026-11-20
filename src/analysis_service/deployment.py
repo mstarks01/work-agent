@@ -7,8 +7,8 @@ picks which file the service reads. Every consumer assembles its configuration
 through this one object — the HTTP service, the in-process engine, the first-run
 web app, the eval harness's pipeline builder and the eval CLI. Each file is
 therefore read once per process, a deployment that redirects
-``ANALYSIS_SAMPLING`` has its sweeps grading the configuration it runs, and the
-node-to-tier walk is written in one place.
+``ANALYSIS_SAMPLING`` has its sweeps grading the configuration it runs, and
+:meth:`Deployment.tier_of` walks a node to its tier.
 
 A process holds one Deployment at a time. The first-run app holds it in one
 cell and replaces it when a save on its Settings page passes (ADR 0093). A job
@@ -96,8 +96,8 @@ from analysis_service.sampling import SamplingConfig, load_sampling
 from analysis_service.selection import NotCarried, SelectionError, resolve_names
 
 # Two layouts resolve to the same defaults, not fetched at run time either way.
-# A wheel built from this project bundles prompts/, domains/, frameworks/ and
-# config/ under analysis_service/_bundled/ (see pyproject.toml's force-include),
+# A wheel built from this project bundles prompts/, domains/, frameworks/,
+# diagram_reader/ and config/ under analysis_service/_bundled/ (see pyproject.toml's force-include),
 # so an external `pip install analysis-service` needs nothing else. An editable/dev
 # install has no _bundled/ -- hatchling's editable mode links back to the
 # source tree rather than copying force-included data -- so this repo's own
@@ -122,6 +122,7 @@ def _default_config_path(filename: str) -> Path:
 DEFAULT_PROMPTS_DIR = _default_dir("prompts")
 DEFAULT_DOMAINS_DIR = _default_dir("domains")
 DEFAULT_FRAMEWORKS_DIR = _default_dir("frameworks")
+DEFAULT_DIAGRAM_READER_DIR = _default_dir("diagram_reader")
 DEFAULT_MODEL_TIERS_PATH = _default_config_path("model_tiers.toml")
 DEFAULT_SAMPLING_PATH = _default_config_path("sampling.toml")
 DEFAULT_RESILIENCE_PATH = _default_config_path("resilience.toml")
@@ -161,8 +162,8 @@ ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: default (ADR 0087); a non-empty value other than an affirmative turns it
 #: off, and an unset or empty variable keeps the default.
 CAPABILITY_READER_VAR = "ANALYSIS_CAPABILITY_READER"
-#: Each optional pass, by its variable, with its default. The one reader of the
-#: defaults: :meth:`Deployment.from_env`, the Settings page and the doc test of
+#: Each optional pass, by its variable, with its default.
+#: :meth:`Deployment.from_env`, the Settings page and the doc test of
 #: the "Optional passes" table in ``Configuration.md`` read it (ADR 0091).
 PASS_FLAGS: dict[str, bool] = {
     ASSERTIONS_VAR: True,
@@ -290,7 +291,7 @@ class Deployment:
     #: Every one of them passed the package gate at load. A
     #: job selects from this set; it is not itself a selection, and it is never
     #: used as a default for one.
-    frameworks: tuple[FrameworkName, ...]
+    carried_frameworks: tuple[FrameworkName, ...]
     paths: ConfigPaths
     require_certified: bool = False
     #: Which transport this install asks ``extract`` to write in. A property of
@@ -356,7 +357,7 @@ class Deployment:
             sampling=load_sampling(paths.sampling, env=env),
             resilience=load_resilience(paths.resilience, env=env),
             manifest=load_manifest(paths.blessed_fingerprints),
-            frameworks=frameworks,
+            carried_frameworks=frameworks,
             paths=paths,
             require_certified=env_flag(env, REQUIRE_CERTIFIED_VAR),
             extraction_format=(
@@ -379,7 +380,11 @@ class Deployment:
         registry instead of a sentence naming what went wrong.
 
         Order is the caller's and is preserved: it is the order the report's
-        blocks carry, and the envelope checks the two agree.
+        blocks carry, and the envelope checks the two agree. Each caller passes
+        a selection that :func:`~analysis_service.selection.resolve_selection`
+        put in the carried order (ADR 0102): a job record's, or an
+        :class:`~analysis_service.engine.Engine`'s. A resumed job keeps the
+        order of the job it resumes, so its graph is the one that job ran.
 
         Read through :func:`~analysis_service.selection.resolve_names`, the
         one reader of the name rule. This seam holds names and no options — a
@@ -392,7 +397,7 @@ class Deployment:
         every package whose options require a field, on every job.
         """
         try:
-            return tuple(resolve_names(self.frameworks, frameworks))
+            return tuple(resolve_names(self.carried_frameworks, frameworks))
         except NotCarried as exc:
             raise FrameworkNotCarried(str(exc)) from exc
         except SelectionError as exc:
@@ -426,7 +431,7 @@ class Deployment:
         otherwise re-derive it from the framework list and drift from the map the
         gate actually resolves against.
         """
-        return tier_node_by_graph_node(self.frameworks)
+        return tier_node_by_graph_node(self.carried_frameworks)
 
     def pipeline(
         self,

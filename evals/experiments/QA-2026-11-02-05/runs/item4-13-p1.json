@@ -1,0 +1,351 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "53ab865734b686cb35ec04d8c23e91067ecf26be",
+    "clean": false,
+    "table": {
+      "case": "13-dispatch-control-plane",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+    },
+    "inputs": []
+  },
+  "claims": [
+    {
+      "title": "Engineer sign-in credentials may be intercepted before reaching the dispatch console",
+      "description": "`flow:entity:duty-engineer>process:dispatch-console>open-console` carries an engineer sign-in to `process:dispatch-console`, but its `encryption_in_transit` is unknown. If transport protection is absent or ineffective, an attacker with a position on the corporate network can intercept sign-in credentials in transit. Those credentials may then enable access to the console and its downstream dispatch requests to `process:dispatch-api`; this is conditional on verifying the transport configuration.",
+      "affected_element_ids": [
+        "flow:entity:duty-engineer>process:dispatch-console>open-console",
+        "entity:duty-engineer",
+        "process:dispatch-console"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:duty-engineer>process:dispatch-console>open-console:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody wrote down how an engineer signs in to it.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `encryption_in_transit` on `flow:entity:duty-engineer>process:dispatch-console>open-console` is unknown and an attacker needs a corporate-network observation position. Impact is high because the flow carries credentials and a successful sign-in reaches the dispatch console, which can call the production-control-plane dispatch API."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and require TLS for console sign-in",
+          "detail": "Set and document TLS 1.2+ for `flow:entity:duty-engineer>process:dispatch-console>open-console`, including certificate validation at the browser."
+        },
+        {
+          "summary": "Strengthen engineer authentication",
+          "detail": "Use phishing-resistant MFA and short-lived sessions so interception of a sign-in secret alone does not provide durable console access."
+        }
+      ]
+    },
+    {
+      "title": "Dispatch actions may be readable across the corporate-to-control-plane boundary",
+      "description": "`flow:process:dispatch-console>process:dispatch-api>dispatch-requests` crosses from the corporate network into the production control plane and carries crew-movement and depot-work actions, while `encryption_in_transit` is unknown. If the channel is not protected, a corporate-network observer or compromised intermediary can intercept dispatch actions in transit. The disclosed work information reveals operational activity and can help an attacker target the live control-plane functions exposed through `process:dispatch-api`; this is conditional on the unverified transport setting.",
+      "affected_element_ids": [
+        "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "process:dispatch-console",
+        "process:dispatch-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>dispatch-requests:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses a trust boundary but an attacker must observe the corporate-network-to-control-plane path while its transport encryption remains unknown. Impact is medium because the flow exposes business-critical dispatch actions affecting crews and depot work."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and mutually authenticate console API traffic",
+          "detail": "Require HTTPS/TLS for `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, with certificate validation and an authenticated API session."
+        },
+        {
+          "summary": "Minimize operational detail in requests",
+          "detail": "Use opaque job references where possible and avoid transmitting unnecessary crew or depot details in dispatch requests."
+        }
+      ]
+    },
+    {
+      "title": "Live crew status may be intercepted on an unverified WebSocket channel",
+      "description": "`flow:process:dispatch-console>process:dispatch-api>live-job-status` crosses from the corporate network to the production control plane and returns live job status for crews on screen. Its `encryption_in_transit` and handshake authentication are unknown. If the WebSocket is not protected with TLS, an attacker able to observe that boundary-crossing channel can intercept live operational status. That information provides real-time visibility into dispatch activity and can guide targeting of the dispatch API and field operations; this is conditional on the unresolved WebSocket transport configuration.",
+      "affected_element_ids": [
+        "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "process:dispatch-console",
+        "process:dispatch-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>live-job-status:encryption_in_transit",
+        "unknown:flow:process:dispatch-console>process:dispatch-api>live-job-status:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "Nobody wrote down whether that socket runs over TLS, whether its handshake is authenticated, or whether it checks the engineer's session again after it is open.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the live-status flow crosses a trust boundary and its TLS and authentication state are unknown, while interception still requires network-path access. Impact is medium because it exposes business-critical live crew status rather than a stated credential or full record corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Require secure WebSockets",
+          "detail": "Configure `flow:process:dispatch-console>process:dispatch-api>live-job-status` as WSS over TLS 1.2+ and reject non-TLS upgrades."
+        },
+        {
+          "summary": "Authenticate and revalidate the socket session",
+          "detail": "Bind the WebSocket handshake to the engineer session and enforce periodic authorization checks before sending live status."
+        }
+      ]
+    },
+    {
+      "title": "Downloaded schedule documents may be exposed while written to the archive",
+      "description": "`flow:process:schedule-importer>store:schedule-archive>store-schedule-documents` writes the scheduling partner's downloaded XML work schedules to `store:schedule-archive`, but the flow's protocol, authentication, and `encryption_in_transit` are unknown. If the corporate file-store write path is unencrypted, a user or compromised host able to observe that internal path can intercept the schedule documents. The disclosure reveals planned work before it is posted into the dispatch API, enabling operational reconnaissance; this is conditional on the unverified internal transport protection.",
+      "affected_element_ids": [
+        "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
+        "process:schedule-importer",
+        "store:schedule-archive"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:schedule-importer>store:schedule-archive>store-schedule-documents:protocol",
+        "unknown:flow:process:schedule-importer>store:schedule-archive>store-schedule-documents:authentication",
+        "unknown:flow:process:schedule-importer>store:schedule-archive>store-schedule-documents:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because all protection attributes for the archive-write flow are unknown, but the attacker needs an internal corporate-network observation position. Impact is medium because the intercepted documents contain tomorrow's planned work and are tagged business-critical-data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt importer-to-archive writes",
+          "detail": "Use an authenticated encrypted file protocol for `flow:process:schedule-importer>store:schedule-archive>store-schedule-documents` and document the protocol and service identity."
+        },
+        {
+          "summary": "Restrict archive access",
+          "detail": "Grant the importer a dedicated least-privilege archive identity and limit other file-store readers to approved operational roles."
+        }
+      ]
+    },
+    {
+      "title": "Work orders and the importer API token may be exposed crossing into the control plane",
+      "description": "`flow:process:schedule-importer>process:dispatch-api>post-work-orders` crosses from the corporate network into the production control plane, carries parsed work orders, presents an API token, and has unknown `encryption_in_transit`. If transport protection is absent or ineffective, an attacker on that path can intercept work orders and potentially the presented static API token. The token was never rotated; if exposed, it can be used to reach the same dispatch API and submit work-order requests, extending the disclosure into control-plane access.",
+      "affected_element_ids": [
+        "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "process:schedule-importer",
+        "process:dispatch-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "unknown:flow:process:schedule-importer>process:dispatch-api>post-work-orders:encryption_in_transit",
+        "assertion:credential-presented~principal:schedule-importer~any~credential:api-token",
+        "assertion:credential-rotation~credential:api-token~any~not-rotated"
+      ],
+      "quotes": [
+        {
+          "text": "It presents an API token. That token was issued when the importer was built and nobody has rotated it since.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the flow crosses a trust boundary with unknown transport encryption and interception requires access to that path. Impact is high because a disclosed, unrotated API token can reach `process:dispatch-api` in the production control plane in addition to exposing business-critical work orders."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS and peer authentication for importer API calls",
+          "detail": "Set `encryption_in_transit` on `flow:process:schedule-importer>process:dispatch-api>post-work-orders` to TLS, preferably mTLS for service-to-service authentication."
+        },
+        {
+          "summary": "Replace the static API token",
+          "detail": "Issue short-lived, scoped credentials to `process:schedule-importer`, rotate the current API token immediately, and ensure credentials are not sent in URLs or logged."
+        }
+      ]
+    },
+    {
+      "title": "Crew personal data may be readable on the dispatch API database connection",
+      "description": "`flow:process:dispatch-api>store:dispatch-database>read-write-job-orders` carries job orders, crew names, and crew mobile numbers between `process:dispatch-api` and `store:dispatch-database`, while its `encryption_in_transit` is unknown. If this database connection is not encrypted, an attacker with a foothold on the production-control-plane path can intercept crew PII and dispatch records. The captured records can be correlated with dispatch operations and used to target individual crews or their work assignments; this is conditional on verification of the database-link transport settings.",
+      "affected_element_ids": [
+        "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "process:dispatch-api",
+        "store:dispatch-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "That database holds the job orders, the crew names and the crew mobile numbers.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `encryption_in_transit` is unknown and the attacker needs a production-control-plane observation position. Impact is high because the flow carries PII, including crew mobile numbers, together with business-critical job-order information."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the dispatch database connection",
+          "detail": "Require TLS with certificate validation for `flow:process:dispatch-api>store:dispatch-database>read-write-job-orders`, including internal production-control-plane traffic."
+        },
+        {
+          "summary": "Limit data exposed on the read path",
+          "detail": "Use least-privilege database roles and return only the crew fields required for each dispatch API operation."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy may expose dispatch records if the dispatch database lacks encryption at rest",
+      "description": "`store:dispatch-database` holds job orders, crew names, and crew mobile numbers, but its `encryption_at_rest` value is unknown. If that unknown resolves to unencrypted storage, an attacker obtaining a database volume, backup, snapshot, or decommissioned copy can read the records without using `process:dispatch-api` or its normal database connection. The disclosed data combines PII with live dispatch information, enabling targeted action against crews and operational planning. This is conditional on the at-rest encryption posture and does not assert that the database is currently unencrypted.",
+      "affected_element_ids": [
+        "store:dispatch-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:dispatch-database:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "How the database is protected at rest is not written down anywhere.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` setting because obtaining a storage-layer copy requires access to operational media or backups. Impact is high because `store:dispatch-database` holds crew PII and business-critical dispatch records, and copied data can be read in bulk without the application access path."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption on all database copies",
+          "detail": "Establish the current `encryption_at_rest` state for `store:dispatch-database`, then require managed-key encryption for the primary database, backups, snapshots, replicas, and decommissioned media."
+        },
+        {
+          "summary": "Restrict storage and key access",
+          "detail": "Separate storage-export and key-use permissions from application database access, and audit snapshot and backup retrieval."
+        }
+      ]
+    },
+    {
+      "title": "Archived partner schedules may be exposed from storage copies if unencrypted at rest",
+      "description": "`store:schedule-archive` retains every XML document downloaded from the scheduling partner, while its `encryption_at_rest` is unknown. If the corporate file-store folder is not encrypted at rest, an attacker who obtains its disk, backup, snapshot, or copied archive can read the accumulated schedule documents without accessing `process:schedule-importer`. The archive provides a historical view of planned work and can support operational reconnaissance against future dispatch activity; this draft is conditional on resolving the archive's at-rest protection.",
+      "affected_element_ids": [
+        "store:schedule-archive"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:schedule-archive:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:schedule-archive` has unknown at-rest encryption and the attacker must obtain a storage-layer copy. Impact is medium because the archive holds every downloaded schedule document containing business-critical planned-work information."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the schedule archive and its copies",
+          "detail": "Establish whether `store:schedule-archive` is encrypted at rest and require managed-key encryption for the file store, backups, snapshots, and exported archives."
+        },
+        {
+          "summary": "Apply archive-specific reader controls",
+          "detail": "Use a dedicated archive access group or service identity so only the importer and explicitly authorized operational users can read retained schedule documents."
+        }
+      ]
+    },
+    {
+      "title": "Weak or absent database authentication could expose the dispatch record corpus",
+      "description": "`flow:process:dispatch-api>store:dispatch-database>read-write-job-orders` is a read-write path to `store:dispatch-database`, but its `authentication` is unknown. If the database accepts no authentication, weak authentication, or credentials usable by an attacker with production-control-plane reach, that attacker can read the job-order corpus, crew names, and crew mobile numbers directly from the store. This bypasses the dispatch API's intended request handling and exposes the information needed to map crews to their assignments; the threat is conditional on the unresolved database authentication and authorization configuration.",
+      "affected_element_ids": [
+        "store:dispatch-database",
+        "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "process:dispatch-api"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The dispatch API reads and writes the dispatch database. That database holds the job orders, the crew names and the crew mobile numbers.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because authentication on the API-to-database read-write flow is unknown and an attacker needs a route to the production-control-plane database service. Impact is high because direct reads from `store:dispatch-database` expose the full PII and business-critical job-order corpus rather than a single dispatch response."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce strong database authentication and least privilege",
+          "detail": "Require a dedicated authenticated `process:dispatch-api` database identity, deny unauthenticated connections, and scope its read access to the rows and columns required."
+        },
+        {
+          "summary": "Constrain database network reachability",
+          "detail": "Allow database connections only from approved API workloads in the production control plane and monitor direct or bulk-read attempts."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

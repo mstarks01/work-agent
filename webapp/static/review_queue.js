@@ -1,4 +1,9 @@
-  fetch("/api/summary").then(r => r.json()).then(s => {
+  fetch("/api/summary").then(r => r.ok ? jsonOf(r) : null, () => null).then(s => {
+    if (!s) {
+      document.getElementById("counts").textContent =
+        "The queue did not load. Reload the page.";
+      return;
+    }
     document.getElementById("counts").textContent =
       s.waiting + " findings waiting, " + s.volatile +
       " of them found in some runs and not others.";

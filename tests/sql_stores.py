@@ -39,12 +39,10 @@ from pathlib import Path
 
 import boto3
 import pytest
-from alembic import command
 from google.auth import compute_engine
 from sqlalchemy.engine import URL, make_url
 
-from analysis_service import gcs_objects
-from analysis_service.migrations import alembic_config
+from analysis_service import gcs_objects, migrations
 from analysis_service.objects import S3_KEY_FILES, ObjectStoreName
 from analysis_service.sql_store import engine_for
 
@@ -82,7 +80,7 @@ def in_a_thread(work, *args):
 
 def upgrade(env: dict[str, str]) -> None:
     """Run the deploy step on the database that ``env`` names."""
-    in_a_thread(command.upgrade, alembic_config(env), "head")
+    in_a_thread(migrations.upgrade, env)
 
 
 @cache

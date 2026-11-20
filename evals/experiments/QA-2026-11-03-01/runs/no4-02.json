@@ -1,0 +1,711 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "bee48c8e0e5a5d370156020b52e22496d5bff33f",
+    "clean": true,
+    "table": {
+      "case": "02-iot-fleet-telemetry",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "cf3fd3442d9a29ea5ca935978e4f32735bcad935281744cdaa5d6f8d567cb976"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "7605b8bc22968a87d5bf509b415d974629bec5bf49a41449471f804739c24da8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Sensor readings may be intercepted between field nodes and the internet-facing gateway",
+      "description": "`flow:entity:sensor-node>process:device-gateway>publish-readings` crosses from the field network to the ingest edge and carries PII-tagged sensor readings and a device identifier, but its `encryption_in_transit` value is unknown. If transport protection is not actually enforced, an observer on the customer-site or Internet path can intercept readings in transit before they reach `process:device-gateway`. The collected device-to-reading mapping can subsequently support targeting of particular customer sites and correlation with data later loaded into the telemetry pipeline.",
+      "affected_element_ids": [
+        "flow:entity:sensor-node>process:device-gateway>publish-readings",
+        "entity:sensor-node",
+        "process:device-gateway"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:sensor-node>process:device-gateway>publish-readings:encryption_in_transit",
+        "crossing:flow:entity:sensor-node>process:device-gateway>publish-readings"
+      ],
+      "quotes": [
+        {
+          "text": "Each node publishes readings over MQTT to the device gateway",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:entity:sensor-node>process:device-gateway>publish-readings` crosses the field-to-ingest boundary and its encryption state is unknown, so an attacker needs path visibility but no application credential. Impact is medium because the flow is tagged `pii` and carries device-linked sensor readings."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated TLS for node MQTT sessions",
+          "detail": "Configure TLS 1.2+ for `flow:entity:sensor-node>process:device-gateway>publish-readings`, validate the gateway certificate at nodes, and record the resulting `encryption_in_transit` posture."
+        },
+        {
+          "summary": "Minimize linkable telemetry identifiers",
+          "detail": "Where feasible, use rotating or opaque device references so a captured reading stream reveals less persistent site identity."
+        }
+      ]
+    },
+    {
+      "title": "Device-registry key material may be readable on the gateway-to-registry path",
+      "description": "`flow:process:device-gateway>store:device-registry>look-up-device` carries device identifiers, key material, and customer assignments to `store:device-registry`, while both its authentication and `encryption_in_transit` controls are unknown. If the transport is unencrypted, an attacker with access to the ingest-edge path can intercept fleet pre-shared-key material and customer mapping data. A recovered fleet key can then be used against the gateway's node-authentication path, enabling later device impersonation attempts.",
+      "affected_element_ids": [
+        "flow:process:device-gateway>store:device-registry>look-up-device",
+        "process:device-gateway",
+        "store:device-registry"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:device-gateway>store:device-registry>look-up-device:encryption_in_transit",
+        "unknown:flow:process:device-gateway>store:device-registry>look-up-device:authentication",
+        "assertion:credential-sharing~credential:pre-shared-key~any~shared"
+      ],
+      "quotes": [
+        {
+          "text": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because transport protection is unknown but the attacker must first obtain a position on the internal gateway-to-registry path. Impact is high because the flow carries credentials and the pre-shared key is stated to be shared across a fleet."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and mutually authenticate the registry lookup",
+          "detail": "Require TLS with workload identity or mTLS on `flow:process:device-gateway>store:device-registry>look-up-device` and explicitly set both transport encryption and authentication attributes."
+        },
+        {
+          "summary": "Remove fleet-wide static key material from lookups",
+          "detail": "Use per-device, rotatable credentials and validate proof of possession without returning reusable key material to the gateway."
+        }
+      ]
+    },
+    {
+      "title": "Telemetry-lake uploads may expose addresses and occupancy data in transit",
+      "description": "`flow:process:telemetry-normalizer>store:telemetry-lake>load-readings` sends site addresses, occupancy patterns, and readings to `store:telemetry-lake`, but its encryption and authentication are unknown. If the BigQuery API connection is not protected in transit, an attacker able to observe the analytics-core path can intercept confidential customer telemetry before storage. The captured address-and-occupancy data can be used to profile customer premises and operations outside the application access path.",
+      "affected_element_ids": [
+        "flow:process:telemetry-normalizer>store:telemetry-lake>load-readings",
+        "process:telemetry-normalizer",
+        "store:telemetry-lake"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:telemetry-normalizer>store:telemetry-lake>load-readings:encryption_in_transit",
+        "unknown:flow:process:telemetry-normalizer>store:telemetry-lake>load-readings:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The lake has site addresses and occupancy patterns in it, so it is customer data.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the encryption state is unknown and interception requires a foothold on the internal analytics path. Impact is high because the flow carries site addresses and occupancy patterns into the confidential telemetry lake."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce TLS and workload authentication for lake ingestion",
+          "detail": "Require TLS 1.2+ and a narrowly scoped workload identity on `flow:process:telemetry-normalizer>store:telemetry-lake>load-readings`; verify and record the connection's encryption state."
+        },
+        {
+          "summary": "Reduce sensitive fields on the ingestion path",
+          "detail": "Tokenize or separate direct site-address fields from routine normalized readings where the loader does not require plaintext values."
+        }
+      ]
+    },
+    {
+      "title": "Fleet-dashboard queries may expose raw customer telemetry across the corporate boundary",
+      "description": "`flow:entity:fleet-operator>store:telemetry-lake>query-dashboards` crosses from the corporate network to the analytics core and returns aggregated and raw customer readings from `store:telemetry-lake`. Its `encryption_in_transit` value is unknown. If the BigQuery connection is not protected, a network-path observer can intercept site addresses, occupancy patterns, and dashboard results. Those results can reveal when customer premises are occupied and support follow-on targeting of specific sites.",
+      "affected_element_ids": [
+        "flow:entity:fleet-operator>store:telemetry-lake>query-dashboards",
+        "entity:fleet-operator",
+        "store:telemetry-lake"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:fleet-operator>store:telemetry-lake>query-dashboards:encryption_in_transit",
+        "crossing:flow:entity:fleet-operator>store:telemetry-lake>query-dashboards"
+      ],
+      "quotes": [
+        {
+          "text": "Our own fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because this is a stated corporate-to-analytics boundary crossing and transport encryption is unknown, although the attacker still needs path access. Impact is high because the query returns raw customer readings and the lake contains site addresses and occupancy patterns."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted BigQuery dashboard connections",
+          "detail": "Enforce TLS for `flow:entity:fleet-operator>store:telemetry-lake>query-dashboards`, including certificate validation by dashboard clients, and document the verified transport posture."
+        },
+        {
+          "summary": "Restrict raw telemetry in dashboard responses",
+          "detail": "Return only fields required for each dashboard role and use aggregate views where raw site-level readings are unnecessary."
+        }
+      ]
+    },
+    {
+      "title": "Gateway-to-Pub/Sub telemetry may be exposed on an unverified internal channel",
+      "description": "`flow:process:device-gateway>store:pub-sub>forward-readings` forwards PII-tagged normalized sensor readings, but its protocol, authentication, and `encryption_in_transit` values are all unknown. If the internal publish channel lacks transport protection, an attacker positioned on the ingest-edge network can intercept accepted readings before they enter `store:pub-sub`. The captured stream can be correlated with later telemetry-lake records to profile customer activity.",
+      "affected_element_ids": [
+        "flow:process:device-gateway>store:pub-sub>forward-readings",
+        "process:device-gateway",
+        "store:pub-sub"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:device-gateway>store:pub-sub>forward-readings:protocol",
+        "unknown:flow:process:device-gateway>store:pub-sub>forward-readings:authentication",
+        "unknown:flow:process:device-gateway>store:pub-sub>forward-readings:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Readings the gateway accepts are forwarded onto Pub/Sub",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because every relevant channel-control attribute is unknown and the attacker requires an ingest-edge network foothold. Impact is medium because the flow is tagged `pii` and carries normalized sensor readings."
+      },
+      "mitigations": [
+        {
+          "summary": "Define and enforce protected Pub/Sub publishing",
+          "detail": "Use a documented TLS-protected Pub/Sub protocol and a dedicated gateway workload identity for `flow:process:device-gateway>store:pub-sub>forward-readings`."
+        },
+        {
+          "summary": "Limit telemetry exposure on the broker",
+          "detail": "Use separate topics and least-privilege publisher/subscriber permissions so a captured or compromised channel reveals only the required stream."
+        }
+      ]
+    },
+    {
+      "title": "Telemetry-normalizer Pub/Sub reads may be interceptable across the analytics boundary",
+      "description": "`flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings` crosses from the analytics core to the ingest edge and carries PII-tagged normalized readings, but its protocol, authentication, and `encryption_in_transit` controls are unknown. If the consumer connection is not encrypted, an attacker able to observe that boundary-crossing path can intercept the telemetry stream. The data then enables correlation of customer activity before the normalizer writes it to the telemetry lake.",
+      "affected_element_ids": [
+        "flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings",
+        "process:telemetry-normalizer",
+        "store:pub-sub"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings:protocol",
+        "unknown:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings:authentication",
+        "unknown:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings:encryption_in_transit",
+        "crossing:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings"
+      ],
+      "quotes": [
+        {
+          "text": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses from the analytics core to the ingest edge while its protocol, authentication, and encryption are all unknown. Impact is medium because the consumed readings are tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect the Pub/Sub subscriber connection",
+          "detail": "Require TLS and a dedicated, authenticated subscriber identity for `flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings`."
+        },
+        {
+          "summary": "Constrain subscription access",
+          "detail": "Grant the normalizer only the topic and subscription it needs, and prevent broad subscription creation or message export by other principals."
+        }
+      ]
+    },
+    {
+      "title": "A copied device registry could disclose fleet authentication keys if encryption at rest is absent",
+      "description": "`store:device-registry` is confidential, holds credentials, and has `encryption_at_rest: unknown`. If the unknown resolves to unencrypted storage, an attacker who obtains a Firestore export, backup, snapshot, or underlying storage copy can read the fleet pre-shared key checks and customer assignments without using the gateway. Since the pre-shared key is shared and not rotated, recovered material can enable follow-on attempts to authenticate as fleet nodes to `process:device-gateway`.",
+      "affected_element_ids": [
+        "store:device-registry"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:store:device-registry:encryption_at_rest",
+        "assertion:credential-sharing~credential:pre-shared-key~any~shared",
+        "assertion:credential-rotation~credential:pre-shared-key~any~not-rotated"
+      ],
+      "quotes": [
+        {
+          "text": "The key is per fleet, not per device. Nobody has rotated it since deployment.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown at-rest encryption state: obtaining a backup or export is a prerequisite, but it avoids the live application path. Impact is high because the confidential store holds credentials and the fleet pre-shared key is shared and not rotated."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt registry data and operational copies at rest",
+          "detail": "Require managed or customer-managed encryption for `store:device-registry`, including exports, backups, replicas, and snapshots, with tightly restricted decrypt and export permissions."
+        },
+        {
+          "summary": "Replace shared fleet keys",
+          "detail": "Issue independently revocable per-device credentials, rotate legacy fleet keys, and avoid storing reusable secret material where a verifier or derived credential can be used."
+        }
+      ]
+    },
+    {
+      "title": "A telemetry-lake snapshot could reveal customer occupancy data if encryption at rest is absent",
+      "description": "`store:telemetry-lake` is classified confidential, holds PII and business-critical data, and has `encryption_at_rest: unknown`. If that attribute resolves to unencrypted storage, an attacker with a copied BigQuery export, backup, snapshot, or other storage-layer artifact can read site addresses, occupancy patterns, and readings outside the normal SSO dashboard path. One copied dataset can expose the customer-site information used throughout fleet reporting and operational analysis.",
+      "affected_element_ids": [
+        "store:telemetry-lake"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:telemetry-lake:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "The lake has site addresses and occupancy patterns in it, so it is customer data.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the lake's at-rest encryption is unknown and the attacker must acquire an operational copy. Impact is high because the store is confidential and contains customer site addresses and occupancy patterns, whose disclosure is irreversible."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption on lake copies",
+          "detail": "Establish the encryption-at-rest state of `store:telemetry-lake` and require encryption with controlled keys for the dataset, exports, backups, snapshots, and replicas."
+        },
+        {
+          "summary": "Restrict dataset export and copy permissions",
+          "detail": "Separate export authority from routine dashboard and analytics roles, log exports, and alert on anomalous bulk extraction."
+        }
+      ]
+    },
+    {
+      "title": "Persisted Pub/Sub messages may disclose PII if storage encryption is absent",
+      "description": "`store:pub-sub` stores PII-tagged normalized sensor readings, while both its data classification and `encryption_at_rest` posture are unknown. If retained messages, subscriptions, or service-managed copies are unencrypted at rest, an attacker holding an operational copy can read the telemetry without querying the normalizer or telemetry lake. This can expose the same customer activity data at a less scrutinized intermediary store.",
+      "affected_element_ids": [
+        "store:pub-sub"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:pub-sub:data_classification",
+        "unknown:store:pub-sub:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because encryption at rest is unknown and a copied retained-message artifact is required. Impact is medium because `store:pub-sub` is tagged `pii`, although its classification and retention protections are not stated."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish the Pub/Sub retention and encryption posture",
+          "detail": "Document whether `store:pub-sub` persists messages and enforce encryption at rest for retained messages, subscriptions, exports, backups, and service-managed copies."
+        },
+        {
+          "summary": "Minimize retained telemetry",
+          "detail": "Set the shortest practical retention period and prevent message export except for narrowly scoped operational principals."
+        }
+      ]
+    },
+    {
+      "title": "An unverified registry authentication path could expose fleet key material",
+      "description": "`flow:process:device-gateway>store:device-registry>look-up-device` is a read path carrying key material and customer assignments, but its authentication is unknown. If the Firestore access path does not require a narrowly scoped gateway identity, a party able to reach the registry interface could request registry records and recover credentials rather than merely validating a presented node key. The recovered shared fleet key could then be presented to `process:device-gateway` in later spoofing attempts.",
+      "affected_element_ids": [
+        "store:device-registry",
+        "flow:process:device-gateway>store:device-registry>look-up-device",
+        "process:device-gateway"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:flow:process:device-gateway>store:device-registry>look-up-device:authentication",
+        "assertion:credential-sharing~credential:pre-shared-key~any~shared"
+      ],
+      "quotes": [
+        {
+          "text": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because authentication on the named registry read path is unknown, though an attacker must be able to reach that interface. Impact is high because the registry holds credentials and the fleet key is stated to be shared."
+      },
+      "mitigations": [
+        {
+          "summary": "Require least-privilege registry authentication",
+          "detail": "Use a dedicated gateway workload identity with read access only to the specific device-verification fields needed, and deny unauthenticated or broad collection reads."
+        },
+        {
+          "summary": "Do not return reusable credentials from verification lookups",
+          "detail": "Perform key verification in a restricted service or return only a validation result and customer assignment, not reusable key material."
+        }
+      ]
+    },
+    {
+      "title": "Fleet operators may elicit raw customer telemetry beyond their assigned scope",
+      "description": "`flow:entity:fleet-operator>store:telemetry-lake>query-dashboards` lets fleet operators read aggregated and raw customer readings from `store:telemetry-lake`; the stated company SSO identifies the operator but does not state any object-, fleet-, or field-level authorization. If dashboard queries do not enforce customer ownership and least-privilege result filtering, an authorized operator can elicit other customers' site addresses, occupancy patterns, and raw readings. The resulting cross-customer intelligence can be used to profile customer sites and operations.",
+      "affected_element_ids": [
+        "entity:fleet-operator",
+        "flow:entity:fleet-operator>store:telemetry-lake>query-dashboards",
+        "store:telemetry-lake"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "unknown:flow:entity:fleet-operator>store:telemetry-lake>query-dashboards:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Our own fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 11,
+      "attacker_position": "authorized-principal",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because operators already hold the stated SSO-authenticated dashboard access, but the model does not state ownership or result-set authorization. Impact is high because the queried confidential lake includes raw customer readings, site addresses, and occupancy patterns."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce authorization on every dashboard query",
+          "detail": "Bind `entity:fleet-operator` identities to explicit fleet and customer scopes and enforce row-, column-, and aggregate-level checks server-side for `flow:entity:fleet-operator>store:telemetry-lake>query-dashboards`."
+        },
+        {
+          "summary": "Provide minimized dashboard views",
+          "detail": "Expose aggregated, privacy-preserving views by default and require a separately authorized role and audit trail for raw telemetry access."
+        }
+      ]
+    },
+    {
+      "title": "An unverified Pub/Sub subscriber path could return customer telemetry to an unauthorized reader",
+      "description": "`flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings` is a read path for PII-tagged normalized sensor readings, but its protocol and authentication are unknown. If `store:pub-sub` does not authenticate and authorize subscriber identities per topic and subscription, a party that can reach the broker interface can subscribe or request messages and elicit customer telemetry. The obtained stream can then be correlated with the telemetry lake's customer-site activity data.",
+      "affected_element_ids": [
+        "store:pub-sub",
+        "flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings",
+        "process:telemetry-normalizer"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "unknown:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings:protocol",
+        "unknown:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings:authentication",
+        "crossing:flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings"
+      ],
+      "quotes": [
+        {
+          "text": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 12,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the subscriber path crosses an analytics-to-ingest boundary while both its protocol and authentication are unknown, although the attacker must reach the broker interface. Impact is medium because the consumed stream is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and authorize every subscriber",
+          "detail": "Require dedicated workload identities and per-topic, per-subscription authorization for `flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings`; deny anonymous subscription and message export."
+        },
+        {
+          "summary": "Use protected subscriber transport",
+          "detail": "Require TLS for Pub/Sub consumption and record the protocol and `encryption_in_transit` state for the reader flow."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

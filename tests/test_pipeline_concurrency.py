@@ -28,7 +28,6 @@ from analysis_service.binding import NodeBinding
 from analysis_service.compact import FULL_FORMAT
 from analysis_service.jobs import JobRecord, PipelineCompleted
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.sampling import load_sampling
 from analysis_service.sources import Source
 from tests.factories import (
@@ -39,6 +38,7 @@ from tests.factories import (
     PROJECT_ROOT,
     STRONG_MODEL,
     ScriptedLlm,
+    adk_runner,
     claims_json,
     emitted,
     repo_package_loaders,
@@ -140,6 +140,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
     """
     marker = f"MARK-{index:04x}"
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|shared-caller",
         sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
@@ -156,9 +157,7 @@ async def _ignore_node(node: str) -> None:
 async def _run_all(count: int) -> list[tuple[int, str, object]]:
     global _barrier
     _barrier = asyncio.Barrier(count)
-    runner = AdkPipelineRunner(
-        _build_shared_pipeline()
-    )  # one shared runner + session service
+    runner = adk_runner(_build_shared_pipeline())  # one shared runner + session service
 
     async def one(index: int) -> tuple[int, str, object]:
         marker, record = _marker_job(index)

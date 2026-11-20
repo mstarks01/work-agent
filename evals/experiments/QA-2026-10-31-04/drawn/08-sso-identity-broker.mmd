@@ -1,0 +1,26 @@
+flowchart LR
+    colleague[Colleagues]
+    fcolleague[Franchise colleagues]
+    fidp[Franchise identity provider]
+    subgraph corp[Corporate network]
+        broker[Identity broker]
+        console[Store admin console]
+    end
+    apps[Other applications]
+    keys[(Key store)]
+    dir[(Directory)]
+    hr[HR system]
+    audit[(Audit log)]
+
+    colleague -->|sign in| broker
+    broker -->|"token (staff id, groups)"| colleague
+    colleague -->|token| console
+    colleague -->|token| apps
+    console -->|fetch public key| broker
+    apps -->|fetch public key| broker
+    keys -->|signing key| broker
+    broker <-->|"colleagues, groups"| dir
+    hr -->|"group changes (nightly)"| broker
+    fcolleague -->|sign in| fidp
+    fidp -->|vouches for colleague| broker
+    broker -->|sign-ins| audit

@@ -1,0 +1,649 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "d51830a1fa4ffbdb5348b1713bae9fa0b2b2a2f2",
+    "clean": true,
+    "table": {
+      "case": "06-cookbook-online-game",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "296b1e44aae80214dc1fe2e419cf581f5fe4e688786116c51e611b055fddac8e"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "4a598fb55db452d3fcbf12281ac336c953897d32b88575e53abdcb8d0f94e9c8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/qa1103/wt/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Player-local game traffic may expose player information if transport protection is absent",
+      "description": "`flow:entity:player>process:game-client>launch-and-play` carries player input and game output on hardware the operator does not control, and its `encryption_in_transit` is unknown. If local transport protection is absent or ineffective, malware or another observer on the player's machine can intercept player-associated input and output before it reaches `process:game-client`. The disclosure can enable targeted account or gameplay attacks using information learned from the client session; this is conditional on the unverified transport setting.",
+      "affected_element_ids": [
+        "flow:entity:player>process:game-client>launch-and-play",
+        "entity:player",
+        "process:game-client"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:player>process:game-client>launch-and-play:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low because observation requires code or equivalent access on the player-controlled local machine, while impact is medium because `entity:player` is tagged `pii` and session information can be captured."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and protect the client-local channel",
+          "detail": "Establish whether this local interaction crosses a process boundary and, where it does, use authenticated local IPC with least-privileged access so untrusted local processes cannot read client traffic."
+        }
+      ]
+    },
+    {
+      "title": "Matchmaking traffic may be readable across the player-to-production boundary",
+      "description": "`flow:process:game-client>process:lobby>matchmaking` crosses from `boundary:player-local-machine` to `boundary:production-network` and has `encryption_in_transit: unknown`. If transport encryption is not in place, an observer on the player's network path can intercept matchmaking requests and match assignments, including player-associated matchmaking information. The resulting match and player context can enable targeted harassment or later attacks against particular players; this draft is conditional on the unverified encryption setting.",
+      "affected_element_ids": [
+        "flow:process:game-client>process:lobby>matchmaking",
+        "process:game-client",
+        "process:lobby"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:game-client>process:lobby>matchmaking",
+        "unknown:flow:process:game-client>process:lobby>matchmaking:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses from a player-controlled network into production and an attacker needs an on-path position, while impact is medium because the flow connects an individual player to the internet-facing `process:lobby`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated TLS for matchmaking",
+          "detail": "Set `encryption_in_transit` for `flow:process:game-client>process:lobby>matchmaking` to TLS with certificate validation, protecting requests and match assignments across the trust boundary."
+        }
+      ]
+    },
+    {
+      "title": "Gameplay state may be readable across the player-to-game-server boundary",
+      "description": "`flow:process:game-client>process:game-server>gameplay-traffic` crosses from `boundary:player-local-machine` to `boundary:production-network`, carries gameplay actions and state updates, and has `encryption_in_transit: unknown`. If the TCP 1235 connection lacks effective encryption, an on-path observer can intercept live gameplay state and actions exchanged with `process:game-server`. Captured state can reveal match behavior and provide intelligence useful for targeting players or exploiting game logic; this is conditional on the unverified transport control.",
+      "affected_element_ids": [
+        "flow:process:game-client>process:game-server>gameplay-traffic",
+        "process:game-client",
+        "process:game-server"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:game-client>process:game-server>gameplay-traffic",
+        "unknown:flow:process:game-client>process:game-server>gameplay-traffic:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the unverified client-to-production crossing can be observed only from the network path, while impact is medium because the flow carries state associated with the business-critical game service."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt gameplay connections end to end",
+          "detail": "Use TLS or a datagram transport with equivalent authenticated encryption on TCP 1235, including certificate validation by `process:game-client`."
+        }
+      ]
+    },
+    {
+      "title": "Unverified lobby-to-game-server transport may expose match composition",
+      "description": "`flow:process:lobby>process:game-server>hand-over-match` carries match composition and player identifiers between `process:lobby` and `process:game-server`, but its `encryption_in_transit` is unknown. If the internal hand-off is not encrypted, an attacker with a foothold on the production-network path can intercept player identifiers and match composition. That information can be used to correlate players with active matches and target them through the game-facing services; the threat is conditional on the unstated transport protection.",
+      "affected_element_ids": [
+        "flow:process:lobby>process:game-server>hand-over-match",
+        "process:lobby",
+        "process:game-server"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:lobby>process:game-server>hand-over-match:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because interception requires a prior position on the internal production-network path, while impact is medium because match composition includes player identifiers and reaches `process:game-server`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the internal match hand-off",
+          "detail": "Use mTLS or equivalent mutually authenticated encryption for `flow:process:lobby>process:game-server>hand-over-match` rather than relying on the production network."
+        }
+      ]
+    },
+    {
+      "title": "Player account records may be exposed on the lobby database read path",
+      "description": "`flow:process:lobby>store:player-database>read-players` reads player account records from `store:player-database`, which is tagged `pii` and `business-critical-data`, while `encryption_in_transit` is unknown. If this database read path is unencrypted, an attacker able to observe the production-network path can intercept player account records as `process:lobby` retrieves them. The captured records can enable targeting of accounts and expose the player corpus beyond the lobby's intended use; this draft is conditional on the unverified transport control.",
+      "affected_element_ids": [
+        "flow:process:lobby>store:player-database>read-players",
+        "process:lobby",
+        "store:player-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:lobby>store:player-database>read-players:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because an attacker must first observe an internal production-network database path, while impact is medium because `store:player-database` holds `pii` and player account records."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the lobby database read connection",
+          "detail": "Require TLS with database-server identity verification for `flow:process:lobby>store:player-database>read-players` and reject plaintext fallback."
+        }
+      ]
+    },
+    {
+      "title": "Match statistics may be exposed on the game-server database path",
+      "description": "`flow:process:game-server>store:stats-database>read-write-stats` carries match statistics to and from `store:stats-database`, and its `encryption_in_transit` is unknown. If this internal database connection is unencrypted, a production-network observer can intercept match statistics exchanged by `process:game-server`. The data can reveal game activity and operationally valuable player behavior, enabling more precise targeting of the game service; this is conditional on the unverified transport setting.",
+      "affected_element_ids": [
+        "flow:process:game-server>store:stats-database>read-write-stats",
+        "process:game-server",
+        "store:stats-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:game-server>store:stats-database>read-write-stats:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because observation requires an internal network foothold, while impact is medium because `store:stats-database` and `process:game-server` handle business-critical match data."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect the statistics database connection with TLS",
+          "detail": "Configure authenticated TLS for `flow:process:game-server>store:stats-database>read-write-stats` and record the verified encryption state in the model."
+        }
+      ]
+    },
+    {
+      "title": "Player progression data may be exposed on the game-server write path",
+      "description": "`flow:process:game-server>store:player-database>update-players` carries player progression and match results to `store:player-database`, which is tagged `pii` and `business-critical-data`, but has `encryption_in_transit: unknown`. If this write path is plaintext, an on-path attacker in the production network can intercept progression and match-result data as `process:game-server` updates player records. The data can be correlated with account records and used to target individual players or identify valuable accounts; this is conditional on the unverified encryption state.",
+      "affected_element_ids": [
+        "flow:process:game-server>store:player-database>update-players",
+        "process:game-server",
+        "store:player-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:game-server>store:player-database>update-players:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the attacker needs a production-network observation point, while impact is medium because the path carries player-related data into a store tagged `pii` and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt game-server updates to player records",
+          "detail": "Use mutually authenticated TLS for `flow:process:game-server>store:player-database>update-players` and prohibit unencrypted database connections."
+        }
+      ]
+    },
+    {
+      "title": "Support-to-moderation traffic may expose player account information",
+      "description": "`flow:entity:customer-support-staff>process:moderation-website>moderate-accounts` crosses from `boundary:corporate-network` to `boundary:production-network`, carries moderation actions on player accounts, and has `encryption_in_transit: unknown`. If the support connection is not encrypted, an attacker observing the corporate-to-production path can intercept player-related moderation requests and responses handled by `process:moderation-website`. The disclosure can reveal account and moderation context that enables targeted social engineering or account abuse; this is conditional on the unverified transport setting.",
+      "affected_element_ids": [
+        "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
+        "entity:customer-support-staff",
+        "process:moderation-website"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
+        "unknown:flow:entity:customer-support-staff>process:moderation-website>moderate-accounts:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses the corporate-to-production boundary and requires an on-path observer, while impact is medium because the moderation path handles `pii` associated with player accounts."
+      },
+      "mitigations": [
+        {
+          "summary": "Require HTTPS for the moderation interface",
+          "detail": "Set `encryption_in_transit` on `flow:entity:customer-support-staff>process:moderation-website>moderate-accounts` to TLS with strong certificate validation and disable plaintext access."
+        }
+      ]
+    },
+    {
+      "title": "Moderation website database traffic may expose player records",
+      "description": "`flow:process:moderation-website>store:player-database>read-write-players` carries player account records and moderation state to `store:player-database`, which is tagged `pii` and `business-critical-data`, while `encryption_in_transit` is unknown. If the connection is unencrypted, an attacker with access to the production-network path can intercept support-driven account records and moderation state. The information can facilitate targeted attacks against players and reveal sensitive support actions; this threat is conditional on the missing transport-verification fact.",
+      "affected_element_ids": [
+        "flow:process:moderation-website>store:player-database>read-write-players",
+        "process:moderation-website",
+        "store:player-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:moderation-website>store:player-database>read-write-players:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the attacker needs access to an internal production-network path, while impact is medium because the path exposes records in the `pii`-tagged `store:player-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt moderation website access to player records",
+          "detail": "Require authenticated TLS for `flow:process:moderation-website>store:player-database>read-write-players`, with database certificates verified by `process:moderation-website`."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy may expose all player records if at-rest encryption is absent",
+      "description": "`store:player-database` holds player accounts and is tagged `pii` and `business-critical-data`, but its `encryption_at_rest` is unknown. If that unknown resolves to no effective encryption at rest, an attacker who obtains a storage-layer copy, such as a decommissioned volume, backup, snapshot, or other operational copy of this store, can read player accounts directly without using the lobby, game-server, or moderation read paths. The copied corpus can then support targeted attacks against player accounts; this draft is conditional and does not assert that the store is unencrypted.",
+      "affected_element_ids": [
+        "store:player-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:player-database:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because a storage copy may be obtainable if encryption is absent, while impact is medium because `store:player-database` contains a corpus tagged `pii` and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for player records",
+          "detail": "Determine the actual `encryption_at_rest` state of `store:player-database`, then use managed-key encryption covering the primary store and every backup, snapshot, replica, and decommissioned medium."
+        },
+        {
+          "summary": "Restrict storage-copy access",
+          "detail": "Limit export, snapshot, restore, and key-use permissions to dedicated least-privileged operational roles and audit bulk-copy activity."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy may expose match statistics if at-rest encryption is absent",
+      "description": "`store:stats-database` holds business-critical match statistics, while its `encryption_at_rest` is unknown. If the store is not effectively encrypted at rest, an attacker holding a disk, backup, snapshot, or other storage-layer copy can read the statistics without authenticating as `process:game-server`. The disclosed historical match data can reveal game activity and enable more informed targeting of the game service; this claim is conditional on the unresolved encryption-at-rest attribute.",
+      "affected_element_ids": [
+        "store:stats-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:stats-database:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 11,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because storage-layer copies become readable if the unverified encryption control is absent, while impact is medium because `store:stats-database` holds business-critical match statistics."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for match statistics",
+          "detail": "Establish the `encryption_at_rest` posture of `store:stats-database` and require managed-key encryption for the store and all operational copies."
+        },
+        {
+          "summary": "Constrain backup and snapshot access",
+          "detail": "Use separate least-privileged roles for copying and restoring statistics data, with audit alerts for export or unusual read volume."
+        }
+      ]
+    },
+    {
+      "title": "Compromise of a player-database reader may expose the player-account corpus",
+      "description": "`process:lobby` reads `store:player-database` through `flow:process:lobby>store:player-database>read-players`, and `process:moderation-website` reads and writes the same store through `flow:process:moderation-website>store:player-database>read-write-players`; authentication on both database paths is unknown. If either reader has credentials or authorization broader than its required records and an attacker runs code in that reader, the attacker can read player account records from the `pii`-tagged store through the service's existing database access. The lobby is player-facing and the source states that the lobby is exposed, so compromise of that reader could turn one component foothold into corpus-scale account disclosure; this is conditional on the unresolved database authentication and authorization scope.",
+      "affected_element_ids": [
+        "store:player-database",
+        "process:lobby",
+        "process:moderation-website",
+        "flow:process:lobby>store:player-database>read-players"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:lobby>store:player-database>authentication",
+        "unknown:flow:process:moderation-website>store:player-database>authentication"
+      ],
+      "quotes": [
+        {
+          "text": "Both of those have to be reachable from wherever a player is, so they are exposed.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 12,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `process:lobby` is exposed to players and database authentication and authorization scope are unstated, while impact is medium because `store:player-database` contains player accounts tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Use separate least-privileged database identities",
+          "detail": "Give `process:lobby` and `process:moderation-website` distinct authenticated database principals limited to the rows and fields each function requires, including server-side object-level checks."
+        },
+        {
+          "summary": "Limit and detect bulk account reads",
+          "detail": "Restrict query capabilities to required account fields and alert on anomalous or corpus-scale reads by either service identity."
+        }
+      ]
+    },
+    {
+      "title": "Compromise of the game-server reader may expose match statistics",
+      "description": "`process:game-server` reads and writes `store:stats-database` through `flow:process:game-server>store:stats-database>read-write-stats`, whose authentication is unknown. If the game-server database identity has read scope broader than an individual match server needs and an attacker runs code in `process:game-server`, the attacker can read accumulated match statistics through the service's authorized path. Because game servers are player-facing, disclosure can provide an attacker with historical and live operational context useful for targeting gameplay services; this draft is conditional on the unverified authentication and grant scope.",
+      "affected_element_ids": [
+        "store:stats-database",
+        "process:game-server",
+        "flow:process:game-server>store:stats-database>read-write-stats"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:game-server>store:stats-database>read-write-stats:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "Both of those have to be reachable from wherever a player is, so they are exposed.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 13,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `process:game-server` is exposed to players and its database authentication is unknown, while impact is medium because `store:stats-database` holds business-critical match statistics."
+      },
+      "mitigations": [
+        {
+          "summary": "Scope the game-server database grant per workload",
+          "detail": "Use a distinct authenticated identity for game servers with only the rows, partitions, and fields required for their assigned matches."
+        },
+        {
+          "summary": "Monitor unusual statistics reads",
+          "detail": "Audit and alert on database reads by game-server identities that exceed expected match-processing volume or partition scope."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

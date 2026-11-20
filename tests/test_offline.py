@@ -1,7 +1,7 @@
 """Offline mode refuses a live provider call before the transport sees it.
 
 Each test drives a shipped path to a transport it supplies and counts what
-reached it. The count with offline mode off is the positive control: without
+reached it. The count with offline mode off is the positive check: without
 it, a guard that refused nothing and a transport the path never reached would
 read the same.
 """
@@ -39,7 +39,7 @@ def _drive_base_tier() -> tuple[list, BaseException]:
 def test_without_offline_mode_the_call_reaches_the_transport(supplied_transport):
     seen, error = _drive_base_tier()
 
-    assert seen, "the positive control: the shipped path reaches this transport"
+    assert seen, "the positive check: the shipped path reaches this transport"
     assert not isinstance(error, LiveInferenceRefused)
 
 
@@ -65,7 +65,11 @@ def test_offline_mode_refuses_before_the_transport_on_every_attempt():
 
 
 def test_offline_mode_refuses_a_single_node_replay():
-    """The path ``critic-replay`` and ``lane-replay`` pay for one call on."""
+    """The one paid call of each single-node replay.
+
+    ``critic-replay``, ``recritic-replay`` and ``lane-replay`` each pay for one
+    call on this path.
+    """
     call = node_call(
         Deployment.from_env(),
         FrameworkNodes("stride").node(CRITIC_ROLE),

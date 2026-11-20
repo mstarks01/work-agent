@@ -1,0 +1,2634 @@
+{
+ "record": {
+  "clean": false,
+  "command": "early-policies",
+  "commit": "7c83662c1131efb68153e14e259aff08e10ded04",
+  "inputs": [
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/01-payments-checkout.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "149d68fbab507e634d2f4c4e102e00bbb1eee33def242aa345922dc0131c8c17"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/02-iot-fleet-telemetry.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "495303bddc0786f75d8b7fc36eaafa0bdd951f5cee69f758bc967fca49c0a5e9"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/04-ml-inference-service.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "314f88496abbccbbcb781da476af9430c3ab2c8fead719349cfe7dc4011c9530"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/05-cookbook-queue-webapp.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "51f92a9028670e612d57e738bb8d377fcbbd35a7cbe0f7789b1515a64e3dd38e"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/06-cookbook-online-game.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "649c662e261510b474268b94faadbc666403ccc9f75a9dff50a036f77301590d"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/08-sso-identity-broker.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "1768b12de8886649a9a0e6482389c6b481a7759eaca1b727546dacfe1c0930e4"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/09-cookbook-sokify-retail.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "766c5773a44c32156bac2143f81445e98aeddc5849b4e1644dbfd0af7567cb92"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/10-cookbook-generic-cms.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "a8ea2f28916c409bad5ef3a7331fa4f6215fb9472ee0c7bf7978e9d1afa74600"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/11-sparse-shift-scheduling.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "1f178352b1e74fc17bfc221cf3ebd7d1f0d36e5e632901d6f57c108e0577d44a"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/12-overclaiming-supplier-portal.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "2bd06be5644238cfb843ee23c5d2044d295b4cbb3271bab674209207e9ebd16d"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.reports/13-dispatch-control-plane.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "e7ea6e33e3ff4dc6e4964ddf434ce7683fda6e22271fb66b5600c39ecba33b65"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/01-payments-checkout.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "bdc86382ae594ea4b1148f885caecf7ef4add4aa9f8f92c1086a63f0b00a60c9"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/02-iot-fleet-telemetry.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "8ce196a1115854195b8e120d182abb6d659eadafd8824191ed5b93150e9aca12"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/04-ml-inference-service.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "ff1697d6ac12d5aebe682c9c849bc56f8595ed0603abe3cd100131011c05248c"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/05-cookbook-queue-webapp.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "497202ab032be7c533113324a5c417e2f4bfcc7a7e9a702ee43f16bab3d2e854"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/06-cookbook-online-game.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "187153bae3b58f7e9bb6fedb5d0351cd149cb2fe2f62ba4b2aef96358ca4f450"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/08-sso-identity-broker.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "32f94fc7f99372236d73ca2ec06329d784dd72559e533a6d2bf0a0ac31bc35df"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/09-cookbook-sokify-retail.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "7d58afa4ef16945322ddf9b081567cb5d54b988c30106d502a6c9795cdfa8a3f"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/10-cookbook-generic-cms.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "023181ccc53e265516d90bf59e96c50b8966aba9a41095d0f31b9c8b6855538a"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/11-sparse-shift-scheduling.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "d9d88179f279a22d6fb5067105e0d0b3e235efea7372733e8a1b0e18e51a6d9a"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/12-overclaiming-supplier-portal.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "a2fce8ee45ea99a388f9ebdf87e19d7d6d4222dd9e8ca144a9cc3110c6f1c0df"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports/13-dispatch-control-plane.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "63e7ff911c86aab0b9e693ace8f1118b0ea1f9569b886aef84abc42dde4d31a1"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/01-payments-checkout.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "55fdf9ad1f01579fadd21d0a8549245e81fccc13e493a4f326de76949fe555f5"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/02-iot-fleet-telemetry.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "b90151525bbcd617ef490171c936d43c138c82ceb130014984efd082dc34f3be"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/04-ml-inference-service.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "f8d35d9addce45a276a01b6c6ee2953cad5b669edf30707e6accf59588a0c2ae"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/05-cookbook-queue-webapp.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "aa054eaad949a0aca8a7fab7c036823f85b0f23ddce08021e0ceea624e4e1912"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/06-cookbook-online-game.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "ad0d3168e8849fb1698a2351b6948738bea74429d7ad69606e4c00aade087285"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/08-sso-identity-broker.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "9f7f7c378bb187aafe177b268754fb8cb9b876bfeb539bee4514f081d0f89307"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/09-cookbook-sokify-retail.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "22a3fd86fa0858b57b8580cf67659715ba577e16f7bcc3651f3c5b290eb3cd19"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/10-cookbook-generic-cms.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "4dd86ca94a2e0ace96bc9e583b7e20723b3b6e7004eccccc1e3ef34cf9cebe69"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/11-sparse-shift-scheduling.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "83397025fe5a760e129fbf7a56a1dea785b2396910b27058cff8e317a34bf69f"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/12-overclaiming-supplier-portal.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "98f20657500a6893213dd240f82196a4c1b63fee77db5a6e99877beb8affa50a"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.reports/13-dispatch-control-plane.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "591f888f2f74fdd27c0c8050b73984eb39154ca5e497f2dee5a7f26f21777f4d"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/01-payments-checkout.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "641f6c8e5017a7127b4adf78e33b5e410bd586addaedd37e1f883bf7a3500ee7"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/02-iot-fleet-telemetry.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "4aea4a28d13fd3fb46f236851f47326a20a4767791d832774fe51b23a5f0b48d"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/04-ml-inference-service.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "a8eb32516a3e57aca2d5a9b5d99419d8f27b8af1dc8c5544e92311bffb936ef1"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/05-cookbook-queue-webapp.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "5a32134afc4abcce6e8bacc55dc3543903e88a03f888997c1e1511194850f54f"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/06-cookbook-online-game.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "9663cde42584356cb4919388a0aa8364e23f025fe3fecaa3d6679c5a8da66def"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/08-sso-identity-broker.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "1f8f17574c959ca7a9bc2e09435cbc2de432da3c7d7f8f29dceac3d57bc10685"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/09-cookbook-sokify-retail.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "f224b918cc50c99813bd03263f089bf0685d8d5616990492b1e54feedf1f3b43"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/10-cookbook-generic-cms.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "d0b8be637e060d2d81525c4a3a3c65774f187fd4d08a0728f1f354c6c7852d4d"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/11-sparse-shift-scheduling.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "9eef400900156ff804107da3651c7a4cc36e96ed75c99456f7fd466f29678c31"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/12-overclaiming-supplier-portal.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "b0067fe2685b24a5df2339a8ecb7a4ca022241c01fcbda457feb94fc105ebc68"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.reports/13-dispatch-control-plane.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "stride": {}
+     }
+    },
+    "sha256": "2d23f30ec2568ab3f19b1ddfa0407d93235d5d9bc04254fceb10765ef573493e"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs-terra.reports/01-payments-checkout.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 2
+      }
+     }
+    },
+    "sha256": "0f6404176cc7040aef1927cb6d8284a369c39a779be5539f95060a6af2967e44"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/01-payments-checkout.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 2
+      }
+     }
+    },
+    "sha256": "4aa6f017a0a334d659bdb0245c747826030097acf633c08db3f6415cf42726ca"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/02-iot-fleet-telemetry.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "c3acc396285bc1bb05b93ffdc4902d0cae4a97607aecd2f571b6268be165e956"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/04-ml-inference-service.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 2
+      }
+     }
+    },
+    "sha256": "9745a50767cf8c2fa70d2000079ce1512a84470560dc71071a841bea32b8a268"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/05-cookbook-queue-webapp.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 2
+      }
+     }
+    },
+    "sha256": "9b7884b1f2f111cbc02258dad50a7f83201380fe2350497f74f09a54eefffffd"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/06-cookbook-online-game.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "bf59329ea23567600e1db615f6e485d1b1e92e4d99511e49177db30854cc8283"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/08-sso-identity-broker.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 2
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 2
+      }
+     }
+    },
+    "sha256": "e132477b9c76e645ee3c1945eeaf067fb459e9b7a73ad2a9ad76e6ff6bd86f34"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/09-cookbook-sokify-retail.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "f27891867cfcb9d23ebd6c2c81e60b18c67122099127d6b825359d2ad8f58ba5"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/10-cookbook-generic-cms.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "fcfcd2836e58e39ff2e39f12b86e1d86acda19593005ab93402d89fd77c50798"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/11-sparse-shift-scheduling.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "bfaf161ea65793abe98276b9efb461aa41eef1c96b0d86f3b7d5fad18da2dfe1"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/12-overclaiming-supplier-portal.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "b31ec86511c1aff26b3e2edfc132f232b06ddd213ac0dd0fdd3b9d98fa61a0a2"
+   },
+   {
+    "path": "/tmp/claude-1000/-home-me-work-agent/e751f6cc-3c46-41b7-9aae-411ef8763efa/scratchpad/root/runs/20260830T000000Z-asvs-first-sweep/analysis-asvs.reports/13-dispatch-control-plane.report.json",
+    "selections": {
+     "all": {
+      "asvs": {
+       "level": 1
+      },
+      "stride": {}
+     },
+     "alone": {
+      "asvs": {
+       "level": 1
+      }
+     }
+    },
+    "sha256": "1d208853abbb2faf1e553da3937e9bc3d54696e9fde689b7f8dfc185a22952c2"
+   }
+  ],
+  "table": {
+   "budgets": [
+    5,
+    10,
+    15,
+    20,
+    30,
+    45,
+    60
+   ],
+   "policies": [
+    "shipped-list",
+    "framework-merge",
+    "grouped-merge",
+    "group-question",
+    "fact-reads",
+    "fact-reads-prior",
+    "fact-ranked",
+    "no-to-the-rest-none",
+    "no-to-the-rest-third",
+    "no-to-the-rest-all"
+   ]
+  }
+ },
+ "summary": {
+  "asvs / all": {
+   "fact-ranked @ 10": {
+    "choices": 120,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 60,
+    "units": 1511
+   },
+   "fact-ranked @ 15": {
+    "choices": 179,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 143,
+    "units": 1511
+   },
+   "fact-ranked @ 20": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 245,
+    "units": 1511
+   },
+   "fact-ranked @ 30": {
+    "choices": 351,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 384,
+    "units": 1511
+   },
+   "fact-ranked @ 45": {
+    "choices": 529,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 481,
+    "units": 1511
+   },
+   "fact-ranked @ 5": {
+    "choices": 60,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 53,
+    "units": 1511
+   },
+   "fact-ranked @ 60": {
+    "choices": 709,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 528,
+    "units": 1511
+   },
+   "fact-ranked @ all": {
+    "choices": 1009,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads @ 10": {
+    "choices": 118,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 53,
+    "units": 1511
+   },
+   "fact-reads @ 15": {
+    "choices": 175,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 116,
+    "units": 1511
+   },
+   "fact-reads @ 20": {
+    "choices": 234,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 180,
+    "units": 1511
+   },
+   "fact-reads @ 30": {
+    "choices": 355,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 333,
+    "units": 1511
+   },
+   "fact-reads @ 45": {
+    "choices": 528,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 422,
+    "units": 1511
+   },
+   "fact-reads @ 5": {
+    "choices": 59,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 53,
+    "units": 1511
+   },
+   "fact-reads @ 60": {
+    "choices": 708,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 489,
+    "units": 1511
+   },
+   "fact-reads @ all": {
+    "choices": 991,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads-prior @ 10": {
+    "choices": 120,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 110,
+    "units": 1511
+   },
+   "fact-reads-prior @ 15": {
+    "choices": 177,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 186,
+    "units": 1511
+   },
+   "fact-reads-prior @ 20": {
+    "choices": 232,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 335,
+    "units": 1511
+   },
+   "fact-reads-prior @ 30": {
+    "choices": 328,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 559,
+    "units": 1511
+   },
+   "fact-reads-prior @ 45": {
+    "choices": 385,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 628,
+    "units": 1511
+   },
+   "fact-reads-prior @ 5": {
+    "choices": 60,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 53,
+    "units": 1511
+   },
+   "fact-reads-prior @ 60": {
+    "choices": 387,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads-prior @ all": {
+    "choices": 387,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "shipped-list @ 10": {
+    "choices": 120,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 60,
+    "units": 1511
+   },
+   "shipped-list @ 15": {
+    "choices": 177,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 148,
+    "units": 1511
+   },
+   "shipped-list @ 20": {
+    "choices": 231,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 229,
+    "units": 1511
+   },
+   "shipped-list @ 30": {
+    "choices": 354,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 350,
+    "units": 1511
+   },
+   "shipped-list @ 45": {
+    "choices": 529,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 435,
+    "units": 1511
+   },
+   "shipped-list @ 5": {
+    "choices": 60,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 53,
+    "units": 1511
+   },
+   "shipped-list @ 60": {
+    "choices": 713,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 501,
+    "units": 1511
+   },
+   "shipped-list @ all": {
+    "choices": 1011,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   }
+  },
+  "asvs / alone": {
+   "fact-ranked @ 10": {
+    "choices": 110,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 416,
+    "units": 1511
+   },
+   "fact-ranked @ 15": {
+    "choices": 165,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 471,
+    "units": 1511
+   },
+   "fact-ranked @ 20": {
+    "choices": 218,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 556,
+    "units": 1511
+   },
+   "fact-ranked @ 30": {
+    "choices": 277,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-ranked @ 45": {
+    "choices": 312,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-ranked @ 5": {
+    "choices": 55,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 254,
+    "units": 1511
+   },
+   "fact-ranked @ 60": {
+    "choices": 312,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-ranked @ all": {
+    "choices": 312,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads @ 10": {
+    "choices": 110,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 416,
+    "units": 1511
+   },
+   "fact-reads @ 15": {
+    "choices": 159,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 555,
+    "units": 1511
+   },
+   "fact-reads @ 20": {
+    "choices": 184,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 580,
+    "units": 1511
+   },
+   "fact-reads @ 30": {
+    "choices": 234,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads @ 45": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads @ 5": {
+    "choices": 55,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 254,
+    "units": 1511
+   },
+   "fact-reads @ 60": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads @ all": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads-prior @ 10": {
+    "choices": 110,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 416,
+    "units": 1511
+   },
+   "fact-reads-prior @ 15": {
+    "choices": 159,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 555,
+    "units": 1511
+   },
+   "fact-reads-prior @ 20": {
+    "choices": 184,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 580,
+    "units": 1511
+   },
+   "fact-reads-prior @ 30": {
+    "choices": 234,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads-prior @ 45": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads-prior @ 5": {
+    "choices": 55,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 254,
+    "units": 1511
+   },
+   "fact-reads-prior @ 60": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "fact-reads-prior @ all": {
+    "choices": 235,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "shipped-list @ 10": {
+    "choices": 110,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 416,
+    "units": 1511
+   },
+   "shipped-list @ 15": {
+    "choices": 165,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 471,
+    "units": 1511
+   },
+   "shipped-list @ 20": {
+    "choices": 220,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 554,
+    "units": 1511
+   },
+   "shipped-list @ 30": {
+    "choices": 285,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "shipped-list @ 45": {
+    "choices": 322,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "shipped-list @ 5": {
+    "choices": 55,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 254,
+    "units": 1511
+   },
+   "shipped-list @ 60": {
+    "choices": 322,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   },
+   "shipped-list @ all": {
+    "choices": 322,
+    "completed": 0,
+    "findings": 314,
+    "findings level 1": 144,
+    "findings level 2": 165,
+    "findings level 3": 5,
+    "reports": 12,
+    "settled": 630,
+    "units": 1511
+   }
+  },
+  "stride / all": {
+   "fact-ranked @ 10": {
+    "choices": 440,
+    "completed": 399,
+    "completed critical": 28,
+    "completed high": 180,
+    "completed low": 23,
+    "completed medium": 168,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 15": {
+    "choices": 653,
+    "completed": 489,
+    "completed critical": 28,
+    "completed high": 208,
+    "completed low": 43,
+    "completed medium": 210,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 20": {
+    "choices": 861,
+    "completed": 519,
+    "completed critical": 28,
+    "completed high": 223,
+    "completed low": 44,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 30": {
+    "choices": 1296,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 45": {
+    "choices": 1939,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 5": {
+    "choices": 220,
+    "completed": 262,
+    "completed critical": 24,
+    "completed high": 116,
+    "completed low": 17,
+    "completed medium": 105,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 60": {
+    "choices": 2586,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ all": {
+    "choices": 3795,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 10": {
+    "choices": 433,
+    "completed": 361,
+    "completed critical": 28,
+    "completed high": 158,
+    "completed low": 23,
+    "completed medium": 152,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 15": {
+    "choices": 643,
+    "completed": 419,
+    "completed critical": 28,
+    "completed high": 181,
+    "completed low": 38,
+    "completed medium": 172,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 20": {
+    "choices": 864,
+    "completed": 423,
+    "completed critical": 28,
+    "completed high": 183,
+    "completed low": 38,
+    "completed medium": 174,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 30": {
+    "choices": 1294,
+    "completed": 459,
+    "completed critical": 28,
+    "completed high": 203,
+    "completed low": 38,
+    "completed medium": 190,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 45": {
+    "choices": 1933,
+    "completed": 494,
+    "completed critical": 28,
+    "completed high": 211,
+    "completed low": 43,
+    "completed medium": 212,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 5": {
+    "choices": 216,
+    "completed": 245,
+    "completed critical": 24,
+    "completed high": 104,
+    "completed low": 14,
+    "completed medium": 103,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 60": {
+    "choices": 2594,
+    "completed": 498,
+    "completed critical": 28,
+    "completed high": 213,
+    "completed low": 44,
+    "completed medium": 213,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ all": {
+    "choices": 3717,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 10": {
+    "choices": 440,
+    "completed": 399,
+    "completed critical": 28,
+    "completed high": 180,
+    "completed low": 23,
+    "completed medium": 168,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 15": {
+    "choices": 651,
+    "completed": 489,
+    "completed critical": 28,
+    "completed high": 208,
+    "completed low": 43,
+    "completed medium": 210,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 20": {
+    "choices": 851,
+    "completed": 519,
+    "completed critical": 28,
+    "completed high": 223,
+    "completed low": 44,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 30": {
+    "choices": 1197,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 45": {
+    "choices": 1403,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 5": {
+    "choices": 220,
+    "completed": 262,
+    "completed critical": 24,
+    "completed high": 116,
+    "completed low": 17,
+    "completed medium": 105,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 60": {
+    "choices": 1411,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ all": {
+    "choices": 1411,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 10": {
+    "choices": 440,
+    "completed": 367,
+    "completed critical": 26,
+    "completed high": 160,
+    "completed low": 23,
+    "completed medium": 158,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 15": {
+    "choices": 657,
+    "completed": 474,
+    "completed critical": 27,
+    "completed high": 204,
+    "completed low": 37,
+    "completed medium": 206,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 20": {
+    "choices": 856,
+    "completed": 517,
+    "completed critical": 28,
+    "completed high": 223,
+    "completed low": 44,
+    "completed medium": 222,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 30": {
+    "choices": 1291,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 45": {
+    "choices": 1931,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 5": {
+    "choices": 219,
+    "completed": 259,
+    "completed critical": 25,
+    "completed high": 118,
+    "completed low": 16,
+    "completed medium": 100,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 60": {
+    "choices": 2602,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ all": {
+    "choices": 3799,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   }
+  },
+  "stride / alone": {
+   "fact-ranked @ 10": {
+    "choices": 439,
+    "completed": 429,
+    "completed critical": 27,
+    "completed high": 186,
+    "completed low": 27,
+    "completed medium": 189,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 15": {
+    "choices": 642,
+    "completed": 510,
+    "completed critical": 28,
+    "completed high": 218,
+    "completed low": 45,
+    "completed medium": 219,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 20": {
+    "choices": 856,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 30": {
+    "choices": 1295,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 45": {
+    "choices": 1849,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 5": {
+    "choices": 220,
+    "completed": 285,
+    "completed critical": 26,
+    "completed high": 133,
+    "completed low": 19,
+    "completed medium": 107,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ 60": {
+    "choices": 2420,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-ranked @ all": {
+    "choices": 2908,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 10": {
+    "choices": 432,
+    "completed": 260,
+    "completed critical": 26,
+    "completed high": 116,
+    "completed low": 18,
+    "completed medium": 100,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 15": {
+    "choices": 631,
+    "completed": 279,
+    "completed critical": 26,
+    "completed high": 131,
+    "completed low": 20,
+    "completed medium": 102,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 20": {
+    "choices": 865,
+    "completed": 335,
+    "completed critical": 26,
+    "completed high": 150,
+    "completed low": 22,
+    "completed medium": 137,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 30": {
+    "choices": 1271,
+    "completed": 400,
+    "completed critical": 26,
+    "completed high": 175,
+    "completed low": 28,
+    "completed medium": 171,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 45": {
+    "choices": 1903,
+    "completed": 424,
+    "completed critical": 26,
+    "completed high": 175,
+    "completed low": 41,
+    "completed medium": 182,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 5": {
+    "choices": 208,
+    "completed": 135,
+    "completed critical": 19,
+    "completed high": 51,
+    "completed low": 5,
+    "completed medium": 60,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ 60": {
+    "choices": 2436,
+    "completed": 487,
+    "completed critical": 28,
+    "completed high": 208,
+    "completed low": 45,
+    "completed medium": 206,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads @ all": {
+    "choices": 2895,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 10": {
+    "choices": 416,
+    "completed": 431,
+    "completed critical": 27,
+    "completed high": 187,
+    "completed low": 28,
+    "completed medium": 189,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 15": {
+    "choices": 560,
+    "completed": 510,
+    "completed critical": 28,
+    "completed high": 218,
+    "completed low": 45,
+    "completed medium": 219,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 20": {
+    "choices": 589,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 30": {
+    "choices": 589,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 45": {
+    "choices": 589,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 5": {
+    "choices": 220,
+    "completed": 285,
+    "completed critical": 26,
+    "completed high": 133,
+    "completed low": 19,
+    "completed medium": 107,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ 60": {
+    "choices": 589,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "fact-reads-prior @ all": {
+    "choices": 589,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 10": {
+    "choices": 433,
+    "completed": 383,
+    "completed critical": 26,
+    "completed high": 169,
+    "completed low": 26,
+    "completed medium": 162,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 15": {
+    "choices": 645,
+    "completed": 446,
+    "completed critical": 27,
+    "completed high": 200,
+    "completed low": 29,
+    "completed medium": 190,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 20": {
+    "choices": 867,
+    "completed": 510,
+    "completed critical": 28,
+    "completed high": 222,
+    "completed low": 44,
+    "completed medium": 216,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 30": {
+    "choices": 1283,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 45": {
+    "choices": 1866,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 5": {
+    "choices": 219,
+    "completed": 289,
+    "completed critical": 24,
+    "completed high": 129,
+    "completed low": 15,
+    "completed medium": 121,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ 60": {
+    "choices": 2441,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   },
+   "shipped-list @ all": {
+    "choices": 2908,
+    "completed": 521,
+    "completed critical": 28,
+    "completed high": 224,
+    "completed low": 45,
+    "completed medium": 224,
+    "findings": 616,
+    "findings critical": 33,
+    "findings high": 251,
+    "findings low": 56,
+    "findings medium": 276,
+    "reports": 44,
+    "settled": 0,
+    "units": 0
+   }
+  }
+ }
+}

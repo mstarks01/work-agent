@@ -15,12 +15,12 @@ instruments must then say:
   the one reader of "does this catalog pass") refuses the row, by code, in
   any of its rounds; or
 * **the endpoint** (:attr:`~evals.harness.replay.AssertionReplay.recovered`,
-  the one reader of required-fact recall) stops counting the row, and the
+  which counts required-fact recall) stops counting the row, and the
   matcher's fate says why.
 
 A falsification probe that takes nothing away at either instrument is a hole in
 the measurement, and :data:`PROBES` is written so that the suite fails when one
-appears. A **positive control** takes nothing away by design and is declared
+appears. A **positive check** takes nothing away by design and is declared
 with ``loses=0`` and no refusal, so the two are never confused.
 
 **A criterion nothing probes says why**, in :data:`UNPROBED`. #926's acceptance
@@ -35,6 +35,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
+from typing import Literal, get_args
 
 from analysis_service.assertions import (
     Assertion,
@@ -42,10 +43,11 @@ from analysis_service.assertions import (
     AssertionRecord,
     Subject,
     assertion_id,
-    settled,
+    uncontradicted,
 )
 from analysis_service.assertions import without as retracted
 from analysis_service.evidence import lead_topics, prepared_view
+from analysis_service.execution import source_texts
 from analysis_service.system_model import (
     SystemModel,
     flow_id_version,
@@ -65,7 +67,7 @@ from evals.harness.replay import (
     unsigned_reason,
 )
 
-#: Every falsification and positive-control line #926's acceptance list names,
+#: Every line of #926's "Falsification and positive-control fixtures" list,
 #: keyed by the slug :data:`PROBES` and :data:`UNPROBED` answer it under. The
 #: registry the table is compared against: a line here with neither a probe nor
 #: a recorded reason fails ``tests/test_evals_falsification.py``.
@@ -209,7 +211,8 @@ class Probe:
     ``refuses`` is the gate codes the corrupted catalog must raise, and
     ``elements`` the fate of each blessed element the corrupted graph no longer
     holds. A probe declaring none of these and no fate but ``found`` is a
-    positive control, and :attr:`control` is how the suite tells the two apart.
+    positive check, and :attr:`positive_check` is how the suite tells the two
+    apart.
 
     ``credits`` is how many touched rows the looser, label-dropping reading
     answers where the strict one does not (#1015). It is a reading reported
@@ -230,10 +233,10 @@ class Probe:
     note: str = ""
 
     @property
-    def control(self) -> bool:
+    def positive_check(self) -> bool:
         """Whether this probe declares a reading that takes nothing away anywhere.
 
-        A positive control, and the only kind of probe allowed to take nothing
+        A positive check, and the only kind of probe allowed to take nothing
         away: no required row lost, no gate refusal, no element missing, and
         every touched row still answered.
         """
@@ -250,7 +253,7 @@ class Probe:
         cannot see at all moves no recall either. Both are still corruptions,
         and both are caught — by a row fate, an element fate or a gate code.
         """
-        return not self.control and not self.loses
+        return not self.positive_check and not self.loses
 
 
 def _find(
@@ -555,7 +558,7 @@ def _changed_source(reference: SignedReference, case: GoldenCase) -> Corruption:
     moves afterwards is visible rather than silently re-read. The catalog is
     untouched: the corruption is entirely in what the submitter wrote.
     """
-    sources = {source.label: source.text for source in case.sources}
+    sources = source_texts(case.sources)
     label = next(iter(sources))
     return Corruption(
         tuple(reference.entries),
@@ -575,9 +578,30 @@ def _valid_inference(reference: SignedReference, case: GoldenCase) -> Corruption
     )
 
 
+#: A probe of :data:`PROBES`.
+ProbeName = Literal[
+    "perfect-reading",
+    "mfa-enforced",
+    "support-copied",
+    "empty-citation",
+    "stopword-mechanism",
+    "removed-assertion",
+    "renamed-flow",
+    "deleted-parallel-interaction",
+    "signature-is-not-authentication",
+    "destination-is-not-authentication",
+    "control-name-elsewhere",
+    "absence-inferred",
+    "scope-dropped",
+    "paraphrase",
+    "identity-and-provenance",
+    "changed-source",
+    "valid-inference",
+]
+
 #: Every probe, keyed by the criterion it answers. A key here is never an arm:
 #: ``tests/test_evals_falsification.py`` holds the two namespaces apart.
-PROBES: Mapping[str, Probe] = MappingProxyType(
+PROBES: Mapping[ProbeName, Probe] = MappingProxyType(
     {
         "perfect-reading": Probe("01-payments-checkout", _perfect),
         "mfa-enforced": Probe(
@@ -707,7 +731,7 @@ class Outcome:
         return not self.broke
 
 
-def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcome:
+def run_probe(name: ProbeName, case: GoldenCase, reference: SignedReference) -> Outcome:
     """Corrupt this case's perfect reading one way, and read both instruments."""
     probe = PROBES[name]
     corrupted = probe.corrupt(reference, case)
@@ -717,7 +741,7 @@ def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcom
     catalog = AssertionCatalog(subjects=subjects, entries=list(corrupted.entries))
     model = case.model if corrupted.model is None else corrupted.model
     sources = (
-        {source.label: source.text for source in case.sources}
+        source_texts(case.sources)
         if corrupted.sources is None
         else dict(corrupted.sources)
     )
@@ -836,8 +860,8 @@ def render(found: Sequence[Outcome]) -> str:
     for name, probe in PROBES.items():
         if probe.note:
             lines.append(f"- `{name}` reaches part of its criterion: {probe.note}")
-    for name, why in sorted(UNPROBED.items()):
-        lines.append(f"- no probe for `{name}`: {why}")
+    for criterion, why in sorted(UNPROBED.items()):
+        lines.append(f"- no probe for `{criterion}`: {why}")
     return "\n".join(lines) + "\n"
 
 
@@ -859,20 +883,19 @@ def render(found: Sequence[Outcome]) -> str:
 #: ``absence-inferred`` is not here: its corrupted row carries the true value
 #: under the basis ``inferred``, and reaching a lane labelled as an inference
 #: is what ADR 0036 asks of one. ``paraphrase`` and ``valid-inference`` are
-#: positive controls, and the rest corrupt the graph rather than a fact.
-CRITICAL: frozenset[str] = frozenset(
-    {
-        "mfa-enforced",
-        "support-copied",
-        "empty-citation",
-        "stopword-mechanism",
-        "control-name-elsewhere",
-        "signature-is-not-authentication",
-        "destination-is-not-authentication",
-        "scope-dropped",
-        "changed-source",
-    }
-)
+#: positive checks, and the rest corrupt the graph rather than a fact.
+CriticalProbe = Literal[
+    "mfa-enforced",
+    "support-copied",
+    "empty-citation",
+    "stopword-mechanism",
+    "control-name-elsewhere",
+    "signature-is-not-authentication",
+    "destination-is-not-authentication",
+    "scope-dropped",
+    "changed-source",
+]
+CRITICAL: frozenset[CriticalProbe] = frozenset(get_args(CriticalProbe))
 
 #: Who assesses the corrupted rows in the reviewed reading. Not a model: the
 #: fixture itself knows which rows it corrupted.
@@ -883,8 +906,9 @@ FIXTURE_REVIEWER = "reviewer:falsification-fixture"
 class Consumed:
     """What one corrupted reading does to a job.
 
-    ``reached`` is every corrupted row the job settles, so a lane reads it
-    through the graph or the evidence table as a fact.
+    ``reached`` is every corrupted row the job settles and the graph does not
+    contradict, so a lane reads it through the graph or the evidence table as a
+    fact.
 
     Lost leads are split by what lost them, against the same reading with the
     corrupted rows simply left out. ``suppressed`` is a lead that reading
@@ -922,11 +946,12 @@ class Consumed:
 
 def consumer_view(
     catalog: AssertionCatalog, model: SystemModel, sources: Mapping[str, str]
-) -> tuple[AssertionCatalog, frozenset[str]]:
-    """What a job reads from this catalog: the rows it keeps, and its leads.
+) -> tuple[frozenset[str], frozenset[str]]:
+    """What a job reads from this catalog: the rows it reads as facts, and its leads.
 
     The job's own sequence, with nothing re-derived: the gate quarantines, the
     projection writes the graph, and the evidence catalog is built over both.
+    A fact is a settled row the graph does not contradict, by identity.
 
     **A lead is named by what it is about**, an element's attribute or a
     subject's predicate, not by its evidence key. A stated absence that becomes
@@ -936,8 +961,11 @@ def consumer_view(
     record = AssertionRecord.over(
         catalog, model, sources, proposed=len(catalog.entries)
     )
-    _, _, evidence = prepared_view(model, record.catalog)
-    return record.catalog, lead_topics(evidence, record.catalog)
+    projected, _, evidence = prepared_view(model, record.catalog)
+    facts = frozenset(
+        assertion_id(entry) for entry in uncontradicted(record.catalog, projected)
+    )
+    return facts, lead_topics(evidence, record.catalog)
 
 
 @dataclass(frozen=True)
@@ -959,7 +987,7 @@ class Reading:
 
 
 def reading(
-    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+    name: ProbeName, case: GoldenCase, reference: SignedReference, *, reviewed: bool
 ) -> Reading:
     """One probe's corruption, ready for analysis preparation.
 
@@ -989,7 +1017,7 @@ def reading(
         ),
         model=case.model if corrupted.model is None else corrupted.model,
         sources=(
-            {source.label: source.text for source in case.sources}
+            source_texts(case.sources)
             if corrupted.sources is None
             else dict(corrupted.sources)
         ),
@@ -998,27 +1026,21 @@ def reading(
 
 
 def consume_probe(
-    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+    name: ProbeName, case: GoldenCase, reference: SignedReference, *, reviewed: bool
 ) -> Consumed:
     """Drive one probe's corruption through the job, reviewed or not."""
     built = reading(name, case, reference, reviewed=reviewed)
     _, perfect = consumer_view(
         AssertionCatalog(subjects=reference.subjects, entries=list(reference.entries)),
         case.model,
-        {source.label: source.text for source in case.sources},
+        source_texts(case.sources),
     )
     _, without = consumer_view(built.without, built.model, built.sources)
-    kept, leads = consumer_view(built.catalog, built.model, built.sources)
+    facts, leads = consumer_view(built.catalog, built.model, built.sources)
     return Consumed(
         probe=name,
         reviewed=reviewed,
-        reached=tuple(
-            sorted(
-                assertion_id(entry)
-                for entry in settled(kept)
-                if assertion_id(entry) in built.changed
-            )
-        ),
+        reached=tuple(sorted(facts & built.changed)),
         suppressed=tuple(sorted(without - leads)),
         omitted=tuple(sorted(perfect - without)),
     )

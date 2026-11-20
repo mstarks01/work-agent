@@ -33,7 +33,8 @@ from tests.factories import SEEDING_BUDGET
 
 app = create_app(
     runner=StubPipelineRunner(),
-    frameworks=("stride",),
+    carried_frameworks=("stride",),
+    carries_catalog=False,
     limits=test_api.TEST_LIMITS,
     job_deadline_seconds=test_api.TEST_DEADLINE_SECONDS,
     max_active_jobs=test_api.TEST_MAX_ACTIVE_JOBS,

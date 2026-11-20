@@ -12,8 +12,10 @@ the agents follow them:
 * One ground per load-bearing fact, with no padding. Read
   :attr:`CaseGrounds.grounds_per_threat`, which the rule predicts stays low.
 * The verbatim-quote discipline. Read :attr:`CaseGrounds.unverified_rate`, which
-  is the share of quote grounds the shipped ladder could not find in the source
-  they name.
+  is the share of checked quote grounds the shipped ladder could not find in
+  the source they name. A fan-in with an empty map of source texts checks no
+  quote: :attr:`CaseGrounds.unchecked_count` counts those quotes, and no rate
+  divides by them.
 
 It is credential-free, like :mod:`evals.harness.scorer` and
 :mod:`evals.harness.critic_yield`. It takes plain data — the merged drafts and
@@ -25,7 +27,7 @@ normalization policy the service does not run.
 Two more readings:
 
 * The repair rung. Read :attr:`CaseGrounds.repaired_count`, which is the quotes
-  the ladder refused and :func:`~analysis_service.grounding.repair_prepared`
+  the ladder refused and :func:`~analysis_service.grounding.faithful_repair`
   then rewrote to the source's nearest span. That is the number that moves
   :data:`~analysis_service.grounding.REPAIR_THRESHOLD`.
 * A claim that lost every ground. Read :attr:`CaseGrounds.dropped_count`, which
@@ -65,6 +67,7 @@ from analysis_service.claims import (
 )
 from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks import lane_of
+from evals.harness.rates import ratio, rounded_figure, shown_figure
 
 # Why the fan-in killed a case. A claim that loses every ground loses its own
 # entry and not the case: it is dropped and marked, and
@@ -81,6 +84,15 @@ FailureKind = Literal["other"]
 #: Every ground kind, read off :data:`GroundKind` itself, so a kind the record
 #: adds is counted rather than dropped.
 _KINDS: tuple[GroundKind, ...] = get_args(GroundKind)
+
+
+def unchecked_quote_count(quotes: int, quotes_checked: bool) -> int:
+    """The quotes no check read: none, or every quote where no check ran.
+
+    The quote check reads every quote of a fan-in or none of them, so a quote
+    is unchecked exactly where ``quotes_checked`` is false.
+    """
+    return 0 if quotes_checked else quotes
 
 
 @dataclass(frozen=True)
@@ -143,6 +155,9 @@ class CaseGrounds:
     case_id: str
     framework: FrameworkName
     threats: tuple[ThreatGrounds, ...]
+    #: Whether the fan-in ran the quote check over these drafts
+    #: (:func:`~analysis_service.claims.quote_check_ran`).
+    quotes_checked: bool
     #: The claims this block dropped for losing every ground, as the report
     #: marks them. Not in ``threats``: a dropped claim never reached the critic.
     dropped: tuple[DroppedClaim, ...] = ()
@@ -163,7 +178,7 @@ class CaseGrounds:
         return {kind: counts.get(kind, 0) for kind in _KINDS}
 
     @property
-    def grounds_per_threat(self) -> float:
+    def grounds_per_threat(self) -> float | None:
         """The padding number: ``analyze.md`` asks for one per load-bearing fact."""
         return ratio(self.ground_count, self.threat_count)
 
@@ -173,7 +188,7 @@ class CaseGrounds:
         return sum(1 for entry in self.threats if not entry.has_quote)
 
     @property
-    def quoteless_rate(self) -> float:
+    def quoteless_rate(self) -> float | None:
         return ratio(self.quoteless_count, self.threat_count)
 
     # --- measurement 2: the unverified-quote rate ------------------------
@@ -183,28 +198,39 @@ class CaseGrounds:
         return self.kind_counts["quote"]
 
     @property
+    def checked_quote_count(self) -> int:
+        """The quotes a check read."""
+        return self.quote_count - self.unchecked_count
+
+    @property
+    def unchecked_count(self) -> int:
+        """The quotes no check read. They are neither verified nor unverified."""
+        return unchecked_quote_count(self.quote_count, self.quotes_checked)
+
+    @property
     def unverified_count(self) -> int:
         return sum(len(entry.unverified) for entry in self.threats)
 
     @property
-    def unverified_rate(self) -> float:
-        """Of the quotes the agents wrote, the share the ladder could not find.
+    def unverified_rate(self) -> float | None:
+        """Of the checked quotes, the share the ladder could not find.
 
         Denominated in *quotes*, never in grounds: an unknown-attribute ground
         is verified by set membership and can never appear here, so dividing by
         every ground would report a rate that falls whenever the agents happen
-        to cite more unknowns.
+        to cite more unknowns. Only checked quotes count, so a block whose
+        fan-in checked no quote has no rate rather than a rate of zero.
         """
-        return ratio(self.unverified_count, self.quote_count)
+        return ratio(self.unverified_count, self.checked_quote_count)
 
     @property
     def repaired_count(self) -> int:
         return sum(len(entry.repaired) for entry in self.threats)
 
     @property
-    def repaired_rate(self) -> float:
-        """Of the quotes the agents wrote, the share the repair rung rewrote."""
-        return ratio(self.repaired_count, self.quote_count)
+    def repaired_rate(self) -> float | None:
+        """Of the checked quotes, the share the repair rung rewrote."""
+        return ratio(self.repaired_count, self.checked_quote_count)
 
     # --- measurement 3: claims dropped for losing every ground -----------
     @property
@@ -212,7 +238,7 @@ class CaseGrounds:
         return len(self.dropped)
 
     @property
-    def dropped_rate(self) -> float:
+    def dropped_rate(self) -> float | None:
         """Of every claim the lanes drafted, the share the service dropped.
 
         Denominated in drafts plus drops: a dropped claim is not in ``threats``,
@@ -230,15 +256,16 @@ class CaseGrounds:
                 "quoteless_threats": self.quoteless_count,
                 "unverified_quotes": self.unverified_count,
                 "repaired_quotes": self.repaired_count,
+                "unchecked_quotes": self.unchecked_count,
                 "dropped_claims": self.dropped_count,
                 **self.kind_counts,
             },
             "metrics": {
-                "grounds_per_threat": round(self.grounds_per_threat, 3),
-                "quoteless_rate": round(self.quoteless_rate, 3),
-                "unverified_rate": round(self.unverified_rate, 3),
-                "repaired_rate": round(self.repaired_rate, 3),
-                "dropped_rate": round(self.dropped_rate, 3),
+                "grounds_per_threat": rounded_figure(self.grounds_per_threat, 3),
+                "quoteless_rate": rounded_figure(self.quoteless_rate, 3),
+                "unverified_rate": rounded_figure(self.unverified_rate, 3),
+                "repaired_rate": rounded_figure(self.repaired_rate, 3),
+                "dropped_rate": rounded_figure(self.dropped_rate, 3),
             },
             "threats": [entry.to_json() for entry in self.threats],
             "dropped": [mark.model_dump(mode="json") for mark in self.dropped],
@@ -279,11 +306,6 @@ class GroundsFailure:
         return {"case": self.case_id, "kind": self.kind, "detail": self.detail}
 
 
-def ratio(numerator: float, denominator: float) -> float:
-    """Zero denominators are 0.0, never a crash and never a silent 100%."""
-    return numerator / denominator if denominator else 0.0
-
-
 def measure_grounds(
     case_id: str,
     framework: FrameworkName,
@@ -291,6 +313,8 @@ def measure_grounds(
     unverified: Iterable[UnverifiedGround],
     dropped: Iterable[DroppedClaim],
     repaired: Iterable[RepairedQuote],
+    *,
+    quotes_checked: bool,
 ) -> CaseGrounds:
     """Fold one framework's drafts and its unverified marks into one measurement.
 
@@ -302,6 +326,9 @@ def measure_grounds(
 
     Typed against the neutral :class:`~analysis_service.claims.Claim` because that
     is what carries ``grounds``. Nothing here reads a field a package declares.
+
+    ``quotes_checked`` says whether the fan-in ran the quote check. Where it
+    did not, no quote carries a mark, and each quote counts as unchecked.
 
     A mark naming a draft that is not here is dropped rather than raised on:
     the report already refuses to be built with a dangling mark, so reaching
@@ -330,6 +357,7 @@ def measure_grounds(
             )
             for draft in drafts
         ),
+        quotes_checked=quotes_checked,
         dropped=tuple(dropped),
     )
 
@@ -402,7 +430,8 @@ def aggregate_grounds(
     """
     threats = sum(entry.threat_count for entry in measurements)
     grounds = sum(entry.ground_count for entry in measurements)
-    quotes = sum(entry.quote_count for entry in measurements)
+    checked = sum(entry.checked_quote_count for entry in measurements)
+    unchecked = sum(entry.unchecked_count for entry in measurements)
     unverified = sum(entry.unverified_count for entry in measurements)
     repaired = sum(entry.repaired_count for entry in measurements)
     quoteless = sum(entry.quoteless_count for entry in measurements)
@@ -417,13 +446,14 @@ def aggregate_grounds(
         "quoteless_threats": quoteless,
         "unverified_quotes": unverified,
         "repaired_quotes": repaired,
+        "unchecked_quotes": unchecked,
         "dropped_claims": dropped,
         **{kind: kinds.get(kind, 0) for kind in _KINDS},
-        "grounds_per_threat": round(ratio(grounds, threats), 3),
-        "quoteless_rate": round(ratio(quoteless, threats), 3),
-        "unverified_rate": round(ratio(unverified, quotes), 3),
-        "repaired_rate": round(ratio(repaired, quotes), 3),
-        "dropped_rate": round(ratio(dropped, threats + dropped), 3),
+        "grounds_per_threat": rounded_figure(ratio(grounds, threats), 3),
+        "quoteless_rate": rounded_figure(ratio(quoteless, threats), 3),
+        "unverified_rate": rounded_figure(ratio(unverified, checked), 3),
+        "repaired_rate": rounded_figure(ratio(repaired, checked), 3),
+        "dropped_rate": rounded_figure(ratio(dropped, threats + dropped), 3),
         "failed_cases": len(failures),
     }
 
@@ -442,11 +472,13 @@ def render(
         counts = entry.kind_counts
         print(
             f"{entry.case_id:<26} grounds {entry.ground_count}"
-            f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
+            f" on {entry.threat_count} threats"
+            f" ({shown_figure(entry.grounds_per_threat, '.2f')} ea)"
             f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
             f"/{counts['absent-attribute']}/{counts['derived-fact']}"
-            f"  quoteless {entry.quoteless_rate:.0%}"
-            f"  unverified {entry.unverified_count}/{entry.quote_count}"
+            f"  quoteless {shown_figure(entry.quoteless_rate, '.0%')}"
+            f"  unverified {entry.unverified_count}/{entry.checked_quote_count}"
+            f"  unchecked {entry.unchecked_count}"
             f"  repaired {entry.repaired_count}"
             f"  dropped {entry.dropped_count}"
         )
@@ -455,11 +487,12 @@ def render(
     if measurements or failures:
         totals = aggregate_grounds(measurements, failures)
         print(
-            f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
-            f" quoteless {totals['quoteless_rate']:.0%},"
-            f" unverified {totals['unverified_rate']:.1%},"
-            f" repaired {totals['repaired_rate']:.1%},"
-            f" dropped {totals['dropped_rate']:.1%},"
+            f"grounds: {shown_figure(totals['grounds_per_threat'], '.2f')} per threat,"
+            f" quoteless {shown_figure(totals['quoteless_rate'], '.0%')},"
+            f" unverified {shown_figure(totals['unverified_rate'], '.1%')},"
+            f" unchecked quotes {totals['unchecked_quotes']},"
+            f" repaired {shown_figure(totals['repaired_rate'], '.1%')},"
+            f" dropped {shown_figure(totals['dropped_rate'], '.1%')},"
             f" failed cases {totals['failed_cases']}"
             " (instrument, non-gating)"
         )

@@ -1,0 +1,3 @@
+# Confirmed claims citing an open ground, and whether the critic dismissed every one.
+{('stride', 'all dismissed'): 51}
+

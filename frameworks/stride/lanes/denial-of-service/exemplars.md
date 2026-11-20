@@ -1,6 +1,6 @@
 # Denial of Service Exemplars
 
-Three drafts against the exemplar system, showing the shape and the reasoning. Follow the reasoning, not the wording.
+Three drafts against the exemplar systems, showing the shape and the reasoning. Follow the reasoning, not the wording.
 
 ## Canonical: asymmetric work on an internet-facing endpoint
 
@@ -19,6 +19,7 @@ The model states no rate limiting. Silence is not a control — rate likelihood 
     "process:ledger-service"
   ],
   "verb": "flood",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
@@ -54,13 +55,14 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
 {
   "sequence": 2,
   "title": "Database connection exhaustion cascades into total transfer outage",
-  "description": "Every payment path terminates at `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api`, or slow-running queries induced by expensive request shapes, exhausts that capacity. Second-order: `process:ledger-service`, which every payment path depends on, cannot complete or roll back transfers once the pool is starved, `flow:process:ledger-service>store:audit-log>append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
+  "description": "Every payment path terminates at `store:accounts-db` over `flow:process:ledger-service>store:accounts-db>read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api` exhausts that capacity. Second-order: `process:ledger-service`, which every payment path depends on, cannot complete or roll back transfers once the pool is starved, `flow:process:ledger-service>store:audit-log>append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
   "affected_element_ids": [
     "store:accounts-db",
     "process:ledger-service",
     "flow:process:ledger-service>store:accounts-db>read-write-balances"
   ],
   "verb": "flood",
+  "attacker_position": "outside",
   "evidence_refs": [],
   "quotes": [
     {
@@ -101,6 +103,7 @@ Written against exemplar system B. The trigger is an `unknown` on an element rat
     "flow:process:mqtt-broker>process:stream-processor>consume-topic"
   ],
   "verb": "flood",
+  "attacker_position": "outside",
   "evidence_refs": [
     "unknown:process:stream-processor:exposure",
     "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic"

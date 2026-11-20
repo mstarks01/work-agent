@@ -30,7 +30,11 @@ from typing import Literal
 
 from evals.harness import ledger, roster
 from evals.harness.ledger import Ledger, Vote
+from evals.harness.rates import percent, ratio
 from evals.harness.roster import Roster, Standing
+
+#: The name of each published series.
+Series = Literal["maintainer", "all"]
 
 #: Each published series, and the standings whose votes it reads. The primary
 #: series is maintainer-only: a contributor's votes stay a second series until
@@ -39,7 +43,7 @@ from evals.harness.roster import Roster, Standing
 #:
 #: A table rather than a flag, so adding a series is an entry here and every
 #: sweep starts computing it. The first key is the primary one.
-SERIES: dict[str, tuple[Standing, ...]] = {
+SERIES: dict[Series, tuple[Standing, ...]] = {
     "maintainer": ("maintainer",),
     # Written out rather than derived from :data:`~evals.harness.roster.STANDINGS`,
     # because this order is published: the artifact's series block carries it
@@ -107,7 +111,7 @@ class PairAgreement:
     @property
     def rate(self) -> float | None:
         """The share compared where both classes matched, or None at zero."""
-        return self.agreed / self.compared if self.compared else None
+        return ratio(self.agreed, self.compared)
 
     @property
     def crosses_the_line(self) -> bool:
@@ -184,7 +188,7 @@ def render(pairs: list[PairAgreement]) -> str:
         "| --- | --- | --- | --- | --- |",
     ]
     for pair in pairs:
-        rate = "—" if pair.rate is None else f"{pair.rate:.0%}"
+        rate = percent(pair.rate)
         crossing = " *" if pair.crosses_the_line else ""
         lines.append(
             f"| {pair.voters[0]} / {pair.voters[1]}{crossing}"

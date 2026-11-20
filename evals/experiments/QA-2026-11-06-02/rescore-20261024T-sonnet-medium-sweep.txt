@@ -1,0 +1,3 @@
+c4c0c719 (before #2200): must-find 21 of 100; must-find losses by cause {'verb': 14, 'position': 60, 'place': 1, 'unled': 4}
+cfd81c63 (#2200): must-find 21 of 100; must-find losses by cause {'verb': 14, 'unstated': 60, 'place': 1, 'unled': 4}
+Both: run.py score over the 13 case artifacts of evals/runs/20261024T-sonnet-medium-sweep, corpus cf3fd3442d9a, ANALYSIS_OFFLINE=1.

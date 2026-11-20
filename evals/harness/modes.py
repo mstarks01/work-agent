@@ -40,11 +40,11 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from analysis_service.analysis import (
+    ControlAttribute,
     comparable_asset_tags,
     control_state,
 )
 from analysis_service.assertions import (
-    ABSENT,
     REGISTRY,
     AssertionCatalog,
     AssertionRecord,
@@ -55,6 +55,7 @@ from analysis_service.assertions import (
     conflicts,
     project,
     projection_fields,
+    states_missing,
 )
 from analysis_service.basis import (
     IN_SCOPE,
@@ -76,6 +77,7 @@ from analysis_service.execution import (
     GraphFailed,
     GraphRun,
     emitted_state,
+    source_texts,
 )
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -89,6 +91,7 @@ from analysis_service.graph import (
     EXTRACTING_ENTRIES,
     STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
+    STATE_DIAGRAM_READINGS,
     STATE_EXTRACTED_MODEL,
     STATE_FIRST_PASS,
     STATE_FRAMEWORK_OPTIONS,
@@ -100,7 +103,9 @@ from analysis_service.graph import (
     ModelResolver,
     Pipeline,
     Rejected,
+    diagram_readings,
     result_of,
+    seeded_source_texts,
     tier_node_by_graph_node,
 )
 from analysis_service.links import with_link_answers
@@ -121,6 +126,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
     Element,
+    ElementPrefix,
     ExternalEntity,
     FlowIdError,
     ModelIndex,
@@ -140,6 +146,7 @@ from evals.harness.alignment import (
     singular,
 )
 from evals.harness.identity import comparable_elements
+from evals.harness.rates import mean, ratio, rounded_figure, shown_figure
 from evals.harness.reference import GoldenCase
 
 EVAL_APP_NAME = "analysis-evals"
@@ -326,7 +333,12 @@ class _Scored(NamedTuple):
     states: bool
 
 
-_SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
+#: An attribute the extraction scorer compares.
+ScoredAttribute = Literal[
+    "kind", "interface_kind", "assets", "operations", "protocol", ControlAttribute
+]
+
+_SCORED_ATTRIBUTES: Mapping[ScoredAttribute, _Scored] = {
     "kind": _Scored(str, states=False),
     "exposure": _Scored(str, states=False),
     "interface_kind": _Scored(str, states=False),
@@ -342,7 +354,7 @@ _SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
 #: The scored fields whose comparison reads a state rather than the fact. Taken
 #: off the table rather than listed beside it, so the two cannot disagree about
 #: which fields those are.
-STATE_REDUCED: frozenset[str] = frozenset(
+STATE_REDUCED: frozenset[ScoredAttribute] = frozenset(
     name for name, scored in _SCORED_ATTRIBUTES.items() if scored.states
 )
 
@@ -368,7 +380,7 @@ class AttributeCheck:
     """
 
     element_id: str
-    attribute: str
+    attribute: ScoredAttribute
     blessed: str
     extracted: str
 
@@ -435,7 +447,7 @@ def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
 #: added tomorrow is in this population unless somebody rules it out — the
 #: direction that fails loudly. A hand-typed triple would have left it silently
 #: outside both readers.
-NAMED_TYPES: tuple[str, ...] = tuple(
+NAMED_TYPES: tuple[ElementPrefix, ...] = tuple(
     sorted(
         element.id_prefix
         for element in get_args(Element)
@@ -497,7 +509,7 @@ class ExtractionScore:
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
     #: Which produced element stands for which blessed one, and on what
-    #: evidence — :mod:`evals.harness.alignment` is the one reader of that
+    #: evidence — :mod:`evals.harness.alignment` answers that
     #: question, and every figure below that asks it reads this. ``matched``,
     #: ``missing`` and ``extra`` are the strict reading by exact ID, kept beside
     #: it so no archived number changes meaning.
@@ -560,14 +572,14 @@ class ExtractionScore:
     zone_pairs: ZonePairs | None = None
 
     @property
-    def recall(self) -> float:
+    def recall(self) -> float | None:
         total = len(self.matched) + len(self.missing)
-        return len(self.matched) / total if total else 0.0
+        return ratio(len(self.matched), total)
 
     @property
-    def precision(self) -> float:
+    def precision(self) -> float | None:
         total = len(self.matched) + len(self.extra)
-        return len(self.matched) / total if total else 0.0
+        return ratio(len(self.matched), total)
 
     @property
     def aliased(self) -> tuple[Pair, ...]:
@@ -587,7 +599,7 @@ class ExtractionScore:
         )
 
     @property
-    def aligned_recall(self) -> float:
+    def aligned_recall(self) -> float | None:
         """Of the citable blessed elements, the share some produced element stands for.
 
         The alignment's reading beside :attr:`endpoint_recall` and
@@ -600,17 +612,17 @@ class ExtractionScore:
         """
         reference = comparable_elements((*self.matched, *self.missing))
         found = reference & self.alignment.aligned_reference
-        return len(found) / len(reference) if reference else 0.0
+        return ratio(len(found), len(reference))
 
     @property
-    def aligned_precision(self) -> float:
+    def aligned_precision(self) -> float | None:
         """Of the citable produced elements, the share that stands for a blessed one."""
         produced = comparable_elements((*self.matched, *self.extra))
         found = produced & frozenset(self.alignment.reference_of)
-        return len(found) / len(produced) if produced else 0.0
+        return ratio(len(found), len(produced))
 
     @property
-    def aligned_interaction_recall(self) -> float:
+    def aligned_interaction_recall(self) -> float | None:
         """Of the blessed interactions, the share the alignment paired.
 
         One to one, unlike :attr:`interaction_recall`, which counts flows per
@@ -621,10 +633,10 @@ class ExtractionScore:
         """
         flows = self._reference_of_type(DataFlow.id_prefix)
         found = flows & self.alignment.aligned_reference
-        return len(found) / len(flows) if flows else 0.0
+        return ratio(len(found), len(flows))
 
     @property
-    def aligned_interaction_precision(self) -> float:
+    def aligned_interaction_precision(self) -> float | None:
         """Of the produced interactions, the share that stands for a blessed one."""
         produced = frozenset(
             element_id
@@ -632,10 +644,10 @@ class ExtractionScore:
             if element_type(element_id) == DataFlow.id_prefix
         )
         found = produced & frozenset(self.alignment.reference_of)
-        return len(found) / len(produced) if produced else 0.0
+        return ratio(len(found), len(produced))
 
     @property
-    def actor_recall(self) -> float:
+    def actor_recall(self) -> float | None:
         """Of the blessed external entities, the share the alignment paired.
 
         Actor retention on its own, apart from :attr:`initiator_recall`: that
@@ -646,10 +658,10 @@ class ExtractionScore:
         """
         actors = self._reference_of_type(ExternalEntity.id_prefix)
         found = actors & self.alignment.aligned_reference
-        return len(found) / len(actors) if actors else 0.0
+        return ratio(len(found), len(actors))
 
     @property
-    def sourced_recall(self) -> float:
+    def sourced_recall(self) -> float | None:
         """Recall over citable elements, crediting a name a reader ruled supported.
 
         **The second of two standards, and it does not replace the first.**
@@ -685,7 +697,7 @@ class ExtractionScore:
             )
         )
         total = found + len(comparable_elements(self.endpoint_missing))
-        return (found + len(credited)) / total if total else 0.0
+        return ratio(found + len(credited), total)
 
     @property
     def naming_departures(self) -> int:
@@ -771,13 +783,13 @@ class ExtractionScore:
         return frozenset(self.blessed_initiators) - self.alignment.aligned_reference
 
     @property
-    def initiator_recall(self) -> float:
+    def initiator_recall(self) -> float | None:
         """Of the blessed model's pure initiators, the share the extraction kept.
 
         Read beside the overall element recall rather than instead of it: the
         two together say whether an extraction is uniformly thin or is dropping
-        one *kind* of element. A case with no pure initiator reads 0.0, for the
-        reason every other empty denominator here does.
+        one *kind* of element. A case with no pure initiator has no value, as
+        every other empty denominator here has none.
 
         **A pure initiator is a graph source node**, an element that starts an
         interaction and never receives one, and that is narrower than an actor
@@ -785,10 +797,8 @@ class ExtractionScore:
         receives a fax, so it is outside this denominator. :attr:`actor_recall`
         is the reading over every external entity.
         """
-        if not self.blessed_initiators:
-            return 0.0
         kept = len(self.blessed_initiators) - len(self.initiators_missing)
-        return kept / len(self.blessed_initiators)
+        return ratio(kept, len(self.blessed_initiators))
 
     @property
     def crossings_found(self) -> frozenset[str]:
@@ -798,7 +808,7 @@ class ExtractionScore:
         )
 
     @property
-    def crossings_recall(self) -> float:
+    def crossings_recall(self) -> float | None:
         """Of the blessed crossings, the share the extraction also derived.
 
         Names dropped, so this is the reading ``crossings_match`` cannot give.
@@ -806,12 +816,10 @@ class ExtractionScore:
         whose flow was never emitted cannot be separated, however it is
         compared. On the 2026-08-23 sweeps that ceiling was 40% and 55%.
         """
-        if not self.blessed_crossings:
-            return 0.0
-        return len(self.crossings_found) / len(self.blessed_crossings)
+        return ratio(len(self.crossings_found), len(self.blessed_crossings))
 
     @property
-    def crossings_precision(self) -> float:
+    def crossings_precision(self) -> float | None:
         """Of the crossings the extraction derived, the share the reference holds.
 
         **Recall alone never charges an invented crossing**, and inventing them
@@ -821,14 +829,12 @@ class ExtractionScore:
         A model that separated nothing is the opposite failure and recall
         already sees it, which is why both are reported rather than folded.
 
-        ``0.0`` where the extraction derived none, on the same reading
+        No value where the extraction derived none, on the same reading
         :attr:`crossings_recall` gives an empty reference: nothing derived is
         not a perfect score.
         """
-        derived = self.extracted_crossings
-        if not derived:
-            return 0.0
-        return len(self.crossings_found) / len(frozenset(derived))
+        derived = frozenset(self.extracted_crossings or ())
+        return ratio(len(self.crossings_found), len(derived))
 
     @property
     def crossings_derivable(self) -> bool:
@@ -836,7 +842,7 @@ class ExtractionScore:
         return self.extracted_crossings is not None
 
     @property
-    def interaction_recall(self) -> float:
+    def interaction_recall(self) -> float | None:
         """Endpoint recall with multiplicity, so a parallel flow is not free.
 
         :func:`_endpoint_keys` returns a *set*, and the schema and the corpus
@@ -858,15 +864,13 @@ class ExtractionScore:
             for element_id in (*self.matched, *self.missing)
             if element_type(element_id) == DataFlow.id_prefix
         )
-        if not blessed:
-            return 0.0
         extracted = Counter(
             _endpoint_key(element_id)
             for element_id in (*self.matched, *self.extra)
             if element_type(element_id) == DataFlow.id_prefix
         )
         kept = sum(min(count, extracted[pair]) for pair, count in blessed.items())
-        return kept / sum(blessed.values())
+        return ratio(kept, sum(blessed.values()))
 
     @property
     def endpoint_matched(self) -> frozenset[str]:
@@ -892,7 +896,7 @@ class ExtractionScore:
         return _endpoint_keys(self.extra) - blessed
 
     @property
-    def endpoint_recall(self) -> float:
+    def endpoint_recall(self) -> float | None:
         """Recall over the elements a claim can cite, so zones are not counted.
 
         :func:`~evals.harness.identity.comparable_elements` drops every
@@ -909,7 +913,7 @@ class ExtractionScore:
             )
         )
         total = found + len(comparable_elements(self.endpoint_missing))
-        return found / total if total else 0.0
+        return ratio(found, total)
 
     def _zones(self) -> tuple[frozenset[str], frozenset[str]]:
         """The case's trust zones, and the ones the extraction did not write.
@@ -927,7 +931,7 @@ class ExtractionScore:
         return blessed, gone
 
     @property
-    def zone_recall(self) -> float:
+    def zone_recall(self) -> float | None:
         """The half :attr:`endpoint_recall` does not count: the trust zones.
 
         Kept apart rather than dropped. A zone name reaches no claim, but the
@@ -936,10 +940,10 @@ class ExtractionScore:
         though the identity rule never reads one.
         """
         blessed, gone = self._zones()
-        return (len(blessed) - len(gone)) / len(blessed) if blessed else 0.0
+        return ratio(len(blessed) - len(gone), len(blessed))
 
     @property
-    def sourced_zone_recall(self) -> float:
+    def sourced_zone_recall(self) -> float | None:
         """:attr:`zone_recall`, crediting a zone a reader ruled supported.
 
         The zone half of the pair :attr:`sourced_recall` and
@@ -960,15 +964,13 @@ class ExtractionScore:
         there at all.
         """
         blessed, gone = self._zones()
-        if not blessed:
-            return 0.0
         credited = gone & frozenset(
             credit.reference for credit in self.aliased if is_zone(credit.reference)
         )
-        return (len(blessed) - len(gone) + len(credited)) / len(blessed)
+        return ratio(len(blessed) - len(gone) + len(credited), len(blessed))
 
     @property
-    def zone_partition_agreement(self) -> float:
+    def zone_partition_agreement(self) -> float | None:
         """Do the same elements sit together, whatever the zones are called?
 
         **A zone recall is a recall over zone *names*.** Every figure beside it
@@ -991,16 +993,16 @@ class ExtractionScore:
         (#961). :attr:`same_zone_recall`, :attr:`different_zone_agreement` and
         :attr:`zone_pair_coverage` are the three readings beside it.
 
-        ``0.0`` where fewer than two zoned elements are paired, because there
+        No value where fewer than two zoned elements are paired, because there
         is no pair to ask and an empty agreement is not a perfect one.
         """
         pairs = self.zone_pairs
-        if pairs is None or not pairs.compared:
-            return 0.0
-        return (pairs.same_agreed + pairs.apart_agreed) / pairs.compared
+        if pairs is None:
+            return None
+        return ratio(pairs.same_agreed + pairs.apart_agreed, pairs.compared)
 
     @property
-    def same_zone_recall(self) -> float:
+    def same_zone_recall(self) -> float | None:
         """Of the aligned pairs the blessed model puts together, the share the extraction does too.
 
         The co-memberships, on their own. Case 01's elements split into a zone
@@ -1008,24 +1010,24 @@ class ExtractionScore:
         the pooled figure reads the average; this reads the loss.
         """
         pairs = self.zone_pairs
-        if pairs is None or not pairs.same_total:
-            return 0.0
-        return pairs.same_agreed / pairs.same_total
+        if pairs is None:
+            return None
+        return ratio(pairs.same_agreed, pairs.same_total)
 
     @property
-    def different_zone_agreement(self) -> float:
+    def different_zone_agreement(self) -> float | None:
         """Of the aligned pairs the blessed model keeps apart, the share the extraction does too.
 
         The separations, on their own: one zone for everything leaves every
         together pair agreeing and this at zero.
         """
         pairs = self.zone_pairs
-        if pairs is None or not pairs.apart_total:
-            return 0.0
-        return pairs.apart_agreed / pairs.apart_total
+        if pairs is None:
+            return None
+        return ratio(pairs.apart_agreed, pairs.apart_total)
 
     @property
-    def zone_pair_coverage(self) -> float:
+    def zone_pair_coverage(self) -> float | None:
         """What share of the blessed model's zoned pairs the partition figures were asked over.
 
         A pair with an unaligned element is outside every figure above, so a
@@ -1035,17 +1037,17 @@ class ExtractionScore:
         agreement.
         """
         pairs = self.zone_pairs
-        if pairs is None or not pairs.reference_total:
-            return 0.0
-        return pairs.compared / pairs.reference_total
+        if pairs is None:
+            return None
+        return ratio(pairs.compared, pairs.reference_total)
 
     @property
     def differing(self) -> tuple[AttributeCheck, ...]:
         """The checks the two models answered differently, in model order."""
-        return tuple(check for check in self.attributes if not check.agrees)
+        return differing(self.attributes)
 
     @property
-    def scored_field_agreement(self) -> float:
+    def scored_field_agreement(self) -> float | None:
         """Agreement over every scored field of the elements both models hold.
 
         **Not an accuracy.** Half these fields are compared after a reduction to
@@ -1056,7 +1058,7 @@ class ExtractionScore:
         over at all.
         """
         agreed = len(self.attributes) - len(self.differing)
-        return agreed / len(self.attributes) if self.attributes else 0.0
+        return ratio(agreed, len(self.attributes))
 
     @property
     def state_agrees_unbased(self) -> int:
@@ -1086,7 +1088,7 @@ class ExtractionScore:
         )
 
     @property
-    def control_state_agreement(self) -> float:
+    def control_state_agreement(self) -> float | None:
         """The :data:`STATE_REDUCED` fields alone, named for what they compare.
 
         ``protocol``, ``authentication``, ``encryption_in_transit``,
@@ -1097,9 +1099,7 @@ class ExtractionScore:
         version, principal, scope or strength it named (#891).
         """
         checks = [c for c in self.attributes if c.attribute in STATE_REDUCED]
-        if not checks:
-            return 0.0
-        return sum(check.agrees for check in checks) / len(checks)
+        return ratio(sum(check.agrees for check in checks), len(checks))
 
     @property
     def attributes_comparable(self) -> int:
@@ -1124,7 +1124,7 @@ class ExtractionScore:
         return len(self.attributes)
 
     @property
-    def comparison_coverage(self) -> float:
+    def comparison_coverage(self) -> float | None:
         """What fraction of the reference's scored fields was compared at all.
 
         Read beside every agreement above it. A high agreement over a low
@@ -1135,52 +1135,58 @@ class ExtractionScore:
         not compared, not compared leniently.
         """
         total = self.attributes_comparable
-        return self.attributes_compared / total if total else 0.0
+        return ratio(self.attributes_compared, total)
 
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case_id,
-            "recall": round(self.recall, 3),
-            "precision": round(self.precision, 3),
-            "endpoint_recall": round(self.endpoint_recall, 3),
+            "recall": rounded_figure(self.recall, 3),
+            "precision": rounded_figure(self.precision, 3),
+            "endpoint_recall": rounded_figure(self.endpoint_recall, 3),
             # The same fold with multiplicity, so a second interaction between
             # one pair of endpoints is not free to drop (#925).
-            "interaction_recall": round(self.interaction_recall, 3),
-            "zone_recall": round(self.zone_recall, 3),
-            "sourced_zone_recall": round(self.sourced_zone_recall, 3),
+            "interaction_recall": rounded_figure(self.interaction_recall, 3),
+            "zone_recall": rounded_figure(self.zone_recall, 3),
+            "sourced_zone_recall": rounded_figure(self.sourced_zone_recall, 3),
             # The zone figure a naming difference cannot reach: do the same
             # elements sit together, whatever the zones are called (#925).
-            "zone_partition_agreement": round(self.zone_partition_agreement, 3),
+            "zone_partition_agreement": rounded_figure(
+                self.zone_partition_agreement, 3
+            ),
             # The partition figure's three readings: the co-memberships alone,
             # the separations alone, and how much of the reference either was
             # asked over (#961).
-            "same_zone_recall": round(self.same_zone_recall, 3),
-            "different_zone_agreement": round(self.different_zone_agreement, 3),
-            "zone_pair_coverage": round(self.zone_pair_coverage, 3),
+            "same_zone_recall": rounded_figure(self.same_zone_recall, 3),
+            "different_zone_agreement": rounded_figure(
+                self.different_zone_agreement, 3
+            ),
+            "zone_pair_coverage": rounded_figure(self.zone_pair_coverage, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "name_tokens_absent_from_source": list(self.name_tokens_absent_from_source),
-            "sourced_recall": round(self.sourced_recall, 3),
+            "sourced_recall": rounded_figure(self.sourced_recall, 3),
             "aliased": [credit.to_json() for credit in self.aliased],
             # The alignment's own reading, beside the strict and folded ones:
             # one produced element per blessed one, on recorded evidence, and
             # what it left unpaired (#961).
             "alignment": self.alignment.to_json(),
-            "aligned_recall": round(self.aligned_recall, 3),
-            "aligned_precision": round(self.aligned_precision, 3),
-            "aligned_interaction_recall": round(self.aligned_interaction_recall, 3),
-            "aligned_interaction_precision": round(
+            "aligned_recall": rounded_figure(self.aligned_recall, 3),
+            "aligned_precision": rounded_figure(self.aligned_precision, 3),
+            "aligned_interaction_recall": rounded_figure(
+                self.aligned_interaction_recall, 3
+            ),
+            "aligned_interaction_precision": rounded_figure(
                 self.aligned_interaction_precision, 3
             ),
-            "actor_recall": round(self.actor_recall, 3),
+            "actor_recall": rounded_figure(self.actor_recall, 3),
             "same_type_unmatched_candidates": list(self.same_type_unmatched_candidates),
             "extra_status": dict(self.extra_status),
-            "initiator_recall": round(self.initiator_recall, 3),
+            "initiator_recall": rounded_figure(self.initiator_recall, 3),
             "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
-            "crossings_recall": round(self.crossings_recall, 3),
+            "crossings_recall": rounded_figure(self.crossings_recall, 3),
             # Beside recall, which never charges an invented crossing.
-            "crossings_precision": round(self.crossings_precision, 3),
+            "crossings_precision": rounded_figure(self.crossings_precision, 3),
             "crossings_derivable": self.crossings_derivable,
             # Beside recall and precision rather than inside either. A flow
             # here is one the extraction found and placed one endpoint of
@@ -1196,14 +1202,14 @@ class ExtractionScore:
             # Named for what it compares. Half these fields reach the check as
             # a state rather than as the fact they hold, so this is agreement
             # over scored fields and never an extraction accuracy (#891).
-            "scored_field_agreement": round(self.scored_field_agreement, 3),
+            "scored_field_agreement": rounded_figure(self.scored_field_agreement, 3),
             "state_agrees_unbased": self.state_agrees_unbased,
-            "control_state_agreement": round(self.control_state_agreement, 3),
+            "control_state_agreement": rounded_figure(self.control_state_agreement, 3),
             "attributes_compared": self.attributes_compared,
             # The denominator beside the count, so a figure taken over half the
             # reference cannot read like one taken over all of it (#925).
             "attributes_comparable": self.attributes_comparable,
-            "comparison_coverage": round(self.comparison_coverage, 3),
+            "comparison_coverage": rounded_figure(self.comparison_coverage, 3),
             # The disagreements alone. An agreeing check is a number, and the
             # count above carries it; writing all of them out would bury the
             # few lines a reader opens this file for.
@@ -1216,6 +1222,11 @@ class ExtractionScore:
         }
 
 
+def differing(checks: Sequence[AttributeCheck]) -> tuple[AttributeCheck, ...]:
+    """The checks in ``checks`` that the two models answered differently, in order."""
+    return tuple(check for check in checks if not check.agrees)
+
+
 def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     """The whole sweep's attribute agreement, and the same split per attribute.
 
@@ -1224,15 +1235,26 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     the question [#184](https://github.com/mstarks01/work-agent/issues/184)
     needed a hand-run count of candidates by lane to answer.
     """
-    checks = [check for score in scores for check in score.attributes]
+    return attribute_agreement(
+        [check for score in scores for check in score.attributes]
+    )
+
+
+def attribute_agreement(checks: Sequence[AttributeCheck]) -> dict[str, Any]:
+    """Agreement over ``checks``, in total and per ``<element type>.<attribute>``.
+
+    Each attribute's ``compared`` is the denominator of its disagreements: the
+    scored checks on the elements the alignment paired, including the checks
+    where both models read ``unknown``.
+    """
     compared = Counter(check.key for check in checks)
     agreed = Counter(check.key for check in checks if check.agrees)
-    order = list(_SCORED_ATTRIBUTES)
+    order: list[str] = list(_SCORED_ATTRIBUTES)
     keys = sorted(compared, key=lambda key: (order.index(key.split(".", 1)[1]), key))
     return {
         "compared": len(checks),
         "agreed": sum(agreed.values()),
-        "agreement": round(sum(agreed.values()) / len(checks), 3) if checks else 0.0,
+        "agreement": rounded_figure(ratio(sum(agreed.values()), len(checks)), 3),
         "by_attribute": {
             key: {
                 "compared": compared[key],
@@ -1439,7 +1461,8 @@ def _extraction_result(
     model, issues = parse_extraction(
         raw,
         pipeline.extraction_format or FULL_FORMAT,
-        sources=state.get(STATE_SOURCE_TEXTS, {}),
+        sources=seeded_source_texts(state.get(STATE_SOURCE_TEXTS)),
+        diagrams=diagram_readings(state.get(STATE_DIAGRAM_READINGS)),
     )
     return ExtractionResult(
         case_id=case.id,
@@ -1532,9 +1555,10 @@ class AssertionScore:
     a reviewer signed.
 
     ``absences`` is the one number that answers the audit directly. It counts
-    rows whose value is ``absent`` — a control the sources say is **not there**
-    — which is the fact the graph's own attributes read as a stated control in
-    ten of the corpus's 21 stated mechanism values.
+    rows that state a control **not there**
+    (:func:`~analysis_service.assertions.states_missing`), which is the fact
+    the graph's own attributes read as a stated control in ten of the corpus's
+    21 stated mechanism values.
 
     Four outcomes are kept apart (#961). ``rejected`` is rows the run lost,
     by the resolver or the gate, as :meth:`~AssertionRecord.refused_rows`
@@ -1560,7 +1584,7 @@ class AssertionScore:
     unknowns: int
     inferred: int
     conflicts: int
-    subjects_reached: float
+    subjects_reached: float | None
     #: The control facts the blessed model states that some predicate in
     #: :data:`~analysis_service.assertions.REGISTRY` can project into, and how
     #: many of them the catalog's own rows reach. **This is the denominator the
@@ -1623,7 +1647,7 @@ class AssertionScore:
             "unknowns": self.unknowns,
             "inferred": self.inferred,
             "conflicts": self.conflicts,
-            "subjects_reached": round(self.subjects_reached, 3),
+            "subjects_reached": rounded_figure(self.subjects_reached, 3),
             "reachable": self.reachable,
             "reached": self.reached,
             "reachable_absent": self.reachable_absent,
@@ -1651,12 +1675,13 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     state = graph_run.final_state
     if STATE_ASSERTION_PROPOSAL not in state:
         raise EvalRunError(f"{case.id}: assert produced no assertions")
-    # Resolved and gated through the one reader production's ``prepare`` node
-    # uses, so a sweep grades the catalog a job would have read.
+    # Resolved and gated through :meth:`AssertionRecord.of`, the call that
+    # production's ``prepare`` node makes, so a sweep grades the catalog a job
+    # would have read.
     record = AssertionRecord.of(
         CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL]),
         case.model,
-        state.get(STATE_SOURCE_TEXTS, {}),
+        seeded_source_texts(state.get(STATE_SOURCE_TEXTS)),
     )
     return AssertionResult(
         case_id=case.id,
@@ -1741,11 +1766,11 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
             for assessment in get_args(Assessment)
         },
         spans=sum(len(entry.support) for entry in entries),
-        absences=sum(1 for entry in entries if entry.value == ABSENT),
+        absences=sum(1 for entry in entries if states_missing(entry)),
         unknowns=sum(1 for entry in entries if entry.value == UNKNOWN),
         inferred=sum(1 for entry in entries if entry.basis == "inferred"),
         conflicts=len(conflicts(catalog)),
-        subjects_reached=len(reached) / len(element_ids) if element_ids else 0.0,
+        subjects_reached=ratio(len(reached), len(element_ids)),
         **_projection_counts(case, catalog),
     )
 
@@ -1754,11 +1779,15 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
 #: Read off the projection's own reasons rather than listed again, so a reason
 #: added to :data:`~analysis_service.assertions.ProjectionReason` is counted the
 #: day it lands.
-_DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
+_DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) - {
     "stated",
     "absent",
     "unknown",
 }
+
+
+#: An attribute a projected value is compared on.
+ComparedAttribute = Literal[ScoredAttribute, "trust_zone"]
 
 
 #: How a projected value is compared with the blessed attribute, keyed by the
@@ -1774,7 +1803,7 @@ _DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
 #: into that has no entry here raises at the first projection, which
 #: ``tests/test_evals_modes.py`` holds against
 #: :func:`~analysis_service.assertions.projection_fields`.
-PROJECTION_COMPARED: Mapping[str, Callable[[Any], str]] = {
+PROJECTION_COMPARED: Mapping[ComparedAttribute, Callable[[Any], str]] = {
     **{name: scored.reduce for name, scored in _SCORED_ATTRIBUTES.items()},
     "trust_zone": str,
 }
@@ -1888,7 +1917,7 @@ def render_assertions(scores: Sequence[AssertionScore]) -> None:
             f"{score.case_id:<26} kept {score.kept:>3}/{score.proposed:<3}"
             f" spans {score.spans:>3} absences {score.absences:>2}"
             f" unknowns {score.unknowns:>2} conflicts {score.conflicts:>2}"
-            f" elements reached {score.subjects_reached:.0%}"
+            f" elements reached {shown_figure(score.subjects_reached, '.0%')}"
             f" reached {score.reached}/{score.reachable}"
             f" (+{score.reached_absent}/{score.reachable_absent} absent)"
             f" agrees {score.agrees_stated} (+{score.agrees_absent} absent,"
@@ -2016,7 +2045,7 @@ def _basis(
     """
     if extracted is None:
         return (), BasisCoverage.empty()
-    sources = {source.label: source.text for source in case.sources}
+    sources = source_texts(case.sources)
     flags, read = read_controls(extracted, sources)
     return tuple(flags), read
 
@@ -2123,6 +2152,11 @@ def _scored_fields(model: SystemModel) -> int:
     )
 
 
+def reduce_attribute(attribute: ScoredAttribute, value: Any) -> str:
+    """``value`` reduced the way the scorer compares ``attribute``."""
+    return _SCORED_ATTRIBUTES[attribute].reduce(value)
+
+
 def _check_attributes(
     blessed: SystemModel, extracted: SystemModel | None, alignment: Alignment
 ) -> tuple[AttributeCheck, ...]:
@@ -2148,15 +2182,17 @@ def _check_attributes(
         counterpart = counterparts.get(produced_of.get(element.id, ""))
         if counterpart is None:
             continue
-        for attribute, scored in _SCORED_ATTRIBUTES.items():
+        for attribute in _SCORED_ATTRIBUTES:
             if attribute not in type(element).model_fields:
                 continue
             checks.append(
                 AttributeCheck(
                     element_id=element.id,
                     attribute=attribute,
-                    blessed=scored.reduce(getattr(element, attribute)),
-                    extracted=scored.reduce(getattr(counterpart, attribute)),
+                    blessed=reduce_attribute(attribute, getattr(element, attribute)),
+                    extracted=reduce_attribute(
+                        attribute, getattr(counterpart, attribute)
+                    ),
                 )
             )
     return tuple(checks)
@@ -2456,7 +2492,7 @@ def _report_of(
     """
     now = datetime.now(UTC)
     try:
-        # The terminal shape first, through the one reader of it. A refused
+        # The terminal shape first, through :func:`result_of`. A refused
         # model reached no fan-in, so reading the drafts first would name the
         # rejection as a framework the graph never reached.
         outcome = result_of(graph_run.final_state)
@@ -2503,7 +2539,19 @@ def _rejection(rejected: Rejected) -> str:
     return f"the graph rejected the model: {detail}"
 
 
-MODE_ENTRIES: dict[str, Entry] = {
+#: Each mode a sweep runs in.
+SweepMode = Literal[
+    "extraction",
+    "assertions",
+    "analysis",
+    "direct-facts",
+    "end-to-end",
+    "heads",
+    "answered",
+    "withheld",
+]
+
+MODE_ENTRIES: dict[SweepMode, Entry] = {
     "extraction": ENTRY_EXTRACT_ONLY,
     "assertions": ENTRY_ASSERT_ONLY,
     "analysis": ENTRY_PREPARE,
@@ -2530,7 +2578,7 @@ MODE_ENTRIES: dict[str, Entry] = {
 #: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
 #: an emission beside its artifact. Read off the entries rather than listed,
 #: so a mode added tomorrow answers by the entry it builds.
-EXTRACTING_MODES: frozenset[str] = frozenset(
+EXTRACTING_MODES: frozenset[SweepMode] = frozenset(
     mode for mode, entry in MODE_ENTRIES.items() if entry in EXTRACTING_ENTRIES
 )
 
@@ -2538,7 +2586,7 @@ EXTRACTING_MODES: frozenset[str] = frozenset(
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
-REPORTING_MODES: frozenset[str] = frozenset(
+REPORTING_MODES: frozenset[SweepMode] = frozenset(
     {"analysis", "answered", "direct-facts", "end-to-end", "withheld"}
 )
 
@@ -2559,11 +2607,11 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     for score in scores:
         agreed = len(score.attributes) - len(score.differing)
         print(
-            f"{score.case_id:<26} extraction recall {score.recall:.2f}"
-            f"  endpoint {score.endpoint_recall:.2f}"
-            f"  precision {score.precision:.2f}"
+            f"{score.case_id:<26} extraction recall {shown_figure(score.recall, '.2f')}"
+            f"  endpoint {shown_figure(score.endpoint_recall, '.2f')}"
+            f"  precision {shown_figure(score.precision, '.2f')}"
             f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
-            f"/{score.crossings_recall:.2f}"
+            f"/{shown_figure(score.crossings_recall, '.2f')}"
             f"  fields {agreed}/{score.attributes_compared}"
             + (
                 f" of {score.attributes_comparable}"
@@ -2576,68 +2624,76 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     # Both readings, because the gap between them is the reading. A wide gap is
     # naming drift over the right architecture; a narrow one at a low number is
     # an extraction that found different things.
-    strict = sum(score.recall for score in scores) / len(scores)
-    endpoint = sum(score.endpoint_recall for score in scores) / len(scores)
+    strict = mean(score.recall for score in scores)
+    endpoint = mean(score.endpoint_recall for score in scores)
     print(
-        f"recall: {strict:.2f} strict, {endpoint:.2f} folding the flow label and"
+        f"recall: {shown_figure(strict, '.2f')} strict,"
+        f" {shown_figure(endpoint, '.2f')} folding the flow label and"
         f" dropping the zones a claim cannot cite"
         f" — the gap is naming, not extraction (instrument, non-gating)"
     )
     if any(score.aliased for score in scores):
-        sourced = sum(score.sourced_recall for score in scores) / len(scores)
+        sourced = mean(score.sourced_recall for score in scores)
         departures = sum(score.naming_departures for score in scores)
         print(
-            f"  {sourced:.2f} crediting a name a reader ruled supported"
+            f"  {shown_figure(sourced, '.2f')} crediting a name a reader ruled"
+            " supported"
             f" — {departures} element(s) found and named another way, which is"
             f" naming policy rather than a component the extraction missed"
         )
-    interactions = sum(score.interaction_recall for score in scores) / len(scores)
+    interactions = mean(score.interaction_recall for score in scores)
     print(
-        f"  {interactions:.2f} counting interactions rather than pairs — a second"
+        f"  {shown_figure(interactions, '.2f')} counting interactions rather than"
+        " pairs — a second"
         f" flow between one pair of endpoints is its own surface (#925)"
     )
-    zones = sum(score.zone_recall for score in scores) / len(scores)
+    zones = mean(score.zone_recall for score in scores)
     print(
-        f"zones: {zones:.2f} recall — no claim cites one, so this scores the"
+        f"zones: {shown_figure(zones, '.2f')} recall — no claim cites one, so this"
+        " scores the"
         f" structure the crossings derive from rather than the identity rule"
     )
-    partition = sum(score.zone_partition_agreement for score in scores) / len(scores)
-    together = sum(score.same_zone_recall for score in scores) / len(scores)
-    apart = sum(score.different_zone_agreement for score in scores) / len(scores)
-    asked = sum(score.zone_pair_coverage for score in scores) / len(scores)
+    partition = mean(score.zone_partition_agreement for score in scores)
+    together = mean(score.same_zone_recall for score in scores)
+    apart = mean(score.different_zone_agreement for score in scores)
+    asked = mean(score.zone_pair_coverage for score in scores)
     print(
-        f"  {partition:.2f} of element pairs are placed alike in both models —"
+        f"  {shown_figure(partition, '.2f')} of element pairs are placed alike in"
+        " both models —"
         f" the one zone figure a naming difference cannot reach (#925);"
-        f" {together:.2f} of the pairs the reference puts together,"
-        f" {apart:.2f} of the pairs it keeps apart, asked over {asked:.2f} of"
+        f" {shown_figure(together, '.2f')} of the pairs the reference puts together,"
+        f" {shown_figure(apart, '.2f')} of the pairs it keeps apart, asked over"
+        f" {shown_figure(asked, '.2f')} of"
         f" its pairs (#961)"
     )
     zone_credits = sum(
         1 for score in scores for credit in score.aliased if is_zone(credit.reference)
     )
     if zone_credits:
-        sourced_zones = sum(score.sourced_zone_recall for score in scores) / len(scores)
+        sourced_zones = mean(score.sourced_zone_recall for score in scores)
         print(
-            f"  {sourced_zones:.2f} crediting a zone a reader ruled supported"
+            f"  {shown_figure(sourced_zones, '.2f')} crediting a zone a reader ruled"
+            " supported"
             f" — {zone_credits} credit(s), which no other figure reads"
         )
-    aligned = sum(s.aligned_recall for s in scores) / len(scores)
-    aligned_interactions = sum(s.aligned_interaction_recall for s in scores) / len(
-        scores
-    )
+    aligned = mean(s.aligned_recall for s in scores)
+    aligned_interactions = mean(s.aligned_interaction_recall for s in scores)
     ambiguous = sum(len(s.alignment.ambiguous) for s in scores)
     print(
-        f"aligned: {aligned:.2f} recall over one produced element per blessed"
-        f" one, {aligned_interactions:.2f} over interactions — an exact ID, a"
+        f"aligned: {shown_figure(aligned, '.2f')} recall over one produced element"
+        " per blessed"
+        f" one, {shown_figure(aligned_interactions, '.2f')} over interactions — an"
+        " exact ID, a"
         f" reader's alias, a flow's own label or its discriminators, and"
         f" nothing guessed; {ambiguous} ambiguity(ies) left unpaired (#961)"
     )
-    actors = sum(s.actor_recall for s in scores) / len(scores)
-    initiator = sum(s.initiator_recall for s in scores) / len(scores)
+    actors = mean(s.actor_recall for s in scores)
+    initiator = mean(s.initiator_recall for s in scores)
     dropped = sum(len(s.initiators_missing) for s in scores)
     print(
-        f"actors: {actors:.2f} recall over external entities;"
-        f" initiators {initiator:.2f}, {dropped} dropped — an element the text"
+        f"actors: {shown_figure(actors, '.2f')} recall over external entities;"
+        f" initiators {shown_figure(initiator, '.2f')}, {dropped} dropped — an"
+        " element the text"
         f" describes by what it does rather than where it sits"
     )
     absent = sum(len(s.name_tokens_absent_from_source) for s in scores)
@@ -2659,11 +2715,11 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f" rename count (#961)"
     )
     undrivable = [s.case_id for s in scores if not s.crossings_derivable]
-    crossings = sum(s.crossings_recall for s in scores) / len(scores)
+    crossings = mean(s.crossings_recall for s in scores)
     print(
         f"crossings: {sum(s.crossings_match for s in scores)}/{len(scores)} match"
-        f" by name, {crossings:.2f} recall and"
-        f" {sum(s.crossings_precision for s in scores) / len(scores):.2f} precision"
+        f" by name, {shown_figure(crossings, '.2f')} recall and"
+        f" {shown_figure(mean(s.crossings_precision for s in scores), '.2f')} precision"
         f" by endpoint pair"
         + (f"; underivable on {len(undrivable)}" if undrivable else "")
     )
@@ -2693,7 +2749,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     over = f" over {totals['compared']}/{comparable} of the reference's fields"
     print(
         f"scored fields: {totals['agreed']}/{totals['compared']} agree"
-        f" ({totals['agreement']:.0%}){over if comparable else ''}"
+        f" ({shown_figure(totals['agreement'], '.0%')}){over if comparable else ''}"
         f" (instrument, non-gating)"
     )
     states = [
@@ -2711,7 +2767,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     for name, split in totals["by_attribute"].items():
         print(
             f"  {name:28} {split['agreed']:5,}/{split['compared']:<7,}"
-            f" {split['agreement']:.0%}"
+            f" {shown_figure(split['agreement'], '.0%')}"
         )
 
 

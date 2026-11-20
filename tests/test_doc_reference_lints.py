@@ -62,6 +62,7 @@ a list nobody prunes stops describing anything.
 
 from __future__ import annotations
 
+import ast
 import builtins
 import importlib
 import importlib.util
@@ -72,12 +73,14 @@ from pathlib import Path
 import pytest
 
 from tests.source_tree import (
+    DEFINITIONS,
     FROZEN_PROSE,
     PYTHON,
     REPO_ROOT,
     TESTS,
     WHOLE_TREE,
     held_files,
+    parse,
     source_files,
     without,
 )
@@ -125,6 +128,17 @@ ROLES_LEFT_OUT: dict[str, str] = {
 #: with the reason. Not an exemption list to grow past its reasons — a stale
 #: entry fails.
 DELIBERATE: dict[tuple[str, str], str] = {
+    (
+        "frameworks/stride/critic.md",
+        "audit.yaml",
+    ): "the label of an owner's evidence file in a worked case of the critic's"
+    " control step. The critic reads the label beside the excerpt, and the"
+    " repository holds no owner's files.",
+    (
+        "frameworks/stride/critic.md",
+        "lb.yaml",
+    ): "the label of an owner's evidence file in a worked case of the critic's"
+    " control step, for the reason audit.yaml gives.",
     (
         "docs/HTTP-API.md",
         "/etc/analysis/logging.json",
@@ -451,3 +465,28 @@ def test_a_file_the_walk_skips_resolves_nothing(tmp_path, monkeypatch):
     assert not _resolves(guide, "only-here.json")
     assert _resolves(guide, "guide.md")
     assert _resolves(guide, "docs/guide.md")
+
+
+#: A test ID the regression matrix names: ``file.py::name`` or
+#: ``file.py::Class::name``.
+_TEST_ID = re.compile(r"`(test_\w+\.py)((?:::\w+)+)`")
+
+
+def test_each_test_the_regression_matrix_names_exists():
+    """Each test the matrix names, by its full ID, is in the tree: a renamed or
+    deleted test fails here, and so does a cell that names a test with no file."""
+    text = (REPO_ROOT / "docs/agents/regression-matrix.md").read_text("utf-8")
+    bare = re.findall(r"`(test_\w+)`", text)
+    assert bare == [], f"name each test with its file: {bare}"
+    named = _TEST_ID.findall(text)
+    assert named
+    for path, parts in named:
+        scope: list[ast.stmt] = parse(REPO_ROOT / "tests" / path).body
+        for part in parts.split("::")[1:]:
+            found = [
+                node
+                for node in scope
+                if isinstance(node, DEFINITIONS) and node.name == part
+            ]
+            assert found, (path, part)
+            scope = found[0].body if isinstance(found[0], ast.ClassDef) else []

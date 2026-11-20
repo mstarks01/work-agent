@@ -1,10 +1,10 @@
 """A finding can wait on some facets of a question, and an answer can carry a detail (#1542 F6, ADR 0073).
 
-At 2fae7d3 a finding referenced a whole question kind, so an answer covered
-it only once every facet was known: a finding that needed only who acted
-stayed uncovered while the log's protection was unknown. A yes or no answer
-also had no place for an exception. These tests drive the follow-up's
-coverage, a report's conditions, the critic's prompt and the answer's line.
+A finding names the facets it waits on, so an answer covers it once those
+facets are known: a finding that needs only who acted is covered while the
+log's protection is still unknown. A yes or no answer has a place for an
+exception. These tests drive the follow-up's coverage, a report's
+conditions, the critic's prompt and the answer's line.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from analysis_service.answer_state import question_set
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
     FactAnswer,
+    asked_facets,
     covers,
     fact_line,
     merged_facts,
@@ -45,16 +46,22 @@ def _analyses():
 
 class TestTheFacetsAFindingNeeds:
     def test_a_reference_names_some_facets_of_its_kind(self):
-        assert needed_facets(ACTOR) == ("records-actor",)
+        assert needed_facets(ACTOR.key, ACTOR.facets) == ("records-actor",)
 
     def test_a_reference_that_names_none_of_its_kind_s_facets_needs_them_all(self):
         stray = WHOLE.model_copy(update={"facets": ["rate"]})
-        assert needed_facets(stray) == ("records-actor", "record-protected")
-        assert needed_facets(WHOLE) == ("records-actor", "record-protected")
+        assert needed_facets(stray.key, stray.facets) == (
+            "records-actor",
+            "record-protected",
+        )
+        assert needed_facets(WHOLE.key, WHOLE.facets) == (
+            "records-actor",
+            "record-protected",
+        )
 
     def test_a_fact_answered_in_one_value_has_no_facets(self):
         attribute = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
-        assert needed_facets(attribute) == ()
+        assert needed_facets(attribute.key, attribute.facets) == ()
 
     def test_a_fact_named_twice_needs_the_facets_of_both(self):
         assert needs_of([ACTOR, WHOLE]) == {KEY: ("records-actor", "record-protected")}
@@ -95,7 +102,10 @@ class TestTheFollowUp:
         ]
         assert question.findings == ("stride/S-01", "stride/S-02")
         assert question.needs == {"stride/S-01": ("records-actor",)}
-        assert question.to_json()["needs"] == {"stride/S-01": ["records-actor"]}
+        assert question.to_json()["needs"] == {
+            "stride/S-01": ["records-actor"],
+            "stride/S-02": ["records-actor", "record-protected"],
+        }
 
     def test_a_report_reads_the_facets_each_finding_needs(self):
         answer = FactAnswer(
@@ -111,6 +121,7 @@ class TestTheFollowUp:
             None,
             {},
             _analyses(),
+            asks=True,
             waiting=False,
             answered=AnswerSet(),
             final=False,
@@ -223,3 +234,72 @@ class TestAFacetTwoFrameworksShare:
         needs = follow_up_needs(self.analyses(), valid_model(), None, [actor_only])
         assert ("stride", "S-01") not in needs.waiting
         assert needs.waiting[("asvs", "v5.0.0-6.2.1")] == frozenset({KEY})
+
+
+def _limits(*facets):
+    return UnknownRef(element_id=STORE, question="capacity-limits", facets=list(facets))
+
+
+def _asked(analyses, earlier=()):
+    [question] = [
+        q
+        for q in fact_questions(analyses, valid_model(), None, earlier)
+        if q.key[4] == "capacity-limits"
+    ]
+    return question
+
+
+class TestTheFacetsAPageAsks:
+    """The report page asks only the facets its findings need (#2029
+    package 1, ADR 0112)."""
+
+    def test_a_size_only_finding_asks_size(self):
+        question = _asked([sample_analysis([_finding("D-01", _limits("size"))])])
+        assert question.asks == ("size",)
+        assert question.to_json()["asks"] == ["size"]
+
+    def test_two_findings_ask_both_and_one_answer_leaves_the_other(self):
+        analyses = [
+            sample_analysis(
+                [_finding("D-01", _limits("rate")), _finding("D-02", _limits("size"))]
+            )
+        ]
+        assert _asked(analyses).asks == ("rate", "size")
+        rate = FactAnswer(key=_limits().key, facets={"rate": "yes"})
+        question = _asked(analyses, [rate])
+        assert question.findings == ("stride/D-02",)
+        assert question.asks == ("size",)
+
+    def test_a_whole_kind_reference_asks_every_facet(self):
+        analyses = [
+            sample_analysis(
+                [_finding("D-01", _limits("size")), _finding("D-02", _limits())]
+            )
+        ]
+        assert _asked(analyses).asks == ("rate", "size", "concurrency", "quota")
+
+    def test_i_don_t_know_is_not_known_and_one_facet_answers_no_other(self):
+        analyses = [sample_analysis([_finding("D-01", _limits("rate"))])]
+        for facets in ({"rate": "unknown"}, {"size": "yes"}):
+            answer = FactAnswer(key=_limits().key, facets=facets)
+            assert _asked(analyses, [answer]).asks == ("rate",)
+
+    def test_a_later_finding_asks_a_facet_the_earlier_answer_left_out(self):
+        size = FactAnswer(key=_limits().key, facets={"size": "yes"})
+        first = [sample_analysis([_finding("D-01", _limits("size"))])]
+        assert not [
+            q
+            for q in fact_questions(first, valid_model(), None, [size])
+            if q.key[4] == "capacity-limits"
+        ]
+        later = [sample_analysis([_finding("D-02", _limits("rate"))])]
+        assert _asked(later, [size]).asks == ("rate",)
+
+    def test_a_fact_no_finding_waits_on_asks_every_facet(self):
+        assert asked_facets(_limits().key) == ("rate", "size", "concurrency", "quota")
+        assert asked_facets(KEY, ["stride/S-01"], {}) == (
+            "records-actor",
+            "record-protected",
+        )
+        attribute = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
+        assert asked_facets(attribute.key) == ()

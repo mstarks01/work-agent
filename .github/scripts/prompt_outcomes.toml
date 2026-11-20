@@ -163,6 +163,14 @@ check = "a_repeated_threat_id_keeps_the_first_draft_and_drops_the_rest"
 
 [[outcome]]
 prompt = "frameworks/stride/output.md"
+sentence = """Two drafts may share both when each cites its own missing or
+unknown control and each needs its own fix: a fake server that the client never
+checks and a fake client that the server never checks are two threats."""
+modules = ["src/analysis_service/claim_identity.py", "src/analysis_service/fan_in.py"]
+check = "two_drafts_at_one_place_that_fail_two_controls_are_two_findings"
+
+[[outcome]]
+prompt = "frameworks/stride/output.md"
 sentence = """A trust zone is context, not a target: a threat that names only
 zones is dropped."""
 modules = ["src/analysis_service/fan_in.py", "src/analysis_service/frameworks/stride/record.py"]
@@ -225,6 +233,23 @@ modules = [
     "src/analysis_service/graph.py",
 ]
 check = "a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic"
+
+[[outcome]]
+prompt = "prompts/critic.md"
+sentence = """A `control` rejection whose reason quotes neither comes back to
+you."""
+modules = [
+    "src/analysis_service/critic.py",
+    "src/analysis_service/job_controls.py",
+]
+check = "a_control_rejection_that_quotes_neither_comes_back_to_the_critic"
+
+[[outcome]]
+prompt = "prompts/critic.md"
+sentence = """The drafts carry each text once: an entry with no `excerpt` is
+the document with the same `sha256` in an earlier entry."""
+modules = ["src/analysis_service/critic.py"]
+check = "an_evidence_entry_with_no_excerpt_names_an_earlier_entry"
 
 # --- Modules with no pinned sentence yet ---------------------------------------
 

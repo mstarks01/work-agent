@@ -1,0 +1,551 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "615b1885bc6c0f16d3f42d7fda170ab4a647d0d7",
+    "clean": true,
+    "table": {
+      "case": "11-sparse-shift-scheduling",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "296b1e44aae80214dc1fe2e419cf581f5fe4e688786116c51e611b055fddac8e"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "11733f3e4b23332c142b56ae7d4c4e9533cd838bbc19c54dec072020f2137d38",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Colleague shift responses may be readable in transit",
+      "description": "If `unknown:flow:entity:colleague>process:scheduling-web-app>view-shifts:encryption_in_transit` resolves to no effective transport encryption, an on-path attacker observing `flow:entity:colleague>process:scheduling-web-app>view-shifts` can intercept a colleague's shift information and associated PII while it crosses from `boundary:public-internet` to `boundary:internal-network`. The crossing relies on an assumed endpoint placement, but the transport-control gap remains unverified. The captured shift data can enable targeted social engineering of colleagues and reveal working patterns.",
+      "affected_element_ids": [
+        "flow:entity:colleague>process:scheduling-web-app>view-shifts",
+        "entity:colleague",
+        "process:scheduling-web-app"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:colleague>process:scheduling-web-app>view-shifts",
+        "unknown:flow:entity:colleague>process:scheduling-web-app>view-shifts:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium, conditional on the unknown transport-encryption state, because the flow crosses from `boundary:public-internet` and an observer must obtain a network-path position. Impact is medium because the flow carries PII-bearing colleague shift information, whose disclosure exposes personal work patterns."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS for colleague access",
+          "detail": "Set `encryption_in_transit` on `flow:entity:colleague>process:scheduling-web-app>view-shifts` to TLS 1.2+ and verify the web-app certificate; use HSTS for browser clients."
+        }
+      ]
+    },
+    {
+      "title": "Store rota submissions may disclose rota and colleague data in transit",
+      "description": "If `unknown:flow:entity:store-manager>process:scheduling-web-app>build-rota:encryption_in_transit` resolves to no effective transport encryption, an on-path attacker can intercept `flow:entity:store-manager>process:scheduling-web-app>build-rota` as it crosses from `boundary:public-internet` to `boundary:internal-network`. The attacker reads store rota entries containing PII and business-critical scheduling data. That information enables targeted attacks on staff and reveals staffing arrangements that may be used against store operations.",
+      "affected_element_ids": [
+        "flow:entity:store-manager>process:scheduling-web-app>build-rota",
+        "entity:store-manager",
+        "process:scheduling-web-app"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:store-manager>process:scheduling-web-app>build-rota",
+        "unknown:flow:entity:store-manager>process:scheduling-web-app>build-rota:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium, conditional on the unknown encryption state, because this is a public-internet-to-internal-network crossing and an attacker still needs an on-path position. Impact is medium because the flow carries PII and business-critical rota data for a store."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt manager-to-app traffic",
+          "detail": "Require TLS 1.2+ for `flow:entity:store-manager>process:scheduling-web-app>build-rota`, enforce certificate validation, and prevent plaintext HTTP fallback."
+        }
+      ]
+    },
+    {
+      "title": "Rota requests may expose colleague data on the app-to-service hop",
+      "description": "If `unknown:flow:process:scheduling-web-app>process:scheduling-service>rota-requests:encryption_in_transit` resolves to no effective encryption, an attacker able to observe the internal path can intercept rota reads and writes on `flow:process:scheduling-web-app>process:scheduling-service>rota-requests`. The request and response traffic carries PII and business-critical rota information; captured data can reveal colleague scheduling and support later targeting of the rota database or staff.",
+      "affected_element_ids": [
+        "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
+        "process:scheduling-web-app",
+        "process:scheduling-service"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:scheduling-web-app>process:scheduling-service>rota-requests:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low, conditional on the unknown encryption state, because an attacker needs a position on the internal-network path rather than merely access to a public interface. Impact is medium because the flow carries PII and business-critical rota reads and writes."
+      },
+      "mitigations": [
+        {
+          "summary": "Use mutually authenticated service transport",
+          "detail": "Set `encryption_in_transit` on `flow:process:scheduling-web-app>process:scheduling-service>rota-requests` to mTLS so internal traffic remains confidential and both service peers are authenticated."
+        }
+      ]
+    },
+    {
+      "title": "Rota database traffic may reveal the full rota dataset in transit",
+      "description": "If `unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:encryption_in_transit` resolves to no effective encryption, an attacker on the internal-network path can intercept `flow:process:scheduling-service>store:rota-database>read-write-rotas`. The traffic includes rota entries, colleague names, contact details, and availability, allowing the observer to accumulate sensitive colleague records without using the database's application access path. The disclosed contact and availability data can enable targeted phishing or privacy harm.",
+      "affected_element_ids": [
+        "flow:process:scheduling-service>store:rota-database>read-write-rotas",
+        "process:scheduling-service",
+        "store:rota-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low, conditional on the unknown encryption state, because exploiting this internal hop requires an on-path foothold. Impact is high because the flow carries the rota database's colleague names, contact details, availability, PII, and business-critical rota data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the scheduling-service database connection",
+          "detail": "Require TLS with certificate validation, preferably mTLS, for `flow:process:scheduling-service>store:rota-database>read-write-rotas`; reject unencrypted database sessions."
+        }
+      ]
+    },
+    {
+      "title": "Payroll exports may be exposed while written to the file share",
+      "description": "If `unknown:flow:process:scheduling-service>store:file-share>write-payroll-export:encryption_in_transit` resolves to no effective encryption, an attacker observing the internal path can intercept the weekly payroll export while `process:scheduling-service` writes it to `store:file-share`. The attacker obtains PII before payroll collection and can use the export to target colleagues or payroll operations.",
+      "affected_element_ids": [
+        "flow:process:scheduling-service>store:file-share>write-payroll-export",
+        "process:scheduling-service",
+        "store:file-share"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:scheduling-service>store:file-share>write-payroll-export:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low, conditional on the unknown encryption state, because the attacker must observe an internal-network transfer. Impact is medium because the weekly payroll export and file share are tagged with PII, creating a potentially broad employee-data disclosure."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt payroll-export delivery to the share",
+          "detail": "Use TLS or another mutually authenticated encrypted file-transfer protocol for `flow:process:scheduling-service>store:file-share>write-payroll-export`, and prohibit plaintext share protocols."
+        }
+      ]
+    },
+    {
+      "title": "Payroll export collection may expose employee data across team environments",
+      "description": "If `unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:encryption_in_transit` resolves to no effective encryption, an on-path attacker can intercept the payroll export as `entity:payroll-system` collects it from `store:file-share` across the `boundary:payroll-team-environment` to `boundary:internal-network` crossing. The attacker reads the PII-bearing weekly export and can use it for employee targeting or to inform attacks against payroll processing. The payroll-system endpoint zone is an inferred placement, so confirming the actual path is also required.",
+      "affected_element_ids": [
+        "flow:entity:payroll-system>store:file-share>collect-payroll-export",
+        "entity:payroll-system",
+        "store:file-share"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:payroll-system>store:file-share>collect-payroll-export",
+        "unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium, conditional on the unknown encryption state, because the collection flow crosses between the payroll-team and internal environments, though an attacker still needs a network-path position. Impact is medium because the collected export is tagged with PII and is intended for payroll processing."
+      },
+      "mitigations": [
+        {
+          "summary": "Secure payroll-system collection",
+          "detail": "Require TLS 1.2+ with mutually authenticated payroll and file-share identities for `flow:entity:payroll-system>store:file-share>collect-payroll-export`."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy of the rota database may expose all colleague records",
+      "description": "`store:rota-database` holds colleague names, contact details, stated availability, and rota data, and `unknown:store:rota-database:encryption_at_rest` leaves its at-rest protection unverified. If that unknown resolves to unencrypted storage, an attacker holding a copied volume, snapshot, backup, or decommissioned media for this store can read the records without authenticating through `process:scheduling-service`. This is conditional on the unknown attribute, not an assertion that the database is unencrypted. The copied corpus enables broad employee profiling and targeted attacks using contact and availability information.",
+      "affected_element_ids": [
+        "store:rota-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:rota-database:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value: an attacker must obtain an operational storage copy, but copies and media bypass the application access path if unprotected. Impact is high because `store:rota-database` holds PII including contact details and availability as well as business-critical rota data."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for rota data",
+          "detail": "Establish the value of `encryption_at_rest` for `store:rota-database`, then use managed-key encryption covering the primary store and every backup, snapshot, replica, and decommissioned copy."
+        },
+        {
+          "summary": "Limit access to exported storage copies",
+          "detail": "Restrict snapshot, backup, and media-export permissions to dedicated operational identities and audit their use."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy of the payroll file share may expose weekly exports",
+      "description": "`store:file-share` contains the weekly payroll export and is tagged with PII, while `unknown:store:file-share:encryption_at_rest` leaves protection of its stored files unverified. If this attribute resolves to unencrypted storage, an attacker who obtains a copied share volume, backup, snapshot, or retired media can read payroll exports directly without authenticating as `entity:payroll-system`. The disclosure can expose employee payroll-related information and support targeted fraud or phishing.",
+      "affected_element_ids": [
+        "store:file-share"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:file-share:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` state because an attacker needs an operational copy, but such copies bypass live access controls if they are unencrypted. Impact is medium because `store:file-share` holds PII-bearing weekly payroll exports."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt payroll exports at rest",
+          "detail": "Establish and enforce encryption at rest for `store:file-share`, including backup, snapshot, and exported copies, with managed keys and restricted key-use permissions."
+        },
+        {
+          "summary": "Constrain file-share copy operations",
+          "detail": "Use dedicated backup and export identities with least privilege, and log access to payroll-export files and copied media."
+        }
+      ]
+    },
+    {
+      "title": "Code in the scheduling service can read the rota database through its standing access",
+      "description": "`process:scheduling-service` is the component that reads `store:rota-database` through `flow:process:scheduling-service>store:rota-database>read-write-rotas`. An attacker who gains code execution in that service or control of its host can use the service's existing database access to read rota entries, colleague names, contact details, and availability. The model leaves `unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:authentication` unresolved, so the scope and isolation of the service's reader identity are unverified. The resulting data can be used to target colleagues and identify staffing patterns; at-rest encryption would not prevent a read performed through an authorized live session.",
+      "affected_element_ids": [
+        "store:rota-database",
+        "process:scheduling-service",
+        "flow:process:scheduling-service>store:rota-database>read-write-rotas"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because the attacker must first run code in or control `process:scheduling-service`, and the database authentication and grant scope are unverified. Impact is high because the service reads `store:rota-database`, which holds contact details, availability, PII, and business-critical rota data."
+      },
+      "mitigations": [
+        {
+          "summary": "Use a narrowly scoped scheduling-service database identity",
+          "detail": "Set explicit authentication for `flow:process:scheduling-service>store:rota-database>read-write-rotas` and grant the service only the rows, columns, and operations it requires."
+        },
+        {
+          "summary": "Detect anomalous service reads",
+          "detail": "Audit database access by a distinct scheduling-service identity and alert on bulk extraction or queries inconsistent with normal rota operations."
+        }
+      ]
+    },
+    {
+      "title": "Unverified payroll-system access may permit direct reading of payroll exports",
+      "description": "`entity:payroll-system` reads `store:file-share` through `flow:entity:payroll-system>store:file-share>collect-payroll-export`, but `unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:authentication` leaves the collection identity and its authorization unverified. If the unknown resolves to absent, weak, or over-broad authentication, an attacker able to reach the file-share interface can read the PII-bearing payroll export by posing as or exploiting access intended for the payroll-system path. This is conditional on the unverified authentication state and does not assert that the payroll system is unauthorized. The export can then support employee targeting and attacks on payroll operations.",
+      "affected_element_ids": [
+        "store:file-share",
+        "flow:entity:payroll-system>store:file-share>collect-payroll-export",
+        "entity:payroll-system"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "crossing:flow:entity:payroll-system>store:file-share>collect-payroll-export",
+        "unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium, conditional on the unknown authentication state, because the file-share read path crosses from the separately identified payroll-team environment and an attacker must reach that interface. Impact is medium because `store:file-share` contains the PII-bearing weekly payroll export."
+      },
+      "mitigations": [
+        {
+          "summary": "Require a dedicated authenticated payroll reader identity",
+          "detail": "Set explicit strong authentication on `flow:entity:payroll-system>store:file-share>collect-payroll-export`, using a dedicated workload identity restricted to the payroll export and collection operation."
+        },
+        {
+          "summary": "Enforce deny-by-default export authorization",
+          "detail": "Authorize file-share reads server-side only for the designated payroll identity, limit access to the current export, and log every export collection."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

@@ -11,10 +11,10 @@ what a person decided about each finding.
 
 ## Read this before you quote a number
 
-**An agent wrote all of it; review records now identify the subsets people have
+**An agent wrote all of it; review records identify the subsets people have
 read.** Every golden case, every reference claim and every calibration label
 began agent-authored. On 2026-09-21 one **Case Sitting** read all 13 cases and
-marked all 344 recorded claims, so every reference set now carries a human
+marked all 344 recorded claims, so every reference set carries a human
 judgement per claim — `agree`, `reject`, `duplicate` or `unsure`. A mark is a
 reader's answer on a claim as written; it does not make the set exhaustive, and
 the 26 `missing` entries that sitting recorded say where the reader thought it
@@ -32,27 +32,30 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**Every case has a merged Case Sitting.** That is the
+**A merged Case Sitting clears a case.** A sitting is the
 reading session over a case's source, model and reference sets together
 (`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
 else. The act is a **Case Sitting**, recorded as one JSON file under
 `evals/review/submissions/` — who read it, what they wrote before the sets
-opened, and the digest of each file they read. `tests/test_case_review.py`
-derives the count from that directory, so this sentence and the gate cannot
-disagree. Case `01-payments-checkout` carries a filled reading document dated
+opened, and the digest of each file they read.
+`uv run python webapp/sitting.py --list` names each case that waits for one.
+Case `01-payments-checkout` carries a filled reading document dated
 2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
 reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
-reader's own words and the template for the method, and no submission clears
-the case (ADR 24).
-`tests/test_case_review.py` fails a new case that arrives without a sitting, and
-fails a read file that changes under its recorded digest.
+reader's own words and the template for the method. The document is not a
+submission, so it does not clear the case (ADR 24).
+`tests/test_case_review.py` fails a case that no sitting clears unless its
+`UNREVIEWED` table names the case, and fails a read file that changes under its
+recorded digest.
 
-**Fourteen cases carry signed reference facts.** Cases 01 to 13 and 16 carry a
+**18 cases carry signed reference facts.** Cases 01 to 13 and 16 to 20 carry a
 `facts.json`, one row per fact the sources state, in the shape the assertion
 node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it: cases 01, 04, 09, 11 and 13 on 2026-09-16,
 the other eight on 2026-09-18 (#1048), and case 16 on 2026-10-10. The maintainer signed case 16's
-`network-membership` row for `process:library-app` on 2026-10-15. The rulings and the model
+`network-membership` row for `process:library-app` on 2026-10-15, and case 18's
+rows on 2026-11-14, and case 17's rows on 2026-11-14 and 2026-11-16, and the rows of cases 19
+and 20 on 2026-11-17. The rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
 placement is not graded as a fact. A file may carry signed alias rulings for
@@ -65,7 +68,7 @@ row (`BLESSING.md` step 7).
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded
-dispositions. That includes the 90% bar. A rule at 94.3% reproduces those
+dispositions. That includes the 90% bar. A rule at 93.5% reproduces those
 dispositions and says nothing about whether they are right; the calibration
 review records are the only evidence that those label opinions have been
 checked.
@@ -84,7 +87,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call:
-**13 false splits of 169, 2 false merges of 92 and 2 false merges of 365.**
+**15 false splits of 169, 2 false merges of 92 and 8 false merges of 484.**
 The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
@@ -93,8 +96,8 @@ destroys a finding and inflates recall, and nobody sees it happen. The three
 denominators are different populations and none is a rate over what a live run
 emits.
 
-Equivalently by population: 13 false splits over 169 equivalent candidate pairs,
-2 false merges over 92 candidate negatives, and 2 false merges over 365
+Equivalently by population: 15 false splits over 169 equivalent candidate pairs,
+2 false merges over 92 candidate negatives, and 8 false merges over 484
 distinct reference pairs.
 
 The 288 calibration fixtures retain their original order and reference claims.
@@ -103,7 +106,7 @@ The candidate merge column arrived with
 negative half the elements and verbs the rule reads. Before it every candidate
 merge count was structurally zero. A further 27 fixtures are set aside before
 identity scoring: 24 `unsupported`, 2 `unclear`, and 1 `invalid-claim`. The
-matcher therefore answers 261 fixtures, refuses none, and agrees with 246
+matcher therefore answers 261 fixtures, refuses none, and agrees with 244
 of them. Diagnostic `mixed` and `misclassified-lane` annotations preserve
 secondary observations without moving that denominator.
 
@@ -151,9 +154,12 @@ evals/
     model.json                  the blessed System Model (passes the shipped validator)
     claims/<framework>.json     that framework's reference set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
-    facts.json                  the reference facts, per predicate; a draft until signed (14 cases signed)
+    facts.json                  the reference facts, per predicate; a draft until signed (18 cases signed)
     rulings.json                other readings a person ruled answer a STRIDE claim (optional)
     case.json                   metadata, provenance, and the declared sources
+  build_diagrams.py             writes diagrams/ from each case's model.json
+  diagrams/<NN>-<slug>.mmd      each case's blessed model as Mermaid text, as
+                                `diagram` source input (generated, never hand-edit)
   calibration_labels/
     build_pairs.py              the match fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
@@ -210,42 +216,50 @@ somewhere else.
 | Module | What it owns |
 |---|---|
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
+| `harness/entry_refusal.py` | The one-line refusal of a command line that loads the corpus or a configuration. Each entry point catches `ENTRY_ERRORS` and returns `refuse_entry`. |
 | `harness/bundle.py` | A sweep's report bundle: the per-case report, drafts and proposals files beside an artifact, their writer and reader, and the block accessors every reader of a saved report starts from. Also the extraction and assertion emission files an extraction or assertion sweep writes, and the readers that re-parse them under the code that stands. A head-only sweep's archived catalog is redrawn as it is read: a principal, a credential and an artifact carry an ID that is a pure function of the words a source used, so it is re-derived from the label the archive holds. A graph-bound subject is left exactly as archived, because its ID is an Element ID the run's own model decided. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
+| `harness/rates.py` | Shares, and how a report shows one with no value. `ratio` is the one reader of an empty denominator: it gives `None`, never 0.0, and `shown_figure` and `percent` print `unavailable`. `mean` skips a value that has none, for a figure read inside one sweep. `complete_mean` has no value where any value is missing; the readers that compare two sweeps or artifacts use it, with `presence`. A lint in `tests/test_one_reader_lints.py` refuses, under `evals/harness/`, a conditional expression that divides in either branch and an early `return 0.0` or `return 1.0`. |
 | `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |
 | `harness/attribution.py` | Which stage lost each requirement the ASVS matrix or the disposition scorer reports as wrong: precondition, generation, critic, verdict or deferral, read off the scope state, the rejection step or the verdict. Explains the two numbers beside it and moves neither. |
 | `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. Carries the `disposition` instrument beside it, which reads what the run concluded rather than whether the requirement applies. |
-| `harness/gain.py` | Whether a coverage gain rests on supported output, read against a baseline on development cases: unmatched findings per case, findings no vote answers, and the rejected rate. A flooded run fails the volume gate offline; the vote gates wait for votes. Keyed by framework, and a package with no vote reading says so. `--held-out` reads the same gates on the held-out cases alone, for rung 5 of the experiment protocol; it refuses an exhausted case and names each case to record in `holdout_reads`. |
-| `harness/critic_yield.py` | What the critic added and removed, scored on both sides. A kill is counted gross, the draft that had matched died, and net, nothing took its reference afterwards; and every kill carries the step the critic said it rejected the draft at. |
+| `harness/gain.py` | Whether a coverage gain rests on supported output, read against a baseline on development cases: unmatched findings per case, findings no live vote answers, and the rejected rate. A flooded run fails the volume gate offline; the vote gates wait for votes. Keyed by framework, and a package with no vote reading says so. `--held-out` reads the same gates on the held-out cases alone, for rung 5 of the experiment protocol; it refuses an exhausted case and names each case to record in `holdout_reads`. |
+| `harness/critic_yield.py` | What the critic added and removed, scored on both sides. A kill is counted gross, where the draft that had matched left the report, and net, where nothing took its reference afterwards. Every kill carries the step its verdict names (or none) and its fate. `killed_by_cause` counts each kill under its step, under `unstated` where its rejection names no step, or under its fate where it has no verdict. Each population rate and yield rate counts only the drafts the block gives a verdict, and the drafts with no archived verdict (`omitted` or `returned`) are counted on their own line. The gross and net kill counts and the kills by step or fate count every draft that left the report, as `losses.py` charges each one to the critic. A rate whose population holds no draft with a verdict reads `None`, never zero. |
 | `harness/verb_pricing.py` | A verb equivalence priced before it ships: false splits and false merges over the labelled pairs, merges over the corpus's own reference pairs, and a sweep re-scored under it. `run.py price-verbs`. |
-| `harness/losses.py` | What lost each STRIDE reference a run missed: the verb, a merge, a misfiling into another lane, the critic, the fan-in (a proposal it removed, or a draft it narrowed off the place, read from the archived proposals and the block's own marks), the place, or no lead. A `place` or `unled` row also names a surviving draft one element over, where the lane wrote near the reference rather than nowhere. A fix carries its ceiling before a run is paid for. |
-| `harness/assembly.py` | Assembly run again on the archive. Every draft in `<case>.drafts.json` was ruled before assembly, so one the report carries in neither array is a **report omission**, found without any ruling. The drafts the report does account for are assembled again from the rulings its ruled claims carry, and a claim filed differently is named. A ruling today's review check refuses is reported, not raised. `run.py assembly`. |
-| `harness/critic_replay.py` | One archived case's critic call, rebuilt and sent again: the request `critic_round.critic_request` renders over the captured `system_model` and `boundary_crossings` and a round built from the archived drafts, marks and catalog. A test holds the rebuilt request against the one a real graph run sent, byte for byte. Compares each draft's verdict with the archived one, and with `--out` writes the completed rulings, so each verdict's reason and open facts can be read. `run.py critic-replay`, one paid call. |
+| `harness/losses.py` | What lost each STRIDE reference a run missed: the verb, a position other than the ruled one, an unstated position (an archived draft that holds no `attacker_position`), a merge, a misfiling into another lane, the critic, the fan-in (a proposal it removed, or a draft it narrowed off the place, read from the archived proposals and the block's own marks), the place, or no lead. A `place` or `unled` row also names a surviving draft one element over, where the lane wrote near the reference rather than nowhere. A fix carries its ceiling before a run is paid for. |
+| `harness/panels.py` | The pre-generation panels of one finished sweep: extraction, capability reading, assertions and preparation. Each panel reads one node's output in that node's own unit, over one source, with its own counts, denominators and unread count, and no code adds two panels together. A panel's phase is `audit.phase_of` its node, so capability reading and assertions are sub-panels of extraction. The extraction panel reads `replay.pooled_extraction`, with each attribute's wrong facts over the checks compared and the unreviewed extra elements apart. The assertion panel reads `replay.pooled_assertions`, names the node that wrote the catalog (`assert` on the signed model, or `extract` for the combined head), and states pooled required-fact recall beside the mean of each emission's recall. The capability panel reads a returned ballot of the reader's statements. The preparation panel reads `delivery.trace`, over every charged miss, with the place facts delivered, not delivered and unavailable counted apart from the leads: it is `known-different` where a traced lane's captured artifacts differ, and otherwise `unverified`, because the lane's other inputs have no rebuild from the archive, and the evidence names each of them. Each panel states how its reading stands to what a job runs: `known-different` or `unverified`, with the evidence. `run.py panels`. |
+| `harness/scorecard.py` | The must-find scorecard of one finished STRIDE sweep in `analysis` mode. Each must-find of each development case the sweep lists gets one row with one status: `matched`, `missed`, `incompatible` or `uncaptured`; the sweep's other cases are named as left out. A row is incompatible when the reference resolves to an element the run's model does not hold (`re-keyed`), or when `scorer.none_stated` reads every draft of the case as stating no position against its ruled one (`position-unstated`). Each row also carries whether the matcher matches it over the drafts and over the report, the cause `losses.py` charged, and the rules that lead to it. Per lane and in total it reports the matched share of the compatible rows beside the matched share of all rows, the share of compatible rows each stage represents, and the references each stage change lost and gained. A rate with an empty denominator reads unavailable, never zero. The proposed stage is uncaptured, because the matcher reads no proposal. The critic panel is `critic_yield.CriticAudit`, read with the vote ledger: it counts the drafts the critic was handed by scored outcome and by fate (`confirmed`, `needs-info`, `rejected`, `returned`, `omitted`). A draft is `real` where it matched a reference or a current vote pools it, and `not-real` where a current vote rejects it. It gives the real drafts rejected and the not-real drafts confirmed, each over its own population, and `needs-info` on its own. Each rate divides by the drafts of its population that have a verdict, and the drafts with no archived verdict are counted on their own line. A not-real population with no draft that has a verdict reads unavailable, and `not_real_gap` names the reason. It also gives the reference-matched drafts that left the report (gross, with a verdict or not) beside the references no reported claim took (net). Beside the rows it runs `assembly.replay_artifact` and counts the STRIDE blocks it reproduces, those that differ and those it refuses, the reports it cannot read, and the cases with a missing or stray capture. It also runs `fan_in_accounting.replay_artifact` and counts the compatible STRIDE blocks, the incompatible ones with their reasons and those with no proposal read, the proposals inspected, accounted, unexplained and unavailable, the extra output IDs, the unreadable reports and the capture faults. It refuses to pool rows of two runs. `run.py scorecard`. |
+| `harness/delivery.py` | What the lane of each charged must-find miss of the scorecard was given, whatever its cause. A draft at the place does not show that the lane was sent the facts the finding turns on, so a `verb` row is traced too. Each miss gets two readings apart. **Lead identities delivered** has five readings: how the closest candidate in the lane's captured `<case>.lanes.json` stands to the reference's place (`equal`, `reference-contains`, `draft-contains`, `overlap` or `absent`, strongest first), the same reading over the candidates today's rules write for the archived model and catalog, whether the two candidate sets hold the same leads, which are a lane, a rule and elements only (`same_leads`), whether the lane's captured artifacts (candidates with their facts and questions, scope, reference notes and prior cases) are byte for byte today's rebuild (`same_lane_artifacts`), and the rules with a candidate on the reference's elements that the archived block also fired. **Place facts delivered (k of n)** reads each signed stated row of `facts.json` (`replay.required_rows`) whose subject is one of the reference's elements. Each is read at six stages, each `present`, `absent` or `unavailable` with its reason: the raw extraction (unavailable: an analysis sweep seeds the model), the assertion catalog (the report's catalog through `replay.replay_assertions`), the projected model (the report's model at `projected_attribute`'s field), the captured `system_model` and `evidence_catalog` shared keys, and the captured candidates' facts. A fact is delivered where the lane system model, the lane evidence catalog or the candidate facts hold it. The graph stages count only where the signed rows settle the fact's field in one value; elsewhere they read `unavailable`, and the evidence catalog alone decides. A fact the lane input does not hold names the stage that lost it. A row with no place fact reads `place facts: none signed`: the case signs no stated fact about the reference's elements. Each miss also carries its matched peer, traced the same way: a must-find of the same case and lane that the run `matched`, else one `unstated`, else `no peer`. The `re-keyed` must-finds are counted beside the rows. A case whose lane capture is absent, or that the trace refuses, is untraced: it reads the rebuild only, and its reason is named. `run.py delivery`. |
+| `harness/assembly.py` | Assembly run again on the archive. Every draft in `<case>.drafts.json` was ruled before assembly, so one the report carries in no array (claims, rejected claims or returned claims) is a **report omission**, found without any ruling. The drafts the report rules on are assembled again from the rulings its ruled claims carry, and a claim filed differently is named. A ruling today's review check refuses is reported, not raised, and so is a case with a missing or stray capture. The command counts the drafts inspected, accounted, omitted, filed differently and unavailable, and the ruled claims with no draft. It reads archived files only and calls no model. `run.py assembly`. |
+| `harness/fan_in_accounting.py` | The fan-in run again on the archive. The shipped fan-in runs over each case's stored proposals, and each proposal a lane emitted gets one fate by its ID: kept, dropped with the fan-in's reason, dropped as an unknown identity, or deferred. A proposal with no fate is unexplained, and an output ID no proposal carries is extra. The command also counts the quotes on the kept drafts as verified, repaired, refused and unchecked. A quote is unchecked where the fan-in got an empty map of source texts and so ran no quote check. An unchecked quote never counts as verified. A corpus case always has sources (`CaseSource` list, `min_length=1`), so the replay reports 0 unchecked; the count keeps the verified count true for any other input. A case whose replayed drafts differ from its archived drafts, whose sources the artifact records under another digest, or whose batches today's schema refuses is incompatible and is not counted as accounted. It reads archived files only and calls no model. `run.py fan-in`. |
+| `harness/recritic_replay.py` | One critic re-ask over an archived case's first pass, with one injected fault. It reads the first pass from the report with `assembly.rulings_from_report`, applies the fault set's one Control, and answers each shown row with the refusal the file states, so the first pass reconciles. It then puts one fault of one `FaultShape` on one draft: a Control row fault, or a fault of another kind the check names, with at least one shape for each kind. A shape on a ruling rejected for `control` reads that ruling's reason from the fault set's `control_reasons`, which quotes the Control's name or a line of its evidence. The round's check must name exactly the problems `PROBLEMS_BY_SHAPE` gives the shape. The request is `critic_round.recritic_request` over the round's `Reask`, and a test holds it against the one a real graph run sent, byte for byte, for each shape a STRIDE case can carry. The answer is merged and checked as the graph's second look does. `run.py recritic-replay`, one paid call. |
+| `harness/critic_replay.py` | One archived case's critic call, rebuilt and sent again: the request `critic_round.critic_request` renders over the captured `system_model` and `boundary_crossings` and a round built from the archived drafts, marks and catalog. A test holds the rebuilt request against the one a real graph run sent, byte for byte. Compares each draft's verdict with the archived one, and counts a draft with no archived verdict on its own line; with `--out` writes the completed rulings, so each verdict's reason and open facts can be read. `run.py critic-replay`, one paid call. |
 | `harness/history.py` | Resolves an old commit ID through the history rewrite maps in `docs/history/`, following every rewrite since the record. The Baseline check and the experiment ledger's reader call it before they ask git about a recorded commit, because those records keep the ID they were written with. |
-| `harness/follow_up_policies.py` | Compares orders of a report's follow-up questions. At each budget of owner choices it counts the conditional findings whose every open fact is answered, by band, read with `follow_up_needs`. The orders are a table, `POLICIES`. With `--samples` it builds each order from one critic replay's verdicts on a Baseline's drafts and scores it on the other's, so an order that reads verdicts is charged for a critic sampled again. `run.py follow-up-policies`, no credentials. |
+| `harness/follow_up_policies.py` | Compares orders of a report's follow-up questions. At each budget of owner choices it counts the conditional findings whose every open fact is answered, by band, read with `follow_up_needs`. The orders are a table, `POLICIES`. `EFFORTS` counts a question's choices two ways: the facets the page asks (`FactQuestion.asks`, ADR 0112) and every facet of its kind. With `--samples` it builds each order from one critic replay's verdicts on a Baseline's drafts and scores it on the other's, so an order that reads verdicts is charged for a critic sampled again. `run.py follow-up-policies`, no credentials. |
 | `harness/early_answerers.py` | Answers the early list from the top, one question a save, with six answerers (every capability yes, no, unknown, yes and no by turns, every question skipped, and each signed applicability fixture's truth) under the shipped order and the order with the effects stubbed. At 5, 10 and 20 choices it counts, per framework, the conditional findings completed in all and by band, the units the framework's own applicability rule decides, the questions an answer made unnecessary, the answers of "I don't know" and the skips. It then reverses the walk's first "yes" or "no" through the service's save and counts what the change reopens and closes. `run.py early-answerers`, no credentials. |
-| `harness/early_policies.py` | Compares orders of early questions for a job that selects more than one framework. Each framework is scored on its own archived reports, with every framework the case's reports hold selected. At each budget of owner choices it counts the conditional findings whose every open fact is answered, and the units whose every missing capability is answered. The orders are a table, `POLICIES`: the shipped list, two merges of each framework's own ranking, and `group-question`, which charges a group's parts once for every element a list shows it for (ADR 0081). `run.py early-policies`, no credentials. |
-| `harness/schema_paths.py` | Counts, per node, how its schema reached the provider (`schema_path`), each refusal that moved its tier down the ladder (`schema_fallback`) and its schema re-asks (`reasks`) and each answer taken out of a lone `answer` key (`answer_unwrapped`), over every archived report under `--root` (ADR 0058). A report written before those fields existed reads as no schema and no re-ask. `run.py schema-paths`, no credentials. |
+| `harness/early_policies.py` | Compares orders of early questions for a job that selects more than one framework. Each framework is scored on its own archived reports, with every framework the case's reports hold selected. At each budget of owner choices it counts the conditional findings whose every open fact is answered, and the units whose every missing capability is answered. The orders are a table, `POLICIES`: the shipped list, two merges of each framework's own ranking, `group-question`, which charges a group's parts once for every element a list shows it for (ADR 0081), and `element-count`, which ranks field questions by the score the floor reads, with every candidate on an element counted (ADR 0115). `run.py early-policies`, no credentials. |
+| `harness/schema_paths.py` | Counts, per node, how its schema reached the provider (`schema_path`), each refusal that moved its tier down the ladder (`schema_fallback`) and its schema re-asks (`reasks`) and each answer taken out of a lone `answer` key (`answer_unwrapped`), over every archived report under `--root` (ADR 0058). A report that holds none of those fields reads as no schema and no re-ask. `run.py schema-paths`, no credentials. |
 | `harness/early_rounds.py` | Replays the early question list on archived extracted models, save after save, with the service's own question set, admission and writer. Seven answerers in `ANSWERERS` answer it: every capability yes or no with the blessed model's attribute values, every control none or a named mechanism, every question skipped, and two that answer only the first facet of a question with parts. It counts the questions at the floor at the start, those asked in all, and those an answer added or took away. `run.py early-rounds`, no credentials. |
-| `harness/question_prior.py` | Counts the early-question prior: how often a framework's findings cite each attribute or question kind, per element of one type, over a sweep's development cases. It reads the reports' verdicts, or with `--replay` the rulings of critic replays of that sweep. It writes that framework's row of `src/analysis_service/question_prior.json` with the runs it read, and keeps the other rows. `run.py question-prior`, no credentials. |
+| `harness/question_prior.py` | Counts the early-question prior: how often a framework's findings cite each attribute or question kind, per element of one type, over a sweep's development cases. It reads the reports' verdicts, or with `--replay` the rulings of critic replays of that sweep. It writes that framework's row of `src/analysis_service/question_prior.json` with the runs it read and its run record, and keeps the other rows. A row's `record` is `null` where no recorded run counted it. `run.py question-prior`, no credentials. |
 | `harness/withheld.py` | A case's answers file, `evals/answers/<case>.json`: who signed it, its answers, and for the withheld-sentence test the phrases taken out of the sources, the model fields set back and the assumption records dropped. One reader parses, checks and applies it for the `answered` and `withheld` modes, and each check fails closed: a phrase must occur once, and afterwards no withheld phrase may remain in a source or a model field, and every excerpt must still pass the validity gate's citation check, which reads `…` as a cut between fragments. |
 | `harness/descendants.py` | The stages after a lane, run again on the archive: the fan-in re-run over a sweep's `<case>.proposals.json` with any injected proposal added to its lane, each kept draft carrying its archived critic ruling by title, and every draft no critic ruled on bounded both ways (`lower` rejected, `upper` accepted). Answers whether a finding would have survived had a lane proposed it, for no provider call. Assembly is not re-run. `run.py descendants`. |
 | `harness/near_misses.py` | The near-miss ballot. `run.py near-misses` reads a scored sweep's `losses` rows and writes one row per missed must-find that a free same-lane draft may state with another verb or place, leaving out a draft that matched its own reference, one a person voted down, and any reading already ruled. `run.py near-miss-rulings` checks a returned ballot against the issued one and writes each `same` and `different` answer into the case's `rulings.json`, signed with the reader's login; a ruling that does not load undoes the whole write. Offline. |
 | `harness/lane_replay.py` | One lane's request, rebuilt from the sweep's `<case>.lanes.json` and sent again: the instruction through the graph's own `analyze_instruction` and ADK's templating, the user turn through ADK's `to_user_content` over `prepare`'s captured output, closed by the package's lane closing as the graph closes it. A test holds the rebuilt request against the one a real graph run sent, byte for byte. `--append` sends a file's text as one more user part after the captured input. `--prepare-today none|signed` takes no sweep: it runs today's `prepare` offline over the case's blessed model, with no catalog or with the case's signed facts, and scores the lane's drafts through the fan-in (`descendants.lane_must_finds`). A test holds its material against the material a real graph run captures. `run.py lane-replay`, one paid call. |
 | `harness/node_call.py` | One graph node's model call outside the graph, on the node's own tier adapter, sampling and output schema. The lane replay and the critic replay both call it. |
-| `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
+| `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. The rate divides by the checked quotes only. A block whose `quotes_checked` is false counts each quote as unchecked and has no rate. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
 | `harness/filler.py` | Whether a package's required justifications say anything: questions pointed at an attribute the evidence catalog would refuse, and how concentrated its grounds are. |
-| `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on, whether a reference every run missed kept one loss cause, and whether a reference two runs matched kept one severity band and one resolved place. Reads artifacts and their report bundles rather than re-running. |
+| `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on, whether a reference every run missed kept one loss cause (a reference that a run charged `unstated` is counted apart as unread), and whether a reference two runs matched kept one severity band and one resolved place. Reads artifacts and their report bundles rather than re-running. |
 | `harness/transport_gate.py` | ADR 0035's gate over two extraction arms: the primary emitted-token figure, six non-inferiority margins, first-pass validity, the two transport faults whose ceiling is zero, and the per-case veto. One table, applied whole, because the first application checked two criteria by hand and passed an arm that had failed. It refuses two corpus digests or an arm spanning two prompt digests, and refuses a sweep whose reports are missing rather than reading them as clean. Reads finished artifacts, so it costs no provider call. |
 | `harness/alignment.py` | Which produced element stands for which blessed one, one to one, on recorded evidence: an exact ID, a reader's alias for a node or for a flow's label, a zone by where its paired members sit, a flow's own label between aligned endpoints, the discriminators between them, or the one flow left on each side. What it cannot decide is listed as an ambiguity. A reader's alias is matched against a produced element's **name** rather than its ID: the two agree on every model the gate passed, and part on an archived one whose ID was derived under an older slug rule. Every extraction figure and the loss instrument read it. |
 | `harness/extraction_losses.py` | What an end-to-end run lost before its lanes ran: every reference's fate across that run and the analysis-mode run beside it (`both`, `downstream`, `extraction`, `recovered`), and for each extraction loss what the extracted model lacked at the reference's place, read through the extraction scorer over the report's own embedded model. `run.py extraction-losses`. |
+| `harness/fact_trace.py` | Where a wrong fact on a paired element went wrong. The replay reads each scored attribute's raw value from the emission, paired with its parsed element by position as the parse pairs its own walks, and reduces it as the scorer does. Each check takes a stage: `agrees`, `corrected-by-code`, `wrong-in-raw`, `changed-by-code` (the one stage that names a deterministic defect), `changed-and-wrong` or `raw-unread`. A wrong state-reduced attribute also takes a certainty: `unjustified-certainty`, `silence-for-absence`, `silence-for-statement` or `contradicts`. A key the emission left out reads as the default the parse fills. `run.py replay` prints and writes both splits. |
 | `harness/replay.py` | Archived emissions re-scored under the coordinates that stand. Every blessed element takes one fate off the alignment — `found`, `renamed`, `mistyped`, `misattached`, `endpoint_unaligned`, `omitted`, `ambiguous`, `unresolved`, and `placeholder` for a zone the reference holds only because the schema requires one — and every signed reference row one off the produced catalog, so a prompt change has the elements it aims at and the ceiling it cannot exceed before a run is paid for. A reference row carries **two** readings, always both: the strict fate, where a **Data Flow**'s label is part of its subject, and whether the run stated the same fact under another label. The gap between them is the naming measurement of #1015, and it is computed where the fates are so no caller can report one without the other. Beside the fates it reports **required-fact recall** — the stated rows a run recovered over the stated rows the case holds — which is the endpoint #1003's comparison and #926's Phase 6 both read, and which is narrower than `found` because a route loses nothing by leaving an inferred or unknown row open. Beside both it reports **span validity** and **support-assessment coverage**, which are different questions from semantic support: a row whose quote locates exactly can still say what the quote does not support, and a reader pooling the two cannot tell a run that quotes badly from one that reasons badly. `SPAN_REFUSALS` is which gate codes say a citation failed, and the assessment coverage reads zero everywhere because nothing in the service writes one. `run.py replay`. |
 | `harness/assertion_use.py` | How much each archived report used its assertion catalog: the claims that cite a catalog row, the claims that rest only on catalog rows, the leads that fire only because of the catalog, the refused rows, the open link questions, and what the `assert` node cost. A claim that cites a row can have the same support from a quote, so these figures are the most the pass added, not what it added. A report that today's model refuses is skipped and counted. Each finished job logs the same figures, from the same reader. Reads reports only, so it costs no provider call. `run.py assertion-use`. |
 | `harness/guard_cost.py` | What ADR 0041's guard holds back. Every archived assertion proposal against every archived extracted graph of its case, the pairing `run.py bind` makes, projected with the guard on and off. It reports the values held back, the projections that pass the gate only with the guard on, the decided crossings, every package's candidates lost and gained, and the must-finds that only a lost candidate led to. A graph today's gate refuses is skipped and counted, because no job projects onto one. Reads the archive and computes, so it costs no provider call. `run.py guard-cost`. |
-| `harness/falsify.py` | #926's falsification fixtures: whether the measurement would notice a reading that is wrong. Each probe corrupts one case's signed reference — a stated absence flipped to a control in force, one interaction's authentication copied onto another, a grant's scope dropped, a flow relabelled, a span removed — plays the result back as the run's own catalog, and declares what the gate and the required-fact endpoint must then say. A corruption that costs neither instrument anything is a hole in the measurement, and the suite fails on it; a positive control declares its zero cost, so the two are never confused, and a probe reaching only part of a criterion with several halves says which half in a field the report prints. Two corruptions are caught by a row fate or a gate code and never by recall, and the report names them rather than leaving a reader to assume the endpoint sees everything. It also drives every corruption through the job's own gate, projection and evidence catalog, unreviewed and with the corrupted rows assessed `unsupported`, and reports which corrupted rows reach a lane, which leads they suppress and which were lost to omission; the critical probes feed `critical-fixtures` in `promotion.py`. Reads the corpus and computes, so it costs no provider call. `run.py falsify`. |
-| `harness/promotion.py` | The gates #926's promotion decision is read against, declared before the runs that resolve them. Two kinds, and the difference is the point: a **resource** gate is a ratio against the baseline arm and one pair measures it, while a **quality** gate is a difference in a scored figure that one pair cannot read, so it declares its limit in standard deviations of the repeat spread and reports `inconclusive` until a caller supplies one. An absent figure is never a zero: an artifact written before a field existed leaves its gate unread and says so. Every gate names where its figure is read, and `tests/test_evals_promotion.py` holds each against a sealed Baseline, so a gate cannot read a key nothing writes. Required-fact recall is a quality gate of its own shape: it is read in assertion mode, from the treatment repeats `--recall` names, against a baseline recomputed from five archived repeats of five cases, and a repeat on another case set or model leaves it unread; the report's own end-to-end recall is printed beside it and not gated. The measurements the promotion needs and has no justified limit for yet — the frozen review population, the four support shares, case diversity — are `PENDING` gates, printed and always unread. It reports no verdict of its own — a run with an unread gate is not a promotion, which is a reading a person makes. `run.py gates`. |
+| `harness/falsify.py` | #926's falsification fixtures: whether the measurement would notice a reading that is wrong. Each probe corrupts one case's signed reference — a stated absence flipped to a control in force, one interaction's authentication copied onto another, a grant's scope dropped, a flow relabelled, a span removed — plays the result back as the run's own catalog, and declares what the gate and the required-fact endpoint must then say. A corruption that costs neither instrument anything is a hole in the measurement, and the suite fails on it; a positive check declares its zero cost, so the two are never confused, and a probe reaching only part of a criterion with several halves says which half in a field the report prints. Two corruptions are caught by a row fate or a gate code and never by recall, and the report names them rather than leaving a reader to assume the endpoint sees everything. It also drives every corruption through the job's own gate, projection and evidence catalog, unreviewed and with the corrupted rows assessed `unsupported`, and reports which corrupted rows reach a lane, which leads they suppress and which were lost to omission; the critical probes feed `critical-fixtures` in `promotion.py`. Reads the corpus and computes, so it costs no provider call. `run.py falsify`. |
+| `harness/promotion.py` | The gates #926's promotion decision is read against, declared before the runs that resolve them. Two kinds, and the difference is the point: a **resource** gate is a ratio against the baseline arm and one pair measures it, while a **quality** gate is a difference in a scored figure that one pair cannot read, so it declares its limit in standard deviations of the repeat spread and reports `inconclusive` until a caller supplies one. An absent figure is never a zero: an artifact that holds no value for a field leaves its gate unread and says so. Every gate names where its figure is read, and `tests/test_evals_promotion.py` holds each against a sealed Baseline, so a gate cannot read a key nothing writes. Required-fact recall is a quality gate of its own shape: it is read in assertion mode, from the treatment repeats `--recall` names, against a baseline recomputed from five archived repeats of five cases, and a repeat on another case set or model leaves it unread; the report's own end-to-end recall is printed beside it and not gated. The measurements the promotion needs and has no justified limit for yet — the frozen review population, the four support shares, case diversity — are `PENDING` gates, printed and always unread. It reports no verdict of its own — a run with an unread gate is not a promotion, which is a reading a person makes. `run.py gates`. |
 | `harness/population.py` | The review population #926's semantic-support measurement is read over, frozen before anybody assesses a row. Routes every row of a report's catalog, or of an assertion-mode sweep's catalogs resolved on each case's reviewed model (`--assertions`), with the job's own readers; each is keyed by its run as well as its case, so two runs of one case stay two populations — projected, offered, open, set aside, refused — so the rows a lane read are fixed before review can select among them; pins the catalog by digest, refuses a catalog that already carries an assessment, and never rewrites a frozen file. After the review, applies a reviewer's verdicts to one report through `analysis_service.reassess` — refusing verdicts written against another catalog digest — and writes the rows rejected, the findings withdrawn and the leads reopened beside the report, which is never rewritten. Runs no model. `run.py freeze-population`, `run.py reassess`. |
 | `harness/audit.py` | The two rules a quality audit needs in code. **The phase table**: which of the six phases owns each graph node, so an attribution is looked up rather than argued, and a node added to the graph fails `tests/test_evals_audit.py` until it lands in one. `run.py phases`, and `--node` answers for one name as an artifact spells it. **The experiment ledger**: one append-only JSONL file per audit under `evals/experiments/`, holding what an audit claimed, what would have refuted it, and what came back. Six outcomes and a row outside them raises, and so does a framework outside `PACKAGES`; a refuted or null row is the valuable one, because it is what stops the next audit paying for the same answer. A row naming no framework is neutral and answers for every package, which is a different claim from answering for one. Each row names the paths its conclusion reads, so the lookup reports `current`, `stale`, `unanchored` or `undecidable` from the tree rather than from what an earlier audit believed. A row in the skill's three-condition diagnostic carries a `condition` block naming its input, adapters, unrepresentable facts, builder's exposure and stage, and `CONDITION_STAGES` refuses a stage the condition cannot reach. Reads files and `git`, so it costs no provider call. `run.py experiments`. |
 | `harness/ledger_isolation.py` | Fails a pull request that changes a file of experiment ledger rows or grants and also changes code, so a reverted candidate keeps its record. It holds the list of code paths. Standard library only: the `Ledger` workflow runs the base branch's copy before any install. |
@@ -254,7 +268,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 13 false splits of 169, 2 false merges of 92 and 2 false merges of 365 with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 169, 2 false merges of 92 and 8 false merges of 484 with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/flow_ids.py` | Which **Data Flow** identity version a graph spells, and the table that lifts an archived artifact's old flow IDs to the version the corpus spells. The table comes from the graph's endpoints, because a version 1 ID omits the endpoint types. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
@@ -265,6 +279,7 @@ somewhere else.
 | `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |
 | `harness/preflight.py` | What a corpus addition inherits from a ruling nobody made about it. A dropped claim's fingerprint is free again, so a later addition can land on it and take the mark a reader made about the dropped claim — #1134 did exactly that, at `must-find`. No check over the tree alone can see it: the discriminator is which claims are new, and at the commit that shipped the defect 304 claims legitimately carried a mark, so a tree-only rule names 305 findings where there is one. So it reads a base revision, and it is a preflight rather than a gate. Run it before the addition lands: after the next sitting every claim carries a mark and an inherited one cannot be told from an earned one. `run.py corpus-preflight`. |
 | `harness/prices.py` | Unit prices from litellm's offline map, and the one cost rule submit and CI both run. A model the map misses prices at `None`, never at zero. A route in front of many providers is refused a price outright — no one rate describes a slug that reaches twelve endpoints. |
+| `harness/shared_answers.py` | Reads how often one shared answer is wrong for an element its box lists (ADR 0081, ADR 0113). Over the corpus, it makes each stated attribute the early list can ask unknown, builds the boxes the paused list asks once with the page's `shareable` rule, and counts each box's elements, true values, elements unlike the most common value, and the choices of an owner who shares one answer and of one who ticks the elements. `run.py shared-answers`, no credentials. |
 | `harness/sitting.py` | Holding a **Case Sitting**: which files it must read, the digest of each, what a reader may say about one recorded finding and the key that mark files under, the append-only entry that records it, the line it clears in the unreviewed list, and the rail of every case with the status the clearing rule gives it. `webapp/sitting.py` is one surface over it; the shell path writes the same files. |
 | `harness/comparison.py` | The published comparison over the merged Baselines, generated into `baselines/README.md`. Walks the instruments table for its columns, so it names no framework and no column. A figure from one sweep says `spread unmeasured`, and an exhausted holdout prints as a development case with its read count. A test fails a stale copy. |
 | `harness/standings.py` | What a **Standing** does to a number: the series table, the ledger narrowing each series reads, and the pairwise agreement report a maintainer reads before a promotion. It promotes nobody. |
@@ -280,6 +295,7 @@ somewhere else.
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/archive.py` | The bytes each archived file's producer writes, as one table keyed by file kind. A Baseline holds a file of each kind in that table, in three encodings — a report is UTF-8, the drafts beside it are escaped ASCII, a manifest sorts its keys — and every writer asks here rather than picking one. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
+| `harness/run_record.py` | The run record that each instrument writes first in its output file: the commit and whether the tree was clean, the instrument's table of policies, budgets and options, and each file read with its sha256 and the framework selections read on it. `run_record_for` gives the record of a run that writes one of its outputs, or none where it writes none. `sweep_inputs` names a sweep's artifact and every case file beside it. `tests/test_run_record_lints.py` holds every harness writer to the record, or to a row that says why its file is not a measurement. No checkout, no record. No credentials. |
 | `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table: `vote`, `sitting`, `baseline`. `verify-contribution --author` re-runs those checks in CI against the login GitHub says opened the PR. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
@@ -325,7 +341,7 @@ subtraction: a file added to a case counts until somebody rules it out. Only
 `corrections.md` and the reading documents are outside it, since no number
 reads them.
 
-An artifact taken before this was recorded carries `unrecorded` in both, which
+An artifact with no record of the two carries `unrecorded` in both, which
 is a required field honestly stating a deficient provenance — the design
 `bootstrap` uses on `case.json`. A commit inferred from a run's date would be a
 guess, and indistinguishable from an observation once written down.
@@ -417,10 +433,13 @@ at a place can be read against the leads it had.
 A case that fails inside the graph writes `artifact.reports/<case>.failure.json`
 instead of a report. It holds the fault's `repr` under `error`, and under
 `state` every key the graph's nodes wrote before the fault: the drafts, the
-critic's rulings and the marks. The job's source text is not in it. A critic
-that fails its gate after its re-ask is a failure of that case only, so the
-sweep records it and runs the next case. `score` and `replay` do not read this
-file.
+critic's rulings and the marks. Where a provider refused at its content
+filter, `refusal_category` holds the category the provider stated, such as
+`cyber`, or `null` where the service read none, and `error` names it or
+says `refusal category not read`. Only Anthropic's `stop_details` is read.
+The job's source text is not in it. A critic that fails its gate after its
+re-ask is a failure of that case only, so the sweep records it and runs the
+next case. `score` and `replay` do not read this file.
 
 Every mode that runs `extract` also writes `artifact.reports/<case>.extraction.json`:
 what the node emitted under `raw`, the model and gate verdict beside it, and
@@ -497,6 +516,14 @@ blessed element and every signed reference row:
 python -m evals.harness.run replay evals/emissions/*.json --out replay.json
 ```
 
+The replay pools sweeps into one arm when they ran one route, one prompt and
+one model, and read one input. The input is the artifact's `rendered_sources`
+block: one digest for each case, of the Sources as the graph renders them for
+the model. A change to a Source or to its render, such as the diagram reader,
+moves it. A sweep without the block is an arm of its own, and the replay prints
+`NOT POOLED` with its name. Name the arm of such sweeps with
+`--arm LABEL=GLOB` to pool them. `bind` takes the same option.
+
 The assertion benchmark seeded the blessed model, so its proposals name
 blessed element IDs; a production job resolves them against the graph its own
 extraction produced. `bind` resolves each archived proposal against every
@@ -508,7 +535,7 @@ cited over the extracted graphs against the blessed one:
 
 ```sh
 python -m evals.harness.run bind evals/emissions/20260914T201030Z-assert-model-benchmark/*.json \
-  --graphs evals/emissions/*.json --out bind.json
+  --graphs evals/emissions/*.json --arm 'benchmark=*' --out bind.json
 ```
 
 A `run` fails (exits non-zero) **only** on a structural problem — a report that
@@ -533,7 +560,7 @@ agent-authored, so it measures agreement with them and not correctness.
 Every number here is measured **against the rule and the ledger** — use
 them to compare configurations and track movement, never as absolute scores or
 against another tool's published figures. The reference sets they rest on are
-agent-authored, and every claim in them now carries one reader's mark.
+agent-authored, and every claim in them carries one reader's mark.
 
 **ASVS's differ only in mechanism.** The `applicability` block is a confusion
 matrix over a finite catalog, matched by requirement ID: its claims carry
@@ -609,7 +636,7 @@ threats, and for the same reason: scoring it as an error punishes finding real
 things and pushes every tuning cycle toward under-reporting.
 
 So **precision is reported only where the set says `exhaustive`**. Every case is
-`sampled` today, so the `prec` column reads `n/a` and the pooled line names how
+`sampled` today, so the `prec` column reads `unavailable` and the pooled line names how
 many of the cases it could read. The `over` column and
 `over_applied_for_promotion` are unchanged either way: the list is a reading for
 the next sitting, and only the rate over it is a score.
@@ -639,8 +666,9 @@ the next sitting, and only the rate over it is a score.
 - **rejected rate** — of the threats the tool produced that aren't in the
   reference set, how many did a person vote down for substance? The one "extra
   threat" standing that counts against the tool. It reads 0.0 over a cold
-  ledger, beside an **unvoted** count that says how much of the answer still
-  waits on a review sitting — a plausible, grounded extra never gates.
+  ledger, beside the **unvoted** and **stale** counts, which say how much of
+  the answer still waits on a review sitting — a plausible, grounded extra
+  never gates.
 
   **It is not a false-positive rate, and the denominator is why.** It divides
   by every threat produced, while only an unmatched, in-lane threat citing a
@@ -650,9 +678,10 @@ the next sitting, and only the rate over it is a score.
   beside the **eligible** and **reviewed** counts the artifact carries, and
   `rejected_rate_of_reviewed` beside those — which is still not precision,
   because a sitting reaches whatever it reaches rather than a drawn sample.
-- **critic yield** — always read as a **pair**: how many junk threats the critic
-  removed (good) *against* how many real threats it removed (bad). A kill count
-  on its own tells you nothing about which of those two is happening.
+- **critic yield** — always read as a **pair**: how many down-voted drafts the
+  critic rejected (good) *against* how many reference-matched drafts it rejected
+  (bad). A kill count on its own tells you nothing about which of those two is
+  happening. The drafts with no archived verdict are counted on their own line.
 - **near/far exemplar delta** — see below.
 - **holdout split** — coverage on the **Holdout Case**s beside coverage on the
   development ones (`holdout_split`, and `applicability_holdout_split` for ASVS).
@@ -773,7 +802,7 @@ because the reason they picked routes it to the writing score instead.
 
 Three properties make the record worth keeping:
 
-- **A vote is spent once.** It hangs on a **fingerprint** — framework, lane and
+- **A vote is cast once.** It hangs on a **fingerprint** — framework, lane and
   endpoint-resolved elements — not on a run, so it stays valid when the wording
   moves, when the model changes, and when a prompt is rewritten. The second
   sitting over one configuration shows nothing; a sitting after a change shows
@@ -788,7 +817,7 @@ Three properties make the record worth keeping:
 
 ## The corpus
 
-Sixteen cases, each sized so a person can enumerate its threats exhaustively
+20 cases, each sized so a person can enumerate its threats exhaustively
 (roughly 8–22 elements).
 
 The shipped prompts teach by example, and every lane's `exemplars.md` works its
@@ -798,7 +827,7 @@ that architecture's threats more easily. You cannot read that bias off an
 absolute score — only off the **gap** between coverage on the near cases and
 coverage on the far ones.
 
-So the corpus carries one control per exemplar system: `01` for payments and
+So the corpus carries one near case per exemplar system: `01` for payments and
 `02` for the fleet. Neither is optional. Drop either and the near side loses a
 system to compare against. `exemplar_proximity` sits on the (case, framework)
 pair, because each framework writes its own exemplars — a case near STRIDE's
@@ -823,6 +852,10 @@ too. The gap is tracked and watched, but never fails a build.
 | `14-loyalty-oauth-platform` | identity & access | far | synthetic (exhausted holdout) |
 | `15-multitenant-invoicing` | multi-tenant SaaS | far | synthetic (exhausted holdout) |
 | `16-library-lending-interview` | library lending | far | synthetic (two sources, one a transcript) |
+| `17-permit-portal-limits` | municipal permits | far | synthetic (request limits stated, absent and hedged) |
+| `18-podcast-host-quotas` | podcast hosting | far | synthetic (request limits stated, absent and hedged) |
+| `19-vet-clinic-records` | veterinary records | far | synthetic (access checks stated, absent and hedged) |
+| `20-school-coursework` | school coursework | far | synthetic (access checks stated, absent and hedged) |
 
 The Cookbook cases come from the [OWASP Threat Model
 Cookbook](https://github.com/OWASP/threat-model-cookbook) (CC-BY 4.0), converted

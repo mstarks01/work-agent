@@ -274,10 +274,10 @@ class SubsetVerbIdentity:
     Each half fails alone and the pair does not. Elements alone cannot separate
     a read from a write against one store, and a verb alone cannot separate two
     reads of two different stores. Together they answer both, and the
-    measurement says how far: over the 23 reference-claim pairs ``endpoint
-    subset`` wrongly merges, the vocabulary separates 20, and
-    :data:`~evals.harness.verbs.UNSEPARATED` names the three it does not with
-    the reason for each.
+    measurement says how far: over the 50 reference-claim pairs ``endpoint
+    subset`` wrongly merges, the vocabulary separates 41, and
+    :data:`~evals.harness.verbs.UNSEPARATED` names the nine it does not, in
+    four entries, with the reason for each.
 
     A :class:`Matcher` like :class:`MechanicalIdentity`, so
     :func:`~evals.harness.calibration.measure_agreement` scores it against the

@@ -62,9 +62,11 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import get_args
+from types import MappingProxyType
+from typing import Literal, get_args
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -74,12 +76,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.claim_identity import report_rows
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
-from analysis_service.report import Report
 from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import ProvenanceError, load_artifact
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -94,13 +97,18 @@ from evals.harness.ledger import (
     github_login,
     load,
 )
-from evals.harness.reference import flows_by_case, load_corpus
+from evals.harness.modes import EvalRunError
+from evals.harness.reference import (
+    flows_by_case,
+    load_corpus,
+)
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
     SecurityHeaders,
-    client_script,
+    client_scripts,
     escape,
+    invalid_request,
     refuse_cross_origin,
     render,
     response,
@@ -112,7 +120,7 @@ PORT = 8010
 
 #: The verdicts the endpoint accepts, spelled from the type the ledger declares
 #: so the two cannot drift apart.
-VERDICTS: tuple[str, ...] = get_args(VoteChoice)
+VERDICTS: tuple[VoteChoice, ...] = get_args(VoteChoice)
 
 #: What each package's records rule on, in the words the reviewer reads. A
 #: table rather than one heading, because the two packages do not ask the same
@@ -124,7 +132,7 @@ VERDICTS: tuple[str, ...] = get_args(VoteChoice)
 #: holds — so only the prose is keyed here and the ledger stays one closed set.
 #: ``evals/build_review_docs.py`` asks the same question per package in the
 #: reading document; these are the browser's half of that pair.
-QUESTIONS: dict[str, dict[str, str]] = {
+QUESTIONS: dict[FrameworkName, dict[str, str]] = {
     "stride": {
         "heading": "Could this happen?",
         "ask": "Could this attack happen in this system?",
@@ -159,6 +167,11 @@ if _unasked:
 #: page. So framing is the way past every check on the write path, and refusing
 #: to be framed is the check.
 _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
+
+
+def _script(name: str) -> str:
+    """The script of one review page, after the reader of an answer it calls."""
+    return client_scripts("service_answer.js", name)
 
 
 class VoteBody(BaseModel):
@@ -282,13 +295,17 @@ def create_app(session: Session) -> FastAPI:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
+    @app.exception_handler(RequestValidationError)
+    async def _invalid_request(request: Request, exc: RequestValidationError):
+        return invalid_request(exc.errors())
+
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
         return response(
             render(
                 _QUEUE_PAGE,
                 _PAGE_GRANTS,
-                script=client_script("review_queue.js"),
+                script=_script("review_queue.js"),
                 voter=escape(session.voter),
             )
         )
@@ -299,7 +316,7 @@ def create_app(session: Session) -> FastAPI:
             render(
                 _REVIEW_PAGE,
                 _PAGE_GRANTS,
-                script=client_script("review_finding.js"),
+                script=_script("review_finding.js"),
                 voter=escape(session.voter),
                 token=script_json(session.token),
             )
@@ -345,7 +362,7 @@ def create_app(session: Session) -> FastAPI:
                 status_code=422,
                 detail=f"verdict is not one of {', '.join(VERDICTS)}",
             )
-        verdict: VoteChoice = body.verdict  # type: ignore[assignment]
+        verdict: VoteChoice = body.verdict
         try:
             recorded = cast(
                 item.components,
@@ -388,6 +405,21 @@ def _require_token(request: Request, session: Session) -> None:
         raise HTTPException(status_code=403, detail="wrong or missing page token")
 
 
+#: Which score a reason moves: the finding's substance, or only its style.
+#: ``review_finding.js`` draws one group of buttons for each.
+ReasonKind = Literal["substance", "style"]
+
+
+#: The heading ``review_finding.js`` gives the group of each kind.
+REASON_KIND_HEADINGS: Mapping[ReasonKind, str] = MappingProxyType(
+    {"substance": "It is wrong", "style": "It is badly written"}
+)
+
+
+def _reason_kind(code: str) -> ReasonKind:
+    return "substance" if code in SUBSTANCE_REASONS else "style"
+
+
 def _reason_payload() -> list[dict[str, str]]:
     """The reason buttons, each carrying which score it moves.
 
@@ -399,9 +431,11 @@ def _reason_payload() -> list[dict[str, str]]:
         {
             "code": code,
             "gloss": REASON_GLOSS[code],
-            "kind": "substance" if code in SUBSTANCE_REASONS else "style",
+            "kind": kind,
+            "heading": REASON_KIND_HEADINGS[kind],
         }
         for code in sorted(SUBSTANCE_REASONS) + sorted(STYLE_REASONS)
+        for kind in (_reason_kind(code),)
     ]
 
 
@@ -409,7 +443,7 @@ _STYLE = """
   :root { color-scheme: light dark; --line: #8884; }
   body { font: 15px/1.6 system-ui, sans-serif; max-width: 60rem;
          margin: 2rem auto; padding: 0 1.25rem; }
-  h1 { font-size: 1.35rem; margin-bottom: .2rem; }
+  h1 { font-size: 20px; margin-bottom: .2rem; }
   .sub { opacity: .7; margin-top: 0; font-size: .9rem; }
   .bar { display: flex; gap: 1.5rem; font-size: .85rem; opacity: .8;
          border-bottom: 1px solid var(--line); padding-bottom: .6rem;
@@ -582,8 +616,8 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]
         # digests of the claim it answered, and those are computed from the
         # package's own record -- so a second reading assembled out of a dict
         # here would key a vote to a claim the rest of the harness never sees.
-        # `bundle.runs_from_reports` already reads these files this way.
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        # `bundle.read_report` is the one reader of an archived report.
+        report = bundle.read_report(report_path)
         rows = report_rows(report)
         for block in report.analyses:
             findings += [
@@ -628,8 +662,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             " has produced findings. Run `python -m evals.harness.run run"
             " --mode analysis --out artifact.json` first."
         )
-    runs, configs = findings_from_artifacts(args.artifact)
-    session = build_session(runs, args.voter, args.ledger, configs)
+    # Each refusal names the file and the field, in one line, so the reviewer
+    # fixes the input instead of reading a traceback.
+    try:
+        runs, configs = findings_from_artifacts(args.artifact)
+        session = build_session(runs, args.voter, args.ledger, configs)
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
+    except (EvalRunError, ProvenanceError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
     print(f"{len(session.items)} findings waiting for {args.voter}")
     print(f"ledger: {args.ledger}")
     print(f"open http://{HOST}:{PORT}/")

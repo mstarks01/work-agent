@@ -34,6 +34,7 @@ from analysis_service.claims import (
     FrameworkName,
     RuledClaim,
     ScopeEntry,
+    ScopeState,
 )
 from analysis_service.frameworks.asvs.record import requirement_of
 from evals.harness.critic_yield import UNSTATED
@@ -66,7 +67,7 @@ STAGES: tuple[Stage, ...] = (
 #: ``needs-other-evidence`` cannot be a miss — the matrix counts it applied —
 #: so a miss carrying it is a scorer disagreement, and it is charged to the
 #: deferral that produced it rather than dropped.
-STAGE_FOR_SCOPE: Mapping[str, Stage] = MappingProxyType(
+STAGE_FOR_SCOPE: Mapping[ScopeState, Stage] = MappingProxyType(
     {
         "undecidable": "precondition",
         "not-applicable": "precondition",
@@ -75,12 +76,19 @@ STAGE_FOR_SCOPE: Mapping[str, Stage] = MappingProxyType(
     }
 )
 
+#: What a report says about one requirement: the kind of an
+#: :class:`~evals.harness.applicability.Observation`. Stated here because the
+#: applicability module imports this one.
+ObservedKind = Literal[
+    "confirmed", "needs-info", "rejected", "not-applicable", "deferred", "silent"
+]
+
 #: What a wrong routing says about a requirement the run *did* apply. Keyed by
 #: the observation kinds :func:`~evals.harness.applicability.observe` can
 #: return for an applied requirement. ``rejected`` and ``not-applicable`` are
 #: absent on purpose: those requirements are also in the matrix's ``missed``
 #: cell, and one loss must move one row.
-STAGE_FOR_OBSERVED: Mapping[str, Stage] = MappingProxyType(
+STAGE_FOR_OBSERVED: Mapping[ObservedKind, Stage] = MappingProxyType(
     {
         "confirmed": "verdict",
         "needs-info": "verdict",

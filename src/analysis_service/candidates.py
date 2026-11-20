@@ -21,11 +21,11 @@ attention.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import AssertionCatalog, PredicateName
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -37,6 +37,8 @@ __all__ = [
     "Rule",
     "clip_fact",
     "generate_candidates",
+    "leads",
+    "with_rule_tables",
 ]
 
 # How much of a caller-authored attribute value a fact carries. Facts exist to
@@ -75,6 +77,34 @@ class Candidate(BaseModel):
     facts: dict[str, Fact] = Field(default_factory=dict)
 
 
+def with_rule_tables(
+    rules: Sequence[Rule],
+    effects: Mapping[str, str],
+    informed_by: Mapping[str, frozenset[PredicateName]],
+) -> tuple[Rule, ...]:
+    """``rules``, each with its row of a package's ``effects`` and ``informed_by`` tables.
+
+    Each table is checked against the rules: a rule with no row, or a row for
+    no rule, raises. So a new rule cannot reach the early list with the
+    analyst's question as its reason, and cannot leave out which predicates
+    inform it.
+    """
+    ids = {rule.rule_id for rule in rules}
+    for name, table in (("effect sentence", effects), ("informed_by row", informed_by)):
+        if missing := sorted(ids - table.keys()):
+            raise ValueError(f"no {name} for the rules {missing}")
+        if extra := sorted(table.keys() - ids):
+            raise ValueError(f"{name}s for no rule: {extra}")
+    return tuple(
+        replace(
+            rule,
+            effect=effects[rule.rule_id],
+            informed_by=informed_by[rule.rule_id],
+        )
+        for rule in rules
+    )
+
+
 class CandidateSet(BaseModel):
     """One lane's candidates, plus the questions their rules put.
 
@@ -103,6 +133,14 @@ class Rule:
     lane: str
     question: str
     find: Callable[[SystemModel, AssertionCatalog], Iterator[Match]]
+    #: What an answer about a fact the rule reads informs, as the early list
+    #: shows it to the owner (:func:`with_rule_tables`). ``question`` is what the
+    #: lane reads.
+    effect: str = ""
+    #: The predicates whose fact bears on this rule's finding (ADR 0117), from
+    #: its package's table (:func:`with_rule_tables`). The rule need not fire
+    #: on a row of one; the early list reads this to rank a question kind.
+    informed_by: frozenset[PredicateName] = frozenset()
 
     def fire(self, model: SystemModel, catalog: AssertionCatalog) -> list[Candidate]:
         """Every candidate this rule produces for this model, in model order."""
@@ -162,24 +200,23 @@ def _candidate_set(
     )
 
 
+def leads(sets: Mapping[str, CandidateSet]) -> set[tuple[str, str, tuple[str, ...]]]:
+    """Each lead in ``sets``, as its lane, its rule and its elements.
+
+    A lead is a rule fired in a lane on a set of elements, so a rule that fires
+    on one more element counts once more. The facts a candidate carries are not
+    part of it: the same lead with a projected value in place of ``unknown`` is
+    the same attention. The questions a set carries are not part of it either.
+    """
+    return {
+        (candidate.lane, candidate.rule_id, candidate.element_ids)
+        for candidate_set in sets.values()
+        for candidate in candidate_set.candidates
+    }
+
+
 def catalog_leads(
     held: Mapping[str, CandidateSet], without: Mapping[str, CandidateSet]
 ) -> int:
-    """How many leads in ``held`` the rules give no lane in ``without``.
-
-    A lead is a rule fired in a lane on a set of elements, so a rule that fires
-    on one more element because of the catalog counts once more. The facts a
-    candidate carries are not part of it: the same lead with a projected value
-    in place of ``unknown`` is the same attention.
-    """
-
-    def leads(
-        sets: Mapping[str, CandidateSet],
-    ) -> set[tuple[str, str, tuple[str, ...]]]:
-        return {
-            (candidate.lane, candidate.rule_id, candidate.element_ids)
-            for candidate_set in sets.values()
-            for candidate in candidate_set.candidates
-        }
-
+    """How many :func:`leads` in ``held`` the rules give no lane in ``without``."""
     return len(leads(held) - leads(without))

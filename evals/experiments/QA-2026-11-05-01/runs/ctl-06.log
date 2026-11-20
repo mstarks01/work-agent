@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Player-local game traffic may expose player data without verified protection | ['flow:entity:player>process:game-client>launch-and-play', 'entity:player', 'process:game-client']
+- Matchmaking traffic may be readable across the player-to-production boundary | ['flow:process:game-client>process:lobby>matchmaking', 'process:game-client', 'process:lobby']
+- Gameplay traffic may disclose match state across the player boundary | ['flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-client', 'process:game-server']
+- Lobby-to-game-server match handoff may reveal player identifiers | ['flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server']
+- Player account records may be exposed on the lobby database read path | ['flow:process:lobby>store:player-database>read-players', 'process:lobby', 'store:player-database']
+- Game-server statistics traffic may expose business-critical match data | ['flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server', 'store:stats-database']
+- Player progression updates may disclose player records in transit | ['flow:process:game-server>store:player-database>update-players', 'process:game-server', 'store:player-database']
+- Support moderation traffic may expose player account data across the corporate boundary | ['flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'entity:customer-support-staff', 'process:moderation-website']
+- Moderation website database traffic may expose player records | ['flow:process:moderation-website>store:player-database>read-write-players', 'process:moderation-website', 'store:player-database']
+- A copied player database may expose player records if storage encryption is absent | ['store:player-database']
+- A copied statistics database may disclose match data if storage encryption is absent | ['store:stats-database']
+- Unverified player-database authentication may permit unauthorized account-record reads | ['store:player-database', 'flow:process:lobby>store:player-database>read-players', 'flow:process:moderation-website>store:player-database>read-write-players']
+- Unverified statistics-database authentication may expose match statistics | ['store:stats-database', 'flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server']
+spent: $0.0601 reported
+must-finds matched: [8, 9]

@@ -20,14 +20,20 @@ wayfinder maps use native sub-issues and issue dependencies. See `docs/agents/is
 
 Run a **pre-merge review** on each pull request's diff, and a **checkpoint
 round** over a range of merged commits. Read your own fix diff against the five
-defect classes, because a fix is the riskiest code in the tree.
+defect classes, because a fix is the riskiest code in the tree. Before the
+merge, a sub-task that did not write the diff reads it against the standards
+and the smell list.
 
 CI requires a `## Five-class read` section, with one entry for each class,
 in the body of each pull request that changes code.
+Before you write code, read each row of the table of classes that come back in
+fixes as a question. Write each answer in a `## Before the code` section of the
+pull request body. CI requires that section too.
 
 A round starts from `git tag -l 'reviewed/*' --sort=-creatordate | head -1` and
 ends in a new annotated `reviewed/<date>` tag. Read that tag's message before
-you report a finding: it lists what was left open by decision. See
+you report a finding: it lists what was left open by decision. Sweep the whole
+tree for each finding, however small, and fix each instance. See
 `docs/agents/code-review.md`.
 
 ### Triage labels
@@ -49,6 +55,11 @@ branch, and check the table against its registry. See
 A **Vendor** row has the same failure mode: a constant, a branch or a short
 table entry that does not raise. `tests/test_vendor_neutrality.py` checks it.
 See `docs/agents/vendor-parity.md`.
+
+### Regression matrix
+
+Before you add a regression test, read `docs/agents/regression-matrix.md`,
+and add a row for the failure the test holds.
 
 ### Quality audits
 

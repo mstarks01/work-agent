@@ -1,5 +1,5 @@
 """The shared base for every fail-closed configuration error, and the one
-reader of where a request's validation error sits.
+reader of where a request's validation error sits, :func:`error_place`.
 
 Four loaders refuse to build on bad config — the model tiers
 (:class:`~analysis_service.model_tiers.ModelConfigError`), vendor credentials
@@ -26,9 +26,12 @@ pydantic's coercion path are unaffected.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from analysis_service.store_settings import StoreConfigError
 
 
 class ConfigError(ValueError):
@@ -39,12 +42,23 @@ class ConfigError(ValueError):
     """
 
 
-def error_place(error: Mapping[str, Any]) -> str:
-    """Where one pydantic error sits: a dotted path of declared names and indexes.
+def config_refusal(exc: ConfigError | StoreConfigError) -> str:
+    """The one line a command prints for ``exc`` in place of a traceback.
 
-    **A refusal names the field, never what the caller sent.** An
-    ``extra_forbidden`` error sits at a key the caller made up, so its path
-    stops at the object that holds that key.
+    A :class:`~analysis_service.store_settings.StoreConfigError` names the
+    store setting to fix. It holds no secret and not the database URL.
+    """
+    return f"cannot run on this configuration: {exc}"
+
+
+def error_place(error: Mapping[str, Any]) -> str:
+    """Where one pydantic error sits: a dotted path of names, keys and indexes.
+
+    **A place never names an extra field.** An ``extra_forbidden`` error sits
+    at a key the caller made up, so its path stops at the object that holds
+    that key. A key of a declared mapping stays in the path, because it names
+    the entry that is wrong, and pydantic adds the part ``[key]`` after a key
+    that the mapping refuses. The place of an error at the top is empty.
     """
     loc = error["loc"][:-1] if error["type"] == "extra_forbidden" else error["loc"]
     return ".".join(str(part) for part in loc)
@@ -78,6 +92,14 @@ def shown_errors(errors: Sequence[Mapping[str, Any]]) -> list[ShownError]:
     return shown
 
 
+def refusal_line(errors: Sequence[Mapping[str, Any]]) -> str:
+    """Each place and rule of :func:`shown_errors` for ``errors``, in one line."""
+    return "; ".join(
+        f"{error.place}: {error.message}" if error.place else error.message
+        for error in shown_errors(errors)
+    )
+
+
 def refusal_text(exc: ValueError) -> str:
     """What a refusal says for ``exc``.
 
@@ -85,8 +107,5 @@ def refusal_text(exc: ValueError) -> str:
     is read as each place and rule instead, through :func:`shown_errors`.
     """
     if isinstance(exc, ValidationError):
-        return "; ".join(
-            f"{error.place}: {error.message}" if error.place else error.message
-            for error in shown_errors(exc.errors(include_input=False))
-        )
+        return refusal_line(exc.errors(include_input=False))
     return str(exc)

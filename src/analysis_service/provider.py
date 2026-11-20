@@ -26,7 +26,7 @@ the provider side already holds.**
 | --- | --- |
 | out | the route, the turn's contents, the system instruction, the output schema as JSON, the per-call decoding params, the deadline |
 | never out | the credential, the seed, the reasoning effort, the request timeout |
-| back | content parts, the served build, usage, the finish reason, the reported charge, the named upstream |
+| back | content parts, the served build, usage, the finish reason, the refusal category, the reported charge, the named upstream |
 | back, as data | what a failure was — see :func:`~analysis_service.retry.classify` |
 
 The credential is the extreme case of that rule and the reason for it: it is
@@ -48,7 +48,7 @@ There is one implementation, :class:`InProcessExecutor`, and it wraps the
 adapter ``binding`` already built. The seam is proven rather than hypothetical
 because every call the service makes crosses it — the transport tests read the
 bytes a direct adapter call would send, and ``tests/test_provider_contract.py`` reads
-the same nine facts off the other side.
+the same ten facts off the other side.
 """
 
 from __future__ import annotations
@@ -77,6 +77,7 @@ from analysis_service.ladder import (
 )
 from analysis_service.offline import refuse_live_inference
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
+from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
 from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
@@ -237,7 +238,7 @@ class GenerationRequest:
 class GenerationResult:
     """What one provider call answered, as the facts this service reads.
 
-    The nine ``tests/test_provider_contract.py`` drives, plus the cache-write
+    The ten ``tests/test_provider_contract.py`` drives, plus the cache-write
     count ``tests/test_prompt_cache.py`` drives, minus the attempt count — that one is the retry loop's own, written above this seam
     on the way back out, because an implementation cannot know how many times
     its caller asked.
@@ -253,6 +254,9 @@ class GenerationResult:
     #: ``native``, ``tool`` or ``prompt``, as the executor sent the schema; ``None`` where
     #: the call sent no schema.
     schema_path: SchemaPath | None
+    #: The refusal category the provider stated beside a filter stop, or
+    #: ``None`` where the service read none.
+    refusal_category: str | None
     #: The refusal rule that moved this call down its tier's ladder, or ``None``.
     schema_fallback: SchemaRefusal | None = None
     #: Whether the answer came out of a lone ``answer`` key on the tool path.
@@ -262,10 +266,10 @@ class GenerationResult:
     def of(cls, response: LlmResponse) -> Self:
         """One ADK response reduced to the facts that cross.
 
-        The charge and the upstream come off ``custom_metadata`` under the keys
-        :mod:`analysis_service.charges` writes them with, rather than being
-        re-read from a provider object — that module owns both the capture and
-        the rule, and this is a carrier.
+        Every stamped fact comes off ``custom_metadata`` under the key that its
+        module writes it with, rather than being re-read from a provider
+        object. The module that writes a key owns both the capture and the
+        rule, and this is a carrier.
         """
         stamped = response.custom_metadata or {}
         return cls(
@@ -277,6 +281,7 @@ class GenerationResult:
             served_upstream=stamped.get(UPSTREAM_METADATA_KEY),
             cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
             schema_path=stamped.get(SCHEMA_PATH_METADATA_KEY),
+            refusal_category=stamped.get(REFUSAL_CATEGORY_METADATA_KEY),
             schema_fallback=stamped.get(SCHEMA_FALLBACK_METADATA_KEY),
             answer_unwrapped=stamped.get(ANSWER_UNWRAPPED_METADATA_KEY, False),
         )
@@ -315,6 +320,7 @@ class GenerationResult:
             UPSTREAM_METADATA_KEY: self.served_upstream,
             CACHE_WRITE_METADATA_KEY: self.cache_write_tokens,
             SCHEMA_PATH_METADATA_KEY: self.schema_path,
+            REFUSAL_CATEGORY_METADATA_KEY: self.refusal_category,
             SCHEMA_FALLBACK_METADATA_KEY: self.schema_fallback,
             ANSWER_UNWRAPPED_METADATA_KEY: self.answer_unwrapped or None,
         }

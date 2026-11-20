@@ -8,8 +8,8 @@ archived report under a root, so a paired run of the native and tool paths
 (#1413) reads its re-ask rate and its fallbacks from the record rather than
 from a log.
 
-A node execution that sent no schema counts under the path ``none``. A report
-written before the fields existed reads as ``none`` with no re-ask, because
+A node execution that sent no schema counts under the path ``none``. A stored
+report that holds no such fields reads as ``none`` with no re-ask, because
 that is what their defaults say, so read the counts only over runs made after
 ADR 0058.
 """
@@ -24,8 +24,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from analysis_service.report import NodeRun, Report
+from analysis_service.report import NodeRun
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
 
 #: The path an execution that sent no schema counts under.
 NO_SCHEMA = "none"
@@ -69,7 +70,7 @@ def sweep(root: Path) -> dict[str, NodeSchemaPaths]:
     """:func:`schema_paths` over every archived report under ``root``."""
     nodes = []
     for path in sorted(root.rglob(f"*{case_suffix('report')}")):
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         nodes.extend(report.nodes)
     return schema_paths(nodes)
 

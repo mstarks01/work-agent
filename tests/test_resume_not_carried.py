@@ -62,6 +62,7 @@ def test_every_other_selection_refusal_stays_a_plain_config_error(names):
 def test_the_admission_passes_it_through_and_holds_no_slot():
     store = InMemoryJobStore()
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=OWNER,
         sources=list(valid_model_sources()),
         frameworks=sample_selection(),

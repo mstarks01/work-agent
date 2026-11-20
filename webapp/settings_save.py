@@ -51,12 +51,12 @@ from analysis_service.settings_variables import (
     merged_env,
     secret_vars,
 )
-from analysis_service.store_backends import build_store, retention_days
 from analysis_service.store_backends import env_variables as store_variables
+from analysis_service.store_backends import retention_days
 from analysis_service.store_settings import StoreConfigError
 from analysis_service.vendors import VENDORS
 from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key
-from webapp.settings_view import with_store_defaults
+from webapp.settings_view import build_app_store
 
 logger = logging.getLogger("webapp")
 
@@ -341,16 +341,28 @@ def _check(
     level on a model that takes none is refused on its own row.
 
     ``build`` builds the test Deployment and its runner, and the store check
-    runs :func:`~analysis_service.store_backends.build_store` and the
-    retention rule. No step calls a provider.
+    runs :func:`~webapp.settings_view.build_app_store` and the retention
+    rule, as the startup does. So a save can name a SQLite file that does not
+    exist yet (ADR 0110). No step calls a provider.
     """
     built = build(env)
     found = [] if built.error is None else [_refusal_of(built.error)]
     try:
-        build_store(with_store_defaults(env))
+        build_app_store(env)
         retention_days(env)
-    except (StoreConfigError, ImportError) as exc:
+    except StoreConfigError as exc:
         found.append(Refusal(None, str(exc)))
+    except ImportError as exc:
+        # Each store converts an extra that is not installed into a
+        # StoreConfigError, so an ImportError here is a broken install of a
+        # library the store loads.
+        found.append(
+            Refusal(
+                None,
+                f"the store cannot load a library ({exc}): install"
+                " analysis-service again with the extra that the store needs",
+            )
+        )
     return built, found
 
 

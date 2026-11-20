@@ -33,10 +33,13 @@ Read off :mod:`evals.harness.alignment`, never off names:
   rename nobody ruled on, or an omission beside an invention; this instrument
   cannot say which, and says so rather than guessing.
 
-A **wrong fact** is not a fate. It is a scored attribute that differs on a
-paired element, read off :attr:`~evals.harness.modes.ExtractionScore.differing`,
-and one element can carry several. An **extra** is an unpaired produced
-element, carried as a count: what it is waits on a ruling (#961 step 3).
+A **wrong fact** is not a fate. It is a scored attribute on a paired element
+whose :attr:`~evals.harness.modes.AttributeCheck.agrees` is false, and one
+element can carry several. :func:`~evals.harness.modes.differing` lists them
+for each emission, and :func:`~evals.harness.modes.attribute_agreement` counts
+them for each attribute over the checks compared for it, which is the printed
+figure. An **extra** is an unpaired produced element, carried as a count: what
+it is waits on a ruling (#961 step 3).
 
 ## Assertion fates, one per signed reference row
 
@@ -81,6 +84,7 @@ and a run confirms.
 
 from __future__ import annotations
 
+import json
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -105,7 +109,10 @@ from analysis_service.assertions import (
     snap_subject,
 )
 from analysis_service.evidence import prepared_view
+from analysis_service.execution import source_texts
 from analysis_service.grounding import normalize
+from analysis_service.parsing import table_entry
+from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     DataFlow,
@@ -115,6 +122,7 @@ from analysis_service.system_model import (
     flow_label,
     parse_flow_id,
 )
+from evals.harness import fact_trace
 from evals.harness.alignment import (
     Alignment,
     align,
@@ -122,13 +130,19 @@ from evals.harness.alignment import (
     placeholder_zones,
     slug_key,
 )
-from evals.harness.artifact import EvalArtifact
+from evals.harness.artifact import EvalArtifact, recorded_sources
+from evals.harness.fact_trace import FactTrace, Stage
 from evals.harness.modes import (
     AssertionResult,
     AttributeCheck,
     ExtractionResult,
+    SweepMode,
+    attribute_agreement,
+    differing,
     score_extraction,
 )
+from evals.harness.provenance import ProvenanceError
+from evals.harness.rates import ratio, shown_figure
 from evals.harness.reference import GoldenCase
 from evals.reference_facts import facts_path, load_facts, reference_catalog
 
@@ -161,7 +175,7 @@ FATES: tuple[Fate, ...] = (
 #: reader ruled a producer need not draw, so nothing stood for it and nothing
 #: had to (:func:`~evals.harness.alignment.placeholder_zones`). A produced
 #: zone that pairs with one still reads ``found`` or ``renamed``.
-LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
+LOSSES: frozenset[Fate] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 
 #: The fates a produced row can answer a reference row with, which is every
 #: fate that is not an absence. Named apart from :data:`RowFate` because one
@@ -195,7 +209,7 @@ ROW_FATES: tuple[RowFate, ...] = (
 #: raised, and the prompt tells the model to write no such row, so nobody
 #: produced it and nobody should have. A produced value against one still
 #: reads ``wrong_value``, which is the defect that matters.
-ROW_LOSSES: frozenset[str] = frozenset(
+ROW_LOSSES: frozenset[RowFate] = frozenset(
     {"wrong_certainty", "wrong_value", "rescoped", "omitted"}
 )
 
@@ -222,6 +236,15 @@ PRODUCED_FATES: tuple[ProducedFate, ...] = (
     "rescoped",
     "misattached",
     "unreviewed",
+)
+
+
+#: The stages a wrong fact with a raw value can take, in the order the printed
+#: table reads them.
+WRONG_STAGES: tuple[Stage, ...] = (
+    "wrong-in-raw",
+    "changed-by-code",
+    "changed-and-wrong",
 )
 
 
@@ -262,20 +285,39 @@ class ExtractionReplay:
     #: also one to read beside this flag.
     parsed: bool
     fates: tuple[ElementFate, ...]
-    wrong_facts: tuple[AttributeCheck, ...]
+    #: Every scored attribute of every paired element, agreeing or not, each
+    #: with its raw value, so a count of wrong facts carries the count it is
+    #: taken over and the stage each one went wrong at.
+    facts: tuple[FactTrace, ...]
     extra: tuple[str, ...]
+    #: The element ID of each ``duplicate-id`` issue the parse raised. The parse
+    #: raises one for each element whose emitted ID another element carried,
+    #: and one for each derived ID that two elements of one name share.
+    duplicate_id_issues: tuple[str, ...]
     issues: tuple[str, ...] = ()
 
     @property
     def counts(self) -> Counter[str]:
         return Counter(row.fate for row in self.fates)
 
+    @property
+    def attributes(self) -> tuple[AttributeCheck, ...]:
+        return tuple(fact.check for fact in self.facts)
+
+    @property
+    def wrong_facts(self) -> tuple[AttributeCheck, ...]:
+        return differing(self.attributes)
+
     def to_json(self) -> dict[str, Any]:
+        wrong = set(self.wrong_facts)
         return {
             "case": self.case_id,
             "parsed": self.parsed,
             "counts": {fate: self.counts[fate] for fate in FATES},
-            "wrong_facts": [check.to_json() for check in self.wrong_facts],
+            "wrong_facts": [
+                fact.to_json() for fact in self.facts if fact.check in wrong
+            ],
+            "duplicate_id_issues": list(self.duplicate_id_issues),
             "extra": list(self.extra),
             "issues": list(self.issues),
             "fates": [row.to_json() for row in self.fates],
@@ -290,7 +332,14 @@ def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionR
         case_id=case.id,
         parsed=result.extracted is not None,
         fates=classify_elements(case.model, result.extracted, score.alignment),
-        wrong_facts=score.differing,
+        facts=fact_trace.trace(
+            result.raw, result.extracted, score.alignment, score.attributes
+        ),
+        duplicate_id_issues=tuple(
+            issue.element_id
+            for issue in result.issues
+            if issue.code == "duplicate-id" and issue.element_id is not None
+        ),
         extra=score.alignment.unaligned_produced,
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues)
         + tuple(f"malformed-flow-id: {one}" for one in malformed),
@@ -415,7 +464,10 @@ class ReferenceRowFate:
 
     reference: str
     fate: RowFate
+    #: The produced row's ID under the signed aliases, as the replay read it.
     produced: str = ""
+    #: The same row's ID as the run's catalog keys it, before the aliases.
+    produced_own: str = ""
     #: Which way one ``wrong_certainty`` runs: the reference rules the fact
     #: inferred and the produced row calls it stated. A grant is never stated, a
     #: credential's presentation is implied by its issue (#961 step 3), and a
@@ -428,6 +480,7 @@ class ReferenceRowFate:
             "reference": self.reference,
             "fate": self.fate,
             "produced": self.produced,
+            "produced_own": self.produced_own,
             "basis_overstated": self.basis_overstated,
         }
 
@@ -504,11 +557,9 @@ class AssertionReplay:
         )
 
     @property
-    def recall(self) -> float:
-        """Required-fact recall for one run. A case with no required row is 1.0."""
-        if not self.required:
-            return 1.0
-        return self.recovered / len(self.required)
+    def recall(self) -> float | None:
+        """Required-fact recall for one run, or ``None`` with no required row."""
+        return ratio(self.recovered, len(self.required))
 
     @property
     def credited(self) -> frozenset[str]:
@@ -701,7 +752,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
     """The case's signed reference, or ``None`` where no signed file grades it."""
     if unsigned_rows(corpus_dir, case) != 0:
         return None
-    sources = {source.label: source.text for source in case.sources}
+    sources = source_texts(case.sources)
     facts = load_facts(corpus_dir / case.id)
     return SignedReference(
         catalog=reference_catalog(facts, case.model, sources),
@@ -725,7 +776,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
 def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     """The produced row in the reference's spellings, where a signed alias rules.
 
-    The one place an alias is applied, before any comparison: the subject, a
+    This applies an alias before any comparison: the subject, a
     value that points at another subject, and each scope qualifier are each
     rewritten to the reference's spelling where a signed ruling names the
     produced one. A value and a qualifier are rewritten only under the produced
@@ -738,7 +789,7 @@ def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     reference it points at. The alias is keyed by the whole **Element ID**, so a
     ruling about a zone reaches no value naming a process.
     """
-    predicate = REGISTRY[produced.predicate]
+    predicate = table_entry(REGISTRY, produced.predicate)
     own = reference.subject_aliases.get(produced.subject)
     subject = produced.subject if own is None else own.to
     value = produced.value
@@ -774,7 +825,7 @@ def _compares_exactly(predicate: str) -> bool:
     one of the layer's own subjects — a credential or a principal slugged
     from whatever the model wrote — are a reader's question.
     """
-    registered = REGISTRY[predicate]
+    registered = table_entry(REGISTRY, predicate)
     if registered.value == "term":
         return True
     return registered.value == "reference" and bool(registered.refers_to & GRAPH_BOUND)
@@ -876,9 +927,12 @@ def replay_assertions(
     without the pair beside it. The strict fates are untouched by it.
     """
     available: dict[tuple[str, str], list[Assertion]] = defaultdict(list)
+    # Each aliased copy is its own object, so its identity finds its row.
+    own: dict[int, str] = {}
     for entry in result.catalog.entries:
         aliased = under_aliases(entry, reference)
         available[aliased.subject, aliased.predicate].append(aliased)
+        own[id(aliased)] = assertion_id(entry)
     assigned = _assigned(reference.entries, available)
     rows = []
     answered: dict[str, ProducedFate] = {}
@@ -898,6 +952,7 @@ def replay_assertions(
                 assertion_id(ours),
                 fate,
                 taken,
+                own[id(theirs)],
                 basis_overstated=(
                     fate == "wrong_certainty"
                     and ours.basis == "inferred"
@@ -967,7 +1022,7 @@ BindFate = Literal[
 BIND_FATES: tuple[BindFate, ...] = get_args(BindFate)
 
 #: The binding losses, which the pooled table lists as targets.
-BIND_LOSSES: frozenset[str] = frozenset(
+BIND_LOSSES: frozenset[BindFate] = frozenset(
     {"renamed", "omitted", "referent_renamed", "referent_omitted"}
 )
 
@@ -1076,7 +1131,7 @@ def bind_assertions(
     differently from the reviewed reading, which is #295's question rather
     than this layer's.
     """
-    sources = {source.label: source.text for source in case.sources}
+    sources = source_texts(case.sources)
     proposed = CatalogProposal.model_validate(proposal.proposal)
     blessed, refused_blessed = AssertionRecord.resolved(proposed, case.model, sources)
     if extraction.extracted is None:
@@ -1103,7 +1158,7 @@ def bind_assertions(
             # predicates that take no reference. A term predicate carrying a
             # term outside its vocabulary draws this same code, and reading
             # `refers_to` directly ended the replay with a bare StopIteration.
-            wanted = referent_type(REGISTRY[row.predicate])
+            wanted = referent_type(table_entry(REGISTRY, row.predicate))
             blessed_id = (
                 None if wanted is None else snap_subject(wanted, row.value, case.model)
             )
@@ -1122,9 +1177,17 @@ def bind_assertions(
     )
 
 
+#: What tells one sweep's input apart from another's on an :class:`Arm`.
+#: ``rendered_sources`` is the artifact's own record of each case's rendered
+#: Sources. ``named`` is the arm a caller named for a sweep that records none.
+#: ``sweep`` is a sweep that records none and that no caller named, so it is
+#: an arm of its own.
+TreatmentBy = Literal["rendered_sources", "named", "sweep"]
+
+
 @dataclass(frozen=True)
 class Arm:
-    """What one archived sweep was: the reading route, and the models that answered it.
+    """What one archived sweep was: the reading route, its input, and the models that answered it.
 
     ``models`` is what answered the archived route, read off the sweep's own
     execution record, never the tier table. Two sweeps with one tier table
@@ -1134,24 +1197,52 @@ class Arm:
     ``nodes`` and ``instructions`` are tuples because a reading route can be
     more than one call, and each call carries its own prompt. A single-call
     route holds one of each, which is every archived sweep.
+
+    ``treatment`` is what the route read, and ``treatment_by`` says where that
+    came from (:data:`TreatmentBy`). Two sweeps with one prompt and one model
+    read different input when a Source or its render moved, such as a change
+    to the diagram reader, and the instruction digest shows neither.
     """
 
     nodes: tuple[str, ...]
     instructions: tuple[str, ...]
     models: tuple[str, ...]
+    treatment: str
+    treatment_by: TreatmentBy
 
     @property
     def label(self) -> str:
         route = "+".join(self.nodes)
         digests = ",".join(digest[:12] for digest in self.instructions)
-        return f"{route}@{digests} on {', '.join(self.models)}"
+        read = TREATMENT_LABELS[self.treatment_by].format(self.treatment)
+        return f"{route}@{digests} on {', '.join(self.models)}, {read}"
 
     def to_json(self) -> dict[str, Any]:
         return {
             "nodes": list(self.nodes),
             "instructions": list(self.instructions),
             "models": list(self.models),
+            "treatment": self.treatment,
+            "treatment_by": self.treatment_by,
         }
+
+
+#: How each kind of treatment prints in an arm's label.
+TREATMENT_LABELS: Mapping[TreatmentBy, str] = {
+    "rendered_sources": "input {:.12}",
+    "named": "arm {!r}",
+    "sweep": "only {}",
+}
+
+
+def rendered_digest(rendered: Mapping[str, str]) -> str:
+    """One digest over a sweep's ``rendered_sources`` block, case by case.
+
+    Sweeps that read the same input for every case they selected share it,
+    so repeats pool and a case's own input never makes an arm of its own.
+    """
+    canonical = json.dumps(dict(rendered), sort_keys=True, separators=(",", ":"))
+    return text_digest(canonical)
 
 
 #: Which reading routes each mode admits, and so which nodes' instructions
@@ -1165,7 +1256,7 @@ class Arm:
 #:
 #: A table keyed by mode, listing routes: a second route added to a mode is one
 #: entry here, and a sweep that ran it is placed rather than refused.
-ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
+ROUTES_OF: Mapping[SweepMode, tuple[tuple[str, ...], ...]] = {
     "extraction": (("extract",),),
     "end-to-end": (("extract",),),
     "assertions": (("assert",),),
@@ -1173,12 +1264,15 @@ ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
 }
 
 
+#: What a replayable mode keeps beside its artifact.
+Kept = Literal["extraction", "catalog"]
+
 #: What each replayable mode keeps beside its artifact, and so which emission a
 #: replay grades. **Apart from** :data:`ROUTES_OF`, which answers a different
 #: question — which nodes' instructions place the sweep on an arm. The head-only
 #: mode reads through ``extract`` and keeps a catalog, so the two tables answer
 #: apart.
-KEEPS: Mapping[str, str] = {
+KEEPS: Mapping[SweepMode, Kept] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
     "assertions": "catalog",
@@ -1186,12 +1280,13 @@ KEEPS: Mapping[str, str] = {
 }
 
 
-def arm_of(artifact: EvalArtifact) -> Arm:
-    """Which prompts and which models an archived sweep ran, off its own record.
+def arm_of(artifact: EvalArtifact, named: str | None) -> Arm:
+    """Which prompts, which input and which models an archived sweep ran, off its own record.
 
     One route of :data:`ROUTES_OF`, and one prompt per node of it. A sweep
     carrying the nodes of two routes is two arms and is refused, and so is one
-    that carries the nodes of none.
+    that carries the nodes of none. ``named`` is the arm a caller names for a
+    sweep that records no ``rendered_sources`` block.
     """
     rows = artifact.block("instruction")
     carried = {row["node"] for row in rows}
@@ -1220,7 +1315,55 @@ def arm_of(artifact: EvalArtifact) -> Arm:
                 f" {node}, so the sweep cannot be placed on an arm"
             )
         models.update(execution["requested_model"] for execution in executions)
-    return Arm(tuple(route), tuple(instructions), tuple(sorted(models)))
+    treatment, treatment_by = _treatment_of(artifact, named)
+    return Arm(
+        tuple(route),
+        tuple(instructions),
+        tuple(sorted(models)),
+        treatment,
+        treatment_by,
+    )
+
+
+def _treatment_of(artifact: EvalArtifact, named: str | None) -> tuple[str, TreatmentBy]:
+    """What a sweep read: its own record, else the caller's name, else itself.
+
+    The record wins over a name, because it is what the run rendered. A sweep
+    with neither is never pooled with another: the replay cannot tell whether
+    two such sweeps read one input, and it does not guess.
+    """
+    try:
+        rendered = recorded_sources(artifact)
+    except ProvenanceError as error:
+        raise ValueError(f"{error}, so the sweep cannot be placed on an arm") from error
+    if rendered is not None:
+        return rendered_digest(rendered), "rendered_sources"
+    if named is not None:
+        return named, "named"
+    return str(artifact.path), "sweep"
+
+
+def unpooled_note(arms: Iterable[Arm]) -> str | None:
+    """Why sweeps with one route, prompt and model print as separate arms.
+
+    ``None`` where no two such sweeps exist. Otherwise the message names the
+    sweeps and the option that pools them.
+    """
+    held: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+    for arm in dict.fromkeys(arms):
+        if arm.treatment_by == "sweep":
+            held[(arm.nodes, arm.instructions, arm.models)].append(arm.treatment)
+    apart = [paths for paths in held.values() if len(paths) > 1]
+    if not apart:
+        return None
+    names = "; ".join(", ".join(Path(path).name for path in paths) for paths in apart)
+    return (
+        f"NOT POOLED: {sum(map(len, apart))} sweep(s) share a route, a prompt and"
+        " a model but carry no rendered_sources block, so nothing records whether"
+        f" they read one input: {names}. Each is its own arm. To pool the sweeps"
+        " that read one input, name their arm with --arm LABEL=GLOB, where GLOB"
+        " matches the artifact file names."
+    )
 
 
 @dataclass(frozen=True)
@@ -1230,7 +1373,7 @@ class SweepReplay:
     artifact: str
     arm: Arm
     commit: str
-    #: ``None`` where the sweep predates the tree state being recorded.
+    #: ``None`` where the sweep records no tree state.
     clean: bool | None
     corpus_digest: str
     extractions: tuple[ExtractionReplay, ...] = ()
@@ -1266,7 +1409,8 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     counts: Counter[str] = Counter()
     by_type: dict[str, Counter[str]] = defaultdict(Counter)
     per_element: dict[str, Counter[str]] = defaultdict(Counter)
-    wrong_facts: Counter[str] = Counter()
+    facts: list[FactTrace] = []
+    duplicates: Counter[str] = Counter()
     renamed_by: Counter[str] = Counter()
     emissions = 0
     unparsed = 0
@@ -1283,7 +1427,8 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
                     renamed_by[row.evidence] += 1
                 if row.fate in LOSSES:
                     per_element[f"{replay.case_id}/{row.reference}"][row.fate] += 1
-            wrong_facts.update(check.key for check in replay.wrong_facts)
+            facts.extend(replay.facts)
+            duplicates[replay.case_id] += len(replay.duplicate_id_issues)
     targets = sorted(
         per_element.items(), key=lambda item: (-sum(item[1].values()), item[0])
     )
@@ -1304,7 +1449,9 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             kind: {fate: fates[fate] for fate in FATES}
             for kind, fates in sorted(by_type.items())
         },
-        "wrong_facts": dict(sorted(wrong_facts.items())),
+        "attribute_aggregate": attribute_agreement([fact.check for fact in facts]),
+        "facts": fact_trace.pooled(facts),
+        "duplicate_id_issues": {case: n for case, n in sorted(duplicates.items()) if n},
         "targets": [
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
@@ -1455,7 +1602,7 @@ def pooled_bindings(sweeps: Sequence[BindingSweep]) -> dict[str, Any]:
         "pairs": pairs,
         "unparsed": unparsed,
         "fates": {fate: counts[fate] for fate in BIND_FATES},
-        "bound_share": counts["bound"] / graph_bound if graph_bound else None,
+        "bound_share": ratio(counts["bound"], graph_bound),
         "offered": offered,
         "offered_blessed": offered_blessed,
         "targets": [
@@ -1472,6 +1619,9 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
         grouped[sweep.arm].append(sweep)
+    note = unpooled_note(grouped)
+    if note:
+        print(note)
     for arm, arm_sweeps in grouped.items():
         pool = pooled_bindings(arm_sweeps)
         print(f"\n== {arm.label}: {len(arm_sweeps)} proposal sweep(s)")
@@ -1483,9 +1633,7 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
         for fate in BIND_FATES:
             print(f"  {fate:<20} {pool['fates'][fate]:>5}")
         share = pool["bound_share"]
-        print(
-            f"  bound share of graph-bound rows: {'n/a' if share is None else f'{share:.3f}'}"
-        )
+        print(f"  bound share of graph-bound rows: {shown_figure(share, '.3f')}")
         print(
             f"  rows a lane could cite: {pool['offered']} over the extracted graphs,"
             f" {pool['offered_blessed']} over the blessed one"
@@ -1500,17 +1648,14 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
 
 
 def binding_artifact(
-    sweeps: Sequence[BindingSweep], commit: str, clean: bool | None, corpus_digest: str
+    sweeps: Sequence[BindingSweep], record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The whole binding replay, with the coordinates it was scored under named first."""
+    """The whole binding replay, with the run record it was scored under first."""
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
         grouped[sweep.arm].append(sweep)
     return {
-        "coordinates": {
-            "repo_commit": {"commit": commit, "clean": clean},
-            "corpus_digest": corpus_digest,
-        },
+        "record": dict(record),
         "arms": [
             {"arm": arm.to_json(), "bindings": pooled_bindings(arm_sweeps)}
             for arm, arm_sweeps in grouped.items()
@@ -1536,7 +1681,11 @@ TREE_STATE: Mapping[bool | None, str] = {
 
 def render(sweeps: Sequence[SweepReplay], targets: int) -> None:
     """The pooled tables, one per arm, with the elements a change would aim at."""
-    for arm, arm_sweeps in by_arm(sweeps).items():
+    arms = by_arm(sweeps)
+    note = unpooled_note(arms)
+    if note:
+        print(note)
+    for arm, arm_sweeps in arms.items():
         print(f"\n== {arm.label}: {len(arm_sweeps)} sweep(s)")
         for sweep in arm_sweeps:
             state = TREE_STATE[sweep.clean]
@@ -1552,7 +1701,8 @@ def render(sweeps: Sequence[SweepReplay], targets: int) -> None:
 def _render_extraction(pool: dict[str, Any], targets: int) -> None:
     per = pool["sweeps"] or 1
     print(
-        f"  {pool['emissions']} emission(s), {pool['unparsed']} refused by today's gate,"
+        f"  {pool['emissions']} emission(s), {pool['unparsed']} refused by today's"
+        " gate,"
         f" {pool['extra']} extra element(s) unreviewed"
     )
     kinds = list(pool["by_type"])
@@ -1575,11 +1725,32 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
             f"{_sd(spread['by_type'].get(kind, {}).get(fate)):>8}" for kind in kinds
         )
         print(f"  {fate:<20} {'':>5} {_sd(spread['sd'][fate]):>9}  {per_kind}")
-    if pool["wrong_facts"]:
+    by_attribute = pool["attribute_aggregate"]["by_attribute"]
+    if by_attribute:
         listed = ", ".join(
-            f"{key} {count}" for key, count in pool["wrong_facts"].items()
+            f"{key} {row['compared'] - row['agreed']}/{row['compared']}"
+            for key, row in by_attribute.items()
         )
-        print(f"  wrong facts on paired elements: {listed}")
+        print(f"  wrong facts on paired elements, of the checks compared: {listed}")
+        by_stage = pool["facts"]["by_stage"]
+        print(
+            "  wrong facts by stage (" + ", ".join(WRONG_STAGES) + "); then the"
+            " checks the parse righted, and the checks with no raw value read"
+        )
+        for key, counts in by_stage.items():
+            wrong = " ".join(f"{counts[stage]:>4}" for stage in WRONG_STAGES)
+            print(
+                f"    {key:<32} {wrong}   corrected by code"
+                f" {counts['corrected-by-code']}, raw unread {counts['raw-unread']}"
+            )
+        for key, counts in pool["facts"]["by_certainty"].items():
+            listed = ", ".join(f"{name} {n}" for name, n in counts.items() if n)
+            print(f"    certainty {key}: {listed}")
+        duplicates = sum(pool["duplicate_id_issues"].values())
+        print(
+            f"  {duplicates} duplicate-id issue(s) the parse raised, in"
+            f" {len(pool['duplicate_id_issues'])} case(s)"
+        )
     if pool["targets"]:
         print(f"  targets (top {targets} of {len(pool['targets'])}):")
         for target in pool["targets"][:targets]:
@@ -1590,7 +1761,7 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
 
 
 def _sd(value: float | None) -> str:
-    return "-" if value is None else f"{value:.2f}"
+    return shown_figure(value, ".2f")
 
 
 def _render_assertions(pool: dict[str, Any], targets: int) -> None:
@@ -1610,7 +1781,7 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
     # ``found`` above counts every reference row, inferred and unknown ones
     # included; this counts only the stated rows the denominator holds.
     required, recovered = pool["required"], pool["recovered"]
-    share = f"{recovered / required:.3f}" if required else "-"
+    share = shown_figure(ratio(recovered, required), ".3f")
     print(f"  required-fact recall: {recovered}/{required} = {share}")
     # The two readings #926 asks to see apart from the fates above, which are
     # the semantic-support half.
@@ -1633,15 +1804,12 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
 
 
 def artifact(
-    sweeps: Sequence[SweepReplay], commit: str, clean: bool | None, corpus_digest: str
+    sweeps: Sequence[SweepReplay], record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The whole replay, with the coordinates it was scored under named first."""
+    """The whole replay, with the run record it was scored under first."""
     arms = by_arm(sweeps)
     return {
-        "coordinates": {
-            "repo_commit": {"commit": commit, "clean": clean},
-            "corpus_digest": corpus_digest,
-        },
+        "record": dict(record),
         "arms": [
             {
                 "arm": arm.to_json(),

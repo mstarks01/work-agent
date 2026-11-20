@@ -106,7 +106,7 @@ def replace_roster(skill: str, block: str) -> str:
 
 def write_rosters(lanes_dir: Path) -> list[str]:
     """Rewrite every chapter's roster in place. Returns the lanes that changed."""
-    changed = []
+    changed: list[str] = []
     for chapter in CHAPTERS:
         path = lanes_dir / chapter.lane / f"{LANE_SKILL_DOC}.md"
         before = path.read_text(encoding="utf-8")

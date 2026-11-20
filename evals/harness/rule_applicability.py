@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, get_args
 
 from analysis_service.answer_state import recommended
-from analysis_service.capabilities import CAPABILITIES, Applicability
+from analysis_service.capabilities import Applicability, Presence, parse_capability_key
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.early_questions import capability_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -46,6 +46,7 @@ from analysis_service.fact_writes import answered_model
 from analysis_service.frameworks import PACKAGES
 from analysis_service.parsing import signer
 from analysis_service.system_model import CapabilityStatement, SystemModel
+from evals.harness.rates import ratio
 
 __all__ = [
     "FIXTURES_DIR",
@@ -67,7 +68,11 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "applicability"
 _LABEL = "Fixture source"
 
 #: How a truth state answers a yes-or-no capability question.
-TRUTH_ANSWERS = {"present": "yes", "absent": "no", "unknown": "unknown"}
+TRUTH_ANSWERS: dict[Presence, str] = {
+    "present": "yes",
+    "absent": "no",
+    "unknown": "unknown",
+}
 
 
 @dataclass(frozen=True)
@@ -83,7 +88,7 @@ class Fixture:
     statements: tuple[CapabilityStatement, ...]
     answers: Mapping[str, str]
     expected: Mapping[str, str]
-    truth: Mapping[str, str]
+    truth: Mapping[str, Presence]
 
     @property
     def signed(self) -> bool:
@@ -115,7 +120,7 @@ def _refuse_untrusted(path: Path, raw: Mapping[str, Any]) -> None:
                 f"{path}: expected {unit}: {state!r} is not one of {', '.join(states)}"
             )
     for key, state in raw.get("truth", {}).items():
-        if key not in CAPABILITIES:
+        if parse_capability_key(key) is None:
             raise FixtureError(f"{path}: truth {key!r} is not a capability")
         if not isinstance(state, str) or state not in TRUTH_ANSWERS:
             raise FixtureError(
@@ -379,14 +384,12 @@ def report(fixtures: Sequence[Fixture]) -> dict[str, Any]:
         pooled["signed" if signed else "unsigned"] = {
             "fixtures": len(group),
             "adjudicated": rows,
-            "accuracy": sum(score.correct for score in group) / rows if rows else None,
+            "accuracy": ratio(sum(score.correct for score in group), rows),
             "false_exclusions": sum(len(score.false_exclusions) for score in group),
             "false_inclusions": sum(len(score.false_inclusions) for score in group),
-            "unknown_accuracy": (
-                sum(score.correct_unknown for score in group)
-                / sum(score.expected_unknown for score in group)
-                if any(score.expected_unknown for score in group)
-                else None
+            "unknown_accuracy": ratio(
+                sum(score.correct_unknown for score in group),
+                sum(score.expected_unknown for score in group),
             ),
         }
     return {

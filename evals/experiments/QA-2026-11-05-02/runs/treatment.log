@@ -1,0 +1,14 @@
+trt-I-02-row-unanswered-1 rc=0 spent=0.0244 total=0.0244
+trt-I-02-row-not-shown-1 rc=0 spent=0.0240 total=0.0484
+trt-I-02-row-on-other-step-1 rc=0 spent=0.0244 total=0.0728
+trt-R-03-row-unanswered-1 rc=0 spent=0.0233 total=0.0961
+trt-R-03-row-not-shown-1 rc=0 spent=0.0232 total=0.1193
+trt-R-03-row-on-other-step-1 rc=0 spent=0.0233 total=0.1426
+trt-I-02-row-unanswered-2 rc=0 spent=0.0053 total=0.1479
+trt-I-02-row-not-shown-2 rc=0 spent=0.0040 total=0.1519
+trt-I-02-row-on-other-step-2 rc=0 spent=0.0039 total=0.1558
+trt-R-03-row-unanswered-2 rc=0 spent=0.0035 total=0.1593
+trt-R-03-row-not-shown-2 rc=0 spent=0.0037 total=0.1630
+trt-R-03-row-on-other-step-2 rc=0 spent=0.0036 total=0.1666
+TOTAL 0.1666
+2

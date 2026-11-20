@@ -95,6 +95,18 @@ class TestEveryRowIsRoutedByTheJobsReaders:
         assert routes[assertion_id(silent)] == "open"
         assert routes[assertion_id(mfa())] == "set-aside"
 
+    def test_a_row_the_graph_contradicts_is_set_aside(self, refused_projection) -> None:
+        """The graph keeps its stated mechanism beside the stated absence, so
+        the absence is a question, like a row another row disputes."""
+        absence = stated(value=ABSENT)
+
+        assert self.routes(record(absence))[assertion_id(absence)] == "set-aside"
+
+    def test_an_absence_the_graph_takes_is_projected(self) -> None:
+        absence = stated(value=ABSENT)
+
+        assert self.routes(record(absence))[assertion_id(absence)] == "projected"
+
     def test_a_refused_row_is_recorded_with_its_codes(self) -> None:
         issues = [
             CatalogIssue(code="unverifiable-span", message="", row=3),
@@ -220,6 +232,7 @@ class TestAPopulationIsFrozenBeforeReview:
         assert population.command_freeze_population(args) == 1
         assert out.read_text(encoding="utf-8") == first
         assert set(json.loads(first)["cases"]) == {str(tmp_path / "case")}
+        assert json.loads(first)["record"]["inputs"][0]["path"] == str(source)
 
     def test_the_command_is_registered(self) -> None:
         assert COMMANDS["freeze-population"].run is (
@@ -263,6 +276,8 @@ class TestReassessingAReport:
         written = json.loads(args.out.read_text(encoding="utf-8"))
         assert len(written["rejected"]) == 1
         assert len(written["withdrawn"]) == 1
+        assert written["record"]["command"] == "reassess"
+        assert written["assertions"]["catalog"]
 
     def test_verdicts_for_another_catalog_are_refused(self, tmp_path) -> None:
         args = self.write(tmp_path, digest="0" * 64)

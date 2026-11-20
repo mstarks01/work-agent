@@ -1,0 +1,10 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- Credential stuffing can let an internet attacker place orders as a shopper | ['entity:shopper', 'process:storefront-api', 'flow:entity:shopper>process:storefront-api>place-order']
+- A stolen shopper session cookie can be replayed to place orders | ['entity:shopper', 'process:storefront-api', 'flow:entity:shopper>process:storefront-api>place-order']
+- A fake storefront can harvest shopper sessions if server authentication is not verified | ['entity:shopper', 'process:storefront-api', 'flow:entity:shopper>process:storefront-api>place-order']
+- Forged settlement callbacks are possible if webhook authentication is absent | ['entity:card-processor', 'process:storefront-api', 'flow:entity:card-processor>process:storefront-api>settlement-webhook']
+- A fake storefront can receive processor callbacks if server authentication is not verified | ['entity:card-processor', 'process:storefront-api', 'flow:entity:card-processor>process:storefront-api>settlement-webhook']
+- A foothold that can reach the order service can submit orders as the storefront API | ['process:storefront-api', 'process:order-service', 'flow:process:storefront-api>process:order-service>submit-order']
+- A fake order service can receive orders if server authentication is not verified | ['process:storefront-api', 'process:order-service', 'flow:process:storefront-api>process:order-service>submit-order']
+spent: $0.0549 reported
+must-finds matched: [0, 1]

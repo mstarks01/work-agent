@@ -1,0 +1,15 @@
+01-payments-checkout arm=signed rc=0 spent=0.0494 total=0.0494
+02-iot-fleet-telemetry arm=signed rc=0 spent=0.0673 total=0.1167
+03-batch-data-pipeline arm=signed rc=0 spent=0.0594 total=0.1761
+04-ml-inference-service arm=signed rc=0 spent=0.0623 total=0.2384
+05-cookbook-queue-webapp arm=signed rc=0 spent=0.0567 total=0.2951
+06-cookbook-online-game arm=signed rc=0 spent=0.0697 total=0.3648
+09-cookbook-sokify-retail arm=signed rc=0 spent=0.0614 total=0.4262
+10-cookbook-generic-cms arm=signed rc=0 spent=0.0436 total=0.4698
+11-sparse-shift-scheduling arm=signed rc=0 spent=0.0561 total=0.5259
+12-overclaiming-supplier-portal arm=signed rc=0 spent=0.0556 total=0.5815
+13-dispatch-control-plane arm=signed rc=0 spent=0.0655 total=0.6470
+14-loyalty-oauth-platform arm=none rc=0 spent=0.0633 total=0.7103
+15-multitenant-invoicing arm=none rc=0 spent=0.0683 total=0.7786
+TOTAL 0.7786
+0

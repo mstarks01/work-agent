@@ -1,0 +1,448 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "615b1885bc6c0f16d3f42d7fda170ab4a647d0d7",
+    "clean": true,
+    "table": {
+      "case": "10-cookbook-generic-cms",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "296b1e44aae80214dc1fe2e419cf581f5fe4e688786116c51e611b055fddac8e"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "11733f3e4b23332c142b56ae7d4c4e9533cd838bbc19c54dec072020f2137d38",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt3/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Database administration traffic exposes CMS accounts and comments on the public-to-hosted path",
+      "description": "An attacker able to observe the public-network path used by `flow:entity:admin>store:mysql-database>direct-administration` can intercept the unsecured MySQL session between `entity:admin` and `store:mysql-database`. The flow crosses from `boundary:public-internet` to `boundary:hosted-network`, has `encryption_in_transit: none`, and carries direct maintenance traffic for pages, accounts, and comments, including the store's `pii`. The attacker can read database results and administration commands without authenticating to the database. Second-order, the captured account and site data can support targeted attacks against users and the public `process:web-server`.",
+      "affected_element_ids": [
+        "flow:entity:admin>store:mysql-database>direct-administration",
+        "entity:admin",
+        "store:mysql-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:admin>store:mysql-database>direct-administration",
+        "absent:flow:entity:admin>store:mysql-database>direct-administration:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the flow crosses from `boundary:public-internet` and is explicitly unencrypted, but the attacker must obtain an on-path position; impact is high because `store:mysql-database` holds `pii` and the flow exposes direct access to its pages, accounts, and comments."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS for direct MySQL administration",
+          "detail": "Configure `flow:entity:admin>store:mysql-database>direct-administration` to use verified TLS, preferably mutual TLS, so MySQL queries and results are confidential on the public-to-hosted path."
+        },
+        {
+          "summary": "Constrain the administration path",
+          "detail": "Require administration through a managed jump host or private access path and restrict database connections to that path rather than allowing arbitrary external network origins."
+        }
+      ]
+    },
+    {
+      "title": "CMS-to-MySQL traffic may expose PII if internal transport encryption is absent",
+      "description": "`flow:process:web-server>store:mysql-database>cms-data` carries pages, accounts, and comments, including `pii`, between `process:web-server` and `store:mysql-database`, but its `encryption_in_transit` attribute is unknown. If that unknown resolves to no effective MySQL transport protection, an attacker with a foothold on the hosted-network path can intercept CMS reads and writes and recover account and comment data. Second-order, captured account-related information can be used to target readers of the internet-facing `process:web-server`. This is conditional on the unverified transport-encryption attribute, not an assertion that the internal flow is plaintext.",
+      "affected_element_ids": [
+        "flow:process:web-server>store:mysql-database>cms-data",
+        "process:web-server",
+        "store:mysql-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:web-server>store:mysql-database>cms-data:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because exploitation requires an internal on-path foothold and is conditional on the unknown encryption state of `flow:process:web-server>store:mysql-database>cms-data`; impact is high because the flow carries `pii` to and from `store:mysql-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encrypted MySQL transport",
+          "detail": "Establish the actual `encryption_in_transit` state and require TLS with certificate validation for `flow:process:web-server>store:mysql-database>cms-data`, including internal hosted-network traffic."
+        },
+        {
+          "summary": "Limit database-path observation",
+          "detail": "Segment the database network path and restrict packet capture and administrative access to systems that require it."
+        }
+      ]
+    },
+    {
+      "title": "CDN publication traffic may disclose unpublished business assets if transport protection is absent",
+      "description": "`flow:process:web-server>store:cdn-bucket>asset-publish` transfers newly published images, stylesheets, and downloads from `process:web-server` into the separate CDN zone, and carries `business-critical-data`. Its protocol, authentication, and `encryption_in_transit` are all unknown. If the unverified transport protection is absent, an attacker observing the hosted-network-to-CDN path can intercept assets before or while they are published. Second-order, early access to unpublished downloads or site material can reveal planned content and provide material for convincing social-engineering or content-targeting attacks. This draft is conditional on the unknown transport state.",
+      "affected_element_ids": [
+        "flow:process:web-server>store:cdn-bucket>asset-publish",
+        "process:web-server",
+        "store:cdn-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:web-server>store:cdn-bucket>asset-publish",
+        "unknown:flow:process:web-server>store:cdn-bucket>protocol",
+        "unknown:flow:process:web-server>store:cdn-bucket:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the publication flow crosses into `boundary:cdn` and its protocol and encryption state are unverified, though interception still needs path access; impact is medium because the flow carries business-critical published assets rather than identified PII or credentials."
+      },
+      "mitigations": [
+        {
+          "summary": "Use authenticated TLS for CDN publication",
+          "detail": "Set a verified HTTPS or equivalent TLS transport for `flow:process:web-server>store:cdn-bucket>asset-publish` and validate the CDN endpoint certificate."
+        },
+        {
+          "summary": "Confirm the publisher identity",
+          "detail": "Use a dedicated, narrowly scoped publishing identity for the web server and record the flow's authentication method rather than leaving it unknown."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy may expose all CMS records if MySQL encryption at rest is absent",
+      "description": "`store:mysql-database` holds pages, accounts, and comments and is tagged `pii`, but its `encryption_at_rest` attribute is unknown. If that unknown resolves to unencrypted disk or operational copies, an attacker who obtains a database volume, backup, snapshot, or decommissioned media can read the CMS corpus without using `process:web-server` or the database's live authentication path. Second-order, a copied account dataset enables targeted attacks against readers and exposes historical content beyond the lifetime of an individual web request. This is conditional on the unverified at-rest protection; it does not assert that the database is unencrypted.",
+      "affected_element_ids": [
+        "store:mysql-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:mysql-database:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value because obtaining a storage copy requires access to operational media or copies; impact is high because `store:mysql-database` contains corpus-scale account data tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for MySQL and its copies",
+          "detail": "Establish the at-rest posture of `store:mysql-database`, then use managed-key encryption for the database, backups, snapshots, replicas, and decommissioned media."
+        },
+        {
+          "summary": "Restrict access to database exports and keys",
+          "detail": "Apply separate least-privilege controls to snapshot, backup, export, and key-use permissions so storage-layer access is not equivalent to access to all CMS records."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy may disclose CDN assets if bucket encryption at rest is absent",
+      "description": "`store:cdn-bucket` holds published images, stylesheets, and downloads tagged `business-critical-data`, while both its data classification and `encryption_at_rest` state are unknown. If at-rest protection is absent, a party obtaining a bucket export, backup, or underlying storage copy can read the assets outside the CDN's normal serving path. Second-order, copied unpublished or historical material can expose site content and release timing without interacting with `process:web-server`. This draft is conditional on the unresolved `encryption_at_rest` attribute and does not claim that the bucket is unencrypted.",
+      "affected_element_ids": [
+        "store:cdn-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:cdn-bucket:encryption_at_rest",
+        "unknown:store:cdn-bucket:data_classification"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the encryption state of `store:cdn-bucket` is unknown and exploitation requires a storage copy; impact is medium because the store is tagged `business-critical-data`, although its classification and precise contents are unverified."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce bucket encryption at rest",
+          "detail": "Verify the posture of `store:cdn-bucket` and require managed-key encryption for the bucket and any exports, replicas, backups, or recovery copies."
+        },
+        {
+          "summary": "Limit bucket-copy permissions",
+          "detail": "Restrict export, backup, and storage-administration permissions to dedicated principals and audit access to unpublished asset objects."
+        }
+      ]
+    },
+    {
+      "title": "The direct MySQL interface may return the full CMS corpus if its authentication is weak or absent",
+      "description": "`entity:admin` reads and writes `store:mysql-database` directly through `flow:entity:admin>store:mysql-database>direct-administration`, which originates from `boundary:public-internet`; the flow's authentication is unknown. If that unresolved authentication is absent, weak, or permits over-broad access, an outside attacker can send database requests to the direct interface and elicit pages, accounts, and comments from `store:mysql-database`. This is distinct from intercepting the administrator's session: the attacker receives rows from the database itself. Second-order, corpus-scale account and comment data can be used to target readers and attacks against the internet-facing `process:web-server`.",
+      "affected_element_ids": [
+        "store:mysql-database",
+        "flow:entity:admin>store:mysql-database>direct-administration",
+        "entity:admin"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "unknown:flow:entity:admin>store:mysql-database>direct-administration:authentication",
+        "crossing:flow:entity:admin>store:mysql-database>direct-administration"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the direct database flow crosses from `boundary:public-internet` while its authentication is unknown; impact is high because successful queries would expose the `pii` and business-critical CMS corpus in `store:mysql-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and harden direct database authentication",
+          "detail": "Establish the authentication mechanism on `flow:entity:admin>store:mysql-database>direct-administration`, require strong individual administrator identities, and deny unauthenticated or shared access."
+        },
+        {
+          "summary": "Apply least-privilege read authorization",
+          "detail": "Give the direct-admin identity only the rows, tables, and operations required for maintenance, and enforce server-side access controls for account and comment data."
+        },
+        {
+          "summary": "Remove public database reachability",
+          "detail": "Require administrative access through a controlled private path or jump host and restrict MySQL network admission to approved administrator origins."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

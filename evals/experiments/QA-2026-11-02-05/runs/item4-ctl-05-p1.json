@@ -1,0 +1,606 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "f453772fa9638aa38ecb88c970ce9c2660ddbc63",
+    "clean": false,
+    "table": {
+      "case": "05-cookbook-queue-webapp",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "fd6fcfceeb11bde3eadba6e34f34bd308ee63ffe873676caaf04412b0fd37548",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3c1d79e22c49192eaee2cafc6fa6b9712d67ed0e8f4c7030887733b05aae20ce",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "4bf1df365a7f5b0e17cfbd701fa44bb2c60ab0be22a5c01d0f22f3aec833529f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "cac087d11e037ed1b2903e3a83c36770f6f601d8b92781edb8fa5adadd8913ce",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "71b93c85034f3ec343287ab470166956ebc0e9fc4f29f68f8b206943a89d389f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "b60ef07e661fa30c8476befd883f194bf9942e8dcfc2b0f7821b8b4777fda2de",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/output.md",
+        "sha256": "6c37631a8b3fa3ba5494368d43fc0d426edc15a3628ed816dfa1951424e926bf",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt-ctl/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Job messages may be intercepted between the web tier and queue",
+      "description": "If `encryption_in_transit` is absent on `flow:process:web-application>store:message-queue>enqueue-job`, an observer on its `boundary:web-tier`-to-`boundary:backend-tier` crossing can intercept business-critical job messages before they reach `store:message-queue`. Captured jobs can reveal operational data and enable targeting of `process:background-worker-process` when it consumes them. This is conditional on the unknown transport-encryption attribute.",
+      "affected_element_ids": [
+        "flow:process:web-application>store:message-queue>enqueue-job",
+        "process:web-application",
+        "store:message-queue"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:web-application>store:message-queue>enqueue-job",
+        "unknown:flow:process:web-application>store:message-queue>enqueue-job:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses from `boundary:web-tier` to `boundary:backend-tier` and its transport encryption is unknown, so a path observer may be able to read it. Impact is medium because the flow and `store:message-queue` carry `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the queue connection",
+          "detail": "Require TLS, preferably mTLS, for `flow:process:web-application>store:message-queue>enqueue-job` and record the verified `encryption_in_transit` setting."
+        }
+      ]
+    },
+    {
+      "title": "Worker queue-consumption traffic may expose job data",
+      "description": "If `encryption_in_transit` is absent on `flow:process:background-worker-process>store:message-queue>consume-job`, an attacker with a foothold able to observe the backend-tier path can intercept business-critical job messages consumed by `process:background-worker-process` from `store:message-queue`. The captured job contents can disclose workload details and help target the worker's downstream database operations. This is conditional on the unknown transport-encryption attribute.",
+      "affected_element_ids": [
+        "flow:process:background-worker-process>store:message-queue>consume-job",
+        "process:background-worker-process",
+        "store:message-queue"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:background-worker-process>store:message-queue>consume-job:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because encryption is unknown but an attacker must first gain an observation position on the internal backend-tier path. Impact is medium because the flow carries `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS for worker-to-queue traffic",
+          "detail": "Configure authenticated TLS for `flow:process:background-worker-process>store:message-queue>consume-job`, including certificate validation by the worker."
+        }
+      ]
+    },
+    {
+      "title": "Worker database traffic may disclose application and log records",
+      "description": "If `encryption_in_transit` is absent on `flow:process:background-worker-process>store:database>read-write-records`, a backend-path observer can intercept application records and log records exchanged between `process:background-worker-process` and `store:database`. Those records can reveal operational information that enables more precise attacks against the worker and database. This is conditional on the unknown transport-encryption attribute.",
+      "affected_element_ids": [
+        "flow:process:background-worker-process>store:database>read-write-records",
+        "process:background-worker-process",
+        "store:database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:background-worker-process>store:database>read-write-records:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the database path is internal and requires a prior observation foothold, although encryption is unverified. Impact is medium because `store:database` and its flow hold `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the worker database connection",
+          "detail": "Require TLS with authenticated database-server validation on `flow:process:background-worker-process>store:database>read-write-records`."
+        }
+      ]
+    },
+    {
+      "title": "Queue credentials may be intercepted while the web application reads configuration",
+      "description": "If `encryption_in_transit` is absent on `flow:process:web-application>store:web-application-config>read-configuration`, an observer of the configuration-read channel can intercept the message-queue credentials returned to `process:web-application` from `store:web-application-config`. An attacker holding those credentials can next attempt access to `store:message-queue`. This is conditional on the unknown transport-encryption attribute.",
+      "affected_element_ids": [
+        "flow:process:web-application>store:web-application-config>read-configuration",
+        "process:web-application",
+        "store:web-application-config"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:web-application>store:web-application-config>read-configuration:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the unverified channel is used by the internet-facing `process:web-application`, although interception still requires path access. Impact is high because the flow carries credentials and `store:web-application-config` is tagged `credentials` and `secrets`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt configuration delivery to the web application",
+          "detail": "Use mutually authenticated TLS for `flow:process:web-application>store:web-application-config>read-configuration` and avoid returning long-lived queue credentials where short-lived workload credentials are possible."
+        }
+      ]
+    },
+    {
+      "title": "Database credentials may be intercepted while the worker reads configuration",
+      "description": "If `encryption_in_transit` is absent on `flow:process:background-worker-process>store:worker-config>read-configuration`, a backend-path observer can intercept database credentials returned from `store:worker-config` to `process:background-worker-process`. Those credentials can then be used to seek direct access to `store:database`. This is conditional on the unknown transport-encryption attribute.",
+      "affected_element_ids": [
+        "flow:process:background-worker-process>store:worker-config>read-configuration",
+        "process:background-worker-process",
+        "store:worker-config"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:background-worker-process>store:worker-config>read-configuration:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the attacker needs a backend-tier observation position, although transport protection is unverified. Impact is high because the flow carries database credentials and `store:worker-config` holds credentials and secrets."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect worker configuration reads in transit",
+          "detail": "Require authenticated TLS on `flow:process:background-worker-process>store:worker-config>read-configuration` and replace static database credentials with short-lived, scoped workload credentials."
+        }
+      ]
+    },
+    {
+      "title": "Queued jobs may be readable from storage copies if queue encryption at rest is absent",
+      "description": "`store:message-queue` has `encryption_at_rest: unknown`. If it is not encrypted at rest, an attacker obtaining queue storage media or an operational copy can read retained business-critical job messages without using the normal queue access path. The contents can disclose work items subsequently consumed by `process:background-worker-process`. This is conditional on the unknown at-rest encryption attribute.",
+      "affected_element_ids": [
+        "store:message-queue"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:message-queue:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because at-rest protection is unverified and storage-layer copies can bypass application access controls. Impact is medium because the queue holds `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt queue data and operational copies at rest",
+          "detail": "Verify and enforce encryption at rest for `store:message-queue`, including retained messages, backups, snapshots, and replicas, with keys restricted to necessary service principals."
+        }
+      ]
+    },
+    {
+      "title": "Database records may be readable from storage copies if encryption at rest is absent",
+      "description": "`store:database` has `encryption_at_rest: unknown`. If storage encryption is absent, an attacker who obtains a database volume, snapshot, backup, or equivalent operational copy can read application records and log records without going through `process:background-worker-process`. The records can reveal information useful for further attacks against the application. This is conditional on the unknown at-rest encryption attribute.",
+      "affected_element_ids": [
+        "store:database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:database:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 7,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because at-rest protection is unverified and storage-layer access bypasses the normal application path. Impact is medium because `store:database` contains `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt database storage and copies",
+          "detail": "Verify and require encryption at rest for `store:database` and its backups, snapshots, and replicas, with managed keys and restricted decrypt/export permissions."
+        }
+      ]
+    },
+    {
+      "title": "Queue credentials may be recovered from unencrypted web-application configuration storage",
+      "description": "`store:web-application-config` holds queue credentials and secrets, while its `encryption_at_rest` attribute is unknown. If encryption at rest is absent, an attacker obtaining the store's media or an operational copy can recover those credentials directly. The recovered credentials enable attempted access to `store:message-queue`. This is conditional on the unknown at-rest encryption attribute.",
+      "affected_element_ids": [
+        "store:web-application-config"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:store:web-application-config:encryption_at_rest",
+        "assertion:credential-custody~credential:queue-credentials~any~v.9bc518f22bfa"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 8,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because encryption at rest is unverified and a storage copy can expose its contents. Impact is high because the store is tagged `credentials` and `secrets`, and the stated queue credentials can unlock `store:message-queue`."
+      },
+      "mitigations": [
+        {
+          "summary": "Move queue credentials into protected secret storage",
+          "detail": "Encrypt `store:web-application-config` and every operational copy with restricted managed keys; prefer short-lived queue credentials issued to `process:web-application` rather than stored static secrets."
+        }
+      ]
+    },
+    {
+      "title": "Database credentials may be recovered from unencrypted worker configuration storage",
+      "description": "`store:worker-config` holds database credentials and secrets, while its `encryption_at_rest` attribute is unknown. If encryption at rest is absent, an attacker obtaining its storage media or operational copy can recover those database credentials directly. They can then seek direct access to `store:database`. This is conditional on the unknown at-rest encryption attribute.",
+      "affected_element_ids": [
+        "store:worker-config"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:store:worker-config:encryption_at_rest",
+        "assertion:credential-custody~credential:database-credentials~any~v.e060d9de7709"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 9,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because at-rest protection is unverified and copied storage can bypass the worker. Impact is high because the store is tagged `credentials` and `secrets`, including stated database credentials."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect and eliminate static worker database credentials",
+          "detail": "Encrypt `store:worker-config` and its backups and snapshots, restrict key use and export, and replace stored database credentials with short-lived workload-issued credentials."
+        }
+      ]
+    },
+    {
+      "title": "An unverified queue read path may disclose queued job messages",
+      "description": "`process:background-worker-process` reads from `store:message-queue` through `flow:process:background-worker-process>store:message-queue>consume-job`, but that flow's `authentication` is unknown. If the queue does not enforce authenticated, least-privilege reads, an attacker able to reach its backend-tier interface can read business-critical job messages. The messages disclose work subsequently performed by the worker. This is conditional on the unknown authentication attribute.",
+      "affected_element_ids": [
+        "store:message-queue",
+        "flow:process:background-worker-process>store:message-queue>consume-job",
+        "process:background-worker-process"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:background-worker-process>store:message-queue>consume-job:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 10,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the queue is in the backend tier and exploitation needs network reach, although authentication is unverified. Impact is medium because the queue contains `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require scoped queue-reader authentication",
+          "detail": "Set verified authentication and deny-by-default consumer authorization on `flow:process:background-worker-process>store:message-queue>consume-job`, granting the worker only its required queue and messages."
+        }
+      ]
+    },
+    {
+      "title": "An unverified database read path may disclose application records",
+      "description": "`process:background-worker-process` reads `store:database` through `flow:process:background-worker-process>store:database>read-write-records`, whose `authentication` is unknown. If the database does not authenticate and narrowly authorize readers, an attacker reaching that interface can read application records and log records. The disclosed records can support targeted attacks against `process:web-application` and the worker. This is conditional on the unknown authentication attribute.",
+      "affected_element_ids": [
+        "store:database",
+        "flow:process:background-worker-process>store:database>read-write-records",
+        "process:background-worker-process"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:background-worker-process>store:database>read-write-records:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 11,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the database is in the backend tier and requires a prior network foothold, though authentication is unverified. Impact is medium because the store contains `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require least-privilege database read authorization",
+          "detail": "Require authenticated database connections on `flow:process:background-worker-process>store:database>read-write-records` and scope the worker identity to only required rows, tables, and columns."
+        }
+      ]
+    },
+    {
+      "title": "An unverified configuration read path may disclose queue credentials",
+      "description": "`process:web-application` reads `store:web-application-config` through `flow:process:web-application>store:web-application-config>read-configuration`, but the flow's `authentication` is unknown. If the configuration store does not require a narrowly scoped authenticated reader, an attacker reaching that read interface can recover queue credentials and use them to attempt access to `store:message-queue`. This is conditional on the unknown authentication attribute.",
+      "affected_element_ids": [
+        "store:web-application-config",
+        "flow:process:web-application>store:web-application-config>read-configuration",
+        "process:web-application"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:flow:process:web-application>store:web-application-config>read-configuration:authentication",
+        "assertion:credential-custody~credential:queue-credentials~any~v.9bc518f22bfa"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 12,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because authentication is unverified on a configuration path used by the internet-facing `process:web-application`. Impact is high because the store contains credentials and secrets, including the stated queue credentials."
+      },
+      "mitigations": [
+        {
+          "summary": "Restrict web-application access to its configuration secrets",
+          "detail": "Require workload-authenticated, deny-by-default reads on `flow:process:web-application>store:web-application-config>read-configuration`; authorize only `process:web-application` and issue short-lived queue credentials."
+        }
+      ]
+    },
+    {
+      "title": "An unverified configuration read path may disclose database credentials",
+      "description": "`process:background-worker-process` reads `store:worker-config` through `flow:process:background-worker-process>store:worker-config>read-configuration`, whose `authentication` is unknown. If the configuration store does not enforce authenticated, least-privilege reads, an attacker reaching that backend-tier interface can recover database credentials and attempt direct reads from `store:database`. This is conditional on the unknown authentication attribute.",
+      "affected_element_ids": [
+        "store:worker-config",
+        "flow:process:background-worker-process>store:worker-config>read-configuration",
+        "process:background-worker-process"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:flow:process:background-worker-process>store:worker-config>read-configuration:authentication",
+        "assertion:credential-custody~credential:database-credentials~any~v.e060d9de7709"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 13,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because an attacker needs reach into the backend tier, though authentication is unverified. Impact is high because `store:worker-config` contains credentials and secrets, including stated database credentials."
+      },
+      "mitigations": [
+        {
+          "summary": "Require scoped worker authentication to configuration",
+          "detail": "Require a dedicated, authenticated worker identity with read access only to its own secrets on `flow:process:background-worker-process>store:worker-config>read-configuration`, and use short-lived database credentials."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

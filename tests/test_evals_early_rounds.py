@@ -34,7 +34,7 @@ def test_every_answerer_reaches_the_end(name, frameworks):
     found = replay("case", open_controls(), valid_model(), frameworks, name)
 
     assert found.ended
-    assert found.above_floor, "a control: the model has questions at the floor"
+    assert found.above_floor, "a positive check: the model has questions at the floor"
     assert found.asked <= found.above_floor + found.added
 
 
@@ -72,7 +72,9 @@ def test_a_replay_records_what_its_stop_leaves_open():
     bands = found.units["asvs"]
     assert set(bands) == {"level 1", "level 2"}
     assert all("unaskable" in states for states in bands.values())
-    assert found.held_back + found.below_floor > 0, "a control: something stays out"
+    assert found.held_back + found.below_floor > 0, (
+        "a positive check: something stays out"
+    )
     stride = replay("case", valid_model(), valid_model(), STRIDE, "capability-yes")
     assert stride.units == {}
 
@@ -130,3 +132,21 @@ def test_a_joint_replay_keeps_the_options_the_report_chose(tmp_path, monkeypatch
     joint = {case: frameworks for case, frameworks, _ in calls if len(frameworks) > 1}
     assert joint["13-dispatch-control-plane"]["asvs"] == {"level": 1}
     assert joint["01-payments-checkout"]["asvs"] == {"level": 2}
+
+
+def test_a_replay_names_each_file_it_read(tmp_path, monkeypatch):
+    """The run record reads each report with the selections replayed on it,
+    and each blessed model with none (#2029)."""
+    _archived(tmp_path, "01-payments-checkout", _asvs_report(2))
+    _archived(tmp_path, "05-cookbook-queue-webapp", sample_report())
+    monkeypatch.setattr(early_rounds, "replay", lambda *args: None)
+
+    _, inputs = early_rounds.replays(tmp_path, CORPUS)
+
+    asvs = tmp_path / "01-payments-checkout" / "01-payments-checkout.report.json"
+    assert inputs[asvs] == {
+        "alone": {"asvs": {"level": 2}},
+        "all": {"stride": {}, "asvs": {"level": 2}},
+    }
+    assert inputs[CORPUS / "01-payments-checkout" / "model.json"] == {}
+    assert len(inputs) == 4

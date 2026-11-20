@@ -25,7 +25,7 @@ from evals.harness.reference import load_case
 
 # The figures published in the module docstring's table. Re-derived below, so
 # the prose and the code cannot drift apart.
-CORPUS_VALUES = 39
+CORPUS_VALUES = 41
 CORPUS_FLAGGED_WEAK = 0
 CORPUS_FLAGGED_STRICT = 17
 
@@ -289,7 +289,7 @@ def test_the_published_weak_rung_rate_is_what_the_corpus_gives(corpus_values):
 
 
 def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
-    """17 in 39, which is why the strict rung is recorded and not shipped."""
+    """17 in 41, which is why the strict rung is recorded and not shipped."""
     flagged = [
         case_id
         for case_id, tokens, source in corpus_values
@@ -302,7 +302,7 @@ def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
 def test_the_corpus_is_read_in_full_so_its_clean_rate_means_something(
     corpus_values,
 ):
-    """0 flags over 39 values, and 39 of 39 actually searched (#925).
+    """0 flags over 41 values, and 41 of 41 actually searched (#925).
 
     The published rate is only a rate if the denominator was read. This ties
     the table's ``values`` column to the coverage of the same walk: were a case
@@ -366,7 +366,7 @@ def test_the_corpus_spends_a_fraction_of_the_scan_budget():
 
 
 def test_the_scan_stops_at_the_budget_and_says_so(caplog):
-    """A model that spends the budget is unmeasured from there on, not accused.
+    """A model that uses up the budget is unmeasured from there on, not accused.
 
     The values below share no word with the source, so an unbudgeted scan flags
     every one of them. The budget admits two searches and the rest read as
@@ -411,7 +411,7 @@ def test_a_control_the_stopped_scan_reaches_is_unmeasured_not_clean():
 def test_a_control_is_undecided_when_one_of_its_tokens_went_unsearched():
     """A memo answers what it holds; the first token it does not hold stops the read.
 
-    The first value spends the budget on ``zeta`` and is flagged. The second
+    The first value uses up the budget on ``zeta`` and is flagged. The second
     carries ``zeta``, answered absent from the memo, and ``kappa``, which no
     search can reach — so it is exhausted rather than flagged, because an
     unsearched token could have echoed.
@@ -427,9 +427,9 @@ def test_a_control_is_undecided_when_one_of_its_tokens_went_unsearched():
 
 
 def test_one_token_is_searched_once_however_many_values_carry_it():
-    """The memo, which is what takes the 150-element worst case off 13 seconds.
+    """One call of ``read_controls`` searches one source for one token one time.
 
-    Measured through the budget rather than through a call count: three values
+    Measured through the budget rather than through a call count: two values
     naming the same token spend one token's worth of it.
     """
     source = "quaternary " * 200

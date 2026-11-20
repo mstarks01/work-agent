@@ -1,0 +1,14 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Inference requests may be readable on the public path to the gateway | ['flow:entity:calling-service>process:inference-gateway>submit-inference-request', 'entity:calling-service', 'process:inference-gateway']
+- Requests forwarded into the model network may be readable between the gateway and model server | ['flow:process:inference-gateway>process:model-server>forward-request', 'process:inference-gateway', 'process:model-server']
+- Model artifacts may be readable while the model server loads them | ['flow:process:model-server>store:model-registry-bucket>load-artifact', 'process:model-server', 'store:model-registry-bucket']
+- Customer feature reads may be readable on the model-network connection | ['flow:process:model-server>store:redis-feature-store>read-features', 'process:model-server', 'store:redis-feature-store']
+- Raw prompts and responses may be readable while being written to the inference log | ['flow:process:inference-gateway>store:inference-log>write-request-log', 'process:inference-gateway', 'store:inference-log']
+- Model artifacts may be readable while engineers publish them to the registry | ['flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact', 'entity:ml-engineer', 'store:model-registry-bucket']
+- A copied model-registry volume may disclose model artifacts if at-rest encryption is absent | ['store:model-registry-bucket']
+- A copied Redis volume may disclose confidential customer financial features | ['store:redis-feature-store']
+- A copied inference-log dataset may disclose retained raw user prompts | ['store:inference-log']
+- An internal attacker may read all Redis customer features if no authentication beyond the absent password exists | ['store:redis-feature-store', 'flow:process:model-server>store:redis-feature-store>read-features', 'process:model-server']
+- Code executing in the model server can read registry artifacts through its service account | ['process:model-server', 'store:model-registry-bucket', 'flow:process:model-server>store:model-registry-bucket>load-artifact']
+spent: $0.0623 reported
+must-finds matched: [9]

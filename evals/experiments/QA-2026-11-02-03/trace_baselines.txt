@@ -1,0 +1,96 @@
+
+######## 2198870-gpt-5.6-terra-6cd39a95  job 2026-09-12
+  run-time catalog: None
+  run-time store-readers lead recorded: False
+--- ref 6: An attacker who compromises the background worker reads the database credentials from its config store.
+  extracted inbound flows: [('process:background-worker', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:background-worker', 'assets': 'credentials, secrets'}
+  draft T-05 [tampering/alter] Tampered worker configuration could alter database operations
+      `store:worker-config` holds the database credentials and settings used by `process:background-worker`, but its `encryption_at_rest` state is unknown. If offline media, snapshots, or restore artifacts for this store can be modified, an attacker can alter worker configuration or replace its database connection credentials. On the next read through `flow:background-worker-to-worker-config:read-config
+  draft I-01 [information-disclosure/recover-credential] Unencrypted config storage could expose queue and database credentials
+      `store:web-application-config` and `store:worker-config` hold the web application's queue credentials and the worker's database credentials, while each store's `encryption_at_rest` is `unknown`. If either unknown resolves to unencrypted storage, an attacker who obtains storage-layer media or an operational copy can recover those credentials without using `process:web-application` or `process:backg
+  draft I-02 [information-disclosure/intercept] Config credentials could be intercepted on unverified internal read paths
+      `flow:web-application-to-web-application-config:read-configuration` carries queue credentials and `flow:background-worker-to-worker-config:read-configuration` carries database credentials, but `encryption_in_transit` is `unknown` for both flows. If either connection is not transport-protected, an attacker with a position on the relevant web-tier or backend-tier path can intercept the credentials a
+  ruling today: matched by verb and place, I-01
+--- ref 7: An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
+  extracted inbound flows: [('process:web-application', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:web-application', 'assets': 'credentials, secrets'}
+  draft T-04 [tampering/alter] Tampered web configuration could redirect or alter application queue behavior
+      `store:web-application-config` holds credentials and settings used by `process:web-application`, while its `encryption_at_rest` state is unknown. If offline storage, snapshots, or restored media are not protected against unauthorized modification, an attacker with access to that storage can alter configuration or substitute queue credentials in `store:web-application-config`. When `process:web-app
+  draft I-01 [information-disclosure/recover-credential] Unencrypted config storage could expose queue and database credentials
+      `store:web-application-config` and `store:worker-config` hold the web application's queue credentials and the worker's database credentials, while each store's `encryption_at_rest` is `unknown`. If either unknown resolves to unencrypted storage, an attacker who obtains storage-layer media or an operational copy can recover those credentials without using `process:web-application` or `process:backg
+  draft I-02 [information-disclosure/intercept] Config credentials could be intercepted on unverified internal read paths
+      `flow:web-application-to-web-application-config:read-configuration` carries queue credentials and `flow:background-worker-to-worker-config:read-configuration` carries database credentials, but `encryption_in_transit` is `unknown` for both flows. If either connection is not transport-protected, an attacker with a position on the relevant web-tier or backend-tier path can intercept the credentials a
+  ruling today: {'cause': 'merged', 'draft_id': 'I-01', 'draft_verb': 'recover-credential'}
+
+######## 6bff717-gpt-5.6-terra-24dda4db  job 2026-09-20
+  run-time catalog: None
+  run-time store-readers lead recorded: False
+--- ref 6: An attacker who compromises the background worker reads the database credentials from its config store.
+  extracted inbound flows: [('process:background-worker-process', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:background-worker-process', 'assets': 'credentials, secrets'}
+  draft T-04 [tampering/alter] Offline tampering of worker configuration could alter database operations
+      `store:worker-config` holds the settings and database credentials consumed by `process:background-worker-process` through `flow:process:background-worker-process>store:worker-config>read-configuration`, while its `encryption_at_rest` is unknown. If the worker configuration's backing media, backup, or snapshot lacks effective integrity protection, an attacker with offline access can alter settings 
+  draft I-02 [information-disclosure/intercept] Database credentials may be intercepted while the worker reads configuration
+      `flow:process:background-worker-process>store:worker-config>read-configuration` carries database credentials from `store:worker-config` to `process:background-worker-process`, while `encryption_in_transit` is unknown. If transport protection is absent, an attacker with an on-path foothold in `boundary:backend-tier` can intercept the worker's database credential. The credential can then be used to 
+  draft I-04 [information-disclosure/recover-credential] Unverified at-rest protection could expose worker database credentials
+      `store:worker-config` holds the background worker's database `credentials` and `secrets`, while its `encryption_at_rest` attribute is unknown. If this store lacks encryption at rest, an attacker obtaining the underlying storage layer can recover the database credential directly, bypassing `process:background-worker-process`. The recovered credential can be used to attempt access to `store:database
+  ruling today: matched by verb and place, I-04
+--- ref 7: An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
+  extracted inbound flows: [('process:web-application', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:web-application', 'assets': 'credentials, secrets'}
+  draft T-03 [tampering/alter] Offline tampering of web configuration could change queue-facing behavior
+      `store:web-application-config` holds settings and message-queue credentials that `process:web-application` reads through `flow:process:web-application>store:web-application-config>read-configuration`; its `encryption_at_rest` is unknown. If snapshots, backup media, or storage backing this store are not integrity-protected, an attacker who obtains offline access can alter configuration or replace t
+  draft I-01 [information-disclosure/intercept] Queue credentials may be intercepted while the web application reads configuration
+      `flow:process:web-application>store:web-application-config>read-configuration` carries message-queue credentials from `store:web-application-config` to `process:web-application`, but its `encryption_in_transit` value is unknown. If this same-web-tier configuration channel is not protected, an attacker with an on-path foothold in `boundary:web-tier` can intercept those credentials while they are re
+  draft I-03 [information-disclosure/recover-credential] Unverified at-rest protection could expose web application queue credentials
+      `store:web-application-config` holds the web application's message-queue `credentials` and `secrets`, but its `encryption_at_rest` value is unknown. If the store is not encrypted at rest, an attacker who obtains its underlying storage media or an operational copy can recover the queue credential without using `process:web-application` or its normal configuration read path. That credential can subs
+  ruling today: matched by verb and place, I-03
+
+######## d3f1898-gpt-5.6-terra-29929443  job 2026-09-12
+  run-time catalog: None
+  run-time store-readers lead recorded: False
+--- ref 6: An attacker who compromises the background worker reads the database credentials from its config store.
+  extracted inbound flows: [('process:background-worker', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:background-worker', 'assets': 'credentials, secrets'}
+  draft I-01 [information-disclosure/recover-credential] Unverified encryption at rest could expose service credentials from configuration stores
+      `store:web-application-config` and `store:worker-config` hold the web application's message-queue credentials and the worker's database credentials, while each has `encryption_at_rest: unknown`. If either store's storage layer or an operational copy is not encrypted, an attacker who obtains its volume, snapshot, or decommissioned media can recover the corresponding credential without using the nor
+  draft I-02 [information-disclosure/intercept] Configuration credentials may be readable on unverified internal transport paths
+      `flow:web-application-to-web-application-config:read-configuration` carries message-queue credentials and `flow:background-worker-to-worker-config:read-configuration` carries database credentials, but `encryption_in_transit` is unknown for both. If transport protection is absent on either internal path, an attacker with an on-path position in `boundary:web-tier` or `boundary:backend-tier` can inte
+  ruling today: matched by verb and place, I-01
+--- ref 7: An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
+  extracted inbound flows: [('process:web-application', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:web-application', 'assets': 'credentials, secrets'}
+  draft I-01 [information-disclosure/recover-credential] Unverified encryption at rest could expose service credentials from configuration stores
+      `store:web-application-config` and `store:worker-config` hold the web application's message-queue credentials and the worker's database credentials, while each has `encryption_at_rest: unknown`. If either store's storage layer or an operational copy is not encrypted, an attacker who obtains its volume, snapshot, or decommissioned media can recover the corresponding credential without using the nor
+  draft I-02 [information-disclosure/intercept] Configuration credentials may be readable on unverified internal transport paths
+      `flow:web-application-to-web-application-config:read-configuration` carries message-queue credentials and `flow:background-worker-to-worker-config:read-configuration` carries database credentials, but `encryption_in_transit` is unknown for both. If transport protection is absent on either internal path, an attacker with an on-path position in `boundary:web-tier` or `boundary:backend-tier` can inte
+  ruling today: {'cause': 'merged', 'draft_id': 'I-01', 'draft_verb': 'recover-credential'}
+
+######## d4edd64-gpt-5.6-terra-fd1c49af  job 2026-09-09
+  run-time catalog: None
+  run-time store-readers lead recorded: False
+--- ref 6: An attacker who compromises the background worker reads the database credentials from its config store.
+  extracted inbound flows: [('process:background-worker', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:background-worker', 'assets': 'credentials, secrets'}
+  draft I-01 [information-disclosure/read] Configuration credentials may be readable from unencrypted storage copies
+      `store:web-application-config` and `store:worker-config` are credential and secret-bearing configuration stores, but each has `encryption_at_rest: unknown`. If either unknown resolves to storage without encryption at rest, an attacker or over-privileged operator who obtains its underlying volume or an operational copy can read the respective queue or database credentials without going through the 
+  draft I-02 [information-disclosure/intercept] Configuration credentials may be intercepted on unverified internal read paths
+      `flow:web-application-to-web-application-config:read-configuration` carries settings and message-queue credentials, while `flow:background-worker-to-worker-config:read-configuration` carries settings and database credentials; `encryption_in_transit` is unknown on both flows. If either configuration-read path is a network or IPC channel without effective transport protection, an attacker with an on
+  ruling today: {'cause': 'verb', 'draft_id': 'I-01', 'draft_verb': 'read'}
+--- ref 7: An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
+  extracted inbound flows: [('process:web-application', 'read')]
+  today's lead: information-disclosure-store-at-rest-unverified {'encryption_at_rest': 'unknown', 'encryption_state': 'unverified', 'data_classification': 'unknown', 'assets': 'credentials, secrets'}
+  today's lead: information-disclosure-store-readers {'readers': 'process:web-application', 'assets': 'credentials, secrets'}
+  draft I-01 [information-disclosure/read] Configuration credentials may be readable from unencrypted storage copies
+      `store:web-application-config` and `store:worker-config` are credential and secret-bearing configuration stores, but each has `encryption_at_rest: unknown`. If either unknown resolves to storage without encryption at rest, an attacker or over-privileged operator who obtains its underlying volume or an operational copy can read the respective queue or database credentials without going through the 
+  draft I-02 [information-disclosure/intercept] Configuration credentials may be intercepted on unverified internal read paths
+      `flow:web-application-to-web-application-config:read-configuration` carries settings and message-queue credentials, while `flow:background-worker-to-worker-config:read-configuration` carries settings and database credentials; `encryption_in_transit` is unknown on both flows. If either configuration-read path is a network or IPC channel without effective transport protection, an attacker with an on
+  ruling today: {'cause': 'verb', 'draft_id': 'I-01', 'draft_verb': 'read'}

@@ -1,0 +1,209 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "53ab865734b686cb35ec04d8c23e91067ecf26be",
+    "clean": false,
+    "table": {
+      "case": "10-cookbook-generic-cms",
+      "lane": "spoofing",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+    },
+    "inputs": []
+  },
+  "claims": [
+    {
+      "title": "An on-path attacker can impersonate the CDN to asset readers",
+      "description": "Because `flow:entity:reader>entity:cdn>asset-fetch` crosses from the public internet to `entity:cdn` with `encryption_in_transit: none`, an attacker able to redirect or observe a reader's HTTP request can answer as the CDN rather than the legitimate service. The reader has no TLS server identity to validate on this flow. Second-order: the impostor can serve substituted images, stylesheets, or downloads in place of the business-critical assets readers expect from the CDN.",
+      "affected_element_ids": [
+        "entity:reader",
+        "entity:cdn",
+        "flow:entity:reader>entity:cdn>asset-fetch"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:entity:reader>entity:cdn>asset-fetch",
+        "absent:flow:entity:reader>entity:cdn>asset-fetch:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because `flow:entity:reader>entity:cdn>asset-fetch` is a public-boundary crossing and has stated absent transport encryption, but exploitation still requires an on-path or traffic-redirection position. Impact is medium because `store:cdn-bucket` and the published asset flow carry `business-critical-data`, and the false CDN can replace assets delivered to readers."
+      },
+      "mitigations": [
+        {
+          "summary": "Serve CDN assets over authenticated TLS",
+          "detail": "Change `flow:entity:reader>entity:cdn>asset-fetch` to HTTPS with certificate-chain validation, redirect HTTP requests to HTTPS, and enable HSTS so readers reject a substituted endpoint that cannot prove the CDN identity."
+        }
+      ]
+    },
+    {
+      "title": "A fake database endpoint can deceive the direct administrator",
+      "description": "`entity:admin` connects from the public internet over `flow:entity:admin>store:mysql-database>direct-administration`, whose `encryption_in_transit` is stated absent. An attacker able to redirect this unsecured MySQL connection can pose as `store:mysql-database` to the administrator because the flow provides no TLS server identity for the admin to validate. Second-order: the impostor can receive or manipulate maintenance interactions intended for the database that holds CMS pages, accounts, comments, PII, and business-critical data.",
+      "affected_element_ids": [
+        "entity:admin",
+        "store:mysql-database",
+        "flow:entity:admin>store:mysql-database>direct-administration"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:entity:admin>store:mysql-database>direct-administration",
+        "absent:flow:entity:admin>store:mysql-database>direct-administration:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because the direct-administration flow crosses from `boundary:public-internet` and explicitly lacks transport encryption, although the attacker needs a routing or on-path position. Impact is medium because the intended endpoint is `store:mysql-database`, which is tagged `pii` and `business-critical-data`, but the model does not establish which administrator credentials or maintenance contents the false endpoint would obtain."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS with MySQL server identity validation",
+          "detail": "Protect `flow:entity:admin>store:mysql-database>direct-administration` with TLS and configure `entity:admin` to validate the database certificate against an expected server identity; use a private CA or pinned identity where appropriate."
+        },
+        {
+          "summary": "Constrain direct database administration",
+          "detail": "Move administration through a verified jump path or controlled management channel and restrict database network reachability so arbitrary public-network locations cannot initiate the direct MySQL connection."
+        }
+      ]
+    },
+    {
+      "title": "An attacker can administer MySQL as the admin if caller authentication is not verified",
+      "description": "`flow:entity:admin>store:mysql-database>direct-administration` crosses from `boundary:public-internet` into the hosted network, but its `authentication` attribute is unknown. If this unknown resolves to absent or ineffective verification of the administrator's identity, an internet attacker can connect to `store:mysql-database` and be accepted as `entity:admin` for direct maintenance. This is conditional on the unresolved authentication attribute, not an assertion that authentication is absent. Second-order: accepted administration reaches the database's pages, accounts, comments, PII, and business-critical data outside the CMS path.",
+      "affected_element_ids": [
+        "entity:admin",
+        "store:mysql-database",
+        "flow:entity:admin>store:mysql-database>direct-administration"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:entity:admin>store:mysql-database>direct-administration",
+        "unknown:flow:entity:admin>store:mysql-database>direct-administration:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown authentication value: the flow is reachable from `boundary:public-internet`, but a strong unrecorded administrator authentication control may exist. Impact is high because successful direct administration reaches `store:mysql-database`, tagged `pii` and `business-critical-data`, with read-write operations on pages, accounts, and comments."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish and enforce a unique administrator identity",
+          "detail": "Record the authentication on `flow:entity:admin>store:mysql-database>direct-administration`; if it is not already strong, require unique administrator accounts with phishing-resistant MFA or client-certificate authentication and prohibit shared database credentials."
+        },
+        {
+          "summary": "Limit direct administration authority",
+          "detail": "Use narrowly scoped database roles and audited administration workflows so an authenticated administrator identity has only the maintenance permissions required."
+        }
+      ]
+    },
+    {
+      "title": "An attacker can publish assets as the web server if the CDN bucket does not verify the publisher",
+      "description": "`flow:process:web-server>store:cdn-bucket>asset-publish` crosses from the hosted network to the CDN zone, but its `authentication` attribute is unknown. If the CDN bucket does not verify a workload identity for `process:web-server`, an attacker able to reach the publishing interface can impersonate the web server and submit assets as legitimate publications. This is conditional on the unresolved authentication attribute. Second-order: the submitted assets are the images, stylesheets, and downloads that the CDN serves to readers, extending the effect beyond the publishing endpoint.",
+      "affected_element_ids": [
+        "process:web-server",
+        "store:cdn-bucket",
+        "flow:process:web-server>store:cdn-bucket>asset-publish"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:web-server>store:cdn-bucket>asset-publish",
+        "unknown:flow:process:web-server>store:cdn-bucket>asset-publish:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the publishing flow is a boundary crossing with authentication never stated, while an attacker must still reach the publisher-facing interface. Impact is medium because the flow writes `business-critical-data` to `store:cdn-bucket` and those published assets are served to readers."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate the web server to the CDN bucket",
+          "detail": "Require a dedicated, verifiable workload identity for `process:web-server` on `flow:process:web-server>store:cdn-bucket>asset-publish`, using short-lived audience-bound tokens or mTLS rather than an unauthenticated publisher path."
+        },
+        {
+          "summary": "Scope publishing permissions to the required asset prefix",
+          "detail": "Restrict the web-server identity to only the bucket paths and write operations needed for publishing, and record publisher identity in bucket audit events."
+        }
+      ]
+    },
+    {
+      "title": "A fake CDN bucket can receive web-server asset publications if server authenticity is unverified",
+      "description": "`process:web-server` publishes over `flow:process:web-server>store:cdn-bucket>asset-publish`, whose protocol and encryption in transit are both unknown. If that unresolved transport state means the web server does not validate the CDN bucket's server identity, an attacker with a hosted-network foothold or a position able to redirect the crossing can impersonate `store:cdn-bucket` and receive publications intended for it. This is conditional on the unknown transport attributes. Second-order: the attacker obtains newly published images, stylesheets, and downloads, while legitimate reader-facing publication can be diverted away from the real CDN bucket.",
+      "affected_element_ids": [
+        "process:web-server",
+        "store:cdn-bucket",
+        "flow:process:web-server>store:cdn-bucket>asset-publish"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:web-server>store:cdn-bucket>asset-publish",
+        "unknown:flow:process:web-server>store:cdn-bucket>asset-publish:protocol",
+        "unknown:flow:process:web-server>store:cdn-bucket>asset-publish:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because both protocol and transport protection are unstated, and exploitation additionally requires a hosted-network foothold or traffic-redirection position. Impact is medium because the diverted flow carries newly published `business-critical-data` destined for `store:cdn-bucket`."
+      },
+      "mitigations": [
+        {
+          "summary": "Make CDN bucket server authentication explicit",
+          "detail": "Use TLS for `flow:process:web-server>store:cdn-bucket>asset-publish` and configure `process:web-server` to validate a certificate bound to the CDN bucket service identity; record the protocol and encryption state in the model."
+        }
+      ]
+    },
+    {
+      "title": "A fake MySQL endpoint can deceive the web server if database server authenticity is unverified",
+      "description": "`process:web-server` reads and writes CMS data through `flow:process:web-server>store:mysql-database>cms-data`, whose `encryption_in_transit` is unknown. If this unknown resolves to no transport protection or no validation of the MySQL server identity, an attacker with a foothold in `boundary:hosted-network` who can redirect the connection can impersonate `store:mysql-database` to the web server. This is conditional on the unresolved transport control. Second-order: the false endpoint can receive CMS traffic containing pages, accounts, and comments, including the flow's PII and business-critical data, and can prevent the web server from reaching the genuine database.",
+      "affected_element_ids": [
+        "process:web-server",
+        "store:mysql-database",
+        "flow:process:web-server>store:mysql-database>cms-data"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "unknown:flow:process:web-server>store:mysql-database>cms-data:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the relevant transport protection is unknown and the attacker also needs a foothold or redirection capability within `boundary:hosted-network`. Impact is medium because `flow:process:web-server>store:mysql-database>cms-data` carries PII and business-critical data to the MySQL database."
+      },
+      "mitigations": [
+        {
+          "summary": "Use authenticated TLS for the CMS database connection",
+          "detail": "Configure `flow:process:web-server>store:mysql-database>cms-data` for TLS with certificate-chain and expected-server-identity validation, and document the resulting `encryption_in_transit` control."
+        },
+        {
+          "summary": "Use a database workload identity",
+          "detail": "Pair server authentication with a distinct, least-privileged database identity for `process:web-server`, so a redirected or unauthorized endpoint cannot participate as the database service."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
@@ -16,7 +16,7 @@ from analysis_service.links import with_link_answers
 from analysis_service.sources import ANSWERS_LABEL, Source
 from analysis_service.system_model import CapabilityStatement, SystemModel
 from analysis_service.validation import validate
-from tests.factories import DESCRIPTION_TEXT, valid_model
+from tests.factories import DESCRIPTION_TEXT, adk_runner, valid_model
 
 ASVS_L1 = {"asvs": {"level": 1}}
 
@@ -97,6 +97,7 @@ class TestWhatIsAsked:
             None,
             ASVS_L1,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(),
             final=False,
@@ -106,7 +107,7 @@ class TestWhatIsAsked:
         admitted = asked.admit(
             sources=[Source.description("A system.")],
             earlier=NO_ANSWERS,
-            given=AnswerSet(facts=(_answer("oauth", "no"),)),
+            given=SentAnswers(facts=(_answer("oauth", "no"),)),
         )
         assert [fact.key for fact in admitted.answers.facts] == [_key("oauth")]
 
@@ -152,6 +153,7 @@ class TestTheAnswerCheck:
             None,
             ASVS_L1,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=tuple(earlier)),
             final=False,
@@ -161,7 +163,7 @@ class TestTheAnswerCheck:
             asked.admit(
                 sources=[Source.description("A system.")],
                 earlier=AnswerSet(facts=tuple(earlier)),
-                given=AnswerSet(facts=(_answer("oauth", "no"),)),
+                given=SentAnswers(facts=(_answer("oauth", "no"),)),
             )
 
     def test_a_revision_that_answers_both_is_admitted(self):
@@ -231,12 +233,13 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
 
     from analysis_service import graph
     from analysis_service.jobs import Checkpoint, JobRecord, Resumption
-    from analysis_service.pipeline import AdkPipelineRunner, PipelineCompleted
+    from analysis_service.pipeline import PipelineCompleted
     from analysis_service.report import FrameworkSelection
     from tests.factories import scripted_pipeline
 
     answer = _answer("oauth", "no")
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id="idp|user-1",
         sources=with_link_answers([Source.description(DESCRIPTION_TEXT)], [], [answer]),
         frameworks=[FrameworkSelection(name="asvs", options={"level": 1})],
@@ -253,7 +256,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
     async def on_node(node: str) -> None:
         return None
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
 
     assert isinstance(outcome, PipelineCompleted)
     (block,) = outcome.report.analyses

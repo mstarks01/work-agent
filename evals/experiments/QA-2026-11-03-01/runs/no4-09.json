@@ -1,0 +1,626 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "bee48c8e0e5a5d370156020b52e22496d5bff33f",
+    "clean": true,
+    "table": {
+      "case": "09-cookbook-sokify-retail",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "cf3fd3442d9a29ea5ca935978e4f32735bcad935281744cdaa5d6f8d567cb976"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "7605b8bc22968a87d5bf509b415d974629bec5bf49a41449471f804739c24da8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Customer order details are readable over plaintext API traffic",
+      "description": "An on-path attacker on `flow:process:mobile-app>process:web-api>api-traffic` can intercept customer details sent from `process:mobile-app` to the internet-facing `process:web-api`: the flow crosses from the customer-device zone into Sokify systems and has `encryption_in_transit: none`. The disclosure can be accumulated across orders and supplies customer identity and order context that can be used to target the records later handled by `process:web-api` and `store:user-database`.",
+      "affected_element_ids": [
+        "flow:process:mobile-app>process:web-api>api-traffic",
+        "process:mobile-app",
+        "process:web-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:mobile-app>process:web-api>api-traffic",
+        "absent:flow:process:mobile-app>process:web-api>api-traffic:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because `flow:process:mobile-app>process:web-api>api-traffic` crosses a trust boundary and transport encryption is stated absent, although the attacker still needs an on-path position. Impact is medium because the flow carries customer details and is tagged `pii`, enabling irreversible disclosure of individual customers' ordering activity."
+      },
+      "mitigations": [
+        {
+          "summary": "Require TLS for mobile-app API traffic",
+          "detail": "Change `flow:process:mobile-app>process:web-api>api-traffic` to HTTPS with TLS 1.2+ and validate the API certificate in `process:mobile-app`."
+        },
+        {
+          "summary": "Minimize sensitive request content",
+          "detail": "Avoid transmitting customer fields not required for order placement and use opaque order references where `process:web-api` can resolve the data server-side."
+        }
+      ]
+    },
+    {
+      "title": "Customer browsing and order details may be exposed before reaching the mobile app",
+      "description": "If `encryption_in_transit` is absent on `flow:entity:customer>process:mobile-app>browse-and-order`, an attacker able to observe the customer-to-app channel can intercept browsing activity and order details before `process:mobile-app` processes them. The transport posture is unverified rather than known absent; resolving it determines whether observers of the customer device or its network can collect PII that is subsequently sent toward `process:web-api`.",
+      "affected_element_ids": [
+        "flow:entity:customer>process:mobile-app>browse-and-order",
+        "entity:customer",
+        "process:mobile-app"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:customer>process:mobile-app>browse-and-order:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because encryption on `flow:entity:customer>process:mobile-app>browse-and-order` is unknown and the attacker must obtain a position observing a customer-device interaction. Impact is medium because the flow carries order details and is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce protected customer-to-app transport",
+          "detail": "Establish the actual transport for `flow:entity:customer>process:mobile-app>browse-and-order`; require authenticated encrypted transport wherever the customer exchanges order details with `process:mobile-app`."
+        }
+      ]
+    },
+    {
+      "title": "Catalogue SQL statements may disclose business-sensitive API operations in transit",
+      "description": "If `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` lacks transport encryption, an attacker observing its marketing-office-to-Sokify crossing can intercept SQL statements that reveal catalogue prices and product-copy changes. Those statements expose business-sensitive operational intent and database-facing implementation details at `process:web-api`, which can guide later targeting of the API or catalogue workflow. This is conditional because `encryption_in_transit` is unknown.",
+      "affected_element_ids": [
+        "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+        "process:catalogue-spreadsheet",
+        "process:web-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+        "unknown:flow:process:catalogue-spreadsheet>process:web-api>sql-statements:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses from `boundary:marketing-office` to Sokify systems and its transport encryption is unknown, while interception still needs network-path access. Impact is medium because the flow carries SQL statements changing prices and product copy, tagged `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and mutually authenticate the spreadsheet-to-API channel",
+          "detail": "Set a verified TLS or mTLS transport for `flow:process:catalogue-spreadsheet>process:web-api>sql-statements` rather than leaving its transport protection unknown."
+        },
+        {
+          "summary": "Replace direct SQL transport with a narrow catalogue interface",
+          "detail": "Have `process:catalogue-spreadsheet` call a constrained, authenticated catalogue-update API so wire content does not expose arbitrary SQL operations."
+        }
+      ]
+    },
+    {
+      "title": "Customer records may be readable on the web API database connection",
+      "description": "If `flow:process:web-api>store:user-database>customer-records` is not encrypted in transit, an attacker with an on-path position inside the server-side estate can intercept customer names, addresses, and payment-card information exchanged between `process:web-api` and `store:user-database`. The captured data can then be used to target customers or to correlate payment and address records; this is conditional because the connection's transport protocol and `encryption_in_transit` are both unstated.",
+      "affected_element_ids": [
+        "flow:process:web-api>store:user-database>customer-records",
+        "process:web-api",
+        "store:user-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:web-api>store:user-database>customer-records:protocol",
+        "unknown:flow:process:web-api>store:user-database>customer-records:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the path is internal and both its protocol and encryption state are unknown, so an attacker needs an internal on-path position. Impact is high because `store:user-database` is confidential and holds `pii` and `financial` data, including the card customers paid with."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted database transport",
+          "detail": "Use TLS for `flow:process:web-api>store:user-database>customer-records`, validate the database peer, and record the resulting `encryption_in_transit` and protocol values in the model."
+        },
+        {
+          "summary": "Reduce payment data on the application path",
+          "detail": "Tokenize card data and restrict the fields `process:web-api` retrieves from `store:user-database` to those needed for the request."
+        }
+      ]
+    },
+    {
+      "title": "Order handover data may be exposed between the web API and SIMS",
+      "description": "If `flow:process:web-api>process:sims>order-handover` is unencrypted, an internal on-path attacker can intercept placed orders, including delivery addresses and the number stored against the order, while `process:web-api` hands them to `process:sims`. The disclosed contact and fulfilment details enable targeted social engineering or misuse of the later fax-confirmation path. The claim is conditional because the flow's protocol and `encryption_in_transit` are unknown.",
+      "affected_element_ids": [
+        "flow:process:web-api>process:sims>order-handover",
+        "process:web-api",
+        "process:sims"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:web-api>process:sims>order-handover:protocol",
+        "unknown:flow:process:web-api>process:sims>order-handover:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the flow is within the server-side zone, its protocol and encryption are unstated, and interception requires an internal path position. Impact is medium because the flow carries delivery addresses and telephone numbers and is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the web API-to-SIMS handover",
+          "detail": "Require authenticated TLS or mTLS on `flow:process:web-api>process:sims>order-handover` and document the protocol and transport-encryption state."
+        }
+      ]
+    },
+    {
+      "title": "Delivery addresses may be exposed while SIMS writes the flat file",
+      "description": "If transport protection is absent on `flow:process:sims>store:delivery-address-flat-file>address-write`, an attacker positioned on the SIMS-to-file path can intercept delivery addresses before they are stored in `store:delivery-address-flat-file`. The address data can be correlated with order handling at `process:sims` and used to target customers. This is a conditional threat because the flow's protocol and `encryption_in_transit` are unknown.",
+      "affected_element_ids": [
+        "flow:process:sims>store:delivery-address-flat-file>address-write",
+        "process:sims",
+        "store:delivery-address-flat-file"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:sims>store:delivery-address-flat-file>address-write:protocol",
+        "unknown:flow:process:sims>store:delivery-address-flat-file>address-write:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the path is internal, its protocol and encryption status are unknown, and an attacker needs an on-path position. Impact is medium because `store:delivery-address-flat-file` is confidential and holds `pii` delivery addresses."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect the SIMS-to-file write path",
+          "detail": "Establish whether the file is local or remotely accessed; where it crosses a transport boundary, require authenticated encrypted transport and explicitly record the protection on `flow:process:sims>store:delivery-address-flat-file>address-write`."
+        }
+      ]
+    },
+    {
+      "title": "Dispatch notes may be readable between SIMS and the fax gateway",
+      "description": "If `flow:process:sims>process:fax-gateway>dispatch-note` lacks transport encryption, an internal on-path attacker can intercept dispatch notes containing a customer's name and address. The information can be used to identify customers and to target the downstream confirmation-fax process. The threat is conditional because both protocol and `encryption_in_transit` are unknown.",
+      "affected_element_ids": [
+        "flow:process:sims>process:fax-gateway>dispatch-note",
+        "process:sims",
+        "process:fax-gateway"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:sims>process:fax-gateway>dispatch-note:protocol",
+        "unknown:flow:process:sims>process:fax-gateway>dispatch-note:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because this is an internal flow with unknown protocol and transport encryption, requiring an internal observation position. Impact is medium because the dispatch note carries a customer's name and address and is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the SIMS-to-fax-gateway connection",
+          "detail": "Set a verified protected transport for `flow:process:sims>process:fax-gateway>dispatch-note` and restrict the gateway interface to the dispatch payload fields it requires."
+        }
+      ]
+    },
+    {
+      "title": "Confirmation faxes may be observable on an unverified fax transport path",
+      "description": "If `flow:process:fax-gateway>entity:customer>confirmation-fax` has no effective transport protection, an attacker able to observe the fax delivery path can intercept confirmation faxes carrying the customer's name and address. The flow crosses from Sokify systems to the customer-device zone, so the disclosed PII leaves the server-side estate; this claim remains conditional because `encryption_in_transit` is unknown.",
+      "affected_element_ids": [
+        "flow:process:fax-gateway>entity:customer>confirmation-fax",
+        "process:fax-gateway",
+        "entity:customer"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:fax-gateway>entity:customer>confirmation-fax",
+        "unknown:flow:process:fax-gateway>entity:customer>confirmation-fax:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because interception requires access to the fax path and the flow's transport protection is unknown. Impact is medium because the boundary-crossing fax carries customer names and addresses, which are `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace or protect the fax confirmation channel",
+          "detail": "Prefer an authenticated customer notification channel with verified encryption; if fax remains necessary, use a service that provides secure delivery controls and document the resulting protection state."
+        }
+      ]
+    },
+    {
+      "title": "An unintended fax recipient can read customer confirmation details",
+      "description": "`process:fax-gateway` sends `flow:process:fax-gateway>entity:customer>confirmation-fax` to the number stored against the order, but destination verification is stated absent. A person controlling, reusing, or incorrectly assigned that number can receive and read the confirmation's customer name and address without accessing Sokify systems. The disclosure also tells that recipient about the customer's order and provides contact information for follow-on targeting.",
+      "affected_element_ids": [
+        "flow:process:fax-gateway>entity:customer>confirmation-fax",
+        "process:fax-gateway",
+        "entity:customer"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "crossing:flow:process:fax-gateway>entity:customer>confirmation-fax",
+        "assertion:destination-verification~flow:process:fax-gateway>entity:customer>confirmation-fax~any~absent"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because destination verification on the boundary-crossing confirmation-fax flow is stated absent, so an unintended recipient need only receive the dialled number's fax. Impact is medium because each fax exposes a customer's name and address, tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify the fax destination before transmitting PII",
+          "detail": "Require an order-bound confirmation of the fax number and recipient before `process:fax-gateway` sends `flow:process:fax-gateway>entity:customer>confirmation-fax`."
+        },
+        {
+          "summary": "Remove customer PII from fax confirmations",
+          "detail": "Use an opaque order reference and require the intended customer to authenticate to retrieve address-bearing confirmation details."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy of the user database may expose customer and payment data",
+      "description": "`store:user-database` is confidential and contains customer names, addresses, and the card they paid with, but its `encryption_at_rest` state is unknown. If that unknown resolves to no effective encryption, an attacker who obtains a database volume, backup, snapshot, or decommissioned storage copy can read the records without using `process:web-api` or its normal access path. The resulting PII and financial-data corpus enables customer targeting and payment-related fraud; this is not an assertion that encryption is absent.",
+      "affected_element_ids": [
+        "store:user-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:user-database:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `store:user-database` encryption at rest is unknown, while copies and storage-layer access do not require live application credentials if encryption is absent. Impact is high because the confidential store holds both `pii` and `financial` data, including customer cards."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for the user database and its copies",
+          "detail": "Establish the actual posture of `store:user-database`, then use managed or customer-controlled keys for the primary database, backups, snapshots, replicas, and decommissioned media."
+        },
+        {
+          "summary": "Limit raw-copy access",
+          "detail": "Restrict export, snapshot, backup, and key-use permissions to separate narrowly scoped principals and audit all copy operations."
+        }
+      ]
+    },
+    {
+      "title": "A storage copy of the delivery-address flat file may expose customer addresses",
+      "description": "`store:delivery-address-flat-file` is confidential and contains delivery addresses, while its `encryption_at_rest` protection is unknown. If the file is stored without effective encryption, an attacker holding a copied disk, backup, or decommissioned media can read every stored delivery address outside the SIMS application path. The disclosed addresses can be combined with order context later handled by `process:sims` for physical or social-engineering targeting; this threat is conditional on the unresolved at-rest protection state.",
+      "affected_element_ids": [
+        "store:delivery-address-flat-file"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:delivery-address-flat-file:encryption_at_rest"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 11,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:delivery-address-flat-file` has unknown encryption at rest and a copied storage artifact bypasses application access controls if encryption is absent. Impact is medium because the confidential file contains customer delivery addresses and is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the delivery-address file and all operational copies",
+          "detail": "Determine the at-rest posture of `store:delivery-address-flat-file`, then encrypt the file, backups, snapshots, and decommissioned media using managed keys."
+        },
+        {
+          "summary": "Constrain access to address-file copies",
+          "detail": "Limit filesystem, backup, and export access to separate least-privilege service principals and retain address records only as long as fulfilment requires."
+        }
+      ]
+    },
+    {
+      "title": "Compromise of the web API may expose user-database records through an unverified read path",
+      "description": "`process:web-api` is internet-facing and has a `read-write` flow to `store:user-database`, whose access authentication is unknown. If the web API's database identity can read the customer corpus more broadly than each request requires, an attacker running code in `process:web-api` can read customer names, addresses, and payment-card data from `store:user-database` through `flow:process:web-api>store:user-database>customer-records`. The unverified authentication and authorization scope must be resolved; the second-order consequence is bulk disclosure of the data that the API otherwise serves to customers.",
+      "affected_element_ids": [
+        "process:web-api",
+        "flow:process:web-api>store:user-database>customer-records",
+        "store:user-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:web-api>store:user-database>customer-records:authentication",
+        "assertion:authentication-mechanism~process:web-api~any~unknown"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 12,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `process:web-api` is internet-facing and the database-flow authentication plus the API authentication mechanism are unknown, though the attacker must first obtain code execution in the API. Impact is high because `store:user-database` is confidential and holds `pii` and `financial` customer records."
+      },
+      "mitigations": [
+        {
+          "summary": "Use a narrowly scoped database identity for the web API",
+          "detail": "Give `process:web-api` only the rows and fields required for each service operation, separate read and write principals, and enforce object-level authorization server-side."
+        },
+        {
+          "summary": "Verify and record the database access control",
+          "detail": "Establish the authentication mechanism and grants on `flow:process:web-api>store:user-database>customer-records`, require authenticated encrypted database access, and monitor bulk or anomalous reads."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

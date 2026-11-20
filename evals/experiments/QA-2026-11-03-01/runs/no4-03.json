@@ -1,0 +1,639 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "bee48c8e0e5a5d370156020b52e22496d5bff33f",
+    "clean": true,
+    "table": {
+      "case": "03-batch-data-pipeline",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "cf3fd3442d9a29ea5ca935978e4f32735bcad935281744cdaa5d6f8d567cb976"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/critic.md",
+        "sha256": "e61d2706ba7d2ffb3611cd8561ab16b3310b3f097bd873a9ac77f86e23de77b4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "7605b8bc22968a87d5bf509b415d974629bec5bf49a41449471f804739c24da8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/output.md",
+        "sha256": "470abded52f62a2eae321b31e1679998729eec5e1280d0b8bb55c69e48fca04e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/critic.md",
+        "sha256": "8d7aab147ba866d120672015740e7401c056ee101d5400b06e39a9370baff538",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/86945c4b-965f-47f7-9559-1494d2aac359/scratchpad/wt4/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Landing-bucket extracts may be intercepted on the scheduler read path",
+      "description": "`flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files` reads partner extract files containing health and PII from `store:landing-bucket`, but its `encryption_in_transit` is unknown. If transport protection is absent or ineffective, an attacker with an on-path position in `boundary:landing-network` can intercept the scheduler's read response and obtain the extracts. The disclosure supplies member names and dates of birth that can be used to target affected individuals and exposes every partner file the scheduler reads.",
+      "affected_element_ids": [
+        "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
+        "process:ingest-scheduler",
+        "store:landing-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The extracts contain claim records with member names and dates of birth.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the unknown encryption state because an attacker must first obtain a position on the intra-landing-network path. Impact is high because `store:landing-bucket` holds `pii` and `health` extracts containing member names and dates of birth."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and require encrypted scheduler-to-bucket reads",
+          "detail": "Configure and verify TLS for `flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files`, including certificate validation and protected service endpoints."
+        }
+      ]
+    },
+    {
+      "title": "Airflow connection strings and partner keys may be intercepted in transit",
+      "description": "`flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections` carries connection strings and partner SFTP keys from `store:airflow-metadata-database`, while both its protocol and `encryption_in_transit` are unknown. If the connection lacks effective transport encryption, an on-path attacker in `boundary:landing-network` can intercept these credentials. The recovered partner keys enable subsequent access attempts against the partner upload path and can expose claims extracts placed in `store:landing-bucket`.",
+      "affected_element_ids": [
+        "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
+        "process:ingest-scheduler",
+        "store:airflow-metadata-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections:protocol",
+        "unknown:flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the unverified internal connection requires an attacker to reach its network path. Impact is high because `store:airflow-metadata-database` holds `credentials` and `secrets`, and a recovered partner key can be used to reach the claims-upload path."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate metadata-database connections",
+          "detail": "Set an authenticated TLS posture for `flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections` and verify the database certificate from the scheduler."
+        },
+        {
+          "summary": "Replace long-lived partner keys",
+          "detail": "Move partner credentials to a dedicated secret store, issue scoped short-lived credentials where possible, and rotate the static onboarding keys."
+        }
+      ]
+    },
+    {
+      "title": "Cross-zone transform requests may disclose processing metadata",
+      "description": "`flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform` crosses from `boundary:landing-network` to `boundary:warehouse-network` and carries a request naming the file to process, but its protocol and `encryption_in_transit` are unknown. If that cross-zone channel is not protected, an on-path attacker can intercept file-selection and pipeline-operation metadata. That information identifies which partner extracts are being processed and can guide targeting of `store:landing-bucket` and the downstream warehouse pipeline; the model does not establish that claim-record contents themselves are carried in this request.",
+      "affected_element_ids": [
+        "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
+        "process:ingest-scheduler",
+        "process:spark-transform-job"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
+        "unknown:flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform:protocol",
+        "unknown:flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "low",
+        "level": "low",
+        "justification": "Likelihood is medium and conditional on the unknown transport controls because the request crosses the stated landing-to-warehouse boundary, giving a broader observer population than an intra-zone call. Impact is low because the stated payload is only a run request naming a file, although it reveals operational targeting information."
+      },
+      "mitigations": [
+        {
+          "summary": "Use mutually authenticated encryption across the zone boundary",
+          "detail": "Require TLS or mTLS for `flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform` and restrict the trigger interface to the scheduler identity."
+        },
+        {
+          "summary": "Minimize file identifiers in trigger requests",
+          "detail": "Use opaque job references rather than descriptive file names where the transform service can resolve the input internally."
+        }
+      ]
+    },
+    {
+      "title": "Normalized claim records may be intercepted during warehouse loading",
+      "description": "`flow:process:spark-transform-job>store:claims-warehouse>load-records` writes normalized claim records to `store:claims-warehouse`, but `encryption_in_transit` is unknown. If the BigQuery API path is not effectively encrypted, an attacker positioned on the warehouse-network path can intercept health and PII records while they are loaded. The captured member records can then be correlated with the direct analyst-query path into `store:claims-warehouse`.",
+      "affected_element_ids": [
+        "flow:process:spark-transform-job>store:claims-warehouse>load-records",
+        "process:spark-transform-job",
+        "store:claims-warehouse"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:spark-transform-job>store:claims-warehouse>load-records:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The transform normalizes the records and loads them into BigQuery.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because an attacker needs a position on an internal warehouse-network path and the encryption state is unverified. Impact is high because `store:claims-warehouse` is confidential and holds `pii` and `health` claim records."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify TLS for warehouse load traffic",
+          "detail": "Require TLS with endpoint and certificate validation for `flow:process:spark-transform-job>store:claims-warehouse>load-records`, including internal service paths."
+        }
+      ]
+    },
+    {
+      "title": "Analyst query results may be exposed on an unverified transport path",
+      "description": "`flow:entity:data-analyst>store:claims-warehouse>run-queries` returns claim records including member identifiers to `entity:data-analyst`, while `encryption_in_transit` is unknown. If this path lacks effective encryption, an attacker observing the warehouse-network connection can intercept query results containing health and PII. Those results can be used to identify members and to select records for further misuse through the warehouse's dataset-wide query access.",
+      "affected_element_ids": [
+        "flow:entity:data-analyst>store:claims-warehouse>run-queries",
+        "entity:data-analyst",
+        "store:claims-warehouse"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:data-analyst>store:claims-warehouse>run-queries:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "Analysts query the warehouse directly.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because interception requires a warehouse-network path position and the transport control is unverified. Impact is high because the query flow carries member identifiers from the confidential `pii`- and `health`-tagged `store:claims-warehouse`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted analyst query sessions",
+          "detail": "Enforce TLS for `flow:entity:data-analyst>store:claims-warehouse>run-queries`, require validated client connections, and prevent plaintext private-endpoint access."
+        }
+      ]
+    },
+    {
+      "title": "A landing-bucket storage copy could expose partner health extracts",
+      "description": "`store:landing-bucket` is confidential and holds partner claim extracts tagged `pii` and `health`, but `encryption_at_rest` is unknown. If the bucket or its operational copies are not encrypted at rest, a person obtaining storage-layer access to exported media, a backup, or a decommissioned copy can read the extracts without using the SFTP or scheduler access paths. This exposes member names and dates of birth for the partner files held in the bucket.",
+      "affected_element_ids": [
+        "store:landing-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:landing-bucket:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "I don't know how the landing bucket is encrypted",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown at-rest control: storage copies and operational access can bypass application controls, though the control may be present. Impact is high because the confidential store holds `pii` and `health` claim extracts with member names and dates of birth."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption on the landing bucket and copies",
+          "detail": "Establish the encryption posture of `store:landing-bucket`, require managed-key encryption for the bucket, backups, snapshots, and exports, and restrict export and key-use permissions."
+        }
+      ]
+    },
+    {
+      "title": "An unencrypted Airflow metadata copy could reveal partner credentials",
+      "description": "`store:airflow-metadata-database` is confidential and holds connection strings and partner SFTP keys, with `encryption_at_rest` unknown. If encryption is absent from the database or its operational copies, an attacker holding a database volume, backup, or snapshot can recover credentials directly. The recovered static partner keys can then be used against the partner upload path and may expose claims extracts in `store:landing-bucket`.",
+      "affected_element_ids": [
+        "store:airflow-metadata-database"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:store:airflow-metadata-database:encryption_at_rest",
+        "assertion:credential-rotation~credential:partner-static-key~any~not-rotated",
+        "assertion:credential-custody~credential:partner-static-key~any~v.a142c82c0168"
+      ],
+      "quotes": [
+        {
+          "text": "I don't know \u2026 whether the Airflow metadata database is encrypted at rest.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown at-rest control because a storage copy bypasses the application's normal authentication path. Impact is high because `store:airflow-metadata-database` contains `credentials` and `secrets`, including partner static keys stated not to be rotated."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the metadata database and every operational copy",
+          "detail": "Verify the at-rest posture of `store:airflow-metadata-database`; enforce managed-key encryption for its database, backups, snapshots, and exports, with separate tightly scoped key-use permissions."
+        },
+        {
+          "summary": "Remove and rotate static partner credentials",
+          "detail": "Store partner credentials in a dedicated secret manager, rotate all existing onboarding keys, and prefer individually scoped, short-lived partner credentials."
+        }
+      ]
+    },
+    {
+      "title": "A claims-warehouse storage copy could disclose the normalized corpus",
+      "description": "`store:claims-warehouse` is a confidential BigQuery dataset containing normalized claim records with member names and dates of birth, but `encryption_at_rest` is unknown. If at-rest encryption is not enabled for the warehouse or its exports and snapshots, an attacker with a storage-layer copy can read the corpus without authenticating through the analyst query flow. The resulting health and PII disclosure is corpus-scale and supplies identifiable records that can be correlated with other data sources.",
+      "affected_element_ids": [
+        "store:claims-warehouse"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:claims-warehouse:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "The transform normalizes the records and loads them into BigQuery.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown encryption state because a backup, export, or storage copy can bypass live query controls. Impact is high because confidential `store:claims-warehouse` holds normalized `pii` and `health` claim records for the warehouse corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify encryption at rest for the warehouse and exports",
+          "detail": "Establish and enforce encryption at rest for `store:claims-warehouse`, including snapshots, extracts, backups, and any lower-environment copies; limit export and key-use permissions."
+        }
+      ]
+    },
+    {
+      "title": "A compromised scheduler can read every landing-bucket extract",
+      "description": "`process:ingest-scheduler` lists `store:landing-bucket` nightly and reads every file present. An attacker running code in the scheduler or controlling its host can use that existing read path to read extracts from all partner folders rather than a single submitted file. This exposes member names and dates of birth across the landing corpus and gives the attacker the data needed to target individuals or correlate records later loaded into `store:claims-warehouse`.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
+        "store:landing-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "lists the bucket, and reads whatever is there",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because the attacker must first execute within `process:ingest-scheduler`, whose exposure is not stated, although the flow authentication is also unverified. Impact is high because the scheduler reads all files in confidential `store:landing-bucket`, which holds `pii` and `health` extracts."
+      },
+      "mitigations": [
+        {
+          "summary": "Constrain the scheduler's read scope",
+          "detail": "Give `process:ingest-scheduler` a narrowly scoped identity that can read only the expected partner object and prefix for each run, rather than enumerate and read all bucket contents."
+        },
+        {
+          "summary": "Protect and monitor bulk extract reads",
+          "detail": "Require strong workload authentication for the bucket read flow and log and alert on enumeration or bulk reads outside the expected nightly job."
+        }
+      ]
+    },
+    {
+      "title": "A compromised scheduler can recover credentials from Airflow metadata",
+      "description": "`process:ingest-scheduler` reads connection strings and partner keys from `store:airflow-metadata-database`. An attacker who gains code execution in the scheduler can use its existing database access to recover those credentials, then use the static partner keys against the partner upload route. This turns compromise of one internal component into access material for partner-originated claims extracts and persists until the keys are rotated.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
+        "store:airflow-metadata-database"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "unknown:flow:process:ingest-scheduler>store:airflow-metadata-database>authentication",
+        "assertion:credential-rotation~credential:partner-static-key~any~not-rotated",
+        "assertion:credential-custody~credential:partner-static-key~any~v.a142c82c0168"
+      ],
+      "quotes": [
+        {
+          "text": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "in-component",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because exploitation requires control of the internal `process:ingest-scheduler`, though its metadata-database authentication is unverified. Impact is high because the target holds `credentials` and `secrets`, including static partner keys stated not to have changed since onboarding."
+      },
+      "mitigations": [
+        {
+          "summary": "Isolate credential retrieval from the scheduler runtime",
+          "detail": "Move partner keys and connection strings from `store:airflow-metadata-database` to a dedicated secret manager with workload-specific, audited retrieval permissions."
+        },
+        {
+          "summary": "Rotate and scope partner keys",
+          "detail": "Rotate the existing static onboarding keys, issue separate keys per partner with least-privilege upload scope, and remove credentials from scheduler-readable configuration where possible."
+        }
+      ]
+    },
+    {
+      "title": "Dataset-wide analyst access exposes member-identifying claim columns",
+      "description": "`entity:data-analyst` authenticates with SSO but uses `flow:entity:data-analyst>store:claims-warehouse>run-queries` to query `store:claims-warehouse` under a dataset-wide grant that includes member-identifying columns. A curious or compromised authorized analyst account can elicit health and PII records beyond an analysis task that does not require direct identifiers. The returned data is directly usable for member identification and can be exported or correlated outside the warehouse query context.",
+      "affected_element_ids": [
+        "entity:data-analyst",
+        "flow:entity:data-analyst>store:claims-warehouse>run-queries",
+        "store:claims-warehouse"
+      ],
+      "verb": "elicit",
+      "evidence_refs": [
+        "assertion:authorization-grant~principal:data-analysts~s.ab42a9530078~v.d3628f23c126"
+      ],
+      "quotes": [
+        {
+          "text": "the grant is dataset-wide \u2014 we have not split member-identifying columns out.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 11,
+      "attacker_position": "authorized-principal",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because analysts already authenticate with SSO and hold a stated dataset-wide query grant that includes member-identifying columns. Impact is high because `store:claims-warehouse` is confidential and tagged `pii` and `health`, and the grant can expose identifiable claim records across the dataset."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace dataset-wide analyst access with least-privilege views",
+          "detail": "Restrict `entity:data-analyst` to approved row- and column-level views, separating member-identifying columns from routine analytical datasets."
+        },
+        {
+          "summary": "Control and detect sensitive query exports",
+          "detail": "Require approval for identifiable-column access, prevent unrestricted exports, and audit and alert on bulk or atypical queries against member-identifying fields."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

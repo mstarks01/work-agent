@@ -29,11 +29,10 @@ decision with its own evidence (#470), and this module does not make it.
 
 **The cost is submitted text times submitted text**, which is the one thing
 here worth reading twice. A search costs the length of a source, and the number
-of searches is how many different words a model's controls name — so a
-150-element model of invented controls over a 100 KiB source cost 13.5 seconds
-of CPU before :class:`_Scan` existed. Memoizing takes the repeated half of that
-away and :data:`MAX_SCAN_WORK` bounds the rest. Stopping is affordable for the
-same reason the whole module is safe: nothing downstream reads the result.
+of searches is how many different words a model's controls name. Memoizing
+takes the repeated searches away and :data:`MAX_SCAN_WORK` bounds the rest.
+Stopping is affordable for the same reason the whole module is safe: nothing
+downstream reads the result.
 
 Scope
 =====
@@ -77,7 +76,7 @@ as content, which costs a diagnostic line and never a rejection.
 The measurement
 ===============
 
-Over the 16 corpus models and their sources, every stated value of the three
+Over the 20 corpus models and their sources, every stated value of the three
 in-scope attributes. A flag on a blessed value is a **false rejection**: the
 corpus is the closest thing to ground truth this repo has, so a value it carries
 is treated as one a person would keep.
@@ -85,15 +84,15 @@ is treated as one a person would keep.
 =====================================  ======  =======  ============
 rung                                   values  flagged  false-reject
 =====================================  ======  =======  ============
-every content token present                39       17        43.6%
-**at least one content token present**     39        0         0.0%
+every content token present                41       17        41.5%
+**at least one content token present**     41        0         0.0%
 =====================================  ======  =======  ============
 
 **The strict rung is dead, and not because the values are wrong.** It fails on
 the prose around the mechanism: ``"static per-partner key issued at onboarding,
 never rotated"`` names a key the source names, and then loses on ``issued``,
 ``onboarding`` and ``rotated`` — the writer's summary of a source that said the
-same thing in other words. Sixteen of the 39 fail that way. So the rule is the
+same thing in other words. Sixteen of the 41 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
@@ -113,13 +112,12 @@ eval corpus; this one needs only the job's own sources and so runs on every job.
 It is carried on :class:`~evals.harness.modes.ExtractionScore` beside that
 score, so a sweep reports the pair.
 
-**Read the rate for what it is.** 39 values is a small sample beside the 206
+**Read the rate for what it is.** 41 values is a small sample beside the 206
 element excerpts that calibrated the grounding ladder, and the corpus is
-agent-authored — no case has been read by a person (#226). A 0% flag rate may
-mean a blessed model reuses its source's wording, which is exactly what an agent
-writing one would do. So the number measures agreement with an unreviewed
-reference, not correctness, and it is a floor under the gate question rather
-than an answer to it.
+agent-authored (#226). A 0% flag rate may mean a blessed model reuses its
+source's wording, which is exactly what an agent writing one would do. So the
+number measures agreement with an unreviewed reference, not correctness, and it
+is a floor under the gate question rather than an answer to it.
 """
 
 from __future__ import annotations
@@ -134,6 +132,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
+    ControlAttribute,
     control_state,
     matches_term,
 )
@@ -168,7 +167,7 @@ logger = logging.getLogger(__name__)
 #: is measured only once somebody declares it. ``tests/test_basis.py`` compares
 #: the two and names the attribute that is missing — here rather than at import,
 #: so the guard still runs on a half-added attribute.
-CONTROL_SCOPE: Mapping[str, str | None] = MappingProxyType(
+CONTROL_SCOPE: Mapping[ControlAttribute, str | None] = MappingProxyType(
     {
         "authentication": None,
         "encryption_in_transit": None,
@@ -186,7 +185,7 @@ CONTROL_SCOPE: Mapping[str, str | None] = MappingProxyType(
 _UNDECLARED = "undeclared"
 
 #: The attributes the diagnostic reads, in registry order.
-IN_SCOPE: tuple[str, ...] = tuple(
+IN_SCOPE: tuple[ControlAttribute, ...] = tuple(
     attribute
     for attribute in CONTROL_ATTRIBUTES
     if CONTROL_SCOPE.get(attribute, _UNDECLARED) is None
@@ -275,12 +274,13 @@ Measurability = Literal["measurable", "uncited", "tokenless"]
 
 
 class StatedControl(NamedTuple):
-    """One stated in-scope control, with the tokens to look for and where.
+    """One stated in-scope control, with the tokens to look for and where, as
+    :func:`control_measurability` yields it.
 
-    **The one reader of "which values does this diagnostic measure".** Both
-    rungs of the published measurement and the shipped
-    :func:`unbased_controls` walk the model through :func:`control_measurability`, so
-    a denominator and a rate can never be computed over two different sets.
+    :func:`control_measurability` is the one reader of "which values does
+    this diagnostic measure". Both rungs of the published measurement and the
+    shipped :func:`unbased_controls` walk the model through it, so a
+    denominator and a rate can never be computed over two different sets.
     """
 
     element_id: str
@@ -459,7 +459,7 @@ def coverage(model: SystemModel, sources: Mapping[str, str]) -> Coverage:
 
 
 class _Scan:
-    """One call's token searches: cached, and spent against a budget.
+    """One call's token searches: cached, and counted against a budget.
 
     Two things make the naive walk cost what it does. It lower-cases the source
     once per element, and it searches the same token against the same source

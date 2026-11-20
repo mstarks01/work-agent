@@ -1,0 +1,15 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Player-local client traffic may expose player data if local transport protection is absent | ['flow:entity:player>process:game-client>launch-and-play', 'entity:player', 'process:game-client']
+- Unverified encryption may expose gameplay state on the player-to-game-server path | ['flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-client', 'process:game-server']
+- Unverified encryption may expose match composition between lobby and game servers | ['flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server']
+- Player account records may be observable between the lobby and player database | ['flow:process:lobby>store:player-database>read-players', 'process:lobby', 'store:player-database']
+- Unverified encryption may expose match statistics between game servers and the stats database | ['flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server', 'store:stats-database']
+- Player progression and match results may be observable en route to the player database | ['flow:process:game-server>store:player-database>update-players', 'process:game-server', 'store:player-database']
+- Support-account moderation traffic may expose player data across the corporate boundary | ['flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'entity:customer-support-staff', 'process:moderation-website']
+- Player records may be observable between the moderation website and player database | ['flow:process:moderation-website>store:player-database>read-write-players', 'process:moderation-website', 'store:player-database']
+- A copied player database may disclose player records if at-rest encryption is absent | ['store:player-database']
+- A copied stats database may disclose match statistics if at-rest encryption is absent | ['store:stats-database']
+- Compromise of an existing player-database reader can disclose player records in bulk | ['store:player-database', 'process:lobby', 'process:moderation-website', 'flow:process:lobby>store:player-database>read-players']
+- Compromise of a game server can expose match statistics through its existing database access | ['store:stats-database', 'process:game-server', 'flow:process:game-server>store:stats-database>read-write-stats']
+spent: $0.0680 reported
+must-finds matched: [8, 9]

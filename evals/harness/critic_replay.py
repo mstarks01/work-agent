@@ -29,12 +29,20 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from google.genai import types
 
 from analysis_service.assertions import AssertionRecord
-from analysis_service.claims import AnalysisMarks, Claim, FrameworkName, Ruling
+from analysis_service.claims import (
+    AnalysisMarks,
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    Ruling,
+    VerdictStatus,
+    quote_check_ran,
+)
 from analysis_service.critic import complete_rulings, review_issues
 from analysis_service.critic_round import CriticRound, critic_request, rulings_of
 from analysis_service.deployment import Deployment
@@ -48,9 +56,10 @@ from analysis_service.graph import (
     STATE_SYSTEM_MODEL,
     STATE_VALID_MODEL,
     FrameworkNodes,
+    parked_quotes_checked,
 )
+from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import (
     CORPUS_DIR,
@@ -59,12 +68,21 @@ from evals.harness.artifact import (
     load_artifact,
     repo_commit,
 )
-from evals.harness.bundle import check_out, finished_file
+from evals.harness.bundle import check_out, finished_file, read_report
+from evals.harness.critic_yield import (
+    NO_VERDICT_FATES,
+    OMITTED,
+    CriticFate,
+    fate_by_claim,
+    has_verdict,
+    no_verdict_line,
+)
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
-from evals.harness.node_call import NodeCall, node_call
+from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, load_case, refuse_holdout
+from evals.harness.run_record import loaded, run_record_for
 
 
 @dataclass(frozen=True)
@@ -74,14 +92,20 @@ class Archived:
     framework: FrameworkName
     drafts: list[Claim]
     marks: AnalysisMarks
-    #: ``None`` where the case failed before it wrote one, and the material
-    #: came from its failure dump instead.
-    report: Report | None
+    #: Whether the fan-in ran the quote check: from the block through
+    #: :func:`~analysis_service.claims.quote_check_ran`, or from a failure
+    #: dump through :func:`~analysis_service.graph.parked_quotes_checked`.
+    quotes_checked: bool
+    #: This framework's block of the case's report, or ``None`` where the case
+    #: failed before it wrote one, and the material came from its failure dump.
+    block: FrameworkAnalysis | None
     shared: dict[str, Any]
     model: SystemModel
     #: The fact catalog the critic's drafts cited, or ``None`` where the run
     #: had no assertion pass.
     assertions: AssertionRecord | None
+    #: The sweep's files this material was read from.
+    files: tuple[Path, ...]
 
 
 def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Archived:
@@ -99,7 +123,7 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
     lanes_path = finished_file(artifact, case_id, "lanes")
     # A finished case: finished_file returns each path or raises.
     assert drafts_path is not None and lanes_path is not None
-    report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+    report = read_report(report_path)
     shared = material_at(lanes_path)["shared"]
     block = next((b for b in report.analyses if b.framework == framework), None)
     if block is None:
@@ -115,10 +139,12 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
         framework=framework,
         drafts=[record.model_validate(draft) for draft in held.get(framework, [])],
         marks=marks,
-        report=report,
+        quotes_checked=quote_check_ran(block.quotes_checked),
+        block=block,
         shared=shared,
         model=report.system_model,
         assertions=report.assertions,
+        files=(report_path, drafts_path, lanes_path),
     )
 
 
@@ -143,7 +169,8 @@ def _from_failure(
         framework=framework,
         drafts=[record.model_validate(draft) for draft in state[nodes.key("drafts")]],
         marks=AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
-        report=None,
+        quotes_checked=parked_quotes_checked(state, nodes),
+        block=None,
         shared={
             STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],
             STATE_BOUNDARY_CROSSINGS: state[STATE_BOUNDARY_CROSSINGS],
@@ -157,7 +184,30 @@ def _from_failure(
             if state.get(STATE_ASSERTION_CATALOG) is None
             else AssertionRecord.model_validate(state[STATE_ASSERTION_CATALOG])
         ),
+        files=(dump,),
     )
+
+
+def round_of(archived: Archived, controls: Sequence[AppliedControl]) -> CriticRound:
+    """The round the archived critic ran, with ``controls`` applied."""
+    record = archived.assertions
+    return CriticRound.of(
+        archived.framework,
+        archived.model,
+        archived.drafts,
+        archived.marks,
+        None if record is None else record.catalog,
+        controls,
+        quotes_checked=archived.quotes_checked,
+    )
+
+
+def shared_keys(archived: Archived) -> dict[str, str]:
+    """The job-wide rendered keys both review prompts read."""
+    return {
+        key: archived.shared[key]
+        for key in (STATE_SYSTEM_MODEL, STATE_BOUNDARY_CROSSINGS, STATE_INPUT_TEXT)
+    }
 
 
 async def compose(
@@ -166,24 +216,12 @@ async def compose(
     prompt_loader: MarkdownLoader,
 ) -> tuple[str, types.Content]:
     """The instruction and the user turn the critic was sent, rebuilt."""
-    record = archived.assertions
-    critic_round = CriticRound.of(
-        archived.framework,
-        archived.model,
-        archived.drafts,
-        archived.marks,
-        None if record is None else record.catalog,
-    )
-    shared = {
-        key: archived.shared[key]
-        for key in (STATE_SYSTEM_MODEL, STATE_BOUNDARY_CROSSINGS, STATE_INPUT_TEXT)
-    }
     return await critic_request(
         package_loader,
         prompt_loader,
         FrameworkNodes(archived.framework),
-        shared,
-        critic_round,
+        shared_keys(archived),
+        round_of(archived, ()),
     )
 
 
@@ -195,37 +233,83 @@ def parse(raw: str, framework: FrameworkName) -> list[Ruling]:
     return rulings_of(payload["claims"], schemas_for(framework))
 
 
+#: A draft no ruling covers: the replayed critic left it unruled, or the case
+#: failed before it wrote a block to read the archived verdict from.
+UNRULED: Literal["unruled"] = "unruled"
+
+#: What the archived side of one draft reads: its fate in the block, or
+#: :data:`UNRULED` where the case wrote no block.
+ArchivedSide = CriticFate | Literal["unruled"]
+
+#: The archived sides that hold no verdict, in the order the count names them.
+NO_VERDICT_SIDES: tuple[ArchivedSide, ...] = tuple(sorted({*NO_VERDICT_FATES, UNRULED}))
+
+
 @dataclass(frozen=True)
 class Agreement:
     """One draft's verdict, as the archived critic ruled and as the replay did."""
 
     draft_id: str
-    archived: str
-    replayed: str
+    archived: ArchivedSide
+    replayed: VerdictStatus | Literal["unruled"]
 
 
 def compare(archived: Archived, rulings: Sequence[Ruling]) -> list[Agreement]:
     """Each draft's verdict status, archived against replayed.
 
     The replayed rulings are completed first, as the graph completes them, so
-    the status read is the one that would have reached the report.
+    the status read is the one that would have reached the report. The
+    archived side is :func:`~evals.harness.critic_yield.fate_by_claim`, so a
+    claim assembly returned to the deferred set (ADR 0126) reads ``returned``,
+    and a draft the block does not carry reads :data:`OMITTED`. A case that
+    failed before it wrote a block has no archived verdict, so each of its
+    drafts reads :data:`UNRULED`.
     """
-    before = {}
-    if archived.report is not None:
-        block = next(
-            b for b in archived.report.analyses if b.framework == archived.framework
-        )
-        before = {claim.id: claim.verdict.status for claim in block.all_claims()}
+    missing: ArchivedSide = UNRULED
+    before: dict[str, CriticFate] = {}
+    if archived.block is not None:
+        before, missing = fate_by_claim(archived.block), OMITTED
     after = {
         ruling.id: ruling.verdict.status
         for ruling in complete_rulings(archived.drafts, rulings)
     }
     return [
-        Agreement(
-            draft.id, before.get(draft.id, "unruled"), after.get(draft.id, "unruled")
-        )
+        Agreement(draft.id, before.get(draft.id, missing), after.get(draft.id, UNRULED))
         for draft in archived.drafts
     ]
+
+
+def agreement_lines(rows: Sequence[Agreement]) -> list[str]:
+    """Each row marked, then how many archived verdicts the replay repeated.
+
+    A draft whose archived side fails
+    :func:`~evals.harness.critic_yield.has_verdict` has nothing to agree with, so
+    it is marked ``·`` and counted on its own line, outside the denominator. A
+    draft the replay left unruled beside an archived verdict is a verdict that
+    did not repeat, so it stays in the denominator.
+    """
+    with_verdict = [row for row in rows if _has_verdict(row)]
+    same = sum(row.archived == row.replayed for row in with_verdict)
+    lines = [
+        f"  {_mark(row)} {row.draft_id:10} archived {row.archived:12}"
+        f" replayed {row.replayed}"
+        for row in rows
+    ]
+    lines.append(f"{same} of {len(with_verdict)} verdicts agree")
+    apart = len(rows) - len(with_verdict)
+    if apart:
+        lines.append(no_verdict_line(apart, NO_VERDICT_SIDES))
+    return lines
+
+
+def _has_verdict(row: Agreement) -> bool:
+    return has_verdict(row.archived)
+
+
+def _mark(row: Agreement) -> str:
+    if not _has_verdict(row):
+        return "·"
+    return "=" if row.archived == row.replayed else "≠"
 
 
 async def replay(
@@ -237,18 +321,6 @@ async def replay(
     """The critic's request sent again, and its rulings parsed."""
     instruction, turn = await compose(archived, package_loader, prompt_loader)
     return parse(await call(instruction, turn), archived.framework)
-
-
-def write_rulings(path: Path, archived: Archived, rulings: Sequence[Ruling]) -> None:
-    """The replayed rulings, completed as the graph completes them, as JSON.
-
-    The status a comparison prints says what moved and not why. The reason and
-    the open facts on each ruling say why, and a replay that kept only the
-    status needed a second paid call to find out.
-    """
-    settled = complete_rulings(archived.drafts, rulings)
-    payload = {"claims": [ruling.model_dump(mode="json") for ruling in settled]}
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def arguments(parser: argparse.ArgumentParser) -> None:
@@ -280,11 +352,22 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 def command_critic_replay(args: argparse.Namespace) -> int:
     """Send one archived critic request again and compare the verdicts."""
+    package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / args.framework)
+    prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
     try:
         refuse_holdout(args.case)
         check_out(args.out, args.raw)
         artifact = load_artifact(args.artifact)
         archived = load(artifact, args.case, args.framework)
+        record = run_record_for(
+            [args.out, args.raw],
+            "critic-replay",
+            {"case": args.case, "framework": args.framework},
+            {
+                **{path: {} for path in (artifact.path, *archived.files)},
+                **loaded((package_loader, prompt_loader)),
+            },
+        )
     except (CorpusError, EvalRunError, ProvenanceError, FileNotFoundError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -305,31 +388,30 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         replay(
             archived,
             call,
-            MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
-            MarkdownLoader(REPO_ROOT / "prompts"),
+            package_loader,
+            prompt_loader,
         )
     )
     if args.raw is not None:
-        args.raw.write_text(json.dumps(seen, indent=2) + "\n", encoding="utf-8")
+        raw = {"record": record, "answers": seen}
+        args.raw.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
     if args.out is not None:
-        write_rulings(args.out, archived, rulings)
-    rows = compare(archived, rulings)
-    same = sum(row.archived == row.replayed for row in rows)
-    for row in rows:
-        mark = "=" if row.archived == row.replayed else "≠"
-        print(
-            f"  {mark} {row.draft_id:10} archived {row.archived:12} replayed {row.replayed}"
-        )
-    print(f"{same} of {len(rows)} verdicts agree")
-    problems = review_issues(archived.drafts, rulings, archived.model).problems
+        # The status a comparison prints says what moved and not why. The
+        # reason and the open facts on each ruling, completed as the graph
+        # completes them, say why without a second paid call.
+        settled = complete_rulings(archived.drafts, rulings)
+        payload = {
+            "record": record,
+            "claims": [ruling.model_dump(mode="json") for ruling in settled],
+        }
+        args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    for line in agreement_lines(compare(archived, rulings)):
+        print(line)
+    problems = review_issues(archived.drafts, rulings, archived.model, {}).problems
     kinds = Counter(problem.kind for problem in problems)
     print(
         f"{len(problems)} problems the re-ask would be sent"
         + "".join(f"; {kind} {count}" for kind, count in sorted(kinds.items()))
     )
-    charged = [charge for charge in spent if charge is not None]
-    print(
-        f"spent: ${sum(charged):.4f} reported"
-        + ("" if len(charged) == len(spent) else "; the provider reported no charge")
-    )
+    print(spent_line(spent))
     return 0

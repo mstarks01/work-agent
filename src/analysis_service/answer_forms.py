@@ -13,11 +13,13 @@ from typing import Literal, get_args, get_origin
 
 from pydantic import BaseModel
 
+from analysis_service.analysis import ControlAttribute
 from analysis_service.assertions import (
     ABSENT,
     REGISTRY,
     UNKNOWN,
     AssertionCatalog,
+    parse_predicate,
 )
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
@@ -29,74 +31,93 @@ from analysis_service.fact_answers import (
     fact_line,
     key_ref,
 )
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
+from analysis_service.parsing import member
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.system_model import EXCERPT_MAX_CHARS, SystemModel
 
 __all__ = [
     "CONTROL_SUGGESTIONS",
     "YES_NO",
     "AnswerForm",
+    "ChoiceAttribute",
     "answer_choices",
     "answer_form",
     "answer_limit",
     "answer_suggestions",
+    "attribute_choices",
     "facets_json",
+    "max_length_of",
 ]
 
 
-def _closed(model: SystemModel, element_id: str, attribute: str) -> tuple[str, ...]:
+def _closed(element_type: type[BaseModel], attribute: str) -> tuple[str, ...]:
     """A literal-typed attribute's legal values, except ``unknown``."""
-    element = model.get(element_id)
-    if element is None:
-        return ()
-    annotation = type(element).model_fields[attribute].annotation
+    annotation = element_type.model_fields[attribute].annotation
     if get_origin(annotation) is not Literal:
         return ()
     return tuple(value for value in get_args(annotation) if value != UNKNOWN)
 
 
+#: The attributes whose answers come from the registry or the model, and not
+#: from their own annotation.
+ChoiceAttribute = Literal["data_classification", "trust_zone"]
+
 #: The answers an attribute takes, where they are not free text. Keyed by
 #: attribute, so an attribute with a closed set it does not name here falls
 #: back to its own annotation rather than to free text.
-_ATTRIBUTE_CHOICES: Mapping[str, Callable[[SystemModel, str], tuple[str, ...]]] = (
-    MappingProxyType(
-        {
-            "data_classification": lambda model, element_id: tuple(
-                sorted(REGISTRY["data-classification"].terms)
-            ),
-            "trust_zone": lambda model, element_id: tuple(
-                boundary.id for boundary in model.trust_boundaries
-            ),
-        }
-    )
+#: A model of ``None`` is no model yet, and a zone then takes no choice.
+_ATTRIBUTE_CHOICES: Mapping[
+    ChoiceAttribute, Callable[[SystemModel | None], tuple[str, ...]]
+] = MappingProxyType(
+    {
+        "data_classification": lambda model: tuple(
+            sorted(REGISTRY["data-classification"].terms)
+        ),
+        "trust_zone": lambda model: (
+            ()
+            if model is None
+            else tuple(boundary.id for boundary in model.trust_boundaries)
+        ),
+    }
 )
+
+
+def attribute_choices(
+    element_type: type[BaseModel], attribute: str, model: SystemModel | None
+) -> tuple[str, ...]:
+    """The values an answer to ``attribute`` of an element of ``element_type``
+    may take, or empty for free text. ``model`` is ``None`` where the page
+    has no model yet, as the Controls page has none."""
+    special = member(attribute, _ATTRIBUTE_CHOICES)
+    if special is None:
+        return _closed(element_type, attribute)
+    return _ATTRIBUTE_CHOICES[special](model)
 
 
 def answer_choices(
     key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
 ) -> tuple[str, ...]:
     """The values an answer to this fact may take, or empty for free text."""
-    element_id, attribute, assertion, _, question, _ = key
-    kind = fact_kind(key)
-    if kind == "capability":
+    ref = key_ref(key)
+    if ref.kind == "capability":
         return YES_NO
-    if kind == "question":
-        asked = QUESTION_KINDS.get(question)
-        return YES_NO if asked is not None and asked.answer == "yes-no" else ()
-    if kind == "attribute":
-        special = _ATTRIBUTE_CHOICES.get(attribute)
-        return (
-            special(model, element_id)
-            if special
-            else _closed(model, element_id, attribute)
-        )
-    if kind == "assertion" and catalog is not None:
-        row = answered_row(catalog, assertion)
+    if ref.kind == "question":
+        name = parse_question_kind(ref.question)
+        yes_no = name is not None and QUESTION_KINDS[name].answer == "yes-no"
+        return YES_NO if yes_no else ()
+    if ref.kind == "attribute":
+        element = model.get(ref.element_id)
+        if element is None:
+            return ()
+        return attribute_choices(type(element), ref.attribute, model)
+    if ref.kind == "assertion" and catalog is not None:
+        row = answered_row(catalog, ref.assertion)
         if row is None:
             return ()
-        predicate = REGISTRY.get(row.predicate)
-        if predicate is None:
+        registered = parse_predicate(row.predicate)
+        if registered is None:
             return ()
+        predicate = REGISTRY[registered]
         if predicate.value == "term":
             return (*sorted(predicate.terms), ABSENT)
         if predicate.value == "reference":
@@ -109,7 +130,8 @@ def answer_choices(
 
 
 #: The answers a ``yes-no`` question kind takes.
-YES_NO: tuple[str, ...] = ("yes", "no")
+YesNo = Literal["yes", "no"]
+YES_NO: tuple[YesNo, ...] = get_args(YesNo)
 
 
 #: Starting points for a control answered in free text: common mechanisms, so
@@ -118,7 +140,7 @@ YES_NO: tuple[str, ...] = ("yes", "no")
 #: ``tests/test_questions.py`` derives from the element classes. The words come
 #: from the corpus's signed models where they name one, and a suggestion is
 #: never an answer until the submitter sends it.
-CONTROL_SUGGESTIONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+CONTROL_SUGGESTIONS: Mapping[ControlAttribute, tuple[str, ...]] = MappingProxyType(
     {
         "authentication": (
             "session cookie after a password login",
@@ -162,17 +184,19 @@ def answer_form(
         return "facets"
     if answer_choices(key, model, catalog):
         return "choice"
-    control = (
-        fact_kind(key) == "attribute" and key_ref(key).attribute in CONTROL_SUGGESTIONS
-    )
+    control = fact_kind(key) == "attribute" and _suggested_attribute(key) is not None
     return "control" if control else "text"
 
 
 def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
     """Common mechanisms for a control answered in free text, or empty."""
-    if fact_kind(key) != "attribute":
-        return ()
-    return CONTROL_SUGGESTIONS.get(key_ref(key).attribute, ())
+    attribute = _suggested_attribute(key) if fact_kind(key) == "attribute" else None
+    return () if attribute is None else CONTROL_SUGGESTIONS[attribute]
+
+
+def _suggested_attribute(key: UnknownKey) -> ControlAttribute | None:
+    """The attribute of :data:`CONTROL_SUGGESTIONS` this key names, or ``None``."""
+    return member(key_ref(key).attribute, CONTROL_SUGGESTIONS)
 
 
 def answer_limit(key: UnknownKey, model: SystemModel) -> int:
@@ -184,20 +208,25 @@ def answer_limit(key: UnknownKey, model: SystemModel) -> int:
     own, the line the answer writes into the answers Source, and an
     attribute's field on its element. The line keeps room for the longest
     detail, so an answer at the limit takes any detail beside it.
+
+    A Control's fact names no element, so it cannot ask this. The Control
+    document and the Controls page bound an attribute value at
+    :data:`~analysis_service.system_model.CONTROL_VALUE_MAX_CHARS`, the bound
+    of the attribute's own field.
     """
     widest = FactAnswer(key=key, value="x", detail="x" * MAX_DETAIL_CHARS)
     bounds = [
-        _max_length(FactAnswer, "value"),
+        max_length_of(FactAnswer, "value"),
         EXCERPT_MAX_CHARS - (len(fact_line(widest)) - 1),
     ]
     ref = key_ref(key)
     element = model.get(ref.element_id) if fact_kind(key) == "attribute" else None
     if element is not None and ref.attribute in type(element).model_fields:
-        bounds.append(_max_length(type(element), ref.attribute))
+        bounds.append(max_length_of(type(element), ref.attribute))
     return min(bound for bound in bounds if bound is not None)
 
 
-def _max_length(model_class: type[BaseModel], field: str) -> int | None:
+def max_length_of(model_class: type[BaseModel], field: str) -> int | None:
     """The field's ``max_length``, which pydantic keeps in its metadata."""
     metadata = model_class.model_fields[field].metadata
     return next(

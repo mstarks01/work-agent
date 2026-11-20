@@ -1,0 +1,12 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- Engineer sign-in credentials may be intercepted before reaching the dispatch console | ['flow:entity:duty-engineer>process:dispatch-console>open-console', 'entity:duty-engineer', 'process:dispatch-console']
+- Dispatch actions may be readable across the corporate-to-control-plane boundary | ['flow:process:dispatch-console>process:dispatch-api>dispatch-requests', 'process:dispatch-console', 'process:dispatch-api']
+- Live crew status may be intercepted on an unverified WebSocket channel | ['flow:process:dispatch-console>process:dispatch-api>live-job-status', 'process:dispatch-console', 'process:dispatch-api']
+- Downloaded schedule documents may be exposed while written to the archive | ['flow:process:schedule-importer>store:schedule-archive>store-schedule-documents', 'process:schedule-importer', 'store:schedule-archive']
+- Work orders and the importer API token may be exposed crossing into the control plane | ['flow:process:schedule-importer>process:dispatch-api>post-work-orders', 'process:schedule-importer', 'process:dispatch-api']
+- Crew personal data may be readable on the dispatch API database connection | ['flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'process:dispatch-api', 'store:dispatch-database']
+- A storage copy may expose dispatch records if the dispatch database lacks encryption at rest | ['store:dispatch-database']
+- Archived partner schedules may be exposed from storage copies if unencrypted at rest | ['store:schedule-archive']
+- Weak or absent database authentication could expose the dispatch record corpus | ['store:dispatch-database', 'flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'process:dispatch-api']
+spent: $0.0558 reported
+must-finds matched: [10, 11]

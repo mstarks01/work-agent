@@ -107,6 +107,7 @@ def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dic
         "affected_element_ids": list(reference.affected_element_ids),
         # From the reference this stands in for; these tests grade grounds.
         "verb": reference.verb,
+        "attacker_position": "outside",
         "severity": {
             "likelihood": reference.severity.likelihood,
             "impact": reference.severity.impact,
@@ -536,13 +537,17 @@ def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
     assert kind_of(written.name) == "failure"
 
 
-def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
+def test_a_refused_completion_keeps_its_fragment_and_category_in_the_failure_record(
     monkeypatch, case
 ):
-    """A refusal names no reason, so its fragment is written beside the state."""
+    """The service reads at most a category from a refusal, never what the
+    filter stopped, so its fragment and its category are written beside the
+    state."""
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
-        raise RefusedCompletionError("analyze_stride_spoofing: refused", "S-01 frag")
+        raise RefusedCompletionError(
+            "analyze_stride_spoofing: refused", "S-01 frag", "cyber"
+        )
 
     monkeypatch.setattr(fan_in_module, "join_drafts", refuse)
 
@@ -551,6 +556,7 @@ def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
     captured = run.failed_states[case.id]
     assert captured["error"].startswith("RefusedCompletionError(")
     assert captured["fragment"] == "S-01 frag"
+    assert captured["refusal_category"] == "cyber"
 
 
 class TestCasesInFlight:

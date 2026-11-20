@@ -1,0 +1,563 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "ec6e8a1e9cbee758d186eb12799f9a023462e368",
+    "clean": false,
+    "table": {
+      "case": "12-overclaiming-supplier-portal",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "cf3fd3442d9a29ea5ca935978e4f32735bcad935281744cdaa5d6f8d567cb976"
+    },
+    "inputs": [
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/domains/databases.md",
+        "sha256": "aedac04477deb5719399b4adcea21872d38daf92dee9579bae204045bb72e618",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/domains/http-api.md",
+        "sha256": "5d17db9796d6345ba4eddd5a8358fffac5be6cfaa0f1e14b192df56248f7f177",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/domains/multi-tenant-saas.md",
+        "sha256": "5742942787899eebdf4a4d39c7c67066139235ad3abb9d80b3dc7c98e7f95b79",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/domains/oauth-oidc.md",
+        "sha256": "463109f0bc775a93efafd3870b0565beeb1bd88978006dbebb2084a033408cdd",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/cases/chained-benign-facts.md",
+        "sha256": "a6364623a915ddbd3d94b1d1e4f24536bc16507448bc8ddcd7989658913edb1c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/cases/shared-credential-attribution.md",
+        "sha256": "599923038704f22a7cb6247a817bb4588cce15ea86f51eb9437f384472b504d5",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/cases/spoofing-or-elevation.md",
+        "sha256": "accd4efee6fe004537bd7adbab20f7b40fd6e94b42e8738adad0d64b40f56dac",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/cases/stated-control-outside-the-model.md",
+        "sha256": "f1fd95eba0188cbaa31ae6c6e13e71b86f53e66bb5e23e51dcd1c215e638f031",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/cases/two-threats-one-flow.md",
+        "sha256": "0f99aaf6760c4732811b253947547d43f37ba8189a8cccdcc95ac522daff8795",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/cases/unknown-is-not-absent.md",
+        "sha256": "becb35bc8bbce48f18224f28059acacc95d8170777cbca89c2f164025f0bcabb",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/critic.md",
+        "sha256": "3f49e0923ab06812e64b83e2365acc08a066579bdb787d48312ab486607fd41e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/disclaimer.md",
+        "sha256": "91d6fe7c4ed8f0be4293ad8549969bcf5223b57ec7f6776932e56c0e256702af",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lane_closing.md",
+        "sha256": "1d005a304561e159e2027e3a91e917e9a9e3e98636741678910d81e19285bdc1",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/denial-of-service/exemplars.md",
+        "sha256": "766a53db5f80daa305918dd8db4764196d51de3b312cffa3fddb19341745ed86",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/denial-of-service/skill.md",
+        "sha256": "1960554729f10491fdf233fe74abbb98010a40a16b8fc5da1d97ac0f18dfcc01",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/elevation-of-privilege/exemplars.md",
+        "sha256": "3b340ef85bc70b679615437f4a4da10489b3d7f65667eb839304eb722b13cfa4",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/elevation-of-privilege/skill.md",
+        "sha256": "a2f43cd06b99dbc34a4cce2f9a1462c78e23e64164c78678cb162162d494dd63",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/information-disclosure/exemplars.md",
+        "sha256": "4a598fb55db452d3fcbf12281ac336c953897d32b88575e53abdcb8d0f94e9c8",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/information-disclosure/skill.md",
+        "sha256": "dbf373cde7dde478d912d5062c0b0809f958a665e9d629865858b6f0f370f27d",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/repudiation/exemplars.md",
+        "sha256": "5a30f1eb3f76a01636af067b877a550a8eb82e9ddfdb06a7c79b389a8b97753a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/repudiation/skill.md",
+        "sha256": "b9f92fb25728db64b04c6dc339dfb231e45a7eeb2fd23659557d832b708edd05",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/spoofing/exemplars.md",
+        "sha256": "aef3c9db2d0bd86779415058d19de21e534e571c90abd91341421b1e40e815e6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/spoofing/skill.md",
+        "sha256": "a5915259d03e6670f999cd88d3b720fe9959a9e2ebf220bc846517f8f4ddbddc",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/tampering/exemplars.md",
+        "sha256": "6b382b74f13ff988b615511d7008d79056e5584075245d6a6f0df750ef612896",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/lanes/tampering/skill.md",
+        "sha256": "94ab9743d2c5d3fc0da686970a19a684a71445ec870762beda4d54e5c53c45ad",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/attribution-and-audit.md",
+        "sha256": "6dba337dae1fd906ad9c14794bef35d13070f1803d484ef6b804f3779e3a2fed",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/callback-and-webhook-trust.md",
+        "sha256": "4bdd8ac57ee5745b15b1f3357dcb3289493e97d5630566846a87e7caca2abd52",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/compromise-inheritance.md",
+        "sha256": "e937fe3c5e2cb601edfd48db9f2a5d8ea0dd4bee90c21dce80b2204891900b5f",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/cost-of-an-unauthenticated-request.md",
+        "sha256": "d02e3447fb9a19a3f9458abe9afdc1fb2e416125f2edd319175b9fa342d92d2c",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/failure-coupling.md",
+        "sha256": "96f493be2afacebc965f78174015abc81f002176fb3431929caf8b45c5f1f04b",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/identity-at-a-boundary.md",
+        "sha256": "b1dfe992ecc1e94bdabe1bc4a5cee6981d423750853441cd3ad2fa262d77501a",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/privilege-transitions.md",
+        "sha256": "b4e905595f0de7f72591f9235e0ced858c12999618d394b0d35b229aa847a71e",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/protection-at-rest.md",
+        "sha256": "f7454325755e85db4f9b66b6a4cbc91bfc31947ead5153dfd5b7839191c0a777",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/transport-protection.md",
+        "sha256": "6840d2b35a6d4f0dac1af95e2ad263f6faea9c618a6f8542762e6a5f75fafd20",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/notes/write-path-integrity.md",
+        "sha256": "73e39c90f6a4fc0eabeaf0989966d9e52f3a7b2455ab33056124c430392d4014",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/output.md",
+        "sha256": "690f7c09ebd1e2292ce755de101507eddac90431458a6389c7e7342ca728c593",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/frameworks/stride/severity_rubric.md",
+        "sha256": "4bddc8b581f041f2d918f79df9fbbb6a0813ea834493a12a973c0adebcc95e74",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/analyze.md",
+        "sha256": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/assert.md",
+        "sha256": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/capabilities.md",
+        "sha256": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/critic.md",
+        "sha256": "1024bf15374e1fae014259c487e6a2f3b80964a4d2dfd51bd0b7521eed07ad10",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/extract-compact.md",
+        "sha256": "0339b3225a0edfd09330bf000307d561b0251df2e5c992ff587b4f70741ba185",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/extract.md",
+        "sha256": "87c2732b544bc1849d70d502e1d9991a210670e24b53818e499053285768d9a7",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/recritic.md",
+        "sha256": "bee43248fb780c852109c22dfc3d4aacd0f84b232cbd1458a70d6c180b9dbad9",
+        "selections": {}
+      },
+      {
+        "path": "/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad/wt-ctl/prompts/repair.md",
+        "sha256": "1fee068ad8db340aa81a6c867ef70a088b4c5c584d205f419f23299825a6fb81",
+        "selections": {}
+      }
+    ]
+  },
+  "claims": [
+    {
+      "title": "Supplier paperwork may be intercepted en route to the vendor portal",
+      "description": "If the unverified `encryption_in_transit` on `flow:entity:supplier>process:supplier-portal>upload-documents` resolves to no effective transport encryption, an observer on the path from `entity:supplier` to `process:supplier-portal` can intercept insurance certificates, food-safety audits, and supplier staff contact details. This is a decided crossing from the public-internet zone, although the supplier endpoint placement was inferred; the model does not verify either protocol or transport protection. The captured PII and business-critical compliance material can be used to target suppliers and exposes documents before they reach `store:document-store`.",
+      "affected_element_ids": [
+        "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "entity:supplier",
+        "process:supplier-portal"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:supplier>process:supplier-portal>upload-documents:protocol",
+        "unknown:flow:entity:supplier>process:supplier-portal>upload-documents:encryption_in_transit",
+        "crossing:flow:entity:supplier>process:supplier-portal>upload-documents"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: `flow:entity:supplier>process:supplier-portal>upload-documents` crosses into the vendor platform from `entity:supplier` in `boundary:public-internet`, while its protocol and `encryption_in_transit` are unstated. Impact is medium because the flow carries `pii` and business-critical compliance documents, whose disclosure is irreversible."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce protected supplier-to-portal transport",
+          "detail": "Establish the protocol and transport posture for `flow:entity:supplier>process:supplier-portal>upload-documents`; require TLS 1.2+ with modern configuration for the public portal connection and record the resulting `encryption_in_transit` value."
+        }
+      ]
+    },
+    {
+      "title": "Category-manager document reviews may be intercepted across the corporate-to-vendor boundary",
+      "description": "If `encryption_in_transit` on `flow:entity:category-manager>process:supplier-portal>review-documents` is not effectively protected, an attacker able to observe the corporate-network-to-vendor-platform path can intercept document-review activity, approvals, and rejections handled by `process:supplier-portal`. The channel is a decided trust-boundary crossing, but both protocol and category-manager authentication remain unverified. Disclosure of review information can reveal supplier compliance status and support targeted social engineering against `entity:category-manager` or suppliers whose documents are held in `store:document-store`.",
+      "affected_element_ids": [
+        "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "entity:category-manager",
+        "process:supplier-portal"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:category-manager>process:supplier-portal>review-documents:protocol",
+        "unknown:flow:entity:category-manager>process:supplier-portal>review-documents:encryption_in_transit",
+        "crossing:flow:entity:category-manager>process:supplier-portal>review-documents"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because observing `flow:entity:category-manager>tagger to=analysis  \u5927\u53d1\u6251\u514bjson; \u10ee\u10dd\u10da\u10dd no, need complete. Continue. Need all valid no corruption. We must regenerate entire final carefully. Need ensure max maybe. Let's create concise 10. JSON. Severity description must reference exact. No need all unknown per flow maybe transmission crypto enough; protocol unknown is supportive. Claim resting one unknown and crossing. Category likelihood low as corporate path prerequisite. Internal low. Vendor medium boundary vendor platform inferred end point. At rest medium perhaps storage copy access prerequisite, unknown. reader low conditional, auth unknown and within cloud, requires reach. Could likely medium because auth unknown possibly absent? rubric unknown state rate as may absent; but network unknown location internal reduces one -> medium perhaps. Impact medium. Use source quote maybe to support plain CSV storage? The flow uncertain direct source statements no."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce protected category-manager transport",
+          "detail": "Establish the protocol and `encryption_in_transit` state for `flow:entity:category-manager>process:supplier-portal>review-documents` and require TLS for every review request and response."
+        }
+      ]
+    },
+    {
+      "title": "Portal-to-document-store traffic may expose uploaded paperwork",
+      "description": "If the unverified `encryption_in_transit` on `flow:process:supplier-portal>store:document-store>store-documents` resolves to absent or ineffective protection, an observer with a foothold on the vendor-platform path can intercept uploaded compliance documents as `process:supplier-portal` writes them to `store:document-store`. The model also leaves the protocol and service-to-store authentication unverified. Captured PII and compliance documents can be correlated with the later review activity handled by the portal.",
+      "affected_element_ids": [
+        "flow:process:supplier-portal>store:document-store>store-documents",
+        "process:supplier-portal",
+        "store:document-store"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:supplier-portal>store:document-store>store-documents:protocol",
+        "unknown:flow:process:supplier-portal>store:document-store>store-documents:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the attacker needs a foothold on the intra-`boundary:vendor-platform` path and `encryption_in_transit` is unverified. Impact is medium because `store:document-store` and the flow carry `pii` and business-critical compliance documents."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated encryption on the portal storage hop",
+          "detail": "Verify the protocol and require TLS or an equivalent authenticated encrypted channel for `flow:process:supplier-portal>store:document-store>store-documents`, including certificate validation between the portal and its document storage service."
+        }
+      ]
+    },
+    {
+      "title": "Nightly supplier extract may be intercepted while the vendor sends it to the landing bucket",
+      "description": "If `encryption_in_transit` on `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` is not effective, an observer on the vendor-platform-to-cloud-account path can intercept the nightly supplier data extract before it reaches `store:landing-bucket`. This is a decided boundary crossing, though the vendor endpoint zone was inferred. The source describes the file as arriving as a plain CSV, but does not settle whether the transport channel was protected; this draft is conditional on that unresolved transport fact. The captured extract can disclose the supplier records subsequently loaded by `process:supplier-master-service` into `store:supplier-database`.",
+      "affected_element_ids": [
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "entity:portal-vendor",
+        "store:landing-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract:protocol",
+        "unknown:flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract:encryption_in_transit",
+        "crossing:flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
+      ],
+      "quotes": [
+        {
+          "text": "The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` crosses from the vendor platform into the cloud account and both protocol and transport encryption are unstated. Impact is medium because the extract carries `pii` and business-critical supplier data that is later persisted in `store:supplier-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Use a verified encrypted vendor-to-bucket delivery channel",
+          "detail": "Require a documented TLS or mutually authenticated managed-transfer channel for `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`, verify the receiving endpoint, and record the resolved transport control."
+        },
+        {
+          "summary": "Encrypt the extract independently of transport",
+          "detail": "Have the vendor encrypt and sign each extract for a key controlled by the cloud-account recipient, so a captured delivery does not disclose the CSV contents."
+        }
+      ]
+    },
+    {
+      "title": "Supplier-master reads from the landing bucket may be visible on an unverified internal channel",
+      "description": "If `encryption_in_transit` on `flow:process:supplier-master-service>store:landing-bucket>load-extract` is absent or ineffective, an attacker with a foothold on the cloud-account path can intercept the nightly supplier extract while `process:supplier-master-service` reads it from `store:landing-bucket`. The protocol and authentication for this read flow are also unstated. The intercepted PII and business-critical records can be retained independently of the service and used to identify or target the suppliers subsequently represented in `store:supplier-database`.",
+      "affected_element_ids": [
+        "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "process:supplier-master-service",
+        "store:landing-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:supplier-master-service>store:landing-bucket>load-extract:protocol",
+        "unknown:flow:process:supplier-master-service>store:landing-bucket>load-extract:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 5,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the attacker needs a foothold on the intra-`boundary:cloud-account` read path and its `encryption_in_transit` value is unknown. Impact is medium because the landing-bucket extract is tagged `pii` and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the service-to-bucket read path",
+          "detail": "Verify and enforce TLS for `flow:process:supplier-master-service>store:landing-bucket>load-extract`, including endpoint validation and a workload identity that can access only the required object prefix."
+        }
+      ]
+    },
+    {
+      "title": "Supplier records may be intercepted while the master service writes the database",
+      "description": "If `encryption_in_transit` on `flow:process:supplier-master-service>store:supplier-database>write-supplier-records` resolves to no effective protection, an attacker with a foothold on the cloud-account path can intercept supplier records as `process:supplier-master-service` writes them to `store:supplier-database`. Both the protocol and connection authentication are unverified. The attacker obtains PII and business-critical record content that remains useful for supplier targeting even after the nightly load completes.",
+      "affected_element_ids": [
+        "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "process:supplier-master-service",
+        "store:supplier-database"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:supplier-master-service>store:supplier-database>write-supplier-records:protocol",
+        "unknown:flow:process:supplier-master-service>store:supplier-database>write-supplier-records:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "attacker_position": "on-path",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because observation requires a foothold within `boundary:cloud-account` and `encryption_in_transit` on the write flow is unstated. Impact is medium because the flow writes `pii` and business-critical supplier records into `store:supplier-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted authenticated database transport",
+          "detail": "Establish and enforce TLS with certificate validation for `flow:process:supplier-master-service>store:supplier-database>write-supplier-records`, and record the service identity authorized to write records."
+        }
+      ]
+    },
+    {
+      "title": "Vendor document-store copies may expose supplier paperwork if encryption at rest is absent",
+      "description": "`store:document-store` holds PII and business-critical uploaded compliance documents, but its `encryption_at_rest` attribute is unknown. If this resolves to unencrypted storage, an attacker who obtains a storage-layer copy, such as operational media or an export associated with this store, can read the documents without using `process:supplier-portal` or its normal authentication path. The disclosure enables targeting suppliers and category managers using the document and contact information. This is conditional on the unresolved at-rest control and does not assert that the vendor store is unencrypted.",
+      "affected_element_ids": [
+        "store:document-store"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:document-store:encryption_at_rest",
+        "unknown:store:document-store:data_classification"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 7,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:document-store` has no verified `encryption_at_rest` control, so a storage copy may be readable if obtained. Impact is medium because the store holds `pii` and business-critical compliance documents, notwithstanding its unknown data classification."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption for document-store data and copies",
+          "detail": "Obtain the vendor's verifiable at-rest encryption and key-management posture for `store:document-store`; require managed encryption covering operational copies and restrict export and storage-administration access."
+        }
+      ]
+    },
+    {
+      "title": "Landing-bucket copies may disclose the complete nightly supplier extract",
+      "description": "`store:landing-bucket` contains the nightly supplier extract and is tagged with PII and business-critical data, while `encryption_at_rest` is unknown. If storage encryption is absent or ineffective, a party obtaining a copy of the bucket's underlying data or an operational export can read the plain extract without authenticating through `process:supplier-master-service`. The extract is then loaded into `store:supplier-database`, so one copied file can expose the supplier dataset before its normal processing path. This is a conditional storage-copy threat, not an assertion that the bucket lacks encryption.",
+      "affected_element_ids": [
+        "store:landing-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:landing-bucket:encryption_at_rest",
+        "unknown:store:landing-bucket:data_classification"
+      ],
+      "quotes": [
+        {
+          "text": "The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:landing-bucket` has unverified `encryption_at_rest` and a copied storage artifact bypasses the application path. Impact is medium because the bucket holds a supplier extract tagged `pii` and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the landing bucket and all retained object versions",
+          "detail": "Establish the at-rest posture for `store:landing-bucket`; require managed-key encryption for objects, versions, and operational copies, and tightly limit object export and key-use permissions."
+        },
+        {
+          "summary": "Avoid retaining readable plain extracts",
+          "detail": "Encrypt the delivered extract before storage and have `process:supplier-master-service` decrypt it only in memory under a scoped workload identity."
+        }
+      ]
+    },
+    {
+      "title": "Supplier-database storage copies may disclose all loaded supplier records",
+      "description": "`store:supplier-database` holds supplier records tagged as PII and business-critical data, but its `encryption_at_rest` attribute is unknown. If that unknown resolves to no effective encryption, an attacker obtaining a storage-layer copy can read the loaded records directly rather than through `process:supplier-master-service` or an application query path. The disclosure creates a retained corpus of supplier information that can be used for targeted fraud or social engineering. This draft is conditional on the unresolved encryption-at-rest state.",
+      "affected_element_ids": [
+        "store:supplier-database"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:supplier-database:encryption_at_rest",
+        "unknown:store:supplier-database:data_classification"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 9,
+      "attacker_position": "storage-copy",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:supplier-database` has no verified `encryption_at_rest` control and a storage copy bypasses its normal access path. Impact is medium because it holds the loaded supplier-record corpus tagged `pii` and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce encryption at rest for the supplier database",
+          "detail": "Verify the `encryption_at_rest` state of `store:supplier-database`, require managed-key encryption for database storage and operational copies, and restrict backup, export, and decrypt permissions."
+        }
+      ]
+    },
+    {
+      "title": "Unverified landing-bucket read authentication may let an unauthorized party obtain the extract",
+      "description": "`process:supplier-master-service` reads the nightly supplier extract from `store:landing-bucket` through `flow:process:supplier-master-service>store:landing-bucket>load-extract`, but authentication on that read path is unknown. If the bucket does not require a narrowly scoped authenticated workload identity, an attacker able to reach its read interface can obtain the extract directly rather than compromising the supplier-master service. The resulting PII and business-critical data can then be retained or used to target suppliers, and the same records subsequently populate `store:supplier-database`. This is conditional on the unverified authentication control, not a claim that bucket access is unauthenticated.",
+      "affected_element_ids": [
+        "store:landing-bucket",
+        "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+        "process:supplier-master-service"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:supplier-master-service>store:landing-bucket>load-extract:authentication"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 10,
+      "attacker_position": "outside",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because authentication on the established read flow into `store:landing-bucket` is unknown, so it must be evaluated as potentially absent, though the attacker must reach the cloud-account bucket interface. Impact is medium because the readable extract is tagged `pii` and business-critical data and feeds `store:supplier-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require least-privilege workload authentication for bucket reads",
+          "detail": "Set and verify authentication on `flow:process:supplier-master-service>store:landing-bucket>load-extract` using a dedicated workload identity limited to the required object prefix; deny anonymous, broad-account, and cross-environment reads."
+        },
+        {
+          "summary": "Audit and alert on extract reads",
+          "detail": "Record object-read identity, source context, and object name for the landing bucket, and alert on reads outside the scheduled supplier-master workload."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

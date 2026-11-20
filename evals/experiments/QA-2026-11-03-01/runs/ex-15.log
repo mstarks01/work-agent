@@ -1,0 +1,16 @@
+material from today's prepare, catalog none; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Guessable payment links disclose invoices and bank details without sign-in | ['flow:entity:payer>process:billing-app>open-payment-page', 'process:billing-app']
+- A company user may elicit another tenant's invoices if ownership checks are absent | ['entity:company-user', 'flow:entity:company-user>process:billing-app>manage-invoices', 'process:billing-app']
+- Any authenticated user can obtain another company's invoice PDF | ['process:billing-app', 'flow:process:billing-app>store:render-queue>queue-render-job', 'store:pdf-bucket']
+- Sensitive tenant-database traffic may be readable on unverified internal connections | ['flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'flow:process:pdf-renderer>store:tenant-database>read-invoice', 'store:tenant-database']
+- Unverified render-queue transport may expose invoice identifiers | ['flow:process:billing-app>store:render-queue>queue-render-job', 'flow:process:pdf-renderer>store:render-queue>take-render-jobs', 'store:render-queue']
+- Invoice PDFs may be readable on unverified bucket connections | ['flow:process:pdf-renderer>store:pdf-bucket>write-pdf', 'flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'store:pdf-bucket']
+- Support-office traffic may expose administrator credentials if transport is unprotected | ['entity:support-agent', 'flow:entity:support-agent>process:admin-console>use-admin-console', 'process:admin-console']
+- An unverified admin-console session channel may disclose customer sessions | ['process:admin-console', 'flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:billing-app']
+- A tenant-database storage copy may disclose every company if at-rest encryption is absent | ['store:tenant-database']
+- A PDF-bucket storage copy may disclose every company's invoices if unencrypted | ['store:pdf-bucket']
+- Compromise of the billing app exposes the shared tenant database through its account | ['process:billing-app', 'flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'store:tenant-database']
+- Compromise of the billing app exposes every tenant's PDFs through one service credential | ['process:billing-app', 'flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'store:pdf-bucket']
+- A compromised renderer may read invoice data through its unverified database access | ['process:pdf-renderer', 'flow:process:pdf-renderer>store:tenant-database>read-invoice', 'store:tenant-database']
+spent: $0.0755 reported
+must-finds matched: [5, 6]

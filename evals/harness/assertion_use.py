@@ -14,11 +14,10 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from pydantic import ValidationError
-
 from analysis_service.assertion_use import AssertionUse, assertion_use
-from analysis_service.report import Report
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import UnreadableReport, read_report
+from evals.harness.rates import shown_figure
 
 REPORT_GLOB = f"*{case_suffix('report')}"
 
@@ -42,10 +41,8 @@ def render(rows: Sequence[tuple[str, AssertionUse]], no_pass: int, refused: int)
     ]
     for name, use in rows:
         for block in use.blocks:
-            leads = "—" if block.catalog_leads is None else block.catalog_leads
-            charge = (
-                "—" if use.assert_charge_usd is None else f"{use.assert_charge_usd:.4f}"
-            )
+            leads = shown_figure(block.catalog_leads, "")
+            charge = shown_figure(use.assert_charge_usd, ".4f")
             out.append(
                 f"| {name} | {block.framework} | {block.claims} | {block.citing}"
                 f" | {block.catalog_only} | {leads} | {use.rows} | {use.refused}"
@@ -86,8 +83,8 @@ def command_assertion_use(args: argparse.Namespace) -> int:
     try:
         for path in report_paths(args.reports):
             try:
-                report = Report.model_validate_json(path.read_bytes())
-            except ValidationError:
+                report = read_report(path)
+            except UnreadableReport:
                 refused += 1
                 continue
             use = assertion_use(report)

@@ -1,0 +1,23 @@
+architecture-beta
+    group z0(cloud)[Trust zone rewards cloud]
+    group z1(cloud)[Trust zone member devices]
+    group z2(cloud)[Trust zone partner servers]
+    service n0(internet)[member] in z1
+    service n1(internet)[partner app] in z2
+    service n2(server)[mobile app] in z1
+    service n3(server)[authorization server] in z0
+    service n4(server)[rewards api] in z0
+    service n5(server)[support console] in z0
+    service n6(database)[identity database] in z0
+    service n7(database)[points ledger] in z0
+    service n8(database)[api log store] in z0
+    n0:R --> L:n3
+    n0:R --> L:n1
+    n2:R --> L:n3
+    n1:R --> L:n3
+    n2:R --> L:n4
+    n1:R --> L:n4
+    n3:R --> L:n6
+    n4:R --> L:n7
+    n4:R --> L:n8
+    n5:R --> L:n6

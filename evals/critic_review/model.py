@@ -26,7 +26,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from analysis_service.claims import RejectionStep
 from analysis_service.frameworks import FrameworkName
+from analysis_service.job_controls import AppliedControl
 from analysis_service.parsing import Signer
 
 #: What each fixture is built to catch, and the four the review change turns on.
@@ -54,12 +56,22 @@ from analysis_service.parsing import Signer
 #: and a flawed one must not erase a valid threat. Without a row of this kind
 #: every fixture that can carry a reading expects the same answer, and a critic
 #: replying ``sound`` to everything scores full marks.
+#:
+#: ``control-covers`` — a sound draft that carries a Control row whose
+#: evidence shows the thing the draft calls missing. It must die for
+#: ``control``, and its reason must quote the evidence.
+#:
+#: ``control-does-not-cover`` — a sound draft that carries a Control row whose
+#: evidence is about something else. It must survive: a critic that applies
+#: every row it is shown has turned the owner's statement into a pass.
 FixtureKind = Literal[
     "credible-conditional",
     "nonsense-argument",
     "irrelevant-unknown",
     "contradicted-by-source",
     "sound-claim-flawed-advice",
+    "control-covers",
+    "control-does-not-cover",
 ]
 
 
@@ -97,9 +109,7 @@ class Expectation(BaseModel):
 
     survives: bool
     status: Literal["confirmed", "needs-info", "rejected"] | None = None
-    rejected_because: Literal["evidence", "reasoning", "lane", "duplicate"] | None = (
-        None
-    )
+    rejected_because: RejectionStep | None = None
     #: Is this draft's recommendation sound advice for this claim?
     #:
     #: Read where the package's own critic text asks for a recommendation
@@ -159,6 +169,10 @@ class CriticFixture(BaseModel):
     #: up rather than importing one — so a second package needs a second
     #: fixture file and no code change.
     framework: FrameworkName
+    #: The Controls the job applies, as the run reads them: the resolved
+    #: scope, the ticked rows and the copied evidence. Empty on a fixture
+    #: about no Control.
+    controls: list[AppliedControl] = Field(default_factory=list)
     #: The corpus case whose blessed model this draft is written against. The
     #: model is read from the corpus rather than copied here, so a fixture
     #: cannot quietly describe a system the corpus no longer holds.

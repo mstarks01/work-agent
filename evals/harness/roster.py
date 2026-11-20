@@ -1,8 +1,8 @@
 """The voter roster: who may vote, hold a sitting or submit a sweep, and with what standing.
 
 ``evals/review/voters.toml`` is one checked-in table, mapping a GitHub login to
-a **Standing** from the closed set ``maintainer`` and ``contributor``. It is the
-only place a standing lives (#320). A standing on a vote row would freeze a
+a **Standing** from the closed set ``maintainer`` and ``contributor``. A
+standing lives in this table (#320). A standing on a vote row would freeze a
 classification into history. A roster edit re-classes a voter's whole series at
 once, which is what makes a promotion one diff (#326). Any past number stays
 recomputable from the ledger plus the roster at that commit.
@@ -43,7 +43,7 @@ Standing = Literal["maintainer", "contributor"]
 #: listed again. Every published number states which of these its series
 #: includes; there is no third class and no per-voter weight — standing selects
 #: which votes a series reads, never how much a vote counts.
-STANDINGS: frozenset[str] = frozenset(get_args(Standing))
+STANDINGS: frozenset[Standing] = frozenset(get_args(Standing))
 
 #: The login shape the ledger enforces on ``voter``, **called** rather than
 #: spelled again: the roster refuses a key that could never name a vote file,

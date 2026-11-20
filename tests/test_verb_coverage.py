@@ -39,6 +39,10 @@ CLAIMS_PER_CASE: dict[str, int] = {
     "14-loyalty-oauth-platform": 15,
     "15-multitenant-invoicing": 15,
     "16-library-lending-interview": 13,
+    "17-permit-portal-limits": 17,
+    "18-podcast-host-quotas": 18,
+    "19-vet-clinic-records": 21,
+    "20-school-coursework": 18,
 }
 
 

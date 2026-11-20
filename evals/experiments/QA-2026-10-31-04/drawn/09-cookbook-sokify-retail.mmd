@@ -1,0 +1,21 @@
+flowchart LR
+    customer(Customer)
+    app[Mobile app]
+    api[Web API]
+    userdb[(User database)]
+    sims[SIMS stock and inventory]
+    flatfile[(Address flat file)]
+    fax[Fax gateway]
+
+    subgraph office["Office"]
+        sheet["Catalogue spreadsheet (marketing laptop)"]
+    end
+
+    customer -->|browse, order| app
+    app -->|"orders (HTTP)"| api
+    api -->|"name, address, card"| userdb
+    api -->|order| sims
+    sims -->|delivery address| flatfile
+    sims -->|dispatch note| fax
+    fax -->|"fax confirmation: name, address"| customer
+    sheet -->|"SQL statements: prices, product copy"| api

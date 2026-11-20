@@ -60,13 +60,10 @@ from analysis_service.gcp_identity import STORAGE_SCOPE, platform_credentials
 from analysis_service.objects import (
     GCS_KEY_FILE_VAR,
     OBJECT_BUCKET_VAR,
-    OBJECT_CREDENTIALS_VAR,
-    OBJECT_STORES,
+    credential_mode,
 )
 from analysis_service.store_settings import (
     StoreConfigError,
-    closed_setting,
-    refuse_unread,
 )
 from analysis_service.vendors import CredentialMode
 
@@ -95,14 +92,7 @@ def make_client(credentials: Credentials) -> storage.Client:
 
 def _platform_identity(env: Mapping[str, str]) -> Credentials:
     """``iam``: the identity of the metadata server, by
-    :func:`~analysis_service.gcp_identity.platform_credentials`. A key file
-    stops the startup too, so a key works only where the deployment declares
-    ``api_key``."""
-    if env.get(GCS_KEY_FILE_VAR, "").strip():
-        raise StoreConfigError(
-            f"the iam mode of the gcs object store reads no key; unset"
-            f" {GCS_KEY_FILE_VAR}, or set ANALYSIS_OBJECT_CREDENTIALS=api_key"
-        )
+    :func:`~analysis_service.gcp_identity.platform_credentials`."""
     return platform_credentials("the iam mode of the gcs object store")
 
 
@@ -237,20 +227,12 @@ class GcsObjectStore:
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> GcsObjectStore:
         refuse_bare_secret(env, GCS_KEY_FILE_VAR, StoreConfigError)
-        refuse_unread(
-            env,
-            ("ANALYSIS_OBJECT_",),
-            OBJECT_STORES["gcs"].reads,
-            "the gcs object store",
-        )
+        mode = credential_mode(env, "gcs")
         bucket = env.get(OBJECT_BUCKET_VAR, "").strip()
         if not bucket:
             raise StoreConfigError(f"set {OBJECT_BUCKET_VAR} for the gcs object store")
         if _BUCKET.fullmatch(bucket) is None:
             raise StoreConfigError(f"{OBJECT_BUCKET_VAR} must match {_BUCKET.pattern}")
-        mode = closed_setting(
-            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, CREDENTIALS
-        )
         credentials = CREDENTIALS[mode](env)
         try:
             client = make_client(credentials)

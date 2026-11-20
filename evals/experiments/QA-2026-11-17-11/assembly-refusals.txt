@@ -1,0 +1,10 @@
+== evals/baselines/2198870-gpt-5.6-terra-6cd39a95/mstarks01-e5d71171.json
+== evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json
+02-iot-fleet-telemetry             stride refused by today's check:
+  D-01: today's ThreatRuling refuses verdict.rejected_because holds 'duplicate': Input should be 'evidence', 'reasoning', 'lane' or 'control'
+13-dispatch-control-plane          stride refused by today's check:
+  S-03: today's ThreatRuling refuses verdict.rejected_because holds 'duplicate': Input should be 'evidence', 'reasoning', 'lane' or 'control'
+== evals/baselines/d3f1898-gpt-5.6-terra-29929443/mstarks01-92560eb2.json
+08-sso-identity-broker             stride refused by today's check:
+  E-02: today's ThreatRuling refuses verdict.rejected_because holds 'duplicate': Input should be 'evidence', 'reasoning', 'lane' or 'control'
+== evals/baselines/d4edd64-gpt-5.6-terra-fd1c49af/mstarks01-ab5d72fb.json

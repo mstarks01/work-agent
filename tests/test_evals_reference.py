@@ -42,35 +42,35 @@ def corpus():
 
 
 def test_loads_every_shipped_case(corpus):
-    assert len(corpus) == 16
+    assert len(corpus) == 20
     assert [case.id for case in corpus] == sorted(case.id for case in corpus)
 
 
-# One near control per exemplar system, and the pairing is definitional rather
-# than a judgement about resemblance: each control's domain is the domain its
+# One near case per exemplar system, and the pairing is definitional rather
+# than a judgement about resemblance: each near case's domain is the domain its
 # exemplar system was written in. `docs/adr/0006-two-exemplar-systems.md` has
 # the reasoning; the short version is that "near" means "an architecture the
 # exemplars actually demonstrate", so adding an exemplar system without adding
-# its control leaves the delta measuring the wrong thing.
-NEAR_EXEMPLAR_CONTROLS = ["01-payments-checkout", "02-iot-fleet-telemetry"]
+# its near case leaves the delta measuring the wrong thing.
+NEAR_CASES = ["01-payments-checkout", "02-iot-fleet-telemetry"]
 
 
-def test_one_near_exemplar_control_per_exemplar_system(corpus):
-    # Without a control there is nothing to subtract from, and the
+def test_one_near_case_per_exemplar_system(corpus):
+    # Without a near case there is nothing to subtract from, and the
     # exemplar-domain-bias delta is unmeasurable.
     near = [
         case.id
         for case in corpus
         if case.declaration("stride").exemplar_proximity == "near"
     ]
-    assert near == NEAR_EXEMPLAR_CONTROLS
+    assert near == NEAR_CASES
 
 
-def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
+def test_the_near_cases_are_outnumbered_by_far_cases(corpus):
     """The delta compares two populations, so neither may be most of the corpus.
 
     A guard on the instrument rather than on the corpus: `far_recall` is what
-    the honest question is asked of, and each near control taken out of the far
+    the honest question is asked of, and each near case taken out of the far
     population removes a case from it. At two of thirteen that is comfortable;
     the check exists so a third exemplar system cannot quietly make it not.
     """
@@ -143,6 +143,24 @@ def test_reference_threat_rejects_unknown_tier():
                 "severity": {"likelihood": "high", "impact": "high"},
             }
         )
+
+
+_THREAT = {
+    "category": "spoofing",
+    "affected_element_ids": ["entity:x"],
+    "claim": "An attacker does a thing.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+}
+
+
+def test_reference_threat_loads_an_action_verb():
+    assert ReferenceThreat.model_validate(_THREAT | {"verb": "forge"}).verb == "forge"
+
+
+def test_reference_threat_rejects_a_verb_outside_the_vocabulary():
+    with pytest.raises(ValidationError, match="steal"):
+        ReferenceThreat.model_validate(_THREAT | {"verb": "steal"})
 
 
 def _copy_case(source: Path, destination: Path) -> Path:
@@ -433,14 +451,124 @@ def test_a_case_without_rulings_reads_its_claims_alone(tmp_path):
             lambda r: r["stride"][0]["reading"].update(verb="flood"),
             "is not a repudiation verb",
         ),
+        (
+            lambda r: r["stride"][0]["reading"].update(verb="steal"),
+            "steal",
+        ),
         (lambda r: r.update(case="01-payments-checkout"), "names case"),
         (lambda r: r.update(asvs=[]), "rulings.json"),
     ],
-    ids=["claim-moved", "dangling-element", "verb-outside-lane", "wrong-case", "asvs"],
+    ids=[
+        "claim-moved",
+        "dangling-element",
+        "verb-outside-lane",
+        "verb-outside-vocabulary",
+        "wrong-case",
+        "asvs",
+    ],
 )
 def test_a_ruling_that_no_longer_fits_its_claim_fails_closed(tmp_path, edit, message):
     with pytest.raises(CorpusError, match=message):
         load_case(_ruled_case(tmp_path, edit))
+
+
+def _position(case_dir: Path, position: str = "outside") -> dict:
+    """A position ruling on reference 5 of :data:`RULED_CASE`, by its own fields."""
+    claim = load_case(case_dir).stride_claims()[5]
+    return {
+        "lane": claim.category,
+        "reference": {
+            "verb": claim.verb,
+            "affected_element_ids": list(claim.affected_element_ids),
+        },
+        "position": position,
+        "ruling": "The draft's attacker is the one the claim describes.",
+        "reviewed_by": "mstarks01",
+        "source": "a test",
+    }
+
+
+def test_a_ruled_position_loads_on_the_claim_it_names(tmp_path):
+    case_dir = _ruled_case(tmp_path)
+    ruled = _ruled_case(
+        tmp_path / "ruled",
+        lambda r: r.update(positions=[_position(case_dir)], any_positions=[]),
+    )
+
+    assert load_case(ruled).ruled_positions == {5: "outside"}
+    assert 5 not in load_case(case_dir).ruled_positions
+
+
+def _any_position(case_dir: Path) -> dict:
+    """An any-position ruling on reference 5 of :data:`RULED_CASE`."""
+    return {
+        key: value for key, value in _position(case_dir).items() if key != "position"
+    }
+
+
+def test_an_any_position_ruling_loads_and_rules_no_position(tmp_path):
+    case_dir = _ruled_case(tmp_path)
+    ruled = _ruled_case(
+        tmp_path / "ruled",
+        lambda r: r.update(positions=[], any_positions=[_any_position(case_dir)]),
+    )
+
+    assert load_case(ruled).ruled_positions == {}
+
+
+@pytest.mark.parametrize(
+    ("edit", "message"),
+    [
+        (
+            lambda one, any_one: {"positions": [one], "any_positions": [any_one]},
+            "a second position",
+        ),
+        (
+            lambda one, any_one: {"positions": [], "any_positions": [any_one] * 2},
+            "a second position",
+        ),
+        (
+            lambda one, any_one: {
+                "positions": [],
+                "any_positions": [
+                    {**any_one, "reference": {**any_one["reference"], "verb": "read"}}
+                ],
+            },
+            "names 0 reference claims",
+        ),
+    ],
+    ids=["position-and-any", "two-any", "claim-moved"],
+)
+def test_an_any_position_ruling_that_does_not_fit_fails_closed(tmp_path, edit, message):
+    case_dir = _ruled_case(tmp_path)
+    one, any_one = _position(case_dir), _any_position(case_dir)
+    with pytest.raises(CorpusError, match=message):
+        load_case(
+            _ruled_case(tmp_path / "ruled", lambda r: r.update(edit(one, any_one)))
+        )
+
+
+@pytest.mark.parametrize(
+    ("positions", "message"),
+    [
+        (lambda one: [one, {**one, "position": "on-path"}], "a second position"),
+        (
+            lambda one: [{**one, "reference": {**one["reference"], "verb": "read"}}],
+            "names 0 reference claims",
+        ),
+        (lambda one: [{**one, "position": "inside"}], "rulings.json"),
+    ],
+    ids=["two-positions", "claim-moved", "unknown-position"],
+)
+def test_a_position_ruling_that_does_not_fit_fails_closed(tmp_path, positions, message):
+    one = _position(_ruled_case(tmp_path))
+    with pytest.raises(CorpusError, match=message):
+        load_case(
+            _ruled_case(
+                tmp_path / "ruled",
+                lambda r: r.update(positions=positions(one), any_positions=[]),
+            )
+        )
 
 
 def test_a_repeated_source_label_is_refused_at_load(tmp_path):

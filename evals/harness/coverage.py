@@ -35,7 +35,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.claims import LaneCoverage as ReportLaneCoverage
 from analysis_service.frameworks import PACKAGES
-from evals.harness.scorer import ratio
+from evals.harness.rates import percent, ratio, rounded_figure
 
 # The offered/cited pairs, in the order they read on a row. Named once because
 # the fold, the rates and the printed table would otherwise each carry their
@@ -67,7 +67,7 @@ class LaneCoverage:
     totals: dict[str, int]
 
     @property
-    def rules_fired_rate(self) -> float:
+    def rules_fired_rate(self) -> float | None:
         """Of this lane's rule *evaluations*, the share that produced a candidate.
 
         Pooling makes the denominator the lane's rules times the cases, so this
@@ -79,7 +79,7 @@ class LaneCoverage:
         """
         return ratio(self.rules_fired, self.rules)
 
-    def cited_rate(self, offered_field: str, cited_field: str) -> float:
+    def cited_rate(self, offered_field: str, cited_field: str) -> float | None:
         return ratio(self.totals[cited_field], self.totals[offered_field])
 
     def to_json(self) -> dict[str, Any]:
@@ -90,10 +90,10 @@ class LaneCoverage:
             "drafts": self.drafts,
             "rules": self.rules,
             "rules_fired": self.rules_fired,
-            "rules_fired_rate": round(self.rules_fired_rate, 3),
+            "rules_fired_rate": rounded_figure(self.rules_fired_rate, 3),
             **self.totals,
             "cited_rates": {
-                cited: round(self.cited_rate(offered, cited), 3)
+                cited: rounded_figure(self.cited_rate(offered, cited), 3)
                 for offered, cited in CITED_PAIRS
             },
         }
@@ -162,7 +162,7 @@ def coverage_totals(lanes: Sequence[LaneCoverage]) -> dict[str, Any]:
         "rules": sum(lane.rules for lane in lanes),
         **totals,
         "cited_rates": {
-            cited: round(ratio(totals[cited], totals[offered]), 3)
+            cited: rounded_figure(ratio(totals[cited], totals[offered]), 3)
             for offered, cited in CITED_PAIRS
         },
     }
@@ -199,9 +199,9 @@ def render(lanes: Sequence[LaneCoverage], offered: bool) -> None:
     totals = coverage_totals(lanes)
     print(
         f"coverage: {totals['rules_fired']}/{totals['rules']} rule evaluations fired,"
-        f" candidates cited {totals['cited_rates']['candidates_cited']:.0%},"
-        f" elements {totals['cited_rates']['elements_cited']:.0%},"
-        f" unknown controls {totals['cited_rates']['unknown_controls_cited']:.0%}"
+        f" candidates cited {percent(totals['cited_rates']['candidates_cited'])},"
+        f" elements {percent(totals['cited_rates']['elements_cited'])},"
+        f" unknown controls {percent(totals['cited_rates']['unknown_controls_cited'])}"
         " (instrument, non-gating)"
     )
 

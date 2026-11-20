@@ -1,6 +1,6 @@
 """Generate the docs' code blocks from ``examples/``, and check they stayed generated.
 
-``examples/`` is the single source of truth for every code block in the prose.
+``examples/`` holds the source of every code block in the prose.
 No Markdown file in this repo carries hand-written engine code: a block is
 declared as an include, and this tool fills it from a named region of a real,
 runnable file.

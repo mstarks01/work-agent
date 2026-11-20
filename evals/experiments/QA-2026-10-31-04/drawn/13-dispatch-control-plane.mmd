@@ -1,0 +1,25 @@
+flowchart LR
+    partner["Scheduling partner"]
+    dispatchdb[("Dispatch database: job orders, crew names, crew mobile numbers")]
+
+    subgraph corp["Corporate network"]
+        engineer(Duty engineer)
+        console["Dispatch console (single-page JS app, browser)"]
+        webhost[Corporate web host]
+        importer[Schedule importer]
+        archive[("Schedule archive (corporate file store)")]
+    end
+
+    subgraph cp["Production control plane"]
+        api[Dispatch API]
+    end
+
+    engineer --> console
+    webhost -->|serves console app| console
+    console -->|"API calls (cross-origin)"| api
+    api -->|"live job status (WebSocket)"| console
+    api <-->|"job orders, crews"| dispatchdb
+    importer -->|"hourly pull (SOAP over HTTPS)"| partner
+    partner -->|"planned work (XML)"| importer
+    importer -->|downloaded XML documents| archive
+    importer -->|parsed work orders| api

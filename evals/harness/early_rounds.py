@@ -38,10 +38,10 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_state import (
     Answers,
     AnswerState,
@@ -59,9 +59,11 @@ from analysis_service.fact_answers import (
     merged_facts,
 )
 from analysis_service.jobs import Checkpoint
-from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
+from evals.harness.rates import ratio
+from evals.harness.run_record import Selections, run_record
 
 #: A replay that has not ended by this save is reported as not ending.
 MAX_SAVES = 50
@@ -140,8 +142,19 @@ def _in_part(rest: str | None) -> Answerer:
     return answer
 
 
+#: The name of each answerer.
+AnswererName = Literal[
+    "capability-yes",
+    "capability-no",
+    "controls-none",
+    "controls-stated",
+    "skip-all",
+    "facets-partial",
+    "facets-mixed-unknown",
+]
+
 #: The answerers, keyed by name.
-ANSWERERS: Mapping[str, Answerer] = {
+ANSWERERS: Mapping[AnswererName, Answerer] = {
     "capability-yes": _capabilities("yes"),
     "capability-no": _capabilities("no"),
     "controls-none": _every_control(stated=False),
@@ -177,7 +190,8 @@ class Replay:
     removed: int
     ended: bool
     #: Questions skipped for now, how many times a question already shown was
-    #: shown again, and why the list stopped (``QuestionSet.stop``).
+    #: shown again, and why the list asks nothing more
+    #: (``QuestionSet.empty_list_reason``; the stored key is ``stop``).
     skipped: int
     repeats: int
     stop: str
@@ -209,6 +223,7 @@ def paused_state(
         checkpoint=Checkpoint(system_model=model, assertions=None),
         frameworks=frameworks,
         analyses=(),
+        asks=True,
         waiting=True,
         final=False,
         sources=(),
@@ -228,7 +243,7 @@ def _saved(
     sources, so no source limit applies."""
     saved = state.answer(
         Answers(
-            given=AnswerSet(facts=tuple(facts)),
+            given=SentAnswers(facts=tuple(facts)),
             save=True,
             skips=skips,
             presented=[question.key for question in state.questions.early],
@@ -276,7 +291,7 @@ def replay(
     extracted: SystemModel,
     blessed: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
-    name: str,
+    name: AnswererName,
 ) -> Replay:
     """Answer ``extracted``'s early list, as the service shows it, with one answerer."""
     answerer = ANSWERERS[name]
@@ -332,7 +347,7 @@ def replay(
         ended=saves < MAX_SAVES,
         skipped=len(skipped),
         repeats=sum(count - 1 for count in showings.values()),
-        stop=str(asked.stop),
+        stop=str(asked.empty_list_reason),
         below_floor=len(asked.below_floor),
         held_back=len(asked.held_back),
         units={}
@@ -353,8 +368,9 @@ def replay(
     )
 
 
-def replays(root: Path, corpus: Path) -> list[Replay]:
-    """Every archived report under ``root`` whose case has a blessed model.
+def replays(root: Path, corpus: Path) -> tuple[list[Replay], dict[Path, Selections]]:
+    """Every archived report under ``root`` whose case has a blessed model,
+    and each file read with the selections read on it.
 
     Each model is also replayed once with every framework the archive holds,
     so a job whose frameworks share the list is measured too. A framework
@@ -362,10 +378,11 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
     takes the options of an archived job that chose it.
     """
     found: list[Replay] = []
+    inputs: dict[Path, Selections] = {}
     paths = sorted(root.rglob(f"*{case_suffix('report')}"))
     every: dict[FrameworkName, Mapping[str, Any]] = {}
     for path in paths:
-        job = Report.model_validate_json(path.read_text(encoding="utf-8")).job
+        job = read_report(path).job
         for selection in job.frameworks:
             every.setdefault(selection.name, selection.options)
     for path in paths:
@@ -373,7 +390,7 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
         blessed_path = corpus / case / "model.json"
         if not blessed_path.is_file():
             continue
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         blessed = SystemModel.model_validate_json(
             blessed_path.read_text(encoding="utf-8")
         )
@@ -384,6 +401,8 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
             replay(case, report.system_model, blessed, frameworks, name)
             for name in ANSWERERS
         )
+        inputs[path] = {"alone": frameworks}
+        inputs[blessed_path] = {}
         if len(every) > 1 and set(frameworks) != set(every):
             found.append(
                 replay(
@@ -394,7 +413,8 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
                     "capability-yes",
                 )
             )
-    return found
+            inputs[path] = {"alone": frameworks, "all": every | frameworks}
+    return found, inputs
 
 
 #: The figures a summary reports, each read off a replay.
@@ -467,10 +487,9 @@ def _unknown_shares(rows: Sequence[Replay]) -> dict[str, dict[str, object]]:
                 total = sum(
                     count for state, count in states.items() if state != "unaskable"
                 )
-                if total:
-                    shares.setdefault(f"{name} / {band}", []).append(
-                        states.get("unknown", 0) / total
-                    )
+                share = ratio(states.get("unknown", 0), total)
+                if share is not None:
+                    shares.setdefault(f"{name} / {band}", []).append(share)
     return {
         key: {
             "median": round(statistics.median(values), 3),
@@ -491,13 +510,15 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         "--corpus", type=Path, default=Path("evals/corpus"), help="the corpus"
     )
     parser.add_argument(
-        "--out", type=Path, help="write every replay and the summary here as JSON"
+        "--out",
+        type=Path,
+        help="write the run record, every replay and the summary here as JSON",
     )
 
 
 def command_early_rounds(args: argparse.Namespace) -> int:
     """Replay the list on every archived model, and print the summary."""
-    found = replays(args.root, args.corpus)
+    found, inputs = replays(args.root, args.corpus)
     if not found:
         print("no archived report has a case with a blessed model", file=sys.stderr)
         return 1
@@ -506,7 +527,15 @@ def command_early_rounds(args: argparse.Namespace) -> int:
     if args.out is not None:
         args.out.write_text(
             json.dumps(
-                {"summary": table, "replays": [asdict(one) for one in found]},
+                {
+                    "record": run_record(
+                        "early-rounds",
+                        {"answerers": list(ANSWERERS), "max_saves": MAX_SAVES},
+                        inputs,
+                    ),
+                    "summary": table,
+                    "replays": [asdict(one) for one in found],
+                },
                 indent=2,
             )
             + "\n",

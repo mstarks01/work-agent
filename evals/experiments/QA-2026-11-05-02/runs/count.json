@@ -1,0 +1,118 @@
+{
+  "views": [
+    {
+      "file": "ctl-I-02-row-not-shown-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-I-02-row-not-shown-2.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-I-02-row-on-other-step-1.json",
+      "read": true,
+      "repaired": false,
+      "kept_fault": 0,
+      "new_problems": 1,
+      "unbriefed": 0,
+      "status": "needs-info -> null"
+    },
+    {
+      "file": "ctl-I-02-row-on-other-step-2.json",
+      "read": true,
+      "repaired": false,
+      "kept_fault": 0,
+      "new_problems": 1,
+      "unbriefed": 0,
+      "status": "needs-info -> null"
+    },
+    {
+      "file": "ctl-I-02-row-unanswered-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-I-02-row-unanswered-2.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-R-03-row-not-shown-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-R-03-row-not-shown-2.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-R-03-row-on-other-step-1.json",
+      "read": true,
+      "repaired": false,
+      "kept_fault": 0,
+      "new_problems": 1,
+      "unbriefed": 0,
+      "status": "needs-info -> null"
+    },
+    {
+      "file": "ctl-R-03-row-on-other-step-2.json",
+      "read": true,
+      "repaired": false,
+      "kept_fault": 0,
+      "new_problems": 1,
+      "unbriefed": 0,
+      "status": "needs-info -> null"
+    },
+    {
+      "file": "ctl-R-03-row-unanswered-1.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    },
+    {
+      "file": "ctl-R-03-row-unanswered-2.json",
+      "read": true,
+      "repaired": true,
+      "kept_fault": 0,
+      "new_problems": 0,
+      "unbriefed": 0,
+      "status": "needs-info -> needs-info"
+    }
+  ],
+  "repaired": 8,
+  "total": 12,
+  "new_problems": 4,
+  "unbriefed": 0,
+  "unread": 0,
+  "status_changed": 0
+}

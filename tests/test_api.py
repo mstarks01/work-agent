@@ -14,10 +14,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.api import (
-    _BODY_SLACK,
     _REFUSALS,
     BodyLimitMiddleware,
     create_app,
+    max_body_bytes,
 )
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
@@ -35,6 +35,7 @@ from analysis_service.jobs import (
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
+    RefusalOutcome,
     StubPipelineRunner,
 )
 from analysis_service.parsing import ascii_int
@@ -125,7 +126,8 @@ def make_client(
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=max_active_jobs,
         budget=budget,
-        frameworks=frameworks,
+        carried_frameworks=frameworks,
+        carries_catalog=False,
     )
     return TestClient(app, raise_server_exceptions=raise_server_exceptions), store
 
@@ -186,7 +188,8 @@ class TestInjectedBoundsMustBeStated:
                 runner=StubPipelineRunner(),
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
     def test_a_runner_without_limits_is_refused(self):
@@ -197,7 +200,8 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
                 max_active_jobs=TEST_MAX_ACTIVE_JOBS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
     def test_a_runner_without_a_concurrency_ceiling_is_refused(self):
@@ -208,7 +212,8 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
 
@@ -227,7 +232,7 @@ class TestEveryCarriedPackageReachesARunner:
         app = create_app(
             deployment=deployment, store=InMemoryJobStore(), verifier=FakeVerifier()
         )
-        carried = tuple(deployment.frameworks)
+        carried = tuple(deployment.carried_frameworks)
 
         runner = app.state.runner_for(carried)
 
@@ -415,6 +420,35 @@ class TestSubmit:
         assert response.status_code == 422
 
 
+class TestOwnerFilesAreNotOnV1:
+    """ADR 0119: ``/v1`` has no Files, and refuses a caller's copy."""
+
+    def test_a_source_that_names_an_owner_file_is_400(self):
+        client, _ = make_client()
+        forged = {
+            "kind": "transcript",
+            "label": "Forged",
+            "text": "Ana: hi",
+            "owner_file_id": "file-" + "a" * 32,
+        }
+        response = client.post(
+            "/v1/jobs",
+            json=submission(sources=[*one_source(), forged]),
+            headers=auth(),
+        )
+        assert response.status_code == 400
+        assert "owner_file_id" in response.json()["detail"]
+
+    def test_an_owner_files_key_is_422(self):
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs",
+            json=submission(owner_files=["file-" + "a" * 32]),
+            headers=auth(),
+        )
+        assert response.status_code == 422
+
+
 class TestInputLadder:
     """Five rungs, shape before size (#52)."""
 
@@ -427,6 +461,7 @@ class TestInputLadder:
             {"kind": "description", "label": "two\nlines", "text": "hi"},
             {"kind": "description", "label": "Doc"},
             {"kind": "description", "label": "Doc", "text": "hi", "authority": "x"},
+            {"kind": "diagram", "label": "Seq", "text": "sequenceDiagram\n  a->>b: hi"},
         ],
     )
     def test_rung_one_a_malformed_source_is_422(self, bad_source):
@@ -559,7 +594,7 @@ class TestInputLadder:
             headers=auth()
             | {
                 "content-type": "application/json",
-                "content-length": str(TEST_LIMITS.max_total_bytes * 4),
+                "content-length": str(max_body_bytes(TEST_LIMITS) * 2),
             },
         )
         assert response.status_code == 413
@@ -571,7 +606,7 @@ class TestInputLadder:
         # through. Streaming the body from a generator makes httpx send it
         # chunked.
         client, _ = make_client()
-        over_cap = TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2
+        over_cap = max_body_bytes(TEST_LIMITS) * 2
 
         def chunks():
             sent = 0
@@ -760,6 +795,7 @@ class TestReport:
     def test_queued_job_report_is_409(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -786,6 +822,7 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
     job is already terminal by the time the next one is sent.
     """
     record = JobRecord.create(
+        assertion_pass=True,
         owner_id=subject,
         sources=[Source.description("an app")],
         frameworks=sample_selection(),
@@ -913,6 +950,7 @@ class TestTheJobIdCheck:
 
     def test_every_minted_id_has_the_shape_each_route_checks(self):
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -1018,16 +1056,18 @@ class TestAdmissionOutcomes:
     """Every outcome the store can answer has one answer here, and only one starts a job."""
 
     def test_the_table_and_the_literal_agree(self):
-        """A new outcome is placed on purpose: a 429 with its message, or a defect.
+        """A new outcome is placed on purpose: a status with its message, or a defect.
 
-        Without this, a seventh outcome would fall through the refusal table.
+        Without this, a new outcome would fall through the refusal table.
         The route fails closed on anything that is not an admission, so the
         fall-through is a 500 rather than a started job, but a refusal that
-        deserves its 429 would still be answered as a defect.
+        deserves its status would still be answered as a defect.
         """
-        answered = set(_REFUSALS) | {"admitted", "duplicate"}
-
-        assert answered == set(get_args(AdmissionOutcome))
+        assert set(_REFUSALS) == set(get_args(RefusalOutcome))
+        assert set(get_args(AdmissionOutcome)) - set(get_args(RefusalOutcome)) == {
+            "admitted",
+            "duplicate",
+        }
 
     def test_an_outcome_the_table_does_not_know_starts_no_job(self, caplog):
         client, store = make_client(raise_server_exceptions=False)
@@ -1122,6 +1162,7 @@ class TestConcurrencyCeiling:
         client, _ = make_client(store=store, max_active_jobs=1)
         client.post("/v1/jobs", json=submission(), headers=auth())
         probe = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
@@ -1333,7 +1374,7 @@ class TestBodyCapOnEveryPost:
         """Driven through the real app, so a POST route added tomorrow is
         covered by the same test rather than by a path someone remembers."""
         client, _ = make_client()
-        over_cap = b"x" * (TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2)
+        over_cap = b"x" * (max_body_bytes(TEST_LIMITS) * 2)
         paths = [
             route.path.replace("{job_id}", "abc")
             for route in client.app.routes
@@ -1431,6 +1472,7 @@ class TestConsumptionBudgets:
         client, store = make_client(budget=tiny)
         client.post("/v1/jobs", json=submission(), headers=auth())
         probe = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description("an app")],
             frameworks=sample_selection(),

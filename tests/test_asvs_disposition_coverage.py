@@ -52,19 +52,11 @@ RECORDS_PER_CASE: dict[str, int] = {
 }
 
 
-def _records(case) -> list[ReferenceRequirement]:
-    return [
-        reference
-        for reference in case.references.get("asvs") or ()
-        if isinstance(reference, ReferenceRequirement)
-    ]
-
-
-def _corpus() -> dict[str, list[ReferenceRequirement]]:
+def _corpus() -> dict[str, tuple[ReferenceRequirement, ...]]:
     return {
-        case.id: _records(case)
+        case.id: records
         for case in load_corpus(verify_corpus.CORPUS_DIR)
-        if _records(case)
+        if (records := case.requirement_records("asvs"))
     }
 
 

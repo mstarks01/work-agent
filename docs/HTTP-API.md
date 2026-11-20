@@ -51,7 +51,7 @@ token whose principal does not exist yet gets the same `404` as a missing job.
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...], "revision"}`: a changed value, or `unknown`. `200` with `{"job_id", "revision", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, `facts` is empty, a correction names no answer the report read, or changes none. `409` where another correction moved the revision. `422` where `revision` is missing. |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the answers, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
 | `POST` | `/v1/jobs/{id}/amendments` | Amend a job in `awaiting-answers`, as `{"text", "revision"}`: what is true that its model misses or reads wrongly. Starts a **new** job that extracts the job's sources again with the amendment added, and pauses again; `201` with its `job_id`. `400` where the job does not wait on answers or `text` is blank. `409` where the revision has moved, before or while the request reads it, a job already locks this one, or the job selects a framework that this deployment no longer carries; that message names the framework. `422` where `revision` is missing. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_kept", "carried_kept_links", "carried_dropped", "carried_dropped_links", "carried_renames", "rename_choices", "detected_facts", "element_hues"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -118,7 +118,7 @@ job it resumes only where its stored status is `completed` or
 
 `DELETE /v1/jobs/{id}` deletes a job and returns `204` with no body. Only the
 **Owner** can delete a job, and only a job that has ended: a job in a terminal
-status (`completed`, `failed`, `rejected` or `awaiting-answers`), or an
+status (`completed`, `failed`, `rejected`, `awaiting-answers` or `stopped`), or an
 [unreadable job](#a-job-from-an-older-schema-version). A `queued` or `running`
 job returns `409`, and the job stays as it is. A job whose follow-up or
 amendment job is `queued` or `running` also returns `409` and stays, until
@@ -159,13 +159,14 @@ flowchart LR
     running -- validity gate refused the input --> rejected([rejected])
     running -- internal error or service restarted --> failed([failed])
     running -- questions asked --> awaiting([awaiting-answers])
+    running -- a person stopped it --> stopped([stopped])
 
     classDef live fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
     classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
     classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
     class queued,running live
     class completed,awaiting good
-    class rejected,failed bad
+    class rejected,failed,stopped bad
 ```
 
 - `completed` — the report is available at `/v1/jobs/{id}/report`.
@@ -182,6 +183,10 @@ flowchart LR
   takes. `GET /v1/jobs/{id}/questions` lists what it asks, and
   `POST /v1/jobs/{id}/answers` continues it as a new job (see below). A waiting
   job takes none of your in-flight slots.
+- `stopped` — a person stopped the run in the first-run app. The job holds
+  no report and no error, and it keeps its token reservation. `/v1` has no
+  route that stops a job
+  ([ADR 0109](adr/0109-a-person-can-stop-a-run-and-the-job-ends-stopped.md)).
 - `unreadable` — only in the poll response, never a stored status. The job
   holds a stored value that this service no longer lists. See
   [A job from an older schema version](#a-job-from-an-older-schema-version).
@@ -221,10 +226,18 @@ billed.
 
 The report answers exactly this set, one block per framework, in this order.
 
-Each source is `{kind, label, text}`. `kind` is `description` or `transcript`
-and selects the guidance extraction reads the text under. A third kind,
+Each source is `{kind, label, text}`. `kind` is `description`, `transcript` or
+`diagram`, and selects the guidance extraction reads the text under. A
+`diagram` source holds Mermaid text, and its first diagram line must start
+with `flowchart`, `graph` or `architecture-beta`. Blank lines, `%%` comments
+and front matter come before it. A diagram of another type is refused with
+`422` (ADR 0120). The service reads the diagram with Mermaid's own parsers,
+and the validity gate then requires an element for each node and a flow for
+each edge. A diagram with a syntax error is read as text (ADR 0121). A third kind,
 `answers`, is composed by the service from `links` (below); a submission that
-sends one itself is refused. `label` is yours: it
+sends one itself is refused. A source carries no `owner_file_id`: only the
+web app sets it, on the copy of a file from its Files section, so a submission
+that sends one is refused with `400` (ADR 0119). `label` is yours: it
 must be unique within the job, at most 200 characters and single-line, and it
 is the key every `source_excerpt` in the report cites, so pick something you
 will recognise. Order is presentation only — **sources carry equal weight**, and
@@ -247,19 +260,23 @@ The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
 sources. The value must be a JSON boolean: the service refuses `"yes"`, `1` or
-`"on"` with `422`. The job stops after extraction, and after the assertion pass where
-the deployment runs one. It ends in `awaiting-answers` and waits. Its
-questions come from what it has read so far. Answer them with the route below,
-or send `{"links": []}` to continue without answers; either starts the
+`"on"` with `422`. The job stops after extraction, and after the assertion
+pass where the deployment runs one. It ends in `awaiting-answers` and waits.
+Its questions come from what it has read so far. Answer them with the route
+below, or send `{"links": []}` to continue without answers; either starts the
 analysis as a new job. A job submitted without `questions`, such as an
-autonomous run, never stops. A deployment that builds no assertion catalog
-asks no link question, and asks its early questions.
+autonomous run, never stops, and its report asks no questions. A deployment
+that builds no assertion catalog asks no link question, and asks its early
+questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
-`{key, kind, label, reasons, choices, form, suggestions, facets, max_length,
-group, group_heading, element, excerpt}`. `kind`, `form`, `suggestions`,
-`facets` and `max_length` are as they are for a report's open facts below.
+`{key, kind, label, reasons, frameworks, choices, form, suggestions, facets,
+asks, max_length, decisions, group, group_heading, element, parent, gates,
+excerpt, reason, rank}`. `kind`, `form`, `suggestions`, `facets`, `asks` and
+`max_length` are as they are for a report's open facts below. An early
+question asks every facet of its question. `frameworks` names the selected
+frameworks that an answer serves.
 `choices` lists each choice as `{id, name}`: `name` is the element's name
 where the choice is an element, and empty otherwise. `excerpt` is the words
 of the source the question's element was read from, and empty where the
@@ -267,8 +284,12 @@ question names no element. `group` is the question kind or the attribute, and
 `group_heading` is its question with no element named, so a page can ask each
 once and list the elements under it by their `element` name. The list keeps
 its order within and across groups.
-`reasons` gives the questions of the rules that fire on the element, which say
-why the fact matters. `score` is the value the list is ranked by. An attribute is asked only where the model, with the
+`reasons` gives the effect sentence of each rule that reads the fact on the
+element: what an answer informs. Where no rule reads the fact, it gives one
+sentence that says why the question is asked. The list ranks a field question
+by its relevance, and the floor reads its score; the entry sends neither
+value. `parent`, `gates`, `decisions`, `reason` and `rank` are described
+below. An attribute is asked only where the model, with the
 assertion catalog applied, leaves it open: `unknown`, possibly with a
 qualification after it, or a zone the service inferred. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
@@ -334,7 +355,7 @@ so in `early_stop`, and a send without `"save"` starts it. `answered_early` and 
 with its question, and you can send a new answer to any of them. A question
 with facets stays listed while a facet has no answer.
 
-**A stop does not say every fact is settled**
+**An empty-list reason does not say every fact is settled**
 ([ADR 0068](adr/0068-a-pause-says-what-it-leaves-open.md)). `early_stop` is
 `null` while the job asks something. It is `budget-exhausted` when the limits
 hold questions back, `below-floor` when only questions under a floor are left,
@@ -362,6 +383,20 @@ framework in `gates`. The questions an undecidable framework would ask once
 its gate is satisfied, at or above the floor, are in `early_blocked` with the
 `reason` `gate-undecided`, so a client can say what a gate answer unlocks.
 
+**Review what the extraction read.** A waiting job's `detected_facts` lists
+each element of its model, in model order, with `name`, `type`, the
+`excerpt` and `source_label` it was read from, and `facts`: each attribute
+the model states, as `{"attribute", "value", "inferred"}`. `type` is the
+prefix of the element's ID: one of `entity`, `process`, `store`, `flow` and
+`boundary`. An attribute the
+model leaves `unknown` is an open fact and is asked, so it is not listed.
+`inferred` holds the basis where extraction recorded the value as an
+assumption, and is empty where a source states it. A finished report lists
+none: its model is in the report. Correct a wrong fact with an amendment.
+
+**Colour each element.** `element_hues` gives the hue of each element in
+degrees, by element ID: the colour of the element's tag in the web app.
+
 **An amendment corrects the model itself**
 ([ADR 0072](adr/0072-a-paused-job-s-description-can-be-amended.md)). An answer
 cannot add a component or a flow, and a fact the model states takes no answer.
@@ -383,8 +418,29 @@ take each answer they still ask, and `carried_dropped` and
 and an ID follows the element's name, so an answer carries where the new
 description gives the element the same name. A job you do not own reads as
 `404`. The service answers `400` where `questions` is off, or where the earlier
-job holds no answer. The earlier job does not change. See
+job holds no answer. The earlier job does not change, and a later deletion of
+it does not change what the new job carries. See
 [ADR 0079](adr/0079-a-new-analysis-can-carry-an-earlier-job-s-answers.md).
+
+`carried_kept` lists the key of each carried fact answer this job's questions
+take, and `carried_kept_links` the `key` of each link question whose carried
+answer it takes, so a page can show which answers came from the earlier job. An answer
+you save to the same question replaces the carried one and leaves these lists.
+Each entry of `carried_dropped` has a `reason`: `missing-element` where it
+names an element this model does not have, and `not-taken` where this job's
+questions refuse it, because the sources state the fact or no question asks
+it. **Map a renamed element** where the new description names it differently
+([ADR 0116](adr/0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md)).
+`rename_choices` lists each missing element with the elements of its type that
+it can map to. Send a save to the waiting job with `renames`: every rename the
+job holds after the save, each `{"earlier": "<missing element ID>",
+"element": "<element ID of this model>"}`. Leave `renames` out to keep the ones
+it holds. The service carries the element's answers to the element you name,
+and the answers of each flow whose ID names it. The service never maps an
+element by a similar name. It answers `400` for a rename to an element of
+another type, to an element a carried answer already names, or of an element a
+carried answer does not name, and for two renames of one element.
+`carried_renames` lists the renames the job holds.
 
 A waiting job lives through a restart of the service on the `sql`
 [job store](#job-storage). On the `memory` store, a restart loses it with its
@@ -414,9 +470,12 @@ the reviewer named it (`critic`).
 ```
 
 - `key` names the fact. Send it back unchanged with your answer.
-- `kind` is `attribute` (a value the model left unknown, or a trust zone the
-  service inferred), `assertion` (a fact
-  about a principal, a credential or a component that the sources left open),
+- `kind` is `attribute` (a value the model left unknown, a trust zone the
+  service inferred, or a value that the catalog's facts contradict or leave
+  open), `assertion` (a fact that the sources left open or disagree about,
+  such as one about a principal or a credential, or a fact for one scope, such
+  as one environment; the key names the fact's place, so it stays the same
+  after you answer),
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), `subject` (a
   question the reviewer wrote in its own words because no listed question
@@ -491,7 +550,8 @@ A fact answer is accepted only for a fact that this job asked: a question in
 it is finished. A fact that an earlier save answered may be answered again.
 
 An attribute answer is accepted only where the model leaves the attribute open,
-or where an earlier save answered it. The model is read with the
+where the catalog's facts contradict the attribute or leave it open, or where an
+earlier save answered it. The model is read with the
 assertion catalog applied, as the analysis reads it, so a fact the catalog
 states takes no answer even while the job waits at its pause. An answer to an attribute that
 the sources state is refused with `400`. An `unknown` answer to a fact that an
@@ -505,7 +565,15 @@ about that attribute, and a `superseded-by-answer` issue names each removed
 fact. A fact that the sources state only for a scope, such as one environment,
 stays in the catalog beside your answer, and your answer settles the attribute. An
 inferred trust zone that you answer is no longer marked as inferred. An
-assertion answer replaces the open fact with a stated one. A subject answer reaches the analysis as your words in the
+assertion answer replaces the open fact at its place with a stated one. An answer to a
+question kind writes a stated fact for each part it answers, about that
+element, unless the sources state that part. An assertion answer, or a part,
+removes each catalog fact at its place (the same subject, fact and scope) that
+is open, set aside (`unsupported` or `unresolved`) or disagrees with your
+answer, and a
+`superseded-by-answer` issue names each removed fact that holds a value. A fact
+that can hold beside your answer, such as a second mechanism of one connection,
+stays. A subject answer reaches the analysis as your words in the
 answers source. Your answer settles the fact, even where the sources said
 otherwise. Fact answers need no assertion catalog, so every deployment takes
 them.
@@ -530,15 +598,34 @@ same principal. A link answer may name only a principal that the job asked
 about, or one that an earlier save answered. The finished job's report is unchanged.
 
 **A report offers one follow-up.** A report's questions are its follow-up.
+Only the report of a job submitted with `"questions": true` asks them. The
+report of any other job lists no question and refuses an answer with `400`.
 Answer them, and the analysis runs once more. The report that run writes is
 final: `final` is `true`, it asks no questions, and an answer to it is refused
 with `400`. The follow-up does not ask a fact that an earlier answer answered,
 and an "I don't know" answer counts. A question with facets is asked again
 only for the facets that no answer answered. You can still send a new answer
 to a fact that an earlier save answered, to change it. Each fact question
-carries `needs`: each finding that waits on only some facets of the
-question, with the facets it needs; a finding not listed needs every facet
+carries `needs`: each finding that waits on the question, with the facets it
+needs; a finding that names none of them needs every facet, and a fact
+answered in one value has none
 ([ADR 0073](adr/0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md)).
+Each question also carries `asks`: the facets that its waiting findings
+need, which the web app shows as inputs. You can still answer any facet
+([ADR 0112](adr/0112-the-report-page-asks-only-the-facets-its-findings-need.md)).
+A body may carry `shares`: each one answer for every element it covers, as
+`{"answer": {"key": [...], ...}, "covers": ["<element id>", ...]}`. The
+answer's key is the key of each element's question with the element left
+empty. The service writes the answer as each covered element's own answer and
+checks each one as any other. A body that gives a covered element its own
+answer as well is refused with `400`, and so is a body with two shares of one
+question. A share replaces the earlier share of its question, so an element
+that leaves `covers` loses the answer the share wrote; an empty `covers` takes
+the share back. A later answer of an element's own takes it out of the share.
+Each covered element counts toward the bound of fact answers in one request.
+The questions route returns the held shares as `answered_shares` and a
+report's draft shares as `draft_shares`
+([ADR 0114](adr/0114-a-shared-answer-is-stored-with-the-elements-it-covers.md)).
 A fact answer may carry a `detail`: one line, at most 300 characters, in your
 own words, such as an exception to a "yes". It follows the answer on its line
 of the answers source, and no code reads a fact out of it. Each fact question
@@ -579,9 +666,10 @@ or waits on it. The analysis does not run again. A correction carries the
 | `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. That problem body carries `contradiction`, `{"part", "ancestor"}`: the two capability questions' keys, which a client can answer together in one request. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
-| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `ANALYSIS_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
+| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, was stopped, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `ANALYSIS_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
 | `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved answer holds a job that no start could run. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
+| `422` | The body has a `control_scopes` key. Only the web app applies Controls (ADR 0127). |
 
 **Or answer in a new submission** of the same system, beside the sources. That
 job extracts everything again, and a principal the new run spells differently
@@ -639,6 +727,7 @@ when a deployment changes vendor. Shape is checked before size:
 | `422` | A `links` entry names an `element` that is not an entity, process or store ID, or `none`; or there are more than 50 entries. |
 | `422` | `frameworks` is missing or empty. The message for an empty list says that a job must select at least one framework. There is no default, so an omitted selection is a malformed submission rather than an implied one. |
 | `422` | `frameworks` names a framework this deployment does not carry, or names one twice. The message names it; order carries nothing, so a repeat is a mistake rather than a preference. |
+| `422` | The body has a `controls` key or a `control_scopes` key. Only the web app applies Controls, so a `/v1` job holds no Controls and its report has no Controls section (ADR 0127). |
 | `422` | Two sources share a `label`. Refused at any size — a label is a citation key, so a repeated one leaves every excerpt naming it ambiguous. The message names the repeated labels. |
 | `413` | More sources than the deployment allows. The message names the count and the limit. |
 | `413` | The sources total more bytes than allowed. There is no per-source cap, so the message names **no** culprit — it carries a per-label byte breakdown instead, because the overspend belongs to the sum. |
@@ -1177,7 +1266,9 @@ The check does not read the hold or the retention time of an object.
 #### The migration step
 
 The service never changes the schema. Run the migration as a deploy step,
-before you start the service, under a user that can change the database:
+before you start the service, under a user that can change the database. This
+applies to SQLite too. Only the first-run app migrates a SQLite database
+itself ([ADR 0110](adr/0110-the-first-run-app-migrates-a-sqlite-job-store.md)):
 
 ```bash
 ANALYSIS_DATABASE_URL=sqlite+aiosqlite:////var/lib/analysis/jobs.db \
@@ -1212,6 +1303,40 @@ creates the database file with mode `0600` where there is none. A migration chan
 tables only. It never changes a stored report, checkpoint or sources object.
 The startup stops when the schema is not at the latest revision.
 
+A schema change edits the first revision in place, so it adds no revision.
+A database with another schema can be at the latest revision, and the command
+does not change it. The startup compares each table and column with the ones
+the service needs, and it stops on a difference. To repair the database,
+remove it and make it again. For SQLite, delete the file. For PostgreSQL,
+drop the database and create it again. Then run the command. The new
+database holds no jobs. A database at a revision that this build does not
+hold, such as one from a later build, takes the same repair.
+
+#### The diagram reader step
+
+The service reads a `diagram` Source with Mermaid's own parsers, which run in
+Node (ADR 0121). The service installs nothing at its startup. Before you
+start it, install Node 22.12 or newer. Then install the reader's locked packages
+from the checkout:
+
+```bash
+npm ci --ignore-scripts --prefix diagram_reader
+```
+
+`npm ci` installs only the versions that `package-lock.json` locks, and
+`--ignore-scripts` runs no package's own install script. A wheel install
+holds the reader at `analysis_service/_bundled/diagram_reader`, in the
+directory of the installed package. Give that directory to `--prefix`, as a
+user that can write to it. This command prints it:
+
+```bash
+python -c "from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR as d; print(d)"
+```
+
+Without Node or the packages, a job with a `diagram` Source fails, and the
+service log names the install step. A job with no diagram does not need the
+reader.
+
 ### The startup
 
 The service starts in this order, and a failure at a step stops the startup:
@@ -1219,7 +1344,9 @@ The service starts in this order, and a failure at a step stops the startup:
 1. It reads the backend settings and builds the store. For SQLite, it checks
    the database file and its directory.
 2. It reads `ANALYSIS_RETENTION_DAYS`.
-3. The `sql` store checks that the schema is at the latest revision.
+3. The `sql` store checks that the schema is at the latest revision and
+   that it holds each table and column that the service needs, and no other
+   column.
 4. The `sql` store checks the object store: for `filesystem`, the root, and
    for `s3`, `HeadBucket` and `GetBucketVersioning` on the bucket, and for
    `gcs`, `buckets.get` on the bucket.
@@ -1309,7 +1436,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | --- | --- |
 | `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-owner rate, the per-owner token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. The same operation creates the **Principal** of a first submission, and only where it admits the job. It refuses with `principal_exists` where the identity already holds one. |
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
-| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
+| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision, its tables and columns, and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
 | `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. Where a stored part of the envelope does not parse, it returns an `UnreadableRecord`, so one row never stops a list. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `sources` | The owned job's sources. A route reads them after it checks that the job is readable. Raises `UnreadableSchema` where they do not parse. |

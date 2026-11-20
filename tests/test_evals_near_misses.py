@@ -358,15 +358,23 @@ def _reworded(claims):
 
 
 def _removed(claims):
-    """Index 3 names no claim; the claims the case's rulings name stay."""
+    """Index 3 names no claim; the claims the case's reading rulings name stay."""
     return [claims[3], claims[5]]
 
 
-@pytest.mark.parametrize("edit", [_moved, _reworded, _removed])
+@pytest.mark.parametrize(
+    ("edit", "keeps_positions"),
+    [(_moved, True), (_reworded, True), (_removed, False)],
+    ids=["_moved", "_reworded", "_removed"],
+)
 def test_a_ruling_on_a_claim_that_changed_since_the_ballot_is_refused(
-    tmp_path, corpus, edit
+    tmp_path, corpus, edit, keeps_positions
 ):
-    """The reader ruled on the claim the ballot showed, not the one at its index now."""
+    """The reader ruled on the claim the ballot showed, not the one at its index now.
+
+    ``_removed`` leaves too few claims for the case's position rulings to name,
+    and the load refuses a ruling whose claim is gone, so that edit drops them.
+    """
     case = load_case(corpus / CASE)
     issued = _issue(tmp_path, case, _tampering_draft(case, 3))
     returned = tmp_path / "returned.csv"
@@ -377,6 +385,9 @@ def test_a_ruling_on_a_claim_that_changed_since_the_ballot_is_refused(
     )
     answered = near_misses.returned_rows(issued, returned)
     _edit_claims(corpus, edit)
+    if not keeps_positions:
+        path = corpus / CASE / RULINGS_FILE
+        path.write_text(json.dumps(json.loads(path.read_text()) | {"positions": []}))
     before = (corpus / CASE / RULINGS_FILE).read_bytes()
 
     with pytest.raises(ValueError, match="row 1: reference claim 3"):

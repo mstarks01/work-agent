@@ -364,7 +364,7 @@ on either of them. That is the finding this sitting exists for.
 **16.** An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.
 
 - `process:schedule-importer`, `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`
-- severity: low/medium · verb: `flood`
+- severity: low/medium · verb: `exhaust-resources`
 - The failure is silent staleness rather than an outage: the API keeps answering and the work it holds is yesterday's.
 
 > mark:
@@ -457,7 +457,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "7d6b0954ab6043050bb4f3a726aa40e7da3b02494e0430ff942375f10c4b14da",
       "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
-      "claims/stride.json": "707f050fcada8b0089b8762bb210da900bde56c19e7652678b0f1de1af351b02"
+      "claims/stride.json": "24806d2756d8ce73b4179f703cf467d09097a8a4c466838e7272f44d4f7b5785"
       }
     }
   }
@@ -480,5 +480,5 @@ generated. A submission covers the frameworks whose reference sets it carries
 a matching digest for, and it stops covering one the moment that file changes.
 CI checks that every finding of every set you read carries a mark, that the
 digests match the tree, and that the pull request adds this one file and
-nothing else. `tests/test_case_review.py` names the cases still waiting, and
-derives that list from the merged submissions.
+nothing else. `uv run python webapp/sitting.py --list` names the cases still
+waiting, and derives that list from the merged submissions.

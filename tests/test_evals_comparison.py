@@ -77,7 +77,7 @@ def merged(
     return directory
 
 
-def score_row(recall=0.8, rejected=0.0, unvoted=0):
+def score_row(recall=0.8, rejected=0.0, unvoted=0, stale=0):
     return {
         "case_id": "01",
         "metrics": {
@@ -85,7 +85,13 @@ def score_row(recall=0.8, rejected=0.0, unvoted=0):
             "must_find_coverage": 0.9,
             "rejected_rate": rejected,
         },
-        "counts": {"rejected": 0, "pooled": 0, "open": 0, "unvoted": unvoted},
+        "counts": {
+            "rejected": 0,
+            "pooled": 0,
+            "open": 0,
+            "unvoted": unvoted,
+            "stale": stale,
+        },
     }
 
 
@@ -194,6 +200,11 @@ class TestARow:
 
     def test_vote_coverage_prints_so_a_reader_can_weigh_the_row(self, tmp_path):
         merged(tmp_path, "one", scores=[score_row(unvoted=4)])
+        assert "0 of 4 unmatched finding(s) judged" in build(tmp_path)
+
+    def test_a_stale_finding_counts_as_unjudged(self, tmp_path):
+        """#2202: a vote on an earlier argument answers nothing in this run."""
+        merged(tmp_path, "one", scores=[score_row(unvoted=1, stale=3)])
         assert "0 of 4 unmatched finding(s) judged" in build(tmp_path)
 
     def test_an_aggregator_tier_names_the_upstream_that_served_it(self, tmp_path):

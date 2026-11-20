@@ -1,0 +1,7 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- CMS database traffic may expose account and comment data inside the hosted network | ['flow:process:web-server>store:mysql-database>cms-data', 'process:web-server', 'store:mysql-database']
+- Database administration traffic exposes CMS records on the network | ['flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin', 'store:mysql-database']
+- An unencrypted MySQL storage copy could disclose CMS account data | ['store:mysql-database']
+- Unverified authentication may permit direct retrieval of the MySQL corpus | ['flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin', 'store:mysql-database']
+spent: $0.0422 reported
+must-finds matched: [9]

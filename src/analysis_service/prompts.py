@@ -38,7 +38,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Literal
 
-from analysis_service.assertions import REGISTRY, Predicate, referent_type
+from analysis_service.assertions import EXTRACTED, Predicate, referent_type
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkName
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
@@ -266,8 +266,8 @@ REFERENCE_FORMS: Mapping[Stage, str] = MappingProxyType(
 def render_predicates(stage: Stage) -> str:
     """The predicate registry as the table a model reads.
 
-    One row per predicate, in registry order: what it means, which subjects it
-    takes, and what its value may be. A ``term`` predicate lists its own words
+    One row per extracted predicate, in registry order: what it means, which
+    subjects it takes, and what its value may be. A ``term`` predicate lists its own words
     beside the two every predicate admits; a ``reference`` one names what it
     points at, in the spelling ``stage``'s own resolver reads
     (:data:`REFERENCE_FORMS`); free text says so. ``stage`` is required, because
@@ -290,7 +290,7 @@ def render_predicates(stage: Stage) -> str:
         "| Predicate | Subjects | Value | Means |",
         "| --- | --- | --- | --- |",
     ]
-    for name, predicate in REGISTRY.items():
+    for name, predicate in EXTRACTED.items():
         subjects = ", ".join(sorted(predicate.subjects))
         meaning = predicate.meaning
         if predicate.stated_only:
@@ -300,7 +300,7 @@ def render_predicates(stage: Stage) -> str:
         )
     scoped = [
         f"`{name}` needs a scope naming its " + " and ".join(predicate.requires)
-        for name, predicate in REGISTRY.items()
+        for name, predicate in EXTRACTED.items()
         if predicate.requires
     ]
     if scoped:

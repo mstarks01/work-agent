@@ -16,7 +16,7 @@ deterministic identity rule over an action verb and a resolved element set. Two
 claims can match on identity and mean different things.
 
 **Never improve this by flooding.** More findings raises coverage and lowers
-precision, and the negative control below is what catches it.
+precision, and the first reading below catches it.
 
 ## 2. Reviewed precision, and unsupported conclusions
 
@@ -100,7 +100,7 @@ A target such as 90% must-find coverage is a provisional feasibility target
 against a named, reviewed reference population. It is not a promise and it
 does not measure report quality.
 
-## Negative controls
+## Two readings beside a recall gain
 
 Two, and an audit that claims a recall gain runs both:
 

@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Supplier paperwork may be intercepted en route to the vendor portal | ['flow:entity:supplier>process:supplier-portal>upload-documents', 'entity:supplier', 'process:supplier-portal']
+- Category-manager document reviews may be intercepted across the corporate-to-vendor boundary | ['flow:entity:category-manager>process:supplier-portal>review-documents', 'entity:category-manager', 'process:supplier-portal']
+- Portal-to-document-store traffic may expose uploaded paperwork | ['flow:process:supplier-portal>store:document-store>store-documents', 'process:supplier-portal', 'store:document-store']
+- Nightly supplier extract may be intercepted while the vendor sends it to the landing bucket | ['flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'entity:portal-vendor', 'store:landing-bucket']
+- Supplier-master reads from the landing bucket may be visible on an unverified internal channel | ['flow:process:supplier-master-service>store:landing-bucket>load-extract', 'process:supplier-master-service', 'store:landing-bucket']
+- Supplier records may be intercepted while the master service writes the database | ['flow:process:supplier-master-service>store:supplier-database>write-supplier-records', 'process:supplier-master-service', 'store:supplier-database']
+- Vendor document-store copies may expose supplier paperwork if encryption at rest is absent | ['store:document-store']
+- Landing-bucket copies may disclose the complete nightly supplier extract | ['store:landing-bucket']
+- Supplier-database storage copies may disclose all loaded supplier records | ['store:supplier-database']
+- Unverified landing-bucket read authentication may let an unauthorized party obtain the extract | ['store:landing-bucket', 'flow:process:supplier-master-service>store:landing-bucket>load-extract', 'process:supplier-master-service']
+spent: $0.0564 reported
+must-finds matched: [8]

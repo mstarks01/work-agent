@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Colleague shift responses may be readable in transit | ['flow:entity:colleague>process:scheduling-web-app>view-shifts', 'entity:colleague', 'process:scheduling-web-app']
+- Store rota submissions may disclose rota and colleague data in transit | ['flow:entity:store-manager>process:scheduling-web-app>build-rota', 'entity:store-manager', 'process:scheduling-web-app']
+- Rota requests may expose colleague data on the app-to-service hop | ['flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-web-app', 'process:scheduling-service']
+- Rota database traffic may reveal the full rota dataset in transit | ['flow:process:scheduling-service>store:rota-database>read-write-rotas', 'process:scheduling-service', 'store:rota-database']
+- Payroll exports may be exposed while written to the file share | ['flow:process:scheduling-service>store:file-share>write-payroll-export', 'process:scheduling-service', 'store:file-share']
+- Payroll export collection may expose employee data across team environments | ['flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system', 'store:file-share']
+- A storage copy of the rota database may expose all colleague records | ['store:rota-database']
+- A storage copy of the payroll file share may expose weekly exports | ['store:file-share']
+- Code in the scheduling service can read the rota database through its standing access | ['store:rota-database', 'process:scheduling-service', 'flow:process:scheduling-service>store:rota-database>read-write-rotas']
+- Unverified payroll-system access may permit direct reading of payroll exports | ['store:file-share', 'flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system']
+spent: $0.0528 reported
+must-finds matched: [9]

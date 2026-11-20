@@ -1,0 +1,720 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n0[\"colleague\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:outside-corporate-network"
+      },
+      {
+        "id": "entity:hr-system",
+        "name": "HR system",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2[\"HR system\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:outside-corporate-network"
+      },
+      {
+        "id": "entity:franchise-identity-provider",
+        "name": "franchise identity provider",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1[\"franchise identity provider\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:franchise-partner"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:identity-broker",
+        "name": "identity broker",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3(\"identity broker\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-admin-console",
+        "name": "store admin console",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4(\"store admin console\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:directory",
+        "name": "directory",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5[(\"directory\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:key-store",
+        "name": "key store",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "n6[(\"key store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:audit-log",
+        "name": "audit log",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"audit log\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>process:identity-broker>sign-in",
+        "name": "sign in",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"sign in\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:colleague",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
+        "name": "vouch for colleague",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"vouch for colleague\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:franchise-identity-provider",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+        "name": "change prices and void",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"change prices and void\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
+        "name": "fetch public key",
+        "description": "unknown",
+        "assets": [
+          "secrets"
+        ],
+        "source_excerpt": "n4 -->|\"fetch public key\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:store-admin-console",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
+        "name": "nightly group pull",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"nightly group pull\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "entity:hr-system",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>store:directory>read-write-directory",
+        "name": "read write directory",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"read write directory\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "store:directory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:identity-broker>store:key-store>read-signing-key",
+        "name": "read signing key",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "n3 -->|\"read signing key\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "store:key-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>store:audit-log>write-sign-ins",
+        "name": "write sign ins",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"write sign ins\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "store:audit-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone: corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:outside-corporate-network",
+        "name": "outside corporate network",
+        "description": "Trust zone: outside corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: outside corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:franchise-partner",
+        "name": "franchise partner",
+        "description": "Trust zone: franchise partner",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: franchise partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The node named colleague is a human external entity.",
+        "element_id": "entity:colleague",
+        "attribute": "kind",
+        "basis": "The node is named \"colleague\" and is placed in the zone labeled \"outside corporate network\"."
+      },
+      {
+        "assumption": "The node named HR system is an external system.",
+        "element_id": "entity:hr-system",
+        "attribute": "kind",
+        "basis": "The node is named \"HR system\" and is placed in the zone labeled \"outside corporate network\"."
+      },
+      {
+        "assumption": "The node named franchise identity provider is an external system.",
+        "element_id": "entity:franchise-identity-provider",
+        "attribute": "kind",
+        "basis": "The node is named \"franchise identity provider\" and is placed in the zone labeled \"franchise partner\"."
+      },
+      {
+        "assumption": "The colleague carries personally identifying information because the element represents a person.",
+        "element_id": "entity:colleague",
+        "attribute": "assets",
+        "basis": "The asset rules classify a person as carrying pii."
+      },
+      {
+        "assumption": "The key store holds credentials and secrets because it is the destination of a flow labeled \"read signing key\".",
+        "element_id": "store:key-store",
+        "attribute": "assets",
+        "basis": "The diagram explicitly names a signing key associated with the key store; signing keys are credentials and secrets."
+      },
+      {
+        "assumption": "The audit log holds business-critical operating records because it is the destination of a flow labeled \"write sign ins\".",
+        "element_id": "store:audit-log",
+        "attribute": "assets",
+        "basis": "The diagram explicitly identifies sign-ins as records written to the audit log."
+      },
+      {
+        "assumption": "The flow from the store admin console to the identity broker carries a secret public key.",
+        "element_id": "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
+        "attribute": "assets",
+        "basis": "The flow is labeled \"fetch public key\" and public keys are secrets under the controlled asset vocabulary."
+      },
+      {
+        "assumption": "The flow from the identity broker to the key store carries credentials and secrets.",
+        "element_id": "flow:process:identity-broker>store:key-store>read-signing-key",
+        "attribute": "assets",
+        "basis": "The flow is labeled \"read signing key\"; signing keys are credentials and secrets."
+      },
+      {
+        "assumption": "The flow from the identity broker to the audit log carries business-critical operating records.",
+        "element_id": "flow:process:identity-broker>store:audit-log>write-sign-ins",
+        "attribute": "assets",
+        "basis": "The flow is labeled \"write sign ins\" and carries records written to the audit log."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n0[\"colleague\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:outside-corporate-network"
+      },
+      {
+        "id": "entity:hr-system",
+        "name": "HR system",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2[\"HR system\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:outside-corporate-network"
+      },
+      {
+        "id": "entity:franchise-identity-provider",
+        "name": "franchise identity provider",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1[\"franchise identity provider\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:franchise-partner"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:identity-broker",
+        "name": "identity broker",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3(\"identity broker\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-admin-console",
+        "name": "store admin console",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4(\"store admin console\")",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:directory",
+        "name": "directory",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5[(\"directory\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:key-store",
+        "name": "key store",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "n6[(\"key store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:audit-log",
+        "name": "audit log",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"audit log\")]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>process:identity-broker>sign-in",
+        "name": "sign in",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"sign in\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:colleague",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
+        "name": "vouch for colleague",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"vouch for colleague\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:franchise-identity-provider",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+        "name": "change prices and void",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"change prices and void\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
+        "name": "fetch public key",
+        "description": "unknown",
+        "assets": [
+          "secrets"
+        ],
+        "source_excerpt": "n4 -->|\"fetch public key\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:store-admin-console",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
+        "name": "nightly group pull",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"nightly group pull\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "entity:hr-system",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>store:directory>read-write-directory",
+        "name": "read write directory",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"read write directory\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "store:directory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:identity-broker>store:key-store>read-signing-key",
+        "name": "read signing key",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "n3 -->|\"read signing key\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "store:key-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>store:audit-log>write-sign-ins",
+        "name": "write sign ins",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"write sign ins\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:identity-broker",
+        "destination": "store:audit-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone: corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:outside-corporate-network",
+        "name": "outside corporate network",
+        "description": "Trust zone: outside corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: outside corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:franchise-partner",
+        "name": "franchise partner",
+        "description": "Trust zone: franchise partner",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: franchise partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The node named colleague is a human external entity.",
+        "element_id": "entity:colleague",
+        "attribute": "kind",
+        "basis": "The node is named \"colleague\" and is placed in the zone labeled \"outside corporate network\"."
+      },
+      {
+        "assumption": "The node named HR system is an external system.",
+        "element_id": "entity:hr-system",
+        "attribute": "kind",
+        "basis": "The node is named \"HR system\" and is placed in the zone labeled \"outside corporate network\"."
+      },
+      {
+        "assumption": "The node named franchise identity provider is an external system.",
+        "element_id": "entity:franchise-identity-provider",
+        "attribute": "kind",
+        "basis": "The node is named \"franchise identity provider\" and is placed in the zone labeled \"franchise partner\"."
+      },
+      {
+        "assumption": "The colleague carries personally identifying information because the element represents a person.",
+        "element_id": "entity:colleague",
+        "attribute": "assets",
+        "basis": "The asset rules classify a person as carrying pii."
+      },
+      {
+        "assumption": "The key store holds credentials and secrets because it is the destination of a flow labeled \"read signing key\".",
+        "element_id": "store:key-store",
+        "attribute": "assets",
+        "basis": "The diagram explicitly names a signing key associated with the key store; signing keys are credentials and secrets."
+      },
+      {
+        "assumption": "The audit log holds business-critical operating records because it is the destination of a flow labeled \"write sign ins\".",
+        "element_id": "store:audit-log",
+        "attribute": "assets",
+        "basis": "The diagram explicitly identifies sign-ins as records written to the audit log."
+      },
+      {
+        "assumption": "The flow from the store admin console to the identity broker carries a secret public key.",
+        "element_id": "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
+        "attribute": "assets",
+        "basis": "The flow is labeled \"fetch public key\" and public keys are secrets under the controlled asset vocabulary."
+      },
+      {
+        "assumption": "The flow from the identity broker to the key store carries credentials and secrets.",
+        "element_id": "flow:process:identity-broker>store:key-store>read-signing-key",
+        "attribute": "assets",
+        "basis": "The flow is labeled \"read signing key\"; signing keys are credentials and secrets."
+      },
+      {
+        "assumption": "The flow from the identity broker to the audit log carries business-critical operating records.",
+        "element_id": "flow:process:identity-broker>store:audit-log>write-sign-ins",
+        "attribute": "assets",
+        "basis": "The flow is labeled \"write sign ins\" and carries records written to the audit log."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

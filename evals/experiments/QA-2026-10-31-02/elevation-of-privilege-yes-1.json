@@ -1,0 +1,131 @@
+{
+  "claims": [
+    {
+      "title": "Supplied code at the storefront can inherit a path into core order processing",
+      "description": "An internet attacker can submit content to `process:storefront-api`, for which the submitter reports that content it takes can run code with that process's authority. If that execution capability is reachable from shopper-controlled order content, the attacker inherits the storefront process's ability to send requests on `flow:process:storefront-api>process:order-service>submit-order`. That flow crosses from the storefront DMZ into core services and has authentication explicitly absent, so the compromised storefront can obtain the order service's authority without presenting an authorized caller identity. Second-order, `process:order-service` has a full read/write application grant on `store:orders-db`; the resulting foothold can therefore reach confidential shopper addresses and card last-four data, not merely the order submission interface.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service"
+      ],
+      "verb": "escalate",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Can content that process:storefront-api takes run code with its authority?\", the answer is \"yes\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high if the stated code-execution capability accepts shopper-reachable content: `process:storefront-api` is internet-facing and `flow:process:storefront-api>process:order-service>submit-order` has authentication stated absent. Impact is high because the inherited path reaches `process:order-service`, whose application account has full read/write on `store:orders-db`, which holds `pii` and `financial` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Prevent untrusted content from executing in the storefront runtime",
+          "detail": "Sandbox or eliminate execution of content accepted by `process:storefront-api`; run any required supplied logic in an isolated process with no ambient credentials or route to core services."
+        },
+        {
+          "summary": "Authenticate and authorize the core submission hop",
+          "detail": "Require `process:order-service` to authenticate the caller on `flow:process:storefront-api>process:order-service>submit-order` and propagate and verify the original shopper identity and authorization for each order."
+        }
+      ]
+    },
+    {
+      "title": "Order-service code execution would abuse its full orders database grant",
+      "description": "The submitter reports that content accepted by `process:order-service` can run with that process's authority. If an attacker can cause that capability to execute attacker-controlled content\u2014for example, through order content arriving on `flow:process:storefront-api>process:order-service>submit-order`\u2014the code inherits the order service application account's full read/write grant on `flow:process:order-service>store:orders-db>read-write-orders`. This is an abuse of the runtime's standing grant: code acting as the service can operate across all order rows rather than being confined to the requesting shopper's authorized objects. Second-order, it can alter or obtain the confidential `pii` and `financial` data in `store:orders-db`. The submitter also reports request-level authorization and validation controls, so this draft is conditional on whether the reported execution capability can be reached with attacker-influenced content despite those controls.",
+      "affected_element_ids": [
+        "process:order-service",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "store:orders-db"
+      ],
+      "verb": "abuse-grant",
+      "evidence_refs": [
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Can content that process:order-service takes run code with its authority?\", the answer is \"yes\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Does process:order-service check the values it takes against what it expects, and encode or bind them where it uses them?\", the answer is \"Does it check the values it takes against what it expects? yes; Does it encode or bind values where it uses them, such as in queries, commands or pages? yes\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: the submitter states that `process:order-service` can execute accepted content, but also states validation and binding controls, so exploitability depends on whether attacker-influenced content reaches that execution capability. Impact is high because the stated application-account grant is full read/write on `store:orders-db`, which contains `pii` and `financial` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Isolate execution from the order-service identity",
+          "detail": "Run any content-execution feature in a separate sandboxed process with no order-service database credential, drop privileges before execution, and require review or signing for persistent extensions."
+        },
+        {
+          "summary": "Constrain the order-service database grant",
+          "detail": "Replace the full read/write application account on `flow:process:order-service>store:orders-db>read-write-orders` with narrowly scoped, short-lived authority that permits only the operations and rows required for a specific order."
+        }
+      ]
+    },
+    {
+      "title": "Conflicting reachability and authentication statements leave the core order surface open to escalation",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` crosses into `boundary:core-services` and its authentication is stated absent. The system description says `process:order-service` is not exposed outside, but the subsequent answer says the internet can reach its interface; likewise, the later answer says it checks every request against caller permissions even though the modeled gRPC flow has no authentication. If the internet-reachability answer is accurate and the stated absent authentication remains true for the reachable interface, an internet attacker can invoke the order service without first obtaining storefront authority, escalating directly into the core order-processing surface. The terminal consequence is the order service's ability to use its application account against all rows in `store:orders-db`; resolving these contradictory statements is required to determine whether the boundary is actually enforced.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service"
+      ],
+      "verb": "escalate",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The order service is a Python worker in our core network; it is not exposed outside.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Asked \"Who can reach process:order-service's interface, and from where?\", the answer is \"Can the internet reach it? yes; Can only named callers reach it, such as through an allow-list, a private network or a VPN? yes\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Who may do what on process:order-service, and does it check each request against that?\", the answer is \"Does it check each request against what the caller may do? yes; Are permissions narrower than full access, such as roles or scopes? yes; Does it check that the caller owns the object it names? yes\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the submitter's sources conflict on whether `process:order-service` is internet reachable and whether it authorizes each request, while the modeled crossing has authentication explicitly absent. Impact is high if reachable because the crossing reaches the `financial` order-processing service and its application account has full read/write authority on `store:orders-db`, which contains `pii` and `financial` data."
+      },
+      "mitigations": [
+        {
+          "summary": "Resolve and enforce the order-service ingress boundary",
+          "detail": "Establish the actual reachable interfaces of `process:order-service`, restrict ingress to the intended storefront workload, and remove any internet-routable listener or management path."
+        },
+        {
+          "summary": "Require a verifiable caller identity at the order service",
+          "detail": "Replace the absent authentication on `flow:process:storefront-api>process:order-service>submit-order` with workload authentication plus propagated end-user identity, and authorize every requested order operation server-side."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

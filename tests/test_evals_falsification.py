@@ -16,10 +16,23 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import GATE_REFUSALS
+from analysis_service.assertions import (
+    ABSENT,
+    GATE_REFUSALS,
+    Assertion,
+    AssertionCatalog,
+    Subject,
+    assertion_id,
+)
 from evals.harness import falsify
 from evals.harness.replay import ROW_FATES
 from evals.harness.run import COMMANDS
+from tests.test_assertions import (
+    FLOW,
+    SOURCES,
+    TestAGraphAttributeAndItsRowsStatingOpposites,
+    stated,
+)
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
@@ -39,11 +52,15 @@ class TestTheTableAnswersTheAcceptanceList:
         assert not set(falsify.PROBES) & set(falsify.UNPROBED)
 
     @pytest.mark.parametrize("name", sorted(falsify.PROBES))
-    def test_every_probe_declares_a_registered_fate(self, name: str) -> None:
+    def test_every_probe_declares_a_registered_fate(
+        self, name: falsify.ProbeName
+    ) -> None:
         assert set(falsify.PROBES[name].fates) <= set(ROW_FATES)
 
     @pytest.mark.parametrize("name", sorted(falsify.PROBES))
-    def test_every_probe_declares_a_registered_refusal(self, name: str) -> None:
+    def test_every_probe_declares_a_registered_refusal(
+        self, name: falsify.ProbeName
+    ) -> None:
         assert set(falsify.PROBES[name].refuses) <= GATE_REFUSALS
 
     def test_the_command_is_registered(self) -> None:
@@ -77,8 +94,8 @@ class TestEveryProbeHolds:
         printed = capsys.readouterr().out
         for name in falsify.PROBES:
             assert f"`{name}`" in printed
-        for name in falsify.UNPROBED:
-            assert f"no probe for `{name}`" in printed
+        for criterion in falsify.UNPROBED:
+            assert f"no probe for `{criterion}`" in printed
 
     @pytest.mark.parametrize("reviewed", [False, True])
     def test_the_command_fails_on_a_critical_failure(
@@ -110,13 +127,15 @@ class TestAProbeThatCostsNothingFails:
         partial = {name for name, probe in falsify.PROBES.items() if probe.note}
         assert partial == {"identity-and-provenance", "changed-source"}
 
-    def test_only_the_positive_controls_cost_nothing(self) -> None:
-        controls = {name for name, probe in falsify.PROBES.items() if probe.control}
-        assert controls == {"perfect-reading", "valid-inference"}
+    def test_only_the_positive_checks_cost_nothing(self) -> None:
+        positive_checks = {
+            name for name, probe in falsify.PROBES.items() if probe.positive_check
+        }
+        assert positive_checks == {"perfect-reading", "valid-inference"}
 
     def test_every_corruption_costs_some_instrument(self, probed) -> None:
         for name, probe in falsify.PROBES.items():
-            if probe.control:
+            if probe.positive_check:
                 continue
             row = probed[name]
             cost = row.lost or row.refused or row.elements
@@ -163,7 +182,9 @@ class TestAProbeThatCostsNothingFails:
             return falsify.Corruption(rows)
 
         probe = falsify.Probe(case_id="01-payments-checkout", corrupt=corrupt)
-        monkeypatch.setattr(falsify, "PROBES", {"stranded": probe})
+        # The stub replaces the whole table under a real key, because
+        # ``run_probe`` takes a ``ProbeName``. It is not the real probe.
+        monkeypatch.setattr(falsify, "PROBES", {"absence-inferred": probe})
         case = next(
             case
             for case in falsify.development_cases(falsify.load_corpus(CORPUS))
@@ -172,7 +193,7 @@ class TestAProbeThatCostsNothingFails:
 
         reference = falsify.signed_reference(CORPUS, case)
         assert reference is not None
-        outcome = falsify.run_probe("stranded", case, reference)
+        outcome = falsify.run_probe("absence-inferred", case, reference)
 
         assert outcome.refused == ("dangling-premise", "unsupported-assertion")
 
@@ -255,3 +276,26 @@ def test_the_reading_without_the_corrupted_rows_keeps_no_subject_behind(name):
     built = falsify.reading(name, case, reference, reviewed=False)
 
     assert built.without == without(built.without, ())
+
+
+class TestWhatAJobReadsAsAFact:
+    """A row the graph contradicts reaches a lane as a question, not a fact."""
+
+    def facts(self, *entries: Assertion) -> frozenset[str]:
+        """The identities ``consumer_view`` reads as facts from these rows."""
+        catalog = AssertionCatalog(
+            subjects=[Subject(id=FLOW, type="interaction", label="place order")],
+            entries=list(entries),
+        )
+        model = TestAGraphAttributeAndItsRowsStatingOpposites().model()
+        facts, _ = falsify.consumer_view(catalog, model, SOURCES)
+        return facts
+
+    def test_a_contradicted_absence_is_not_a_fact(self, refused_projection) -> None:
+        """The graph keeps its stated mechanism beside the stated absence."""
+        assert self.facts(stated(value=ABSENT)) == frozenset()
+
+    def test_an_absence_the_graph_takes_is_a_fact(self) -> None:
+        absence = stated(value=ABSENT)
+
+        assert self.facts(absence) == {assertion_id(absence)}

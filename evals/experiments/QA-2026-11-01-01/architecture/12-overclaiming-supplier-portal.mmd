@@ -1,0 +1,19 @@
+architecture-beta
+    group z0(cloud)[Trust zone public internet]
+    group z1(cloud)[Trust zone corporate network]
+    group z2(cloud)[Trust zone vendor platform]
+    group z3(cloud)[Trust zone cloud account]
+    service n0(internet)[supplier] in z0
+    service n1(internet)[category manager] in z1
+    service n2(internet)[portal vendor] in z2
+    service n3(server)[supplier portal] in z2
+    service n4(server)[supplier master service] in z3
+    service n5(database)[document store] in z2
+    service n6(database)[landing bucket] in z3
+    service n7(database)[supplier database] in z3
+    n0:R --> L:n3
+    n1:R --> L:n3
+    n3:R --> L:n5
+    n2:R --> L:n6
+    n4:R --> L:n6
+    n4:R --> L:n7

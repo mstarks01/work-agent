@@ -127,8 +127,12 @@ dev = [
 # below): the app itself simply isn't packaged. Groups never enter the built
 # distribution either, so the integrator at route step 5 inherits none of
 # this — their dependency surface stays whatever `src/analysis_service` needs.
+# The app's default store is `sql` on SQLite (ADR 0111), so the group carries
+# the `sql` extra and `uv run` installs it with the app. The extra stays the
+# one statement of its ranges.
 web = [
     "uvicorn>=0.30",
+    "analysis-service[sql]",
 ]
 # Browser tests of the first-run app's pages (#1289): the web group's server,
 # and headless Chromium driven through Playwright. A group of its own, so a
@@ -144,15 +148,16 @@ browser = [
 # bare `uv run python webapp/main.py` with no install incantation in between.
 default-groups = ["dev", "web"]
 # google-adk caps opentelemetry-api and opentelemetry-sdk at 1.42.1, and
-# 1.42.1 carries CVE-2026-114603. 1.45.1 fixes it, so the override lifts the
-# cap past google-adk's own requirement. Drop it when google-adk allows 1.45.1.
+# 1.42.1 carries CVE-2026-114603. The override lifts the cap to 1.45.2, which
+# fixes CVE-2026-114603 and CVE-2026-126360. Drop it when google-adk allows
+# 1.45.2.
 # litellm caps filelock below 4.0, and 3.32.0 carries CVE-2026-112907,
 # CVE-2026-112913 and CVE-2026-112940. 4.2.1 fixes them. Drop the filelock
 # override when litellm allows 4.2.1.
 override-dependencies = [
     "filelock==4.2.1",
-    "opentelemetry-api==1.45.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -175,6 +180,7 @@ packages = ["src/analysis_service"]
 "domains" = "analysis_service/_bundled/domains"
 "frameworks" = "analysis_service/_bundled/frameworks"
 "config" = "analysis_service/_bundled/config"
+"diagram_reader" = "analysis_service/_bundled/diagram_reader"
 
 [tool.ruff]
 # Stated rather than inferred from `requires-python`, so raising the floor to
@@ -198,7 +204,7 @@ extend-exclude = ["docs/research"]
 # re-spelled as a bare `str`, and the tests are what pin the Protocol seams --
 # checking only `src/` would leave the checker blind to exactly the drift it
 # was added for.
-files = ["src", "tests", "evals", "examples", "webapp"]
+files = ["src", "tests", "evals", "examples", "webapp", ".github/scripts"]
 # `evals/runs` holds run artifacts the repository does not track, and a live run
 # leaves its probe scripts beside them. Checking them fails the push gate on a
 # file the tree does not hold. `ruff` already skips them, because it respects
@@ -206,10 +212,12 @@ files = ["src", "tests", "evals", "examples", "webapp"]
 # tree; this is the third reader of the same rule (#942).
 exclude = ["^evals/runs/"]
 # `src` on the path, so `src/analysis_service/api.py` is the module
-# `analysis_service.api` and not also `src.analysis_service.api`. With the layouts
+# `analysis_service.api` and not also `src.analysis_service.api`. The CI
+# scripts' directory is on the path too, so a test names a script's type by
+# the script's module name. With the layouts
 # outside it -- `evals/` and `examples/` have no `__init__.py` -- that needs
 # each directory in `files` treated as its own package root.
-mypy_path = "src"
+mypy_path = "src:.github/scripts"
 explicit_package_bases = true
 # The `requires-python` floor rather than the version CI happens to install, so
 # a 3.12-only construct fails here instead of at an integrator's 3.11.

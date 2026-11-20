@@ -5,13 +5,18 @@ mode: the local app calls the models you configure.
 
 ## 1. Install
 
-You need Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/) and Node 22.12 or newer.
 
 ```sh
 git clone https://github.com/mstarks01/work-agent.git
 cd work-agent
 uv sync
 ```
+
+The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 22.12
+or newer. At its first start, the app installs the parsers' locked packages,
+so that start needs a network connection. Where the install fails, the app
+logs a warning that names the command to run.
 
 ## 2. Select models and provide credentials
 
@@ -310,8 +315,9 @@ Open <http://127.0.0.1:8000>.
 The app is a local demonstration, not a production service. The implementation
 hard-codes `127.0.0.1:8000`, performs no user authentication, allows one active
 run, and keeps at most 20 recent runs. With no store setting, it keeps them in
-process memory, and a restart loses them. To keep them across a restart, set a
-`sql` store as [the web app guide](Web-App.md#where-the-runs-are-kept) states.
+SQLite in `~/.local/share/work-agent`, so a restart keeps them. You run no
+command to set this up. [The web app guide](Web-App.md#where-the-runs-are-kept)
+states the defaults and how to keep nothing on disk.
 When the app must remove a run, it removes the oldest run that does not wait
 for your answers.
 
@@ -371,10 +377,43 @@ than one analysis can carry, is not UTF-8, or holds control characters. The
 service reads the transcript as a conversation, beside the description where
 you type one. **Remove** takes the transcript off the form.
 
+To add a diagram, click the same **+** button and choose a Mermaid file that
+ends in `.mmd` or `.mermaid`, such as a `flowchart`. The service reads it as a
+diagram of the system: a node can be a component and an arrow a data flow. A
+subgraph is a trust zone only where its label says so. A node's shape states
+its type only where a comment in the diagram states the shape convention, as
+the line `%% Shapes: ...` in a diagram from **Download as Mermaid** does. The
+page holds one transcript and one diagram, and **Remove** takes each one off
+the form.
+
+The service reads a `flowchart`, `graph` or `architecture-beta` diagram with
+Mermaid's own parsers. Extraction then models every node as an element and
+every edge as a flow, and the model decides what each one is. An element
+takes its node's label as its name, or the part of the label before a colon
+or a bracket, such as `Orders DB` for `Orders DB (PostgreSQL)`. A diagram that
+Mermaid cannot read, such as one with a syntax error, is read as text.
+
 Then replace the example with your own description. State security controls
 that are actually known. When the input does not state an attribute, extraction
 uses `unknown`; code turns a claim resting on such an attribute into
 `needs-info` rather than treating the control as missing.
+
+A protection that you state on each analysis, such as a WAF at the edge or
+SSO on an API, can be a **Control** instead. Open **Controls** in the
+sidebar, click **New Control**, and say what it protects, the protections it states,
+the framework units it covers and the evidence files that show it. The form
+names your ticked Controls under "Controls", and each one starts ticked.
+**Choose Controls** opens the list. A
+Control that states no fact and covers none of the frameworks you choose, at
+the framework version the service carries, changes nothing, so the list shows
+it unticked and says why. At
+the questions, the page shows what each Control matched in your description,
+and you confirm the match there. With the questions off, the service applies
+each Control's default match and continues at once. When it cannot apply them,
+the page shows the refusal at the questions. That pause asks no question: untick
+or resolve a Control there, then choose **Start the analysis**.
+The report lists each Control with the facts it wrote and what became of each
+row. See [The Controls page](Web-App.md#the-controls-page).
 
 ### Answer the questions the analysis asks
 
@@ -400,11 +439,27 @@ The app can ask you questions before the analysis, and after the report.
 
   The page lists the recommended questions at once, the most useful first.
   The help beside each prompt explains what its answers may change. Where one question asks about several
-  parts of your system, the page asks it once and lists the parts it applies
-  to; one answer is saved for each of them. Where a part differs, open
-  **Answer each one separately** and change that part, or untick it. The help also quotes the words of your description that the part was read
-  from. A line at the top explains that your answers can add questions as well as remove
-  them, and the page says when they do. Each answer is saved as you give
+  parts of your system, the page asks it once and lists the parts under it,
+  each unticked. Tick each part that the answer covers, and the answer is
+  saved for each part you tick. A part you leave unticked keeps its own
+  answer, or none, and you can answer it on its own. Untick a part to take
+  back the shared answer from it. A line beside the answer names the parts
+  it covers, and **Undo** puts back the answer and the parts as they were
+  before your last change to it. A matching question does not prove that
+  one control covers every part, so the page ticks none for you. **Cover
+  every part** ticks each part that has no answer of its own, and leaves a
+  part with its own answer unticked. When you choose an answer and tick no
+  part, the line tells you to tick the parts it covers. The service
+  keeps which parts the answer covers. After a reload, a covered part shows
+  under **Your answers**, marked "(shared answer)"; change it there to give
+  that part its own answer. The help
+  also quotes the words of your description that the part was read
+  from. A line at the top says how many questions the list holds, how many
+  choices they take, and how many more questions wait on an answer in the
+  list, because your answers can add questions as well as remove them. The
+  page says when they do. The first groups of the list open, up to three
+  choices; the other groups stay closed and show how many questions each
+  holds. A group you close stays closed. Each answer is saved as you give
   it: a chosen option at once, typed text a moment after you stop. The line
   near the question guidance says **Not saved** when a save fails, and **Save
   now** sends again what a lost connection left unsaved. If you leave the page
@@ -438,24 +493,27 @@ The app can ask you questions before the analysis, and after the report.
   so, and you can still change an answer. Only **Start the analysis** starts
   it. The analysis then starts from what was already read, so nothing is read
   again, and it reads your answers.
-- **After the report: one optional follow-up.** The report is complete
-  without it. Where the report asks something, a line under the findings
-  offers **Add information**, and the **Questions** tab shows how many
-  questions it asks. The questions use the same list as the questions before
-  the analysis: a group for each kind of question, an index of the groups on
-  the left, typed answers, and one shared answer where a question asks about
-  several parts. Each question says what became of it before the analysis: new
-  from this analysis, left blank, skipped, answered in part, or answered "I
-  don't know". **Used by** names the findings that use it; click an ID to open
-  that finding. The help under **?** says what the answer informs and that a
-  finding can need other facts too. Where your install builds an assertion
-  catalog, the list also asks which part of your system each user, team or
-  account is, under **Match each user, team or account to a part of your
-  system**. Where a part of your system has the same name, the question lists
-  that part first, marked "(same name)", and shows an arrow button; nothing is
-  chosen until you click it. **Answers this report read** lists your earlier
-  answers; **Change** gives a new one. A known answer cannot change back to "I
-  don't know" there, and a known part of a question with parts cannot either.
+- **After the report: one optional follow-up.** Only an analysis with **Ask me
+  questions to make the report better.** ticked offers it. A report of an
+  analysis with the box unticked has no **Questions** tab. The report is
+  complete without the follow-up. Where the report asks something, a line
+  under the findings offers **Add information**, and the **Questions** tab
+  shows how many questions it asks. The questions use the same list as the
+  questions before the analysis: a group for each kind of question, an index
+  of the groups on the left, typed answers, and one shared answer for the
+  parts you tick where a question asks about several parts. Each question says
+  what became of it before the analysis: new from this analysis, left blank,
+  skipped, answered in part, or answered "I don't know". **Used by** names the
+  findings that use it; click an ID to open that finding. The help under **?**
+  says what the answer informs and that a finding can need other facts too.
+  Where your install builds an assertion catalog, the list also asks which
+  part of your system each user, team or account is, under **Match each user,
+  team or account to a part of your system**. Where a part of your system has
+  the same name, the question lists that part first, marked "(same name)", and
+  shows an arrow button; nothing is chosen until you click it. **Answers this
+  report read** lists your earlier answers; **Change** gives a new one. A
+  known answer cannot change back to "I don't know" there, and a known part of
+  a question with parts cannot either.
 
   For a control such as authentication or encryption, first choose "There is
   none", "I don't know" or "A mechanism". For a mechanism, the text box
@@ -472,6 +530,14 @@ The app can ask you questions before the analysis, and after the report.
   corrected answer. The analysis does not run again, and the verdicts do not
   change. This works on every install, with or without an assertion catalog.
 
+**Check what the app read.** Above the questions, **What your description
+says** is open and lists each part of your system with the facts read about
+it and the words they came from. A value marked "inferred" is one your
+description did not state. Where a fact is wrong or a part is missing, write
+what is true under **Is a part of your system missing, or described
+wrongly?**, after the questions, and the app reads your description again
+with it.
+
 Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's job store, like every other
 run, and the app never removes it to make room. A run that you answered or
@@ -483,10 +549,19 @@ one. With the `memory` store, a restart of the app loses it.
 **Reuse the answers of an earlier analysis.** With questions on, choose an
 earlier analysis under **Reuse answers from**, then click **Prepare
 analysis**. The new analysis takes each earlier answer that one of its own
-questions still asks. It lists the other answers as answers that do not fit
-this system model. An answer about a part of your system carries only where
-the new description gives that part the same name. The list shows each
-analysis that the app holds. With the `memory` store, a restart clears it.
+questions still asks. A line above the list counts the earlier answers it
+kept, those it did not keep, and those that wait for you to choose a part.
+**Your answers** marks each kept one "(from the earlier analysis)"; change it
+there to make it this analysis's own answer. An answer about a part of your
+system carries where the new description gives that part the same name. Where the new system model
+does not have the part, the page lists its answers under the part's earlier
+ID. If the part now has another name, choose it from the list beside them and
+click **Keep these answers**. The answers then belong to that part, and so do
+the answers about its connections. **Undo** takes the choice back. The app
+never matches a part by a similar name. The page lists each other answer it
+does not keep, because this system model states the fact or does not ask it.
+The list under **Reuse answers from** shows each analysis that the app holds.
+With the `memory` store, a restart clears it.
 
 ## Next steps
 

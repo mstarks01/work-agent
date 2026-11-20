@@ -61,6 +61,8 @@ def a_report(store) -> tuple[str, str]:
 def a_report_that_asks(store) -> tuple[str, str]:
     """A completed job whose report waits on :data:`OPEN`."""
     record = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="alice",
         sources=[Source.description("A web app writes to an audit log.")],
         frameworks=sample_selection(),

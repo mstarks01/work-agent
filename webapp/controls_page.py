@@ -1,0 +1,367 @@
+"""What the Controls page reads, and what its routes answer (#2157, ADR 0127).
+
+The page renders each value from here: the units each Framework Package
+offers, with the labels its catalog gives at run time, the facts each scope
+type takes, the evidence classes and the limits. A save sends a document
+with the text of each new evidence file, and :func:`saved_control` builds the
+Control the store keeps.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from datetime import datetime
+from types import MappingProxyType
+from typing import get_args
+from uuid import uuid4
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from analysis_service.claims import UnknownRef
+from analysis_service.controls import (
+    ALIASES_FULL,
+    ATTRIBUTE_STATEMENTS,
+    EVIDENCE_ID,
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROL_ROWS,
+    ROWS_FULL,
+    SCOPE_FACT_KINDS,
+    SCOPE_WORDS,
+    Control,
+    ControlDocument,
+    ControlFactKind,
+    ControlLimits,
+    ControlRow,
+    ControlScope,
+    EvidenceFile,
+    ScopeType,
+    evidence_full,
+    scope_phrase,
+)
+from analysis_service.errors import refusal_text
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.frameworks import PACKAGES, FrameworkPackage
+from analysis_service.job_controls import current_row
+from analysis_service.owner_files import NOT_UTF_8
+from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
+from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
+    Element,
+    ZonedElement,
+    attribute_names,
+)
+
+#: How the page names each evidence class.
+EVIDENCE_LABELS: Mapping[EvidenceClass, str] = MappingProxyType(
+    {"config": "Configuration", "code": "Code", "people": "People"}
+)
+
+
+def _element_types(scope_type: ScopeType) -> tuple[type[Element], ...]:
+    """The element classes whose facts a scope of ``scope_type`` writes: its
+    own class, each class a zone holds, or none for the whole application."""
+    zoned = get_args(ZonedElement)
+    if scope_type == "boundary":
+        return zoned
+    return tuple(kind for kind in zoned if kind.id_prefix == scope_type)
+
+
+def _key(*, attribute: str = "", question: str = "") -> list:
+    """A fact's key with no element: the scope supplies it."""
+    ref = UnknownRef(attribute=attribute, question=question)
+    return list(ref.key)
+
+
+def _statement(
+    key: list, label: str, topic: str, *, answer: str | None, facet: str = ""
+) -> dict[str, object]:
+    """One protection the page offers as a tick: the fact's key, the facet it
+    answers, and the answer it writes, or ``None`` where the owner writes how."""
+    return {
+        "key": key,
+        "facet": facet,
+        "answer": answer,
+        "label": label,
+        "topic": topic,
+    }
+
+
+def _attribute_statements(scope_type: ScopeType) -> list[dict[str, object]]:
+    held = {
+        attribute
+        for element_type in _element_types(scope_type)
+        for attribute in attribute_names(element_type.model_construct())
+    }
+    return [
+        _statement(
+            _key(attribute=attribute),
+            statement.statement,
+            statement.topic,
+            answer=statement.value,
+        )
+        for attribute, statement in ATTRIBUTE_STATEMENTS.items()
+        if attribute in held
+    ]
+
+
+def _question_statements() -> list[dict[str, object]]:
+    statements = []
+    for name, kind in QUESTION_KINDS.items():
+        key = _key(question=name)
+        if kind.statement is not None:
+            statements.append(
+                _statement(key, kind.statement, kind.topic, answer=kind.protects)
+            )
+        statements.extend(
+            _statement(
+                key, facet.statement, kind.topic, answer=facet.protects, facet=facet.id
+            )
+            for facet in kind.facets
+        )
+    return statements
+
+
+#: The statements the page offers of each kind of fact that a scope writes
+#: (:data:`~analysis_service.controls.SCOPE_FACT_KINDS`).
+_FACT_OFFERS: Mapping[
+    ControlFactKind, Callable[[ScopeType], list[dict[str, object]]]
+] = MappingProxyType(
+    {
+        "attribute": _attribute_statements,
+        "question": lambda scope_type: _question_statements(),
+    }
+)
+
+
+_PART_HINT = (
+    "The name must match the part after case and punctuation. A similar name"
+    " matches nothing."
+)
+
+#: What the editor says of the name of each scope type. The whole
+#: application has no name.
+SCOPE_HINTS: Mapping[ScopeType, str] = MappingProxyType(
+    {
+        "application": "",
+        "boundary": (
+            f"The name must match the {SCOPE_WORDS['boundary'].noun} after case"
+            " and punctuation. The Control applies to each part the description"
+            " places in it."
+        ),
+        "process": _PART_HINT,
+        "store": _PART_HINT,
+        "entity": _PART_HINT,
+    }
+)
+
+
+def scope_types() -> list[dict[str, object]]:
+    """Each scope type, with its words and the protections a Control of that
+    scope may state.
+
+    The kinds come from :data:`~analysis_service.controls.SCOPE_FACT_KINDS`.
+    """
+    return [
+        {
+            "type": scope_type,
+            "label": words.label,
+            "hint": SCOPE_HINTS[scope_type],
+            "statements": [
+                statement
+                for kind in sorted(SCOPE_FACT_KINDS[scope_type])
+                for statement in _FACT_OFFERS[kind](scope_type)
+            ],
+        }
+        for scope_type, words in SCOPE_WORDS.items()
+    ]
+
+
+def _names_an_element(package: FrameworkPackage) -> bool:
+    """Whether each finding of ``package`` names an element of the System
+    Model, as its record's bound on ``affected_element_ids`` says."""
+    metadata = package.record.model_fields["affected_element_ids"].metadata
+    return any(getattr(bound, "min_length", 0) > 0 for bound in metadata)
+
+
+def units() -> dict[str, dict[str, object]]:
+    """Each package's version and units, with the label its catalog gives
+    each unit at run time, and whether each finding names an element."""
+    return {
+        name: {
+            "version": package.version,
+            "names_an_element": _names_an_element(package),
+            "units": [
+                {
+                    "id": unit.id,
+                    "grain": unit.grain,
+                    "inside": unit.inside,
+                    "label": package.record.text_of_unit(unit.id),
+                }
+                for unit in package.units
+            ],
+        }
+        for name, package in PACKAGES.items()
+    }
+
+
+def controls_full(limits: ControlLimits) -> str:
+    """The refusal of a new Control where the owner holds the most Controls
+    the deployment keeps."""
+    return (
+        f"Controls holds {limits.max_controls} Controls, the most it can keep."
+        " Delete a Control before you add another."
+    )
+
+
+def page_data(limits: ControlLimits) -> dict[str, object]:
+    """Everything the Controls page reads of the service."""
+    return {
+        "units": units(),
+        "scope_types": scope_types(),
+        "evidence_classes": [
+            {"id": evidence_class, "label": label}
+            for evidence_class, label in EVIDENCE_LABELS.items()
+        ],
+        "limits": {
+            "max_controls": limits.max_controls,
+            "max_evidence": limits.max_evidence,
+            "max_evidence_bytes": limits.max_evidence_bytes,
+            "max_aliases": MAX_CONTROL_ALIASES,
+            "max_rows": MAX_CONTROL_ROWS,
+            "name_chars": MAX_LABEL_CHARS,
+            "value_chars": CONTROL_VALUE_MAX_CHARS,
+        },
+        # The sentences a save over a count gets, which the page shows before
+        # it sends one.
+        "at_limit": {
+            "aliases": ALIASES_FULL,
+            "rows": ROWS_FULL,
+            "evidence": evidence_full(limits.max_evidence),
+        },
+    }
+
+
+class NewEvidence(BaseModel):
+    """An evidence file the save adds, with its text. The page reads the file
+    and sends its text, so no route takes a file."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(max_length=MAX_LABEL_CHARS)
+    evidence_class: EvidenceClass = Field(alias="class")
+    text: str
+
+
+class HeldEvidence(BaseModel):
+    """An evidence file the Control holds, which the save keeps with its text
+    and gives the class the owner chose."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=EVIDENCE_ID)
+    evidence_class: EvidenceClass = Field(alias="class")
+
+
+class ControlBody(BaseModel):
+    """The fields of each Control save: a Control as the editor wrote it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    scope: ControlScope
+    facts: list[FactAnswer]
+    rows: list[ControlRow]
+
+
+class ControlSave(ControlBody):
+    """The body of ``POST /workspace/controls``. The service gives each new
+    Control and each new evidence file its ID."""
+
+    evidence: list[NewEvidence] = Field(max_length=MAX_CONTROL_EVIDENCE_CEILING)
+
+
+class ControlEdit(ControlBody):
+    """The body of ``PUT /workspace/controls/{id}``: each held file by its ID,
+    each new file, and the ``updated_at`` the editor read."""
+
+    evidence: list[HeldEvidence | NewEvidence] = Field(
+        max_length=MAX_CONTROL_EVIDENCE_CEILING
+    )
+    updated_at: datetime
+
+
+def saved_control(
+    save: ControlSave | ControlEdit,
+    *,
+    owner_id: str,
+    control_id: str | None = None,
+    held: Sequence[EvidenceFile] = (),
+) -> tuple[Control, dict[str, str]]:
+    """The Control a save writes, and the text of each new evidence file by
+    its ID. ``control_id`` is the edited Control's ID, or ``None`` for a new
+    one, and ``held`` is the evidence the store holds for it. Raises
+    :class:`ValueError` where the save names a file the Control does not hold,
+    or where the document breaks a rule of :class:`ControlDocument`."""
+    kept = {file.id: file for file in held}
+    files: list[EvidenceFile] = []
+    texts: dict[str, str] = {}
+    for sent in save.evidence:
+        if isinstance(sent, HeldEvidence):
+            if sent.id not in kept:
+                raise ValueError("The save names an evidence file this Control lacks.")
+            files.append(
+                kept[sent.id].model_copy(update={"evidence_class": sent.evidence_class})
+            )
+            continue
+        # The digest encodes strict UTF-8 before the store applies
+        # control_refusal, so a lone surrogate is refused here, in the words
+        # text_refusal gives it.
+        try:
+            data = sent.text.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError(NOT_UTF_8) from None
+        evidence_id = f"evidence-{uuid4().hex}"
+        files.append(
+            EvidenceFile.model_validate(
+                {
+                    "id": evidence_id,
+                    "name": sent.name,
+                    "class": sent.evidence_class,
+                    "sha256": text_digest(sent.text),
+                    "size_bytes": len(data),
+                }
+            )
+        )
+        texts[evidence_id] = sent.text
+    document = ControlDocument(
+        id=control_id or f"control-{uuid4().hex}",
+        name=save.name,
+        scope=save.scope,
+        facts=save.facts,
+        rows=save.rows,
+        evidence=files,
+    )
+    return Control.create(owner_id=owner_id, document=document), texts
+
+
+def save_refusal(exc: ValueError) -> str:
+    """What the page shows for a refused save of a Control: the sentence of
+    the first rule that a validator of the document states for the owner,
+    else each place and rule of :func:`refusal_text`."""
+    if isinstance(exc, ValidationError):
+        for error in exc.errors(include_input=False):
+            if error["type"] == "value_error":
+                return str(error["ctx"]["error"])
+    return refusal_text(exc)
+
+
+def control_view(control: Control) -> dict[str, object]:
+    """What the page shows of a Control: the document, its last save, whether
+    each row names the version this service carries, and no evidence text."""
+    return control.document.model_dump(mode="json") | {
+        "updated_at": control.updated_at.isoformat(),
+        "scope_phrase": scope_phrase(control.document.scope),
+        "current_rows": [current_row(row) for row in control.document.rows],
+    }

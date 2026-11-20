@@ -34,6 +34,7 @@ from analysis_service.critic import critic_view
 from analysis_service.evidence import (
     ASSERTION_GLOSSES,
     absent_evidence_ref,
+    catalog_refs,
     crossing_evidence_ref,
     evidence_catalog,
     evidence_ref,
@@ -46,6 +47,7 @@ from analysis_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
+from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import (
     DraftThreat,
@@ -115,7 +117,8 @@ class TestEvidenceCatalog:
         ``decided=False``. The catalog is what an agent may cite and a critic
         lets stand, so an entry for it would say a boundary was crossed — the
         one thing rule 4 says an undecidable crossing does not establish. The
-        unplaced zone still reaches the agent as its own ``unknown`` entry.
+        unplaced endpoint still publishes an ``unknown`` entry for its
+        ``trust_zone``.
         """
         model = valid_model()
         model.data_stores[0].trust_zone = UNKNOWN
@@ -141,14 +144,14 @@ class TestEvidenceCatalog:
     def test_an_undecidable_crossing_offers_its_unplaced_endpoint_instead(
         self, unplaced
     ):
-        """The row ``prompts/analyze.md`` sends a lane agent to, tested here.
+        """The entry ``prompts/analyze.md`` sends a lane agent to, tested here.
 
         The prompt tells an agent that an undecidable crossing cannot be cited
         and that the unplaced endpoint's ``trust_zone`` can. That is a claim
         about this catalog, so the two readers are tested against each other
         rather than each against its own expectation: for every undecidable
         crossing, every endpoint the sources left unplaced publishes its own
-        ``unknown`` row.
+        ``unknown`` entry.
         """
         model = valid_model()
         by_id = {element.id: element for element in model.zoned_elements()}
@@ -528,6 +531,24 @@ class TestRenderCatalog:
         for ref in catalog:
             assert f"| `{ref}` |" in rendered
 
+    def test_the_refs_read_back_are_the_catalog_keys(self):
+        catalog = evidence_catalog(valid_model(), assertions(row()))
+        rendered = render_catalog(catalog, assertions(row()))
+
+        assert catalog_refs(rendered) == set(catalog)
+        assert assertion_id(row()) in catalog_refs(rendered)
+
+    def test_a_ref_with_an_escaped_bar_reads_back_whole(self):
+        """``_cell`` escapes a ``|``, and the read undoes it."""
+        ref = "unknown:store:a|b:encryption_at_rest"
+        ground = Ground(
+            kind="unknown-attribute",
+            element_id="store:a|b",
+            attribute="encryption_at_rest",
+        )
+
+        assert catalog_refs(render_catalog({ref: ground}, None)) == {ref}
+
     def test_it_is_not_a_list_an_agent_could_pattern_complete(self):
         rendered = render_catalog(evidence_catalog(valid_model()), assertions=None)
 
@@ -664,7 +685,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         draft = sample_draft("S-01", grounds=[ground])
 
         (view,) = critic_view(
-            [draft], assertions=held, only=None, repaired=(), unverified=()
+            [draft],
+            assertions=held,
+            only=None,
+            repaired=(),
+            unverified=(),
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         (fact,) = view["assertion_facts"]
@@ -679,7 +706,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         draft = sample_draft("S-01", grounds=[ground])
 
         (view,) = critic_view(
-            [draft], assertions=held, only=None, repaired=(), unverified=()
+            [draft],
+            assertions=held,
+            only=None,
+            repaired=(),
+            unverified=(),
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert view["assertion_facts"][0]["says"] in render_catalog(
@@ -694,6 +727,8 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
             repaired=(),
             unverified=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert "assertion_facts" not in view
@@ -1342,6 +1377,17 @@ def test_lead_topics_without_a_catalog_skips_an_assertion_ground():
     }
 
     assert lead_topics(evidence, assertions=None) == frozenset()
+
+
+def test_a_capacity_parts_no_is_a_lead():
+    """A part's "no" states the limit missing, so the lane can still raise it."""
+    entry = row(subject="process:web-app", predicate="capacity-limits-rate", value="no")
+    ref = assertion_id(entry)
+    evidence = {ref: Ground(kind="assertion", assertion=ref)}
+
+    assert lead_topics(evidence, assertions(entry)) == frozenset(
+        {"process:web-app.capacity-limits-rate"}
+    )
 
 
 class TestWhichElementsAGroundIsAbout:

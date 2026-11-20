@@ -1,0 +1,1 @@
+The rota app is a web app that the clinic's own team builds and runs. Staff sign in to the rota app with a password. From the admin console a support agent can open a session in the rota app as any staff user.

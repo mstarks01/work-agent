@@ -13,7 +13,7 @@
   saved round does not count toward
 - **Evidence**: `QA-2026-09-26-03-E20` and `-E21` in `evals/experiments/`
 - **Amended by**: [ADR 0068](0068-a-pause-says-what-it-leaves-open.md),
-  which narrows the `nothing-left` stop, and
+  which narrows the `nothing-left` reason, and
   [ADR 0071](0071-the-floor-exception-reads-each-framework-s-own-bands.md),
   under which the floor exception reads the bands of each framework apart;
   by [ADR 0088](0088-field-questions-have-no-limit.md), under which field
@@ -116,8 +116,9 @@ score on 2026-10-06.
 **A limit bounds the questions not yet answered at all.** Every saved answer
 counts toward its kind's limit. A question with facets that a round answered
 in part comes back first, and takes no place under the limit. Where the limits
-hold questions back, the question set says so: `stop` is `budget-exhausted`,
-not `nothing-left`, and the page states how many questions will not be asked.
+hold questions back, the question set says so: `empty_list_reason` is
+`budget-exhausted`, not `nothing-left`, and the page states how many questions
+will not be asked.
 
 **A submitter can skip a question for now.** A save may name questions of its
 round to skip. A skip is not a fact, not an absence and not an "I don't

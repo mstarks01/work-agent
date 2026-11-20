@@ -75,7 +75,6 @@ labels and no provider call happens at all.
 
 from __future__ import annotations
 
-import hashlib
 import itertools
 import json
 from collections import Counter
@@ -87,6 +86,7 @@ from typing import Any, Literal, get_args
 from analysis_service.frameworks import FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 from analysis_service.parsing import strings
+from analysis_service.sources import text_digest
 from evals.harness.identity import (
     NO_FLOWS,
     CaseFlows,
@@ -99,6 +99,7 @@ from evals.harness.identity import (
     endpoint_subset,
     flow_directions,
 )
+from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import GoldenCase
 from evals.harness.verbs import UNSEPARATED, same_action
 
@@ -154,7 +155,7 @@ def fixture_id(case: str, reference_index: int, candidate_ordinal: int) -> str:
     edit nobody can check.
     """
     material = f"{case}\0{reference_index}\0{candidate_ordinal}"
-    return hashlib.sha256(material.encode()).hexdigest()[:12]
+    return text_digest(material)[:12]
 
 
 @dataclass(frozen=True)
@@ -273,18 +274,20 @@ class CalibrationResult:
     set_aside: Mapping[Label, int] = field(default_factory=dict)
 
     @property
-    def agreement(self) -> float:
-        return self.agreements / self.total if self.total else 0.0
+    def agreement(self) -> float | None:
+        return ratio(self.agreements, self.total)
 
     @property
     def meets_bar(self) -> bool:
-        return self.agreement >= AGREEMENT_BAR
+        """Whether the agreement reaches the bar. No pair read never meets it."""
+        agreement = self.agreement
+        return agreement is not None and agreement >= AGREEMENT_BAR
 
     def to_json(self) -> dict[str, Any]:
         return {
             "total": self.total,
             "agreements": self.agreements,
-            "agreement": round(self.agreement, 4),
+            "agreement": rounded_figure(self.agreement, 4),
             "bar": AGREEMENT_BAR,
             "meets_bar": self.meets_bar,
             "refused": self.refused,
@@ -492,7 +495,7 @@ class IdentityValidation:
     collides: Callable[[Any, Any, CaseFlows], bool]
     #: The collisions this corpus is known to carry, as ``(case, lane) ->
     #: reason``. A collision outside this table fails
-    #: ``tests/test_evals_identity.py``: three recorded exceptions must not
+    #: ``tests/test_evals_identity.py``: the recorded exceptions must not
     #: become a floor nobody notices rising.
     recorded_collisions: Mapping[tuple[str, str], str]
 

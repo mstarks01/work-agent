@@ -254,13 +254,13 @@ def _smoke_selection(deployment: Deployment) -> tuple[FrameworkName, ...]:
     a framework left out is three tier keys nothing exercised, and an operator
     who wants them exercised runs a job.
     """
-    return selectable_without_options(deployment.frameworks)
+    return selectable_without_options(deployment.carried_frameworks)
 
 
 def unexercised_frameworks(deployment: Deployment) -> tuple[FrameworkName, ...]:
     """The carried frameworks this smoke run could not select, in carried order."""
     selected = set(_smoke_selection(deployment))
-    return tuple(name for name in deployment.frameworks if name not in selected)
+    return tuple(name for name in deployment.carried_frameworks if name not in selected)
 
 
 def _unexercised_notes(deployment: Deployment) -> tuple[str, ...]:
@@ -710,7 +710,7 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
             # outcome this module exists to rule out.
             failure=(
                 "every framework this install carries needs a job option a smoke"
-                f" run cannot supply: {list(deployment.frameworks)}"
+                f" run cannot supply: {list(deployment.carried_frameworks)}"
             ),
             notes=_unexercised_notes(deployment),
         )

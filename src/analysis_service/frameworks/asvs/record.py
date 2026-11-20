@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Literal, Self, get_args
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -72,19 +72,20 @@ from analysis_service.frameworks.asvs.applicability import (
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
-    LANES,
+    AsvsChapter,
     AsvsLevel,
+    published_text,
     requirement_band,
     requirement_id,
-    requirement_text,
     requirements_for,
 )
+from analysis_service.parsing import table_entry
+from analysis_service.sources import EvidenceClass
 from analysis_service.system_model import SystemModel
 
 __all__ = [
     "ASVS_ID_FORMAT",
     "AsvsAnalysis",
-    "AsvsChapter",
     "AsvsOptions",
     "AsvsSummary",
     "DraftRequirementRuling",
@@ -95,36 +96,6 @@ __all__ = [
     "build_asvs_summary",
     "requirement_of",
 ]
-
-#: One lane, spelled where a type checker can read it. The catalog is the source
-#: of truth and this restates it, so the two are checked against each other at
-#: import: a chapter the catalog adds and this omits would give the report a
-#: field that cannot hold its own lane.
-AsvsChapter = Literal[
-    "encoding-and-sanitization",
-    "validation-and-business-logic",
-    "web-frontend-security",
-    "api-and-web-service",
-    "file-handling",
-    "authentication",
-    "session-management",
-    "authorization",
-    "self-contained-tokens",
-    "oauth-and-oidc",
-    "cryptography",
-    "secure-communication",
-    "configuration",
-    "data-protection",
-    "secure-coding-and-architecture",
-    "security-logging-and-error-handling",
-    "webrtc",
-]
-
-if set(get_args(AsvsChapter)) != set(LANES):
-    raise ValueError(
-        f"AsvsChapter names {sorted(get_args(AsvsChapter))}, but the catalog"
-        f" declares {sorted(LANES)}"
-    )
 
 #: The ``str.format`` template this package's IDs are composed from. It is the
 #: standard's own version-safe reference — ``v5.0.0-1.2.5`` — so a claim cites
@@ -201,8 +172,8 @@ class DraftRequirementRuling(Claim):
     # the proposal so the critic reads it beside the grounds: an ``excluded``
     # on a verified absent element is the framework's exclusion, and a critic
     # that cannot see the direction rejected 96 of 99 of them as inferences.
-    # Empty only on a claim read back from a report written before the field,
-    # the precedent ``rejected_because`` set: the service fills it from the
+    # Empty only on a claim read back from a report with no such field,
+    # as ``rejected_because`` is: the service fills it from the
     # proposal, whose schema requires it, and recording nothing is truthful
     # where inventing a direction the lane never stated is not.
     direction: Literal["", "gap", "question", "excluded"] = ""
@@ -327,12 +298,16 @@ class DraftRequirementRuling(Claim):
 
     @classmethod
     def text_of_unit(cls, unit: str) -> str:
-        """The catalog's words for one requirement, or ``""`` for an unknown ID."""
-        return requirement_text(unit)
+        """The catalog's words for one unit, or ``""`` for an unknown ID."""
+        return published_text(unit)
 
     @classmethod
     def partition_proposals(
-        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+        cls,
+        proposals: Sequence[Any],
+        lane: str,
+        carried: Collection[str],
+        covered: Collection[str],
     ) -> tuple[list[Any], dict[str, str]]:
         """Every requirement whose lane agent said this job cannot settle it.
 
@@ -344,11 +319,16 @@ class DraftRequirementRuling(Claim):
 
         The reason names the kind, so the **Scope Entry** tells a reader what
         would answer the requirement instead of only that nothing did.
+
+        A requirement in ``covered`` is kept whatever kind it names: a row of
+        an applied Control covers it, and the critic judges the row.
         """
         defer = [
             proposal
             for proposal in proposals
-            if proposal.needs_evidence and proposal.needs_evidence not in carried
+            if proposal.needs_evidence
+            and proposal.needs_evidence not in carried
+            and requirement_id(lane, proposal.requirement) not in covered
         ]
         kept = [proposal for proposal in proposals if proposal not in defer]
         return kept, {
@@ -380,7 +360,9 @@ def _entry(unit: str, decision: Decision) -> ApplicabilityEntry:
     """One requirement's decision as the entry a report carries."""
     why = RATIONALES[unit]
     if decision.state == "unknown":
-        asked = "; ".join(CAPABILITIES[key].question for key in decision.missing)
+        asked = "; ".join(
+            table_entry(CAPABILITIES, key).question for key in decision.missing
+        )
         return ApplicabilityEntry(
             unit=unit,
             state="unknown",
@@ -475,7 +457,7 @@ class RequirementProposal(Proposal):
     # `""` is a legal value — it is the ordinary answer, meaning the agent
     # ruled — but it must be *chosen* rather than fallen into. The enum is
     # what keeps a required field from becoming an invented one.
-    needs_evidence: Literal["", "prose", "code", "config", "people"]
+    needs_evidence: Literal["", "prose", EvidenceClass]
     # REQUIRED, WITH NO DEFAULT, for the reason ``needs_evidence`` is: the
     # schema obliges an answer where a prompt alone does not. Closed, so a
     # spelling outside the three is an invalid proposal rather than a fourth
@@ -756,8 +738,8 @@ class AsvsAnalysis(FrameworkAnalysis):
         # Appearing and being answered are two facts. A draft the critic sent
         # back for its lane or as a duplicate still appears, in the audit array,
         # and answers nothing — so its requirement is listed in ``scope`` as
-        # well, and that pair is not a duplication. A block written before the
-        # cause was read lists no such requirement, and still appears once.
+        # well, and that pair is not a duplication. A requirement of
+        # such a draft that a stored block does not list still appears once.
         ruled = {requirement_of(claim.id) for claim in every if claim.rules_on_unit()}
         listed = {entry.unit for entry in self.scope}
         issues = []

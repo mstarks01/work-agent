@@ -1,0 +1,1067 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "Colleague",
+        "description": "A colleague interacting with the identity broker, store admin console, and other applications.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "colleague[Colleagues]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Colleagues'.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:franchise-colleague",
+        "name": "Franchise colleague",
+        "description": "A franchise colleague signing in through the franchise identity provider.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fcolleague[Franchise colleagues]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Franchise colleagues'.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:franchise-identity-provider",
+        "name": "Franchise identity provider",
+        "description": "An identity provider that vouches for a franchise colleague to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fidp[Franchise identity provider]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Franchise identity provider'.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:other-application",
+        "name": "Other application",
+        "description": "An application receiving a token from a colleague and fetching a public key from the identity broker.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "apps[Other applications]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Other applications'.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:hr-system",
+        "name": "HR system",
+        "description": "An HR system sending group changes to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "hr[HR system]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:identity-broker",
+        "name": "Identity broker",
+        "description": "A broker handling colleague sign-in, tokens, public-key retrieval, franchise identity vouches, group changes, and sign-in records.",
+        "assets": [
+          "credentials",
+          "pii",
+          "secrets"
+        ],
+        "source_excerpt": "broker[Identity broker]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-admin-console",
+        "name": "Store admin console",
+        "description": "A store administration console that fetches a public key from the identity broker.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "console[Store admin console]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:key-store",
+        "name": "Key store",
+        "description": "A store containing a signing key used by the identity broker.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "keys[(Key store)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:directory",
+        "name": "Directory",
+        "description": "A directory holding colleagues and groups and exchanging them with the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "dir[(Directory)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:audit-log",
+        "name": "Audit log",
+        "description": "A store receiving sign-in records from the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "audit[(Audit log)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>process:identity-broker>sign-in",
+        "name": "sign in",
+        "description": "A colleague signs in to the identity broker.",
+        "assets": [],
+        "source_excerpt": "colleague -->|sign in| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sign in",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>entity:colleague>token-staff-id-groups",
+        "name": "token (staff id, groups)",
+        "description": "The identity broker sends a token containing staff id and groups to a colleague.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "broker -->|\"token (staff id, groups)\"| colleague",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "entity:colleague",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "token (staff id, groups)",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>token",
+        "name": "token",
+        "description": "A colleague sends a token to the store admin console.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "colleague -->|token| console",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "token",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:colleague>entity:other-application>token",
+        "name": "token",
+        "description": "A colleague sends a token to another application.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "colleague -->|token| apps",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "entity:other-application",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "token",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
+        "name": "fetch public key",
+        "description": "The store admin console fetches a public key from the identity broker.",
+        "assets": [],
+        "source_excerpt": "console -->|fetch public key| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:store-admin-console",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fetch public key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:other-application>process:identity-broker>fetch-public-key",
+        "name": "fetch public key",
+        "description": "Another application fetches a public key from the identity broker.",
+        "assets": [],
+        "source_excerpt": "apps -->|fetch public key| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:other-application",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fetch public key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:store:key-store>process:identity-broker>signing-key",
+        "name": "signing key",
+        "description": "The key store sends a signing key to the identity broker.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "keys -->|signing key| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "store:key-store",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "signing key",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>store:directory>colleagues-groups",
+        "name": "colleagues, groups",
+        "description": "The identity broker exchanges colleagues and groups with the directory.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "broker <-->|\"colleagues, groups\"| dir",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:directory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "colleagues, groups",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:directory>process:identity-broker>colleagues-groups",
+        "name": "colleagues, groups",
+        "description": "The directory exchanges colleagues and groups with the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "broker <-->|\"colleagues, groups\"| dir",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "store:directory",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "colleagues, groups",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:hr-system>process:identity-broker>group-changes-nightly",
+        "name": "group changes (nightly)",
+        "description": "The HR system sends nightly group changes to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "hr -->|\"group changes (nightly)\"| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:hr-system",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "group changes (nightly)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:franchise-colleague>entity:franchise-identity-provider>sign-in",
+        "name": "sign in",
+        "description": "A franchise colleague signs in to the franchise identity provider.",
+        "assets": [],
+        "source_excerpt": "fcolleague -->| sign in| fidp",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:franchise-colleague",
+        "destination": "entity:franchise-identity-provider",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sign in",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:franchise-identity-provider>process:identity-broker>vouches-for-colleague",
+        "name": "vouches for colleague",
+        "description": "The franchise identity provider vouches for a colleague to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fidp -->|vouches for colleague| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:franchise-identity-provider",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "vouches for colleague",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>store:audit-log>sign-ins",
+        "name": "sign-ins",
+        "description": "The identity broker sends sign-in records to the audit log.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "broker -->|sign-ins| audit",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:audit-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sign-ins",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "The corporate network trust zone containing the identity broker and store admin console.",
+        "assets": [],
+        "source_excerpt": "subgraph corp[Corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Colleague is a human external entity because the label identifies colleagues.",
+        "element_id": "entity:colleague",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Colleagues'."
+      },
+      {
+        "assumption": "Franchise colleague is a human external entity because the label identifies franchise colleagues.",
+        "element_id": "entity:franchise-colleague",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Franchise colleagues'."
+      },
+      {
+        "assumption": "Franchise identity provider is an external system because the label identifies an identity provider.",
+        "element_id": "entity:franchise-identity-provider",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Franchise identity provider'."
+      },
+      {
+        "assumption": "Other application is an external system because the label identifies applications other than the system being modelled.",
+        "element_id": "entity:other-application",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Other applications'."
+      },
+      {
+        "assumption": "HR system is an external system because the label identifies an HR system.",
+        "element_id": "entity:hr-system",
+        "attribute": "kind",
+        "basis": "The node is labelled 'HR system'."
+      },
+      {
+        "assumption": "Colleague carries pii because a colleague is a person.",
+        "element_id": "entity:colleague",
+        "attribute": "assets",
+        "basis": "The node is labelled 'Colleagues'."
+      },
+      {
+        "assumption": "Franchise colleague carries pii because a franchise colleague is a person.",
+        "element_id": "entity:franchise-colleague",
+        "attribute": "assets",
+        "basis": "The node is labelled 'Franchise colleagues'."
+      },
+      {
+        "assumption": "Franchise identity provider carries pii because it vouches for a colleague.",
+        "element_id": "entity:franchise-identity-provider",
+        "attribute": "assets",
+        "basis": "The flow is labelled 'vouches for colleague'."
+      },
+      {
+        "assumption": "Other application carries credentials because it receives a token.",
+        "element_id": "entity:other-application",
+        "attribute": "assets",
+        "basis": "The flow to it is labelled 'token'."
+      },
+      {
+        "assumption": "HR system carries pii because it sends group changes associated with colleagues and groups.",
+        "element_id": "entity:hr-system",
+        "attribute": "assets",
+        "basis": "The flow is labelled 'group changes (nightly)'."
+      },
+      {
+        "assumption": "Identity broker carries credentials, pii, and secrets because it handles tokens, colleague and group data, and a signing key.",
+        "element_id": "process:identity-broker",
+        "attribute": "assets",
+        "basis": "The connected flows are labelled 'token (staff id, groups)', 'colleagues, groups', and 'signing key'."
+      },
+      {
+        "assumption": "Store admin console carries credentials because it receives a token.",
+        "element_id": "process:store-admin-console",
+        "attribute": "assets",
+        "basis": "The flow to it is labelled 'token'."
+      },
+      {
+        "assumption": "Key store holds credentials and secrets because it contains a signing key.",
+        "element_id": "store:key-store",
+        "attribute": "assets",
+        "basis": "The flow from it is labelled 'signing key'."
+      },
+      {
+        "assumption": "Directory holds pii because it contains colleagues and groups.",
+        "element_id": "store:directory",
+        "attribute": "assets",
+        "basis": "The bidirectional flow is labelled 'colleagues, groups'."
+      },
+      {
+        "assumption": "Audit log holds pii because it receives sign-in records.",
+        "element_id": "store:audit-log",
+        "attribute": "assets",
+        "basis": "The flow to it is labelled 'sign-ins'."
+      },
+      {
+        "assumption": "The key store's data classification is confidential because it holds a signing key.",
+        "element_id": "store:key-store",
+        "attribute": "data_classification",
+        "basis": "The flow is labelled 'signing key'; signing keys are secrets."
+      },
+      {
+        "assumption": "The directory's data classification is confidential because it holds colleague data.",
+        "element_id": "store:directory",
+        "attribute": "data_classification",
+        "basis": "The flow is labelled 'colleagues, groups'; colleague data is personal data."
+      },
+      {
+        "assumption": "The audit log's data classification is confidential because it holds sign-in records associated with people.",
+        "element_id": "store:audit-log",
+        "attribute": "data_classification",
+        "basis": "The flow is labelled 'sign-ins'; sign-in records identify or describe people."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "Colleague",
+        "description": "A colleague interacting with the identity broker, store admin console, and other applications.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "colleague[Colleagues]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Colleagues'.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:franchise-colleague",
+        "name": "Franchise colleague",
+        "description": "A franchise colleague signing in through the franchise identity provider.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fcolleague[Franchise colleagues]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Franchise colleagues'.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:franchise-identity-provider",
+        "name": "Franchise identity provider",
+        "description": "An identity provider that vouches for a franchise colleague to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fidp[Franchise identity provider]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Franchise identity provider'.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:other-application",
+        "name": "Other application",
+        "description": "An application receiving a token from a colleague and fetching a public key from the identity broker.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "apps[Other applications]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "The diagram labels this entity 'Other applications'.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:hr-system",
+        "name": "HR system",
+        "description": "An HR system sending group changes to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "hr[HR system]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:identity-broker",
+        "name": "Identity broker",
+        "description": "A broker handling colleague sign-in, tokens, public-key retrieval, franchise identity vouches, group changes, and sign-in records.",
+        "assets": [
+          "credentials",
+          "pii",
+          "secrets"
+        ],
+        "source_excerpt": "broker[Identity broker]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-admin-console",
+        "name": "Store admin console",
+        "description": "A store administration console that fetches a public key from the identity broker.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "console[Store admin console]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:key-store",
+        "name": "Key store",
+        "description": "A store containing a signing key used by the identity broker.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "keys[(Key store)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:directory",
+        "name": "Directory",
+        "description": "A directory holding colleagues and groups and exchanging them with the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "dir[(Directory)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:audit-log",
+        "name": "Audit log",
+        "description": "A store receiving sign-in records from the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "audit[(Audit log)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>process:identity-broker>sign-in",
+        "name": "sign in",
+        "description": "A colleague signs in to the identity broker.",
+        "assets": [],
+        "source_excerpt": "colleague -->|sign in| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sign in",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>entity:colleague>token-staff-id-groups",
+        "name": "token (staff id, groups)",
+        "description": "The identity broker sends a token containing staff id and groups to a colleague.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "broker -->|\"token (staff id, groups)\"| colleague",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "entity:colleague",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "token (staff id, groups)",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>token",
+        "name": "token",
+        "description": "A colleague sends a token to the store admin console.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "colleague -->|token| console",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "token",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:colleague>entity:other-application>token",
+        "name": "token",
+        "description": "A colleague sends a token to another application.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "colleague -->|token| apps",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "entity:other-application",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "token",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
+        "name": "fetch public key",
+        "description": "The store admin console fetches a public key from the identity broker.",
+        "assets": [],
+        "source_excerpt": "console -->|fetch public key| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:store-admin-console",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fetch public key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:other-application>process:identity-broker>fetch-public-key",
+        "name": "fetch public key",
+        "description": "Another application fetches a public key from the identity broker.",
+        "assets": [],
+        "source_excerpt": "apps -->|fetch public key| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:other-application",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fetch public key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:store:key-store>process:identity-broker>signing-key",
+        "name": "signing key",
+        "description": "The key store sends a signing key to the identity broker.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "keys -->|signing key| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "store:key-store",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "signing key",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>store:directory>colleagues-groups",
+        "name": "colleagues, groups",
+        "description": "The identity broker exchanges colleagues and groups with the directory.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "broker <-->|\"colleagues, groups\"| dir",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:directory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "colleagues, groups",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:directory>process:identity-broker>colleagues-groups",
+        "name": "colleagues, groups",
+        "description": "The directory exchanges colleagues and groups with the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "broker <-->|\"colleagues, groups\"| dir",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "store:directory",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "colleagues, groups",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:hr-system>process:identity-broker>group-changes-nightly",
+        "name": "group changes (nightly)",
+        "description": "The HR system sends nightly group changes to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "hr -->|\"group changes (nightly)\"| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:hr-system",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "group changes (nightly)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:franchise-colleague>entity:franchise-identity-provider>sign-in",
+        "name": "sign in",
+        "description": "A franchise colleague signs in to the franchise identity provider.",
+        "assets": [],
+        "source_excerpt": "fcolleague -->|sign in| fidp fidp",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:franchise-colleague",
+        "destination": "entity:franchise-identity-provider",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sign in",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:franchise-identity-provider>process:identity-broker>vouches-for-colleague",
+        "name": "vouches for colleague",
+        "description": "The franchise identity provider vouches for a colleague to the identity broker.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fidp -->|vouches for colleague| broker",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:franchise-identity-provider",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "vouches for colleague",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:identity-broker>store:audit-log>sign-ins",
+        "name": "sign-ins",
+        "description": "The identity broker sends sign-in records to the audit log.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "broker -->|sign-ins| audit",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:audit-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sign-ins",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "The corporate network trust zone containing the identity broker and store admin console.",
+        "assets": [],
+        "source_excerpt": "subgraph corp[Corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Colleague is a human external entity because the label identifies colleagues.",
+        "element_id": "entity:colleague",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Colleagues'."
+      },
+      {
+        "assumption": "Franchise colleague is a human external entity because the label identifies franchise colleagues.",
+        "element_id": "entity:franchise-colleague",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Franchise colleagues'."
+      },
+      {
+        "assumption": "Franchise identity provider is an external system because the label identifies an identity provider.",
+        "element_id": "entity:franchise-identity-provider",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Franchise identity provider'."
+      },
+      {
+        "assumption": "Other application is an external system because the label identifies applications other than the system being modelled.",
+        "element_id": "entity:other-application",
+        "attribute": "kind",
+        "basis": "The node is labelled 'Other applications'."
+      },
+      {
+        "assumption": "HR system is an external system because the label identifies an HR system.",
+        "element_id": "entity:hr-system",
+        "attribute": "kind",
+        "basis": "The node is labelled 'HR system'."
+      },
+      {
+        "assumption": "Colleague carries pii because a colleague is a person.",
+        "element_id": "entity:colleague",
+        "attribute": "assets",
+        "basis": "The node is labelled 'Colleagues'."
+      },
+      {
+        "assumption": "Franchise colleague carries pii because a franchise colleague is a person.",
+        "element_id": "entity:franchise-colleague",
+        "attribute": "assets",
+        "basis": "The node is labelled 'Franchise colleagues'."
+      },
+      {
+        "assumption": "Franchise identity provider carries pii because it vouches for a colleague.",
+        "element_id": "entity:franchise-identity-provider",
+        "attribute": "assets",
+        "basis": "The flow is labelled 'vouches for colleague'."
+      },
+      {
+        "assumption": "Other application carries credentials because it receives a token.",
+        "element_id": "entity:other-application",
+        "attribute": "assets",
+        "basis": "The flow to it is labelled 'token'."
+      },
+      {
+        "assumption": "HR system carries pii because it sends group changes associated with colleagues and groups.",
+        "element_id": "entity:hr-system",
+        "attribute": "assets",
+        "basis": "The flow is labelled 'group changes (nightly)'."
+      },
+      {
+        "assumption": "Identity broker carries credentials, pii, and secrets because it handles tokens, colleague and group data, and a signing key.",
+        "element_id": "process:identity-broker",
+        "attribute": "assets",
+        "basis": "The connected flows are labelled 'token (staff id, groups)', 'colleagues, groups', and 'signing key'."
+      },
+      {
+        "assumption": "Store admin console carries credentials because it receives a token.",
+        "element_id": "process:store-admin-console",
+        "attribute": "assets",
+        "basis": "The flow to it is labelled 'token'."
+      },
+      {
+        "assumption": "Key store holds credentials and secrets because it contains a signing key.",
+        "element_id": "store:key-store",
+        "attribute": "assets",
+        "basis": "The flow from it is labelled 'signing key'."
+      },
+      {
+        "assumption": "Directory holds pii because it contains colleagues and groups.",
+        "element_id": "store:directory",
+        "attribute": "assets",
+        "basis": "The bidirectional flow is labelled 'colleagues, groups'."
+      },
+      {
+        "assumption": "Audit log holds pii because it receives sign-in records.",
+        "element_id": "store:audit-log",
+        "attribute": "assets",
+        "basis": "The flow to it is labelled 'sign-ins'."
+      },
+      {
+        "assumption": "The key store's data classification is confidential because it holds a signing key.",
+        "element_id": "store:key-store",
+        "attribute": "data_classification",
+        "basis": "The flow is labelled 'signing key'; signing keys are secrets."
+      },
+      {
+        "assumption": "The directory's data classification is confidential because it holds colleague data.",
+        "element_id": "store:directory",
+        "attribute": "data_classification",
+        "basis": "The flow is labelled 'colleagues, groups'; colleague data is personal data."
+      },
+      {
+        "assumption": "The audit log's data classification is confidential because it holds sign-in records associated with people.",
+        "element_id": "store:audit-log",
+        "attribute": "data_classification",
+        "basis": "The flow is labelled 'sign-ins'; sign-in records identify or describe people."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": [
+      {
+        "element_id": "flow:entity:franchise-colleague>entity:franchise-identity-provider>sign-in",
+        "written": "fcolleague -->| sign in| fidp",
+        "similarity": 0.903,
+        "scan_complete": true
+      }
+    ]
+  },
+  "issues": [],
+  "repair": null
+}

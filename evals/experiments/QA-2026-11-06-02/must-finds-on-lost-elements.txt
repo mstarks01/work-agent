@@ -1,0 +1,14 @@
+4/5 lost  5 must-find  14-loyalty-oauth-platform/flow:entity:partner-app>process:rewards-api>call-rewards-api  {'omitted': 1, 'endpoint_unaligned': 3}
+2/5 lost  5 must-find  13-dispatch-control-plane/flow:process:dispatch-console>process:dispatch-api>live-job-status  {'unresolved': 2}
+1/5 lost  5 must-find  01-payments-checkout/flow:entity:shopper>process:storefront-api>place-order  {'unresolved': 1}
+5/5 lost  3 must-find  14-loyalty-oauth-platform/flow:entity:member>entity:partner-app>return-with-authorization-code  {'omitted': 2, 'endpoint_unaligned': 3}
+3/5 lost  2 must-find  14-loyalty-oauth-platform/entity:partner-app  {'mistyped': 3}
+1/5 lost  2 must-find  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  {'omitted': 1}
+1/5 lost  2 must-find  13-dispatch-control-plane/flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed  {'omitted': 1}
+5/5 lost  1 must-find  14-loyalty-oauth-platform/flow:entity:member>process:authorization-server>sign-in-and-consent  {'omitted': 3, 'misattached': 2}
+2/5 lost  1 must-find  02-iot-fleet-telemetry/flow:entity:field-technician>entity:sensor-node>local-service-session  {'endpoint_unaligned': 2}
+2/5 lost  1 must-find  10-cookbook-generic-cms/flow:process:web-server>store:mysql-database>cms-data  {'omitted': 2}
+1/5 lost  1 must-find  09-cookbook-sokify-retail/flow:process:fax-gateway>entity:customer>confirmation-fax  {'endpoint_unaligned': 1}
+1/5 lost  1 must-find  09-cookbook-sokify-retail/process:fax-gateway  {'mistyped': 1}
+1/5 lost  1 must-find  12-overclaiming-supplier-portal/flow:process:supplier-master-service>store:landing-bucket>load-extract  {'omitted': 1}
+must-finds touching a lost element: 28 {'stride': 13, 'asvs': 15} of {'stride': 119, 'asvs': 72}

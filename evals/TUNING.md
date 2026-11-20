@@ -35,7 +35,7 @@ runs" in [`AGENTS.md`](../AGENTS.md).
   a model to sweep with" below.
 - **Classify a command by what it does, not by its name.** `score`, `replay`,
   `stability` and the other re-reads of an archive are offline. `run`,
-  `lane-replay` and `critic-replay` send requests and are paid. Set
+  `lane-replay`, `critic-replay` and `recritic-replay` send requests and are paid. Set
   `ANALYSIS_OFFLINE=1` for offline work, and a paid path fails before it
   reaches a provider.
 
@@ -152,8 +152,8 @@ python -m evals.harness.run calibrate --out agreement.json
 ```
 
 **Read the error directions first; they are the measurement.** The shipped
-rule has 13 false splits of 169 equivalent candidate pairs, 2 false merges of
-92 candidate negatives and 2 false merges of 365 distinct reference pairs. A
+rule has 15 false splits of 169 equivalent candidate pairs, 2 false merges of
+92 candidate negatives and 8 false merges of 484 distinct reference pairs. A
 split hands a reviewer one unmatched finding. A merge destroys a finding and
 inflates recall, and nobody sees it happen — which is the expensive way to be
 wrong, and why a lenient rule is never the fix. Watch the candidate column
@@ -232,7 +232,9 @@ python -m evals.harness.run stability baseline-*.json --out baseline-spread.json
 ```
 
 Read two things off it. `worst_case_recall_spread` is the band any later
-comparison has to clear. `sometimes_matched` — references found in some runs and
+comparison has to clear, read beside `cases_without_recall_spread`: a case
+whose recall has no value in some run has no spread, so the band covers the
+other cases only. `sometimes_matched` — references found in some runs and
 not others — is the same fact per reference, and it is the more useful one when
 a case's recall happens to land on the same number twice by finding different
 threats.
@@ -307,7 +309,7 @@ lands from now on sharpens it and costs nothing extra.
 
 Extraction is graded on element IDs, which are derived from names, so a model
 that identifies a component correctly and names it its own way scores as though
-it found nothing. Those are two different questions and the score now asks both:
+it found nothing. Those are two different questions and the score asks both:
 
 - **Naming-policy conformity** — `endpoint_recall`. Did the extraction keep the
   source's wording, which is what `extract.md` rule 3 asks for?
@@ -370,7 +372,7 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find coverage** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. It is coverage of a reference, not a measure of whether the argument is right (#890). |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average coverage while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
+| **critic yield** (a pair) | rejects more down-voted drafts (`rejected_kill_rate`) without rejecting reference-matched drafts (`matched_kill_rate`) | A kill count alone tells you nothing — read both halves together. Each rate counts only the drafts with a verdict, and its numerator counts the critic's rejections. The "no archived verdict" line counts each draft that leaves the report with no verdict, and the "lost for good" count of the "all kills" figures also counts a reference-matched one whose reference no claim took. |
 
 All of these are *relative to the rule and the ledger*. Use them to compare
 configurations and track movement; never quote them as absolute scores or
@@ -397,7 +399,7 @@ them the way you read critic yield — as a pair:
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
 | **`rejected_rate`** (per case) | falls, or holds | A style down-vote is not this number. `poorly-written` leaves the finding in the pool, so a config that writes worse cannot flatter this one. |
-| **`pooled`** against **`unvoted`** | `pooled` rises while `unvoted` falls | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` count means nobody has looked, not that the tool is right. |
+| **`pooled`** against **`unvoted`** and **`stale`** | `pooled` rises while `unvoted` and `stale` fall | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` or `stale` count means nobody has looked at this argument, not that the tool is right. |
 | **`writing_aggregate.objection_rate`** | falls, or holds | Where a style objection lands, and the only number it moves. It is a rate over the findings people answered, so read `answered` beside it. |
 
 The votes reach the numbers with no provider call: `score` re-reads the ledger
@@ -407,7 +409,7 @@ over a finished sweep's saved reports.
 python -m evals.harness.run score baseline-1.json
 ```
 
-A vote hangs on a finding's fingerprint, so tuning does not re-spend it: after
+A vote hangs on a finding's fingerprint, so tuning does not ask for it again: after
 the first sitting, a configuration change puts only its *new* findings in the
 queue. That is what makes this affordable per experiment rather than per
 session.
@@ -420,10 +422,10 @@ artifact:
 
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
-| **applicability recall and precision** | both go up, or one holds while the other rises | **Read them together or not at all.** An ASVS claim rules applicability and never a pass, so a lane that ruled *everything* applicable scores 100% recall. Recall alone is trivially winnable and worthless. Precision reads `n/a` until a case declares `reference_set: exhaustive`, because the complement of a sample is not a set of negatives — so today recall has no partner and no ASVS run is tunable on this row. |
+| **applicability recall and precision** | both go up, or one holds while the other rises | **Read them together or not at all.** An ASVS claim rules applicability and never a pass, so a lane that ruled *everything* applicable scores 100% recall. Recall alone is trivially winnable and worthless. Precision reads `unavailable` until a case declares `reference_set: exhaustive`, because the complement of a sample is not a set of negatives — so today recall has no partner and no ASVS run is tunable on this row. |
 | **`off_catalog`** | is zero, and stays zero | Not a tuning number. It counts claims naming a requirement the run's level does not carry — the package composing an identifier its own catalog cannot reach. Any value here is a bug to fix, not a lever to pull. |
 | **applicability exemplar delta** | shrinks or holds | Same question as STRIDE's, over this package's own exemplars. `exemplar_proximity` sits on the `(case, framework)` pair, so a case near STRIDE's payments exemplar is near nothing of ASVS's. |
-| **applicability yield** (a pair) | rejects more the corpus did not expect (`earned`) without rejecting what it did (`destroyed`) | The ASVS critic's only destructive move is `rejected` — the ruling that a requirement does not apply. `destroyed` is the veto number here, exactly as `matched_killed` is for STRIDE, and a rejection count alone reads as either. |
+| **applicability yield** (a pair) | rejects more the corpus did not expect (`earned`) without rejecting what it did (`destroyed`) | The ASVS critic's only destructive move is `rejected` — the ruling that a requirement does not apply. `destroyed` is the veto number here. Its STRIDE counterpart among the rejections is the numerator of `matched_kill_rate`; STRIDE's veto number `matched_killed` also counts a kill with no verdict. A rejection count alone reads as either. |
 
 **What moves each cell, when recall is short:**
 
@@ -450,7 +452,10 @@ it as a number: must-finds of 129.
 
 **Read the archived misses.** Every scored sweep carries two blocks that charge
 each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
-place and wrote another action), `merged`, `misfiled` (the finding sits in
+place and wrote another action), `position` (the lane wrote the action against
+another attacker than the one a person ruled), `unstated` (as `position`, but
+the drafts state no position, because the archive holds them with no
+`attacker_position`), `merged`, `misfiled` (the finding sits in
 another lane), the critic, `fan-in` (the lane proposed it and the fan-in
 removed it, or narrowed its elements off the place), the place (a rule led
 there and nothing was drafted), or `unled`. A `place` or `unled` row also says
@@ -499,6 +504,10 @@ reference row on an assertion case takes a fate the same way.
 ```bash
 python -m evals.harness.run replay evals/emissions/*.json --out /tmp/replay.json
 ```
+
+The replay pools only the sweeps that record one input in `rendered_sources`.
+Name the arm of an older sweep with `--arm LABEL=GLOB` to pool it with others
+that read the same input.
 
 An `omitted` count is the ceiling of a prompt change that asks the model to
 read more. An `unresolved` count is not: it waits on a ruling, and a run
@@ -695,12 +704,16 @@ compare to the baseline band:
   and the next sweep may not reproduce it.
 - **Near/far delta** — did the gap widen? If so, you may have traded far-domain
   coverage for a better-looking average.
-- **Critic yield** — did `killed-real` (real findings the critic threw out) go
-  up? That's a regression hiding inside a higher kill rate.
+- **Critic yield** — did `matched_kill_rate` (reference-matched drafts the critic
+  rejected) go up? That's a regression hiding inside a higher kill rate. Also
+  read the "no archived verdict" line, which counts each draft that leaves the
+  report with no verdict, and the "lost for good" count of the "all kills"
+  figures, which also counts a reference-matched one whose reference no claim
+  took. A draft with no verdict does not raise `matched_kill_rate`.
 
 A change that lifts or holds per-case recall, without widening the delta or
-raising `killed-real`, is a keeper. Anything else is noise, or a trade you should
-justify in the pull request.
+raising `matched_kill_rate`, is a keeper. Anything else is noise, or a trade you
+should justify in the pull request.
 
 ## Step 6 — Promote the winner
 

@@ -548,7 +548,7 @@ def _named_identifiers(tree: ast.AST) -> set[str]:
 
 def _searched_files():
     """Every file the two scans below read, from the one enumerator every lint
-    shares — so a local run's artifacts cannot fail this suite (#942)."""
+    shares — so a local run's artifacts cannot fail this suite (PR #944)."""
     for path in SEARCHED:
         yield path.relative_to(REPO_ROOT).as_posix(), path
 
@@ -603,9 +603,8 @@ def test_a_vendor_named_thing_is_declared_or_open():
     """A value may not carry a vendor's name unexplained.
 
     The half :data:`LITERAL` is blind to, and the half that matters most here:
-    a rule named for a vendor invites the next reader to key it on one, which
-    is how a family rule came to sit in a vendor-keyed table with an entry
-    missing.
+    a rule named for a vendor invites the next reader to key it on one, and a
+    family rule then sits in a vendor-keyed table with an entry missing.
     """
     unexplained = {
         name: sorted(word for word in words if word not in OPEN_BY_DECISION)

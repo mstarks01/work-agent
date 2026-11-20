@@ -19,9 +19,9 @@ from collections.abc import Iterable, Mapping
 from types import MappingProxyType
 
 from analysis_service.assertions import (
-    REGISTRY,
     AssertionCatalog,
     assertion_id,
+    parse_predicate,
     projection_fields,
 )
 from analysis_service.claims import ASSERTION_GROUNDS, ATTRIBUTE_GROUNDS, Claim
@@ -82,7 +82,7 @@ def row_controls(assertions: AssertionCatalog | None) -> Mapping[str, str]:
         {
             assertion_id(entry): fields.get(entry.predicate) or entry.predicate
             for entry in assertions.entries
-            if entry.predicate in REGISTRY
+            if parse_predicate(entry.predicate) is not None
         }
     )
 

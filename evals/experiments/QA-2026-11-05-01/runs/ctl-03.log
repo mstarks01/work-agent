@@ -1,0 +1,14 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Landing-bucket extracts may be readable on the scheduler read path | ['flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'process:ingest-scheduler', 'store:landing-bucket']
+- Airflow connection strings and partner keys may be exposed in transit | ['flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'process:ingest-scheduler', 'store:airflow-metadata-database']
+- Transform-run requests may disclose sensitive pipeline metadata across zones | ['flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform', 'process:ingest-scheduler', 'process:spark-transform-job']
+- Normalized claim records may be readable on the warehouse load path | ['flow:process:spark-transform-job>store:claims-warehouse>load-records', 'process:spark-transform-job', 'store:claims-warehouse']
+- Analyst query results may be exposed on an unverified warehouse connection | ['flow:entity:data-analyst>store:claims-warehouse>run-queries', 'entity:data-analyst', 'store:claims-warehouse']
+- Landing-bucket copies may expose partner health extracts if storage encryption is absent | ['store:landing-bucket']
+- A metadata-database storage copy may reveal long-lived partner credentials | ['store:airflow-metadata-database']
+- Warehouse storage copies may expose the complete normalized claims corpus | ['store:claims-warehouse']
+- Weak or absent scheduler authentication could expose every landing-bucket extract | ['store:landing-bucket', 'flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files', 'process:ingest-scheduler']
+- Weak or absent metadata-database authentication could disclose Airflow secrets | ['store:airflow-metadata-database', 'flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections', 'process:ingest-scheduler']
+- Dataset-wide analyst access permits disclosure of member-identifying claim data | ['entity:data-analyst', 'flow:entity:data-analyst>store:claims-warehouse>run-queries', 'store:claims-warehouse']
+spent: $0.0575 reported
+must-finds matched: [8, 9]

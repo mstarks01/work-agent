@@ -17,7 +17,24 @@ the report's own order settled, at six and at ten questions a case. The count
 cannot see the main reason to ask early: the lanes then write their findings
 with the answer in hand.
 
-**The list ranks a question by its score per choice.** A question answered in
+**Eligibility and order read two values** (ADR 0115). The floor reads the
+score, so every candidate on an element keeps a question eligible. The list
+ranks a field question by its relevance: the same product with only the
+candidates whose rule reads that fact (:func:`reads`). A candidate that reads
+another fact of the element does not move the question up. On the archive,
+where a kind ranked by its prior alone, this order completed 12% to 14% more
+STRIDE findings than the score did at 10 and 15 choices.
+
+**A rule reads a question kind where it names one of the kind's parts** in
+:attr:`~analysis_service.candidates.Rule.informed_by` (ADR 0117). A
+framework's candidates count only toward the fields of its own prior. The ASVS
+prior names no question kind, so the ASVS rows do not move the early order.
+Against the order where a kind ranked by its prior alone, STRIDE alone
+completed 14 more findings at 15 choices and 35 more at 20. With STRIDE
+also selected, ASVS settled 144 fewer units at 20 choices (833 to 689)
+(``QA-2026-11-13-01-E1``).
+
+**The list ranks a question by its relevance per choice.** A question answered in
 facets costs a choice a facet, so a table of four facets must score four
 times a one-choice question to come before it. Ranked by score alone, a
 STRIDE-only pause opened with tables, and a submitter's first ten choices
@@ -74,15 +91,21 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
-from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import generate_candidates
+from analysis_service.assertions import AssertionCatalog, PredicateName
+from analysis_service.candidates import Candidate, generate_candidates
 from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import (
     FrameworkName,
     UnknownKey,
     UnknownRef,
 )
-from analysis_service.fact_answers import FactKind, answer_facets, fact_kind, key_ref
+from analysis_service.fact_answers import (
+    FactKind,
+    answer_facets,
+    asked_facets,
+    fact_kind,
+    key_ref,
+)
 from analysis_service.frameworks import PACKAGES, PreconditionResult, run_precondition
 from analysis_service.memo import Memo, remembered
 from analysis_service.open_facts import (
@@ -92,12 +115,13 @@ from analysis_service.open_facts import (
     open_attribute,
     prepared_model,
 )
-from analysis_service.parsing import non_negative
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
+from analysis_service.parsing import non_negative, table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
     "GATE_REASON",
+    "KIND_REASON",
     "PRIOR_REASON",
     "QUESTION_PRIOR",
     "QUESTION_PRIOR_PATH",
@@ -110,15 +134,21 @@ __all__ = [
     "element_type",
     "framework_gates",
     "load_prior",
+    "reads",
     "waiting_parts",
 ]
 
 QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
 
 
-#: The reason a field question gives where no rule reads its fact: the prior,
-#: which is why it is asked at all.
+#: The reason an attribute question gives where no rule reads its fact: the
+#: prior, which is why it is asked at all.
 PRIOR_REASON = "Findings in earlier analyses often depend on this fact."
+
+#: The reason a question kind gives where no rule reads its fact: what the
+#: kind covers (:attr:`~analysis_service.question_kinds.QuestionKind.covers`),
+#: which names the findings an answer informs.
+KIND_REASON = "An answer informs which findings about {covers} the analysis reports for {element}."
 
 #: The reason a gate question gives, once for each framework it decides.
 GATE_REASON = "Whether the {framework} analysis runs depends on this fact."
@@ -128,10 +158,13 @@ GATE_REASON = "Whether the {framework} analysis runs depends on this fact."
 class PriorRow:
     """One framework's prior, and the runs it was counted from."""
 
+    #: The run record of the command that counted the rates
+    #: (``evals/harness/run_record.py``): the commit, whether the tree was
+    #: clean, the command's options and the sha256 of each file it read.
+    #: ``None`` where no recorded run counted them.
+    record: Mapping[str, Any] | None
     #: The archived runs the rates were counted from, as ``run.py`` was given them.
     runs: tuple[str, ...]
-    #: The commit the command ran at, or ``None`` where no run was counted.
-    revision: str | None
     #: The development cases counted. A holdout case is never counted.
     cases: int
     #: Citations of each attribute or kind, per element of each type.
@@ -139,8 +172,8 @@ class PriorRow:
 
     def to_json(self) -> dict[str, object]:
         return {
+            "record": None if self.record is None else dict(self.record),
             "runs": list(self.runs),
-            "revision": self.revision,
             "cases": self.cases,
             "rates": {kind: dict(fields) for kind, fields in self.rates.items()},
         }
@@ -158,14 +191,19 @@ def _refuse_prior(path: Path, raw: object) -> None:
     """Refuse a prior a list could not be ranked from, naming the file and the key.
 
     A framework outside ``PACKAGES`` or an element type no model holds would
-    load and then rank nothing, so the list would shrink without a word.
+    load and then rank nothing, so the list would shrink without a word. A row
+    with no ``record`` would hide whether a recorded run counted it.
     """
     if not isinstance(raw, dict):
         raise PriorError(f"{path}: the prior is not a JSON object")
     for name, row in raw.items():
         if name not in PACKAGES:
             raise PriorError(f"{path}: {name!r} is not a framework package")
-        rates = row.get("rates") if isinstance(row, dict) else None
+        if not isinstance(row, dict):
+            raise PriorError(f"{path}: {name}: the row is not an object")
+        if "record" not in row or not isinstance(row["record"], dict | None):
+            raise PriorError(f"{path}: {name}: record is not an object or null")
+        rates = row.get("rates")
         if not isinstance(rates, dict):
             raise PriorError(f"{path}: {name}: rates is not an object")
         for kind, fields in rates.items():
@@ -187,8 +225,8 @@ def load_prior(path: Path = QUESTION_PRIOR_PATH) -> Mapping[FrameworkName, Prior
     return MappingProxyType(
         {
             name: PriorRow(
+                record=row["record"],
                 runs=tuple(row["runs"]),
-                revision=row["revision"],
                 cases=row["cases"],
                 rates=MappingProxyType(
                     {
@@ -219,9 +257,11 @@ class EarlyQuestion:
     #: What a reader sees: an element's name and the attribute, or the kind's
     #: question about the element.
     label: str
-    #: Why the fact matters before any finding exists: the questions of the
-    #: rules that read this fact on this element, or :data:`PRIOR_REASON`
-    #: where no rule reads it. Never a rule that only names the element.
+    #: Why the fact matters before any finding exists: the effect sentence
+    #: (:attr:`~analysis_service.candidates.Rule.effect`) of each rule
+    #: that reads this fact on this element, :data:`KIND_REASON` for a
+    #: question kind no rule there reads, or :data:`PRIOR_REASON` where no rule
+    #: reads it. Never a rule that only names the element.
     reasons: tuple[str, ...]
     #: The selected frameworks an answer serves, by name, in name order.
     frameworks: tuple[FrameworkName, ...]
@@ -240,17 +280,20 @@ class EarlyQuestion:
     group: str
     group_heading: str
     element: str
-    #: The value the list is ranked from. For a field, the prior's rate for the
-    #: field on the element's type times one plus the candidates the rules
-    #: raise on the element, summed over the frameworks: a ranking heuristic,
-    #: not a measured count of the findings an answer changes. For a
-    #: capability, how many units it could settle. The list ranks a field
-    #: question by this value per choice (:attr:`decisions`), capabilities
-    #: first; the recommended list takes its places with the frameworks in
-    #: turn (:func:`~analysis_service.answer_state.by_turn`). Within a turn a
-    #: capability ranks by its :attr:`standing`, and what an answer settles
-    #: (:mod:`analysis_service.answer_effects`) breaks a tie.
+    #: The value the floor reads. For a field, the prior's rate for the field
+    #: on the element's type times one plus the candidates the rules raise on
+    #: the element, summed over the frameworks: a heuristic, not a measured
+    #: count of the findings an answer changes. For a capability, how many
+    #: units it could settle. The recommended list takes its places with the
+    #: frameworks in turn (:func:`~analysis_service.answer_state.by_turn`).
+    #: Within a turn a capability ranks by its :attr:`standing`, and what an
+    #: answer settles (:mod:`analysis_service.answer_effects`) breaks a tie.
     score: float = 0.0
+    #: For a field, the value the list ranks it by, per choice
+    #: (:attr:`decisions`): :attr:`score` with only the candidates whose rule
+    #: reads the field (:func:`reads`). A question kind takes the prior alone.
+    #: Zero for every other question.
+    relevance: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
@@ -295,6 +338,7 @@ class EarlyQuestion:
             "form": self.form,
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
+            "asks": list(asked_facets(self.key)),
             "max_length": self.max_length,
             "decisions": self.decisions,
             "group": self.group,
@@ -305,11 +349,16 @@ class EarlyQuestion:
         }
 
 
-def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | None:
+def _open_key(
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    element: Element,
+    field: str,
+) -> UnknownKey | None:
     """The fact this field asks about this element, or ``None`` where it is not open."""
-    if field in QUESTION_KINDS:
+    if parse_question_kind(field) is not None:
         return UnknownRef(element_id=element.id, question=field).key
-    if open_attribute(model, element.id, field):
+    if open_attribute(model, element.id, field, catalog):
         return UnknownRef(element_id=element.id, attribute=field).key
     return None
 
@@ -365,8 +414,39 @@ def early_questions(
             json.dumps(sorted(assume)),
         ),
         lambda: _early_questions(model, frameworks, catalog, prior, assume),
-        held=(prior, PACKAGES),
+        held=(prior, PACKAGES, reads),
     )
+
+
+#: The candidate facts that name a field by another name: the zone of either
+#: end of a flow is that end's ``trust_zone``.
+ZONE_FACTS = frozenset({"source_zone", "destination_zone"})
+
+
+def reads(
+    candidate: Candidate, informed_by: Collection[PredicateName], field: str
+) -> bool:
+    """Whether ``candidate``'s rule read ``field`` on the elements it names.
+
+    **The one reader of the facts a candidate reads.** A rule reads each fact
+    it names, the ``trust_zone`` of a flow's end where it names that end's
+    zone, and the attribute it names where it reads a named attribute. It
+    reads a question kind where ``informed_by``, the rule's
+    :attr:`~analysis_service.candidates.Rule.informed_by`, names one of the
+    kind's parts. It reads that kind on each element the candidate names, so
+    a part of the process at a flow's source can inform a rule about the flow.
+    """
+    kind = parse_question_kind(field)
+    if kind is not None:
+        return any(
+            predicate in informed_by for _, predicate in QUESTION_KINDS[kind].parts
+        )
+    read = set(candidate.facts)
+    if read & ZONE_FACTS:
+        read.add("trust_zone")
+    if "attribute" in candidate.facts:
+        read.add(str(candidate.facts["attribute"]))
+    return field in read
 
 
 def _early_questions(
@@ -399,51 +479,68 @@ def _early_questions(
     deciding = _gate_questions(model, gates, catalog, names)
     decided = {question.key for question in deciding}
     score: dict[UnknownKey, float] = {}
+    relevance: dict[UnknownKey, float] = {}
     helps: dict[UnknownKey, list[FrameworkName]] = {}
-    reasons: dict[tuple[str, str], list[str]] = {}
+    reasons: dict[UnknownKey, list[str]] = {}
     for name in runnable:
         package = PACKAGES[name]
-        asks = {rule.rule_id: rule.question for rule in package.rules}
-        named: Counter[str] = Counter()
+        rules = {rule.rule_id: rule for rule in package.rules}
+        named: dict[str, list[Candidate]] = {}
         for lane, found in generate_candidates(
             model, package.lanes, package.rules, catalog
         ).items():
             if package.record.idle(model, frameworks[name], lane):
                 continue
             for candidate in found.candidates:
-                named.update(set(candidate.element_ids))
-                for element_id in candidate.element_ids:
-                    for field in candidate.facts:
-                        said = reasons.setdefault((element_id, field), [])
-                        if asks[candidate.rule_id] not in said:
-                            said.append(asks[candidate.rule_id])
+                for element_id in set(candidate.element_ids):
+                    named.setdefault(element_id, []).append(candidate)
         for element in model.elements():
             rates = prior[name].rates.get(element_type(element), {})
             for field, rate in rates.items():
-                key = _open_key(model, element, field)
-                if key is not None and key not in decided:
-                    score[key] = score.get(key, 0.0) + rate * (1 + named[element.id])
-                    helps.setdefault(key, []).append(name)
-    asked = []
-    for key, value in score.items():
-        ref = key_ref(key)
-        asked.append(
-            _question(
-                key,
-                model,
-                catalog,
-                names,
-                reasons=tuple(
-                    reasons.get((ref.element_id, ref.attribute), ()) or (PRIOR_REASON,)
-                ),
-                frameworks=tuple(helps[key]),
-                score=value,
-            )
+                key = _open_key(model, catalog, element, field)
+                if key is None or key in decided:
+                    continue
+                on_element = named.get(element.id, [])
+                reading = [
+                    one
+                    for one in on_element
+                    if reads(one, rules[one.rule_id].informed_by, field)
+                ]
+                score[key] = score.get(key, 0.0) + rate * (1 + len(on_element))
+                relevance[key] = relevance.get(key, 0.0) + rate * (1 + len(reading))
+                helps.setdefault(key, []).append(name)
+                said = reasons.setdefault(key, [])
+                for candidate in reading:
+                    if rules[candidate.rule_id].effect not in said:
+                        said.append(rules[candidate.rule_id].effect)
+    asked = [
+        _question(
+            key,
+            model,
+            catalog,
+            names,
+            reasons=tuple(reasons[key]) or (_unread_reason(key, names),),
+            frameworks=tuple(helps[key]),
+            score=value,
+            relevance=relevance[key],
         )
+        for key, value in score.items()
+    ]
     asked.sort(
-        key=lambda question: (-question.score / question.decisions, question.key)
+        key=lambda question: (-question.relevance / question.decisions, question.key)
     )
     return (*deciding, *capability_questions(model, runnable), *asked)
+
+
+def _unread_reason(key: UnknownKey, names: Mapping[str, str]) -> str:
+    """The reason a question gives where no rule reads its fact."""
+    if fact_kind(key) != "question":
+        return PRIOR_REASON
+    ref = key_ref(key)
+    return KIND_REASON.format(
+        covers=table_entry(QUESTION_KINDS, ref.question).covers,
+        element=names.get(ref.element_id, ref.element_id),
+    )
 
 
 def _question(
@@ -455,6 +552,7 @@ def _question(
     reasons: tuple[str, ...],
     frameworks: tuple[FrameworkName, ...],
     score: float = 0.0,
+    relevance: float = 0.0,
     gates: tuple[FrameworkName, ...] = (),
 ) -> EarlyQuestion:
     """One early question about an element's fact, with the form its answer takes."""
@@ -475,6 +573,7 @@ def _question(
         group_heading=heading,
         element=names.get(ref.element_id, ref.element_id),
         score=score,
+        relevance=relevance,
         gates=gates,
     )
 
@@ -498,7 +597,7 @@ def _gate_questions(
             continue
         for ref in PACKAGES[name].precondition_facts(model):
             if ref.kind == "attribute" and not open_attribute(
-                model, ref.element_id, ref.attribute
+                model, ref.element_id, ref.attribute, catalog
             ):
                 continue
             deciding.setdefault(ref.key, []).append(name)
@@ -580,7 +679,7 @@ def capability_questions(
         questions[key] = EarlyQuestion(
             key=ref.key,
             kind="capability",
-            label=CAPABILITIES[key].question,
+            label=table_entry(CAPABILITIES, key).question,
             reasons=(f"An answer settles whether up to {counts[key]} units apply.",),
             choices=YES_NO,
             form="choice",
@@ -589,7 +688,7 @@ def capability_questions(
             max_length=answer_limit(ref.key, model),
             group=group,
             group_heading=heading,
-            element=CAPABILITIES[key].question,
+            element=table_entry(CAPABILITIES, key).question,
             frameworks=tuple(helps[key]),
             score=float(counts[key]),
             framework_bands=tuple(own[key]),

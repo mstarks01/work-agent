@@ -1,11 +1,11 @@
 """The gain gates: a coverage gain that comes from saying more is caught (#1093).
 
-The negative control is the point of the module. A copy of a sealed Baseline is
+The flooded copy is the point of the module. A copy of a sealed Baseline is
 flooded: every case gains a must-find and also files six more unmatched
 findings that nobody voted on. Coverage rises, and the gates must not let that
-rise through. The positive control gains the same coverage with no added
-volume and every finding answered, and the gates must let it through, or the
-gates refuse everything and the negative control proves nothing.
+rise through. A clean copy gains the same coverage with no added volume
+and every finding answered, and the gates must let it through, or the gates
+refuse everything and the flooded copy proves nothing.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def _verdicts(readings) -> dict[str, str]:
     return {reading.gate: reading.verdict for reading in readings}
 
 
-class TestTheNegativeControl:
+class TestTheGatesFail:
     def test_a_flooded_gain_fails_on_volume_and_on_review(self):
         readings = gain.read(
             _baseline(),
@@ -72,6 +72,16 @@ class TestTheNegativeControl:
         verdicts = _verdicts(readings)
         assert verdicts["volume"] == "fail"
         assert verdicts["reviewed"] == "fail"
+
+    def test_a_flood_whose_votes_are_all_stale_fails_on_review(self):
+        """#2202: a vote on an earlier argument answers nothing in this run."""
+        candidate = _gained(_baseline(), added=6, voted=True)
+        for row in candidate["scores"]:
+            row["counts"]["stale"] = 6
+
+        readings = gain.read(_baseline(), candidate, "stride", spread=SPREAD)[0]
+
+        assert _verdicts(readings)["reviewed"] == "fail"
 
     def test_a_flood_somebody_voted_on_still_fails_on_volume(self):
         """Votes do not launder volume: the two halves are separate gates."""
@@ -95,7 +105,7 @@ class TestTheNegativeControl:
         assert verdicts["rejected-rate"] == "fail"
 
 
-class TestThePositiveControl:
+class TestTheGatesPass:
     def test_a_gain_with_no_added_volume_and_every_finding_answered_passes(self):
         readings = gain.read(
             _baseline(),

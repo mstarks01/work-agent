@@ -32,7 +32,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.capabilities import CAPABILITIES
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
 from analysis_service.grounding import verify_quote
 from analysis_service.references import canonical
 from analysis_service.sources import ANSWERS_LABEL, MAX_LABEL_CHARS
@@ -86,7 +86,7 @@ def with_stated_capabilities(
     for row in reading.capabilities:
         label = canonical(row.source_label, list(sources))
         submitted = label in sources and label != ANSWERS_LABEL
-        known = row.capability in CAPABILITIES and submitted
+        known = parse_capability_key(row.capability) is not None and submitted
         if not known or row.capability in named:
             continue
         if not verify_quote(row.quote, sources[label]):

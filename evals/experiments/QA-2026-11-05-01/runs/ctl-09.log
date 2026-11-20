@@ -1,0 +1,15 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Customer order details may be readable between the customer and mobile app | ['flow:entity:customer>process:mobile-app>browse-and-order', 'entity:customer', 'process:mobile-app']
+- Customer details are readable on the plaintext mobile-app API connection | ['flow:process:mobile-app>process:web-api>api-traffic', 'process:mobile-app', 'process:web-api']
+- Catalogue SQL statements may be observable crossing from Marketing to the API | ['flow:process:catalogue-spreadsheet>process:web-api>sql-statements', 'process:catalogue-spreadsheet', 'process:web-api']
+- Customer database traffic may expose card and address data inside Sokify systems | ['flow:process:web-api>store:user-database>customer-records', 'process:web-api', 'store:user-database']
+- Order handover to SIMS may disclose delivery details on an unverified internal link | ['flow:process:web-api>process:sims>order-handover', 'process:web-api', 'process:sims']
+- Delivery addresses may be exposed while SIMS writes the flat file | ['flow:process:sims>store:delivery-address-flat-file>address-write', 'process:sims', 'store:delivery-address-flat-file']
+- Dispatch notes may be readable between SIMS and the fax gateway | ['flow:process:sims>process:fax-gateway>dispatch-note', 'process:sims', 'process:fax-gateway']
+- Fax confirmation contents may be observable in transit to the customer | ['flow:process:fax-gateway>entity:customer>confirmation-fax', 'process:fax-gateway', 'entity:customer']
+- An unintended fax recipient can read customer confirmation details | ['flow:process:fax-gateway>entity:customer>confirmation-fax', 'process:fax-gateway', 'entity:customer']
+- A storage copy may expose all customer records if the user database lacks at-rest encryption | ['store:user-database']
+- A storage copy may expose delivery addresses if the flat file lacks at-rest encryption | ['store:delivery-address-flat-file']
+- An unauthenticated API caller may elicit customer records through the web API | ['process:web-api', 'flow:process:web-api>store:user-database>customer-records', 'store:user-database']
+spent: $0.0652 reported
+must-finds matched: [10, 11, 13]

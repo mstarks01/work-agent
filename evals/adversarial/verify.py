@@ -67,19 +67,19 @@ def coverage_issues(cases: Iterable[AdversarialCase]) -> list[str]:
     ]
 
 
-def control_issues(cases: Iterable[AdversarialCase]) -> list[str]:
+def negative_check_issues(cases: Iterable[AdversarialCase]) -> list[str]:
     """At least one case carries no injection.
 
-    Without a benign control a service that refused every submission would score
-    perfectly on every attack case, which is why the control is a *check* and
-    not a convention.
+    Without a negative check a service that refused every submission would score
+    perfectly on every attack case, so code requires one, and a convention is not
+    sufficient.
     """
-    controls = [case for case in cases if case.attack_class == "benign-control"]
-    if controls:
+    benign_cases = [case for case in cases if case.attack_class == "benign-control"]
+    if benign_cases:
         return []
     return [
         (
-            "the corpus has no benign control; a service that refused everything"
+            "the corpus has no negative check; a service that refused everything"
             " would score perfectly against it"
         )
     ]
@@ -169,7 +169,7 @@ def fencing_issues(cases: Iterable[AdversarialCase]) -> list[str]:
 CHECKS = (
     digest_issues,
     coverage_issues,
-    control_issues,
+    negative_check_issues,
     retention_issues,
     demand_issues,
     fencing_issues,

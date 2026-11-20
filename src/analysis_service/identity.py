@@ -41,13 +41,13 @@ saw.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Final
 
+from analysis_service.sources import text_digest
 from analysis_service.vendors import ServedTrust, vendor_for_route
 
 #: The identity schema. Bumped whenever the payload gains, loses or re-spells a
@@ -112,8 +112,8 @@ def served_trust_for(requested_route: str) -> ServedTrust:
     Read off the *requested* route because that is the only key the three call
     sites hold. The producer has a route and no ``Vendor``; the two verifiers
     recompute from an artifact's recorded ``requested_model``, which is a
-    string. :func:`~analysis_service.vendors.vendor_for_route` is the one
-    reader of the rule that turns it into a vendor.
+    string. :func:`~analysis_service.vendors.vendor_for_route` applies
+    the rule that turns it into a vendor.
 
     Raising on a route that names no vendor is safe, and is the point.
     ``node_models`` is built from the tier config through ``Vendor.prefix``, so
@@ -170,7 +170,7 @@ def fingerprint(identity: Mapping[str, Any]) -> str:
     collision here reads as a matching identity.
     """
     canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return text_digest(canonical)
 
 
 def execution_fingerprint(

@@ -148,6 +148,93 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-11-02-05/capture_turn.py": (
+        "This code is that framework's. It runs a job that reaches the capability"
+        " reader, and the graph puts the reader only in a job whose selection"
+        " reads capabilities: a package whose units carry an applicability"
+        " expression."
+    ),
+    "evals/experiments/QA-2026-10-09-03/summarize.py": (
+        "This code is that framework's. It reads the stored answers of a lane"
+        " that drafts by a verb and a place, and scores them against the"
+        " must-finds of that package's references."
+    ),
+    "evals/experiments/QA-2026-11-02-05/position_rescore.py": (
+        "This code is that framework's. It counts the matches on the must-finds"
+        " that carry an attacker position, and only that package's drafts state one."
+    ),
+    "evals/experiments/QA-2026-11-06-02/lead_loss.py": (
+        "This code is that framework's. It measures candidate leads, and only"
+        " the package whose identity is an action at a place has a rule set"
+        " that leads a lane to the elements a reference names."
+    ),
+    "evals/experiments/QA-2026-11-19-01/unled_leads.py": (
+        "This code is that framework's. It prices candidate lead rules, and"
+        " only the package whose identity is an action at a place has a rule"
+        " set that leads a lane to the elements a reference names."
+    ),
+    "evals/experiments/QA-2026-11-06-02/zones.py": (
+        "This code is that framework's. It reads the zone kinds that the"
+        " privilege-crossing rule of the package with candidate leads reads."
+    ),
+    "evals/experiments/QA-2026-11-06-01/control_view_size.py": (
+        "This code is that framework's measurement case. It builds drafts of"
+        " one package whose units nest, so one Control row on a chapter reaches"
+        " several drafts. The view code it measures reads no package field."
+    ),
+    "evals/experiments/QA-2026-11-03-01/score_stage.py": (
+        "This code is that framework's. It reads the attacker position that"
+        " only that package's drafts state, against its ruled references."
+    ),
+    "evals/experiments/QA-2026-11-02-05/position_ballot.py": (
+        "This code is that framework's. It records the attacker position of a"
+        " reference claim, and only that package's drafts state a position."
+    ),
+    "evals/experiments/QA-2026-11-02-05/mechanism_proxy.py": (
+        "This code is that framework's. It reads the must-finds of a package"
+        " whose references a lane drafts by a verb and a place, and the drafts"
+        " that the claim scorer matches to them."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities.py": (
+        "This code is that framework's. It reads the decisions at the top band"
+        " of a package whose units carry an applicability expression, after the"
+        " capability reader. A package whose units carry none reads no"
+        " capability, so a stated capability settles nothing in it."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities_v2.py": (
+        "This code is that framework's: it reads the same decisions as"
+        " `read_capabilities.py`, through the same request."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities_v1.py": (
+        "This code is that framework's: it reads the same decisions as"
+        " `read_capabilities.py`, through an earlier form of the request."
+    ),
+    "evals/experiments/QA-2026-11-02-03/trace_baselines.py": (
+        "This code is that framework's. It traces two references through the"
+        " lane that a lead points at a place, and matches a draft by action and"
+        " place. A package whose claims carry a catalog identifier is led by"
+        " requirement, so it has no place-led lane to trace."
+    ),
+    "evals/experiments/QA-2026-11-02-03/trace_lane_input.py": (
+        "This code is that framework's: it prints the lane input that"
+        " `trace_baselines.py` reads, for the same lane."
+    ),
+    "evals/experiments/QA-2026-10-31-02/build_answers.py": (
+        "A recorded experiment's script. It reads the STRIDE prior because the"
+        " experiment measures the STRIDE lanes; the ASVS prior holds no"
+        " question kinds, so there is nothing for another package to read."
+    ),
+    "evals/experiments/QA-2026-11-13-01/order_variants.py": (
+        "A recorded experiment's script. E2 removes the question-kind reads of"
+        " one package. That package's prior holds no question kind, so the"
+        " variant equals E1 by construction. The other variants change the"
+        " turn rule, which names no package."
+    ),
+    "evals/experiments/QA-2026-11-17-13/rows.py": (
+        "This code is that framework's. It reads the loss rows charged to a"
+        " verb, and only the package whose identity is an action at a place"
+        " charges a miss to the action a draft wrote there."
+    ),
     "evals/experiments/QA-2026-10-27-01/price.py": (
         "This code is that framework's. It prices trial lead rules against the"
         " lanes that read them, which exists only for a package whose leads"
@@ -176,6 +263,11 @@ DECLARED: dict[str, str] = {
         " identifier is keyed by that identifier and the place (3)."
         " IDENTIFIER_OF's entries follow from whether the package owns a"
         " catalog to read."
+    ),
+    "evals/harness/shared_answers.py": (
+        "OPTIONS is a table keyed by framework, and SELECTIONS reads every"
+        " package in PACKAGES through it. Self-completing — a package missing"
+        " from OPTIONS raises when the module loads."
     ),
     "evals/harness/scorer.py": (
         "This code is STRIDE's. It reads a category and two rated severity axes,"
@@ -220,8 +312,8 @@ DECLARED: dict[str, str] = {
         "The scoring pass is that package's, because grading an open claim set"
         " is not a per-case fold; it names the block it grades so a sweep of"
         " another package skips it rather than fails in it. The"
-        " per-case mechanical dispatch that used to branch here is now"
-        " `PACKAGE_SCORERS`, a table keyed by framework."
+        " per-case mechanical dispatch is `PACKAGE_SCORERS`, a table keyed by"
+        " framework."
     ),
     "webapp/review.py": (
         "QUESTIONS is a table keyed by framework, checked against PACKAGES at"
@@ -263,10 +355,11 @@ DECLARED: dict[str, str] = {
     ),
     "evals/harness/critic_yield.py": (
         "This code is STRIDE's, through `DraftThreat` and a category. Yield is"
-        " the pair of counts over drafts a critic killed and references it"
-        " destroyed, which only a package whose lane agents propose an open"
-        " claim set has. `INSTRUMENTS` already declares the instrument"
-        ' `frameworks=("stride",)`; this is the module behind it.'
+        " the pair of rates over the drafts a critic rejected: the down-voted"
+        " drafts and the reference-matched drafts, which only a package whose"
+        " lane agents propose an open claim set has. `INSTRUMENTS` already"
+        ' declares the instrument `frameworks=("stride",)`; this is the module'
+        " behind it."
     ),
     "evals/harness/verb_pricing.py": (
         "This code is STRIDE's, through `SubsetVerbIdentity` and the STRIDE"
@@ -281,6 +374,14 @@ DECLARED: dict[str, str] = {
         " whose lane agents propose an open claim set has; a package whose"
         " claims carry a catalog identifier scores by applicability instead."
     ),
+    "evals/harness/fan_in_accounting.py": (
+        "A table keyed by framework: `ARCHIVED_BATCHES` holds each package's"
+        " type for a stored lane batch, and"
+        " `tests/test_evals_fan_in_accounting.py` holds it to PACKAGES. The two"
+        " package imports are the table's rows: a package whose archive can"
+        " hold a field its agent schema now requires reads it through its own"
+        " archived type."
+    ),
     "evals/harness/gain.py": (
         "A table keyed by framework: `READERS` holds each package's own reading"
         " of an unmatched finding and of its vote standing, and a package"
@@ -293,6 +394,22 @@ DECLARED: dict[str, str] = {
         " claims carry a catalog identifier has `attribution.py`, the stage"
         " reading, instead. `INSTRUMENTS` already declares the instrument"
         ' `frameworks=("stride",)`; this is the module behind it.'
+    ),
+    "evals/harness/scorecard.py": (
+        "This code is STRIDE's, through `DraftThreat`, its lane set and an"
+        " attacker position. A row's stages and loss cause read a structural"
+        " match of an action and a place, and a position-unstated row reads a"
+        " ruled attacker position, which only a package whose claims compose an"
+        " identity from an action and a place has; a package whose claims carry"
+        " a catalog identifier has `attribution.py`, the stage reading, instead."
+    ),
+    "evals/harness/delivery.py": (
+        "This code is STRIDE's, through the `losses` rows the scorecard charges"
+        " and the STRIDE block's fired rules. It traces each charged miss, and"
+        " compares a candidate's elements and the signed facts at a place with"
+        " the place of a claim whose identity is an action and a place; a"
+        " package whose claims carry a catalog identifier has no place for a"
+        " candidate to lead to, and `attribution.py` reads its stages instead."
     ),
     "evals/harness/near_misses.py": (
         "This code is STRIDE's, through `DraftThreat` and the `losses` rows it"
@@ -539,6 +656,19 @@ def test_a_new_framework_literal_is_declared(literals):
     )
 
 
+def unexcused_names() -> dict[str, list[str]]:
+    """Each file's framework-named identifiers that no open decision excuses."""
+    found = {
+        name: sorted(
+            word
+            for word in words
+            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
+        )
+        for name, words in framework_named_identifiers().items()
+    }
+    return {name: words for name, words in found.items() if words}
+
+
 def test_a_framework_named_thing_is_declared_or_open(literals):
     """A class or a value may not carry a framework's name unexplained.
 
@@ -550,15 +680,8 @@ def test_a_framework_named_thing_is_declared_or_open(literals):
     in :data:`OPEN_BY_DECISION`, so somebody decided to keep it and said why.
     """
     unexplained = {
-        name: sorted(
-            word
-            for word in words
-            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
-        )
-        for name, words in framework_named_identifiers().items()
-        if name not in DECLARED
+        name: words for name, words in unexcused_names().items() if name not in DECLARED
     }
-    unexplained = {name: words for name, words in unexplained.items() if words}
 
     assert not unexplained, (
         f"these name a framework on a thing that serves every framework:"
@@ -593,15 +716,17 @@ def test_every_open_decision_gives_a_reason():
 def test_the_declaration_does_not_rot(literals):
     """A file that stops reaching one framework has to leave the list.
 
-    Either way of reaching one keeps it here. A module can name a package or
-    import its record, and a declaration is stale only when it does neither —
+    Each way of reaching one keeps it here. A module can name a package, import
+    its record, or give a thing a framework's name that no open decision
+    excuses, and a declaration is stale only when it does none of the three —
     otherwise removing a literal from a module that still imports the record
     would drop the reason and the entry together.
     """
-    reaching = set(literals) | set(package_importers())
+    reaching = set(literals) | set(package_importers()) | set(unexcused_names())
     stale = sorted(set(DECLARED) - reaching)
     assert not stale, (
-        f"these files no longer name or import a framework and are still"
+        f"these files no longer name a framework, import its record or give a"
+        f" thing a framework's name that no open decision excuses, and are still"
         f" declared: {stale}. Remove them."
     )
 
@@ -1076,6 +1201,7 @@ COUNT_WORDS = {
     8: "eight",
     9: "nine",
     10: "ten",
+    11: "eleven",
     17: "seventeen",
 }
 
@@ -1212,7 +1338,7 @@ def test_one_reader_bounds_every_package_s_emission():
         assert len(batch.invalid) == emitted, name
         lane = package.lanes[0]
         with pytest.raises(DraftJoinError, match=f"{lane} emitted {emitted}"):
-            fan_in({lane: batch}, package, model, sources={})
+            fan_in({lane: batch}, package, model, sources={}, assertions=None)
 
 
 def test_no_package_s_lane_may_write_the_list_code_fills():

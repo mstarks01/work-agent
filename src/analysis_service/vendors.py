@@ -190,7 +190,7 @@ class _ReportedCharge:
 
     ``covers_whole_call`` is the whole of it, and it is what decides whether the
     figure may be recorded as what a call cost.
-    :func:`analysis_service.charges.records_reported_charge` is the one reader.
+    :func:`analysis_service.charges.records_reported_charge` reads it.
 
     A ``False`` here is not a smaller number to record with a note beside it. It
     is a number that answers a different question from the one the field asks,
@@ -216,7 +216,7 @@ class _UpstreamPin:
     Three field names in the request body, because a gateway spells them its
     own way: ``field`` is the routing object, ``only`` its allowlist, and
     ``fallbacks`` the flag that would let the gateway leave the list when every
-    named upstream is busy. :meth:`Vendor.upstream_kwargs` is the one reader,
+    named upstream is busy. :meth:`Vendor.upstream_kwargs` reads it,
     and it always sets the flag off: a pin the gateway may abandon is not a
     pin, and the served upstream is what a **Baseline** is named after.
     """
@@ -638,7 +638,7 @@ _BEDROCK_CLAUDE_ID = re.compile(
 #   more branch.
 # * **The 2023 names** ``claude-v1``, ``claude-v2:1`` and ``claude-instant-v1``.
 #   The shape requires a family name and a generation, because those two
-#   segments are what a later reader keys on, and these three predate that
+#   segments are what a later reader keys on, and these three do not follow that
 #   naming.
 # * **A Claude that omits ``anthropic.``**, per the shared family above. It is
 #   the shape a config copying an anthropic-direct tier row into the bedrock row
@@ -751,10 +751,10 @@ def _every_model(rule: SchemaRule) -> _SchemaRuleFor:
 # requires the match to start the identifier or to follow a dot, so a ``claude-``
 # inside a word — ``my-claude-clone-3`` — is not a Claude.
 #
-# The minor separator is the **union** here, and that is the one place it may
-# be: this is a parse rather than a shape gate, so reading ``4.6`` and ``4-6``
-# as one generation does no harm, while a per-vendor parse would have to key
-# on the vendor the docstring below refuses to key on.
+# The minor separator is the **union** here, and that is safe: this is a parse
+# rather than a shape gate, so reading ``4.6`` and ``4-6`` as one generation
+# does no harm, while a per-vendor parse would have to key on the vendor the
+# docstring below refuses to key on.
 _CLAUDE_GENERATION = re.compile(
     rf"(?:^|\.)claude-(?:{_claude_modern('[-.]')}|{_claude_legacy('[-.]')})"
 )

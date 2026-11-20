@@ -38,7 +38,7 @@ credential from the metadata server.**
   > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
   > `api_key` reads a service account key file.
 
-- A new module, `gcp_identity`, holds `platform_credentials(label)`. It calls
+- A new module, `gcp_identity`, holds `platform_credentials(setting)`. It calls
   `google.auth.default()` with the scope
   `https://www.googleapis.com/auth/devstorage.read_write`. It refuses each
   result that is not a `compute_engine.Credentials`. The `gcs` row passes the

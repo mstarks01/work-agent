@@ -21,7 +21,6 @@ from pathlib import Path
 
 from analysis_service import smoke
 from analysis_service.deployment import Deployment
-from analysis_service.engine import Engine
 from analysis_service.graph import (
     ASSEMBLE_NODE,
     EXTRACT_NODE,
@@ -74,6 +73,7 @@ from tests.factories import (
     sample_selection,
     secret_env,
     served_build,
+    stand_in_engine,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -388,7 +388,7 @@ class TestDrivingTheEngine:
 
     def smoke_with(self, monkeypatch, outcome):
         """``run_smoke`` against a stubbed runner, with no adapters to build."""
-        engine = Engine(
+        engine = stand_in_engine(
             StubRunner(outcome),
             limits=DEPLOYMENT.resilience.source_limits(),
             deadline_seconds=DEPLOYMENT.job_deadline_seconds(),
@@ -397,7 +397,7 @@ class TestDrivingTheEngine:
         monkeypatch.setattr(
             smoke.Engine,
             "from_deployment",
-            # The smoke run names the selection now — every carried framework —
+            # The smoke run names the selection — every carried framework —
             # so the stand-in takes it and ignores it.
             classmethod(lambda cls, _deployment, _frameworks: engine),
         )

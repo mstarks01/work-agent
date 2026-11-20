@@ -54,6 +54,6 @@ call, about $0.004, and the passes after the gate wait for it. Its early
 capability questions and the units decided before its lanes run read the
 capabilities the sources state.
 
-The run spent the last read of both holdout cases, so the ledger counts them as
+The run used the last read of both holdout cases, so the ledger counts them as
 development cases. No case is left that an audit has not read; a later
 measurement on unseen text needs a new holdout case.

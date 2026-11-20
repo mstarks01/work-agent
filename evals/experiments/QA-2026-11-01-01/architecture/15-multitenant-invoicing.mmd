@@ -1,0 +1,23 @@
+architecture-beta
+    group z0(cloud)[Trust zone internet]
+    group z1(cloud)[Trust zone cloud platform]
+    group z2(cloud)[Trust zone support office network]
+    service n0(internet)[company user] in z0
+    service n1(internet)[payer] in z0
+    service n2(internet)[support agent] in z2
+    service n3(server)[billing app] in z1
+    service n4(server)[pdf renderer] in z1
+    service n5(server)[admin console] in z1
+    service n6(database)[tenant database] in z1
+    service n7(database)[render queue] in z1
+    service n8(database)[pdf bucket] in z1
+    n0:R --> L:n3
+    n1:R --> L:n3
+    n3:R --> L:n6
+    n3:R --> L:n7
+    n4:R --> L:n7
+    n4:R --> L:n6
+    n4:R --> L:n8
+    n3:R --> L:n8
+    n2:R --> L:n5
+    n5:R --> L:n3

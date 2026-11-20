@@ -42,17 +42,21 @@ from analysis_service.fact_answers import (
     FactStatus,
     answer_facets,
     answered_keys,
+    asked_facets,
     covers,
     fact_kind,
+    needed_facets,
     needs_of,
 )
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import (
     element_names,
+    fact_routes,
     group_of,
     label_of,
     open_attribute,
     prepared_model,
+    routed,
 )
 from analysis_service.question_kinds import Facet
 from analysis_service.system_model import SystemModel
@@ -127,8 +131,15 @@ class FactQuestion:
     history: FactStatus = "open"
     #: For each finding that waits on only some facets of this question, as
     #: ``framework/claim``, the facets it needs (ADR 0073). A finding absent
-    #: here needs every facet.
+    #: here needs every facet. :meth:`to_json` sends each waiting finding's
+    #: facets as :func:`~analysis_service.fact_answers.needed_facets` reads
+    #: them, so a page applies no rule of its own.
     needs: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+
+    @property
+    def asks(self) -> tuple[str, ...]:
+        """The facets a page asks for (:func:`~analysis_service.fact_answers.asked_facets`)."""
+        return asked_facets(self.key, self.findings, self.needs)
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -143,13 +154,17 @@ class FactQuestion:
             "form": self.form,
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
+            "asks": list(self.asks),
             "max_length": self.max_length,
             "group": self.group,
             "group_heading": self.group_heading,
             "element": self.element,
             "band": self.band,
             "findings": list(self.findings),
-            "needs": {finding: list(need) for finding, need in self.needs.items()},
+            "needs": {
+                finding: list(needed_facets(self.key, self.needs.get(finding, ())))
+                for finding in self.findings
+            },
         }
 
 
@@ -159,7 +174,9 @@ def choices_of(key: UnknownKey) -> int:
 
 
 def _by_band(
-    open_facts: Mapping[Finding, AbstractSet[UnknownKey]], band: Mapping[Finding, int]
+    open_facts: Mapping[Finding, AbstractSet[UnknownKey]],
+    band: Mapping[Finding, int],
+    needed: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]],
 ) -> list[UnknownKey]:
     """The facts in the order that serves the most important findings first.
 
@@ -168,12 +185,19 @@ def _by_band(
     of that band, the next is the one that completes the most of them, then
     the most in each band below. Where none does, the next are the facts of
     that band's finding with the fewest choices left, the most cited first,
-    asked together. A lower band never comes before a higher one that still
+    asked together. A finding's choices are the facets it needs of each fact
+    (``needed``, ADR 0073), as :func:`~analysis_service.fact_answers.needed_facets`
+    reads them, and one for a fact with no facets. A lower band never comes
+    before a higher one that still
     waits: a critical finding that waits on two facts comes before a low one
     that waits on one. A tie goes to more citations, then to the lower key,
     so one input always gives one order (``QA-2026-09-26-03-E35``).
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
+
+    def choices(finding: Finding, key: UnknownKey) -> int:
+        return len(needed_facets(key, needed.get(finding, {}).get(key, ()))) or 1
+
     order: list[UnknownKey] = []
     while left:
         cites = Counter(key for keys in left.values() for key in keys)
@@ -196,12 +220,16 @@ def _by_band(
                 )
             ]
         else:
-            nearest = min(
-                (keys for finding, keys in left.items() if band[finding] == top),
-                key=lambda keys: (
-                    sum(choices_of(key) for key in keys),
-                    len(keys),
-                    sorted(keys),
+            _, nearest = min(
+                (
+                    (finding, keys)
+                    for finding, keys in left.items()
+                    if band[finding] == top
+                ),
+                key=lambda pair: (
+                    sum(choices(pair[0], key) for key in pair[1]),
+                    len(pair[1]),
+                    sorted(pair[1]),
                 ),
             )
             chosen = sorted(nearest, key=lambda key: (-cites[key], key))
@@ -252,6 +280,9 @@ def follow_up_needs(
     a fact it waits on without settling it, because no answer in the list can
     cover it.
 
+    A reference to a row the graph contradicts or another row disputes is
+    read as the fact it is asked as (:func:`~analysis_service.open_facts.fact_routes`).
+
     **A finding that needs only some facets of a kind**
     (:func:`~analysis_service.fact_answers.needs_of`) waits on it until those
     facets are known, and no longer (ADR 0073).
@@ -261,6 +292,7 @@ def follow_up_needs(
     refs: dict[UnknownKey, UnknownRef] = {}
     conditional: set[Finding] = set()
     prepared = prepared_model(model, catalog)
+    routes = fact_routes(catalog, prepared)
     done = answered_keys(earlier)
     said = {answer.key: answer for answer in earlier}
     bands: dict[Finding, Band] = {}
@@ -270,7 +302,7 @@ def follow_up_needs(
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
             bands[finding] = rank(claim)
-            waited = claim.waits_on()
+            waited = routed(claim.waits_on(), routes)
             wanted = needs_of(waited)
             covered = {
                 key for key, need in wanted.items() if covers(said.get(key), need)
@@ -287,14 +319,14 @@ def follow_up_needs(
                 conditional.add(finding)
             grounds = [
                 ref
-                for ref in claim.unknown_grounds()
-                if _open(ref, prepared) and ref.key not in done
+                for ref in routed(claim.unknown_grounds(), routes)
+                if _open(ref, prepared, catalog) and ref.key not in done
             ]
             evidence[finding] = frozenset(ref.key for ref in grounds)
             verdict = [
                 ref
                 for ref in waited
-                if _open(ref, prepared) and ref.key not in done | covered
+                if _open(ref, prepared, catalog) and ref.key not in done | covered
             ]
             named[finding] = frozenset(ref.key for ref in verdict)
             for ref in (*grounds, *verdict):
@@ -327,7 +359,7 @@ def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
     order, and 42% more at ten (``QA-2026-09-26-03-E35``).
     """
     band = {finding: each.order for finding, each in needs.bands.items()}
-    first = _by_band(needs.waiting, band)
+    first = _by_band(needs.waiting, band, needs.facets)
     asked = set(first)
     rest = _by_band(
         {
@@ -339,6 +371,7 @@ def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
             for finding in needs.bands
         },
         band,
+        needs.facets,
     )
     grounded = {key for keys in needs.evidence.values() for key in keys}
     return [
@@ -433,11 +466,13 @@ def fact_questions(
     return tuple(asked)
 
 
-def _open(ref: UnknownRef, model: SystemModel) -> bool:
+def _open(
+    ref: UnknownRef, model: SystemModel, catalog: AssertionCatalog | None
+) -> bool:
     """False for an attribute the model states; every other fact is open."""
     element_id, attribute = ref.element_id, ref.attribute
     return fact_kind(ref.key) != "attribute" or open_attribute(
-        model, element_id, attribute
+        model, element_id, attribute, catalog
     )
 
 
@@ -472,6 +507,6 @@ def question_fallback(analyses: Sequence[FrameworkAnalysis]) -> Fallback:
         for ref in claim.verdict.related_unknowns
     ]
     return Fallback(
-        typed=sum(1 for ref in refs if ref.spellings == ("question",)),
-        free_text=sum(1 for ref in refs if ref.spellings == ("subject",)),
+        typed=sum(1 for ref in refs if ref.sound and ref.kind == "question"),
+        free_text=sum(1 for ref in refs if ref.sound and ref.kind == "subject"),
     )

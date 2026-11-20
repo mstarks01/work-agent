@@ -1,0 +1,348 @@
+== corpus models, 20 cases
+C1a spoofing: places 3, false leads 0, newly led 1 [06/15*], unled targets 1 [06/15]
+C1b spoofing: places 5, false leads 1, newly led 2 [06/15*, 09/19], unled targets 2 [06/15, 09/19]
+C1c spoofing: places 14, false leads 4, newly led 4 [06/15*, 08/3, 09/19, 11/3], unled targets 2 [06/15, 09/19]
+C2 tampering: places 38, false leads 12, newly led 3 [09/6, 15/2*, 17/3], unled targets 1 [09/6]
+C3 denial-of-service: places 32, false leads 5, newly led 2 [09/16, 10/13], unled targets 2 [09/16, 10/13]
+C3b denial-of-service: places 83, false leads 34, newly led 5 [03/16, 08/16, 09/16, 10/13, 18/6], unled targets 2 [09/16, 10/13]
+C4 information-disclosure: places 63, false leads 14, newly led 1 [10/11], unled targets 1 [10/11]
+C5a elevation-of-privilege: places 32, false leads 8, newly led 12 [09/17, 09/18*, 14/11, 14/13, 14/14, 15/10*, 16/9*, 17/10, 18/14, 20/15, 20/16, 20/17], unled targets 1 [09/18]
+C5b elevation-of-privilege: places 6, false leads 1, newly led 5 [09/18*, 15/10*, 16/9*, 20/15, 20/16], unled targets 1 [09/18]
+C7 tampering: places 49, false leads 8, newly led 3 [01/4*, 01/6, 15/2*], unled targets 1 [01/6]
+== run models, 8 cases
+C1a spoofing: places 1, false leads 0, newly led 1 [06/15*], unled targets 1 [06/15]
+C1b spoofing: places 2, false leads 0, newly led 2 [06/15*, 09/19], unled targets 2 [06/15, 09/19]
+C1c spoofing: places 9, false leads 2, newly led 4 [06/15*, 08/3, 09/19, 11/3], unled targets 2 [06/15, 09/19]
+C2 tampering: places 18, false leads 7, newly led 1 [09/6], unled targets 1 [09/6]
+C3 denial-of-service: places 9, false leads 0, newly led 2 [09/16, 10/13], unled targets 2 [09/16, 10/13]
+C3b denial-of-service: places 35, false leads 16, newly led 3 [08/16, 09/16, 10/13], unled targets 2 [09/16, 10/13]
+C4 information-disclosure: places 25, false leads 8, newly led 1 [10/11], unled targets 1 [10/11]
+C5a elevation-of-privilege: places 9, false leads 5, newly led 2 [09/17, 09/18*], unled targets 1 [09/18]
+C5b elevation-of-privilege: places 3, false leads 1, newly led 1 [09/18*], unled targets 1 [09/18]
+C7 tampering: places 19, false leads 2, newly led 2 [01/4*, 01/6], unled targets 1 [01/6]
+== corpus places (references of the lane each place overlaps)
+01 C2 ('flow:entity:card-processor>process:storefront-api>settlement-webhook', 'process:storefront-api') refs: 5,17
+01 C2 ('flow:process:storefront-api>process:order-service>submit-order', 'process:order-service') refs: 3*,17
+01 C3 ('process:order-service', 'process:storefront-api') refs: 14*,15
+01 C3b ('flow:entity:card-processor>process:storefront-api>settlement-webhook', 'process:storefront-api') refs: 14*,15
+01 C3b ('flow:process:storefront-api>process:order-service>submit-order', 'process:order-service') refs: -
+01 C4 ('flow:entity:shopper>process:storefront-api>place-order', 'entity:shopper', 'process:storefront-api') refs: -
+01 C4 ('flow:entity:card-processor>process:storefront-api>settlement-webhook', 'entity:card-processor', 'process:storefront-api') refs: -
+01 C4 ('flow:process:storefront-api>process:order-service>submit-order', 'process:storefront-api', 'process:order-service') refs: 11*,13
+01 C5a ('flow:process:storefront-api>process:order-service>submit-order', 'process:storefront-api', 'process:order-service') refs: 18
+01 C5b ('process:storefront-api', 'entity:card-processor', 'entity:shopper') refs: 18
+01 C7 ('flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db') refs: 4*,5
+01 C7 ('flow:process:order-service>store:receipt-archive>append-receipt', 'store:receipt-archive') refs: 6
+02 C3 ('store:device-registry', 'process:device-gateway') refs: 10*
+02 C3 ('store:pub-sub', 'process:device-gateway') refs: 10*
+02 C3b ('flow:process:telemetry-normalizer>store:telemetry-lake>load-readings', 'store:telemetry-lake') refs: 11
+02 C3b ('flow:process:device-gateway>store:pub-sub>forward-readings', 'store:pub-sub') refs: -
+02 C4 ('flow:entity:sensor-node>process:device-gateway>publish-readings', 'entity:sensor-node', 'process:device-gateway') refs: 7*
+02 C4 ('flow:entity:sensor-node>store:firmware-bucket>poll-firmware', 'entity:sensor-node', 'store:firmware-bucket') refs: 8
+02 C4 ('flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'entity:fleet-operator', 'store:telemetry-lake') refs: 6*
+02 C4 ('flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer', 'store:pub-sub') refs: -
+02 C5a ('flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway', 'store:device-registry') refs: -
+02 C5a ('flow:process:device-gateway>store:pub-sub>forward-readings', 'process:device-gateway', 'store:pub-sub') refs: -
+02 C7 ('flow:process:telemetry-normalizer>store:telemetry-lake>load-readings', 'store:telemetry-lake') refs: 15
+02 C7 ('flow:process:device-gateway>store:pub-sub>forward-readings', 'store:pub-sub') refs: -
+03 C2 ('flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform', 'process:spark-transform-job') refs: 3*
+03 C3b ('flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform', 'process:spark-transform-job') refs: 13,16
+03 C3b ('flow:process:spark-transform-job>store:claims-warehouse>load-records', 'store:claims-warehouse') refs: 13
+03 C4 ('flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform', 'process:ingest-scheduler', 'process:spark-transform-job') refs: -
+03 C7 ('flow:entity:insurance-partner>store:landing-bucket>push-daily-extract', 'store:landing-bucket') refs: 3*,15
+03 C7 ('flow:process:spark-transform-job>store:claims-warehouse>load-records', 'store:claims-warehouse') refs: 5
+04 C2 ('flow:process:inference-gateway>process:model-server>forward-request', 'process:model-server') refs: 5
+04 C3 ('process:model-server', 'process:inference-gateway') refs: 12*,13,14
+04 C3 ('store:inference-log', 'process:inference-gateway') refs: 12*
+04 C3b ('flow:process:inference-gateway>process:model-server>forward-request', 'process:model-server') refs: 13,14
+04 C3b ('flow:process:inference-gateway>store:inference-log>write-request-log', 'store:inference-log') refs: -
+04 C3b ('flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact', 'store:model-registry-bucket') refs: 14
+04 C4 ('flow:entity:calling-service>process:inference-gateway>submit-inference-request', 'entity:calling-service', 'process:inference-gateway') refs: 10,16
+04 C4 ('flow:process:inference-gateway>process:model-server>forward-request', 'process:inference-gateway', 'process:model-server') refs: 10,11
+04 C5a ('flow:process:inference-gateway>process:model-server>forward-request', 'process:inference-gateway', 'process:model-server') refs: 15
+04 C5a ('flow:process:inference-gateway>store:inference-log>write-request-log', 'process:inference-gateway', 'store:inference-log') refs: 15
+04 C7 ('flow:process:inference-gateway>store:inference-log>write-request-log', 'store:inference-log') refs: -
+04 C7 ('flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact', 'store:model-registry-bucket') refs: 3*
+05 C2 ('flow:entity:browser>process:web-application>page-request', 'process:web-application') refs: 3*
+05 C3 ('store:message-queue', 'process:web-application') refs: 10*,11,16
+05 C3 ('store:web-application-config', 'process:web-application') refs: 11
+05 C3b ('flow:entity:browser>process:web-application>page-request', 'process:web-application') refs: 11
+05 C3b ('flow:process:web-application>store:message-queue>enqueue-job', 'store:message-queue') refs: 10*,16
+05 C3b ('flow:process:background-worker-process>store:message-queue>consume-job', 'store:message-queue') refs: 10*,16
+05 C3b ('flow:process:background-worker-process>store:database>read-write-records', 'store:database') refs: -
+05 C4 ('flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue') refs: 9,15
+05 C5a ('flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue') refs: 13
+05 C5a ('flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config') refs: 13
+05 C7 ('flow:process:web-application>store:message-queue>enqueue-job', 'store:message-queue') refs: 14,17
+05 C7 ('flow:process:background-worker-process>store:message-queue>consume-job', 'store:message-queue') refs: 14,17
+05 C7 ('flow:process:background-worker-process>store:database>read-write-records', 'store:database') refs: 4
+06 C1a ('flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server') refs: 0*,1*,15*
+06 C1b ('flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server') refs: 0*,1*,15*
+06 C1c ('flow:entity:player>process:game-client>launch-and-play', 'entity:player', 'process:game-client') refs: -
+06 C1c ('flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server') refs: 0*,1*,15*
+06 C2 ('flow:entity:player>process:game-client>launch-and-play', 'process:game-client') refs: 3*
+06 C2 ('flow:process:game-client>process:lobby>matchmaking', 'process:lobby') refs: -
+06 C2 ('flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-server') refs: 3*
+06 C2 ('flow:process:lobby>process:game-server>hand-over-match', 'process:game-server') refs: -
+06 C2 ('flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'process:moderation-website') refs: -
+06 C3 ('process:game-server', 'process:lobby') refs: 12*,13*
+06 C3 ('store:player-database', 'process:lobby') refs: 12*
+06 C3 ('store:stats-database', 'process:game-server') refs: 13*
+06 C3 ('store:player-database', 'process:game-server') refs: 13*
+06 C3b ('flow:entity:player>process:game-client>launch-and-play', 'process:game-client') refs: -
+06 C3b ('flow:process:game-client>process:lobby>matchmaking', 'process:lobby') refs: 12*
+06 C3b ('flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-server') refs: 13*
+06 C3b ('flow:process:lobby>process:game-server>hand-over-match', 'process:game-server') refs: 13*
+06 C3b ('flow:process:game-server>store:stats-database>read-write-stats', 'store:stats-database') refs: -
+06 C3b ('flow:process:game-server>store:player-database>update-players', 'store:player-database') refs: -
+06 C3b ('flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'process:moderation-website') refs: -
+06 C3b ('flow:process:moderation-website>store:player-database>read-write-players', 'store:player-database') refs: -
+06 C4 ('flow:process:game-client>process:lobby>matchmaking', 'process:game-client', 'process:lobby') refs: 9*,10
+06 C4 ('flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-client', 'process:game-server') refs: 9*,10
+06 C4 ('flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'entity:customer-support-staff', 'process:moderation-website') refs: 11,16
+06 C5a ('flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server') refs: -
+06 C5a ('flow:process:lobby>store:player-database>read-players', 'process:lobby', 'store:player-database') refs: -
+06 C5a ('flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server', 'store:stats-database') refs: -
+06 C5a ('flow:process:game-server>store:player-database>update-players', 'process:game-server', 'store:player-database') refs: -
+06 C5b ('process:game-server', 'process:game-client', 'process:lobby') refs: -
+06 C7 ('flow:process:game-server>store:stats-database>read-write-stats', 'store:stats-database') refs: 4*
+06 C7 ('flow:process:game-server>store:player-database>update-players', 'store:player-database') refs: 5
+06 C7 ('flow:process:moderation-website>store:player-database>read-write-players', 'store:player-database') refs: 5
+07 C2 ('flow:entity:developer>process:build-runner>manual-rebuild', 'process:build-runner') refs: 5*
+07 C3b ('flow:entity:developer>store:git-server>push-branches', 'store:git-server') refs: -
+07 C3b ('flow:entity:developer>process:build-runner>manual-rebuild', 'process:build-runner') refs: 21
+07 C3b ('flow:process:build-runner>store:image-registry>push-image', 'store:image-registry') refs: 17
+07 C4 ('flow:entity:developer>process:build-runner>manual-rebuild', 'entity:developer', 'process:build-runner') refs: 12*,20
+07 C4 ('flow:process:build-runner>store:git-server>fetch-source', 'process:build-runner', 'store:git-server') refs: 12*,13,20
+07 C4 ('flow:process:build-runner>entity:public-package-registry>resolve-dependencies', 'process:build-runner', 'entity:public-package-registry') refs: 12*,20
+07 C4 ('flow:process:build-runner>process:deploy-controller>set-current-release', 'process:build-runner', 'process:deploy-controller') refs: 12*,20
+07 C4 ('flow:process:store-server>process:deploy-controller>poll-current-release', 'process:store-server', 'process:deploy-controller') refs: 20
+07 C4 ('flow:process:store-server>store:image-registry>pull-image', 'process:store-server', 'store:image-registry') refs: 14,15
+07 C7 ('flow:entity:developer>store:git-server>push-branches', 'store:git-server') refs: 7
+07 C7 ('flow:process:build-runner>store:image-registry>push-image', 'store:image-registry') refs: 6*
+08 C1c ('flow:process:store-admin-console>process:identity-broker>fetch-public-key', 'process:store-admin-console', 'process:identity-broker') refs: 0*,2*,3,20
+08 C2 ('flow:entity:colleague>process:identity-broker>sign-in', 'process:identity-broker') refs: 4*
+08 C3b ('flow:entity:colleague>process:identity-broker>sign-in', 'process:identity-broker') refs: 15*,17
+08 C3b ('flow:process:identity-broker>store:directory>read-write-directory', 'store:directory') refs: 16
+08 C3b ('flow:process:identity-broker>store:audit-log>write-sign-ins', 'store:audit-log') refs: -
+08 C4 ('flow:entity:colleague>process:identity-broker>sign-in', 'entity:colleague', 'process:identity-broker') refs: 13
+08 C4 ('flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague', 'entity:franchise-identity-provider', 'process:identity-broker') refs: -
+08 C4 ('flow:entity:colleague>process:store-admin-console>change-prices-and-void', 'entity:colleague', 'process:store-admin-console') refs: -
+08 C4 ('flow:process:identity-broker>entity:hr-system>nightly-group-pull', 'process:identity-broker', 'entity:hr-system') refs: 14
+08 C7 ('flow:process:identity-broker>store:directory>read-write-directory', 'store:directory') refs: 4*
+08 C7 ('flow:process:identity-broker>store:audit-log>write-sign-ins', 'store:audit-log') refs: 7
+09 C1b ('flow:process:web-api>process:sims>order-handover', 'process:web-api', 'process:sims') refs: 0*,19
+09 C1c ('flow:entity:customer>process:mobile-app>browse-and-order', 'entity:customer', 'process:mobile-app') refs: 2
+09 C1c ('flow:process:web-api>process:sims>order-handover', 'process:web-api', 'process:sims') refs: 0*,19
+09 C1c ('flow:process:sims>process:fax-gateway>dispatch-note', 'process:sims', 'process:fax-gateway') refs: 19
+09 C2 ('flow:entity:customer>process:mobile-app>browse-and-order', 'process:mobile-app') refs: -
+09 C2 ('flow:process:mobile-app>process:web-api>api-traffic', 'process:web-api') refs: 3*,4*,5*
+09 C2 ('flow:process:catalogue-spreadsheet>process:web-api>sql-statements', 'process:web-api') refs: 4*,5*
+09 C2 ('flow:process:web-api>process:sims>order-handover', 'process:sims') refs: 6
+09 C2 ('flow:process:sims>process:fax-gateway>dispatch-note', 'process:fax-gateway') refs: -
+09 C3 ('store:user-database', 'process:web-api') refs: 14,15
+09 C3 ('process:sims', 'process:web-api') refs: 14,15,16
+09 C3b ('flow:entity:customer>process:mobile-app>browse-and-order', 'process:mobile-app') refs: -
+09 C3b ('flow:process:mobile-app>process:web-api>api-traffic', 'process:web-api') refs: 14,15
+09 C3b ('flow:process:catalogue-spreadsheet>process:web-api>sql-statements', 'process:web-api') refs: 14,15
+09 C3b ('flow:process:web-api>store:user-database>customer-records', 'store:user-database') refs: -
+09 C3b ('flow:process:web-api>process:sims>order-handover', 'process:sims') refs: 16
+09 C3b ('flow:process:sims>store:delivery-address-flat-file>address-write', 'store:delivery-address-flat-file') refs: -
+09 C3b ('flow:process:sims>process:fax-gateway>dispatch-note', 'process:fax-gateway') refs: -
+09 C4 ('flow:process:mobile-app>process:web-api>api-traffic', 'process:mobile-app', 'process:web-api') refs: 10*
+09 C4 ('flow:process:catalogue-spreadsheet>process:web-api>sql-statements', 'process:catalogue-spreadsheet', 'process:web-api') refs: -
+09 C4 ('flow:process:fax-gateway>entity:customer>confirmation-fax', 'process:fax-gateway', 'entity:customer') refs: 13*
+09 C5a ('flow:process:web-api>store:user-database>customer-records', 'process:web-api', 'store:user-database') refs: 17,18*
+09 C5a ('flow:process:web-api>process:sims>order-handover', 'process:web-api', 'process:sims') refs: 18*
+09 C5b ('process:web-api', 'process:catalogue-spreadsheet', 'process:mobile-app') refs: 18*
+09 C7 ('flow:process:web-api>store:user-database>customer-records', 'store:user-database') refs: -
+09 C7 ('flow:process:sims>store:delivery-address-flat-file>address-write', 'store:delivery-address-flat-file') refs: -
+10 C3 ('store:mysql-database', 'process:web-server') refs: 12,14
+10 C3 ('store:cdn-bucket', 'process:web-server') refs: 12,13
+10 C3b ('flow:process:web-server>store:mysql-database>cms-data', 'store:mysql-database') refs: 14
+10 C3b ('flow:process:web-server>store:cdn-bucket>asset-publish', 'store:cdn-bucket') refs: 13
+10 C3b ('flow:entity:admin>store:mysql-database>direct-administration', 'store:mysql-database') refs: 14
+10 C4 ('flow:entity:reader>entity:cdn>asset-fetch', 'entity:reader', 'entity:cdn') refs: 11
+10 C4 ('flow:process:web-server>store:cdn-bucket>asset-publish', 'process:web-server', 'store:cdn-bucket') refs: -
+10 C4 ('flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin', 'store:mysql-database') refs: 9*,10
+10 C5a ('flow:process:web-server>store:mysql-database>cms-data', 'process:web-server', 'store:mysql-database') refs: -
+10 C5a ('flow:process:web-server>store:cdn-bucket>asset-publish', 'process:web-server', 'store:cdn-bucket') refs: 15*
+10 C7 ('flow:process:web-server>store:mysql-database>cms-data', 'store:mysql-database') refs: 6,17*
+10 C7 ('flow:process:web-server>store:cdn-bucket>asset-publish', 'store:cdn-bucket') refs: 4*
+10 C7 ('flow:entity:admin>store:mysql-database>direct-administration', 'store:mysql-database') refs: 5*,6,17*
+11 C1c ('flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-web-app', 'process:scheduling-service') refs: 3
+11 C2 ('flow:entity:store-manager>process:scheduling-web-app>build-rota', 'process:scheduling-web-app') refs: 6
+11 C2 ('flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-service') refs: -
+11 C3b ('flow:entity:store-manager>process:scheduling-web-app>build-rota', 'process:scheduling-web-app') refs: 12
+11 C3b ('flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-service') refs: 13*
+11 C3b ('flow:process:scheduling-service>store:rota-database>read-write-rotas', 'store:rota-database') refs: -
+11 C3b ('flow:process:scheduling-service>store:file-share>write-payroll-export', 'store:file-share') refs: 13*
+11 C4 ('flow:entity:colleague>process:scheduling-web-app>view-shifts', 'entity:colleague', 'process:scheduling-web-app') refs: 11
+11 C4 ('flow:entity:store-manager>process:scheduling-web-app>build-rota', 'entity:store-manager', 'process:scheduling-web-app') refs: -
+11 C4 ('flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system', 'store:file-share') refs: 10*
+11 C7 ('flow:process:scheduling-service>store:rota-database>read-write-rotas', 'store:rota-database') refs: 5
+11 C7 ('flow:process:scheduling-service>store:file-share>write-payroll-export', 'store:file-share') refs: 4*,15
+12 C2 ('flow:entity:category-manager>process:supplier-portal>review-documents', 'process:supplier-portal') refs: -
+12 C3b ('flow:entity:category-manager>process:supplier-portal>review-documents', 'process:supplier-portal') refs: 11,18
+12 C3b ('flow:process:supplier-portal>store:document-store>store-documents', 'store:document-store') refs: 18
+12 C3b ('flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'store:landing-bucket') refs: 12*
+12 C3b ('flow:process:supplier-master-service>store:supplier-database>write-supplier-records', 'store:supplier-database') refs: -
+12 C4 ('flow:entity:supplier>process:supplier-portal>upload-documents', 'entity:supplier', 'process:supplier-portal') refs: 10
+12 C4 ('flow:entity:category-manager>process:supplier-portal>review-documents', 'entity:category-manager', 'process:supplier-portal') refs: -
+12 C4 ('flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'entity:portal-vendor', 'store:landing-bucket') refs: 8*,9
+12 C7 ('flow:process:supplier-portal>store:document-store>store-documents', 'store:document-store') refs: 5
+12 C7 ('flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'store:landing-bucket') refs: 3*,4*,16
+12 C7 ('flow:process:supplier-master-service>store:supplier-database>write-supplier-records', 'store:supplier-database') refs: 17*
+13 C1c ('flow:entity:duty-engineer>process:dispatch-console>open-console', 'entity:duty-engineer', 'process:dispatch-console') refs: 3
+13 C1c ('flow:entity:duty-engineer>process:corporate-web-host>load-console', 'entity:duty-engineer', 'process:corporate-web-host') refs: -
+13 C2 ('flow:entity:duty-engineer>process:dispatch-console>open-console', 'process:dispatch-console') refs: 18
+13 C2 ('flow:process:dispatch-console>process:dispatch-api>dispatch-requests', 'process:dispatch-api') refs: 4*,5*,18
+13 C3b ('flow:entity:duty-engineer>process:dispatch-console>open-console', 'process:dispatch-console') refs: -
+13 C3b ('flow:process:dispatch-console>process:dispatch-api>dispatch-requests', 'process:dispatch-api') refs: 14*
+13 C3b ('flow:process:schedule-importer>store:schedule-archive>store-schedule-documents', 'store:schedule-archive') refs: -
+13 C3b ('flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'store:dispatch-database') refs: -
+13 C4 ('flow:process:dispatch-console>process:dispatch-api>dispatch-requests', 'process:dispatch-console', 'process:dispatch-api') refs: 19*
+13 C4 ('flow:process:dispatch-console>process:dispatch-api>live-job-status', 'process:dispatch-console', 'process:dispatch-api') refs: 10*,19*
+13 C4 ('flow:process:schedule-importer>process:dispatch-api>post-work-orders', 'process:schedule-importer', 'process:dispatch-api') refs: 12
+13 C7 ('flow:process:schedule-importer>store:schedule-archive>store-schedule-documents', 'store:schedule-archive') refs: 7
+13 C7 ('flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'store:dispatch-database') refs: 6
+14 C3 ('store:identity-database', 'process:authorization-server') refs: 10
+14 C3 ('store:points-ledger', 'process:rewards-api') refs: -
+14 C3 ('store:api-log-store', 'process:rewards-api') refs: -
+14 C3 ('store:identity-database', 'process:support-console') refs: -
+14 C3b ('flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'store:identity-database') refs: -
+14 C3b ('flow:process:rewards-api>store:points-ledger>read-and-write-points', 'store:points-ledger') refs: -
+14 C3b ('flow:process:rewards-api>store:api-log-store>write-request-log', 'store:api-log-store') refs: -
+14 C3b ('flow:process:support-console>store:identity-database>close-accounts', 'store:identity-database') refs: -
+14 C5a ('flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'process:authorization-server', 'store:identity-database') refs: 11,13,14
+14 C5a ('flow:process:rewards-api>store:points-ledger>read-and-write-points', 'process:rewards-api', 'store:points-ledger') refs: 12*
+14 C5a ('flow:process:rewards-api>store:api-log-store>write-request-log', 'process:rewards-api', 'store:api-log-store') refs: 12*
+14 C5a ('flow:process:support-console>store:identity-database>close-accounts', 'process:support-console', 'store:identity-database') refs: 11,13,14
+14 C7 ('flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'store:identity-database') refs: -
+14 C7 ('flow:process:rewards-api>store:points-ledger>read-and-write-points', 'store:points-ledger') refs: 5
+14 C7 ('flow:process:rewards-api>store:api-log-store>write-request-log', 'store:api-log-store') refs: -
+14 C7 ('flow:process:support-console>store:identity-database>close-accounts', 'store:identity-database') refs: -
+15 C1a ('flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:admin-console', 'process:billing-app') refs: 0*,1
+15 C1b ('flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:admin-console', 'process:billing-app') refs: 0*,1
+15 C1c ('flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:admin-console', 'process:billing-app') refs: 0*,1
+15 C2 ('flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:billing-app') refs: 2*
+15 C3 ('store:tenant-database', 'process:billing-app') refs: -
+15 C3 ('store:render-queue', 'process:billing-app') refs: 9*
+15 C3 ('store:pdf-bucket', 'process:billing-app') refs: -
+15 C3b ('flow:process:billing-app>store:render-queue>queue-render-job', 'store:render-queue') refs: 9*
+15 C3b ('flow:process:pdf-renderer>store:pdf-bucket>write-pdf', 'store:pdf-bucket') refs: -
+15 C3b ('flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:billing-app') refs: -
+15 C4 ('flow:entity:support-agent>process:admin-console>use-admin-console', 'entity:support-agent', 'process:admin-console') refs: -
+15 C5a ('flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'process:billing-app', 'store:tenant-database') refs: 10*
+15 C5a ('flow:process:billing-app>store:render-queue>queue-render-job', 'process:billing-app', 'store:render-queue') refs: 10*
+15 C5a ('flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'process:billing-app', 'store:pdf-bucket') refs: 10*
+15 C5b ('process:billing-app', 'entity:company-user', 'entity:payer', 'process:admin-console') refs: 10*
+15 C7 ('flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'store:tenant-database') refs: 2*
+15 C7 ('flow:process:billing-app>store:render-queue>queue-render-job', 'store:render-queue') refs: 3,13
+15 C7 ('flow:process:pdf-renderer>store:pdf-bucket>write-pdf', 'store:pdf-bucket') refs: -
+16 C1c ('flow:entity:member>process:library-app>borrow-renew-and-reserve', 'entity:member', 'process:library-app') refs: 0*,11
+16 C2 ('flow:entity:member>process:library-app>borrow-renew-and-reserve', 'process:library-app') refs: -
+16 C2 ('flow:process:library-app>process:lending-api>loan-and-reservation-requests', 'process:lending-api') refs: 3
+16 C2 ('flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns', 'process:lending-api') refs: -
+16 C3 ('store:loans-database', 'process:lending-api') refs: 8*
+16 C3b ('flow:entity:member>process:library-app>borrow-renew-and-reserve', 'process:library-app') refs: -
+16 C3b ('flow:process:library-app>process:lending-api>loan-and-reservation-requests', 'process:lending-api') refs: 8*
+16 C3b ('flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns', 'process:lending-api') refs: 8*
+16 C3b ('flow:process:lending-api>store:loans-database>read-and-write-loans', 'store:loans-database') refs: -
+16 C4 ('flow:process:library-app>process:lending-api>loan-and-reservation-requests', 'process:library-app', 'process:lending-api') refs: 7
+16 C4 ('flow:process:self-service-kiosk>process:lending-api>record-loans-and-returns', 'process:self-service-kiosk', 'process:lending-api') refs: 12
+16 C4 ('flow:entity:desk-staff>process:lending-api>change-loans-by-hand', 'entity:desk-staff', 'process:lending-api') refs: 12
+16 C5a ('flow:process:lending-api>store:loans-database>read-and-write-loans', 'process:lending-api', 'store:loans-database') refs: 9*
+16 C5b ('process:lending-api', 'entity:desk-staff', 'process:library-app', 'process:self-service-kiosk') refs: 9*
+16 C7 ('flow:process:lending-api>store:loans-database>read-and-write-loans', 'store:loans-database') refs: 10*
+17 C1a ('flow:entity:applicant>process:permit-gateway>submit-applications', 'entity:applicant', 'process:permit-gateway') refs: 0
+17 C1b ('flow:entity:applicant>process:permit-gateway>submit-applications', 'entity:applicant', 'process:permit-gateway') refs: 0
+17 C1b ('flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files', 'process:plan-upload-service', 'process:plan-renderer') refs: -
+17 C1c ('flow:entity:applicant>process:permit-gateway>submit-applications', 'entity:applicant', 'process:permit-gateway') refs: 0
+17 C1c ('flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files', 'process:plan-upload-service', 'process:plan-renderer') refs: -
+17 C2 ('flow:entity:applicant>process:permit-gateway>submit-applications', 'process:permit-gateway') refs: 3
+17 C2 ('flow:process:permit-gateway>process:permit-service>forward-application-requests', 'process:permit-service') refs: -
+17 C2 ('flow:entity:applicant>process:plan-upload-service>upload-plan-drawings', 'process:plan-upload-service') refs: 2
+17 C2 ('flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files', 'process:plan-renderer') refs: -
+17 C2 ('flow:entity:inspector>process:permit-service>review-and-decide', 'process:permit-service') refs: 16
+17 C3 ('process:permit-service', 'process:permit-gateway') refs: 9,11,12
+17 C3 ('store:plan-store', 'process:plan-upload-service') refs: 7*,13
+17 C3 ('process:plan-renderer', 'process:plan-upload-service') refs: 7*,8,13
+17 C3b ('flow:entity:applicant>process:permit-gateway>submit-applications', 'process:permit-gateway') refs: 9,11,12
+17 C3b ('flow:process:permit-gateway>process:permit-service>forward-application-requests', 'process:permit-service') refs: 9,12
+17 C3b ('flow:process:permit-service>store:permit-database>keep-applications-and-decisions', 'store:permit-database') refs: 12
+17 C3b ('flow:entity:applicant>process:plan-upload-service>upload-plan-drawings', 'process:plan-upload-service') refs: 7*,13
+17 C3b ('flow:process:plan-upload-service>store:plan-store>save-plan-files', 'store:plan-store') refs: 7*,13
+17 C3b ('flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files', 'process:plan-renderer') refs: 8,13
+17 C3b ('flow:process:plan-renderer>store:plan-store>write-image-tiles', 'store:plan-store') refs: 7*,13
+17 C3b ('flow:entity:inspector>process:permit-service>review-and-decide', 'process:permit-service') refs: 9,12
+17 C4 ('flow:process:permit-gateway>process:permit-service>forward-application-requests', 'process:permit-gateway', 'process:permit-service') refs: -
+17 C4 ('flow:entity:applicant>process:plan-upload-service>upload-plan-drawings', 'entity:applicant', 'process:plan-upload-service') refs: 6
+17 C4 ('flow:entity:inspector>process:permit-service>review-and-decide', 'entity:inspector', 'process:permit-service') refs: 15
+17 C5a ('flow:process:permit-gateway>process:permit-service>forward-application-requests', 'process:permit-gateway', 'process:permit-service') refs: 14
+17 C5a ('flow:process:plan-upload-service>store:plan-store>save-plan-files', 'process:plan-upload-service', 'store:plan-store') refs: -
+17 C5a ('flow:process:plan-upload-service>process:plan-renderer>hand-over-plan-files', 'process:plan-upload-service', 'process:plan-renderer') refs: 10
+17 C7 ('flow:process:permit-service>store:permit-database>keep-applications-and-decisions', 'store:permit-database') refs: 16
+17 C7 ('flow:process:plan-upload-service>store:plan-store>save-plan-files', 'store:plan-store') refs: 2
+17 C7 ('flow:process:plan-renderer>store:plan-store>write-image-tiles', 'store:plan-store') refs: 2
+18 C2 ('flow:entity:ad-partner>process:stats-importer>send-download-counts', 'process:stats-importer') refs: 13
+18 C3 ('store:media-store', 'process:upload-api') refs: 7,9,10,11
+18 C3 ('store:show-database', 'process:upload-api') refs: 5*,7,9,10,11
+18 C3 ('store:show-database', 'process:feed-service') refs: 5*
+18 C3b ('flow:process:upload-api>store:media-store>store-audio', 'store:media-store') refs: 7,10,11
+18 C3b ('flow:process:upload-api>store:show-database>store-episode-details', 'store:show-database') refs: 5*
+18 C3b ('flow:entity:ad-partner>process:stats-importer>send-download-counts', 'process:stats-importer') refs: 6
+18 C3b ('flow:process:stats-importer>store:stats-database>write-counts', 'store:stats-database') refs: -
+18 C4 ('flow:entity:podcaster>process:upload-api>upload-episodes', 'entity:podcaster', 'process:upload-api') refs: 4
+18 C4 ('flow:entity:podcast-app>process:feed-service>fetch-feeds', 'entity:podcast-app', 'process:feed-service') refs: -
+18 C4 ('flow:entity:ad-partner>process:stats-importer>send-download-counts', 'entity:ad-partner', 'process:stats-importer') refs: -
+18 C5a ('flow:process:upload-api>store:media-store>store-audio', 'process:upload-api', 'store:media-store') refs: 14
+18 C5a ('flow:process:upload-api>store:show-database>store-episode-details', 'process:upload-api', 'store:show-database') refs: 14
+18 C5a ('flow:process:feed-service>store:show-database>read-show-details', 'process:feed-service', 'store:show-database') refs: 14
+18 C7 ('flow:process:upload-api>store:media-store>store-audio', 'store:media-store') refs: 2
+18 C7 ('flow:process:upload-api>store:show-database>store-episode-details', 'store:show-database') refs: 17
+18 C7 ('flow:process:stats-importer>store:stats-database>write-counts', 'store:stats-database') refs: 13
+19 C2 ('flow:entity:clinic-staff>process:clinic-api>manage-records', 'process:clinic-api') refs: -
+19 C2 ('flow:entity:partner-lab>process:lab-results-importer>send-test-results', 'process:lab-results-importer') refs: 4*,5
+19 C3 ('store:records-database', 'process:owner-api') refs: 14,15
+19 C3 ('store:records-database', 'process:lab-results-importer') refs: 15
+19 C3b ('flow:process:owner-api>store:records-database>keep-owner-records', 'store:records-database') refs: 15
+19 C3b ('flow:entity:clinic-staff>process:clinic-api>manage-records', 'process:clinic-api') refs: -
+19 C3b ('flow:process:clinic-api>store:records-database>keep-records', 'store:records-database') refs: 15
+19 C3b ('flow:entity:partner-lab>process:lab-results-importer>send-test-results', 'process:lab-results-importer') refs: 15
+19 C3b ('flow:process:lab-results-importer>store:records-database>write-lab-results', 'store:records-database') refs: 15
+19 C4 ('flow:entity:pet-owner>process:owner-api>book-appointments-and-read-records', 'entity:pet-owner', 'process:owner-api') refs: 8
+19 C4 ('flow:process:owner-api>store:records-database>keep-owner-records', 'process:owner-api', 'store:records-database') refs: 12,13
+19 C4 ('flow:entity:clinic-staff>process:clinic-api>manage-records', 'entity:clinic-staff', 'process:clinic-api') refs: 9
+19 C4 ('flow:process:clinic-api>store:records-database>keep-records', 'process:clinic-api', 'store:records-database') refs: 12,13
+19 C4 ('flow:entity:partner-lab>process:lab-results-importer>send-test-results', 'entity:partner-lab', 'process:lab-results-importer') refs: 10
+19 C4 ('flow:process:lab-results-importer>store:records-database>write-lab-results', 'process:lab-results-importer', 'store:records-database') refs: 12,13
+19 C4 ('flow:process:billing-service>store:records-database>read-appointments', 'process:billing-service', 'store:records-database') refs: 12,13
+19 C4 ('flow:process:billing-service>entity:pet-owner>send-invoices', 'process:billing-service', 'entity:pet-owner') refs: 11,12
+19 C4 ('flow:entity:clinic-staff>process:billing-service>open-invoices', 'entity:clinic-staff', 'process:billing-service') refs: 12
+19 C5a ('flow:process:owner-api>store:records-database>keep-owner-records', 'process:owner-api', 'store:records-database') refs: 19,20
+19 C5a ('flow:process:lab-results-importer>store:records-database>write-lab-results', 'process:lab-results-importer', 'store:records-database') refs: 17,19,20
+19 C7 ('flow:process:owner-api>store:records-database>keep-owner-records', 'store:records-database') refs: 4*
+19 C7 ('flow:process:clinic-api>store:records-database>keep-records', 'store:records-database') refs: 4*
+19 C7 ('flow:process:lab-results-importer>store:records-database>write-lab-results', 'store:records-database') refs: 4*
+20 C1c ('flow:entity:office-staff>process:admin-console>manage-classes-and-grades', 'entity:office-staff', 'process:admin-console') refs: -
+20 C2 ('flow:entity:student>process:coursework-service>hand-in-work', 'process:coursework-service') refs: 2*
+20 C2 ('flow:entity:teacher>process:coursework-service>mark-work', 'process:coursework-service') refs: 2*
+20 C2 ('flow:entity:office-staff>process:admin-console>manage-classes-and-grades', 'process:admin-console') refs: 4
+20 C2 ('flow:entity:teacher>process:admin-console>open-admin-pages', 'process:admin-console') refs: 4
+20 C3 ('store:coursework-database', 'process:coursework-service') refs: 13
+20 C3b ('flow:entity:student>process:coursework-service>hand-in-work', 'process:coursework-service') refs: 13
+20 C3b ('flow:entity:teacher>process:coursework-service>mark-work', 'process:coursework-service') refs: 13
+20 C3b ('flow:process:coursework-service>store:coursework-database>keep-coursework', 'store:coursework-database') refs: -
+20 C3b ('flow:entity:office-staff>process:admin-console>manage-classes-and-grades', 'process:admin-console') refs: -
+20 C3b ('flow:entity:teacher>process:admin-console>open-admin-pages', 'process:admin-console') refs: -
+20 C3b ('flow:process:admin-console>store:coursework-database>write-classes-and-grades', 'store:coursework-database') refs: -
+20 C4 ('flow:entity:student>process:coursework-service>hand-in-work', 'entity:student', 'process:coursework-service') refs: 7*,9
+20 C4 ('flow:entity:teacher>process:coursework-service>mark-work', 'entity:teacher', 'process:coursework-service') refs: 7*,8
+20 C4 ('flow:entity:teacher>process:admin-console>open-admin-pages', 'entity:teacher', 'process:admin-console') refs: 8
+20 C4 ('flow:process:admin-console>store:coursework-database>write-classes-and-grades', 'process:admin-console', 'store:coursework-database') refs: 7*,8,11,12
+20 C4 ('flow:process:grade-export>entity:district-records-system>send-final-grades', 'process:grade-export', 'entity:district-records-system') refs: 10
+20 C5a ('flow:process:coursework-service>store:coursework-database>keep-coursework', 'process:coursework-service', 'store:coursework-database') refs: 15,16,17
+20 C5b ('process:coursework-service', 'entity:student', 'entity:teacher') refs: 14*,15,16
+20 C7 ('flow:process:coursework-service>store:coursework-database>keep-coursework', 'store:coursework-database') refs: 2*,4
+20 C7 ('flow:process:admin-console>store:coursework-database>write-classes-and-grades', 'store:coursework-database') refs: 2*,4

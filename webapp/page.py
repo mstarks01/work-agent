@@ -43,14 +43,18 @@ import html
 import json
 import re
 import secrets
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from fastapi import HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from analysis_service.errors import refusal_line
 
 #: Every template carries this in each inline ``<style>`` and ``<script>`` tag.
 #: A block added later without one simply stops running rather than running
@@ -184,6 +188,12 @@ def client_script(name: str) -> str:
     return (_STATIC / name).read_text(encoding="utf-8")
 
 
+def client_scripts(*names: str) -> str:
+    """The client scripts of one page as one text, in the order a caller names
+    them. A script reads the globals of each script before it."""
+    return "\n".join(client_script(name) for name in names)
+
+
 def render(
     template: str, grants: Grants, *, script: str = "", **fields: str
 ) -> RenderedPage:
@@ -198,8 +208,9 @@ def render(
     This cannot choose for the caller, because only the template says where a
     placeholder sits.
 
-    ``script`` is the page's client code, from :func:`client_script`. It fills
-    ``<!--script-->`` and takes no escape, for the reason that function gives.
+    ``script`` is the page's client code, from :func:`client_scripts`. It fills
+    ``<!--script-->`` and takes no escape, for the reason :func:`client_script`
+    gives.
     It lands before the fields do, so a template is free to put a placeholder
     inside the code as well as beside it.
 
@@ -258,6 +269,12 @@ def refuse_cross_origin(request: Request) -> None:
         raise HTTPException(
             status_code=403, detail="this request did not come from the app's page"
         )
+
+
+def invalid_request(errors: Sequence[Mapping[str, Any]]) -> JSONResponse:
+    """The ``422`` of a request the schema refuses: each place and its rule in
+    one line, and no value that the caller sent."""
+    return JSONResponse({"detail": refusal_line(errors)}, status_code=422)
 
 
 class SecurityHeaders:

@@ -1,0 +1,164 @@
+{
+  "claims": [
+    {
+      "title": "Unbounded shopper order submissions can exhaust the storefront and order-capture path",
+      "description": "An attacker using a shopper session can flood `process:storefront-api` over `flow:entity:shopper>process:storefront-api>place-order`. The submitted answers state that this process has no request-rate, request-size, concurrency, or per-user quota limit, so a cheap stream of order submissions can consume its request capacity and propagate one-for-one through `flow:process:storefront-api>process:order-service>submit-order`. Second-order, saturation of `process:storefront-api` prevents legitimate shoppers from placing orders and starves `process:order-service` of capacity to capture and persist legitimate orders. The system model and original description expose the API to the internet, while the later link answer says the internet cannot reach it; this threat applies if the stated public route represented by the boundary crossing is deployed and that contradiction is resolved in favor of the model.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "flood",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "quotes": [
+        {
+          "text": "It is the only thing we expose to the internet.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Asked \"What limits bound the requests and work process:storefront-api accepts: rate, size, concurrency, quotas or queue bounds?\", the answer is \"Does it limit the rate of requests? no; Does it limit the size of a request or message? no; Does it limit how much work runs at once? no; Does it set a quota per user or tenant? no\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Who can reach process:storefront-api's interface, and from where?\", the answer is \"Can the internet reach it? no; Can only named callers reach it, such as through an allow-list, a private network or a VPN? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: `flow:entity:shopper>process:storefront-api>place-order` is a derived crossing from `boundary:public-internet`, and the submitted answers explicitly deny all listed request and work bounds, but the later reachability answer conflicts with the model's internet-facing placement. Impact is medium: flooding `process:storefront-api` blocks the order-entry path and overload propagates over `flow:process:storefront-api>process:order-service>submit-order`, but the stated harm is a recoverable order-processing outage."
+      },
+      "mitigations": [
+        {
+          "summary": "Bound shopper request volume and cost at the storefront API",
+          "detail": "Apply per-session and per-account rate limits, request-size limits, bounded concurrency, and load shedding at `process:storefront-api` before a request is forwarded over `flow:process:storefront-api>process:order-service>submit-order`."
+        },
+        {
+          "summary": "Protect the core order service from propagated load",
+          "detail": "Set timeouts, concurrency ceilings, and backpressure on the storefront-to-order-service call so public-facing request bursts cannot consume all `process:order-service` worker capacity."
+        },
+        {
+          "summary": "Reconcile and enforce the API reachability boundary",
+          "detail": "Resolve the conflict between the internet-facing model and the submitted reachability answer, then restrict `process:storefront-api` to the intended public entry path and enforce the corresponding limits there."
+        }
+      ]
+    },
+    {
+      "title": "Unauthenticated settlement-webhook floods can deny order processing",
+      "description": "If the public settlement callback route represented by `flow:entity:card-processor>process:storefront-api>settlement-webhook` is deployed, an internet attacker can repeatedly submit webhook-shaped requests to `process:storefront-api`. The answers explicitly state that the API does not verify who sent inbound content and has no rate, size, concurrency, or quota bounds. This makes the callback endpoint a cheaper attacker-controlled source of work than the resulting processing through `flow:process:storefront-api>process:order-service>submit-order`. Second-order, webhook traffic can exhaust storefront capacity needed by `flow:entity:shopper>process:storefront-api>place-order` and consume `process:order-service` capacity needed for legitimate order capture. The later answer that the internet cannot reach the API conflicts with both the model's public-boundary crossing and the original public-exposure statement; the threat is conditional on the publicly reachable webhook path being present.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "flood",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication",
+        "assertion:origin-verification~flow:entity:card-processor>process:storefront-api>settlement-webhook~any~unknown"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Does process:storefront-api check where what it takes came from, and that it was not altered?\", the answer is \"Does it check who sent what it takes, such as by a signature or an authenticated sender? no; Does it check that what it takes was not altered? no\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"What limits bound the requests and work process:storefront-api accepts: rate, size, concurrency, quotas or queue bounds?\", the answer is \"Does it limit the rate of requests? no; Does it limit the size of a request or message? no; Does it limit how much work runs at once? no; Does it set a quota per user or tenant? no\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Who can reach process:storefront-api's interface, and from where?\", the answer is \"Can the internet reach it? no; Can only named callers reach it, such as through an allow-list, a private network or a VPN? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: the processor-to-API flow crosses from `boundary:public-internet`, webhook authentication is recorded as unknown in `unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication`, and the answers state that sender verification and workload bounds are absent; however, the answers also conflict with the model on internet reachability. Impact is medium: a successful flood denies both webhook handling and shopper order entry at `process:storefront-api`, and the submitted orders propagate to `process:order-service`, but the stated consequence is recoverable availability loss."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and meter settlement callbacks before processing",
+          "detail": "Require a verified processor signature or mutually authenticated sender on `flow:entity:card-processor>process:storefront-api>settlement-webhook`, reject unauthenticated callbacks before expensive handling, and apply source-specific rate and concurrency limits."
+        },
+        {
+          "summary": "Isolate webhook capacity from shopper traffic",
+          "detail": "Use bounded worker pools and load shedding so callback bursts cannot exhaust the request capacity used by `flow:entity:shopper>process:storefront-api>place-order`."
+        },
+        {
+          "summary": "Cap downstream work from callback handling",
+          "detail": "Apply deadlines and bounded concurrency to `flow:process:storefront-api>process:order-service>submit-order` so callback floods fail fast rather than accumulating work in `process:order-service`."
+        }
+      ]
+    },
+    {
+      "title": "Unbounded order creation can exhaust order and receipt storage",
+      "description": "A shopper-side flood through `flow:entity:shopper>process:storefront-api>place-order` reaches `process:order-service`, which persists orders through `flow:process:order-service>store:orders-db>read-write-orders`; the submitted answers state that neither `store:orders-db` nor `store:receipt-archive` has rate, size, concurrency, or per-user quota bounds. An attacker who can submit many orders can therefore consume database write throughput and storage in `store:orders-db` until legitimate order writes fail. If the attacker can also cause those orders to be treated as completed through the externally originated settlement path, one receipt per completed order is written over `flow:process:order-service>store:receipt-archive>append-receipt`, allowing the same unbounded volume to consume receipt-archive capacity. Second-order, exhausted order storage prevents `process:order-service` from capturing legitimate orders; exhausted receipt storage also prevents normal receipt generation. The receipt portion is conditional on whether attacker-driven settlements can complete attacker-created orders and whether duplicate or high-volume completion events are idempotently bounded.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "store:receipt-archive",
+        "flow:process:order-service>store:receipt-archive>append-receipt"
+      ],
+      "verb": "flood",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook"
+      ],
+      "quotes": [
+        {
+          "text": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Every completed order also gets a receipt written to a Cloud Storage bucket we call the receipt archive.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Asked \"What limits bound the requests and work store:orders-db accepts: rate, size, concurrency, quotas or queue bounds?\", the answer is \"Does it limit the rate of requests? no; Does it limit the size of a request or message? no; Does it limit how much work runs at once? no; Does it set a quota per user or tenant? no\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"What limits bound the requests and work store:receipt-archive accepts: rate, size, concurrency, quotas or queue bounds?\", the answer is \"Does it limit the rate of requests? no; Does it limit the size of a request or message? no; Does it limit how much work runs at once? no; Does it set a quota per user or tenant? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: `flow:entity:shopper>process:storefront-api>place-order` crosses from the public-internet zone and the answers explicitly deny per-user quotas and work bounds on both stores, but exploiting the receipt portion also depends on completion behavior not stated in the model and public API reachability is contradicted by the later answers. Impact is medium: `store:orders-db` holds the order records needed by `process:order-service`, while `store:receipt-archive` holds business-critical receipt data; exhaustion prevents legitimate order persistence and receipt generation, but no irreversible loss is stated."
+      },
+      "mitigations": [
+        {
+          "summary": "Apply per-principal order and storage quotas",
+          "detail": "Set per-shopper limits on order creation, request size, retained order volume, and receipt creation so one account or callback source cannot consume `store:orders-db` or `store:receipt-archive` capacity."
+        },
+        {
+          "summary": "Bound database and object-write work",
+          "detail": "Configure statement and transaction timeouts, bounded write concurrency, storage-fill monitoring, and load shedding on `flow:process:order-service>store:orders-db>read-write-orders` and `flow:process:order-service>store:receipt-archive>append-receipt`."
+        },
+        {
+          "summary": "Make payment completion and receipt creation idempotent",
+          "detail": "Authenticate settlement callbacks and bind each settlement and receipt write to a single order state transition, preventing repeated callback delivery from creating unbounded completed-order work."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

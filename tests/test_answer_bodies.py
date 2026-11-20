@@ -20,6 +20,7 @@ from analysis_service.answer_bodies import (
 from analysis_service.answer_state import MAX_SKIPS, Answers
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
+from analysis_service.sources import MAX_SOURCE_BYTES_CEILING
 
 KEY = ("flow:web-app>database", "encryption_in_transit", "", "", "", "")
 OTHER = ("component:web-app", "", "", "rate_limits", "", "")
@@ -64,6 +65,11 @@ class TestAnAcceptedBody:
         assert read_amendment({"text": "A CDN fronts it.", "revision": 0}) == (
             AmendmentSubmission(text="A CDN fronts it.", revision=0)
         )
+
+    def test_an_amendment_over_the_largest_byte_budget_is_refused(self):
+        text = "a" * (MAX_SOURCE_BYTES_CEILING + 1)
+        with pytest.raises(BodyRefused):
+            read_amendment({"text": text, "revision": 0})
 
     def test_corrections(self):
         assert read_corrections({"facts": [FACT], "revision": 1}) == (

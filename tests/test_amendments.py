@@ -57,6 +57,7 @@ def _state(*, carried=(), facts=(), waiting=True, model=None):
         checkpoint=Checkpoint(system_model=model or valid_model(), assertions=None),
         frameworks={"stride": {}},
         analyses=(),
+        asks=True,
         waiting=waiting,
         final=False,
         sources=(Source.description(DESCRIPTION_TEXT),),
@@ -156,6 +157,7 @@ class TestTheRoute:
         """The carried answers wait for its questions; the extraction and the
         catalog pass never read them."""
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id="alice",
             sources=[Source.description(DESCRIPTION_TEXT)],
             frameworks=sample_selection(),

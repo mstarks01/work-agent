@@ -57,6 +57,7 @@ from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import STYLE_REASONS, Ledger
+from evals.harness.rates import ratio, rounded_figure, shown_figure
 from evals.harness.reference import GoldenCase
 
 if TYPE_CHECKING:
@@ -79,9 +80,9 @@ class CaseWriting:
     by_reason: dict[str, int] = field(default_factory=dict)
 
     @property
-    def objection_rate(self) -> float:
+    def objection_rate(self) -> float | None:
         """Of the findings a person answered, the share drawing a style reason."""
-        return self.objections / self.answered if self.answered else 0.0
+        return ratio(self.objections, self.answered)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -91,7 +92,7 @@ class CaseWriting:
             "answered": self.answered,
             "objections": self.objections,
             "carried": self.carried,
-            "objection_rate": round(self.objection_rate, 3),
+            "objection_rate": rounded_figure(self.objection_rate, 3),
             "by_reason": dict(sorted(self.by_reason.items())),
         }
 
@@ -234,7 +235,7 @@ def aggregate(rows: Sequence[CaseWriting]) -> dict[str, Any]:
         "answered": answered,
         "objections": objections,
         "carried": sum(row.carried for row in rows),
-        "objection_rate": round(objections / answered, 3) if answered else 0.0,
+        "objection_rate": rounded_figure(ratio(objections, answered), 3),
         "by_framework": dict(sorted(by_framework.items())),
         "by_reason": dict(sorted(reasons.items())),
     }
@@ -251,7 +252,7 @@ def render(rows: Sequence[CaseWriting]) -> None:
         print(
             f"  {row.case_id:<34} {row.framework:<8}"
             f" {row.objections}/{row.answered} answered"
-            f" ({row.objection_rate:.2f}), {row.produced} produced,"
+            f" ({shown_figure(row.objection_rate, '.2f')}), {row.produced} produced,"
             f" {row.carried} carried"
         )
 
@@ -267,7 +268,7 @@ def render(rows: Sequence[CaseWriting]) -> None:
         return
     print(
         f"  all: {totals['objections']}/{totals['answered']} answered"
-        f" ({totals['objection_rate']:.2f}),"
+        f" ({shown_figure(totals['objection_rate'], '.2f')}),"
         f" {totals['carried']} answered on other words"
     )
     for reason, count in totals["by_reason"].items():

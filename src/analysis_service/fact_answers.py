@@ -14,10 +14,12 @@ them, and :func:`fact_kind` says which.
 * An **assertion** row the sources left open. The answer replaces the row with
   a stated one, quoting its line of the answers Source.
 * A **question** of one of the kinds in
-  :data:`~analysis_service.question_kinds.QUESTION_KINDS`, about one element,
-  or a free-text **subject** where no kind fits. Nothing structured can hold
-  either answer, so it reaches the lanes only as its line of the answers
-  Source.
+  :data:`~analysis_service.question_kinds.QUESTION_KINDS`, about one element.
+  Each part of the kind is a predicate (ADR 0117), so the answer writes a
+  stated row for each part it answers (:func:`part_answers`), quoting its line
+  of the answers Source, and the lanes read it in both forms.
+* A free-text **subject** where no kind fits. Nothing structured can hold the
+  answer, so it reaches the lanes only as its line of the answers Source.
 * A **capability** of the whole application, answered yes or no. The answer
   replaces what the sources stated about it with a statement on the model
   that quotes its line of the answers Source.
@@ -55,11 +57,15 @@ from pydantic import (
 )
 
 from analysis_service.assertions import (
+    FACET_ANSWERS,
     UNKNOWN,
     Assertion,
     AssertionCatalog,
+    PredicateName,
     answered,
     assertion_id,
+    disputed,
+    place_identity,
 )
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import (
@@ -70,12 +76,13 @@ from analysis_service.claims import (
 )
 from analysis_service.grounding import normalize
 from analysis_service.open_facts import element_names, label_of
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
+from analysis_service.parsing import table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.sources import FORMATTING_CATEGORIES, plain_name, quotable
 from analysis_service.system_model import SystemModel
 
 __all__ = [
-    "FACET_ANSWERS",
+    "FACT_VALUE_MAX_CHARS",
     "MAX_FACT_ANSWERS",
     "MAX_HELD_FACTS",
     "STORED",
@@ -86,7 +93,9 @@ __all__ = [
     "answer_facets",
     "answered_keys",
     "answered_row",
+    "asked_facets",
     "attribute_place",
+    "control_line",
     "covers",
     "detail_note",
     "fact_kind",
@@ -97,7 +106,9 @@ __all__ = [
     "merged_facts",
     "needed_facets",
     "needs_of",
+    "part_answers",
     "refuse_repeated_facts",
+    "with_element",
 ]
 
 
@@ -130,9 +141,6 @@ SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length
 FactKind = Spelling
 
 
-#: The answers a facet takes, beside ``unknown``.
-FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
-
 #: The validation context of an answer that the service reads back: a record
 #: that a store holds, or an answer that a run's state carries. An answer read
 #: back keeps what the service admitted, so a rule that judges a submission,
@@ -140,7 +148,7 @@ FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 STORED: Mapping[str, bool] = MappingProxyType({"stored": True})
 
 
-def _read_back(info: ValidationInfo) -> bool:
+def read_back(info: ValidationInfo) -> bool:
     """True where the service reads back an answer it admitted earlier.
 
     **The one reader of "is this a submission or a read-back".** Each rule
@@ -149,13 +157,17 @@ def _read_back(info: ValidationInfo) -> bool:
     return bool(info.context and info.context.get("stored"))
 
 
+#: The longest value of one answer to an open fact.
+FACT_VALUE_MAX_CHARS = 1000
+
+
 class FactAnswer(BaseModel):
     """One submitter answer to one open fact, named by the fact's key."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     key: UnknownKey
-    value: str = Field(min_length=1, max_length=1000)
+    value: str = Field(min_length=1, max_length=FACT_VALUE_MAX_CHARS)
     #: A ``facets`` kind's answer: each facet's ID and one of
     #: :data:`FACET_ANSWERS` or ``unknown``. The service writes ``value`` from
     #: it, so a submission sends one or the other.
@@ -175,13 +187,14 @@ class FactAnswer(BaseModel):
         **The one writer of a facet answer's value**, at admission. An
         answer read back under :data:`STORED` keeps the value it holds.
         """
-        if _read_back(info) or not isinstance(data, dict) or data.get("facets") is None:
+        if read_back(info) or not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
         question = ""
         if isinstance(key, list | tuple) and len(key) == len(UNKNOWN_KEY_FIELDS):
             question = dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))["question"]
-        kind = QUESTION_KINDS.get(question)
+        name = parse_question_kind(question)
+        kind = None if name is None else QUESTION_KINDS[name]
         if kind is None or kind.answer != "facets":
             raise ValueError("facets answer only a question kind that has facets")
         if not isinstance(facets, dict) or not facets:
@@ -231,7 +244,7 @@ class FactAnswer(BaseModel):
             case ("assertion",):
                 read = {"assertion": ref.assertion}
             case ("subject",):
-                if not (_read_back(info) or quotable(ref.subject)):
+                if not (read_back(info) or quotable(ref.subject)):
                     raise ValueError(
                         "a subject is one line, with no double quote and no"
                         " control or formatting character"
@@ -292,6 +305,12 @@ def key_ref(key: UnknownKey) -> UnknownRef:
     )
 
 
+def with_element(key: UnknownKey, element_id: str) -> UnknownKey:
+    """``key`` with its element part replaced by ``element_id``, read through
+    :func:`key_ref`."""
+    return key_ref(key).model_copy(update={"element_id": element_id}).key
+
+
 def attribute_place(key: UnknownKey) -> tuple[str, str]:
     """The element and the attribute that a key names, by name.
 
@@ -329,10 +348,10 @@ def fact_line(fact: FactAnswer) -> str:
     """
     ref = key_ref(fact.key)
     if fact.kind == "capability":
-        asked = CAPABILITIES[ref.capability].question
+        asked = table_entry(CAPABILITIES, ref.capability).question
         line = f'Asked "{asked}", the answer is "{fact.value}".'
     elif fact.kind == "question":
-        kind = QUESTION_KINDS[ref.question]
+        kind = table_entry(QUESTION_KINDS, ref.question)
         asked = kind.template.format(element=ref.element_id)
         line = f'Asked "{asked}", the answer is "{fact.value}".'
     elif fact.kind == "attribute":
@@ -342,6 +361,12 @@ def fact_line(fact: FactAnswer) -> str:
     else:
         line = f'Asked "{_phrase(ref.subject)}", the answer is "{fact.value}".'
     return line + detail_note(fact.detail)
+
+
+def control_line(name: str, fact: FactAnswer) -> str:
+    """A fact a Control writes as its line of the answers Source, which names
+    the Control (ADR 0125)."""
+    return f'{fact_line(fact)} From the Control "{_phrase(name)}".'
 
 
 def _phrase(value: str) -> str:
@@ -374,33 +399,51 @@ def detail_note(detail: str) -> str:
 
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
     """The facets a question kind is answered in, or empty."""
-    kind = (
-        QUESTION_KINDS.get(key_ref(key).question)
+    name = (
+        parse_question_kind(key_ref(key).question)
         if fact_kind(key) == "question"
         else None
     )
-    return () if kind is None else kind.facets
+    return () if name is None else QUESTION_KINDS[name].facets
+
+
+def part_answers(fact: FactAnswer) -> tuple[tuple[PredicateName, str], ...]:
+    """Each predicate a question-kind answer names, with what it answers that part.
+
+    Each part comes from :attr:`~analysis_service.question_kinds.QuestionKind.parts`
+    (ADR 0117). A facet the answer leaves out reads ``unknown``, and a
+    ``yes-no`` kind's one part reads the answer's value.
+    Empty for every other fact, and for a kind this table no longer holds.
+    """
+    name = parse_question_kind(key_ref(fact.key).question)
+    if fact.kind != "question" or name is None:
+        return ()
+    given = fact.facets or {}
+    return tuple(
+        (predicate, fact.value if facet is None else given.get(facet, UNKNOWN))
+        for facet, predicate in QUESTION_KINDS[name].parts
+    )
 
 
 def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:
-    """The row an answer to the open row ``identity`` writes over, if any.
+    """The row an answer to the open place ``identity`` writes over, if any.
 
-    **The one reader of "which row does this answer settle".** That is the open
-    row itself, or the stated row an earlier answer wrote in its place. The
-    second is the row a resumed job's checkpoint holds, and a later run
-    writes it again, so that its quote reads the answers Source this run
-    composed. A row the sources settled is neither, so no answer names it.
+    **The one reader of "which row does this answer settle".** ``identity``
+    names a place (:func:`~analysis_service.assertions.place_identity`). The
+    row is the open row there, a side of a disagreement there
+    (:func:`~analysis_service.assertions.disputed`), or the stated row an
+    earlier answer wrote there. The last is the row a resumed job's checkpoint
+    holds, and a later run writes it again, so that its quote reads the
+    answers Source this run composed. A row the sources settled is none of
+    these, so no answer names it. The open row or the earlier answer comes
+    before a side of a disagreement, so a later answer writes over the earlier
+    one whatever the catalog order.
     """
-    for entry in catalog.entries:
-        if entry.value == UNKNOWN:
-            reopened = entry
-        elif answered(entry):
-            reopened = entry.model_copy(update={"value": UNKNOWN})
-        else:
-            continue
-        if assertion_id(reopened) == identity:
-            return entry
-    return None
+    sides = {assertion_id(entry) for entry in disputed(catalog)}
+    at_place = [entry for entry in catalog.entries if place_identity(entry) == identity]
+    written = [entry for entry in at_place if entry.value == UNKNOWN or answered(entry)]
+    disagreeing = [entry for entry in at_place if assertion_id(entry) in sides]
+    return next(iter([*written, *disagreeing]), None)
 
 
 def refuse_repeated_facts(facts: Sequence[FactAnswer]) -> None:
@@ -493,17 +536,17 @@ def fact_status(
     return "partial" if answer.known else "unknown"
 
 
-def needed_facets(ref: UnknownRef) -> tuple[str, ...]:
-    """The facets of its question kind a dependency waits on, in the kind's order.
+def needed_facets(key: UnknownKey, named: Collection[str]) -> tuple[str, ...]:
+    """The facets of ``key``'s question kind that a need names, in the kind's order.
 
     **The one reader of "which part of a question does a finding need"** (ADR
-    0073). The facets the reference names that its kind has; where it names
-    none of them, every facet the kind has, so the finding waits on the whole
-    question. Empty for a fact answered in one value.
+    0073). ``named`` is what a dependency or a finding names: the facets it
+    names that the kind has, or every facet the kind has where it names none
+    of them, so the finding waits on the whole question (ADR 0112). Empty for
+    a fact answered in one value.
     """
-    every = tuple(facet.id for facet in answer_facets(ref.key))
-    named = tuple(facet for facet in every if facet in ref.facets)
-    return named or every
+    every = tuple(facet.id for facet in answer_facets(key))
+    return tuple(facet for facet in every if facet in named) or every
 
 
 def needs_of(refs: Sequence[UnknownRef]) -> dict[UnknownKey, tuple[str, ...]]:
@@ -514,11 +557,35 @@ def needs_of(refs: Sequence[UnknownRef]) -> dict[UnknownKey, tuple[str, ...]]:
     """
     needs: dict[UnknownKey, set[str]] = {}
     for ref in refs:
-        needs.setdefault(ref.key, set()).update(needed_facets(ref))
+        needs.setdefault(ref.key, set()).update(needed_facets(ref.key, ref.facets))
     return {
         key: tuple(facet.id for facet in answer_facets(key) if facet.id in held)
         for key, held in needs.items()
     }
+
+
+def asked_facets(
+    key: UnknownKey,
+    findings: Sequence[str] = (),
+    needs: Mapping[str, Sequence[str]] | None = None,
+) -> tuple[str, ...]:
+    """The facets of ``key`` a page asks for: each facet a waiting finding needs.
+
+    ``findings`` wait on the fact, and ``needs`` maps a finding that needs only
+    some facets to those facets (ADR 0073). :func:`needed_facets` reads each
+    finding's need, so a finding absent from ``needs`` needs every facet, and
+    so does a fact no finding waits on, such as an early question or an
+    earlier answer (ADR 0112). Empty for a fact with no facets.
+    """
+    needs = needs or {}
+    if not findings:
+        return needed_facets(key, ())
+    wanted = {
+        facet
+        for finding in findings
+        for facet in needed_facets(key, needs.get(finding, ()))
+    }
+    return tuple(facet.id for facet in answer_facets(key) if facet.id in wanted)
 
 
 def covers(answer: FactAnswer | None, facets: Sequence[str]) -> bool:

@@ -1,0 +1,15 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Sensor readings may be intercepted between field nodes and the internet-facing gateway | ['flow:entity:sensor-node>process:device-gateway>publish-readings', 'entity:sensor-node', 'process:device-gateway']
+- Device-registry key material may be readable on the gateway-to-registry path | ['flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway', 'store:device-registry']
+- Telemetry-lake uploads may expose addresses and occupancy data in transit | ['flow:process:telemetry-normalizer>store:telemetry-lake>load-readings', 'process:telemetry-normalizer', 'store:telemetry-lake']
+- Fleet-dashboard queries may expose raw customer telemetry across the corporate boundary | ['flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'entity:fleet-operator', 'store:telemetry-lake']
+- Gateway-to-Pub/Sub telemetry may be exposed on an unverified internal channel | ['flow:process:device-gateway>store:pub-sub>forward-readings', 'process:device-gateway', 'store:pub-sub']
+- Telemetry-normalizer Pub/Sub reads may be interceptable across the analytics boundary | ['flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer', 'store:pub-sub']
+- A copied device registry could disclose fleet authentication keys if encryption at rest is absent | ['store:device-registry']
+- A telemetry-lake snapshot could reveal customer occupancy data if encryption at rest is absent | ['store:telemetry-lake']
+- Persisted Pub/Sub messages may disclose PII if storage encryption is absent | ['store:pub-sub']
+- An unverified registry authentication path could expose fleet key material | ['store:device-registry', 'flow:process:device-gateway>store:device-registry>look-up-device', 'process:device-gateway']
+- Fleet operators may elicit raw customer telemetry beyond their assigned scope | ['entity:fleet-operator', 'flow:entity:fleet-operator>store:telemetry-lake>query-dashboards', 'store:telemetry-lake']
+- An unverified Pub/Sub subscriber path could return customer telemetry to an unauthorized reader | ['store:pub-sub', 'flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings', 'process:telemetry-normalizer']
+spent: $0.0713 reported
+must-finds matched: [7]

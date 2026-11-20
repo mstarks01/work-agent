@@ -17,7 +17,9 @@ real graph run sent.
 
 **The prompt files are today's.** The captured material is the run's, and the
 instruction around it is read from this checkout. The command prints both
-commits, and a replay across a prompt change measures that change.
+commits, and a replay across a prompt change measures that change. The run
+record names each prompt and package file the run loaded, with its digest, so
+a record from a changed tree still shows the text the lane read.
 
 **One extra user part, on request.** ``--append`` sends a file's text as a
 second part of the user turn, after the captured input. ADR 0030's measurement
@@ -39,35 +41,42 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal, get_args
 
 from google.genai import types
 from pydantic import BaseModel
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.graph import (
     STATE_ASSERTION_PROPOSAL,
+    STATE_EVIDENCE_CATALOG,
     STATE_FRAMEWORK_OPTIONS,
+    STATE_SYSTEM_MODEL,
     STATE_VALID_MODEL,
     FrameworkNodes,
     GraphKeys,
     Lane,
+    LaneArtifact,
     analyze_instruction,
     framework_lane_inputs,
     prepare_analysis,
+    unfence,
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.node_requests import node_request
 from analysis_service.prompts import lane_closing
+from analysis_service.system_model import ELEMENT_GROUPS
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
+    corpus_digest,
     load_artifact,
     repo_commit,
 )
@@ -75,7 +84,7 @@ from evals.harness.bundle import check_out, finished_file
 from evals.harness.descendants import FRAMEWORK as SCORED
 from evals.harness.descendants import lane_must_finds
 from evals.harness.modes import EvalRunError, case_framework_options
-from evals.harness.node_call import NodeCall, node_call
+from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import (
     DEFAULT_CORPUS,
@@ -84,11 +93,13 @@ from evals.harness.reference import (
     load_case,
     refuse_holdout,
 )
+from evals.harness.run_record import Selections, loaded, run_record_for
 from evals.reference_facts import load_facts, signed_proposal
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
 #: job with ``ANALYSIS_ASSERTIONS`` off, or the case's signed facts.
-CATALOG_ARMS = ("none", "signed")
+CatalogArm = Literal["none", "signed"]
+CATALOG_ARMS: tuple[CatalogArm, ...] = get_args(CatalogArm)
 
 
 def lane_of(framework: FrameworkName, name: str) -> Lane:
@@ -101,11 +112,11 @@ def lane_of(framework: FrameworkName, name: str) -> Lane:
     return lanes[name]
 
 
-def load_material(artifact: EvalArtifact, case_id: str) -> dict[str, Any]:
-    """One case's captured lane material, or a refusal saying why there is none.
+def lanes_file(artifact: EvalArtifact, case_id: str) -> Path:
+    """One case's ``<case>.lanes.json``, or a refusal saying why there is none.
 
-    The file is read through :func:`~evals.harness.bundle.finished_file`, so a
-    lost file of a finished case is refused by name. A failed case wrote no
+    The file is found through :func:`~evals.harness.bundle.finished_file`, so
+    a lost file of a finished case is refused by name. A failed case wrote no
     lane material, so it is refused too.
     """
     path = finished_file(artifact, case_id, "lanes")
@@ -114,18 +125,110 @@ def load_material(artifact: EvalArtifact, case_id: str) -> dict[str, Any]:
             f"{case_id}: the artifact records the case as failed, so the sweep"
             " wrote no lane material for it"
         )
-    return material_at(path)
+    return path
 
 
 def material_at(path: Path) -> dict[str, Any]:
     """The lane material in one ``<case>.lanes.json``, or a refusal."""
-    material: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        material = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise EvalRunError(f"{path} is not JSON: {error.msg}") from error
+    if not isinstance(material, dict):
+        raise EvalRunError(f"{path} holds no JSON object")
     if material.get("prepared") is None:
         raise EvalRunError(
             f"{path} carries no user turn; a lane's request without the input"
             " prepare handed it is not the request the lane made"
         )
     return material
+
+
+def captured_lane(
+    material: Mapping[str, Any], framework: FrameworkName, lane_name: str
+) -> Mapping[LaneArtifact, str]:
+    """One lane's captured artifacts in ``material``, keyed by placeholder, or a refusal.
+
+    The one reader of a lane's artifacts in a lane capture.
+    The capture holds each :data:`~analysis_service.graph.LANE_ARTIFACTS` key
+    and no other, as :meth:`~analysis_service.graph.Lane.state` requires of
+    what ``prepare`` writes, and each value is text.
+    """
+    lanes = material.get("lanes")
+    framework_lanes = lanes.get(framework) if isinstance(lanes, Mapping) else None
+    held = (
+        framework_lanes.get(lane_name) if isinstance(framework_lanes, Mapping) else None
+    )
+    if not isinstance(held, Mapping):
+        raise EvalRunError(f"the capture holds no {framework} lane {lane_name!r}")
+    try:
+        lane_of(framework, lane_name).state(held)
+    except ValueError as error:
+        raise EvalRunError(
+            f"the {framework} lane {lane_name!r} capture is not a lane's state: {error}"
+        ) from error
+    unrendered = sorted(
+        name for name, text in held.items() if not isinstance(text, str)
+    )
+    if unrendered:
+        raise EvalRunError(
+            f"the {framework} lane {lane_name!r} capture holds"
+            f" {', '.join(unrendered)} as other than text"
+        )
+    artifacts: Mapping[LaneArtifact, str] = held
+    return artifacts
+
+
+@dataclass(frozen=True)
+class SharedInput:
+    """The shared keys a case's lanes were sent, as the sweep captured them."""
+
+    #: Each element of the captured ``system_model``, by its ID, or ``None``
+    #: where the key is refused.
+    elements: Mapping[str, Mapping[str, Any]] | None
+    #: The captured ``evidence_catalog`` table, or ``None`` where it is refused.
+    evidence_catalog: str | None
+    #: Why each refused key is refused, by its state key.
+    refused: Mapping[str, str]
+
+
+def captured_shared(material: Mapping[str, Any]) -> SharedInput:
+    """The captured ``system_model`` and ``evidence_catalog`` of a case, each read apart.
+
+    A key the capture lacks, or a model that is not a JSON object, is refused
+    on its own, and the other key is still read.
+    """
+    shared = material.get("shared")
+    held = shared if isinstance(shared, Mapping) else {}
+    refused: dict[str, str] = {}
+    texts: dict[str, str] = {}
+    for key in (STATE_SYSTEM_MODEL, STATE_EVIDENCE_CATALOG):
+        if isinstance(text := held.get(key), str):
+            texts[key] = text
+        else:
+            refused[key] = f"the capture holds no shared {key} text"
+    elements = None
+    if STATE_SYSTEM_MODEL in texts:
+        try:
+            model = json.loads(unfence(texts[STATE_SYSTEM_MODEL]))
+        except json.JSONDecodeError as error:
+            model = None
+            refused[STATE_SYSTEM_MODEL] = (
+                f"the captured system model is not JSON: {error.msg}"
+            )
+        if isinstance(model, dict):
+            elements = {
+                element["id"]: element
+                for group in ELEMENT_GROUPS
+                if isinstance(collection := model.get(group), list)
+                for element in collection
+                if isinstance(element, dict) and isinstance(element.get("id"), str)
+            }
+        else:
+            refused.setdefault(
+                STATE_SYSTEM_MODEL, "the captured system model holds no JSON object"
+            )
+    return SharedInput(elements, texts.get(STATE_EVIDENCE_CATALOG), refused)
 
 
 async def compose(
@@ -141,10 +244,9 @@ async def compose(
     it, so ``--append`` comes after that.
     """
     lane = lane_of(framework, lane_name)
-    held = material["lanes"][framework][lane_name]
     state = {
         **material["shared"],
-        **{lane.key(name): value for name, value in held.items()},
+        **lane.state(captured_lane(material, framework, lane_name)),
     }
     template = analyze_instruction(
         package_loader, prompt_loader, package_for(framework), lane
@@ -186,10 +288,12 @@ def fresh_leads(
 
 @dataclass(frozen=True)
 class PreparedToday:
-    """What today's ``prepare`` wrote for one case: the lanes' material and the state."""
+    """What today's ``prepare`` wrote for one case: the lanes' material, the
+    state, and each file its loaders held, for a run record."""
 
     material: dict[str, Any]
     state: dict[str, Any]
+    inputs: dict[Path, Selections]
 
 
 def prepare_today(
@@ -218,17 +322,21 @@ def prepare_today(
         facts = load_facts(REPO_ROOT / DEFAULT_CORPUS / case.id)
         extra[STATE_ASSERTION_PROPOSAL] = signed_proposal(facts).model_dump(mode="json")
     ctx = SimpleNamespace(state=seed_state(case.sources, extra))
+    domains = MarkdownLoader(REPO_ROOT / "domains")
+    package = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
     event = prepare_analysis(
         valid_model,
         ctx,
         GraphKeys.of([framework]),
         [framework],
-        MarkdownLoader(REPO_ROOT / "domains"),
-        {framework: MarkdownLoader(REPO_ROOT / "frameworks" / framework)},
+        domains,
+        {framework: package},
         assertions=arm == "signed",
     )
     run = GraphRun(final_state=ctx.state, node_runs=[], prepared=event.output)
-    return PreparedToday(run.lane_material([framework]), ctx.state)
+    return PreparedToday(
+        run.lane_material([framework]), ctx.state, loaded((domains, package))
+    )
 
 
 def parse(raw: str, framework: FrameworkName) -> BaseModel:
@@ -288,12 +396,17 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="build the request with today's prepare over the case's blessed"
         " model, with no catalog or the case's signed facts, and score the drafts",
     )
-    parser.add_argument("--out", type=Path, help="write the lane's proposals here")
+    parser.add_argument(
+        "--out", type=Path, help="write the run record and the lane's proposals here"
+    )
 
 
 def command_lane_replay(args: argparse.Namespace) -> int:
     """Send one lane request again, and print what the lane proposed."""
     prepared = None
+    package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / args.framework)
+    prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
+    inputs = loaded((package_loader, prompt_loader))
     try:
         refuse_holdout(args.case)
         if (args.artifact is None) == (args.prepare_today is None):
@@ -308,25 +421,43 @@ def command_lane_replay(args: argparse.Namespace) -> int:
         if args.prepare_today is not None:
             prepared = prepare_today(case, args.framework, args.prepare_today)
             material = prepared.material
+            inputs |= prepared.inputs
             print(
                 f"material from today's prepare, catalog {args.prepare_today};"
                 f" prompt files from {repo_commit().commit}"
             )
         else:
             artifact = load_artifact(args.artifact)
-            material = load_material(artifact, args.case)
+            lanes = lanes_file(artifact, args.case)
+            material = material_at(lanes)
+            inputs |= {artifact.path: {}, lanes: {}}
             if args.fresh_leads:
                 material = fresh_leads(
                     material,
                     case,
                     args.framework,
                     args.lane,
-                    MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
+                    package_loader,
                 )
             print(
                 f"material from {artifact.commit.commit}; prompt files"
                 f" from {repo_commit().commit}"
             )
+        if args.append is not None:
+            inputs[args.append] = {}
+        record = run_record_for(
+            [args.out],
+            "lane-replay",
+            {
+                "case": args.case,
+                "lane": args.lane,
+                "framework": args.framework,
+                "fresh_leads": args.fresh_leads,
+                "prepare_today": args.prepare_today,
+                "corpus_digest": corpus_digest(),
+            },
+            inputs,
+        )
     except (CorpusError, EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -344,22 +475,20 @@ def command_lane_replay(args: argparse.Namespace) -> int:
             args.framework,
             args.lane,
             call,
-            MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
-            MarkdownLoader(REPO_ROOT / "prompts"),
+            package_loader,
+            prompt_loader,
             args.append.read_text(encoding="utf-8") if args.append else None,
         )
     )
     dumped = batch.model_dump(mode="json")
     for claim in dumped["claims"]:
         print(f"- {claim.get('title')} | {claim.get('affected_element_ids')}")
-    charged = [charge for charge in spent if charge is not None]
-    print(
-        f"spent: ${sum(charged):.4f} reported"
-        + ("" if len(charged) == len(spent) else "; the provider reported no charge")
-    )
+    print(spent_line(spent))
     if args.out:
-        args.out.write_text(json.dumps(dumped, indent=2) + "\n", encoding="utf-8")
+        written = {"record": record, **dumped}
+        args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
     if prepared is not None and args.framework == SCORED:
+        assert isinstance(batch, ProposalBatch)
         matched = lane_must_finds(case, prepared.state, args.lane, batch)
         print(f"must-finds matched: {list(matched)}")
     return 0

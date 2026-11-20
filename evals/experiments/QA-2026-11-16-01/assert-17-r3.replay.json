@@ -1,0 +1,395 @@
+{
+  "record": {
+    "command": "replay",
+    "commit": "cf11746c8762b9364362ccbeb44a46b32ebfeb15",
+    "clean": true,
+    "table": {
+      "targets": 10,
+      "corpus_digest": "b535ac3d85f5e51798e1a9656294adaa85d25ce24db260d513645518d605ce78"
+    },
+    "inputs": [
+      {
+        "path": "evals/runs/2054/assert-17-r3.json",
+        "sha256": "166d36097d054fce7482a3c44eb6c495e4648144bd12fe06a4b46ec43e11f75d",
+        "selections": {}
+      },
+      {
+        "path": "evals/runs/2054/assert-17-r3.reports/17-permit-portal-limits.assertions.json",
+        "sha256": "4c826919c8fb0772eb22c611641c0a0433a89e127ceac7298a306214485c3ec8",
+        "selections": {}
+      }
+    ]
+  },
+  "arms": [
+    {
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "fb4821b1605907c4aa8b4c1337816bfb901fc3eadccc3eabfb056ac3713faac1"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "39eae7bf4f128fb9815bb09f538f99dd71a56df8fe7280085d4e38318b3af0aa",
+        "treatment_by": "rendered_sources"
+      },
+      "extraction": null,
+      "assertions": {
+        "sweeps": 1,
+        "emissions": 1,
+        "fates": {
+          "found": 5,
+          "worded": 0,
+          "wrong_certainty": 0,
+          "wrong_value": 1,
+          "rescoped": 2,
+          "omitted": 8,
+          "silent": 10
+        },
+        "required": 14,
+        "recovered": 5,
+        "found": 5,
+        "relabelled": 0,
+        "basis_overstated": 0,
+        "produced": {
+          "found": 5,
+          "worded": 0,
+          "wrong_certainty": 0,
+          "wrong_value": 1,
+          "rescoped": 2,
+          "misattached": 1,
+          "unreviewed": 6
+        },
+        "rejected": 7,
+        "span_refusals": 1,
+        "rows": 15,
+        "assessed": 0,
+        "targets": [
+          {
+            "row": "17-permit-portal-limits/assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "wrong_value": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:capacity-limits-quota~process:permit-service~any~unknown",
+            "losses": 1,
+            "by_fate": {
+              "rescoped": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:capacity-limits-rate~process:permit-gateway~any~yes",
+            "losses": 1,
+            "by_fate": {
+              "rescoped": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:credential-sharing~credential:the-district-inspector-login~any~shared",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:internet-exposure~process:permit-gateway~any~internet-facing",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~entity:inspector~any~boundary:city-network",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~process:permit-service~any~boundary:city-cloud-account",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~process:plan-renderer~any~boundary:city-cloud-account",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~process:plan-upload-service~any~boundary:city-cloud-account",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~store:permit-database~any~boundary:city-cloud-account",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          },
+          {
+            "row": "17-permit-portal-limits/assertion:network-membership~store:plan-store~any~boundary:city-cloud-account",
+            "losses": 1,
+            "by_fate": {
+              "omitted": 1
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "sweeps": [
+    {
+      "artifact": "assert-17-r3.json",
+      "arm": {
+        "nodes": [
+          "assert"
+        ],
+        "instructions": [
+          "fb4821b1605907c4aa8b4c1337816bfb901fc3eadccc3eabfb056ac3713faac1"
+        ],
+        "models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "treatment": "39eae7bf4f128fb9815bb09f538f99dd71a56df8fe7280085d4e38318b3af0aa",
+        "treatment_by": "rendered_sources"
+      },
+      "repo_commit": {
+        "commit": "cf11746c8762b9364362ccbeb44a46b32ebfeb15",
+        "clean": true
+      },
+      "corpus_digest": "b535ac3d85f5e51798e1a9656294adaa85d25ce24db260d513645518d605ce78",
+      "extractions": [],
+      "assertions": [
+        {
+          "case": "17-permit-portal-limits",
+          "counts": {
+            "found": 5,
+            "worded": 0,
+            "wrong_certainty": 0,
+            "wrong_value": 1,
+            "rescoped": 2,
+            "omitted": 8,
+            "silent": 10
+          },
+          "basis_overstated": 0,
+          "produced_counts": {
+            "found": 5,
+            "worded": 0,
+            "wrong_certainty": 0,
+            "wrong_value": 1,
+            "rescoped": 2,
+            "misattached": 1,
+            "unreviewed": 6
+          },
+          "required": 14,
+          "recovered": 5,
+          "rejected": 7,
+          "refusals": {
+            "unsupported-assertion": 6,
+            "ambiguous-span": 1
+          },
+          "span_refusals": 1,
+          "produced_rows": 15,
+          "assessed_rows": 0,
+          "issues": [
+            "unsupported-assertion: a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+            "unsupported-assertion: a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+            "unsupported-assertion: a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+            "unsupported-assertion: a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+            "unsupported-assertion: a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+            "unsupported-assertion: a stated value cites the words that state it, and a quote not found in the source it names takes no span",
+            "ambiguous-span: source 'System description' holds this quote in more than one place, so these offsets name no one of them; quote enough of the source to say which"
+          ],
+          "rows": [
+            {
+              "reference": "assertion:capacity-limits-rate~process:permit-gateway~any~yes",
+              "fate": "rescoped",
+              "produced": "assertion:capacity-limits-rate~process:permit-gateway~s.223852f2e641~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-size~process:permit-gateway~any~yes",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-size~process:permit-gateway~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-concurrency~process:permit-gateway~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-quota~process:permit-gateway~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-size~process:plan-upload-service~any~no",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-size~process:plan-upload-service~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-rate~process:plan-upload-service~any~no",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-rate~process:plan-upload-service~any~no",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-concurrency~process:plan-upload-service~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-quota~process:plan-upload-service~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-concurrency~process:plan-renderer~any~yes",
+              "fate": "found",
+              "produced": "assertion:capacity-limits-concurrency~process:plan-renderer~any~yes",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:capacity-limits-quota~process:permit-service~any~unknown",
+              "fate": "rescoped",
+              "produced": "assertion:capacity-limits-quota~process:permit-service~s.2b8c996eac9a~unknown",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:internet-exposure~process:permit-gateway~any~internet-facing",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:internet-exposure~process:plan-upload-service~any~internet-facing",
+              "fate": "found",
+              "produced": "assertion:internet-exposure~process:plan-upload-service~any~internet-facing",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:permit-service~any~boundary:city-cloud-account",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:plan-upload-service~any~boundary:city-cloud-account",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:plan-renderer~any~boundary:city-cloud-account",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~store:permit-database~any~boundary:city-cloud-account",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~store:plan-store~any~boundary:city-cloud-account",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:inspector~any~boundary:city-network",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~entity:applicant~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:network-membership~process:permit-gateway~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:credential-sharing~credential:the-district-inspector-login~any~shared",
+              "fate": "omitted",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~unknown",
+              "fate": "wrong_value",
+              "produced": "assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~v.ed27cb153088",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:applicant>process:permit-gateway>submit-applications~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:authentication-mechanism~flow:entity:applicant>process:plan-upload-service>upload-plan-drawings~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:applicant>process:permit-gateway>submit-applications~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            },
+            {
+              "reference": "assertion:transport-encryption~flow:entity:applicant>process:plan-upload-service>upload-plan-drawings~any~unknown",
+              "fate": "silent",
+              "produced": "",
+              "basis_overstated": false
+            }
+          ],
+          "produced": {
+            "assertion:data-classification~store:permit-database~any~confidential": "unreviewed",
+            "assertion:data-classification~store:plan-store~any~internal": "unreviewed",
+            "assertion:credential-presented~principal:inspector~any~credential:shared-inspector-login": "unreviewed",
+            "assertion:credential-presented~flow:entity:inspector>process:permit-service>review-and-decide~any~credential:shared-inspector-login": "unreviewed",
+            "assertion:credential-sharing~credential:shared-inspector-login~s.609bd44e7a22~shared": "misattached",
+            "assertion:authorization-grant~principal:applicant~s.cfb0d52e8021~v.4edd454a1fe7": "unreviewed",
+            "assertion:authorization-grant~principal:inspector~s.e6f17ff4270a~v.0bfa1cc228db": "unreviewed",
+            "assertion:capacity-limits-rate~process:permit-gateway~s.223852f2e641~yes": "rescoped",
+            "assertion:capacity-limits-size~process:permit-gateway~any~yes": "found",
+            "assertion:capacity-limits-size~process:plan-upload-service~any~no": "found",
+            "assertion:capacity-limits-rate~process:plan-upload-service~any~no": "found",
+            "assertion:capacity-limits-concurrency~process:plan-renderer~any~yes": "found",
+            "assertion:capacity-limits-quota~process:permit-service~s.2b8c996eac9a~unknown": "rescoped",
+            "assertion:internet-exposure~process:plan-upload-service~any~internet-facing": "found",
+            "assertion:authentication-mechanism~flow:entity:inspector>process:permit-service>review-and-decide~any~v.ed27cb153088": "wrong_value"
+          },
+          "relabelled": []
+        }
+      ],
+      "skipped": {}
+    }
+  ]
+}

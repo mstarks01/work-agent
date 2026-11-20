@@ -1,0 +1,18 @@
+material from today's prepare, catalog none; prompt files from d51830a1fa4ffbdb5348b1713bae9fa0b2b2a2f2
+- A company user can enumerate other tenants' invoices if ownership is not checked | ['process:billing-app', 'flow:entity:company-user>process:billing-app>manage-invoices']
+- Guessable unauthenticated payment links disclose invoice and bank details | ['process:billing-app', 'flow:entity:payer>process:billing-app>open-payment-page']
+- Any customer user can obtain invoice PDFs for other companies | ['process:billing-app', 'process:pdf-renderer', 'flow:entity:company-user>process:billing-app>manage-invoices']
+- Tenant database snapshots may expose all companies' records if at-rest encryption is absent | ['store:tenant-database']
+- PDF-bucket copies may disclose every tenant's invoices if at-rest encryption is absent | ['store:pdf-bucket']
+- An observer may read tenant database traffic from the billing app if transport encryption is absent | ['flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'process:billing-app', 'store:tenant-database']
+- An observer may read render-job identifiers if queue transport is unencrypted | ['flow:process:billing-app>store:render-queue>queue-render-job', 'process:billing-app', 'store:render-queue']
+- An observer may read render jobs when the renderer consumes an unverified queue channel | ['flow:process:pdf-renderer>store:render-queue>take-render-jobs', 'process:pdf-renderer', 'store:render-queue']
+- An observer may read invoice data on the renderer's database connection | ['flow:process:pdf-renderer>store:tenant-database>read-invoice', 'process:pdf-renderer', 'store:tenant-database']
+- An observer may read invoice PDFs on the renderer-to-bucket path | ['flow:process:pdf-renderer>store:pdf-bucket>write-pdf', 'process:pdf-renderer', 'store:pdf-bucket']
+- An observer may read cross-tenant PDFs on the billing-app bucket connection | ['flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'process:billing-app', 'store:pdf-bucket']
+- An observer may capture support-agent credentials if the office-to-console channel is unencrypted | ['flow:entity:support-agent>process:admin-console>use-admin-console', 'process:admin-console']
+- An observer may capture customer-session material on the admin-console handoff | ['flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:admin-console', 'process:billing-app']
+- Code in the billing app can read every tenant through the shared database account | ['process:billing-app', 'flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'store:tenant-database']
+- Code in the billing app can retrieve every tenant's PDFs through one bucket credential | ['process:billing-app', 'flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'store:pdf-bucket']
+spent: $0.0716 reported
+must-finds matched: [5, 6]

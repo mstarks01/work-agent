@@ -54,7 +54,7 @@ state, which is the test every rewrite in `normalize_element_ids` meets.
 ## Consequences
 
 - A model that is consistent in its names and inconsistent in one prefix
-  passes the gate instead of spending the job.
+  passes the gate instead of failing it.
 - A reference to a slug the model gave two types stays a gate finding. The
   normalizer never chooses between two elements.
 - The alignment in `evals/harness/alignment.py` reads the normalized model,

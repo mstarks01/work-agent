@@ -1,0 +1,274 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:podcaster>process:upload-api>upload-episodes",
+      "entity:podcaster"
+    ],
+    "claim": "An attacker who successfully authenticates with a guessed or reused podcaster password, defeating any additional sign-in controls, can publish episodes with that account's permissions.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated: podcasters sign in with an email address and a password. The source states nothing that slows guesses at sign-in.",
+    "verb": "use-credential"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:entity:ad-partner>process:stats-importer>send-download-counts",
+      "entity:ad-partner"
+    ],
+    "claim": "If the stats importer does not authenticate the ad partner, an attacker sends files of download counts as the ad partner.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source never says how the ad partner's files arrive or how the importer knows who sent them.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:media-store"
+    ],
+    "claim": "If the media store does not restrict who writes to it, an attacker replaces an episode's audio in the media store.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source states nothing about access to the media store.",
+    "verb": "alter"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:entity:podcaster>process:upload-api>upload-episodes",
+      "entity:podcaster"
+    ],
+    "claim": "If publishing actions lack reliable audit records tying the upload to an account and content version, a podcaster can deny publishing an episode and the operator may be unable to establish attribution.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "The source states no record of who uploads or changes an episode.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:entity:podcaster>process:upload-api>upload-episodes"
+    ],
+    "claim": "If the upload API's sign-in is not encrypted in transit, an attacker on the network path reads podcasters' email addresses and passwords.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The source says nothing about encryption in transit, and passwords cross this flow.",
+    "verb": "intercept"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:feed-service",
+      "flow:entity:podcast-app>process:feed-service>fetch-feeds",
+      "store:show-database"
+    ],
+    "claim": "An attacker requests RSS feeds from the public feed service as fast as they can, from many clients, until the feed service and the show database stop serving feeds to podcast apps.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "This case exists for this finding. The source states the absence: \"We do not rate limit the feed service\". The service is public. An assertion pass that writes the stated absence gives the lane the fact this finding rests on.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:stats-importer",
+      "flow:entity:ad-partner>process:stats-importer>send-download-counts"
+    ],
+    "claim": "An attacker who can send files to the stats importer sends a great many files at once, and the importer starts a job for each one until it exhausts its host.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Stated absence: \"with no cap on how many run together\". The attacker must reach the importer's input, which the source does not describe.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:upload-api",
+      "store:media-store"
+    ],
+    "claim": "If an attacker can create many shows without an aggregate account or platform quota, filling each to 50 GB can exhaust shared storage capacity or budget and disrupt legitimate uploads.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The quota is stated per show: \"Each show gets 50 GB of storage in total\". The source states no limit on how many shows one person opens.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:transcoder",
+      "flow:process:transcoder>store:media-store>pick-up-audio"
+    ],
+    "claim": "An attacker able to upload audio could exploit a vulnerable transcoder to execute code with its actual permissions, potentially disclosing media it can read or affecting other resources it is authorized to access.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The transcoder parses files that any podcaster uploads. The source states nothing about how transcoding is isolated.",
+    "verb": "escalate"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:upload-api",
+      "flow:entity:podcaster>process:upload-api>upload-episodes"
+    ],
+    "claim": "If upload rate, concurrency or per-request resource controls are inadequate, a podcaster can overload upload bandwidth or processing with large or concurrent uploads while staying within the show's 50 GB storage quota.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source states a quota on stored bytes per show, hedges a size limit on one file (\"he would have to check\"), and states no limit on upload rate or concurrency. This exhausts upload bandwidth or processing, not stored space.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:upload-api",
+      "store:media-store",
+      "flow:entity:podcaster>process:upload-api>upload-episodes"
+    ],
+    "claim": "If concurrent upload quota checks and storage reservations are not atomic or otherwise coordinated, a podcaster can submit simultaneous uploads that each pass the remaining-space check but together exceed the show's 50 GB quota.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "The source states that the upload API refuses an upload that would take a show over 50 GB, and not how it checks concurrent uploads. Uploads that each pass the check can exceed the quota together. A coordinated check rules this out, so verify enforcement under concurrent uploads.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:upload-api",
+      "process:transcoder",
+      "store:media-store"
+    ],
+    "claim": "If queue bounds or backpressure are inadequate, a podcaster can submit audio faster than it is transcoded and build a backlog that delays episode availability despite the two-job limit on each transcoder.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "Each transcoder runs at most two jobs at once, and the source states no bound on the queue, the number of transcoders or the total work. Uploads that arrive faster than transcoding build a backlog that delays publication.",
+    "verb": "flood"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:transcoder",
+      "flow:process:transcoder>store:media-store>pick-up-audio"
+    ],
+    "claim": "If per-job time and resource limits are inadequate, a podcaster can upload audio that consumes excessive decoding CPU, memory or time and occupies transcoder slots, delaying other jobs without exploiting a code-execution vulnerability.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source states no limit on time or resources for one transcoding job. A few costly files hold the two slots on each transcoder. This differs from the backlog of many uploads and from code execution in the transcoder.",
+    "verb": "exhaust-resources"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "entity:ad-partner",
+      "process:stats-importer",
+      "store:stats-database"
+    ],
+    "claim": "If validation and duplicate or replay handling are inadequate, a compromised ad partner or attacker able to resubmit accepted files can cause the stats importer to store false or double-counted download totals.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source says nothing about how the importer checks the files it receives. A file sent again, or false counts from a compromised partner, give false totals even when the sender is authentic. This differs from a sender who impersonates the partner.",
+    "verb": "alter"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:upload-api",
+      "store:show-database",
+      "flow:entity:podcaster>process:upload-api>upload-episodes"
+    ],
+    "claim": "If the upload API fails to enforce show-level authorization, an authenticated podcaster can publish episode data to a show that the account does not control.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Podcasters sign in with an email address and a password, and the source states nothing about how the upload API checks which shows an account controls. The attack needs no stolen password and no direct write to the media store.",
+    "verb": "escalate"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "entity:podcast-app"
+    ],
+    "claim": "If the episode-delivery path lacks effective resource controls, a client able to download episodes can repeatedly fetch them and exhaust delivery bandwidth or the hosting budget, disrupting legitimate downloads.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source says apps download episodes, and not from where, or where the smaller versions are kept. Feed polling does not cover downloads. Identify the episode-serving endpoint, the storage for transcoded files, the download path and its resource controls.",
+    "verb": "flood"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "entity:podcast-app"
+    ],
+    "claim": "If episode delivery lacks authenticated integrity protection or an equivalent content-verification mechanism, an attacker able to modify traffic on that path can substitute audio delivered to listeners' apps.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source does not describe the delivery path for episodes, so its transport and content protection are unknown. This changes audio on its way to listeners' apps, not audio in the media store. Identify the delivery path and verify its integrity protection.",
+    "verb": "alter-in-transit"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:process:upload-api>store:show-database>store-episode-details",
+      "store:show-database",
+      "process:feed-service"
+    ],
+    "claim": "If episode-metadata writes lack effective authorization or integrity protection, an attacker able to reach the upload-API-to-show-database path can alter episode details that the feed service later publishes.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source says nothing about authorization or integrity on the upload API's writes to the show database. A changed episode detail reaches the show's feed when the feed service next builds it. This differs from a change to audio in the media store.",
+    "verb": "alter"
+  }
+]

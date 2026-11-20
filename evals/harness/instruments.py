@@ -45,6 +45,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from analysis_service.claims import (
     FrameworkAnalysis,
     FrameworkName,
+    quote_check_ran,
 )
 from analysis_service.identity import IDENTITY_VERSION
 from analysis_service.report import NodeRun, Report, TokenUsage
@@ -776,6 +777,7 @@ def measure_case(
                 block.unverified_grounds,
                 block.dropped_claims,
                 block.repaired_quotes,
+                quotes_checked=quote_check_ran(block.quotes_checked),
             )
         )
     scored = score_blocks(case, run.report, run.drafts)

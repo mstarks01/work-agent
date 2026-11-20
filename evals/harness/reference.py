@@ -40,14 +40,15 @@ it would quietly lower the recall denominator.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -59,6 +60,7 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.actions import ActionVerb
 from analysis_service.claim_identity import sibling_flows
 from analysis_service.claims import (
     FrameworkName,
@@ -67,8 +69,12 @@ from analysis_service.claims import (
     derive_severity_level,
 )
 from analysis_service.deployment import ConfigPaths
-from analysis_service.frameworks.asvs.record import AsvsChapter
-from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory
+from analysis_service.frameworks.asvs.catalog import AsvsChapter
+from analysis_service.frameworks.stride.record import (
+    LANES_OF_VERB,
+    AttackerPosition,
+    StrideCategory,
+)
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.parsing import Sha256Hex, signer
 from analysis_service.resilience import load_resilience
@@ -86,7 +92,6 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness.identity import CaseFlows
-from evals.harness.verbs import check_verb
 
 # Two tiers, because one weight makes every threshold wrong. ``must-find``
 # drives the hard recall gate, ``expected`` a tracked, softer number.
@@ -122,18 +127,6 @@ RULINGS_FILE = "rulings.json"
 
 class CorpusError(ValueError):
     """A golden case is missing, malformed, or internally inconsistent."""
-
-
-def corpus_refusal(error: CorpusError) -> str:
-    """The one line a command line prints when the corpus does not load.
-
-    Every entry point that reads the corpus refuses the same way, so the
-    sentence is written here once rather than in each ``main``. The error
-    already names the case, the file and the field it stopped on. A traceback
-    in its place names a pydantic frame, which is nothing the reader whose own
-    case carries the bad entry can act on.
-    """
-    return f"cannot read the corpus: {error}"
 
 
 class ReferenceSeverity(BaseModel):
@@ -181,15 +174,7 @@ class ReferenceClaim(BaseModel):
     #: ``None`` where nobody has assigned one, which
     #: ``tests/test_verb_coverage.py`` counts per case. It is what fingerprint
     #: version 2 reads, so the count reaching zero is what lets the default move.
-    verb: str | None = None
-
-    @field_validator("verb")
-    @classmethod
-    def _known_verb(cls, value: str | None) -> str | None:
-        """An unrecognised verb fails here rather than matching nothing later."""
-        if value is not None:
-            check_verb(value)
-        return value
+    verb: ActionVerb | None = None
 
     @property
     def must_find(self) -> bool:
@@ -248,13 +233,8 @@ class Reading(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    verb: str
+    verb: ActionVerb
     affected_element_ids: tuple[str, ...] = Field(min_length=1)
-
-    @field_validator("verb")
-    @classmethod
-    def _known_verb(cls, value: str) -> str:
-        return check_verb(value)
 
 
 #: A person's answer on whether a second reading states a claim's finding.
@@ -291,6 +271,44 @@ class RuledReading(BaseModel):
     source: str = Field(min_length=1, max_length=300)
 
 
+class RuledPosition(BaseModel):
+    """Where the attacker of one STRIDE reference claim stands, and who ruled it.
+
+    A reference claim holds a verb and a place, and a draft at that verb and
+    place can still state another attacker: a storage copy where the claim is
+    about code that runs in the store's reader. This record is a person's
+    ruling on the claim's position, and the scorer matches the claim only to a
+    draft that states the same one. The claim is named by its lane, verb and
+    place as they read today, as :class:`RuledReading` names it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lane: StrideCategory
+    reference: Reading
+    position: AttackerPosition
+    ruling: str = Field(min_length=1, max_length=1000)
+    reviewed_by: Annotated[str, BeforeValidator(signer), Field(max_length=100)]
+    source: str = Field(min_length=1, max_length=300)
+
+
+class RuledAnyPosition(BaseModel):
+    """A person's ruling that no attacker position decides one STRIDE reference.
+
+    The finding holds whatever the attacker's position, so the scorer holds
+    the claim to none. The record names its claim as :class:`RuledPosition`
+    does, and the loader refuses a claim that carries both kinds of ruling.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lane: StrideCategory
+    reference: Reading
+    ruling: str = Field(min_length=1, max_length=1000)
+    reviewed_by: Annotated[str, BeforeValidator(signer), Field(max_length=100)]
+    source: str = Field(min_length=1, max_length=300)
+
+
 class CaseRulings(BaseModel):
     """One case's :data:`RULINGS_FILE`, keyed by framework."""
 
@@ -298,6 +316,8 @@ class CaseRulings(BaseModel):
 
     case: str
     stride: tuple[RuledReading, ...] = ()
+    positions: tuple[RuledPosition, ...] = ()
+    any_positions: tuple[RuledAnyPosition, ...] = ()
 
 
 #: What a case expects the service to conclude about one requirement it applies.
@@ -549,6 +569,15 @@ class ReadRecord(BaseModel):
     sha256: Sha256Hex
 
 
+def read_digest(path: Path) -> str:
+    """The digest a :class:`ReadRecord` pins: the sha256 of the file's bytes.
+
+    **The one reader of a read file's digest**: a sitting writes it, a reading
+    document prints it, and a later read compares against it.
+    """
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 #: What a sitting records when the person who read the case is not named.
 #: A reserved word rather than an empty field: the read happened, and a blank
 #: reads as a field nobody filled in. Nothing resolves it — no roster lookup,
@@ -683,9 +712,11 @@ class GoldenCase:
     model: SystemModel
     references: Mapping[FrameworkName, tuple[ReferenceClaim, ...]]
     #: STRIDE reference index -> the readings a person ruled it also accepts.
-    ruled_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
+    ruled_readings: Mapping[int, tuple[Reading, ...]] = field(kw_only=True)
     #: STRIDE reference index -> the readings a person ruled a different finding.
-    refused_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
+    refused_readings: Mapping[int, tuple[Reading, ...]] = field(kw_only=True)
+    #: STRIDE reference index -> the attacker position a person ruled it holds.
+    ruled_positions: Mapping[int, AttackerPosition] = field(kw_only=True)
 
     @property
     def id(self) -> str:
@@ -707,14 +738,27 @@ class GoldenCase:
         """One framework's reference set."""
         return self.references[framework]
 
+    def requirement_records(
+        self, framework: FrameworkName
+    ) -> tuple[ReferenceRequirement, ...]:
+        """One framework's catalog-keyed records, in file order.
+
+        Empty for a framework this case carries no records for, or whose
+        records name no requirement.
+        """
+        return tuple(
+            reference
+            for reference in self.references.get(framework) or ()
+            if isinstance(reference, ReferenceRequirement)
+        )
+
     def requirements_for(
         self, framework: FrameworkName
     ) -> dict[str, ReferenceRequirement]:
         """One framework's catalog-keyed records, by requirement identifier."""
         return {
             reference.requirement: reference
-            for reference in self.references.get(framework) or ()
-            if isinstance(reference, ReferenceRequirement)
+            for reference in self.requirement_records(framework)
         }
 
     def must_find_for(self, framework: FrameworkName) -> tuple[ReferenceClaim, ...]:
@@ -847,7 +891,9 @@ def _case_refusal(case_dir: Path, error: ValidationError) -> str:
 def missing_case_files(case_dir: Path) -> list[str]:
     """Which of :data:`CASE_FILES` this directory does not carry, as files.
 
-    **The one reader of "is this a case directory".** The loader raises on the
+    **The one reader of "is this a case directory"** for the loader and the
+    corpus lint. An experiment script under ``evals/experiments`` tests
+    ``case.json`` itself. The loader raises on the
     answer and ``evals/verify_corpus.py`` reports it, and the two asked it
     apart: one listed the three names and called ``is_file``, the other listed
     them again and called ``exists``, so a *directory* named ``case.json``
@@ -902,25 +948,58 @@ def load_case(case_dir: Path | str, limits: SourceLimits | None = None) -> Golde
     )
 
 
+def _named(
+    references: Sequence[ReferenceClaim],
+    lane: StrideCategory,
+    reference: Reading,
+    where: str,
+) -> int:
+    """The index of the one reference claim a ruling names, or an error.
+
+    A ruling names its claim by the lane, verb and place the claim reads with
+    today, so a reworded claim keeps its ruling and a moved one fails the load.
+    """
+    named = [
+        index
+        for index, claim in enumerate(references)
+        if claim.lane == lane
+        and claim.verb == reference.verb
+        and set(claim.affected_element_ids) == set(reference.affected_element_ids)
+    ]
+    if len(named) != 1:
+        raise CorpusError(
+            f"{where} names {len(named)} reference claims; it must name"
+            " exactly one by its lane, verb and place as they read today"
+        )
+    return named[0]
+
+
 def _load_rulings(
     case_dir: Path, model: SystemModel, references: Sequence[ReferenceClaim]
-) -> dict[str, Mapping[int, tuple[Reading, ...]]]:
-    """The case's ruled readings by verdict and reference index, or an error.
+) -> dict[str, Mapping[int, Any]]:
+    """The case's ruled readings and positions by reference index, or an error.
 
-    Returns the two :class:`GoldenCase` fields, ``ruled_readings`` for the
-    ``same`` verdicts and ``refused_readings`` for the ``different`` ones.
+    Returns three :class:`GoldenCase` fields: ``ruled_readings`` for the
+    ``same`` verdicts, ``refused_readings`` for the ``different`` ones, and
+    ``ruled_positions``.
 
     Fails closed on each way a ruling can stop meaning what it was ruled on: a
     reference that no longer reads as it did, an element the model does not
     carry, and a verb the lane does not admit. The last is
     :data:`~analysis_service.frameworks.stride.record.LANES_OF_VERB`, the table
     the service files drafts by, so a ruling cannot accept a draft the service
-    itself would refuse.
+    itself would refuse. A claim takes one position ruling at most, a position
+    or an ``any_positions`` entry, so a second one is refused rather than left
+    to the order of the file. An ``any_positions`` entry adds nothing to
+    ``ruled_positions``.
     """
     fields = {"same": "ruled_readings", "different": "refused_readings"}
     path = case_dir / RULINGS_FILE
     if not path.is_file():
-        return {field: MappingProxyType({}) for field in fields.values()}
+        return {
+            field: MappingProxyType({})
+            for field in (*fields.values(), "ruled_positions")
+        }
     try:
         rulings = CaseRulings.model_validate(_read_json(path))
     except ValidationError as exc:
@@ -935,19 +1014,7 @@ def _load_rulings(
     }
     for number, ruled in enumerate(rulings.stride):
         where = f"{case_dir.name}: {RULINGS_FILE} stride ruling {number}"
-        named = [
-            index
-            for index, claim in enumerate(references)
-            if claim.lane == ruled.lane
-            and claim.verb == ruled.reference.verb
-            and set(claim.affected_element_ids)
-            == set(ruled.reference.affected_element_ids)
-        ]
-        if len(named) != 1:
-            raise CorpusError(
-                f"{where} names {len(named)} reference claims; it must name"
-                " exactly one by its lane, verb and place as they read today"
-            )
+        index = _named(references, ruled.lane, ruled.reference, where)
         alternate = ruled.reading
         dangling = sorted(set(alternate.affected_element_ids) - known_ids)
         if dangling:
@@ -957,9 +1024,27 @@ def _load_rulings(
         if ruled.verdict == "same" and ruled.lane not in LANES_OF_VERB[alternate.verb]:
             raise CorpusError(f"{where}: {alternate.verb!r} is not a {ruled.lane} verb")
         by_index = readings[ruled.verdict]
-        by_index[named[0]] = (*by_index.get(named[0], ()), alternate)
+        by_index[index] = (*by_index.get(index, ()), alternate)
+    positions: dict[int, AttackerPosition] = {}
+    for number, ruled_position in enumerate(rulings.positions):
+        where = f"{case_dir.name}: {RULINGS_FILE} position ruling {number}"
+        index = _named(references, ruled_position.lane, ruled_position.reference, where)
+        if index in positions:
+            raise CorpusError(f"{where} rules a second position on one claim")
+        positions[index] = ruled_position.position
+    unscored: set[int] = set()
+    for number, ruled_any in enumerate(rulings.any_positions):
+        where = f"{case_dir.name}: {RULINGS_FILE} any-position ruling {number}"
+        index = _named(references, ruled_any.lane, ruled_any.reference, where)
+        if index in positions or index in unscored:
+            raise CorpusError(f"{where} rules a second position on one claim")
+        unscored.add(index)
     return {
-        field: MappingProxyType(readings[verdict]) for verdict, field in fields.items()
+        **{
+            field: MappingProxyType(readings[verdict])
+            for verdict, field in fields.items()
+        },
+        "ruled_positions": MappingProxyType(positions),
     }
 
 

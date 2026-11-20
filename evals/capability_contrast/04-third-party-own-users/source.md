@@ -1,0 +1,1 @@
+The rota app is a web app that the clinic's own team builds and runs. Each night the rota app imports a CSV export of shifts from a hosted payroll product that the clinic buys. Managers sign in to the payroll product with a password and a code from a hardware security key.

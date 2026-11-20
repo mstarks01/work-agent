@@ -1,0 +1,1 @@
+The rota app is a web app that the clinic's own team builds and runs. Staff sign in to the rota app with a password, and then enter a six-digit code from an authenticator app on their phone. The rota app asks for both at each sign-in.

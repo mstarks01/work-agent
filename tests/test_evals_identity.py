@@ -80,21 +80,21 @@ MEASURED = {
 #: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order
 #: no rule reads, so a claim naming two processes says nothing about which way
 #: the attacker moves between them. A claim naming a **Data Flow** says it
-#: through that flow's endpoints, and 194 of 285 corpus claims name exactly one.
+#: through that flow's endpoints, and 252 of 359 corpus claims name exactly one.
 #:
 #: The two readings of an absent direction are both dead ends, and the numbers
-#: below are why. Read it as a mismatch and the rule splits 90 of the 186
-#: labelled pairs it merges correctly today, to recover 2 of its 3 candidate
-#: merges. Read it as a wildcard and it changes nothing at all: in both merges
-#: that survive the verb the coarser side cites no flow.
+#: below are why. Read it as a mismatch and the rule splits 71 of the 154
+#: labelled pairs it merges correctly today, to recover 1 of its 2 candidate
+#: merges. Read it as a wildcard and it changes nothing at all: no merge that
+#: survives the verb runs two ways.
 DIRECTION = {
     # Over the corpus, what a claim yields without a new field.
-    "claims": 285,
-    "one_flow_cited": 194,
-    "several_flows_cited": 9,
-    "no_flow_cited": 82,
-    # Over the 2 reference merges the shipped rule makes.
-    "merges_with_a_direction_on_both_sides": 0,
+    "claims": 359,
+    "one_flow_cited": 252,
+    "several_flows_cited": 11,
+    "no_flow_cited": 96,
+    # Over the 8 reference merges the shipped rule makes.
+    "merges_with_a_direction_on_both_sides": 1,
     "merges_that_run_opposite_ways": 0,
     # Over the 261 scored pairs, an absent direction read each way.
     "as_a_mismatch_new_splits": 71,
@@ -125,21 +125,21 @@ FRONTIER = {
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
     "endpoint subset + verb": {
-        "splits": 13,
+        "splits": 15,
         "candidate_merges": 2,
-        "reference_merges": 2,
+        "reference_merges": 8,
     },
     "endpoint equality": {"splits": 49, "candidate_merges": 33, "reference_merges": 15},
-    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 18},
-    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 42},
-    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 58},
+    "subset": {"splits": 33, "candidate_merges": 54, "reference_merges": 26},
+    "endpoint subset": {"splits": 12, "candidate_merges": 69, "reference_merges": 55},
+    "overlap": {"splits": 3, "candidate_merges": 66, "reference_merges": 83},
     # Case 02's calibration pair about disabling the Pub/Sub topic names
     # ``store:pub-sub`` (#925), which is one candidate that does not merge
     # under the loosest rung.
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 81,
-        "reference_merges": 187,
+        "reference_merges": 225,
     },
 }
 
@@ -406,10 +406,10 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
 #: is what survives the verb. The gap between them is what the verb adds.
 VERB_MEASURED = {
-    "cases": 16,
-    "within_lane_pairs": 365,
-    "subset": 42,
-    "subset_verb": 2,
+    "cases": 20,
+    "within_lane_pairs": 484,
+    "subset": 55,
+    "subset_verb": 8,
 }
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
@@ -420,7 +420,7 @@ VERB_MEASURED = {
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
 #: are agent-authored, so this measures reproduction and not correctness.
-SUBSET_VERB_AGREEMENT = {"agreements": 246, "total": 261}
+SUBSET_VERB_AGREEMENT = {"agreements": 244, "total": 261}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
@@ -477,8 +477,8 @@ def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
 def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
     """A merge the verb does not break must be named in ``UNSEPARATED``.
 
-    Otherwise the three recorded exceptions become a floor nobody notices
-    rising: a fourth would sit in the count and nowhere else.
+    Otherwise the recorded exceptions become a floor nobody notices rising: a
+    new one would sit in the count and nowhere else.
     """
     recorded = {(case, lane) for case, lane, _ in UNSEPARATED}
     for case in corpus:
@@ -506,7 +506,7 @@ def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
 def test_a_direction_is_underivable_on_a_third_of_the_corpus(corpus, flows_by_case):
     """#652's first obstacle: the field a direction would come from is absent.
 
-    A component the corpus cannot state on 86 of 244 claims is not a component
+    A component the corpus cannot state on 96 of 359 claims is not a component
     the identity can read. Moving this number means a blessing pass re-cited
     claims against flows, which is the one thing that would reopen the question.
     """
@@ -532,8 +532,8 @@ def test_a_direction_component_is_a_no_op_or_a_catastrophe(corpus, flows_by_case
 
     Both readings of an absent direction are measured, because the choice
     between them is the whole design and neither survives it. As a mismatch it
-    splits 90 of the 186 labelled pairs the rule merges correctly, to recover 2
-    of its 3 candidate merges. As a wildcard it moves nothing.
+    splits 71 of the 154 labelled pairs the rule merges correctly, to recover 1
+    of its 2 candidate merges. As a wildcard it moves nothing.
     """
     result = measure_direction(
         corpus, load_pairs(), flows_by_case, SubsetVerbIdentity(flows_by_case)
@@ -563,11 +563,11 @@ def test_a_direction_component_is_a_no_op_or_a_catastrophe(corpus, flows_by_case
 def test_no_surviving_merge_runs_in_two_directions(corpus, flows_by_case):
     """#652's second obstacle: on the merges that survive, one side has no way.
 
-    Both merges ``UNSEPARATED`` records pair a claim citing a flow with a
-    coarser claim citing only its endpoints or its store, so one side has no
-    direction. A direction separates neither of them, and this is the test
-    that says so. A third merge that *did* run two ways would land here as a
-    failure and reopen #652 with a case behind it.
+    In all but one merge ``UNSEPARATED`` records, one side cites no flow, so
+    it has no direction. In the one left, both sides cite the same flow, so
+    both run the same way. A direction separates none of them, and this is
+    the test that says so. A merge that *did* run two ways would land here as
+    a failure and reopen #652 with a case behind it.
 
     ``measure_merges`` finds the same pairs and reports them as prose, which a
     direction cannot be derived from. So this enumerates them a second time to
@@ -665,7 +665,7 @@ def test_the_rule_refuses_a_pair_with_no_verb(assigned, flows_by_case):
 
 
 def test_the_shared_merge_measurement_matches_the_frontier(corpus, flows_by_case):
-    """``measure_merges`` and ``FRONTIER`` must count the same two merges.
+    """``measure_merges`` and ``FRONTIER`` must count the same merges.
 
     The frontier prices seven rules with raw shape functions, because the point
     is to compare them. ``calibration.measure_merges`` prices one rule through

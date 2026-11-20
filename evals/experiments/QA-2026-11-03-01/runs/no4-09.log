@@ -1,0 +1,15 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Customer order details are readable over plaintext API traffic | ['flow:process:mobile-app>process:web-api>api-traffic', 'process:mobile-app', 'process:web-api']
+- Customer browsing and order details may be exposed before reaching the mobile app | ['flow:entity:customer>process:mobile-app>browse-and-order', 'entity:customer', 'process:mobile-app']
+- Catalogue SQL statements may disclose business-sensitive API operations in transit | ['flow:process:catalogue-spreadsheet>process:web-api>sql-statements', 'process:catalogue-spreadsheet', 'process:web-api']
+- Customer records may be readable on the web API database connection | ['flow:process:web-api>store:user-database>customer-records', 'process:web-api', 'store:user-database']
+- Order handover data may be exposed between the web API and SIMS | ['flow:process:web-api>process:sims>order-handover', 'process:web-api', 'process:sims']
+- Delivery addresses may be exposed while SIMS writes the flat file | ['flow:process:sims>store:delivery-address-flat-file>address-write', 'process:sims', 'store:delivery-address-flat-file']
+- Dispatch notes may be readable between SIMS and the fax gateway | ['flow:process:sims>process:fax-gateway>dispatch-note', 'process:sims', 'process:fax-gateway']
+- Confirmation faxes may be observable on an unverified fax transport path | ['flow:process:fax-gateway>entity:customer>confirmation-fax', 'process:fax-gateway', 'entity:customer']
+- An unintended fax recipient can read customer confirmation details | ['flow:process:fax-gateway>entity:customer>confirmation-fax', 'process:fax-gateway', 'entity:customer']
+- A storage copy of the user database may expose customer and payment data | ['store:user-database']
+- A storage copy of the delivery-address flat file may expose customer addresses | ['store:delivery-address-flat-file']
+- Compromise of the web API may expose user-database records through an unverified read path | ['process:web-api', 'flow:process:web-api>store:user-database>customer-records', 'store:user-database']
+spent: $0.0596 reported
+must-finds matched: [10, 11, 13]

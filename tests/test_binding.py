@@ -21,8 +21,8 @@ from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers, secret_env
 
-#: This install's whole selection. The node -> tier map is built per selection
-#: now, so a test walking "every node" has to say which graph's nodes it means.
+#: This install's whole selection. The node -> tier map is built per selection,
+#: so a test walking "every node" has to say which graph's nodes it means.
 CARRIED_FRAMEWORKS = DEFAULT_FRAMEWORKS
 
 DIVERGENT = """\
@@ -120,11 +120,10 @@ def test_the_binding_is_frozen(tiers, sampling):
 class TestReasoningTemperatureFloor:
     """The build-time gate for OpenAI families that pin ``temperature``.
 
-    The residual it covers has now bitten twice: the shipped sampling pins
-    ``temperature = 0.0``, LiteLLM's cost map does not know a model released
-    after the pinned copy, ``check_supported`` falls through to the provider's
-    base config, and the build passes a configuration the provider rejects on
-    the first request.
+    The residual it covers: the shipped sampling pins ``temperature = 0.0``,
+    LiteLLM's cost map does not know a model released after the pinned copy,
+    ``check_supported`` falls through to the provider's base config, and the
+    build passes a configuration the provider rejects on the first request.
     """
 
     def _binding(self, model: str, sampling_toml: str, tmp_path):

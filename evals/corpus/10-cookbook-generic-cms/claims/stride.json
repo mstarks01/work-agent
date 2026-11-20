@@ -216,7 +216,7 @@
       "impact": "high"
     },
     "notes": "The database is shared between the admin path and the site, and the source describes no separation between them.",
-    "verb": "flood"
+    "verb": "exhaust-resources"
   },
   {
     "category": "elevation-of-privilege",

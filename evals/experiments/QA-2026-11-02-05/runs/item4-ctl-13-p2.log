@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from f453772fa9638aa38ecb88c970ce9c2660ddbc63
+- Engineer sign-in credentials may be intercepted on the unverified console connection | ['flow:entity:duty-engineer>process:dispatch-console>open-console', 'entity:duty-engineer', 'process:dispatch-console']
+- Dispatch actions may be readable across the corporate-to-control-plane boundary | ['flow:process:dispatch-console>process:dispatch-api>dispatch-requests', 'process:dispatch-console', 'process:dispatch-api']
+- Live crew status may be intercepted on an unverified cross-boundary WebSocket | ['flow:process:dispatch-console>process:dispatch-api>live-job-status', 'process:dispatch-console', 'process:dispatch-api']
+- Downloaded schedule documents may be exposed while written to the corporate archive | ['flow:process:schedule-importer>store:schedule-archive>store-schedule-documents', 'process:schedule-importer', 'store:schedule-archive']
+- The importer's static API token and work orders may be intercepted en route to the dispatch API | ['flow:process:schedule-importer>process:dispatch-api>post-work-orders', 'process:schedule-importer', 'process:dispatch-api']
+- Crew names and mobile numbers may be exposed on the unverified API-to-database path | ['flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'process:dispatch-api', 'store:dispatch-database']
+- A storage-layer copy could expose the dispatch database if at-rest encryption is absent | ['store:dispatch-database']
+- Archived partner schedules could be read from storage copies if the archive lacks at-rest encryption | ['store:schedule-archive']
+- An unauthorized control-plane reader could obtain the dispatch-data corpus if database authentication is weak | ['store:dispatch-database', 'flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'process:dispatch-api']
+- An overly permissive CORS policy could let a hostile origin elicit live dispatch status | ['process:dispatch-api', 'process:dispatch-console', 'flow:process:dispatch-console>process:dispatch-api>live-job-status']
+spent: $0.0367 reported
+must-finds matched: [10, 11]

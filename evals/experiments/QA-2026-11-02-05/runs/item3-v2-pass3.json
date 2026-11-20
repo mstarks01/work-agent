@@ -1,0 +1,363 @@
+{
+ "record": {
+  "node": "capabilities",
+  "tier": "base",
+  "selection": {
+   "vendor": "openrouter",
+   "model": "openai/gpt-5.6-luna"
+  },
+  "sampling": {
+   "temperature": null,
+   "top_p": null,
+   "seed": null,
+   "max_output_tokens": 16384,
+   "candidate_count": 1,
+   "presence_penalty": null,
+   "frequency_penalty": null,
+   "thinking": null,
+   "constrain_output": true,
+   "structured_output": "auto"
+  },
+  "pinned_upstreams": [
+   "openai/flex"
+  ],
+  "commit": {
+   "commit": "f90ea44fddd9540520561e09ec5888efe101adf1",
+   "clean": false
+  }
+ },
+ "results": [
+  {
+   "case": "01-one-time-code-only",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The rota app is a web app that the clinic's own team builds and runs."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "The rota app is a web app that the clinic's own team builds and runs."
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "one-time-codes",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "out-of-band-authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "out-of-band-codes",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "mail-sending",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    }
+   ],
+   "mfa_kept": [],
+   "V6.4.4": "unknown",
+   "charge_usd": 0.00035888
+  },
+  {
+   "case": "02-independent-factors",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a password, and then enter a six-digit code from an authenticator app on their phone."
+    },
+    {
+     "capability": "password-authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a password"
+    },
+    {
+     "capability": "multi-factor-authentication",
+     "source_label": "System description",
+     "quote": "The rota app asks for both at each sign-in."
+    },
+    {
+     "capability": "one-time-codes",
+     "source_label": "System description",
+     "quote": "enter a six-digit code from an authenticator app on their phone"
+    }
+   ],
+   "mfa_kept": [
+    {
+     "capability": "multi-factor-authentication",
+     "state": "present",
+     "source_excerpt": "The rota app asks for both at each sign-in.",
+     "source_label": "System description",
+     "origin": "reader",
+     "basis": ""
+    }
+   ],
+   "V6.4.4": "applicable",
+   "charge_usd": 0.00039977
+  },
+  {
+   "case": "03-support-impersonation",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a password."
+    },
+    {
+     "capability": "password-authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a password."
+    },
+    {
+     "capability": "sessions",
+     "source_label": "System description",
+     "quote": "a support agent can open a session in the rota app as any staff user."
+    },
+    {
+     "capability": "administrative-interface",
+     "source_label": "System description",
+     "quote": "From the admin console"
+    }
+   ],
+   "mfa_kept": [],
+   "V6.4.4": "unknown",
+   "charge_usd": 0.0004171
+  },
+  {
+   "case": "04-third-party-own-users",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "file-upload",
+     "source_label": "System description",
+     "quote": "Each night the rota app imports a CSV export of shifts from a hosted payroll product that the clinic buys."
+    },
+    {
+     "capability": "external-resource-use",
+     "source_label": "System description",
+     "quote": "Each night the rota app imports a CSV export of shifts from a hosted payroll product that the clinic buys."
+    }
+   ],
+   "mfa_kept": [],
+   "V6.4.4": "unknown",
+   "charge_usd": 0.00036619
+  },
+  {
+   "case": "05-account-and-code",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The rota app is a web app"
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "Each staff user signs in to the rota app with their own account and a one-time code."
+    },
+    {
+     "capability": "one-time-codes",
+     "source_label": "System description",
+     "quote": "Each staff user signs in to the rota app with their own account and a one-time code."
+    }
+   ],
+   "mfa_kept": [],
+   "V6.4.4": "unknown",
+   "charge_usd": 0.00028198
+  },
+  {
+   "case": "15-multitenant-invoicing",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "browser-accessible-http",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "tls-use",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "password-authentication",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "sessions",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "cookies",
+     "source_label": "System description",
+     "quote": "They sign in with an email address and a password and get a session cookie."
+    },
+    {
+     "capability": "multi-tenancy",
+     "source_label": "System description",
+     "quote": "Each customer company is one tenant, and all companies share one billing app, one database and one PDF bucket in our cloud platform."
+    },
+    {
+     "capability": "restricted-access",
+     "source_label": "System description",
+     "quote": "Each user belongs to one company and is either an admin or a viewer."
+    },
+    {
+     "capability": "sensitive-data",
+     "source_label": "System description",
+     "quote": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database."
+    },
+    {
+     "capability": "database",
+     "source_label": "System description",
+     "quote": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database."
+    },
+    {
+     "capability": "request-object-field-writes",
+     "source_label": "System description",
+     "quote": "The invoice edit form posts the whole invoice back, and the billing app saves every field it receives, including the paid flag and the company's payout bank account."
+    },
+    {
+     "capability": "administrative-interface",
+     "source_label": "System description",
+     "quote": "The admin console is reachable only from there, and each agent signs in to it with their own account and a one-time code."
+    },
+    {
+     "capability": "one-time-codes",
+     "source_label": "System description",
+     "quote": "The admin console is reachable only from there, and each agent signs in to it with their own account and a one-time code."
+    },
+    {
+     "capability": "multiple-authentication-pathways",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    },
+    {
+     "capability": "multiple-authentication-pathways",
+     "source_label": "System description",
+     "quote": "The admin console is reachable only from there, and each agent signs in to it with their own account and a one-time code."
+    },
+    {
+     "capability": "internal-services",
+     "source_label": "System description",
+     "quote": "To make a PDF, the billing app puts a render job on the render queue."
+    },
+    {
+     "capability": "backend-service-connections",
+     "source_label": "System description",
+     "quote": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket, or how the database and the bucket are protected at rest."
+    },
+    {
+     "capability": "separate-service-connections",
+     "source_label": "System description",
+     "quote": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket, or how the database and the bucket are protected at rest."
+    },
+    {
+     "capability": "multi-system-request",
+     "source_label": "System description",
+     "quote": "The PDF renderer takes jobs off the queue one at a time, reads the invoice from the tenant database and writes the PDF to the PDF bucket under the company ID and the invoice number."
+    },
+    {
+     "capability": "service-accounts",
+     "source_label": "System description",
+     "quote": "The app connects with one database account for all companies."
+    },
+    {
+     "capability": "backend-service-credentials",
+     "source_label": "System description",
+     "quote": "The billing app fetches PDFs from the bucket with one service credential for all companies."
+    },
+    {
+     "capability": "backend-secrets",
+     "source_label": "System description",
+     "quote": "The billing app fetches PDFs from the bucket with one service credential for all companies."
+    },
+    {
+     "capability": "secret-assets",
+     "source_label": "System description",
+     "quote": "The billing app fetches PDFs from the bucket with one service credential for all companies."
+    },
+    {
+     "capability": "external-resource-use",
+     "source_label": "System description",
+     "quote": "Nobody recorded how the billing app and the renderer reach the database, the queue or the bucket, or how the database and the bucket are protected at rest."
+    },
+    {
+     "capability": "file-download",
+     "source_label": "System description",
+     "quote": "The billing app fetches PDFs from the bucket with one service credential for all companies."
+    },
+    {
+     "capability": "dangerous-functionality",
+     "source_label": "System description",
+     "quote": "From the admin console an agent can open a session in the billing app as any customer user."
+    },
+    {
+     "capability": "data-object-responses",
+     "source_label": "System description",
+     "quote": "The payment page shows the invoice, the company's name and its bank details."
+    },
+    {
+     "capability": "external-facing-http-services",
+     "source_label": "System description",
+     "quote": "People at a customer company use the billing app in their browser over HTTPS."
+    }
+   ],
+   "mfa_kept": [],
+   "V6.4.4": "unknown",
+   "charge_usd": 0.00152251
+  }
+ ]
+}

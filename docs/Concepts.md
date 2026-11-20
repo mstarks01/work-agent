@@ -90,12 +90,18 @@ A ground has one of these kinds:
 
 - `quote`: a quote from a labeled source;
 - `unknown-attribute`: an attribute the source left unknown;
-- `absent-attribute`: an attribute the source explicitly said was absent;
+- `absent-attribute`: an attribute the source explicitly said was absent,
+  unless the unscoped assertion rows that state its value all state the
+  opposite (the answers alone, where a submitter's answer makes the value),
+  or the rows' projection qualifies it and the field does not show that;
 - `derived-fact`: a trust-boundary crossing derived from the model;
 - `absent-element`: the absence of a named element from the model;
-- `assertion`: an assertion row that the sources settle (see below); or
-- `unknown-assertion`: an assertion row that the sources left open, because
-  its value is unknown or another row disputes it.
+- `assertion`: an assertion row that the sources settle, unless the rows that
+  state the model's attribute and the attribute state opposites and no
+  submitter's answer makes that value (see below); or
+- `unknown-assertion`: an open assertion row: its value is unknown, another
+  row disputes it, or the rows that state the model's attribute and the
+  attribute state opposites and no submitter's answer makes that value.
 
 Every carried claim has at least one ground. Quotes are checked against the
 source text. If a close source span can be found, code repairs the quote and
@@ -126,10 +132,21 @@ What code does with a row:
   limit. A row no person has checked never closes an open question: where the
   field reads `unknown`, or says a control is absent, the field stays open and
   names the row's value, and the lanes see the row itself, marked `unchecked`.
+  A submitter's answer with a value does close it.
   A row that states an absence still fills an `unknown` field, because an
   absence is itself something to analyze.
 - **Where rows disagree, or the source hedges**, the field reads `unknown` and
-  says why.
+  says why, when the service can write the model. Where it cannot, the field
+  keeps what extraction wrote. That value is then no fact: a field that reads
+  `none` is not a stated absence, and the hedged rows and the two rows of one
+  predicate that disagree are open questions.
+- **Where the model's field states the opposite of the rows that state its
+  value**, the rows are open questions, and a claim on one is conditional.
+  This happens where the service could not write the value into the model,
+  and where two compatible rows, such as a password and a token, sit beside a
+  field that extraction wrote as `none`. The field is then no fact either:
+  the lanes cannot cite it as a stated absence. Where a submitter's answer
+  makes the value, the rows stay facts.
 - **Each row states its basis.** `stated` means the source says it in words.
   `inferred` means the pass concluded it from what the source says, and the row
   gives the reasoning. `derived` means a rule in code wrote the value, and the
@@ -140,8 +157,8 @@ No person has checked a row when the report is built, so every row starts
 A row marked `unsupported` or `unresolved` reaches neither the evidence nor any
 field. The report itself is not rewritten after a review: a reassessment is
 computed from it and recorded beside it, and it names every finding that rested
-on a rejected row. The report states how many rows were checked, rejected and
-left unchecked.
+on a rejected row or on a row the reviewed graph contradicts. The report states
+how many rows were checked, rejected and left unchecked.
 
 ## Proposal, claim, and verdict
 
@@ -230,6 +247,8 @@ An analysis job ends in one of these terminal statuses:
   submitter questions. The job holds its valid system model and, where the
   assertion pass ran, its assertion catalog. An answer starts a resumed job
   from them. Only a job submitted with questions turned on ends here.
+- **Stopped:** a person stopped the run in the first-run app. No partial
+  report is returned.
 
 A completed multi-framework report includes one block per selected framework,
 even when a framework's precondition skips its analyzers. The block then records

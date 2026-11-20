@@ -14,7 +14,7 @@ arms then compare one case:
 
 Every answer is then the source's own statement, and nobody invents one.
 
-**One reader of the file.** :func:`load_answer_file` parses and checks it,
+**How the file is read and applied.** :func:`load_answer_file` parses and checks it,
 and :func:`withheld_case` applies it, for both modes. A withheld phrase must
 occur exactly once across the sources, and afterwards no withheld phrase may
 remain in a source or in a model field, and every element's excerpt must still
@@ -42,6 +42,7 @@ from typing import Any, cast
 
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import FrameworkName
+from analysis_service.execution import source_texts
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.parsing import signer, strings
@@ -221,6 +222,7 @@ def answers_within_saves(
             None,
             frameworks,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=tuple(given)),
             final=False,
@@ -264,7 +266,7 @@ def withheld_case(case: GoldenCase, answer_file: AnswerFile) -> GoldenCase:
             )
     # The gate's own reading of an excerpt, which takes ``…`` as a cut, so a
     # case the gate admits is never refused here for an excerpt it accepts.
-    cited = {source.label: source.text for source in sources}
+    cited = source_texts(sources)
     for issue in validate(model, sources=cited):
         if issue.is_citation:
             raise EvalRunError(

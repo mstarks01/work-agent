@@ -25,6 +25,7 @@ from analysis_service.claims import (
 )
 from analysis_service.frameworks.stride.record import (
     STRIDE_VERSION,
+    AttackerPosition,
     DraftThreat,
     StrideCategory,
     Threat,
@@ -87,7 +88,7 @@ def sweep_document(
 
     ``upstream_pins`` is what the deployment pinned the strong tier's requests
     to, which the models block records for every tier on an aggregator route.
-    ``None`` is a sweep taken before the pin was recorded and carries no key;
+    ``None`` is a sweep that carries no key;
     ``()`` is an aggregator the deployment left unpinned. The two are different
     identities, so the factory keeps them apart.
     """
@@ -278,6 +279,7 @@ def draft_threat(
     verb: ActionVerb = "impersonate",
     likelihood: Rating = "high",
     impact: Rating = "high",
+    attacker_position: AttackerPosition | None = None,
 ) -> DraftThreat:
     """One category agent's draft, as ``merge_drafts`` parks it for the critic.
 
@@ -302,6 +304,7 @@ def draft_threat(
         # Overridable, because a scorer test that wants two drafts to be one
         # finding — or two — sets exactly this and the elements beside it.
         verb=verb,
+        attacker_position=attacker_position,
         grounds=[Ground(kind="quote", text="scripted", source_label="scripted")],
         severity=Severity(
             likelihood=likelihood, impact=impact, justification="scripted"
@@ -318,6 +321,7 @@ def produced_threat(
     likelihood: Rating = "high",
     impact: Rating = "high",
     verdict_status: str = "confirmed",
+    attacker_position: AttackerPosition | None = None,
 ) -> Threat:
     """One threat as the graph would emit it, titled with its claim."""
     verdict = (
@@ -340,6 +344,7 @@ def produced_threat(
         element_ids=element_ids,
         likelihood=likelihood,
         impact=impact,
+        attacker_position=attacker_position,
     )
     return promote(draft, verdict=verdict)
 
@@ -353,7 +358,13 @@ def promote(draft: DraftThreat, *, verdict: Verdict | None = None) -> Threat:
     )
 
 
-def threat_for(reference: ReferenceThreat, sequence: int, title: str) -> Threat:
+def threat_for(
+    reference: ReferenceThreat,
+    sequence: int,
+    title: str,
+    *,
+    attacker_position: AttackerPosition | None = None,
+) -> Threat:
     """A produced threat aimed at one reference, citing the same elements."""
     return produced_threat(
         sequence,
@@ -362,7 +373,20 @@ def threat_for(reference: ReferenceThreat, sequence: int, title: str) -> Threat:
         element_ids=reference.affected_element_ids,
         likelihood=reference.severity.likelihood,
         impact=reference.severity.impact,
+        attacker_position=attacker_position,
     )
+
+
+def ruled_position(
+    case: GoldenCase, reference: ReferenceThreat
+) -> AttackerPosition | None:
+    """The attacker position a person ruled on ``reference``, if any.
+
+    A live lane always states a position, and the scorer matches a reference
+    with a ruled one only to a draft that states it, so a test draft aimed at
+    the reference states this.
+    """
+    return case.ruled_positions.get(case.stride_claims().index(reference))
 
 
 #: What a test's vote read, where the test is about something else. A real vote
@@ -393,7 +417,7 @@ def cast(*args: object, **kwargs: object) -> Vote:
     """:func:`evals.harness.ledger.cast` with the two digests defaulted.
 
     Shadows the ledger's own name on purpose, so a test that does not care what
-    was voted on reads exactly as it did before the fields existed. A test
+    was voted on names no digest. A test
     *about* the digests passes them itself, or calls the ledger directly.
     """
     kwargs.setdefault("content", SAMPLE_CONTENT)

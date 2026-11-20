@@ -95,7 +95,11 @@ Evidence = Literal[
 ]
 
 
-def protocol_state(value: Any) -> str:
+#: What :func:`protocol_state` reduces a protocol to.
+ProtocolState = Literal["stated", "silent"]
+
+
+def protocol_state(value: Any) -> ProtocolState:
     """A flow's protocol reduced to whether it says anything: ``stated`` or ``silent``.
 
     The one reader of that reduction, shared by the scored-attribute table in

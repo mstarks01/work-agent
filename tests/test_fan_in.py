@@ -18,15 +18,18 @@ from analysis_service.claims import (
     MENTION_MAX_CHARS,
     Ground,
     Mitigation,
+    QuoteCandidate,
 )
 from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
-from analysis_service.frameworks import schemas_for
+from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS, DEFAULT_DESCRIPTION_LABEL
 from analysis_service.validation import MAX_ELEMENTS
 from tests.factories import (
     REPORTING_JOB,
+    SCRIPTED_FRAMEWORKS,
     sample_draft,
     sample_proposal,
     three_hop_model,
@@ -241,7 +244,13 @@ class TestJoinDrafts:
         view = {
             row["id"]: row
             for row in critic.critic_view(
-                joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+                joined.drafts,
+                only=None,
+                repaired=(),
+                unverified=(),
+                assertions=None,
+                package=PACKAGES["stride"],
+                controls=(),
             )
         }
         assert set(view) == {"D-01", "D-02"}
@@ -707,7 +716,7 @@ class TestQuoteVerification:
         assert len(joined.marks.dropped_claims) == 3
 
     def test_a_refused_quote_near_the_source_is_repaired_and_marked(self, model):
-        """The ground now carries the submitter's words, and the mark carries
+        """The ground carries the submitter's words, and the mark carries
         the agent's, so the substitution is on the record. A repaired quote
         verifies, so it is never also marked unverified, and a claim resting on
         it alone is not groundless."""
@@ -726,10 +735,43 @@ class TestQuoteVerification:
         assert joined.marks.unverified_grounds == []
         assert joined.marks.dropped_claims == []
 
-    def test_a_repair_that_flips_a_negation_is_marked_as_such(self, model):
-        """The span is substituted, as ADR 0018 decided, and the mark says
-        the substitution put a negation back — the safeguard #675 D15 asked
-        for, so a reader never takes a 0.95 similarity for support."""
+    def test_a_repair_that_flips_a_negation_is_refused(self, model):
+        """A window that changes a negation states the opposite fact, so the
+        quote stays unverified and the claim keeps its other ground. A guard,
+        not proof of meaning: it compares negation and number tokens only."""
+        sources = {
+            LABEL: "Customers log in to the web app, which does not store orders."
+        }
+        drafts = self.quoting(
+            "Customers log in to the web app, which does store orders.",
+            extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
+        )
+
+        joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
+
+        (draft,) = joined.drafts
+        assert draft.grounds[0].text == (
+            "Customers log in to the web app, which does store orders."
+        )
+        assert joined.marks.repaired_quotes == []
+        assert [(m.claim_id, m.index) for m in joined.marks.unverified_grounds] == [
+            ("S-01", 0)
+        ]
+
+    def test_a_repair_that_changes_a_number_is_refused(self, model):
+        sources = {LABEL: "Customers log in to the web app, which keeps 30 days."}
+        drafts = self.quoting(
+            "Customers log in to the web app, which keeps 90 days.",
+            extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
+        )
+
+        joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
+
+        assert joined.marks.repaired_quotes == []
+        assert [m.index for m in joined.marks.unverified_grounds] == [0]
+
+    def test_a_claim_whose_only_quote_flips_a_negation_is_dropped(self, model):
+        """No ground verifies, so the claim drops, as any groundless claim does."""
         sources = {
             LABEL: "Customers log in to the web app, which does not store orders."
         }
@@ -739,10 +781,18 @@ class TestQuoteVerification:
 
         joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
 
-        (draft,) = joined.drafts
-        assert draft.grounds[0].text == sources[LABEL]
+        assert joined.drafts == []
+        assert [mark.claim_id for mark in joined.marks.dropped_claims] == ["S-01"]
+
+    def test_a_repair_that_moves_no_negation_or_number_still_passes(self, model):
+        """The neighbour of the guard: case, spacing and a comma keep the repair."""
+        drafts = self.quoting("customers  log in to the WEB app which stores orders")
+
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
+
         (mark,) = joined.marks.repaired_quotes
-        assert mark.moved == ["negation"]
+        assert mark.moved == []
+        assert joined.marks.unverified_grounds == []
 
     def test_the_critic_is_shown_what_a_repair_moved(self, model):
         drafts = self.quoting("Customers log in to the web app which stores orders")
@@ -754,6 +804,8 @@ class TestQuoteVerification:
             only=None,
             unverified=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert view["repaired_quotes"] == [
@@ -764,7 +816,13 @@ class TestQuoteVerification:
             }
         ]
         (plain,) = critic.critic_view(
-            joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+            joined.drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert "repaired_quotes" not in plain
 
@@ -790,11 +848,19 @@ class TestQuoteVerification:
             only=None,
             repaired=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert [entry["index"] for entry in view["unverified_quotes"]] == [0]
         assert LABEL in view["unverified_quotes"][0]["reason"]
         (plain,) = critic.critic_view(
-            joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+            joined.drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert "unverified_quotes" not in plain
 
@@ -898,7 +964,7 @@ class TestSnapDrafts:
         assert snapped.grounds[0].source_label == "System description"
 
     def test_without_labels_a_quote_is_untouched(self):
-        """The in-process engine carries no sources, so there is nothing to snap."""
+        """A caller with no job passes no sources, so there is nothing to snap."""
         draft = sample_draft(
             grounds=[Ground(kind="quote", text="anything", source_label="Whatever")]
         )
@@ -1129,7 +1195,7 @@ class TestAGroundIsAboutTheClaimsElements:
 class TestASpentBodyDeadlineFoldsNoSource:
     """The bound the fan-in actually runs under.
 
-    The fan-in prepares each source itself and calls ``repair_prepared``, so
+    The fan-in prepares each source itself and calls ``faithful_repair``, so
     the guard that holds the bound is the one at the call site, and this is what
     holds it there.
     """
@@ -1192,9 +1258,34 @@ def batches(**proposals_by_lane):
 class TestFanIn:
     """The one interface: batches in, drafts, marks, deferrals and coverage out."""
 
+    @pytest.mark.parametrize("needs", ["code", ""])
+    def test_each_deferred_proposal_is_named_by_its_claim_id(self, model, needs):
+        """A unit holds the reason; the proposal that took it holds an ID, so a
+        reader can tie a deferral back to what the lane emitted."""
+        lane = "encoding-and-sanitization"
+        proposal = RequirementProposal(
+            title="t",
+            description="d",
+            requirement="2.4",
+            needs_evidence=needs,
+            direction="question" if needs else "gap",
+            quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
+        )
+        stored = {lane: schemas_for("asvs").proposals(claims=[proposal])}
+
+        merged = fan_in.fan_in(
+            stored, PACKAGES["asvs"], model, sources={}, assertions=None
+        )
+
+        assert merged.deferred_ids == (["v5.0.0-1.2.4"] if needs else [])
+
     def test_a_lane_with_no_batch_contributes_nothing(self, model):
         merged = fan_in.fan_in(
-            batches(spoofing=[sample_proposal("S-01")]), STRIDE, model, sources={}
+            batches(spoofing=[sample_proposal("S-01")]),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
 
         assert [draft.id for draft in merged.drafts] == ["S-01"]
@@ -1204,7 +1295,11 @@ class TestFanIn:
     def test_a_proposal_resolves_to_the_draft_the_fixtures_promise(self, model):
         """The catalog is derived from the same model the agent chose from."""
         merged = fan_in.fan_in(
-            batches(spoofing=[sample_proposal("S-01")]), STRIDE, model, sources={}
+            batches(spoofing=[sample_proposal("S-01")]),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
 
         assert merged.drafts == [sample_draft("S-01")]
@@ -1222,7 +1317,11 @@ class TestFanIn:
             "S-01", affected_element_ids=["process:invented", three_hops]
         )
         merged = fan_in.fan_in(
-            batches(spoofing=[proposal]), STRIDE, three_hop_model(), SOURCES
+            batches(spoofing=[proposal]),
+            STRIDE,
+            three_hop_model(),
+            SOURCES,
+            assertions=None,
         )
 
         assert merged.drafts == []
@@ -1242,6 +1341,7 @@ class TestFanIn:
             model,
             ruled_out={"S-01": "ruled out in code by a test"},
             sources={},
+            assertions=None,
         )
 
         assert merged.drafts == []
@@ -1267,6 +1367,7 @@ class TestFanIn:
             model,
             ruled_in={"S-01": "Applies: the rule says so."},
             sources={},
+            assertions=None,
         )
 
         assert merged.drafts == []
@@ -1280,6 +1381,7 @@ class TestFanIn:
             model,
             ruled_in={"S-01": "Applies: the rule says so."},
             sources={},
+            assertions=None,
         )
 
         assert [draft.id for draft in merged.drafts] == ["S-01"]
@@ -1293,6 +1395,7 @@ class TestFanIn:
             STRIDE,
             model,
             sources={},
+            assertions=None,
         )
 
         by_lane = {row.lane: row.drafts for row in merged.coverage}
@@ -1322,7 +1425,9 @@ class TestTheEmissionBound:
         batch = self._batch(MAX_CLAIMS_PER_BATCH, 0)
 
         assert len(batch.claims) == MAX_CLAIMS_PER_BATCH
-        assert fan_in.fan_in({"spoofing": batch}, STRIDE, model, sources={}).drafts
+        assert fan_in.fan_in(
+            {"spoofing": batch}, STRIDE, model, sources={}, assertions=None
+        ).drafts
 
     def test_a_batch_one_over_the_cap_is_refused_with_the_lane_and_the_count(
         self, model
@@ -1333,7 +1438,9 @@ class TestTheEmissionBound:
             fan_in.DraftJoinError,
             match=f"spoofing emitted {MAX_CLAIMS_PER_BATCH + 1}",
         ):
-            fan_in.fan_in({"spoofing": batch}, STRIDE, model, sources={})
+            fan_in.fan_in(
+                {"spoofing": batch}, STRIDE, model, sources={}, assertions=None
+            )
 
     def test_the_bound_counts_what_the_agent_wrote_not_what_survived(self, model):
         """The case a bound on ``claims`` alone cannot see.
@@ -1349,7 +1456,9 @@ class TestTheEmissionBound:
         assert len(batch.claims) == half
         assert len(batch.invalid) == half
         with pytest.raises(fan_in.DraftJoinError, match=f"emitted {half * 2}"):
-            fan_in.fan_in({"spoofing": batch}, STRIDE, model, sources={})
+            fan_in.fan_in(
+                {"spoofing": batch}, STRIDE, model, sources={}, assertions=None
+            )
 
     def test_a_lane_of_absences_at_the_bound_is_a_short_body(self):
         """#1316: every absent term is searched against every element's text.
@@ -1379,7 +1488,26 @@ class TestTheEmissionBound:
         ]
         started = time.thread_time()
 
-        merged = fan_in.fan_in(batches(spoofing=proposals), STRIDE, model, SOURCES)
+        merged = fan_in.fan_in(
+            batches(spoofing=proposals), STRIDE, model, SOURCES, assertions=None
+        )
 
         assert time.thread_time() - started < 2
         assert len(merged.drafts) == MAX_SEQUENCE
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_each_package_keeps_the_proposal_objects_it_was_given(framework):
+    """The fan-in names a deferred proposal by identity, so every package's
+    split must hand back the objects it was given, never copies."""
+    fixture = SCRIPTED_FRAMEWORKS[framework]
+    proposals = (
+        schemas_for(framework).proposals.model_validate_json(fixture.proposal).claims
+    )
+
+    kept, _ = PACKAGES[framework].record.partition_proposals(
+        proposals, fixture.lane, CARRIED_EVIDENCE_KINDS, ()
+    )
+
+    assert kept
+    assert all(any(held is given for given in proposals) for held in kept)

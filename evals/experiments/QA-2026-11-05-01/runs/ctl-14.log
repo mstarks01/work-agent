@@ -1,0 +1,13 @@
+material from today's prepare, catalog none; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Prefix-matched redirect URI lets an attacker obtain authorization codes | ['process:authorization-server', 'flow:entity:member>entity:partner-app>return-with-authorization-code', 'entity:partner-app']
+- Identity-database traffic may expose password hashes and refresh tokens in transit | ['flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'process:authorization-server', 'store:identity-database']
+- Unverified ledger transport may disclose members' balances and transactions | ['flow:process:rewards-api>store:points-ledger>read-and-write-points', 'process:rewards-api', 'store:points-ledger']
+- Unverified log-shipping transport may expose bearer tokens | ['flow:process:rewards-api>store:api-log-store>write-request-log', 'process:rewards-api', 'store:api-log-store']
+- Unverified support-console database transport may reveal account-closure data | ['flow:process:support-console>store:identity-database>close-accounts', 'process:support-console', 'store:identity-database']
+- A copied identity database may expose credentials if encryption at rest is absent | ['store:identity-database']
+- A copied points ledger may disclose the complete member transaction corpus | ['store:points-ledger']
+- An unencrypted API-log copy would expose replayable bearer tokens | ['store:api-log-store']
+- Weak or absent identity-database authentication could expose the credential corpus | ['store:identity-database', 'flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants', 'process:authorization-server']
+- Weak or absent ledger authentication could disclose all member balances | ['store:points-ledger', 'flow:process:rewards-api>store:points-ledger>read-and-write-points', 'process:rewards-api']
+spent: $0.0597 reported
+must-finds matched: [4]

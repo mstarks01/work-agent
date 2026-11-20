@@ -1,0 +1,31 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: corporate network"]
+        n0["developer"]
+        n3("deploy controller")
+        n5[("git server")]
+    end
+    subgraph z1["Trust zone: build environment"]
+        n2("build runner")
+        n6[("image registry")]
+    end
+    subgraph z2["Trust zone: store estate"]
+        n4("store server")
+    end
+    subgraph z3["Trust zone: internet"]
+        n1["public package registry"]
+    end
+    n0 -->|"push branches"| n5
+    n0 -->|"manual rebuild"| n2
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n2 -->|"fetch source"| n5
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n2 -->|"resolve dependencies"| n1
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n2 -->|"push image"| n6
+    n2 -->|"set current release"| n3
+    linkStyle 5 stroke:#c0392b,stroke-width:2px
+    n4 -->|"poll current release"| n3
+    linkStyle 6 stroke:#c0392b,stroke-width:2px
+    n4 -->|"pull image"| n6
+    linkStyle 7 stroke:#c0392b,stroke-width:2px

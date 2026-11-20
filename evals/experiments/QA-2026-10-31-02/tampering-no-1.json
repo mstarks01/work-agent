@@ -1,0 +1,283 @@
+{
+  "claims": [
+    {
+      "title": "Forged settlement callbacks can mark orders paid",
+      "description": "An attacker able to reach `flow:entity:card-processor>process:storefront-api>settlement-webhook` can submit a fabricated or modified settlement confirmation to `process:storefront-api`. The process does not check the sender or message integrity, while the flow's stated purpose is to mark an order paid; the attacker can therefore alter an order's payment state without a legitimate processor settlement. This is an endpoint-forgery path rather than an on-path transport claim; the model's transport protection remains unverified.",
+      "affected_element_ids": [
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "process:storefront-api"
+      ],
+      "verb": "alter",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication",
+        "assertion:origin-verification~flow:entity:card-processor>process:storefront-api>settlement-webhook~any~unknown"
+      ],
+      "quotes": [
+        {
+          "text": "Does it check who sent what it takes, such as by a signature or an authenticated sender? no; Does it check that what it takes was not altered? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium: the callback crosses `boundary:public-internet` to `process:storefront-api`, but reachability is contradicted by the later answer and an attacker must still reach the callback interface. Impact is high because the callback changes payment status for orders carrying `financial` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and integrity-protect settlement webhooks",
+          "detail": "Require a processor-specific signed webhook scheme with timestamp/replay validation at `process:storefront-api`, and reject callbacks whose signature, timestamp, or order binding fails verification."
+        },
+        {
+          "summary": "Bind settlement state to a verified processor transaction",
+          "detail": "Have `process:storefront-api` reconcile the signed callback to the expected processor transaction, amount, currency, and order before marking an order paid."
+        }
+      ]
+    },
+    {
+      "title": "Reachable callers can inject unvalidated orders into the core order service",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` crosses from the storefront DMZ into core services and has stated absent authentication. An attacker who gains any network reach to `process:order-service` can inject crafted order contents directly because the service accepts anything that can reach it and does not validate received values or verify their origin or integrity. `process:order-service` persists orders through `flow:process:order-service>store:orders-db>read-write-orders`, so malicious order fields can become authoritative rows in `store:orders-db` containing financial and shopper data.",
+      "affected_element_ids": [
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service",
+        "store:orders-db"
+      ],
+      "verb": "inject",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it",
+          "source_label": "System description"
+        },
+        {
+          "text": "Does it check the values it takes against what it expects? no; Does it encode or bind values where it uses them, such as in queries, commands or pages? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Does it check who sent what it takes, such as by a signature or an authenticated sender? no; Does it check that what it takes was not altered? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium: `process:order-service` is internal, so the attacker needs network reach into the core path, but the gRPC flow has no authentication. Impact is high because injected order data is written to confidential `store:orders-db`, which holds `pii` and `financial` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated service-to-service calls",
+          "detail": "Apply mTLS or workload identity authorization to `flow:process:storefront-api>process:order-service>submit-order` and allow only the storefront service identity to invoke the order service."
+        },
+        {
+          "summary": "Validate order messages at the receiving boundary",
+          "detail": "Canonicalize and allowlist expected order fields, types, lengths, and state transitions in `process:order-service`; reject messages that do not conform before persistence."
+        },
+        {
+          "summary": "Use message integrity protection",
+          "detail": "Have the storefront sign or otherwise bind submitted order messages and require `process:order-service` to verify origin and integrity independently of network location."
+        }
+      ]
+    },
+    {
+      "title": "Unbound order values can alter orders through database-query injection",
+      "description": "A shopper can submit attacker-controlled order contents through `flow:entity:shopper>process:storefront-api>place-order`; those contents are forwarded on `flow:process:storefront-api>process:order-service>submit-order` to the Python order service, which reads and writes PostgreSQL order rows. The submitted answers state that `process:order-service` neither validates values nor encodes or binds them where used in queries. Crafted input can therefore escape into a database instruction and inject modifications to order rows in `store:orders-db`, bypassing intended application-level order handling. The effect reaches the confidential database's shopper addresses, card last-four values, and financial order state.",
+      "affected_element_ids": [
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service",
+        "store:orders-db"
+      ],
+      "verb": "inject",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "Does it check the values it takes against what it expects? no; Does it encode or bind values where it uses them, such as in queries, commands or pages? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "When a shopper submits an order the storefront API calls the order service over gRPC.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because internet-facing `process:storefront-api` accepts shopper order contents and the answer states values are neither validated nor bound at `process:order-service`. Impact is high because a successful injection modifies confidential `store:orders-db`, which contains `pii` and `financial` data."
+      },
+      "mitigations": [
+        {
+          "summary": "Use parameterized PostgreSQL operations",
+          "detail": "Make `process:order-service` use prepared statements or parameterized ORM operations for every value derived from submitted order data; prohibit dynamic SQL construction."
+        },
+        {
+          "summary": "Validate order data before database use",
+          "detail": "Apply server-side allowlist validation, type checks, length limits, and canonicalization at both `process:storefront-api` and `process:order-service` before values reach PostgreSQL."
+        },
+        {
+          "summary": "Restrict the database account",
+          "detail": "Reduce the order-service application account from blanket read/write to only the tables and statements required by order capture."
+        }
+      ]
+    },
+    {
+      "title": "A leaked order-service database password permits arbitrary order rewrites",
+      "description": "`flow:process:order-service>store:orders-db>read-write-orders` uses one application password held in the worker environment and grants that account full read/write access to `store:orders-db`. An attacker who obtains this static credential can alter order rows directly through the database path, bypassing validation performed by `process:order-service`. The corruption reaches the confidential corpus of orders, shopper addresses, card last-four values, and financial state rather than being limited to one submitted order.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "process:order-service"
+      ],
+      "verb": "alter",
+      "evidence_refs": [
+        "assertion:credential-custody~credential:order-service-database-password~any~v.c4f5cadf8e5c",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "a single application account that has full read/write. The password comes from an environment variable on the worker.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because an attacker must first obtain the static environment-held database password, but it is immediately usable as database authority. Impact is high because the credential has full read/write access to confidential `store:orders-db`, which holds `pii` and `financial` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace the static password with short-lived workload identity",
+          "detail": "Authenticate `process:order-service` to `store:orders-db` using short-lived, workload-bound database credentials rather than a password held in an environment variable."
+        },
+        {
+          "summary": "Constrain database write authority",
+          "detail": "Separate reader and writer identities and restrict the writer to required tables, row operations, and stored procedures rather than full database read/write access."
+        },
+        {
+          "summary": "Detect and contain credential exposure",
+          "detail": "Store any transitional secret in a managed secret service, rotate it regularly, and alert on direct database connections or writes outside the expected service identity."
+        }
+      ]
+    },
+    {
+      "title": "Tampered orders-db backups can be restored as trusted order data",
+      "description": "An attacker who obtains a disk, backup, or snapshot of `store:orders-db` can alter order records offline. The submitted answers state that backups and snapshots are not encrypted, are not restricted to named operators, and are not checked for tampering before use. A modified backup restored into `store:orders-db` can therefore overwrite authoritative order, shipping-address, card-last-four, and financial records; `process:order-service` subsequently consumes the corrupted data through its read-write database flow.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders"
+      ],
+      "verb": "alter",
+      "evidence_refs": [
+        "unknown:store:orders-db:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Are its backups and snapshots encrypted? no; Can only named operators get its disks, backups or snapshots? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Are backups, snapshots and restores of store:orders-db checked for tampering before they are used?\", the answer is \"no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the attacker must obtain an offline copy, but the submitted answer says disks, backups, and snapshots are not limited to named operators and are unencrypted. Impact is high because a restore can corrupt confidential `store:orders-db` records tagged `pii` and `financial`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and restrict all database backup media",
+          "detail": "Apply managed-key encryption to `store:orders-db` backups and snapshots and enforce named-operator, least-privilege access to copies and restore operations."
+        },
+        {
+          "summary": "Verify backup integrity before restore",
+          "detail": "Use signed backup manifests, immutable versioning, and integrity verification in the restore workflow; reject backups whose signature or hash does not match an approved backup record."
+        },
+        {
+          "summary": "Separate backup and restoration authority",
+          "detail": "Require reviewed, auditable restore approvals using identities separate from normal database writers."
+        }
+      ]
+    },
+    {
+      "title": "Tampered receipt-archive backups can replace receipt evidence on restore",
+      "description": "An attacker who obtains a backup or snapshot copy of `store:receipt-archive` can modify receipt objects before restoration. Although the live archive is described as customer-managed-key encrypted, the submitted answers state that its backups and snapshots are not encrypted or limited to named operators and are not checked for tampering before use. A restored altered copy can replace receipts that record completed orders and the writing service, undermining the integrity of business-critical receipt evidence consumed after restoration.",
+      "affected_element_ids": [
+        "store:receipt-archive",
+        "flow:process:order-service>store:receipt-archive>append-receipt"
+      ],
+      "verb": "alter",
+      "evidence_refs": [
+        "unknown:store:receipt-archive:data_classification"
+      ],
+      "quotes": [
+        {
+          "text": "Are its backups and snapshots encrypted? no; Can only named operators get its disks, backups or snapshots? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Are backups, snapshots and restores of store:receipt-archive checked for tampering before they are used?\", the answer is \"no\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "The receipt records which order was written and that the order service wrote it.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because offline-copy access is required, but the answers state that archive backups are neither encrypted nor restricted to named operators. Impact is medium because corrupted receipts alter `business-critical-data` recording completed orders and their claimed writer, while the archive's data classification is unknown."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect receipt backups and snapshots",
+          "detail": "Encrypt backups of `store:receipt-archive`, restrict backup and restore access to named least-privilege operators, and retain immutable versions."
+        },
+        {
+          "summary": "Require integrity-checked restores",
+          "detail": "Sign receipt backup manifests and verify object hashes and signatures before restoring archive contents; quarantine any backup that fails verification."
+        },
+        {
+          "summary": "Make receipt records independently verifiable",
+          "detail": "Include a signed, immutable receipt record or integrity manifest so restored receipt content can be validated against the order and writer identity."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

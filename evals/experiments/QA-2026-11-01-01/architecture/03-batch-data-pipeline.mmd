@@ -1,0 +1,17 @@
+architecture-beta
+    group z0(cloud)[Trust zone partner network]
+    group z1(cloud)[Trust zone landing network]
+    group z2(cloud)[Trust zone warehouse network]
+    service n0(internet)[insurance partner] in z0
+    service n1(internet)[data analyst] in z2
+    service n2(server)[ingest scheduler] in z1
+    service n3(server)[Spark transform job] in z2
+    service n4(database)[landing bucket] in z1
+    service n5(database)[Airflow metadata database] in z1
+    service n6(database)[claims warehouse] in z2
+    n0:R --> L:n4
+    n2:R --> L:n4
+    n2:R --> L:n5
+    n2:R --> L:n3
+    n3:R --> L:n6
+    n1:R --> L:n6

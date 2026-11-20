@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tomllib
 from fnmatch import fnmatchcase
+from itertools import permutations
 from pathlib import Path
 
 import pytest
@@ -22,7 +23,7 @@ from analysis_service.frameworks import (
     SEVERITY_RUBRIC_DOC,
 )
 from evals.harness.submit import run_command
-from tests.source_tree import REPO_ROOT, prompt_files
+from tests.source_tree import REPO_ROOT, matching, prompt_files
 from tests.test_workflow_lints import FILTERED_WORKFLOWS, _filter_paths
 
 pytestmark = pytest.mark.lint
@@ -44,6 +45,16 @@ FULL_SECTION = "\n".join(
 )
 
 
+BEFORE_SECTION = "\n".join(
+    [
+        check.BEFORE_HEADING,
+        *(f"- **{name}**: `grep -c x src`, none found." for name in check.RECURRING),
+    ]
+)
+
+FULL_BODY = f"{FULL_SECTION}\n\n{BEFORE_SECTION}"
+
+
 def _guide_classes() -> list[str]:
     """Each class the class table of ``docs/agents/code-review.md`` names, in order."""
     text = REVIEW_GUIDE.read_text(encoding="utf-8")
@@ -53,6 +64,20 @@ def _guide_classes() -> list[str]:
 
 def test_the_class_names_are_the_guides():
     assert list(check.CLASSES) == _guide_classes()
+
+
+def _guide_recurring() -> list[str]:
+    """Each class the table "The classes that come back in fixes" of
+    ``docs/agents/code-review.md`` names, in order."""
+    text = REVIEW_GUIDE.read_text(encoding="utf-8")
+    table = text.partition("**The classes that come back in fixes.**")[2]
+    rows = re.match(r"(?:.+\n)*?\n((?:\|.*\n)+)", table)
+    assert rows is not None
+    return re.findall(r"^\| ([^|]+?) \|", rows.group(1), re.MULTILINE)[1:]
+
+
+def test_the_recurring_class_names_are_the_guides():
+    assert list(check.RECURRING) == _guide_recurring()
 
 
 def _guide_code_paths() -> list[str]:
@@ -149,6 +174,11 @@ def test_a_name_wrapped_over_two_lines_counts():
     assert check.missing(body) == []
 
 
+def test_a_lone_carriage_return_ends_a_line():
+    body = FULL_SECTION.replace(LAST, f"## Docs\r{LAST}")
+    assert check.missing(body) == [check.CLASSES[-1]]
+
+
 @pytest.mark.parametrize(
     "hide",
     [
@@ -179,6 +209,38 @@ def test_the_names_on_one_line_are_not_a_read():
     assert check.missing(body) == [f"text after {name}" for name in check.CLASSES[:-1]]
 
 
+def test_a_before_the_code_section_with_every_class_passes():
+    assert check.missing(BEFORE_SECTION, check.BEFORE_HEADING, check.RECURRING) == []
+
+
+def test_a_body_with_no_before_the_code_section_names_the_heading():
+    assert check.missing(FULL_SECTION, check.BEFORE_HEADING, check.RECURRING) == [
+        check.BEFORE_HEADING
+    ]
+
+
+def test_a_before_the_code_section_that_leaves_out_a_class_names_it():
+    body = BEFORE_SECTION.replace("A default only a test omits", "A default")
+    assert check.missing(body, check.BEFORE_HEADING, check.RECURRING) == [
+        "A default only a test omits"
+    ]
+
+
+def test_an_empty_before_the_code_entry_is_named():
+    name = check.RECURRING[2]
+    body = BEFORE_SECTION.replace(
+        f"**{name}**: `grep -c x src`, none found.", f"**{name}**:"
+    )
+    assert check.missing(body, check.BEFORE_HEADING, check.RECURRING) == [
+        f"text after {name}"
+    ]
+
+
+def test_a_class_name_counts_with_or_without_its_backticks():
+    plain = BEFORE_SECTION.replace("`Literal`", "Literal")
+    assert check.missing(plain, check.BEFORE_HEADING, check.RECURRING) == []
+
+
 def _commit(repo: Path, path: str, text: str | None = None) -> str:
     file = repo / path
     file.parent.mkdir(parents=True, exist_ok=True)
@@ -202,12 +264,21 @@ def _commit(repo: Path, path: str, text: str | None = None) -> str:
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    """A repository whose first commit holds the tree's two tables, as the base
+    branch does."""
     run_command(["git", "init", "-b", "main", str(tmp_path)], tmp_path)
-    _commit(tmp_path, "README.md")
+    for table in (check.TABLE, check.HELD):
+        _commit(
+            tmp_path,
+            f".github/scripts/{table.name}",
+            table.read_text(encoding="utf-8"),
+        )
     return tmp_path
 
 
-def _run(repo: Path, base: str, head: str, body: str) -> int:
+def _ran(
+    repo: Path, base: str, head: str, body: str
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), base, head],
         cwd=repo,
@@ -215,14 +286,20 @@ def _run(repo: Path, base: str, head: str, body: str) -> int:
         capture_output=True,
         text=True,
         check=False,
-    ).returncode
+    )
+
+
+def _run(repo: Path, base: str, head: str, body: str) -> int:
+    return _ran(repo, base, head, body).returncode
 
 
 def test_a_code_change_with_no_section_is_refused(repo):
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/module.py")
     assert _run(repo, base, head, "A body with no section.") == 1
-    assert _run(repo, base, head, FULL_SECTION) == 0
+    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, BEFORE_SECTION) == 1
+    assert _run(repo, base, head, FULL_BODY) == 0
 
 
 def test_a_code_file_moved_out_of_a_code_path_needs_the_read(repo):
@@ -323,7 +400,7 @@ def test_each_reader_is_a_module(pattern):
     ),
 )
 def test_each_prompt_a_reader_names_is_a_file(prompt):
-    assert list(REPO_ROOT.glob(prompt))
+    assert matching(prompt)
 
 
 def _package_texts(name: FrameworkName) -> set[str]:
@@ -416,17 +493,30 @@ reason = "test"
 
 def test_the_check_reads_the_base_branchs_table(repo):
     """The table a pull request carries cannot free the pull request: the check
-    reads the base commit's copy, and falls back to its own copy only where the
-    base holds none."""
+    reads the base commit's copy."""
     _commit(repo, ".github/scripts/prompt_outcomes.toml", TABLE_ROW)
     _commit(repo, "prompts/extract.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     _commit(repo, "src/module.py")
     head = _commit(repo, ".github/scripts/prompt_outcomes.toml", "")
-    read = f"{FULL_SECTION}\n\n{check.PROMPT_HEADING}\n\n- `prompts/extract.md`: true."
+    read = f"{FULL_BODY}\n\n{check.PROMPT_HEADING}\n\n- `prompts/extract.md`: true."
 
-    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, FULL_BODY) == 1
     assert _run(repo, base, head, read) == 0
+
+
+@pytest.mark.parametrize("table", [check.TABLE, check.HELD], ids=lambda t: t.name)
+def test_a_base_with_no_table_stops_the_check(repo, table):
+    """The check reads each table from the base commit only, so a base that
+    holds none fails with an error that names the table."""
+    run_command(["git", "rm", "-q", f".github/scripts/{table.name}"], repo)
+    _commit(repo, "README.md")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    head = _commit(repo, "src/module.py")
+    ran = _ran(repo, base, head, FULL_BODY)
+
+    assert ran.returncode == 1
+    assert f"holds no .github/scripts/{table.name}" in ran.stderr
 
 
 def test_a_prompt_read_names_each_prompt_with_text_after_it():
@@ -445,11 +535,90 @@ def test_a_prompt_read_names_each_prompt_with_text_after_it():
 
 
 def test_a_module_change_with_no_prompt_read_is_refused(repo):
-    """The base holds no table, so the check reads the script's own copy, and
-    asks for the prompt the tree holds."""
+    """The base holds the tree's table, so the check asks for the prompt that
+    the table pairs with the module."""
     _commit(repo, "prompts/extract-compact.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/analysis_service/compact.py")
     read = f"{check.PROMPT_HEADING}\n\n- prompts/extract-compact.md: still true."
-    assert _run(repo, base, head, FULL_SECTION) == 1
-    assert _run(repo, base, head, f"{FULL_SECTION}\n\n{read}") == 0
+    assert _run(repo, base, head, FULL_BODY) == 1
+    assert _run(repo, base, head, f"{FULL_BODY}\n\n{read}") == 0
+
+
+#: The rows of held wording in model text, read once for every test here and
+#: for the wording lints of ``tests/test_history_prose_lints.py``.
+HELD_TABLE = tomllib.loads(check.HELD.read_text(encoding="utf-8"))
+HELD_ROWS: list[dict[str, str]] = HELD_TABLE["held"]
+
+#: The keys a held row carries.
+HELD_KEYS = frozenset({"file", "phrase", "rule", "reason"})
+
+
+def test_the_held_table_sits_beside_the_script():
+    assert check.HELD == SCRIPT.with_name("held_wording.toml")
+    assert check.HELD.is_file()
+
+
+@pytest.mark.parametrize("row", HELD_ROWS, ids=lambda row: row["phrase"][:40])
+def test_each_held_row_holds_a_phrase_its_file_spells_and_names_a_rule(row):
+    """A row whose phrase is gone fails, so the row goes with the measured
+    change that removes the phrase."""
+    assert set(row) == HELD_KEYS
+    assert row["rule"] in check.RULES
+    assert row["reason"].strip()
+    assert "\n" not in row["phrase"]
+    lines = (REPO_ROOT / row["file"]).read_text(encoding="utf-8").splitlines()
+    assert any(row["phrase"] in line for line in lines), (
+        f"{row['file']} no longer spells {row['phrase']!r}: delete its row in"
+        f" {check.HELD.name}."
+    )
+
+
+def test_a_prompt_read_names_each_held_phrase_once():
+    """A prompt read names a held row by its phrase, so no phrase holds
+    another, and a mention of one names no other."""
+    phrases = [row["phrase"].casefold() for row in HELD_ROWS]
+    assert [
+        (one, other) for one, other in permutations(phrases, 2) if one in other
+    ] == []
+
+
+def test_a_change_to_a_file_with_held_wording_names_its_held_phrases():
+    table = {
+        "held": [
+            {"file": "prompts/critic.md", "phrase": "one"},
+            {"file": "prompts/extract.md", "phrase": "two"},
+            {"file": "prompts/critic.md", "phrase": "three"},
+        ]
+    }
+    changed = ["docs/guide.md", "prompts/critic.md"]
+
+    assert check.held_phrases(changed, table) == ["one", "three"]
+    assert check.held_phrases(["docs/guide.md"], table) == []
+    assert check.held_phrases(changed, {}) == []
+
+
+HELD_ROW = """
+[[held]]
+file = "prompts/critic.md"
+phrase = "two parts talk"
+rule = "element-term"
+reason = "test"
+"""
+
+
+def test_a_change_to_held_wording_needs_a_prompt_read_from_the_base_table(repo):
+    """The check reads the base commit's held rows, so a pull request that
+    removes the phrase and its row still says what it did with the phrase."""
+    _commit(repo, ".github/scripts/held_wording.toml", HELD_ROW)
+    _commit(repo, "prompts/critic.md", "Here two parts talk.\n")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    _commit(repo, "prompts/critic.md", "Here two elements talk.\n")
+    head = _commit(repo, ".github/scripts/held_wording.toml", "")
+    read = (
+        f"{FULL_BODY}\n\n{check.PROMPT_HEADING}\n\n"
+        "- `two parts talk`: changed by a measured change, ledger row QA-01."
+    )
+
+    assert _run(repo, base, head, FULL_BODY) == 1
+    assert _run(repo, base, head, read) == 0

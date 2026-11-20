@@ -1,0 +1,9 @@
+material from today's prepare, catalog signed; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Database administration traffic exposes CMS accounts and comments on the public-to-hosted path | ['flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin', 'store:mysql-database']
+- CMS-to-MySQL traffic may expose PII if internal transport encryption is absent | ['flow:process:web-server>store:mysql-database>cms-data', 'process:web-server', 'store:mysql-database']
+- CDN publication traffic may disclose unpublished business assets if transport protection is absent | ['flow:process:web-server>store:cdn-bucket>asset-publish', 'process:web-server', 'store:cdn-bucket']
+- A storage copy may expose all CMS records if MySQL encryption at rest is absent | ['store:mysql-database']
+- A storage copy may disclose CDN assets if bucket encryption at rest is absent | ['store:cdn-bucket']
+- The direct MySQL interface may return the full CMS corpus if its authentication is weak or absent | ['store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin']
+spent: $0.0458 reported
+must-finds matched: [9]

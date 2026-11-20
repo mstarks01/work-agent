@@ -24,8 +24,8 @@ with it. **Content stability**: for a reference two or more runs matched,
 whether the matching claims kept one severity band and one resolved place
 across the runs. Five case 01 runs matched reference 17 every time and rated
 it high four times and critical once; recall called that stable. Both read
-what an artifact and its report bundle already hold, and each says
-``unread`` where a run predates the block it needs rather than reporting a
+what an artifact and its report bundle already hold, and each gives
+``None`` where a run lacks the block it needs rather than reporting a
 zero. Wording is not compared: it moves every run, and comparing it as prose
 would measure the tokenizer.
 
@@ -59,9 +59,11 @@ from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import CaseFlows, endpoint_form
+from evals.harness.losses import UNREAD_CAUSE
+from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
+from evals.harness.rates import jaccard, mean, presence, ratio, rounded_figure
 from evals.harness.reference import MUST_FIND
-from evals.harness.scorer import ratio
 
 #: One case of one framework. Stability is per framework because the two
 #: instruments answer over different sets — STRIDE's open claim set through a
@@ -110,15 +112,14 @@ class ScoredRun:
     label: str
     #: The corpus every reference coordinate below indexes into.
     corpus_digest: str
-    mode: str
+    mode: SweepMode
     models: dict[str, Any]
     matched: dict[Scope, frozenset[str]]
     references: dict[Scope, int]
-    recall: dict[Scope, float]
+    recall: dict[Scope, float | None]
     #: Each missed reference's charged cause, per scope, off the ``losses``
-    #: block. ``None`` where the artifact carries no such block, which every
-    #: sweep before the instrument existed does: an absent record is not a run
-    #: whose causes all agreed.
+    #: block. ``None`` where the artifact carries no such block: an absent record is
+    #: not a run whose causes all agreed.
     causes: dict[Scope, dict[str, str]] | None = None
     #: Each matched reference's content, per scope: the matching claim's
     #: severity band and its endpoint-resolved place, off the report bundle.
@@ -150,16 +151,20 @@ class CaseStability:
     case_id: str
     runs: int
     references: int
-    recalls: tuple[float, ...]
+    recalls: tuple[float | None, ...]
     always: int
     sometimes: int
     never: int
-    mean_jaccard: float
-    #: Of the references every run missed, how many were charged to one cause
-    #: in every run and how many to more than one. ``None`` for both where any
-    #: run carries no loss rows, because an absent cause is not an agreeing one.
+    mean_jaccard: float | None
+    #: The references every run missed, in three counts that sum to ``never``:
+    #: charged to one cause in every run, charged to more than one, and charged
+    #: ``unstated`` by any run. ``unstated`` says the archive holds no position
+    #: to read, so such a reference shows neither one cause nor two. ``None``
+    #: for all three where any run carries no loss rows, because an absent
+    #: cause is not an agreeing one.
     cause_stable: int | None = None
     cause_moving: int | None = None
+    cause_unread: int | None = None
     #: Of the references two or more runs matched, how many kept one severity
     #: band across every run that matched them, and how many kept one
     #: resolved place. ``None`` where any run has no report bundle to read, or
@@ -170,11 +175,15 @@ class CaseStability:
     place_moved: int | None = None
 
     @property
-    def recall_spread(self) -> float:
-        return max(self.recalls) - min(self.recalls)
+    def recall_spread(self) -> float | None:
+        """How far apart the runs' recalls lie, or ``None`` where a run has none."""
+        if presence(self.recalls) != "every":
+            return None
+        held = [recall for recall in self.recalls if recall is not None]
+        return max(held) - min(held)
 
     @property
-    def volatile_rate(self) -> float:
+    def volatile_rate(self) -> float | None:
         return ratio(self.sometimes, self.references)
 
     def to_json(self) -> dict[str, Any]:
@@ -183,15 +192,16 @@ class CaseStability:
             "case": self.case_id,
             "runs": self.runs,
             "references": self.references,
-            "recalls": [round(recall, 3) for recall in self.recalls],
-            "recall_spread": round(self.recall_spread, 3),
+            "recalls": [rounded_figure(recall, 3) for recall in self.recalls],
+            "recall_spread": rounded_figure(self.recall_spread, 3),
             "always_matched": self.always,
             "sometimes_matched": self.sometimes,
             "never_matched": self.never,
-            "volatile_rate": round(self.volatile_rate, 3),
-            "mean_jaccard": round(self.mean_jaccard, 3),
+            "volatile_rate": rounded_figure(self.volatile_rate, 3),
+            "mean_jaccard": rounded_figure(self.mean_jaccard, 3),
             "cause_stable": self.cause_stable,
             "cause_moving": self.cause_moving,
+            "cause_unread": self.cause_unread,
             "severity_held": self.severity_held,
             "severity_moved": self.severity_moved,
             "place_held": self.place_held,
@@ -225,6 +235,11 @@ def _claim_scored_framework() -> FrameworkName:
     return composed[0]
 
 
+def _recall(value: float | None) -> float | None:
+    """A recall read off an artifact: a number, or ``None`` where it has none."""
+    return None if value is None else float(value)
+
+
 def read_run(artifact: EvalArtifact) -> ScoredRun:
     """Reduce a loaded artifact to its per-``(framework, case)`` matched sets.
 
@@ -239,7 +254,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     """
     matched: dict[Scope, frozenset[str]] = {}
     references: dict[Scope, int] = {}
-    recall: dict[Scope, float] = {}
+    recall: dict[Scope, float | None] = {}
 
     # Refused by name rather than raised through: an artifact whose blocks are
     # the wrong shape is a file to re-produce, and a KeyError out of a
@@ -256,7 +271,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
                 str(pair["reference_index"]) for pair in score["matched"]
             )
             references[scope] = int(score["counts"]["references"])
-            recall[scope] = float(score["metrics"]["reference_coverage"])
+            recall[scope] = _recall(score["metrics"]["reference_coverage"])
             # This package marks the tier on each matched row and names no
             # missed reference, so the missed half stays empty.
             must_find[scope] = MustFindFate(
@@ -270,7 +285,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
             scope = ("asvs", str(entry["case"]))
             matched[scope] = frozenset(str(item) for item in entry["matched"])
             references[scope] = int(entry["expected"])
-            recall[scope] = float(entry["recall"])
+            recall[scope] = _recall(entry["recall"])
             # This one names the missed must-finds by catalog identifier, and
             # marks no tier on a matched row — so the matched half is the
             # matched set narrowed to identifiers some run named as a must-find,
@@ -307,8 +322,8 @@ def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
     """Each missed reference's charged cause, off the ``losses`` block, or ``None`` without one.
 
     Two artifacts have no causes to read and they are different files: one
-    predates the instrument and omits the key, and one ran it over a mode that
-    charges nothing and writes ``None``. Both read ``unread`` here, and neither
+    omits the key, and one ran it over a mode that
+    charges nothing and writes ``None``. Both read ``None`` here, and neither
     may take the rest of the comparison down with it — recall and content need
     no losses block.
     """
@@ -432,13 +447,16 @@ class Band:
     @property
     def inflation(self) -> float | None:
         """How much wider the truth is than the floor, in variance. ``None`` uncalibrated."""
-        if not self.observed_variance or not self.calibration_floor:
+        # A zero observed variance reads as uncalibrated, because a zero
+        # inflation would give a band of zero width.
+        if not self.observed_variance or self.calibration_floor is None:
             return None
-        return self.observed_variance / self.calibration_floor
+        return ratio(self.observed_variance, self.calibration_floor)
 
     @property
     def variance(self) -> float:
-        return self.floor_variance * (self.inflation or 1.0)
+        inflation = self.inflation
+        return self.floor_variance * (1.0 if inflation is None else inflation)
 
     @property
     def sd(self) -> float:
@@ -565,8 +583,8 @@ def band(
         volatile=sum(1 for m, k in fates.values() if 0 < m < k),
         runs=len(runs),
         floor_variance=_floor(fates),
-        observed_variance=observed / freedom if freedom else None,
-        calibration_floor=floor / freedom if freedom else None,
+        observed_variance=ratio(observed, freedom),
+        calibration_floor=ratio(floor, freedom),
         calibration_freedom=freedom,
     )
 
@@ -595,18 +613,15 @@ def load_runs(paths: Iterable[Path | str]) -> list[ScoredRun]:
     return [read_run(load_artifact(path)) for path in paths]
 
 
-def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float:
+def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float | None:
     """Mean pairwise Jaccard, with the empty-vs-empty pair scored 1.0.
 
     Two runs that both found nothing agree completely, and calling that 0.0
     would report the most stable outcome there is as the least stable one.
     """
     pairs = list(itertools.combinations(sets, 2))
-    overlaps = [
-        1.0 if not (left | right) else len(left & right) / len(left | right)
-        for left, right in pairs
-    ]
-    return ratio(sum(overlaps), len(overlaps))
+    overlaps = [jaccard(left, right) for left, right in pairs]
+    return mean(overlaps)
 
 
 def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
@@ -660,11 +675,16 @@ def _cause_stability(
     references: int,
     sets: Sequence[frozenset[str]],
 ) -> dict[str, int | None]:
-    """Over the references every run missed: one cause each time, or several."""
+    """Over the references every run missed: one cause, several, or unread.
+
+    A reference that any run charges :data:`UNREAD_CAUSE` is unread, whatever
+    the other runs charge.
+    """
     if any(run.causes is None for run in runs):
-        return {"cause_stable": None, "cause_moving": None}
+        return {"cause_stable": None, "cause_moving": None, "cause_unread": None}
     never = {str(index) for index in range(references)} - frozenset.union(*sets)
     stable = 0
+    unread = 0
     for reference in never:
         causes = set()
         for run in runs:
@@ -676,22 +696,29 @@ def _cause_stability(
                     f" {reference} and its losses block charges it to nothing"
                 )
             causes.add(charged)
-        stable += len(causes) == 1
-    return {"cause_stable": stable, "cause_moving": len(never) - stable}
+        if UNREAD_CAUSE in causes:
+            unread += 1
+        else:
+            stable += len(causes) == 1
+    return {
+        "cause_stable": stable,
+        "cause_moving": len(never) - stable - unread,
+        "cause_unread": unread,
+    }
 
 
 def _content_stability(
     runs: Sequence[ScoredRun], scope: Scope, sets: Sequence[frozenset[str]]
 ) -> dict[str, int | None]:
     """Over the references two or more runs matched: one band and one place, or not."""
-    unread: dict[str, int | None] = {
+    no_record: dict[str, int | None] = {
         "severity_held": None,
         "severity_moved": None,
         "place_held": None,
         "place_moved": None,
     }
     if IDENTIFIER_OF[scope[0]] is not None or any(run.content is None for run in runs):
-        return unread
+        return no_record
     counts = Counter(reference for matched in sets for reference in matched)
     severity_held = severity_moved = place_held = place_moved = 0
     for reference, seen in counts.items():
@@ -779,6 +806,7 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
         "cases": len(stability),
         "cause_stable": pooled("cause_stable"),
         "cause_moving": pooled("cause_moving"),
+        "cause_unread": pooled("cause_unread"),
         "severity_held": pooled("severity_held"),
         "severity_moved": pooled("severity_moved"),
         "place_held": pooled("place_held"),
@@ -788,13 +816,24 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
         "always_matched": always,
         "sometimes_matched": sometimes,
         "never_matched": sum(entry.never for entry in stability),
-        "always_rate": round(ratio(always, references), 3),
-        "volatile_rate": round(ratio(sometimes, references), 3),
-        "mean_jaccard": round(
-            ratio(sum(entry.mean_jaccard for entry in stability), len(stability)), 3
+        "always_rate": rounded_figure(ratio(always, references), 3),
+        "volatile_rate": rounded_figure(ratio(sometimes, references), 3),
+        "mean_jaccard": rounded_figure(
+            mean(entry.mean_jaccard for entry in stability), 3
         ),
-        "worst_case_recall_spread": round(
-            max((entry.recall_spread for entry in stability), default=0.0), 3
+        "worst_case_recall_spread": rounded_figure(
+            max(
+                (
+                    entry.recall_spread
+                    for entry in stability
+                    if entry.recall_spread is not None
+                ),
+                default=None,
+            ),
+            3,
+        ),
+        "cases_without_recall_spread": sum(
+            entry.recall_spread is None for entry in stability
         ),
     }
 

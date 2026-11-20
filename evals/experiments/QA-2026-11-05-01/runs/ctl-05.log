@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Job messages may be intercepted between the web tier and message queue | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Queue job payloads may be readable on the worker-to-queue connection | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Application and log records may be intercepted on the worker database connection | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be intercepted while the web application reads configuration | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be intercepted while the worker reads configuration | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- A message-queue storage copy may disclose queued job data | ['store:message-queue']
+- A database storage copy may disclose application and log records | ['store:database']
+- A copied web-application configuration store may reveal queue credentials | ['store:web-application-config']
+- A copied worker configuration store may reveal database credentials | ['store:worker-config']
+- Weak or absent queue read authentication could expose job messages | ['store:message-queue', 'process:background-worker-process', 'flow:process:background-worker-process>store:message-queue>consume-job']
+- Weak or absent database read authentication could expose records | ['store:database', 'process:background-worker-process', 'flow:process:background-worker-process>store:database>read-write-records']
+- Weak configuration-store authentication could disclose queue credentials | ['store:web-application-config', 'process:web-application', 'flow:process:web-application>store:web-application-config>read-configuration']
+- Weak configuration-store authentication could disclose database credentials | ['store:worker-config', 'process:background-worker-process', 'flow:process:background-worker-process>store:worker-config>read-configuration']
+spent: $0.0566 reported
+must-finds matched: []

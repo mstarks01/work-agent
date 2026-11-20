@@ -1,0 +1,17 @@
+architecture-beta
+    group z0(cloud)[Trust zone public internet]
+    group z1(cloud)[Trust zone internal network]
+    group z2(cloud)[Trust zone payroll team environment]
+    service n0(internet)[colleague] in z0
+    service n1(internet)[store manager] in z0
+    service n2(internet)[payroll system] in z2
+    service n3(server)[scheduling web app] in z1
+    service n4(server)[scheduling service] in z1
+    service n5(database)[rota database] in z1
+    service n6(database)[file share] in z1
+    n0:R --> L:n3
+    n1:R --> L:n3
+    n3:R --> L:n4
+    n4:R --> L:n5
+    n4:R --> L:n6
+    n2:R --> L:n6

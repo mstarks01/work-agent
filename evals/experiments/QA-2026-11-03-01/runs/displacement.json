@@ -1,0 +1,302 @@
+{
+  "counts": {
+    "treatment": {
+      "other": 14,
+      "compromised-reader": 5,
+      "grant-holder": 5
+    },
+    "control": {
+      "other": 14,
+      "grant-holder": 8,
+      "compromised-reader": 1
+    }
+  },
+  "reads": {
+    "treatment": [
+      {
+        "run": "item4-04-p1",
+        "title": "A copied model-registry volume may disclose artifacts if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-04-p1",
+        "title": "A copied Redis data set may expose confidential customer features if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-04-p1",
+        "title": "A copied inference-log dataset may disclose raw prompts if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-04-p1",
+        "title": "A model-server compromise can read Redis customer features through its read path",
+        "class": "compromised-reader",
+        "because": "compromise"
+      },
+      {
+        "run": "item4-04-p1",
+        "title": "A model-server compromise can recover proprietary artifacts through its registry grant",
+        "class": "compromised-reader",
+        "because": "compromise"
+      },
+      {
+        "run": "item4-04-p2",
+        "title": "A copied model-registry storage artifact may reveal models if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-04-p2",
+        "title": "A copied Redis volume may disclose confidential customer features if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-04-p2",
+        "title": "A copied inference-log dataset may expose raw prompts if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-04-p2",
+        "title": "Model-network access may permit direct reading of Redis customer features",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication"
+      },
+      {
+        "run": "item4-04-p2",
+        "title": "A compromised model-server workload can read registry artifacts through its service account",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "item4-05-p1",
+        "title": "Unencrypted queue storage could expose retained job messages",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-05-p1",
+        "title": "Unencrypted database storage could expose application and log records",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-05-p1",
+        "title": "A compromised worker can read queued jobs through its existing reader path",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "item4-05-p1",
+        "title": "A compromised worker can read database records through its existing grant",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "item4-05-p2",
+        "title": "Queued job data may be readable from storage copies if queue encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-05-p2",
+        "title": "Database records may be readable from storage copies if database encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-05-p2",
+        "title": "Unauthenticated or weakly authenticated queue reads could expose queued jobs",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:message-queue>consume-job:authentication"
+      },
+      {
+        "run": "item4-05-p2",
+        "title": "Unauthenticated or weakly authenticated database reads could expose application records",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:database>read-write-records:authentication"
+      },
+      {
+        "run": "item4-13-p1",
+        "title": "A storage copy may expose dispatch records if the dispatch database lacks encryption at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-13-p1",
+        "title": "Archived partner schedules may be exposed from storage copies if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-13-p1",
+        "title": "Weak or absent database authentication could expose the dispatch record corpus",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:authentication"
+      },
+      {
+        "run": "item4-13-p2",
+        "title": "A storage copy may expose dispatch records if database encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-13-p2",
+        "title": "Archived partner schedules may be exposed from storage copies",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-13-p2",
+        "title": "An unverified database read path may permit unauthorized disclosure of crew records",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:authentication"
+      }
+    ],
+    "control": [
+      {
+        "run": "item4-ctl-04-p1",
+        "title": "Registry artifacts are exposed by storage-layer copies if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-04-p1",
+        "title": "Confidential Redis features are exposed by storage-layer copies if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-04-p1",
+        "title": "Raw prompt logs are exposed by storage-layer copies if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-04-p1",
+        "title": "An internal foothold may permit direct reading of Redis customer features",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication"
+      },
+      {
+        "run": "item4-ctl-04-p1",
+        "title": "A compromised model server can read registry artifacts using its workload identity",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "item4-ctl-04-p2",
+        "title": "Model-registry operational copies may reveal artifacts if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-04-p2",
+        "title": "A Redis storage copy may disclose confidential customer features if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-04-p2",
+        "title": "Inference-log storage copies may expose raw end-user prompts if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-04-p2",
+        "title": "An internal attacker may read all Redis customer features if no additional authentication protects Redis",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication"
+      },
+      {
+        "run": "item4-ctl-05-p1",
+        "title": "Queued jobs may be readable from storage copies if queue encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-05-p1",
+        "title": "Database records may be readable from storage copies if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-05-p1",
+        "title": "An unverified queue read path may disclose queued job messages",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:message-queue>consume-job:authentication"
+      },
+      {
+        "run": "item4-ctl-05-p1",
+        "title": "An unverified database read path may disclose application records",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:database>read-write-records:authentication"
+      },
+      {
+        "run": "item4-ctl-05-p2",
+        "title": "Queued jobs may be readable from storage copies if queue encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-05-p2",
+        "title": "Database records may be readable from storage copies if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-05-p2",
+        "title": "Queue contents may be disclosed if worker queue authentication is absent or weak",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:message-queue>consume-job:authentication"
+      },
+      {
+        "run": "item4-ctl-05-p2",
+        "title": "Database records may be disclosed if worker database authentication is absent or weak",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:database>read-write-records:authentication"
+      },
+      {
+        "run": "item4-ctl-13-p1",
+        "title": "Dispatch database copies may disclose crew PII if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-13-p1",
+        "title": "Archived schedule copies may be readable if the corporate file store lacks encryption at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-13-p1",
+        "title": "Unverified database read authentication could expose the dispatch corpus",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:authentication"
+      },
+      {
+        "run": "item4-ctl-13-p2",
+        "title": "A storage-layer copy could expose the dispatch database if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-13-p2",
+        "title": "Archived partner schedules could be read from storage copies if the archive lacks at-rest encryption",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "item4-ctl-13-p2",
+        "title": "An unauthorized control-plane reader could obtain the dispatch-data corpus if database authentication is weak",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:dispatch-api>store:dispatch-database>read-write-job-orders:authentication"
+      }
+    ]
+  }
+}

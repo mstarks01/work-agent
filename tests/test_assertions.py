@@ -57,7 +57,6 @@ from analysis_service.assertions import (
     contradiction_issues,
     contradictions,
     identity_parts,
-    merged,
     offered,
     project,
     projected_attribute,
@@ -291,12 +290,12 @@ class TestTheRegistryAnswersItsVocabularies:
         field the graph already holds joins the projecting side, which
         `data-classification` did; one for a fact the graph has no field for
         joins the other, which `origin-verification`, `credential-lifetime`,
-        `credential-revocation`, `record-attribution` and `content-validation`
-        did.
+        `credential-revocation`, `record-attribution`, `content-validation`
+        and the 32 parts of the question kinds (ADR 0117) did.
         """
         unprojected = len(REGISTRY) - len(projection_fields())
 
-        assert (len(REGISTRY), unprojected) == (23, 16)
+        assert (len(REGISTRY), unprojected) == (55, 48)
         assert unprojected > len(projection_fields())
 
     def test_two_predicates_can_project_into_one_field(self):
@@ -1220,13 +1219,6 @@ class TestARowNamesItsWriter:
         row = Assertion.model_validate(self.raw("answer", "answers"))
         assert answered(row)
 
-    def test_a_merge_of_an_answer_and_a_pass_row_is_refused(self):
-        """A merge that joined the two would hide which spans the answer wrote."""
-        pass_row = Assertion.model_validate(self.raw("assertion-pass", "description"))
-        answer_row = Assertion.model_validate(self.raw("answer", "answers"))
-        with pytest.raises(ValidationError, match="answers Source"):
-            merged(catalog([pass_row]), catalog([answer_row]))
-
 
 class TestResolvingAProposal:
     """What a model proposes, and what code builds from it.
@@ -1756,7 +1748,7 @@ class TestWhatAProjectionWillNotReach:
         assert project(held) == ()
 
     def test_a_store_predicate_on_a_store_does_reach_its_field(self):
-        """The positive control: the same predicate family, on the type that has it."""
+        """The positive check: the same predicate family, on the type that has it."""
         held = AssertionCatalog(
             subjects=subjects(("store:receipts", "component", "receipts")),
             entries=[
@@ -2025,7 +2017,7 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
     def test_a_graph_absence_under_a_stated_row_is_reported_too(self):
         """The mirror, because either side can be the wrong one."""
         found = contradictions(catalog([stated()]), self.model(authentication="none"))
-        assert len(found) == 1 and found[0].projected == "email and password"
+        assert len(found) == 1 and found[0].values == ("email and password",)
 
     def test_two_wordings_of_one_mechanism_are_not_a_contradiction(self):
         """Otherwise every run reports one, and the finding means nothing."""
@@ -2050,7 +2042,11 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
         assert f"'{ABSENT_WORD}'" in issues[0].message
 
     def test_the_row_stays_settled_because_it_is_not_a_refused_row(self):
-        """A contradiction makes a fact visible; it never drops one."""
+        """A contradiction makes a fact visible; it never drops one.
+
+        The row stays in the catalog and in :func:`settled`; the evidence
+        catalog offers it as an open question (``tests/test_evidence_states.py``).
+        """
         held = catalog([stated(value=ABSENT)])
         assert len(settled(held)) == 1
         assert all(
@@ -2517,25 +2513,6 @@ class TestTheImplementationAudit:
         assert len(entry.support) == MAX_SPANS
         assert codes(record.issues) == ["support-truncated"]
         assert record.refused_rows() == 0
-
-    def test_a_merge_outside_the_resolver_cuts_as_the_resolver_does(self):
-        """``merged`` cuts and records, so a patch adding a ninth quote to a
-        fact keeps the fact rather than rolling the batch back."""
-        many = [
-            f"Segment {index} says password authentication applies."
-            for index in range(MAX_SPANS + 1)
-        ]
-        text = " ".join(many)
-        rows = [stated(support=[support_span(quote, "test", text)]) for quote in many]
-        joined = catalog(rows[:1])
-        cut = []
-        for row in rows[1:]:
-            joined, cut = merged(joined, catalog([row]))
-
-        (entry,) = joined.entries
-        assert len(entry.support) == MAX_SPANS
-        assert codes(cut) == ["support-truncated"]
-        assert gated(joined, sources={"test": text}) == []
 
 
 @pytest.mark.parametrize("reason", ["unmeasured", "truncated"])

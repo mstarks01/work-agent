@@ -11,21 +11,31 @@ rule. One case in ``test_execution`` proves the executor actually calls this.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
 
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.mermaid import model_mermaid
 from analysis_service.prompts import compose_extract_prompt, compose_repair_prompt
 from analysis_service.sources import (
+    _REGISTERS,
     DEFAULT_DESCRIPTION_LABEL,
     DEFAULT_TRANSCRIPT_LABEL,
+    DIAGRAM_TYPES,
+    FORMATS,
+    KIND_FORMATS,
     MAX_LABEL_CHARS,
     Source,
+    SourceKind,
+    diagram_header,
+    is_read_diagram_type,
     render_sources,
     total_bytes,
 )
+from tests.factories import valid_model
 
 
 def lines_outside_fences(document: str) -> list[str]:
@@ -189,6 +199,29 @@ class TestRender:
         assert "written description" in described
         assert "transcribed conversation" in transcribed
 
+    def test_a_diagram_register_says_how_to_read_mermaid(self):
+        diagram = Source(kind="diagram", label="Model", text="flowchart LR")
+        document = render_sources([diagram], {"Model": {"refused": "empty"}})
+        outside = "\n".join(lines_outside_fences(document))
+        assert "Mermaid" in outside
+        assert "trust zone only where its label says so" in outside
+        assert (
+            "model each of its nodes as an element named with the node's label,"
+            " or with the part of the label before its first colon or bracket,"
+            " and each of its edges as a data flow between those elements in the"
+            " direction of its arrow" in " ".join(outside.split())
+        )
+        assert "a comment in the diagram states its shape convention" in outside
+
+    def test_a_job_with_no_diagram_renders_no_diagram_guidance(self):
+        """The diagram guidance rides on its own source's header, so the
+        extraction prompt of a job without one holds no diagram guidance."""
+        document = render_sources([Source.description("x"), Source.transcript("y")])
+        assert "Mermaid" not in document
+
+    def test_every_kind_has_a_register(self):
+        assert set(_REGISTERS) == set(get_args(SourceKind))
+
     def test_the_label_rides_inside_the_fence(self):
         # It is caller-controlled, so it can never sit on the marker line.
         document = render_sources([Source.description("hi", label="Payments doc")])
@@ -309,3 +342,83 @@ class TestComposedPromptFencing:
         ]
 
         assert not escaped, "analyze.md let caller text escape"
+
+
+class TestTheFormatTable:
+    """One table serves both uploads (ADR 0120)."""
+
+    def test_each_default_kind_is_one_of_its_rows_kinds(self):
+        for row in FORMATS.values():
+            assert row.default_kind in row.kinds
+
+    def test_no_row_allows_the_answers_kind(self):
+        assert all("answers" not in row.kinds for row in FORMATS.values())
+
+    def test_no_kind_is_in_two_rows(self):
+        """So the kind of an Owner File gives its format."""
+        kinds = [kind for row in FORMATS.values() for kind in row.kinds]
+        assert sorted(kinds) == sorted(KIND_FORMATS)
+
+    def test_no_extension_is_in_two_rows(self):
+        extensions = [ext for row in FORMATS.values() for ext in row.extensions]
+        assert len(extensions) == len(set(extensions))
+
+    def test_each_extension_is_lower_case_with_a_dot(self):
+        for row in FORMATS.values():
+            assert all(
+                ext.startswith(".") and ext == ext.lower() for ext in row.extensions
+            )
+
+
+#: Headers and whether the reader reads their type. ``tests/test_diagrams.py``
+#: runs ``read.mjs`` on the same set.
+DIAGRAM_HEADERS = [
+    ("flowchart LR\n  a --> b\n", True),
+    ("graph TD\n  a --> b\n", True),
+    ("architecture-beta\n  service a(server)[A]\n", True),
+    ("\n\n   flowchart LR\n", True),
+    ("%% a comment\nflowchart LR\n", True),
+    ("---\ntitle: Payments\n---\nflowchart LR\n", True),
+    ("---\nconfig:\n  theme: dark\n---\n%% note\n\ngraph LR\n", True),
+    ("flowchart-elk TD\n", True),
+    ("sequenceDiagram\n  a->>b: hi\n", False),
+    ("classDiagram\n", False),
+    ("Flowchart LR\n", False),
+    ("flowcharts LR\n", False),
+    ("graphé LR\n", True),
+    ("---\nflowchart LR\n", False),
+    ("%% flowchart LR\n", False),
+    ("", False),
+]
+
+
+class TestTheDiagramType:
+    """A diagram Source is a type the reader of ADR 0121 reads (ADR 0120)."""
+
+    @pytest.mark.parametrize(("text", "read"), DIAGRAM_HEADERS)
+    def test_the_first_diagram_line_decides_the_type(self, text, read):
+        assert is_read_diagram_type(text) is read
+
+    def test_the_header_skips_blank_lines_comments_and_front_matter(self):
+        text = "---\ntitle: x\n---\n\n%% c\n  graph LR  \n  a --> b\n"
+        assert diagram_header(text) == "graph LR"
+
+    def test_a_diagram_of_another_type_is_refused_without_its_text(self):
+        with pytest.raises(ValidationError) as caught:
+            Source(
+                kind="diagram", label="Seq", text="sequenceDiagram\n  secret->>b: hi"
+            )
+        [error] = caught.value.errors()
+        message = error["msg"]
+        assert all(name in message for name in DIAGRAM_TYPES)
+        assert "secret" not in message
+
+    def test_the_rule_reads_only_the_diagram_kind(self):
+        assert Source(kind="transcript", label="Call", text="sequenceDiagram").text
+
+    @pytest.mark.parametrize("path", sorted(Path("evals/diagrams").glob("*.mmd")))
+    def test_each_corpus_diagram_passes(self, path):
+        Source(kind="diagram", label=path.stem, text=path.read_text(encoding="utf-8"))
+
+    def test_the_export_of_a_model_passes(self):
+        Source(kind="diagram", label="Model", text=model_mermaid(valid_model()))

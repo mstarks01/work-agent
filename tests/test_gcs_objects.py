@@ -80,10 +80,6 @@ class TestTheSettings:
                 "needs ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset",
             ),
             (
-                {"ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE": "/run/hunter2"},
-                "reads no key; unset ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE",
-            ),
-            (
                 {"ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY": "hunter2"},
                 "unset ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY, which this service refuses",
             ),
@@ -97,6 +93,7 @@ class TestTheSettings:
                     ("ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE", "/run/hunter2"),
                     ("ANALYSIS_OBJECT_SECRET_ACCESS_KEY", "hunter2"),
                     ("ANALYSIS_OBJECT_ROOT", "/srv/objects"),
+                    ("ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE", "/run/hunter2"),
                 ]
             ),
         ],

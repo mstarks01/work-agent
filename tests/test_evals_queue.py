@@ -172,10 +172,10 @@ def test_a_second_voter_is_not_told_how_the_first_one_voted():
     pooled = finding(title="Ada said yes", target="process:p")
     untouched = finding(title="Nobody voted", target="process:n")
     ledger = Ledger()
-    # The finding's own case, so ada's vote really does key onto it. It read
-    # "01-payments-checkout" against a finding filed under "01", which the key
-    # ignored before the scope entered it and which would now quietly make this
-    # a test about two unpooled findings.
+    # The finding's own case, so ada's vote really does key onto it. Another
+    # case name, such as "01-payments-checkout" against a finding filed under
+    # "01", keys the vote elsewhere and quietly makes this a test about two
+    # unpooled findings.
     ledger.votes.append(
         cast(value_of(pooled), pooled.case, "up", "ada", content=pooled.content)
     )

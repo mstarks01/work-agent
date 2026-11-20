@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -21,6 +22,7 @@ from analysis_service.sampling import (
     SUPPORTED_VERSION,
     SamplingConfig,
     SamplingConfigError,
+    SamplingParam,
     TierSampling,
     env_var_for,
     load_sampling,
@@ -30,6 +32,11 @@ from tests.factories import sample_fingerprint
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SAMPLING_PATH = PROJECT_ROOT / "config" / "sampling.toml"
+
+
+def test_the_sampling_params_name_each_field_of_a_tier():
+    """``SamplingParam`` spells the fields of ``TierSampling`` a second time."""
+    assert set(get_args(SamplingParam)) == set(TierSampling.model_fields)
 
 
 def tier_block(tier, body=""):

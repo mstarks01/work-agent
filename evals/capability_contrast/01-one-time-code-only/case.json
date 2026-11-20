@@ -1,0 +1,23 @@
+{
+  "actor": "a staff user of the rota app",
+  "capability_scope": "the rota app's own sign-in",
+  "note": "A one-time code is the whole sign-in: one factor, so the reader states the code and not a second factor.",
+  "reading": {
+    "capabilities": [
+      {
+        "capability": "authentication",
+        "source_label": "System description",
+        "quote": "Staff sign in to the rota app"
+      },
+      {
+        "capability": "out-of-band-codes",
+        "source_label": "System description",
+        "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address"
+      }
+    ]
+  },
+  "rule_break_quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address",
+  "expected": {
+    "V6.4.4": "unknown"
+  }
+}

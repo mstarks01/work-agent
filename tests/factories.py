@@ -26,7 +26,7 @@ import inspect
 import json
 import shutil
 import tempfile
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from functools import partial
@@ -64,9 +64,11 @@ from analysis_service.claims import (
 )
 from analysis_service.compact import FULL_FORMAT, ExtractionFormat
 from analysis_service.conformance import REFERENCE_MODELS
+from analysis_service.engine import Engine
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
+    DraftRequirementRuling,
     RequirementProposal,
     RequirementRulingProposal,
 )
@@ -87,7 +89,7 @@ from analysis_service.graph import (
     build_pipeline,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
-from analysis_service.jobs import Checkpoint, InMemoryJobStore
+from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineRunner
 from analysis_service.links import LinkAnswer
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
@@ -97,6 +99,7 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     load_model_tiers,
 )
+from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.principals import Identity, Principal
 from analysis_service.provider import InProcessExecutor
 from analysis_service.report import (
@@ -108,7 +111,7 @@ from analysis_service.report import (
 )
 from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sampling import SamplingConfig, load_sampling
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
+from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source, SourceLimits
 from analysis_service.system_model import (
     Assumption,
     DataFlow,
@@ -215,6 +218,12 @@ TEST_CREDENTIAL_ENV: dict[str, str] = {
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
 }
+
+
+def adk_runner(pipeline: Pipeline) -> AdkPipelineRunner:
+    """A runner for ``pipeline`` with no certification gate, for a test that
+    drives the graph and asks nothing of certification."""
+    return AdkPipelineRunner(pipeline, certification=None)
 
 
 def blessed_manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
@@ -447,13 +456,14 @@ def assert_each_route_checks_the_job_id(
     foreign: str,
     bodies: Mapping[tuple[str, str], object],
     headers: Mapping[str, str],
+    others: Collection[str] = (),
 ) -> None:
     """Apply :func:`assert_job_ids_read_as_missing` to each route of the app
-    that has a path parameter.
+    that has the path parameter ``parameter``.
 
-    Every path parameter of the app must be ``parameter``, so a route that
-    takes a job ID under another name fails here. ``bodies`` holds the body
-    that a route validates before its lookup.
+    Every other path parameter of the app must be in ``others``, which a test
+    of its own checks, so a route that takes a job ID under another name fails
+    here. ``bodies`` holds the body that a route validates before its lookup.
     """
     app = client.app
     assert isinstance(app, FastAPI)
@@ -464,7 +474,8 @@ def assert_each_route_checks_the_job_id(
         for name in route.param_convertors
         for method in sorted(route.methods or ())
     ]
-    assert {name for _, _, name in routes} == {parameter}
+    assert {name for _, _, name in routes} == {parameter, *others}
+    routes = [route for route in routes if route[2] == parameter]
 
     def send(method: str, path: str, job: str) -> httpx.Response:
         return client.request(
@@ -498,6 +509,25 @@ def sample_selection(
     return [FrameworkSelection(name=name) for name in frameworks]
 
 
+def stand_in_engine(
+    runner: PipelineRunner,
+    *,
+    limits: SourceLimits,
+    deadline_seconds: float,
+    frameworks: Sequence[FrameworkSelection],
+) -> Engine:
+    """An engine that runs ``runner`` for each selection and entry, and holds
+    the selection to every package this build carries."""
+    return Engine(
+        lambda selection, entry: runner,
+        carried_frameworks=tuple(PACKAGES),
+        limits=limits,
+        deadline_seconds=deadline_seconds,
+        frameworks=frameworks,
+        assertion_pass=True,
+    )
+
+
 def package_whose_precondition(
     precondition: Any, name: FrameworkName = "stride"
 ) -> FrameworkPackage:
@@ -505,8 +535,8 @@ def package_whose_precondition(
 
     **The one thing this repository cannot otherwise test.** STRIDE's
     precondition is total, so a gate that never runs and a gate that always
-    passes look identical from every seam — which is how the member came to be
-    declared, checked on the corpus side and never called in ``src/``. A package
+    passes look identical from every seam — so a member declared, checked on
+    the corpus side and never called in ``src/`` shows nothing at any seam. A package
     that can refuse is what tells the two apart, and until a second framework
     lands there is no such package to select.
 
@@ -567,7 +597,7 @@ DESCRIPTION_TEXT = (
 """The submitted text every scripted job carries.
 
 Every ``source_excerpt`` in :func:`valid_model` and the quote ground in
-:func:`sample_threat` are verbatim spans of *this string*, because the gate now
+:func:`sample_threat` are verbatim spans of *this string*, because the gate
 checks an excerpt against the source it cites the same way the fan-in checks a
 threat's quote. A fixture citing words its own job never carried is the exact
 defect that check exists to catch, and one used by 29 tests would have failed
@@ -741,6 +771,16 @@ def sample_draft(
     )
 
 
+def asvs_draft(**overrides: Any) -> DraftRequirementRuling:
+    """One ASVS lane's draft on requirement 6.2.1, built from sample_draft()."""
+    threat = sample_draft("S-01").model_dump(
+        exclude={"category", "verb", "attacker_position", "severity", "mitigations"}
+    )
+    return DraftRequirementRuling.model_validate(
+        {**threat, "id": "v5.0.0-6.2.1", "chapter": "authentication", **overrides}
+    )
+
+
 def sample_proposal(
     threat_id: str = "S-01",
     category: str = "spoofing",
@@ -832,6 +872,8 @@ def sample_threat(
                 verb for verb, lanes in LANES_OF_VERB.items() if category in lanes
             )
         ),
+        # A stolen cookie replayed from the attacker's own machine.
+        "attacker_position": "outside",
         # One quote and one derived fact, so a default draft exercises two
         # branches rather than the cheapest one. The quote is a verbatim span of
         # the source ``sample_report`` submits, so it verifies through the
@@ -1062,8 +1104,9 @@ def inject_transport(
     decision rather than the registry's: the OpenAI SDK where the provider is
     OpenAI-compatible and it has an SDK for it, and its own ``AsyncHTTPHandler``
     where it composes the request itself — which is the path every OpenRouter
-    call takes. The injection therefore has to know which, and a vendor litellm
-    reaches a third way raises here rather than quietly running against nothing.
+    and every Anthropic call takes. The injection therefore has to know which,
+    and a vendor litellm reaches a third way raises here rather than quietly
+    running against nothing.
 
     The seam is the client ADK already exposes for testability, so nothing in
     ``src/`` learns that a test is running, and the kwargs the adapter was built
@@ -1072,9 +1115,10 @@ def inject_transport(
     **The two routes do not carry the same evidence about a credential.** On the
     OpenAI path the SDK client this builds holds a key of its own, and that key
     is what reaches the header, so nothing there says which key the adapter
-    resolved. On the OpenRouter path litellm composes the request itself from
-    the key it resolved, so the header is evidence. One reader for both, in this
-    file, because two copies of this chain would answer that differently.
+    resolved. On the OpenRouter and Anthropic path litellm composes the request
+    itself from the key it resolved, so the header is evidence. One reader for
+    both, in this file, because two copies of this chain would answer that
+    differently.
     """
     # Deferred, and not a style choice: importing ``litellm`` at module level
     # here would sort above ``analysis_service`` and so could pull the library
@@ -1087,7 +1131,7 @@ def inject_transport(
     client: Any
     if vendor == "openai":
         client = AsyncOpenAI(api_key=SDK_CLIENT_KEY, http_client=connection)
-    elif vendor == "openrouter":
+    elif vendor in ("openrouter", "anthropic"):
         client = AsyncHTTPHandler()
         client.client = connection
     else:  # pragma: no cover - a vendor reached through neither of those
@@ -1161,6 +1205,7 @@ def report_state(
         ),
         frameworks={s.name: s.options for s in report.job.frameworks},
         analyses=report.analyses,
+        asks=True,
         waiting=False,
         final=final,
         sources=(),
@@ -1431,7 +1476,8 @@ class ScriptedFramework:
     whole emission and ``ruling`` is the critic's, both in the package's own
     node schema. ``claim_id`` is the ID the graph composes for that draft, so a
     test can find it on the finished block. ``options`` is a complete selection
-    for the package.
+    for the package. ``second_key`` is another key the same lane can propose,
+    for a test that needs a second draft beside the first.
     """
 
     lane: str
@@ -1439,6 +1485,7 @@ class ScriptedFramework:
     claim_id: str
     proposal: str
     ruling: str
+    second_key: str | int
 
 
 #: One scripted fixture per package, keyed by framework and checked against
@@ -1451,6 +1498,7 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
             lane="spoofing",
             options={},
             claim_id="S-01",
+            second_key=2,
             proposal=claims_json(sample_proposal("S-01", "spoofing")),
             ruling=claims_json(sample_ruling("S-01")),
         ),
@@ -1458,6 +1506,7 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
             lane="authentication",
             options={"level": 1},
             claim_id="v5.0.0-6.2.1",
+            second_key="2.2",
             proposal=claims_json(
                 RequirementProposal(
                     requirement="2.1",

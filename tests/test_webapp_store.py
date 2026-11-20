@@ -14,21 +14,25 @@ import json
 import logging
 import re
 import sqlite3
+import stat
 import time
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
-from analysis_service.answer_sets import NO_ANSWERS
+from analysis_service import migrations
+from analysis_service.answer_sets import NO_SENT_ANSWERS
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
 from analysis_service.sources import Source
+from analysis_service.sql_store import RevisionNotHeld
 from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
 from tests import test_webapp
 from tests.factories import SEEDING_BUDGET, sample_selection, valid_model
-from tests.sql_stores import database_of, sql_env
+from tests.sql_stores import database_of, filesystem_env, sql_env, sqlite_url
 from tests.test_api import completed_days_ago
 from tests.test_sql_store import UNLISTED, store_unlisted
 from tests.test_webapp import (
@@ -91,7 +95,15 @@ def submit(client, *, questions: bool) -> str:
 
 
 def completed(client) -> str:
-    run = submit(client, questions=False)
+    """The report of an analysis that asks: its pause, continued with no
+    answers, so the report offers its follow-up."""
+    paused = submit(client, questions=True)
+    assert ran(client, paused) == "awaiting-answers"
+    continued = client.post(
+        f"/answer/{paused}", json={"revision": 0}, headers=SAME_ORIGIN
+    )
+    assert continued.status_code == 200, continued.text
+    run = continued.json()["run"]
     assert ran(client, run) == "completed"
     return run
 
@@ -103,8 +115,61 @@ def payload(page: str, block: str) -> dict:
     return json.loads(match.group(1))
 
 
+class TestTheDefaultStore:
+    """With no store setting, the app keeps its runs in SQLite and a file root
+    in its data directory, and makes and migrates both (ADR 0111)."""
+
+    def test_a_restart_keeps_every_run(self, tiers, default_store):
+        with app(tiers) as client:
+            run = run_to_completion(client)
+        with app(tiers) as client:
+            assert [row["run"] for row in client.get("/workspace/runs").json()] == [run]
+            assert client.get(f"/report/{run}").status_code == 200
+
+    def test_it_makes_the_data_directory_and_the_root_private(
+        self, tiers, default_store
+    ):
+        from webapp import settings_view
+
+        directory = settings_view.data_dir({})
+        with app(tiers):
+            pass
+        for path in (directory, directory / "objects"):
+            assert stat.S_IMODE(path.stat().st_mode) == 0o700, path
+        assert stat.S_IMODE((directory / "jobs.db").stat().st_mode) == 0o600
+
+    def test_the_page_has_no_store_note(self, tiers, default_store):
+        with app(tiers) as client:
+            assert "This app keeps your runs" not in client.get("/").text
+
+    def test_a_data_directory_that_others_can_open_stops_the_startup(
+        self, tiers, default_store
+    ):
+        from webapp import settings_view
+
+        directory = settings_view.data_dir({})
+        directory.mkdir(mode=0o700, parents=True)
+        directory.chmod(0o755)
+        with pytest.raises(StoreConfigError, match="set its mode to 0700"):
+            app(tiers)
+
+    def test_a_data_directory_it_cannot_make_stops_the_startup(
+        self, tiers, default_store
+    ):
+        from webapp import settings_view
+
+        parent = settings_view.data_dir({}).parent
+        parent.chmod(0o500)
+        try:
+            with pytest.raises(StoreConfigError, match="cannot make its data"):
+                app(tiers)
+        finally:
+            parent.chmod(0o700)
+
+
 class TestTheSettings:
-    def test_with_no_store_setting_a_restart_loses_every_run(self, tiers):
+    def test_with_the_memory_store_a_restart_loses_every_run(self, tiers, monkeypatch):
+        monkeypatch.setenv("ANALYSIS_JOB_STORE", "memory")
         with app(tiers) as client:
             run_to_completion(client)
         with app(tiers) as client:
@@ -178,6 +243,111 @@ class TestTheSettings:
                 time.sleep(0.01)
             assert client.portal.call(store.get, expired) is None
             assert client.portal.call(store.get, kept) is not None
+
+
+@pytest.fixture
+def first_run(tmp_path: Path, monkeypatch) -> Path:
+    """A ``sql`` store on a SQLite file that no migration touched, in a
+    private directory, set as the app reads it. The file does not exist."""
+    directory = tmp_path / "data"
+    directory.mkdir(mode=0o700)
+    database = directory / "jobs.db"
+    env = {
+        "ANALYSIS_JOB_STORE": "sql",
+        "ANALYSIS_DATABASE_URL": sqlite_url(database),
+        **filesystem_env(tmp_path),
+    }
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    return database
+
+
+def _migrated_lines(caplog) -> list[str]:
+    return [line for line in caplog.messages if "migrated the job database" in line]
+
+
+class TestTheFirstRunMigration:
+    """The first-run app migrates a SQLite database itself (ADR 0110)."""
+
+    @pytest.mark.parametrize("exists", [False, True], ids=["missing", "empty"])
+    def test_it_migrates_a_new_file_and_runs_on_it(
+        self, tiers, first_run, caplog, exists
+    ):
+        if exists:
+            first_run.touch(mode=0o600)
+        with (
+            caplog.at_level(logging.INFO, logger="analysis_service.sql_store"),
+            app(tiers) as client,
+        ):
+            run_to_completion(client)
+        assert stat.S_IMODE(first_run.stat().st_mode) == 0o600
+        line = f"from revision None to {migrations.head()}"
+        assert _migrated_lines(caplog) == [
+            f"the first-run app migrated the job database {line}"
+        ]
+
+    def test_a_file_at_the_latest_revision_stays_as_it_is(self, tiers, durable, caplog):
+        with (
+            caplog.at_level(logging.INFO, logger="analysis_service.sql_store"),
+            app(tiers),
+        ):
+            pass
+        assert _migrated_lines(caplog) == []
+
+    @pytest.mark.parametrize(
+        ("change", "error", "refused"),
+        [
+            (
+                "UPDATE alembic_version SET version_num = 'r9999'",
+                RevisionNotHeld,
+                "revision r9999",
+            ),
+            (
+                "ALTER TABLE jobs DROP COLUMN carried_renames",
+                StoreConfigError,
+                "differs",
+            ),
+        ],
+        ids=["a revision the tree does not hold", "a schema difference"],
+    )
+    def test_a_database_no_migration_repairs_stops_the_startup(
+        self, tiers, durable, change, error, refused
+    ):
+        """The app migrates its own SQLite file, so the remedy names no
+        command line: delete the file and start the app again."""
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(change)
+        with (
+            pytest.raises(error, match=refused) as stopped,
+            app(tiers),
+        ):
+            pass
+        assert "delete the database file, then start the app again" in str(
+            stopped.value
+        )
+        assert "python -m" not in str(stopped.value)
+        assert database_of(durable) not in str(stopped.value)
+
+    def test_a_file_that_is_not_a_database_stops_the_startup(
+        self, tiers, first_run, caplog
+    ):
+        """The read of its revision fails, before any migration."""
+        first_run.write_bytes(b"not a database" * 100)
+        first_run.chmod(0o600)
+        with pytest.raises(StoreConfigError, match="cannot be read;"):
+            app(tiers)
+        assert str(first_run) not in str(caplog.messages)
+
+    def test_a_migration_that_fails_stops_the_startup(
+        self, tiers, first_run, caplog, monkeypatch
+    ):
+        def fails(env):
+            raise OperationalError("ALTER TABLE", {}, Exception("disk I/O error"))
+
+        monkeypatch.setattr(migrations, "upgrade", fails)
+        with pytest.raises(StoreConfigError, match="cannot be migrated;"):
+            app(tiers)
+        assert str(first_run) not in str(caplog.messages)
 
 
 class TestARestart:
@@ -285,6 +455,18 @@ class TestARecordOfAnotherSchemaVersion:
         assert report.status_code == 409, report.text
         linked = {item["run"] for snapshot in listed for item in snapshot["reports"]}
         assert run not in linked
+
+    def test_the_stream_of_such_a_record_ends_with_no_node_frame(self, tiers, durable):
+        with app(tiers) as client:
+            run = completed(client)
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(
+                "UPDATE jobs SET schema_version = '0.1' WHERE id = ?", (run,)
+            )
+        with app(tiers) as client:
+            stream = client.get(f"/events/{run}")
+        assert stream.status_code == 200, stream.text
+        assert "event: node" not in stream.text
 
     def test_an_unparsable_resumption_is_never_parsed(self, tiers, durable):
         with app(tiers) as client:
@@ -426,6 +608,7 @@ def queued_run(store) -> str:
         principal = await store.principal(OPERATOR)
         assert principal is not None
         record = JobRecord.create(
+            assertion_pass=True,
             owner_id=principal.owner_id,
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
@@ -453,7 +636,7 @@ class ChangesTheOldestOnAdmission:
     async def reserve(self, record, **bounds):
         if self.oldest is not None:
             assert await self._store.save_draft(
-                self.oldest, record.owner_id, NO_ANSWERS, 0
+                self.oldest, record.owner_id, NO_SENT_ANSWERS, 0
             )
         return await self._store.reserve(record, **bounds)
 
@@ -474,7 +657,7 @@ class TestTheBound:
         assert listed == {oldest, newest, started.json()["run"]}
 
     def test_each_delete_writes_the_line_with_the_cause_workspace(self, tiers, caplog):
-        workspace = Workspace(max_jobs=1)
+        workspace = Workspace(store=InMemoryJobStore(), max_jobs=1)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )

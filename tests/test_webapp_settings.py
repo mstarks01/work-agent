@@ -7,9 +7,7 @@ browser gets them.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +31,7 @@ from tests.test_settings_env import (
     settings_client,
     write_settings,
 )
-from tests.test_webapp import LOOPBACK, SAME_ORIGIN
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN, _island
 from webapp.main import Workspace, create_app
 from webapp.settings_page import (
     CHANGED_SAMPLING,
@@ -64,13 +62,7 @@ def memory_client(tmp_path, **process: str) -> TestClient:
 
 def page_data(response) -> dict:
     """The data the page's script draws from."""
-    block = re.search(
-        r'<script type="application/json" id="settings"[^>]*>(.*?)</script>',
-        response.text,
-        re.DOTALL,
-    )
-    assert block is not None, "the page carries no settings data"
-    return json.loads(block.group(1))
+    return _island(response.text, "settings")
 
 
 def rows_of(client) -> dict[str, dict]:
@@ -90,6 +82,32 @@ class TestTheRows:
                 SETTINGS[key].label,
                 SETTINGS[key].mark,
             )
+
+    def test_each_numeric_entry_carries_the_bounds_the_loader_takes(self, tmp_path):
+        from analysis_service.config_files import MAX_VALUE_CHARS
+        from analysis_service.store_backends import (
+            MAX_RETENTION_DAYS,
+            MIN_RETENTION_DAYS,
+            RETENTION_DAYS_VAR,
+            StoreConfigError,
+            retention_days,
+        )
+
+        data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
+        rows = {row["key"]: row for row in data["rows"]}
+        bounds = ("min", "above", "max")
+        assert data["value_chars"] == MAX_VALUE_CHARS
+        assert [rows["resilience.attempts"][key] for key in bounds] == [1, None, 10]
+        ratio = [rows["resilience.retry_budget_ratio"][key] for key in bounds]
+        assert ratio == [None, 0, 1]
+        retention = [rows["store.retention_days"][key] for key in bounds]
+        assert retention == [MIN_RETENTION_DAYS, None, MAX_RETENTION_DAYS]
+        assert retention_days({RETENTION_DAYS_VAR: str(MIN_RETENTION_DAYS)}) == 1
+        with pytest.raises(StoreConfigError):
+            retention_days({RETENTION_DAYS_VAR: str(MIN_RETENTION_DAYS - 1)})
+        assert all(
+            row["max"] is not None for row in rows.values() if row.get("numeric")
+        )
 
     def test_each_entry_that_no_selection_hides_shows(self, tmp_path):
         rows = rows_of(client_for(tmp_path, hand_written()))
@@ -323,6 +341,17 @@ class TestSecrets:
         assert row["value"] == url
 
 
+#: The store rows that the page shows with no store setting: the default
+#: ``sql`` store on SQLite with a filesystem root (ADR 0111).
+DEFAULT_SHOWN = [
+    "store.job_store",
+    "store.retention_days",
+    "store.database_url",
+    "store.object_store",
+    "store.object_root",
+]
+
+
 class TestWhatTheSelectionShows:
     def test_each_vendor_row_carries_its_vendor_and_the_modes_that_read_it(
         self, tmp_path
@@ -355,12 +384,28 @@ class TestWhatTheSelectionShows:
         assert setups.keys() == {"bedrock", "vertex"}
         assert setups["vertex"] == "gcloud auth application-default login"
 
-    def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
+    def test_the_default_store_shows_its_database_and_object_root(self, tmp_path):
+        """With no store setting, the page shows the SQLite store in the data
+        directory, each value marked as a default (ADR 0111)."""
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
         rows = {row["key"]: row for row in data["rows"]}
 
+        assert data["store_shown"] == DEFAULT_SHOWN
+        assert rows["store.job_store"]["value"] == "sql"
+        database = rows["store.database_url"]
+        assert database["source"] == "default"
+        assert database["value"].startswith("sqlite+aiosqlite:///")
+        assert database["value"].endswith("/work-agent/jobs.db")
+        assert rows["store.object_store"]["value"] == "filesystem"
+
+    def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
+        data = page_data(
+            client_for(tmp_path, hand_written(ANALYSIS_JOB_STORE="memory")).get(
+                "/settings"
+            )
+        )
+
         assert data["store_shown"] == ["store.job_store", "store.retention_days"]
-        assert rows["store.job_store"]["value"] == "memory"
 
     def test_the_data_carries_every_store_row(self, tmp_path):
         rows = rows_of(client_for(tmp_path, hand_written()))
@@ -371,7 +416,7 @@ class TestWhatTheSelectionShows:
             for key, setting in SETTINGS.items()
             if setting.variable in store_variables() and setting.mark != "excluded"
         }
-        assert all(rows[key]["restart"] for key in store)
+        assert all("restart" not in row for row in rows.values())
 
     def test_the_sql_store_shows_the_reads_of_its_object_store(self, tmp_path):
         shown = store_shown_of(
@@ -482,7 +527,7 @@ class TestTheStoreRowsOfUnsavedChanges:
 
         answer = rows_for(client, {"store.job_store": None})
 
-        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+        assert answer.json()["shown"] == DEFAULT_SHOWN
 
     def test_the_process_environment_wins_over_a_change(self, tmp_path):
         client = memory_client(tmp_path, ANALYSIS_JOB_STORE="memory")
@@ -496,7 +541,7 @@ class TestTheStoreRowsOfUnsavedChanges:
 
         answer = rows_for(client, {"tiers.base.model": "sql", "no.such.key": "sql"})
 
-        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+        assert answer.json()["shown"] == DEFAULT_SHOWN
 
     @pytest.mark.parametrize(
         ("body", "media_type", "status"),
@@ -611,4 +656,4 @@ class TestLoopbackControls:
     def test_the_first_run_nav_links_to_it(self, tmp_path, path):
         client = client_for(tmp_path, hand_written())
 
-        assert '<a href="/settings"' in client.get(path).text
+        assert '<a id="settings-nav" href="/settings"' in client.get(path).text

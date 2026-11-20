@@ -55,24 +55,22 @@ edit in a pull request, and layer 2 does not.
 
 **The `live-providers` environment carries a deployment branch policy naming
 `main`, and it is the third layer.** It is a repository setting rather than a
-line in a file, so a pushed branch cannot edit it — which is exactly what layer
-1 cannot claim and what layer 2 wrongly claimed. `evals-live-api-key.yml` says
+line in a file, so a pushed branch cannot edit it — which layer 1 cannot claim,
+and a suffix pin in layer 2 cannot claim either. `evals-live-api-key.yml` says
 what its absence means: "an environment nobody has configured protection rules
-on protects nothing." It was absent until 2026-09-03, so for the provider-key
-jobs the editable ref guard was the only control. If you ever need to run one of
+on protects nothing." Without it, the editable ref guard is the only control
+for the provider-key jobs. If you ever need to run one of
 those workflows from a branch, this policy is the second thing to change, and
 that is the point of it.
 
-**Layer 2 pins `ref` because a suffix is not a pin.** It read
-`job_workflow_ref.endsWith('@refs/heads/main')`, and the `@` there separates a
-prefix from a ref the attacker names. `git check-ref-format` accepts a branch
-called `pwn@refs/heads/main`; its claim ends `@refs/heads/pwn@refs/heads/main`
-and satisfies the suffix. So both layers fell to one push: the branch name
-carried layer 2, and editing the workflow file on that branch carried layer 1.
-A security audit found this on 2026-09-03 and it is fixed. The lesson is worth
-more than the fix — **the guard whose failure the design accepts and the guard
-it relies on must fail for different reasons**, and these two failed for the
-same one.
+**Layer 2 pins `ref` because a suffix is not a pin.** In a suffix check such as
+`job_workflow_ref.endsWith('@refs/heads/main')`, the `@` separates a prefix
+from a ref the attacker names. `git check-ref-format` accepts a branch called
+`pwn@refs/heads/main`; its claim ends `@refs/heads/pwn@refs/heads/main` and
+satisfies the suffix. With a suffix pin, one push defeats both layers: the
+branch name carries layer 2, and an edit to the workflow file on that branch
+carries layer 1. **The guard whose failure the design accepts and the guard it
+relies on must fail for different reasons.**
 
 `tests/test_workflow_lints.py` enforces both halves of layer 1 against every
 workflow in the directory, so a lane added later is covered without anyone

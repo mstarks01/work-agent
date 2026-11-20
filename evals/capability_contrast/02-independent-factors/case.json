@@ -1,0 +1,33 @@
+{
+  "actor": "a staff user of the rota app",
+  "capability_scope": "the rota app's own sign-in",
+  "note": "One user presents a password and a code from a device to the app's own sign-in: two independent factors.",
+  "reading": {
+    "capabilities": [
+      {
+        "capability": "authentication",
+        "source_label": "System description",
+        "quote": "Staff sign in to the rota app"
+      },
+      {
+        "capability": "password-authentication",
+        "source_label": "System description",
+        "quote": "Staff sign in to the rota app with a password"
+      },
+      {
+        "capability": "totp",
+        "source_label": "System description",
+        "quote": "enter a six-digit code from an authenticator app on their phone"
+      },
+      {
+        "capability": "multi-factor-authentication",
+        "source_label": "System description",
+        "quote": "The rota app asks for both at each sign-in"
+      }
+    ]
+  },
+  "rule_break_quote": null,
+  "expected": {
+    "V6.4.4": "applicable"
+  }
+}

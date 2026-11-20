@@ -1,0 +1,15 @@
+architecture-beta
+    group z0(cloud)[Trust zone Public internet]
+    group z1(cloud)[Trust zone Hosted network]
+    group z2(cloud)[Trust zone CDN]
+    service n0(internet)[Reader] in z0
+    service n1(internet)[Admin] in z0
+    service n2(internet)[CDN] in z2
+    service n3(server)[Web server] in z1
+    service n4(database)[MySQL database] in z1
+    service n5(database)[CDN bucket] in z2
+    n0:R --> L:n3
+    n0:R --> L:n2
+    n3:R --> L:n4
+    n3:R --> L:n5
+    n1:R --> L:n4

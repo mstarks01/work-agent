@@ -35,6 +35,8 @@ def finished(store, *, final: bool = True) -> str:
 
     report = sample_report([asking_threat(ASKED)])
     parent = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
@@ -44,6 +46,8 @@ def finished(store, *, final: bool = True) -> str:
     parent.transition("completed")
     asyncio.run(admit(store, parent))
     record = JobRecord.create(
+        assertion_pass=True,
+        ask_questions=True,
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
@@ -182,7 +186,9 @@ class TestWhichFindingsACorrectionReaches:
 
     def reached(self, threat):
         report = sample_report([threat])
-        return corrected_findings(report.analyses, [ANSWER], [self.BACK])
+        return corrected_findings(
+            report.analyses, [ANSWER], [self.BACK], report.system_model, None
+        )
 
     def test_a_finding_that_quotes_the_answer_s_line(self):
         quote = Ground(kind="quote", text=fact_line(ANSWER), source_label=ANSWERS_LABEL)

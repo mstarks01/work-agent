@@ -359,8 +359,8 @@ class TestTheRepairRung:
 
         A median quote on a source at the size ceiling finds its match after
         about 6,000 units and then needs 113,000,000 more to finish ranking
-        every remaining window. Answering `None` there spends the whole budget
-        and buys nothing, and it turns the rung off for exactly the largest
+        every remaining window. Answering `None` there uses the whole budget
+        and gains nothing, and it turns the rung off for exactly the largest
         source it is meant to serve.
         """
         source = " ".join(
@@ -477,9 +477,9 @@ class TestPreparingASourceOnce:
 class TestWhatARepairMoved:
     """The mechanical half of "the span says something different" (#675 D15).
 
-    A repair inside the threshold can flip what a quote asserts. The rung
-    still substitutes — ADR 0018 — and names what moved, so the critic and the
-    reader are told the span is not the agent's evidence.
+    A repair inside the threshold can flip what a quote asserts.
+    ``meaning_moved`` names the classes that ``faithful_repair`` refuses
+    (ADR 0130), and the load check of a stored repair mark reads it again.
     """
 
     def test_a_dropped_not_is_a_moved_negation(self):

@@ -7,18 +7,23 @@ against the one the graph sent, instruction and user turn, byte for byte.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
+from dataclasses import replace
+from typing import get_args, get_type_hints
 
 import pytest
 
 from analysis_service.assertions import AssertionCatalog, AssertionRecord
+from analysis_service.claims import ReturnedClaim
 from analysis_service.graph import STATE_ASSERTION_CATALOG
 from analysis_service.markdown_loader import MarkdownLoader
-from evals.harness import critic_replay
+from evals.harness import critic_replay, critic_yield
 from evals.harness.bundle import case_file, reports_dir, write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.run_record import loaded
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
@@ -61,7 +66,7 @@ def test_the_critic_request_is_rebuilt_byte_for_byte(recorded, case):  # noqa: F
 
 
 def test_changed_drafts_make_a_request_the_critic_never_saw(recorded, case):  # noqa: F811
-    """The control for the byte-for-byte test."""
+    """The positive check for the byte-for-byte test."""
     out, seen = recorded
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
     archived.drafts.pop()
@@ -76,7 +81,7 @@ def test_changed_drafts_make_a_request_the_critic_never_saw(recorded, case):  # 
 def test_a_replayed_answer_is_compared_draft_by_draft(recorded, case):  # noqa: F811
     out, _ = recorded
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
-    block = archived.report.analyses[0]
+    block = archived.block
     first = block.all_claims()[0]
     flipped = {
         "claims": [
@@ -126,34 +131,65 @@ def test_an_answer_outside_the_contract_is_refused(recorded, case):  # noqa: F81
         asyncio.run(critic_replay.replay(archived, call, PACKAGE_LOADER, PROMPT_LOADER))
 
 
-def test_the_replayed_rulings_are_written_completed(recorded, case, tmp_path):  # noqa: F811
+def test_the_replayed_rulings_are_written_completed(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
     """The file carries what a status cannot: the reason and the open facts.
 
     A ruling that names nothing on a draft citing an unknown ground is written
-    with that ground in ``related_unknowns``, as the graph completes it.
+    with that ground in ``related_unknowns``, as the graph completes it. The
+    file starts with the record of the sweep files the replay read (#2029).
     """
     out, _ = recorded
-    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
-    bare = critic_replay.parse(
-        json.dumps(
-            {
-                "claims": [
-                    {
-                        "id": claim.id,
-                        "verdict": {},
-                        "confidence": getattr(claim, "confidence", "medium"),
-                    }
-                    for claim in archived.drafts
-                ]
-            }
-        ),
-        "stride",
+    artifact = finished(out, case.id)
+    archived = critic_replay.load(artifact, case.id, "stride")
+    bare = json.dumps(
+        {
+            "claims": [
+                {
+                    "id": claim.id,
+                    "verdict": {},
+                    "confidence": getattr(claim, "confidence", "medium"),
+                }
+                for claim in archived.drafts
+            ]
+        }
     )
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return bare
+
+        return call
+
+    monkeypatch.setattr(critic_replay, "node_call", scripted)
+    monkeypatch.setattr(critic_replay.Deployment, "from_env", lambda: None)
     written = tmp_path / "rulings.json"
+    args = argparse.Namespace(
+        artifact=artifact.path,
+        case=case.id,
+        framework="stride",
+        accept_cost="unknown",
+        out=written,
+        raw=None,
+    )
 
-    critic_replay.write_rulings(written, archived, bare)
+    assert critic_replay.command_critic_replay(args) == 0
 
-    claims = json.loads(written.read_text(encoding="utf-8"))["claims"]
+    held = json.loads(written.read_text(encoding="utf-8"))
+    assert held["record"]["command"] == "critic-replay"
+    assert [one["path"] for one in held["record"]["inputs"]] == sorted(
+        str(path)
+        for path in (
+            artifact.path,
+            *archived.files,
+            *loaded((PACKAGE_LOADER, PROMPT_LOADER)),
+        )
+    )
+    claims = held["claims"]
     assert [claim["id"] for claim in claims] == [d.id for d in archived.drafts]
     conditional = [d.id for d in archived.drafts if d.unknown_grounds()]
     assert conditional, "the recorded case carries a draft citing an unknown"
@@ -189,7 +225,7 @@ def test_a_failed_case_rebuilds_its_critic_request_from_the_dump(
         critic_replay.compose(archived, PACKAGE_LOADER, PROMPT_LOADER)
     )
 
-    assert archived.report is None
+    assert archived.block is None
     assert next(contents for text, contents in seen if text == instruction) == [turn]
 
 
@@ -221,3 +257,165 @@ def test_a_failure_dump_keeps_the_fact_catalog_the_drafts_cited(
     archived = critic_replay.load(failed(out, case.id), case.id, "stride")
 
     assert archived.assertions == record
+
+
+def test_a_claim_assembly_returned_reads_as_returned(recorded, case):  # noqa: F811
+    """Assembly took the claim out of both arrays after the critic kept it, so
+    the archive holds no verdict for it, and the critic did rule on it."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    first, *rest = archived.block.claims
+    block = archived.block.model_copy(
+        update={
+            "claims": rest,
+            "returned_claims": [
+                ReturnedClaim(claim_id=first.id, unit="u", needs="code")
+            ],
+        }
+    )
+
+    rows = critic_replay.compare(replace(archived, block=block), [])
+
+    status = {row.draft_id: row.archived for row in rows}
+    assert status[first.id] == "returned"
+    assert all(status[claim.id] == claim.verdict.status for claim in rest)
+
+
+def test_a_returned_claim_is_counted_apart_from_agreement(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+    monkeypatch,
+    capsys,
+):
+    """A returned claim has no archived verdict to agree with, so the printed
+    count leaves it out of the denominator and names it on its own line."""
+    out, _ = recorded
+    artifact = finished(out, case.id)
+    archived = critic_replay.load(artifact, case.id, "stride")
+    first, *rest = archived.block.claims
+    block = archived.block.model_copy(
+        update={
+            "claims": rest,
+            "returned_claims": [
+                ReturnedClaim(claim_id=first.id, unit="u", needs="code")
+            ],
+        }
+    )
+    returned = replace(archived, block=block)
+    ruled = json.dumps(
+        {
+            "claims": [
+                {
+                    "id": claim.id,
+                    "verdict": {},
+                    "confidence": getattr(claim, "confidence", "medium"),
+                }
+                for claim in archived.drafts
+            ]
+        }
+    )
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return ruled
+
+        return call
+
+    monkeypatch.setattr(critic_replay, "load", lambda *_: returned)
+    monkeypatch.setattr(critic_replay, "node_call", scripted)
+    monkeypatch.setattr(critic_replay.Deployment, "from_env", lambda: None)
+    args = argparse.Namespace(
+        artifact=artifact.path,
+        case=case.id,
+        framework="stride",
+        accept_cost="unknown",
+        out=None,
+        raw=None,
+    )
+
+    assert critic_replay.command_critic_replay(args) == 0
+
+    lines = capsys.readouterr().out.splitlines()
+    agreeing = sum(line.startswith("  = ") for line in lines)
+    assert f"  · {first.id:10} archived returned     replayed confirmed" in lines
+    assert f"{agreeing} of {len(archived.drafts) - 1} verdicts agree" in lines
+    assert "1 draft has no archived verdict (omitted, returned or unruled)" in lines
+
+
+def test_an_omitted_draft_is_counted_apart(recorded, case):  # noqa: F811
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    block = archived.block.model_copy(update={"claims": archived.block.claims[1:]})
+    rows = critic_replay.compare(replace(archived, block=block), [])
+    sides = [row.archived for row in rows]
+    assert sides.count("omitted") == 1
+    assert set(sides) - {"omitted"} <= critic_yield.VERDICT_STATUSES
+
+    lines = critic_replay.agreement_lines(rows)
+
+    assert f"0 of {len(rows) - 1} verdicts agree" in lines
+    assert "1 draft has no archived verdict (omitted, returned or unruled)" in lines
+
+
+def test_a_case_with_no_block_has_no_verdict_to_agree_with(recorded, case):  # noqa: F811
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    rows = critic_replay.compare(replace(archived, block=None), [])
+    assert len(rows) > 1
+
+    lines = critic_replay.agreement_lines(rows)
+
+    assert "0 of 0 verdicts agree" in lines
+    assert (
+        f"{len(rows)} drafts have no archived verdict (omitted, returned or unruled)"
+        in lines
+    )
+
+
+def test_a_draft_the_replay_left_unruled_still_counts_as_a_disagreement(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+):
+    """The archived side ruled, so the pair is a verdict that did not repeat."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    rows = critic_replay.compare(archived, [])
+    assert {row.archived for row in rows} <= critic_yield.VERDICT_STATUSES
+
+    lines = critic_replay.agreement_lines(rows)
+
+    assert f"0 of {len(rows)} verdicts agree" in lines
+    assert all("no archived verdict" not in line for line in lines)
+
+
+def test_the_no_verdict_sides_are_every_archived_side_outside_the_statuses():
+    """Read off the annotation the comparison writes, not off the sides' parts."""
+    annotation = get_type_hints(critic_replay.Agreement)["archived"]
+    sides = {value for part in get_args(annotation) for value in get_args(part)}
+    assert set(critic_replay.NO_VERDICT_SIDES) == (
+        sides - critic_yield.VERDICT_STATUSES
+    )
+    assert critic_replay.NO_VERDICT_SIDES == ("omitted", "returned", "unruled")
+
+
+def test_a_draft_the_archived_block_lacks_reads_as_omitted(recorded, case):  # noqa: F811
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    first, *rest = archived.block.claims
+    block = archived.block.model_copy(update={"claims": rest})
+
+    rows = critic_replay.compare(replace(archived, block=block), [])
+
+    status = {row.draft_id: row.archived for row in rows}
+    assert status[first.id] == "omitted"
+    assert all(status[claim.id] == claim.verdict.status for claim in rest)
+
+
+def test_a_case_with_no_block_reads_every_draft_as_unruled(recorded, case):  # noqa: F811
+    """A case that failed before assembly has no archived verdict to read."""
+    out, _ = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+
+    rows = critic_replay.compare(replace(archived, block=None), [])
+
+    assert {row.archived for row in rows} == {"unruled"}

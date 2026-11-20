@@ -32,19 +32,20 @@ beyond the repository.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.catalog import ASVS_VERSION, requirement_text
+from evals.harness.reference import read_digest
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"
 
-#: Case 01's sitting document predates this generator and is the template it
-#: was derived from; regenerating it would overwrite the historical record.
+#: Case 01's sitting document is hand-written and is the template of this
+#: generator; regenerating it would overwrite that record.
 HAND_WRITTEN = frozenset({"01-payments-checkout"})
 
 #: What this generator writes beside each case. Named rather than spelled at
@@ -384,7 +385,7 @@ def asvs_part(records: list[dict]) -> dict:
 #: is applicability. Each answers in blocks rather than in text, so the
 #: reading document and `webapp/sitting.py` lay out one description of the
 #: record and cannot drift into describing two.
-RENDERERS: dict[str, Callable[[list[dict]], dict]] = {
+RENDERERS: dict[FrameworkName, Callable[[list[dict]], dict]] = {
     "stride": stride_part,
     "asvs": asvs_part,
 }
@@ -433,9 +434,7 @@ def closing(case_id: str, meta: dict) -> str:
     read.append("model.json")
     read += [f"claims/{fw['name']}.json" for fw in meta["frameworks"]]
     read_json = ",\n      ".join(
-        json.dumps(name)
-        + ": "
-        + json.dumps(hashlib.sha256((case_dir / name).read_bytes()).hexdigest())
+        json.dumps(name) + ": " + json.dumps(read_digest(case_dir / name))
         for name in read
     )
     return f"""\
@@ -495,8 +494,8 @@ generated. A submission covers the frameworks whose reference sets it carries
 a matching digest for, and it stops covering one the moment that file changes.
 CI checks that every finding of every set you read carries a mark, that the
 digests match the tree, and that the pull request adds this one file and
-nothing else. `tests/test_case_review.py` names the cases still waiting, and
-derives that list from the merged submissions.
+nothing else. `uv run python webapp/sitting.py --list` names the cases still
+waiting, and derives that list from the merged submissions.
 """
 
 

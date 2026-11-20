@@ -24,7 +24,7 @@ from pydantic import ValidationError
 
 from analysis_service.deployment import Deployment
 from analysis_service.engine import EngineInputError
-from analysis_service.jobs import PipelineRejected
+from analysis_service.jobs import InMemoryJobStore, PipelineRejected
 from analysis_service.report import InputRef
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, clean_system_name
 from tests.factories import TEST_TIER_ENV
@@ -128,7 +128,7 @@ def _title_outcome(name: str) -> Outcome:
     """What the workspace's rename route did with ``name``, by its status and
     the title it wrote onto the job."""
     tiers = Deployment.from_env(env=TEST_TIER_ENV).tiers
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     client = TestClient(create_app(startup_for(tiers), workspace), base_url=LOOPBACK)
     with client:
         run = run_to_completion(client)

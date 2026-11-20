@@ -1,0 +1,24 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: public internet"]
+        n0["colleague"]
+        n1["store manager"]
+    end
+    subgraph z1["Trust zone: internal network"]
+        n3("scheduling web app")
+        n4("scheduling service")
+        n5[("rota database")]
+        n6[("file share")]
+    end
+    subgraph z2["Trust zone: payroll team environment"]
+        n2["payroll system"]
+    end
+    n0 -->|"view shifts"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"build rota"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"rota requests"| n4
+    n4 -->|"read write rotas"| n5
+    n4 -->|"write payroll export"| n6
+    n2 -->|"collect payroll export"| n6
+    linkStyle 5 stroke:#c0392b,stroke-width:2px

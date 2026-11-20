@@ -1,0 +1,10 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- CDN assets are readable in transit over HTTP | ['flow:entity:reader>entity:cdn>asset-fetch', 'entity:reader', 'entity:cdn']
+- Database maintenance traffic exposes CMS data on the public network | ['flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin', 'store:mysql-database']
+- CMS-to-MySQL traffic may expose account and comment data if transport encryption is absent | ['flow:process:web-server>store:mysql-database>cms-data', 'process:web-server', 'store:mysql-database']
+- Asset publication may disclose unpublished CDN content if its transport is unencrypted | ['flow:process:web-server>store:cdn-bucket>asset-publish', 'process:web-server', 'store:cdn-bucket']
+- A storage copy could expose CMS accounts if MySQL encryption at rest is absent | ['store:mysql-database']
+- A copied CDN bucket may disclose business-critical assets if it lacks encryption at rest | ['store:cdn-bucket']
+- An unauthenticated direct MySQL path could expose the entire CMS database | ['store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin']
+spent: $0.0436 reported
+must-finds matched: [9]

@@ -182,7 +182,7 @@ def test_an_empty_ledger_answers_nothing_rather_than_objecting_to_nothing():
     row = measure(stride_report(3), Ledger())
 
     assert (row.produced, row.answered, row.objections) == (3, 0, 0)
-    assert row.objection_rate == 0.0
+    assert row.objection_rate is None
 
 
 def test_a_superseded_objection_is_not_counted():
@@ -361,8 +361,8 @@ class TestAnObjectionIsAboutWordsThatStillExist:
             Ledger([vote("tampering", "down", "too-vague", prose=words("spoofing"))]),
         )
 
-        assert row.objection_rate == 0.0
-        assert row.carried == 1, "the zero has a reason beside it"
+        assert row.objection_rate is None
+        assert row.carried == 1, "the gap has a reason beside it"
 
     def test_one_voter_on_these_words_and_one_on_older_words(self):
         votes = Ledger(

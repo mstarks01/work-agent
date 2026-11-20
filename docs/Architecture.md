@@ -93,6 +93,7 @@ valid model goes on to the next node.
   fan-in: every reference resolves, no two lanes reused a claim ID, and every
   quote ground is matched against the bytes of the source it names. A refused
   quote is rewritten to the source's own nearest span where one is near enough
+  and changes no negation and no number
   ([`repaired_quotes`](Report-Schema.md#repaired_quotes--quotes-rewritten-to-the-sources-own-span)).
   An unverifiable quote is marked and still renders; a claim where *nothing*
   verifies is dropped and marked as a
@@ -102,8 +103,8 @@ valid model goes on to the next node.
   over the drafts.
   Then that framework's **critic** rules on the drafts code did not settle, in
   one pass — a verdict on each draft, and the judgements its package's text
-  asks for, such as the STRIDE confidence rating — spending judgement only
-  on what code cannot check. A draft resting on an `unknown` is ruled
+  asks for, such as the STRIDE confidence rating — judging only
+  what code cannot check. A draft resting on an `unknown` is ruled
   `needs-info` in code before the critic reads, and when that leaves nothing
   to rule on, or the lanes drafted nothing, the critic is not called. **Each package carries its own critic, blind to every other
   framework**: two frameworks' subgraphs never touch between `prepare` and
@@ -138,7 +139,7 @@ Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in
 [`execution.extraction_format`](Report-Schema.md#provenance). The adapter resolves
 references and copies fields; it decides no fact. `repair` writes a full
-`SystemModel` on either transport, so the one repair pass is never spent on a
+`SystemModel` on either transport, so the one repair pass is never used for a
 format conversion.
 
 Whether the compact transport is worth running is a measurement, not a claim,
@@ -384,6 +385,9 @@ points:
 - **failed** (raises) — an internal error. No partial report is ever produced:
   an empty Tampering section means "looked, found nothing", never "the Tampering
   agent errored".
+- **stopped** — a person stopped the run, and the graph was cancelled as at
+  the deadline. No partial report is produced
+  ([ADR 0109](adr/0109-a-person-can-stop-a-run-and-the-job-ends-stopped.md)).
 
 That last guarantee is enforced, not assumed. An LLM node whose completion is
 truncated writes no output key at all — ADK saves one only from a final event

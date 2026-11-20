@@ -31,8 +31,9 @@ in `GLOSSARY.md`.
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
 captured lane request again, and `run.py lane-replay --append` adds a user part
 after the captured input. `run.py critic-replay` does the same for a critic
-call. `run.py lane-replay --fresh-leads` rebuilds a lane's leads with the
-current rules through the function the prepare node calls. A replay costs one
+call, and `run.py recritic-replay` sends one critic re-ask over one injected
+fault of a named shape. `run.py lane-replay --fresh-leads` rebuilds a lane's
+leads with the current rules through the function the prepare node calls. A replay costs one
 model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
 refuses it.
 
@@ -103,7 +104,10 @@ only store lead, whose question asks who reaches the storage layer. The
 that read such a store. In a blind ruling it stated the access-path threat at
 4 of 8 reference places over two passes, against 1 of 8 without it
 (`QA-2026-10-05-02-E3`). It recovers the two read-grant references (02/6,
-12/8) and neither compromised-reader reference (05/6, 05/7).
+12/8) and neither compromised-reader reference (05/6, 05/7). A caller whose
+flows into the store state no read and at least one `unknown` reaches the
+lane under `callers_of_unknown_operation`, with a conditional question, and
+never as a reader (#2105).
 
 **Prose-only mismatches (8 rows).** A different principal impersonated, a
 different resource flooded, or a defining part missing
@@ -146,8 +150,8 @@ report; the earlier audit
 `evals/experiments/QA-2026-09-26-01/E1-must-find-matches-by-meaning.csv` (61
 pairs, verdict and note per pair) and
 `evals/experiments/QA-2026-09-26-01/E2-sentence-against-control-by-meaning.csv`
-(40 pairs; the `arm` column is S for the instruction and C for the control,
-added after the blind ruling).
+(40 pairs). The `arm` column, added after the blind ruling, holds `S1` and `S2`
+for the sentence arm and `C1` and `C2` for the comparison arm.
 
 **Pull requests:** #1230 (`lane-replay --append`), #1232 (holdout mechanism),
 #1233 (holdout cases 14 and 15), #1234, #1235 and #1236 (ledger rows), #1237
@@ -170,7 +174,7 @@ rows and the committed rulings instead.
    `falsifier`.
 2. Check the rulings: the verdict counts in the two committed CSV files must
    give the figures above (E1: 49 `same`, 12 `different`; E2: sentence arm 8
-   and 8, control 3 and 4, by distinct missed must-find).
+   and 8, comparison arm 3 and 4, by distinct missed must-find).
 3. Read ADR 0030 and the lane-closing code path: the table, the callback in
    `analysis_service.graph`, and the test in `tests/test_evals_lane_replay.py`
    that a STRIDE lane's request ends with the closing and the critic's does

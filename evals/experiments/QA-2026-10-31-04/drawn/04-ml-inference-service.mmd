@@ -1,0 +1,19 @@
+flowchart LR
+    callers[Calling team backends]
+    eng[ML engineers]
+    subgraph gke[GKE]
+        gw[Inference gateway]
+    end
+    subgraph modelnet[Model network]
+        ms[Model server]
+        redis[(Redis feature store)]
+    end
+    registry[(Model registry bucket)]
+    log[(Inference log)]
+
+    callers -->|inference request| gw
+    gw -->|request| ms
+    registry -->|model artifacts| ms
+    redis -->|customer features| ms
+    gw -->|"requests + responses"| log
+    eng -->|publish model artifacts| registry
