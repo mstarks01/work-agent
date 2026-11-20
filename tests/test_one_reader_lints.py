@@ -2947,9 +2947,8 @@ ONE_READERS: dict[str, _OneReader] = {
                 " row. Where offered reads a field as carrying a signed row,"
                 " field_reading reads that field present, and"
                 " test_a_field_offered_reads_as_carrying_a_row_reads_present"
-                " in tests/test_evals_delivery.py holds the pair. The other way"
-                " does not hold by design: two free-text values in one state"
-                " are one fact to a lane, and offered still cites the row"
+                " in tests/test_evals_delivery.py holds the pair. Both read"
+                " a field as carrying a value only where it holds that text"
             ),
         },
         "",

@@ -76,6 +76,7 @@ from typing import Any, Literal, get_args
 
 from pydantic import ValidationError
 
+from analysis_service.analysis import control_state
 from analysis_service.assertions import (
     SETTLING_REASONS,
     Assertion,
@@ -248,8 +249,8 @@ def trace_lane(
 
 
 #: Where a place fact is read, in the order a fact reaches a lane. The raw
-#: extraction is the model's own reading of the sources. The catalog is the
-#: report's assertion catalog, joined to the signed row through
+#: extraction is the model's own reading of the sources. The assertion catalog
+#: is the report's catalog, joined to the signed row through
 #: :func:`~evals.harness.replay.replay_assertions`. The projected model is the
 #: report's ``system_model``, read at the field
 #: :func:`~analysis_service.assertions.projected_attribute` names. The lane
@@ -257,7 +258,7 @@ def trace_lane(
 #: captured, and the candidate facts are the captured lane's candidates.
 PlaceStage = Literal[
     "raw extraction",
-    "catalog",
+    "assertion catalog",
     "projected model",
     "lane system model",
     "lane evidence catalog",
@@ -475,17 +476,28 @@ def case_facts(
 def field_reading(held: object, value: str, attribute: ProjectedField) -> StageReading:
     """Whether a field that holds ``held`` states the projected ``value``.
 
-    The two compare as :data:`~evals.harness.modes.PROJECTION_COMPARED` says
-    for the field: a closed term by its value, a mechanism by its state, and a
-    zone by identity.
+    Text that :data:`~evals.harness.modes.PROJECTION_COMPARED` reads as
+    another value is ``absent``: a closed term by its value, a mechanism by its
+    state, a zone by identity. Other text that it reads as the same value is
+    ``present``, except two stated mechanisms in other words: those can name
+    two mechanisms, so they are ``unavailable``.
     """
     if held is None:
         return StageReading("absent", "the field is missing or null")
     if not isinstance(held, str):
         return StageReading("absent", f"holds {held!r}, not text")
+    if held == value:
+        return StageReading("present", f"holds {held!r}")
     compared = PROJECTION_COMPARED[attribute]
-    state: StageState = "present" if compared(held) == compared(value) else "absent"
-    return StageReading(state, f"holds {held!r}")
+    if compared(held) != compared(value):
+        return StageReading("absent", f"holds {held!r}")
+    if control_state(held) != "stated":
+        return StageReading("present", f"holds {held!r}")
+    return StageReading(
+        "unavailable",
+        f"holds {held!r}, in the same state as {value!r}; whether it names the"
+        " same mechanism is a reader's question",
+    )
 
 
 def catalog_reading(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
@@ -577,7 +589,7 @@ def trace_fact(
     catalog, produced_own = catalog_reading(fact_id, facts)
     stages: dict[PlaceStage, StageReading] = {
         "raw extraction": StageReading("unavailable", NO_EXTRACTION),
-        "catalog": catalog,
+        "assertion catalog": catalog,
         "lane evidence catalog": lane_evidence_reading(catalog, produced_own, facts),
     }
     attribute = projected_attribute(entry.predicate, entry.subject)

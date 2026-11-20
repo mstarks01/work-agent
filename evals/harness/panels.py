@@ -60,7 +60,7 @@ BALLOT_VERDICTS: tuple[BallotVerdict, ...] = get_args(BallotVerdict)
 
 @dataclass(frozen=True)
 class ProductionPath:
-    """Whether a panel's reading reproduces what a job runs, and why."""
+    """How a panel's reading stands to what a job runs, and why."""
 
     fidelity: Fidelity
     evidence: tuple[str, ...]

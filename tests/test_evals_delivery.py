@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from analysis_service.analysis import control_state
 from analysis_service.assertions import (
     AssertionCatalog,
     AssertionRecord,
@@ -338,7 +339,7 @@ def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
     facts = [fact for row in traced.rows for fact in row.place_facts.traces]
     assert facts
     assert {fact.stages["lane system model"].state for fact in facts} <= {"unavailable"}
-    assert {fact.stages["catalog"].reason for fact in facts} == {
+    assert {fact.stages["assertion catalog"].reason for fact in facts} == {
         "the report holds no assertion record"
     }
 
@@ -554,7 +555,7 @@ def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
 
     assert row.place_facts.traces
     for fact in row.place_facts.traces:
-        assert fact.stages["catalog"] == delivery.StageReading(
+        assert fact.stages["assertion catalog"] == delivery.StageReading(
             "present", f"found: {fact.fact_id}"
         )
         assert fact.stages["raw extraction"].state == "unavailable"
@@ -573,11 +574,14 @@ def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
     ],
 )
 def test_a_field_reads_a_value_as_projection_compared_reads_it(held, value, attribute):
-    """One rule: the scorer's comparison of a projected value with a field."""
+    """Absent where the scorer's comparison reads another value; two stated mechanisms in other words are unavailable."""
     compared = PROJECTION_COMPARED[attribute]
-    expected = "present" if compared(held) == compared(value) else "absent"
+    reading = delivery.field_reading(held, value, attribute)
 
-    assert delivery.field_reading(held, value, attribute).state == expected
+    assert (reading.state == "absent") == (compared(held) != compared(value))
+    assert (reading.state == "unavailable") == (
+        held != value and reading.state != "absent" and control_state(held) == "stated"
+    )
 
 
 @pytest.mark.parametrize("held", [None, 3])
