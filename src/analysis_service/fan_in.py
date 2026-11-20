@@ -949,8 +949,9 @@ def join_drafts(
     ``sources`` maps each source's label to its text. It is empty only for a
     caller with no job behind it, such as a test that drives a hand-authored
     model, because that model has no sources to check against, and an
-    invented set would fail it on a citation that is not wrong. Empty means the text check does not run —
-    no quote is marked and no claim is dropped on one. ``assertions`` is what
+    invented set would fail it on a citation that is not wrong. Empty means
+    the text check does not run — no quote is marked and no claim is dropped
+    on one. ``assertions`` is what
     :func:`fan_in` was handed, so an assertion ground resolves against the
     same catalog the agent selected from.
     """
