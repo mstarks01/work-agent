@@ -30,7 +30,7 @@ from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
 from evals.harness.lane_replay import SharedInput, captured_lane
 from evals.harness.ledger import Ledger
-from evals.harness.modes import AssertionResult, EvalRunError
+from evals.harness.modes import PROJECTION_COMPARED, AssertionResult, EvalRunError
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.replay import replay_assertions, signed_reference
 from evals.harness.scorecard import charged_misses
@@ -562,19 +562,27 @@ def test_the_catalog_stage_reads_the_replay_of_the_signed_reference(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("held", "value", "predicate", "state"),
+    ("held", "value", "attribute"),
     [
-        ("boundary:a", "boundary:a", "network-membership", "present"),
-        ("boundary:b", "boundary:a", "network-membership", "absent"),
-        (None, "boundary:a", "network-membership", "absent"),
-        ("unknown", "TLS", "transport-encryption", "absent"),
-        ("none; plain HTTP", "none", "transport-encryption", "present"),
-        ("HTTP/S", "encrypted", "transport-encryption", "unavailable"),
+        ("boundary:a", "boundary:a", "trust_zone"),
+        ("boundary:b", "boundary:a", "trust_zone"),
+        ("internal", "internet-facing", "exposure"),
+        ("unknown", "TLS", "encryption_in_transit"),
+        ("none; plain HTTP", "none", "encryption_in_transit"),
+        ("HTTP/S", "encrypted", "encryption_in_transit"),
     ],
 )
-def test_a_field_states_a_value_exactly_or_by_its_state(held, value, predicate, state):
-    """Two stated free-text values are a reader's question, never a match."""
-    assert delivery.field_reading(held, value, predicate).state == state
+def test_a_field_reads_a_value_as_projection_compared_reads_it(held, value, attribute):
+    """One rule: the scorer's comparison of a projected value with a field."""
+    compared = PROJECTION_COMPARED[attribute]
+    expected = "present" if compared(held) == compared(value) else "absent"
+
+    assert delivery.field_reading(held, value, attribute).state == expected
+
+
+@pytest.mark.parametrize("held", [None, 3])
+def test_a_missing_or_non_text_field_is_absent(held):
+    assert delivery.field_reading(held, "boundary:a", "trust_zone").state == "absent"
 
 
 def _row(card, **changes):
@@ -665,7 +673,9 @@ def test_the_evidence_stage_reads_the_key_the_catalog_filed_the_row_under(
     facts = _case_facts(report, shared)
     catalog = delivery.StageReading("present", "found: assertion:read")
 
-    assert delivery.evidence_reading(catalog, "assertion:own", facts).state == state
+    assert (
+        delivery.lane_evidence_reading(catalog, "assertion:own", facts).state == state
+    )
 
 
 def test_the_replay_names_the_run_s_own_id_of_a_row_read_under_an_alias():
@@ -734,8 +744,7 @@ def test_a_field_offered_reads_as_carrying_a_row_reads_present(report, case):
         value = getattr(element, projection.attribute, None)
         if value != projection.value or not set(projection.rows) & carried:
             continue
-        row = next(r for r in reference.entries if assertion_id(r) in projection.rows)
-        reading = delivery.field_reading(value, projection.value, row.predicate)
+        reading = delivery.field_reading(value, projection.value, projection.attribute)
         assert reading.state == "present"
         checked += 1
     assert checked

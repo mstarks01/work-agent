@@ -73,7 +73,6 @@ from typing import Any, Literal, get_args
 
 from pydantic import ValidationError
 
-from analysis_service.analysis import control_state
 from analysis_service.assertions import (
     SETTLING_REASONS,
     Assertion,
@@ -104,13 +103,12 @@ from evals.harness.lane_replay import (
     material_at,
 )
 from evals.harness.losses import RELATIONS, UNREAD_CAUSE, Relation, relation
-from evals.harness.modes import AssertionResult, EvalRunError
+from evals.harness.modes import PROJECTION_COMPARED, AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, flows_by_case
 from evals.harness.replay import (
     AnsweredFate,
     AssertionReplay,
     SignedReference,
-    compares_exactly,
     replay_assertions,
     required_rows,
     signed_reference,
@@ -464,28 +462,20 @@ def case_facts(
     )
 
 
-def field_reading(held: object, value: str, predicate: str) -> StageReading:
+def field_reading(held: object, value: str, attribute: ProjectedField) -> StageReading:
     """Whether a field that holds ``held`` states the projected ``value``.
 
-    A term and a graph-bound reference compare exactly
-    (:func:`~evals.harness.replay.compares_exactly`). Free text compares by
-    :func:`~analysis_service.analysis.control_state` first: two states that
-    differ are two facts. Two stated free-text values are a reader's question.
+    The two compare as :data:`~evals.harness.modes.PROJECTION_COMPARED` says
+    for the field: a closed term by its value, a mechanism by its state, and a
+    zone by identity.
     """
     if held is None:
-        return StageReading("absent", "the field is not there")
+        return StageReading("absent", "the field is missing or null")
     if not isinstance(held, str):
         return StageReading("absent", f"holds {held!r}, not text")
-    if held == value:
-        return StageReading("present", f"holds {held!r}")
-    if compares_exactly(predicate) or control_state(held) != control_state(value):
-        return StageReading("absent", f"holds {held!r}")
-    if control_state(held) != "stated":
-        return StageReading("present", f"holds {held!r}")
-    return StageReading(
-        "unavailable",
-        f"holds free text {held!r}; whether it states {value!r} is a reader's question",
-    )
+    compared = PROJECTION_COMPARED[attribute]
+    state: StageState = "present" if compared(held) == compared(value) else "absent"
+    return StageReading(state, f"holds {held!r}")
 
 
 def catalog_reading(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
@@ -501,7 +491,16 @@ def catalog_reading(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
     return StageReading("absent", row.fate), ""
 
 
-def evidence_reading(
+def shared_refusal(facts: CaseFacts, key: str) -> StageReading | None:
+    """The ``unavailable`` reading of a shared ``key`` the trace did not read, or ``None``."""
+    if facts.shared is None:
+        return StageReading("unavailable", facts.unshared)
+    if key in facts.shared.refused:
+        return StageReading("unavailable", facts.shared.refused[key])
+    return None
+
+
+def lane_evidence_reading(
     catalog: StageReading, produced_own: str, facts: CaseFacts
 ) -> StageReading:
     """The lane evidence catalog stage: the key the run's own row is filed under.
@@ -509,10 +508,10 @@ def evidence_reading(
     ``produced_own`` is that row's ID before the signed aliases, as
     :attr:`~evals.harness.replay.ReferenceRowFate.produced_own` holds it.
     """
-    if facts.shared is None:
-        return StageReading("unavailable", facts.unshared)
-    if facts.shared.evidence_catalog is None:
-        return StageReading("unavailable", facts.shared.refused[STATE_EVIDENCE_CATALOG])
+    refusal = shared_refusal(facts, STATE_EVIDENCE_CATALOG)
+    if refusal is not None:
+        return refusal
+    assert facts.shared is not None and facts.shared.evidence_catalog is not None
     if catalog.state == "absent":
         return StageReading("absent", "no catalog row answers the fact")
     if not produced_own:
@@ -522,20 +521,20 @@ def evidence_reading(
     return StageReading("absent", f"no key {produced_own}")
 
 
-def sent_model_reading(
-    entry: Assertion, attribute: str, value: str, facts: CaseFacts
+def lane_model_reading(
+    subject: str, attribute: ProjectedField, value: str, facts: CaseFacts
 ) -> StageReading:
     """The lane system model stage: the subject's field in the captured model."""
-    if facts.shared is None:
-        return StageReading("unavailable", facts.unshared)
-    if facts.shared.elements is None:
-        return StageReading("unavailable", facts.shared.refused[STATE_SYSTEM_MODEL])
-    held = facts.shared.elements.get(entry.subject, {}).get(attribute)
-    return field_reading(held, value, entry.predicate)
+    refusal = shared_refusal(facts, STATE_SYSTEM_MODEL)
+    if refusal is not None:
+        return refusal
+    assert facts.shared is not None and facts.shared.elements is not None
+    held = facts.shared.elements.get(subject, {}).get(attribute)
+    return field_reading(held, value, attribute)
 
 
 def candidate_reading(
-    subject: str, attribute: str, value: str, predicate: str, sent: SentLane | None
+    subject: str, attribute: ProjectedField, value: str, sent: SentLane | None
 ) -> StageReading:
     """The candidate facts stage: a candidate on the subject that carries the field.
 
@@ -546,7 +545,7 @@ def candidate_reading(
     if sent is None:
         return StageReading("unavailable", "the lane is untraced")
     readings = [
-        field_reading(candidate.facts.get(attribute), value, predicate)
+        field_reading(candidate.facts.get(attribute), value, attribute)
         for candidate in sent.candidates.candidates
         if subject in candidate.element_ids and attribute in candidate.facts
     ]
@@ -569,7 +568,7 @@ def trace_fact(
     stages: dict[PlaceStage, StageReading] = {
         "raw extraction": StageReading("unavailable", NO_EXTRACTION),
         "catalog": catalog,
-        "lane evidence catalog": evidence_reading(catalog, produced_own, facts),
+        "lane evidence catalog": lane_evidence_reading(catalog, produced_own, facts),
     }
     attribute = projected_attribute(entry.predicate, entry.subject)
     if not attribute:
@@ -589,13 +588,13 @@ def trace_fact(
     else:
         element = facts.elements.get(entry.subject)
         stages["projected model"] = field_reading(
-            getattr(element, attribute, None), projection.value, entry.predicate
+            getattr(element, attribute, None), projection.value, attribute
         )
-        stages["lane system model"] = sent_model_reading(
-            entry, attribute, projection.value, facts
+        stages["lane system model"] = lane_model_reading(
+            entry.subject, attribute, projection.value, facts
         )
         stages["candidate facts"] = candidate_reading(
-            entry.subject, attribute, projection.value, entry.predicate, sent
+            entry.subject, attribute, projection.value, sent
         )
     return PlaceFactTrace(
         fact_id=fact_id,
@@ -770,18 +769,18 @@ def trace(
     }
 
     def traced_reference(row: ReferenceRow) -> TracedReference:
-        lane = sent.get(row.case, {}).get(row.lane)
+        captured = sent.get(row.case, {}).get(row.lane)
         return TracedReference(
             reference=row,
             lane=trace_lane(
                 row.elements,
                 row.lane,
                 reports[row.case],
-                lane,
+                captured,
                 flows[row.case],
                 by_id[row.case].declaration("stride").options,
             ),
-            place_facts=place_facts(row.elements, facts_by_case[row.case], lane),
+            place_facts=place_facts(row.elements, facts_by_case[row.case], captured),
         )
 
     rows = []
