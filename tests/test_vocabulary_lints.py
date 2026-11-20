@@ -122,7 +122,7 @@ UNIONS = (UnionType, Union)
 #: suppression: the constant still has to stay a subset, which
 #: :func:`test_no_declaration_outlives_its_subset` checks.
 PARTIAL: dict[tuple[str, str], str] = {
-    ("evals.harness.delivery", "ANSWERING_FATES"): (
+    ("evals.harness.delivery", "VALUE_KEEPING_FATES"): (
         "the replay fates that keep the signed value, which leaves out a wrong"
         " value and a rescoped row"
     ),

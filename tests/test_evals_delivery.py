@@ -727,6 +727,7 @@ def test_a_projection_the_signed_rows_leave_unsettled_is_unavailable(report, cas
     for stage in delivery.GRAPH_STAGES:
         assert traced.stages[stage].state == "unavailable"
         assert "several-values" in traced.stages[stage].reason
+    assert not traced.reads_graph
 
 
 def test_a_field_offered_reads_as_carrying_a_row_reads_present(report, case):

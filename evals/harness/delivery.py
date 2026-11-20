@@ -290,7 +290,7 @@ FACT_DELIVERIES: tuple[FactDelivery, ...] = get_args(FactDelivery)
 
 #: The replay fates that answer a signed row with its value. ``worded`` and
 #: ``wrong_certainty`` keep the value, and differ in its words or its force.
-ANSWERING_FATES: frozenset[AnsweredFate] = frozenset(
+VALUE_KEEPING_FATES: frozenset[AnsweredFate] = frozenset(
     {"found", "worded", "wrong_certainty"}
 )
 
@@ -324,6 +324,10 @@ class PlaceFactTrace:
     subject: str
     #: The graph field the row reaches, or ``""`` where it reaches none.
     attribute: ProjectedField | Literal[""]
+    #: Whether a graph field can carry the fact: the row reaches one, and the
+    #: signed rows settle it in one value. Where not, the graph stages read
+    #: ``unavailable`` and do not count toward delivery.
+    reads_graph: bool
     stages: Mapping[PlaceStage, StageReading]
 
     @property
@@ -332,7 +336,7 @@ class PlaceFactTrace:
         states = {
             self.stages[stage].state
             for stage in LANE_INPUT
-            if self.attribute or stage not in GRAPH_STAGES
+            if self.reads_graph or stage not in GRAPH_STAGES
         }
         if "present" in states:
             return "delivered"
@@ -349,17 +353,20 @@ class PlaceFactTrace:
         """
         if self.delivered != "not delivered":
             return None
-        held = [
+        present_at = [
             index
             for index, stage in enumerate(PLACE_STAGES)
             if self.stages[stage].state == "present"
         ]
-        start = held[-1] + 1 if held else 0
-        return next(
+        start = present_at[-1] + 1 if present_at else 0
+        lost = [
             stage
             for stage in PLACE_STAGES[start:]
             if self.stages[stage].state == "absent"
-        )
+        ]
+        # "not delivered" means a lane stage reads absent after any present one.
+        assert lost, "a fact not delivered has an absent stage after its last present"
+        return lost[0]
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -484,7 +491,7 @@ def catalog_reading(fact: str, facts: CaseFacts) -> tuple[StageReading, str]:
         # A job that ran no assertion pass kept no catalog to carry the fact.
         return StageReading("absent", "the report holds no assertion record"), ""
     row = next(row for row in facts.replay.rows if row.reference == fact)
-    if row.fate in ANSWERING_FATES:
+    if row.fate in VALUE_KEEPING_FATES:
         return StageReading("present", f"{row.fate}: {row.produced}"), row.produced_own
     if fact in facts.replay.aligned:
         return StageReading("present", "aligned under another flow label"), ""
@@ -571,6 +578,7 @@ def trace_fact(
         "lane evidence catalog": lane_evidence_reading(catalog, produced_own, facts),
     }
     attribute = projected_attribute(entry.predicate, entry.subject)
+    reads_graph = False
     if not attribute:
         stages |= dict.fromkeys(
             GRAPH_STAGES, StageReading("unavailable", "the row reaches no graph field")
@@ -586,6 +594,7 @@ def trace_fact(
             ),
         )
     else:
+        reads_graph = True
         element = facts.elements.get(entry.subject)
         stages["projected model"] = field_reading(
             getattr(element, attribute, None), projection.value, attribute
@@ -601,6 +610,7 @@ def trace_fact(
         predicate=entry.predicate,
         subject=entry.subject,
         attribute=attribute,
+        reads_graph=reads_graph,
         stages={stage: stages[stage] for stage in PLACE_STAGES},
     )
 
@@ -789,7 +799,9 @@ def trace(
         control = controls[row.case, row.reference_index]
         rows.append(
             DeliveryRow(
-                **vars(miss),
+                reference=miss.reference,
+                lane=miss.lane,
+                place_facts=miss.place_facts,
                 control=None if control is None else traced_reference(control),
             )
         )
