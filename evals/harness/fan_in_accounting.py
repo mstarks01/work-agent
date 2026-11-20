@@ -16,10 +16,13 @@ deferred because the job carries no evidence of the kind it needs. A proposal
 with none of these is unexplained. An output that names an ID no proposal
 carries, or names one ID more often than proposals carry it, is extra.
 
-**Quotes.** The drafts' quote grounds, counted three ways: verified as
-written, repaired to the source's own span, and refused. Only the drafts that
-survive carry their grounds, so a draft dropped because no ground verifies
-counts among the drops, not among the refused quotes.
+**Quotes.** The drafts' quote grounds, counted four ways: verified as
+written, repaired to the source's own span, refused, and unchecked. A quote is
+unchecked where the fan-in ran no quote check
+(:attr:`~analysis_service.fan_in.FanIn.quotes_checked`), so only a check that
+ran can count a quote as verified. Only the drafts that survive carry their
+grounds, so a draft dropped because no ground verifies counts among the drops,
+not among the refused quotes.
 
 **What it cannot read.** The report does not hold the units the package's
 rules ruled out or in, or the units an applied Control row covers, so the
@@ -116,6 +119,8 @@ class FanInAccount:
     quotes_verified: int
     quotes_repaired: int
     quotes_refused: int
+    #: Quote grounds on kept drafts that no quote check read.
+    quotes_unchecked: int
     #: Why the replay cannot stand for the run, or ``""``.
     incompatible: str = ""
 
@@ -165,6 +170,7 @@ def account(
     )
     repaired = len(marks.repaired_quotes)
     refused = len(marks.unverified_grounds)
+    unchecked = 0 if merged.quotes_checked else quotes
     return FanInAccount(
         case=case_id,
         framework=package.name,
@@ -175,9 +181,10 @@ def account(
         deferred=tuple(merged.deferred_ids),
         unexplained=tuple(unexplained),
         extra=tuple(extra),
-        quotes_verified=quotes - repaired - refused,
+        quotes_verified=quotes - unchecked - repaired - refused,
         quotes_repaired=repaired,
         quotes_refused=refused,
+        quotes_unchecked=unchecked,
     )
 
 
@@ -241,6 +248,7 @@ def account_case(
             quotes_verified=0,
             quotes_repaired=0,
             quotes_refused=0,
+            quotes_unchecked=0,
         )
         lanes = stored.get(framework)
         if lanes is None:
@@ -377,7 +385,8 @@ def command_fan_in(args: argparse.Namespace) -> int:
     print(
         f"quotes on kept drafts: {sum(row.quotes_verified for row in compatible)}"
         f" verified, {sum(row.quotes_repaired for row in compatible)} repaired,"
-        f" {sum(row.quotes_refused for row in compatible)} refused"
+        f" {sum(row.quotes_refused for row in compatible)} refused,"
+        f" {sum(row.quotes_unchecked for row in compatible)} unchecked"
     )
     unaccounted = any(row.unexplained or row.extra for row in compatible)
     return 1 if unaccounted or sweep.capture_faults else 0

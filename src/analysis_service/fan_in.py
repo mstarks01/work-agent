@@ -109,6 +109,7 @@ class FanIn(NamedTuple):
     from ``deferred``, against the kind it would have been deferred for.
     ``deferred_ids`` is the claim ID of each proposal the package deferred,
     once per proposal, because one unit can hold more than one.
+    ``quotes_checked`` is :attr:`JoinedDrafts.quotes_checked`.
     """
 
     drafts: list[Claim]
@@ -117,6 +118,7 @@ class FanIn(NamedTuple):
     coverage: list[LaneCoverage]
     undeferred: dict[str, str]
     deferred_ids: list[str]
+    quotes_checked: bool
 
 
 def fan_in(
@@ -323,7 +325,15 @@ def fan_in(
         model,
         package,
     )
-    return FanIn(merged, marks, deferred, coverage, undeferred, deferred_ids)
+    return FanIn(
+        merged,
+        marks,
+        deferred,
+        coverage,
+        undeferred,
+        deferred_ids,
+        joined.quotes_checked,
+    )
 
 
 class Returned(NamedTuple):
@@ -394,10 +404,15 @@ class JoinedDrafts(NamedTuple):
     checks that decide whether a finding *means* anything fail closed, and
     checks that describe how complete it is are recorded for a reader. The
     fan-in has no re-ask path, so the second kind must never fail a report.
+
+    ``quotes_checked`` says whether the quote check ran. It is false where the
+    job had no sources, and then a quote ground carries no mark because nothing
+    checked it, not because it verified.
     """
 
     drafts: list[Claim]
     marks: AnalysisMarks
+    quotes_checked: bool
 
 
 def _unresolved_mentions(
@@ -957,9 +972,10 @@ def join_drafts(
     bounded = _bound_element_references(referenced.drafts, index, assertions)
     targeted, untargeted = _drop_untargeted(bounded.drafts)
     scoped = _scope_grounds(targeted, index, assertions)
+    quotes_checked = bool(sources)
     checked = (
         _verify_quotes(scoped.drafts, sources)
-        if sources
+        if quotes_checked
         else _QuoteCheck(list(scoped.drafts), [], [], [])
     )
     kept = list(checked.drafts)
@@ -980,4 +996,5 @@ def join_drafts(
                 *checked.groundless,
             ],
         ).merged_with(package.record.claim_marks(kept)),
+        quotes_checked=quotes_checked,
     )
