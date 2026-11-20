@@ -260,8 +260,6 @@ class TestTheApiKeyMode:
             ("hunter2", "is not UTF-8 JSON"),
             (b"\xff\xfe", "is not UTF-8 JSON"),
             ("[" * 100_000, "is longer than 16,384 bytes"),
-            # Under the bound, but deep enough to raise RecursionError.
-            ("[" * 16_000, "is not UTF-8 JSON"),
             ('["hunter2"]', "its type must be service_account"),
             ('{"private_key": "hunter2"}', "its type must be service_account"),
         ],
@@ -272,6 +270,19 @@ class TestTheApiKeyMode:
         with pytest.raises(StoreConfigError, match=message) as refused:
             build_object_store(key_env(tmp_path, content))
         assert "hunter2" not in str(refused.value)
+
+    def test_json_too_deep_to_parse_stops_the_startup(
+        self, tmp_path, key_info, monkeypatch
+    ):
+        """The depth at which the parser raises ``RecursionError`` depends on
+        the interpreter, so the parser raises it here directly."""
+
+        def too_deep(*_, **__):
+            raise RecursionError
+
+        monkeypatch.setattr("analysis_service.gcs_objects.json.loads", too_deep)
+        with pytest.raises(StoreConfigError, match="is not UTF-8 JSON"):
+            build_object_store(key_env(tmp_path, json.dumps(key_info)))
 
     @pytest.mark.parametrize(
         "kind",

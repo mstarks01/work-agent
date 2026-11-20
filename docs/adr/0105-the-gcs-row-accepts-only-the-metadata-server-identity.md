@@ -78,9 +78,8 @@ credential from the metadata server.**
 A developer machine with a gcloud login or a key file cannot run the `gcs`
 row in the `iam` mode. A deployment that sets `GOOGLE_APPLICATION_CREDENTIALS`
 for the Vertex row cannot also run the `gcs` row in the `iam` mode in the same
-process. The IAM roles on the
-bucket stay the main access control, and the scope only limits a token that
-leaks.
+process. The IAM roles on the bucket stay the main access control, and the
+scope only limits a token that leaks.
 
 Google's Knative docs show that the metadata token path accepts a `scopes`
 parameter. Nobody has checked that Cloud Run, GKE Workload Identity and GCE
