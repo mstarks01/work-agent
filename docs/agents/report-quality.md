@@ -150,8 +150,8 @@ report; the earlier audit
 `evals/experiments/QA-2026-09-26-01/E1-must-find-matches-by-meaning.csv` (61
 pairs, verdict and note per pair) and
 `evals/experiments/QA-2026-09-26-01/E2-sentence-against-control-by-meaning.csv`
-(40 pairs; the `arm` column is S for the instruction and C for the comparison
-arm, added after the blind ruling).
+(40 pairs; the `arm` column is S for the instruction and C, the file's code for
+the comparison arm, added after the blind ruling).
 
 **Pull requests:** #1230 (`lane-replay --append`), #1232 (holdout mechanism),
 #1233 (holdout cases 14 and 15), #1234, #1235 and #1236 (ledger rows), #1237
@@ -174,7 +174,7 @@ rows and the committed rulings instead.
    `falsifier`.
 2. Check the rulings: the verdict counts in the two committed CSV files must
    give the figures above (E1: 49 `same`, 12 `different`; E2: sentence arm 8
-   and 8, control 3 and 4, by distinct missed must-find).
+   and 8, comparison arm 3 and 4, by distinct missed must-find).
 3. Read ADR 0030 and the lane-closing code path: the table, the callback in
    `analysis_service.graph`, and the test in `tests/test_evals_lane_replay.py`
    that a STRIDE lane's request ends with the closing and the critic's does
