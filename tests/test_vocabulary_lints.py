@@ -143,7 +143,7 @@ PARTIAL: dict[tuple[str, str], str] = {
         " predicate whose extraction is off (ADR 0117)"
     ),
     ("evals.experiments.QA-2026-11-02-05.control_ballot", "CONTROL_CHECKS"): (
-        "the checks of the item 4 control arm, which has no spoofing runs"
+        "the checks of the item 4 comparison arm, which has no spoofing runs"
     ),
     ("evals.harness.critic_replay", "NO_VERDICT_SIDES"): (
         "the archived sides that hold no verdict status, which leaves out each"

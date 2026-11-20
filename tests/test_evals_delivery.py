@@ -325,7 +325,7 @@ def test_each_charged_miss_is_a_row_and_a_verb_row_is_traced_too():
     assert "verb" in causes and causes - losses.SILENT
     assert all(
         row.place_facts.traces
-        or row.place_facts.describe() == "required facts: undefined"
+        or row.place_facts.describe() == "place facts: none signed"
         for row in traced.rows
     )
 
@@ -512,7 +512,10 @@ def _drop_zone(subject: str) -> Callable[[dict[str, Any]], None]:
 
 
 def test_a_verb_row_with_its_place_facts_sent_reads_n_of_n(tmp_path):
-    """The control of the negative fixture below: the same capture, unchanged."""
+    """The capture with no change: each place fact reaches the lane.
+
+    The test below drops one.
+    """
     row = _verb_row(_trace(_captured_sweep(tmp_path, {}, VERB_CASE)))
 
     assert row.place_facts.traces
@@ -622,7 +625,7 @@ def test_a_row_with_no_peer_and_no_place_fact_says_so(capsys):
     assert any(row.peer is None for row in traced.rows)
     assert all("peer" in row.to_json() for row in traced.rows)
     assert "    no peer\n" in out
-    assert "required facts: undefined" in out
+    assert "place facts: none signed" in out
 
 
 def test_a_capture_with_no_shared_model_leaves_the_leads_traced(tmp_path):

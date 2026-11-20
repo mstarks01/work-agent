@@ -56,7 +56,7 @@ reading is ``present``, ``absent`` or ``unavailable`` with its reason. A fact
 is delivered where a stage of the lane input holds it. The graph stages count
 only where the signed rows settle the fact's field in one value; elsewhere they
 read ``unavailable``, and the evidence catalog alone decides. A row with no
-place fact reads ``required facts: undefined``.
+place fact reads ``place facts: none signed``.
 
 **The matched peer.** Each row carries a must-find of the same case and
 lane that the run answered with the right action at the right place: a
@@ -402,7 +402,7 @@ class PlaceFacts:
         if self.kind == "unread":
             return f"place facts unavailable: {self.unread}"
         if self.kind == "empty":
-            return "required facts: undefined"
+            return "place facts: none signed"
         delivered = Counter(fact.delivered for fact in self.traces)
         shown = f"place facts delivered {delivered['delivered']} of {len(self.traces)}"
         if delivered["unavailable"]:
