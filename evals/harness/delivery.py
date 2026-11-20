@@ -16,13 +16,13 @@ For each such row it gives five readings:
   for the archived model and the archived catalog, with the case's options
   from today's corpus. The archive records no options, so a ``differs`` can
   come from an options edit as well as from a rule edit.
-* ``leads``: whether the two candidate sets hold the same
+* ``same_leads``: whether the two candidate sets hold the same
   :func:`~analysis_service.candidates.leads`. A lead is a lane, a rule and
   elements only, so a candidate's facts and a rule's question text are not
   part of this reading.
-* ``lane_input``: whether the lane's four captured artifacts (candidates,
-  scope, reference notes and prior cases) are, byte for byte, the ones that
-  :func:`~evals.harness.triggers.rebuilt_lane_inputs` writes today. A changed
+* ``same_lane_input``: whether the lane's captured artifacts (each
+  :data:`~analysis_service.graph.LaneArtifact`) are, byte for byte, the ones
+  that :func:`~evals.harness.triggers.rebuilt_lane_inputs` writes today. A changed
   fact or question text reads ``differs`` here. The shared keys every lane
   templates and the prepared user turn have no rebuild from the archive, so
   this reading does not compare them.
@@ -85,16 +85,16 @@ class LaneTrace:
 
     delivered: PlaceRelation | None
     rebuilt: PlaceRelation
-    leads: Agreement
-    lane_input: Agreement
+    same_leads: Agreement
+    same_lane_input: Agreement
     archived_lead_rules: tuple[str, ...]
 
     def to_json(self) -> dict[str, Any]:
         return {
             "delivered": self.delivered,
             "rebuilt": self.rebuilt,
-            "leads": self.leads,
-            "lane_input": self.lane_input,
+            "same_leads": self.same_leads,
+            "same_lane_input": self.same_lane_input,
             "archived_lead_rules": list(self.archived_lead_rules),
         }
 
@@ -111,7 +111,9 @@ def closest_relation(
 
 
 def sent_candidates(sent: Mapping[LaneArtifact, str]) -> CandidateSet:
-    """The candidates of one lane's captured artifacts."""
+    """The candidates of one lane's captured artifacts, or a refusal."""
+    if "candidates" not in sent:
+        raise EvalRunError("the lane's capture holds no candidates")
     return CandidateSet.model_validate_json(unfence(sent["candidates"]))
 
 
@@ -137,17 +139,17 @@ def trace_lane(
     if sent is None:
         delivered: PlaceRelation | None = None
         same_leads: Agreement = "uncaptured"
-        same_input: Agreement = "uncaptured"
+        same_lane_input: Agreement = "uncaptured"
     else:
         candidates = sent_candidates(sent)
         delivered = closest_relation(reference_ids, candidates, flows)
         same_leads = _agreement(leads({lane: candidates}), leads({lane: rebuilt}))
-        same_input = _agreement(dict(sent), dict(inputs.artifacts[lane]))
+        same_lane_input = _agreement(dict(sent), dict(inputs.artifacts[lane]))
     return LaneTrace(
         delivered=delivered,
         rebuilt=closest_relation(reference_ids, rebuilt, flows),
-        leads=same_leads,
-        lane_input=same_input,
+        same_leads=same_leads,
+        same_lane_input=same_lane_input,
         archived_lead_rules=archived_lead_rules(
             rebuilt, reference_ids, stride_block(report).fired_rules
         ),
@@ -264,8 +266,9 @@ def render(result: Delivery) -> None:
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
             f" {reference.cause} [{reference.compatibility}]: delivered"
-            f" {lane.delivered or '-'}, rebuilt {lane.rebuilt}, leads"
-            f" {lane.leads}, lane input {lane.lane_input}; lead rules today"
+            f" {lane.delivered or '-'}, rebuilt {lane.rebuilt}, same leads"
+            f" {lane.same_leads}, same lane input {lane.same_lane_input}; lead"
+            " rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"
         )

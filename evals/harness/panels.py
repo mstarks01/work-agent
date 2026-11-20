@@ -314,22 +314,21 @@ def preparation_panel(result: Delivery) -> Panel:
     ``rebuilt`` the candidates today's rules write for the archived model. A
     shared element is a structural overlap and not mechanism relevance.
 
-    The path is ``known-different`` where a traced lane's leads or its four
-    lane artifacts differ from the rebuild. Otherwise it is ``unverified`` and
+    The path is ``known-different`` where a traced lane's captured artifacts
+    differ from the rebuild. The candidates artifact holds the leads, so
+    ``same_leads`` differs only where ``same_lane_input`` differs too. Otherwise it is ``unverified`` and
     never ``equivalent``: the shared keys every lane templates, the prepared
     user turn and the case options have no rebuild from the archive, and the
     evidence names each of them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
-    same_leads = Counter(lane.leads for lane in lanes)
-    same_input = Counter(lane.lane_input for lane in lanes)
+    captured = [lane for lane in lanes if lane.same_leads != "uncaptured"]
+    uncaptured = len(lanes) - len(captured)
+    same_leads = Counter(lane.same_leads for lane in captured)
+    same_input = Counter(lane.same_lane_input for lane in captured)
     delivered = Counter(lane.delivered for lane in lanes if lane.delivered is not None)
     rebuilt = Counter(lane.rebuilt for lane in lanes)
-    fidelity: Fidelity = (
-        "known-different"
-        if same_leads["differs"] or same_input["differs"]
-        else "unverified"
-    )
+    fidelity: Fidelity = "known-different" if same_input["differs"] else "unverified"
     evidence = [
         "the delivered candidates are the lane input the archived run sent",
         "the rebuilt lane input reads today's corpus options",
@@ -343,8 +342,9 @@ def preparation_panel(result: Delivery) -> Panel:
         source=result.run.artifact,
         unit=f"charged must-find miss of cause {' or '.join(sorted(SILENT))}",
         counts={
-            **{f"leads {key}": count for key, count in sorted(same_leads.items())},
-            **{f"lane input {key}": count for key, count in sorted(same_input.items())},
+            **{f"same leads {key}": n for key, n in sorted(same_leads.items())},
+            **{f"same lane input {key}": n for key, n in sorted(same_input.items())},
+            "lane material uncaptured": uncaptured,
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
             **{f"rebuilt {key}": count for key, count in sorted(rebuilt.items())},
             "with an archived lead rule": sum(
@@ -352,13 +352,9 @@ def preparation_panel(result: Delivery) -> Panel:
             ),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
-        rates={
-            "lane material captured": Rate(
-                len(lanes) - same_leads["uncaptured"], len(lanes)
-            )
-        },
+        rates={"lane material captured": Rate(len(captured), len(lanes))},
         means={},
-        unread=same_leads["uncaptured"],
+        unread=uncaptured,
         path=ProductionPath(fidelity, tuple(evidence)),
     )
 

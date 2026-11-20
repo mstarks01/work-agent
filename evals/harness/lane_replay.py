@@ -138,7 +138,11 @@ def material_at(path: Path) -> dict[str, Any]:
 def captured_lane(
     material: Mapping[str, Any], framework: FrameworkName, lane_name: str
 ) -> Mapping[LaneArtifact, str]:
-    """One lane's captured artifacts in ``material``, keyed by placeholder."""
+    """One lane's captured artifacts in ``material``, keyed by placeholder.
+
+    A key that ``prepare`` did not write is absent, so the mapping can hold
+    fewer keys than :data:`~analysis_service.graph.LaneArtifact` names.
+    """
     held: Mapping[LaneArtifact, str] = material["lanes"][framework][lane_name]
     return held
 

@@ -162,8 +162,10 @@ def test_an_analysis_sweep_feeds_only_the_preparation_panel():
     traced = sum(
         count for name, count in prepare.counts.items() if name.startswith("rebuilt ")
     )
-    assert traced == sum(
-        count for name, count in prepare.counts.items() if name.startswith("leads ")
+    assert traced == prepare.counts["lane material uncaptured"] + sum(
+        count
+        for name, count in prepare.counts.items()
+        if name.startswith("same leads ")
     )
 
 
@@ -181,7 +183,7 @@ def test_the_preparation_panel_counts_the_delivery_trace():
     assert sum(
         count for name, count in panel.counts.items() if name.startswith("rebuilt ")
     ) == len(lanes)
-    assert panel.unread == sum(lane.leads == "uncaptured" for lane in lanes)
+    assert panel.unread == sum(lane.same_leads == "uncaptured" for lane in lanes)
     assert panel.counts["with an archived lead rule"] == sum(
         1 for lane in lanes if lane.archived_lead_rules
     )
@@ -199,8 +201,8 @@ def _delivery(*readings: tuple[Agreement, Agreement]) -> Delivery:
             lane=LaneTrace(
                 delivered=None if same_leads == "uncaptured" else "equal",
                 rebuilt="equal",
-                leads=same_leads,
-                lane_input=same_input,
+                same_leads=same_leads,
+                same_lane_input=same_input,
                 archived_lead_rules=(),
             ),
         )
