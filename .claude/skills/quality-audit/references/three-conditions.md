@@ -179,7 +179,7 @@ reads the shipped route on material the change never saw.
 
 **One exception: a gate that isolates one flag.** A gate that holds the signed
 model fixed to compare one switch on and off may read `analysis` mode, because
-the fixed model is its unchanged case, and not a claim about the route. The
+the model is held fixed, and the gate makes no claim about the route. The
 `ANALYSIS_ASSERTIONS` gates in `evals/harness/promotion.py` are such a gate.
 Such a gate decides the flag only. A
 claim that the whole route improved still needs the ordinary pipeline on fresh

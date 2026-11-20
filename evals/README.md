@@ -827,7 +827,7 @@ that architecture's threats more easily. You cannot read that bias off an
 absolute score — only off the **gap** between coverage on the near cases and
 coverage on the far ones.
 
-So the corpus carries one comparison arm per exemplar system: `01` for payments and
+So the corpus carries one near case per exemplar system: `01` for payments and
 `02` for the fleet. Neither is optional. Drop either and the near side loses a
 system to compare against. `exemplar_proximity` sits on the (case, framework)
 pair, because each framework writes its own exemplars — a case near STRIDE's
