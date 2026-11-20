@@ -18,13 +18,13 @@ For each such row it gives these readings:
 * ``same_lane_artifacts``: whether the lane's captured artifacts (each
   :data:`~analysis_service.graph.LaneArtifact`) are, byte for byte, the ones
   that :func:`~evals.harness.triggers.rebuilt_lane_inputs` writes today. A
-  changed fact or question text reads ``differs`` here. The shared keys every
-  lane templates and the prepared user turn have no rebuild from the archive,
-  so this reading does not compare them.
+  changed fact or question text reads ``differs`` here. The lane's other
+  inputs have no rebuild from the archive, and
+  :func:`~evals.harness.panels.preparation_panel` names each of them.
 
 These three are ``comparison``, which is ``None`` where the sweep captured no
 lane material, or where the capture is refused: a case's reason is in
-``uncaptured``. The other two readings stand for every traced row:
+``untraced``. The other two readings stand for every traced row:
 
 * ``rebuilt``: the strongest relation over the candidates that today's rules
   write for the archived model and the archived catalog, with the case's
@@ -113,7 +113,7 @@ class LaneTrace:
     """One reference's lane, as the archive holds it and as today's rules rebuild it."""
 
     #: ``None`` where the sweep captured no lane material for the case, or
-    #: where the trace refused the capture; ``Delivery.uncaptured`` names why.
+    #: where the trace refused the capture; ``Delivery.untraced`` names why.
     comparison: LaneComparison | None
     rebuilt: PlaceRelation
     archived_lead_rules: tuple[str, ...]
@@ -209,14 +209,15 @@ class Delivery:
     #: :func:`~evals.harness.scorecard.charged_misses`, and are counted here so
     #: the traced population is read beside them.
     re_keyed: int
-    #: Each case whose lane material the sweep did not capture, and why.
-    uncaptured: Mapping[str, str]
+    #: Each case whose lane material the trace does not read, and why: the
+    #: sweep captured none, or the trace refused the capture.
+    untraced: Mapping[str, str]
 
     def to_json(self) -> dict[str, Any]:
         return {
             "run": self.run.to_json(),
             "re_keyed": self.re_keyed,
-            "uncaptured": dict(self.uncaptured),
+            "untraced": dict(self.untraced),
             "rows": [row.to_json() for row in self.rows],
         }
 
@@ -249,23 +250,22 @@ def trace(
         )
 
     # A case's lanes are one file, so a lane the trace refuses refuses its case.
+    # A row holds a dict, so its case and reference index key it.
     traces: dict[tuple[str, int], LaneTrace] = {}
-    uncaptured: dict[str, str] = {}
+    untraced: dict[str, str] = {}
     for case in traced_cases:
         rows_here = [row for row in silent if row.case == case]
         try:
             material = material_at(lanes_file(artifact, case))
             here = {
-                (row.case, row.reference_index): traced(
+                (case, row.reference_index): traced(
                     row, captured_lane(material, "stride", row.lane)
                 )
                 for row in rows_here
             }
         except EvalRunError as error:
-            uncaptured[case] = str(error)
-            here = {
-                (row.case, row.reference_index): traced(row, None) for row in rows_here
-            }
+            untraced[case] = str(error)
+            here = {(case, row.reference_index): traced(row, None) for row in rows_here}
         traces.update(here)
     rows = tuple(
         DeliveryRow(reference=row, lane=traces.get((row.case, row.reference_index)))
@@ -275,7 +275,7 @@ def trace(
         run=card.run,
         rows=rows,
         re_keyed=sum(row.compatibility == "re-keyed" for row in card.rows),
-        uncaptured=uncaptured,
+        untraced=untraced,
     )
 
 
@@ -295,15 +295,15 @@ def render(result: Delivery) -> None:
         f" the lane wrote at the place; {result.re_keyed} re-keyed must-find(s)"
         " outside the population"
     )
-    for case, reason in sorted(result.uncaptured.items()):
-        print(f"  lane material uncaptured: {case}: {reason}")
+    for case, reason in sorted(result.untraced.items()):
+        print(f"  lane material untraced: {case}: {reason}")
     for row in traced:
         reference, lane = row.reference, row.lane
         assert lane is not None
         print(
             f"  {reference.case} #{reference.reference_index} {reference.lane}"
             f" {reference.cause} [{reference.compatibility}]:"
-            f" {'uncaptured' if lane.comparison is None else lane.comparison.describe()},"
+            f" {'untraced' if lane.comparison is None else lane.comparison.describe()},"
             f" rebuilt {lane.rebuilt}; lead rules today"
             f" {', '.join(reference.lead_rules) or '-'}, archived"
             f" {', '.join(lane.archived_lead_rules) or '-'}"

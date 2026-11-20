@@ -317,14 +317,13 @@ def preparation_panel(result: Delivery) -> Panel:
     The path is ``known-different`` where a traced lane's captured artifacts
     differ from the rebuild. The candidates artifact holds the leads, so
     ``same_leads`` differs only where ``same_lane_artifacts`` differs too.
-    Otherwise it is ``unverified`` and never ``equivalent``: the shared keys
-    every lane templates, the prepared user turn, the lane prompt files at the
-    run's commit and the case options have no rebuild from the archive, and
-    the evidence names each of them.
+    Otherwise it is ``unverified`` and never ``equivalent``: the lane's other
+    inputs have no rebuild from the archive, and the evidence names each of
+    them.
     """
     lanes = [row.lane for row in result.rows if row.lane is not None]
     captured = [lane.comparison for lane in lanes if lane.comparison is not None]
-    uncaptured = len(lanes) - len(captured)
+    untraced = len(lanes) - len(captured)
     same_leads = Counter(each.same_leads for each in captured)
     same_artifacts = Counter(each.same_lane_artifacts for each in captured)
     delivered = Counter(each.delivered for each in captured)
@@ -340,8 +339,8 @@ def preparation_panel(result: Delivery) -> Panel:
         "not compared: the lane prompt files at the run's commit",
         *(f"not compared: the shared key {key}" for key in LANE_SHARED_KEYS),
         *(
-            f"{case}: lane material uncaptured: {reason}"
-            for case, reason in sorted(result.uncaptured.items())
+            f"{case}: lane material untraced: {reason}"
+            for case, reason in sorted(result.untraced.items())
         ),
     ]
     return Panel(
@@ -354,7 +353,7 @@ def preparation_panel(result: Delivery) -> Panel:
                 f"same lane artifacts {key}": n
                 for key, n in sorted(same_artifacts.items())
             },
-            "lane material uncaptured": uncaptured,
+            "lane material untraced": untraced,
             **{f"delivered {key}": count for key, count in sorted(delivered.items())},
             **{f"rebuilt {key}": count for key, count in sorted(rebuilt.items())},
             "with an archived lead rule": sum(
@@ -362,9 +361,9 @@ def preparation_panel(result: Delivery) -> Panel:
             ),
             "re-keyed must-finds outside the population": result.re_keyed,
         },
-        rates={"lane material captured": Rate(len(captured), len(lanes))},
+        rates={"lane material traced": Rate(len(captured), len(lanes))},
         means={},
-        unread=uncaptured,
+        unread=untraced,
         path=ProductionPath(fidelity, tuple(evidence)),
     )
 

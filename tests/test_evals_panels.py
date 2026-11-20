@@ -168,7 +168,7 @@ def test_an_analysis_sweep_feeds_only_the_preparation_panel():
     traced = sum(
         count for name, count in prepare.counts.items() if name.startswith("rebuilt ")
     )
-    assert traced == prepare.counts["lane material uncaptured"] + sum(
+    assert traced == prepare.counts["lane material untraced"] + sum(
         count
         for name, count in prepare.counts.items()
         if name.startswith("same leads ")
@@ -221,7 +221,7 @@ def _delivery(*readings: tuple[Agreement, Agreement] | None) -> Delivery:
         )
         for reading in readings
     )
-    return Delivery(run=reference.run, rows=rows, re_keyed=0, uncaptured={})
+    return Delivery(run=reference.run, rows=rows, re_keyed=0, untraced={})
 
 
 AGREES = ("agrees", "agrees")

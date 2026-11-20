@@ -231,7 +231,7 @@ def test_an_agreeing_lane_leaves_the_evidence_payload_unverified(
 def _one_row(traced: delivery.LaneTrace) -> delivery.Delivery:
     card = run.scorecard_of(BASELINE, REPO_ROOT / "evals/corpus", Ledger())
     row = delivery.DeliveryRow(reference=card.rows[0], lane=traced)
-    return delivery.Delivery(run=card.run, rows=(row,), re_keyed=0, uncaptured={})
+    return delivery.Delivery(run=card.run, rows=(row,), re_keyed=0, untraced={})
 
 
 def test_an_uncaptured_lane_reads_only_the_rebuild(report, flows, options):
@@ -308,7 +308,7 @@ def test_a_sweep_with_no_lane_capture_reads_only_the_rebuild():
     lanes = [row.lane for row in traced.rows if row.lane is not None]
     assert lanes
     assert {lane.comparison for lane in lanes} == {None}
-    assert set(traced.uncaptured) == {
+    assert set(traced.untraced) == {
         row.reference.case for row in traced.rows if row.lane is not None
     }
 
@@ -359,7 +359,7 @@ def test_a_captured_lane_is_read_as_the_sweep_sent_it(tmp_path):
     captured = _comparison(lane)
     assert captured.same_leads == captured.same_lane_artifacts == "agrees"
     assert captured.delivered == lane.rebuilt == "equal"
-    assert CAPTURED_CASE not in traced.uncaptured
+    assert CAPTURED_CASE not in traced.untraced
 
 
 def test_a_captured_lane_prints_each_reading_once(tmp_path, capsys):
@@ -375,13 +375,13 @@ def test_a_captured_lane_prints_each_reading_once(tmp_path, capsys):
     ("extra", "reason"),
     [({"drafts": "a stray key"}, "drafts"), ({"candidates": "not json"}, "candidate")],
 )
-def test_a_refused_lane_capture_reads_as_uncaptured_with_its_reason(
+def test_a_refused_lane_capture_reads_as_untraced_with_its_reason(
     tmp_path, extra, reason
 ):
     traced = _trace(_captured_sweep(tmp_path, extra))
 
     assert _captured_case_lane(traced).comparison is None
-    assert reason in traced.uncaptured[CAPTURED_CASE]
+    assert reason in traced.untraced[CAPTURED_CASE]
 
 
 def test_the_command_writes_the_trace_with_its_record(tmp_path):
