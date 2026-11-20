@@ -16,7 +16,7 @@ deterministic identity rule over an action verb and a resolved element set. Two
 claims can match on identity and mean different things.
 
 **Never improve this by flooding.** More findings raises coverage and lowers
-precision, and the two readings below catch it.
+precision, and the first reading below catches it.
 
 ## 2. Reviewed precision, and unsupported conclusions
 
