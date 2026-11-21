@@ -28,8 +28,10 @@ repository by `repository_id`.**
 - The script reads the ID with `gh api repos/<OWNER>/<REPO> --jq .id` and stops
   when the result is not a number, so it never writes a condition with an
   empty ID.
-- The attribute mapping adds `attribute.repository_id`, and the binding is the
-  principal set `.../attribute.repository_id/<REPO_ID>`.
+- The attribute mapping holds `google.subject` and `attribute.repository_id`
+  only, and the binding is the principal set
+  `.../attribute.repository_id/<REPO_ID>`. No binding reads another attribute,
+  so a binding on the name matches no principal.
 - A re-run updates the mapping as well as the condition, so a provider that an
   earlier run created gets the new attribute.
 - The condition keeps the `ref` and `job_workflow_ref` checks of ADR 0021.
@@ -46,7 +48,12 @@ repository by `repository_id`.**
 ## Consequences
 
 A rename or a transfer of the repository keeps the live lane working with no
-change in Google Cloud. A deployment that ran the script before this decision
-keeps a binding on `attribute.repository/<OWNER>/<REPO>`. A re-run adds the ID
-binding and replaces the condition, so the old binding admits nothing; remove
-it with `gcloud iam service-accounts remove-iam-policy-binding`.
+change in Google Cloud.
+
+A deployment that ran the script before this decision has the service account
+`analysis-evals`, with `roles/aiplatform.user` and a binding on
+`attribute.repository/<OWNER>/<REPO>`. A re-run creates `katra-evals`, binds it
+to the ID, points `GCP_EVAL_SERVICE_ACCOUNT` at it, and replaces the mapping,
+so the binding on the name matches no principal. Delete the account that
+nothing uses with
+`gcloud iam service-accounts delete analysis-evals@<PROJECT_ID>.iam.gserviceaccount.com`.

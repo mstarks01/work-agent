@@ -405,6 +405,15 @@ def test_the_offline_suite_still_covers_pull_requests():
 SETUP_SCRIPT = REPO_ROOT / ".github" / "scripts" / "setup-workload-identity.sh"
 
 
+def _setup_assignment(name: str) -> str:
+    """The line of the setup script that assigns ``name``."""
+    return next(
+        line
+        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
+        if line.startswith(f"{name}=")
+    )
+
+
 def test_the_federation_pins_the_ref_claim_and_not_only_a_suffix():
     """Layer 2 has to fail for a different reason than layer 1 does.
 
@@ -416,23 +425,10 @@ def test_the_federation_pins_the_ref_claim_and_not_only_a_suffix():
 
     `ref` is the run's ref exactly, with no attacker-chosen tail.
     """
-    condition = next(
-        line
-        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
-        if line.startswith("ATTRIBUTE_CONDITION=")
-    )
+    condition = _setup_assignment("ATTRIBUTE_CONDITION")
 
     assert "assertion.ref == '${TRUSTED_REF}'" in condition, (
         "the ref claim must be compared, not matched as a suffix of another claim"
-    )
-
-
-def _setup_assignment(name: str) -> str:
-    """The line of the setup script that assigns ``name``."""
-    return next(
-        line
-        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
-        if line.startswith(f"{name}=")
     )
 
 
@@ -443,8 +439,10 @@ def test_the_federation_names_the_repository_by_its_id():
         "ATTRIBUTE_CONDITION"
     )
     assert "assertion.repository ==" not in _setup_assignment("ATTRIBUTE_CONDITION")
-    assert "attribute.repository_id=assertion.repository_id" in _setup_assignment(
-        "ATTRIBUTE_MAPPING"
+    mapping = _setup_assignment("ATTRIBUTE_MAPPING")
+    assert "attribute.repository_id=assertion.repository_id" in mapping
+    assert "attribute.repository=" not in mapping, (
+        "a binding on the name would still match while the name maps"
     )
     assert _setup_assignment("PRINCIPAL_SET").endswith(
         'attribute.repository_id/${REPO_ID}"'

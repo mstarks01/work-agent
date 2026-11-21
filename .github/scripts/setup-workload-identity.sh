@@ -158,10 +158,10 @@ fi
 # IT NAMES TWO THINGS, AND THE REPOSITORY IS ONLY THE FIRST. `repository_owner`
 # alone still admits every repo under the account, including one an attacker
 # gets a workflow merged into -- so the repository is named, by the
-# `repository_id` claim: the number that a rename does not change. But the repository
-# alone is not enough (#508): a collaborator who pushes a branch and opens a
-# pull request produces a token whose `repository` claim is identical to
-# main's. Repository scoping cannot
+# `repository_id` claim: the number that a rename does not change. But the
+# repository alone is not enough (#508): a collaborator who pushes a branch and
+# opens a pull request produces a token whose `repository_id` claim is
+# identical to main's. Repository scoping cannot
 # tell reviewed code from unreviewed code, so on its own it federates both.
 #
 # `job_workflow_ref` is the claim that can. It carries the ref of the *workflow
@@ -191,8 +191,10 @@ fi
 # claim carries.
 ATTRIBUTE_CONDITION="assertion.repository_id == '${REPO_ID}' && assertion.ref == '${TRUSTED_REF}' && assertion.job_workflow_ref.endsWith('@${TRUSTED_REF}')"
 
-# `attribute.repository_id` is what the service account binding names below.
-ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner=assertion.repository_owner"
+# `attribute.repository_id` is what the service account binding names below,
+# and no binding reads another attribute, so a binding on any other attribute
+# matches no principal.
+ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository_id=assertion.repository_id"
 
 note "OIDC provider: ${PROVIDER_ID}"
 if gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \

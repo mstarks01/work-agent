@@ -36,7 +36,7 @@ sufficient. It is not. Anyone who can push a branch to this repository and open
 a pull request can edit the application code a live lane imports, or edit the
 lane's own workflow file, and have the edit run while the job holds the Vertex
 identity or a provider key. The OIDC token minted for that run carries the same
-`repository` claim as one minted on `main`, so repository-scoped federation
+`repository_id` claim as one minted on `main`, so repository-scoped federation
 admits it.
 
 Two layers close it, and either one closes it alone:
@@ -151,10 +151,11 @@ repo under the account, including one an attacker gets a workflow merged into.
 a transfer keeps the ID, so the trust stays valid. A full name can name another
 repository over time: a rename frees it, its owner can create a new repository
 with it, and a condition on the name would trust that repository. The service account
-binding names the same ID, through the `attribute.repository_id` mapping.
+binding names the same ID, through the `attribute.repository_id` mapping, and
+the mapping holds no other attribute but `google.subject`.
 
 **The repository claim alone is not enough.** A collaborator's pull-request branch produces a token whose
-`repository` claim is identical to `main`'s, so repository scoping federates
+`repository_id` claim is identical to `main`'s, so repository scoping federates
 reviewed and unreviewed code alike. `job_workflow_ref` is the claim that tells
 them apart: it names the ref of the *workflow definition* GitHub is running —
 `<OWNER>/<REPO>/.github/workflows/<file>@<REF>` — so it admits only workflow
