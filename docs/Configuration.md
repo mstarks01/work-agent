@@ -1062,6 +1062,12 @@ the curve, because it does not vary by deployment.
 
 ## Environment variables
 
+Each variable that the service reads has the prefix `KATRA_`. The service
+reads no variable with the prefix `ANALYSIS_`, and it stops when one is set:
+the startup fails with a message that names each one, and each provider call
+is refused. So a switch such as `ANALYSIS_OFFLINE` cannot look as if it is on
+while the service ignores it. Give each such variable the prefix `KATRA_`.
+
 ### The settings directory of the first-run app
 
 The first-run app reads its settings from the process environment and from

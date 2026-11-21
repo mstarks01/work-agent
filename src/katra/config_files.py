@@ -100,6 +100,23 @@ def env_flag(env: Mapping[str, str], var: str, *, default: bool = False) -> bool
     return value in ("1", "true", "yes", "on")
 
 
+#: The prefix of the settings of a deployment that does not use the ``KATRA_``
+#: names. The service reads none of them, so a deployment that sets one, such
+#: as the offline switch, would not get the behaviour it asks for.
+RETIRED_PREFIX = "ANALYSIS_"
+
+
+def retired_settings(env: Mapping[str, str]) -> list[str]:
+    """The name of each variable in ``env`` with :data:`RETIRED_PREFIX`,
+    sorted. Names only, never a value.
+
+    **The one reader of that prefix.** ``Deployment.from_env`` stops the
+    startup on it, and :func:`~katra.offline.refuse_live_inference` refuses
+    each provider call on it.
+    """
+    return sorted(var for var in env if var.startswith(RETIRED_PREFIX))
+
+
 def settings_dir(env: Mapping[str, str]) -> Path:
     """The settings directory of the first-run app (ADR 0092).
 

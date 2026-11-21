@@ -251,6 +251,18 @@ def test_a_set_but_empty_path_variable_fails_closed(var):
         Deployment.from_env(env={var: "   "})
 
 
+def test_a_setting_with_the_retired_prefix_stops_the_startup():
+    """A deployment that sets the offline switch under a name that no code
+    reads must not start as if the switch were off."""
+    env = VERTEX_TIERS | {"ANALYSIS_OFFLINE": "hunter2", "ANALYSIS_A": "1"}
+    with pytest.raises(ConfigError) as refused:
+        Deployment.from_env(env=env)
+    message = str(refused.value)
+    assert "ANALYSIS_A, ANALYSIS_OFFLINE" in message
+    assert "KATRA_" in message
+    assert "hunter2" not in message
+
+
 def test_from_env_fails_closed_on_a_missing_tier_config(tmp_path):
     with pytest.raises(ModelConfigError, match="cannot be read"):
         Deployment.from_env(env={MODEL_TIERS_VAR: str(tmp_path / "gone.toml")})

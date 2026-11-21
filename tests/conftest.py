@@ -13,7 +13,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from katra.config_files import SETTINGS_DIR_VAR, refused_var
+from katra.config_files import SETTINGS_DIR_VAR, refused_var, retired_settings
 from katra.offline import OFFLINE_ENV
 from katra.vendors import VENDORS
 
@@ -43,6 +43,9 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
     for vendor in VENDORS.values():
         for var in vendor.all_secret_env_vars():
             monkeypatch.delenv(refused_var(var), raising=False)
+    # So would a setting with the prefix that the service does not read.
+    for var in retired_settings(os.environ):
+        monkeypatch.delenv(var)
 
 
 @pytest.fixture(scope="session")

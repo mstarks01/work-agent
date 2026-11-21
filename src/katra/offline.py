@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 
-from katra.config_files import env_flag
+from katra.config_files import env_flag, retired_settings
 
 #: On for ``1``, ``true``, ``yes`` or ``on``, as every other boolean flag here.
 #: The test suite sets it for every test, so a test that reaches a provider
@@ -40,7 +40,18 @@ class LiveInferenceRefused(RuntimeError):
 
 
 def refuse_live_inference(route: str) -> None:
-    """Raise if offline mode is on, naming the route the call would have taken."""
+    """Raise if offline mode is on, naming the route the call would have taken.
+
+    Also raise where the process sets a variable that the service does not read
+    (:func:`~katra.config_files.retired_settings`): it can be an offline switch
+    under a name that no code reads, so the call fails closed.
+    """
+    retired = retired_settings(os.environ)
+    if retired:
+        raise LiveInferenceRefused(
+            f"a setting that the service does not read refused a live call to"
+            f" {route!r}. Give each one the prefix KATRA_: {', '.join(retired)}"
+        )
     if env_flag(os.environ, OFFLINE_ENV):
         raise LiveInferenceRefused(
             f"offline mode ({OFFLINE_ENV} is set) refused a live call to"

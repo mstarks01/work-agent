@@ -14,6 +14,7 @@ import pytest
 from google.genai import types
 
 from evals.harness.node_call import node_call
+from katra.config_files import retired_settings
 from katra.deployment import Deployment
 from katra.frameworks import schemas_for
 from katra.graph import CRITIC_ROLE, FrameworkNodes
@@ -62,6 +63,26 @@ def test_offline_mode_refuses_before_the_transport_on_every_attempt():
     assert isinstance(error, LiveInferenceRefused)
     assert "openai/" in str(error)
     assert OFFLINE_ENV in str(error)
+
+
+def test_a_setting_with_the_retired_prefix_refuses_the_call(
+    monkeypatch, supplied_transport
+):
+    """The offline switch under a name that no code reads still refuses the
+    call, with offline mode off."""
+    monkeypatch.setenv("ANALYSIS_OFFLINE", "hunter2")
+
+    seen, error = _drive_base_tier()
+
+    assert seen == []
+    assert isinstance(error, LiveInferenceRefused)
+    assert "ANALYSIS_OFFLINE" in str(error)
+    assert "hunter2" not in str(error)
+
+
+def test_retired_settings_names_only_the_retired_prefix():
+    env = {"ANALYSIS_B": "x", "KATRA_A": "x", "ANALYSIS_A": "x", "XANALYSIS_C": "x"}
+    assert retired_settings(env) == ["ANALYSIS_A", "ANALYSIS_B"]
 
 
 def test_offline_mode_refuses_a_single_node_replay():

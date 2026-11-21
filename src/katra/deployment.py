@@ -73,7 +73,7 @@ from katra.certification import (
 )
 from katra.claims import FrameworkName
 from katra.compact import COMPACT_FORMAT, FULL_FORMAT, ExtractionFormat
-from katra.config_files import env_flag
+from katra.config_files import env_flag, retired_settings
 from katra.errors import ConfigError
 from katra.framework_config import load_frameworks
 from katra.frameworks import reads_capabilities, validate_packages
@@ -345,9 +345,18 @@ class Deployment:
         problem: by the time a job names a framework, that package is known to
         be registered, well-formed, present on disk, and to have the three
         ``model_tiers.toml`` keys its nodes resolve on.
+
+        A variable with the prefix that the service does not read
+        (:func:`~katra.config_files.retired_settings`) stops the startup too.
         """
         if env is None:
             env = os.environ
+        retired = retired_settings(env)
+        if retired:
+            raise ConfigError(
+                "the service reads no setting with this prefix; give each one"
+                " the prefix KATRA_: " + ", ".join(retired)
+            )
         paths = ConfigPaths.from_env(env)
         tiers = load_model_tiers(paths.model_tiers, env=env)
         frameworks = load_frameworks(paths.frameworks_file, env=env)

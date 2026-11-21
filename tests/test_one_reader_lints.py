@@ -2955,6 +2955,12 @@ ONE_READERS: dict[str, _OneReader] = {
         },
         "",
     ),
+    "the retired prefix of a setting": _OneReader(
+        lambda node: _loads(node, "RETIRED_PREFIX"),
+        ("src/katra/config_files.py", "retired_settings"),
+        {},
+        "",
+    ),
     "a key file of the gcs store": _OneReader(
         lambda node: _loads(node, "GCS_KEY_FILE_VAR"),
         ("src/katra/gcs_objects.py", "_service_account"),
