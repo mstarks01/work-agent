@@ -7,10 +7,10 @@ Deterministic, credential-free, and free of provider calls.
 
 from __future__ import annotations
 
-from analysis_service.claim_identity import finding_key
-from analysis_service.claims import UnknownRef, Verdict
-from analysis_service.report_changes import report_changes
-from analysis_service.system_model import ModelIndex
+from katra.claim_identity import finding_key
+from katra.claims import UnknownRef, Verdict
+from katra.report_changes import report_changes
+from katra.system_model import ModelIndex
 from tests.factories import sample_report, sample_threat, valid_model
 from tests.test_asvs import sample_asvs_claim
 
@@ -80,8 +80,8 @@ def _completed(store, report, resumption=None):
     """A completed job of alice's, holding ``report``."""
     import asyncio
 
-    from analysis_service.jobs import JobRecord
-    from analysis_service.sources import Source
+    from katra.jobs import JobRecord
+    from katra.sources import Source
     from tests.factories import admit, sample_selection
 
     record = JobRecord.create(
@@ -103,7 +103,7 @@ def _completed(store, report, resumption=None):
 
 
 def _follow_up_of(parent_id):
-    from analysis_service.jobs import Checkpoint, Resumption
+    from katra.jobs import Checkpoint, Resumption
 
     return Resumption(
         parent_id=parent_id,
@@ -173,7 +173,7 @@ class TestTheChangesRoute:
 
 def test_two_mechanisms_under_one_key_are_matched_apart():
     """Two claims at one place resting on disjoint controls are two findings (ADR 0060)."""
-    from analysis_service.claims import Ground
+    from katra.claims import Ground
 
     flow = "flow:process:web-app>store:orders-db>store-order"
     store = "store:orders-db"

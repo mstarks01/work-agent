@@ -2,8 +2,8 @@
 
 import pytest
 
-from analysis_service.analysis import control_state, leading_word
-from analysis_service.validation import AMBIGUOUS_CONTROL_LEADS, validate
+from katra.analysis import control_state, leading_word
+from katra.validation import AMBIGUOUS_CONTROL_LEADS, validate
 from tests.factories import valid_model
 
 

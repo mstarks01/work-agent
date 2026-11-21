@@ -1,7 +1,7 @@
 """The format ladder's step rules, driven with no translator (ADR 0058).
 
 The executor tests in ``test_schema_fallback.py`` drive the same rules through
-a built Bedrock adapter. These drive :class:`~analysis_service.ladder.Ladder`
+a built Bedrock adapter. These drive :class:`~katra.ladder.Ladder`
 alone, so a rule fails here with nothing between the test and the rule.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.ladder import Ladder
+from katra.ladder import Ladder
 
 EXTRACT = {"title": "SystemModel", "type": "object"}
 CLAIMS = {"title": "Claims", "type": "object"}

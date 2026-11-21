@@ -1,6 +1,6 @@
 # Report Schema
 
-A successful analysis returns a `Report` from `analysis_service.report`. The
+A successful analysis returns a `Report` from `katra.report`. The
 report keeps the result and the system model it was based on in one payload.
 Code verifies that referenced element IDs exist, boundary crossings match the
 embedded model, summary counts match the claims, and the framework blocks match
@@ -518,7 +518,7 @@ class RepairedQuote:
 ```
 
 The ladder refused what the agent wrote, and the repair rung
-(`analysis_service.grounding.faithful_repair`) found a window of the named
+(`katra.grounding.faithful_repair`) found a window of the named
 source near enough to hand back, with no negation or number changed. The ground
 carries that window — the submitter's words, whitespace collapsed — and this
 mark carries the agent's, so the substitution is on the record. A repaired quote
@@ -928,7 +928,7 @@ correctly afterwards.
 cannot inflate it. `justification` explains the two inputs.
 
 ```python
-from analysis_service import derive_severity_level
+from katra import derive_severity_level
 
 derive_severity_level("high", "high")  # "critical"
 derive_severity_level("medium", "low")  # "low"
@@ -1274,7 +1274,7 @@ version before it. Read it when you load an archived report.
     selected from, with each row's basis and assessment, and the rows the
     resolver and the gate refused. It is `None` on a job that ran no assertion
     pass, which is every job on a deployment that sets
-    `ANALYSIS_ASSERTIONS=false`. The `Ground` kind `assertion` references a row in it.
+    `KATRA_ASSERTIONS=false`. The `Ground` kind `assertion` references a row in it.
   - The `Ground` kind `unknown-assertion` references a catalog row whose value
     is the unknown sentinel, for a predicate the model has no field for. It is
     the assertion layer's `unknown-attribute`: a question the sources leave open

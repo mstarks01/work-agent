@@ -1,6 +1,6 @@
 """Per-tier sampling config: the knob eval and production share.
 
-These are unit tests of the config layer: loading, the ``ANALYSIS_SAMPLING_*``
+These are unit tests of the config layer: loading, the ``KATRA_SAMPLING_*``
 override surface, the three-way split of a resolved tier's params at the point
 of use, and the ``resolve_sampling`` sibling of ``resolve_model``. All
 fail-closed, mirroring ``test_model_tiers``. Binding the resolver onto each
@@ -16,8 +16,8 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.model_tiers import ModelTierConfig, TierSelection
-from analysis_service.sampling import (
+from katra.model_tiers import ModelTierConfig, TierSelection
+from katra.sampling import (
     OFFERED_PARAMS,
     SUPPORTED_VERSION,
     SamplingConfig,
@@ -191,7 +191,7 @@ class TestCandidateCountReserved:
             load_sampling(config_path(text), env={})
 
     def test_candidate_count_not_overridable_by_env(self, config_path):
-        env = {"ANALYSIS_SAMPLING_BASE_CANDIDATE_COUNT": "3"}
+        env = {"KATRA_SAMPLING_BASE_CANDIDATE_COUNT": "3"}
         with pytest.raises(SamplingConfigError, match="not overridable"):
             load_sampling(config_path(config_toml()), env=env)
 
@@ -309,25 +309,24 @@ class TestEnvOverrides:
             load_sampling(config_path(config_toml()), env=env)
 
     def test_forbidden_param_not_overridable(self, config_path):
-        env = {"ANALYSIS_SAMPLING_STRONG_RESPONSE_SCHEMA": "{}"}
+        env = {"KATRA_SAMPLING_STRONG_RESPONSE_SCHEMA": "{}"}
         with pytest.raises(SamplingConfigError, match="not overridable"):
             load_sampling(config_path(config_toml()), env=env)
 
     def test_unknown_tier_in_var_rejected(self, config_path):
-        env = {"ANALYSIS_SAMPLING_TURBO_TEMPERATURE": "0.5"}
+        env = {"KATRA_SAMPLING_TURBO_TEMPERATURE": "0.5"}
         with pytest.raises(SamplingConfigError, match="unknown tier"):
             load_sampling(config_path(config_toml()), env=env)
 
     def test_unrelated_env_vars_ignored(self, config_path):
-        env = {"PATH": "/usr/bin", "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro"}
+        env = {"PATH": "/usr/bin", "KATRA_MODEL_STRONG_MODEL": "gemini-2.5-pro"}
         config = load_sampling(config_path(config_toml()), env=env)
         assert config.for_tier("strong").temperature == 0.0
 
     def test_env_var_naming(self):
-        assert env_var_for("base", "top_p") == "ANALYSIS_SAMPLING_BASE_TOP_P"
+        assert env_var_for("base", "top_p") == "KATRA_SAMPLING_BASE_TOP_P"
         assert (
-            env_var_for("strong", "temperature")
-            == "ANALYSIS_SAMPLING_STRONG_TEMPERATURE"
+            env_var_for("strong", "temperature") == "KATRA_SAMPLING_STRONG_TEMPERATURE"
         )
 
     def test_os_environ_overrides_apply(self, config_path, monkeypatch):
@@ -379,7 +378,7 @@ class TestResolveSampling:
 
 
 def _all_llm_nodes():
-    from analysis_service.model_tiers import LLM_NODES
+    from katra.model_tiers import LLM_NODES
 
     return LLM_NODES
 
@@ -496,8 +495,8 @@ class TestAPenaltyIsFinite:
         ``check_supported`` asks whether a param maps, not whether its value is
         sane, so every pair that takes a penalty at all takes an infinite one.
         """
-        from analysis_service.model_gate import ModelGateError, check_supported
-        from analysis_service.vendors import vendor_for
+        from katra.model_gate import ModelGateError, check_supported
+        from katra.vendors import vendor_for
 
         vendor, model = vendor_for("bedrock"), "cohere.command-text-v14"
         check_supported(vendor, model, {"presence_penalty": 0.5}, source="s")

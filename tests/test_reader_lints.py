@@ -30,14 +30,14 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.assertions import QUALIFIED_SPELLING, UNKNOWN
-from analysis_service.claims import ATTRIBUTE_GROUNDS
-from analysis_service.sources import FORMATTING_CATEGORIES
-from analysis_service.system_model import Element, all_attribute_names
 from evals.harness.archive import CaseKind, case_suffix
 from evals.harness.bundle import REPORTS_SUFFIX
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
+from katra.assertions import QUALIFIED_SPELLING, UNKNOWN
+from katra.claims import ATTRIBUTE_GROUNDS
+from katra.sources import FORMATTING_CATEGORIES
+from katra.system_model import Element, all_attribute_names
 from tests.source_tree import (
     EXPERIMENTS_LEFT_OUT,
     PYTHON,
@@ -501,8 +501,8 @@ def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
 #: Read from the owner rather than written out here, so this table is not
 #: itself the second spelling it exists to forbid.
 OWNED_VOCABULARIES: dict[str, frozenset[str]] = {
-    "src/analysis_service/claims.py": ATTRIBUTE_GROUNDS,
-    "src/analysis_service/sources.py": FORMATTING_CATEGORIES,
+    "src/katra/claims.py": ATTRIBUTE_GROUNDS,
+    "src/katra/sources.py": FORMATTING_CATEGORIES,
     "evals/harness/roster.py": STANDINGS,
     "evals/harness/reference.py": frozenset(CASE_FILES),
 }
@@ -606,7 +606,7 @@ def _qualifiable_attributes() -> frozenset[str]:
     """The attributes that can hold a qualified ``unknown``.
 
     A free-text field in some element type, less the fields the projection
-    spells bare (:data:`~analysis_service.assertions.QUALIFIED_SPELLING`),
+    spells bare (:data:`~katra.assertions.QUALIFIED_SPELLING`),
     where the gate refuses anything after the sentinel. A closed field holds
     the bare sentinel or nothing, so an exact comparison reads it correctly.
     """

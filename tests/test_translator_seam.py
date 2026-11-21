@@ -35,13 +35,13 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.sampling import OFFERED_PARAMS, TierSampling
-from analysis_service.vendors import VENDORS
+from katra.sampling import OFFERED_PARAMS, TierSampling
+from katra.vendors import VENDORS
 from tests.source_tree import PYTHON, REPO_ROOT, parse, source_files
 
 pytestmark = pytest.mark.lint
 
-PACKAGE = REPO_ROOT / "src" / "analysis_service"
+PACKAGE = REPO_ROOT / "src" / "katra"
 
 #: Kwargs that redirect a request to an address of the caller's choosing.
 #: LiteLLM and the SDKs beneath it accept all of these. **None is set anywhere
@@ -166,7 +166,7 @@ def test_litellm_resolves_tls_verification_on():
     It also closes the one path the lints cannot reach at all. They read call
     kwargs and dict keys, so a module assignment — ``litellm.ssl_verify =
     False`` somewhere in the package — would pass them. Importing
-    ``analysis_service`` is what runs that assignment, and this test runs after
+    ``katra`` is what runs that assignment, and this test runs after
     the import.
 
     **Every falsy answer is a failure, not only ``False``.** ``SSL_VERIFY=""``
@@ -239,7 +239,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     is from.
 
     The translator is the object on the provider side of
-    `analysis_service.provider`'s seam, and it is what holds the tier's
+    `katra.provider`'s seam, and it is what holds the tier's
     configuration — so this is still the one constructor a deployment's values
     reach LiteLLM through.
 

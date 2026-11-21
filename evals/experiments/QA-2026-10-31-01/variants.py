@@ -17,10 +17,10 @@ from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
-import analysis_service.early_questions as early_module
-from analysis_service import answer_state
-from analysis_service.question_kinds import QUESTION_KINDS
+import katra.early_questions as early_module
 from evals.harness.early_policies import _each, _shipped_list, paired, summary, sweep
+from katra import answer_state
+from katra.question_kinds import QUESTION_KINDS
 
 SHIPPED_READS = early_module.reads
 SHIPPED_FLOOR = answer_state.passes_floor

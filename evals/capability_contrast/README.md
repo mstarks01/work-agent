@@ -32,4 +32,4 @@ uv run python evals/experiments/QA-2026-10-14-02/gate.py <out.json> <model route
   ../capability_contrast/05-account-and-code
 ```
 
-The run costs money, and `ANALYSIS_OFFLINE` refuses it.
+The run costs money, and `KATRA_OFFLINE` refuses it.

@@ -7,7 +7,7 @@
 # answers the question that one cannot: does a real provider actually serve
 # this graph. It has never answered it -- see the preflight below.
 #
-# Vertex because this workflow *chooses* Vertex, in the ANALYSIS_MODEL_* block
+# Vertex because this workflow *chooses* Vertex, in the KATRA_MODEL_* block
 # below. The shipped config/model_tiers.toml selects no vendor at all, so a live
 # sweep has to name one; this is the only place that choice is written down, and
 # changing the four variables there is what moves the sweep to another vendor.
@@ -85,7 +85,7 @@ on:
     #
     # WITHOUT THE BACKSTOP: nothing catches what subtraction still cannot see.
     # With no scheduled sweep, a responsibility that moves out of
-    # `src/analysis_service/` altogether -- into `evals/`, or into a new
+    # `src/katra/` altogether -- into `evals/`, or into a new
     # top-level package -- is invisible until someone dispatches a run by hand.
     paths:
       - "prompts/**"
@@ -93,31 +93,31 @@ on:
       - "domains/**"
       - "config/**"
       - "diagram_reader/**"
-      - "src/analysis_service/**"
-      - "!src/analysis_service/answer_bodies.py"
-      - "!src/analysis_service/api.py"
-      - "!src/analysis_service/attestation.py"
-      - "!src/analysis_service/auth.py"
-      - "!src/analysis_service/aws_identity.py"
-      - "!src/analysis_service/conformance.py"
-      - "!src/analysis_service/detected_facts.py"
-      - "!src/analysis_service/engine.py"
-      - "!src/analysis_service/fixes.py"
-      - "!src/analysis_service/gcp_identity.py"
-      - "!src/analysis_service/gcs_objects.py"
-      - "!src/analysis_service/job_answers.py"
-      - "!src/analysis_service/job_state.py"
-      - "!src/analysis_service/objects.py"
-      - "!src/analysis_service/report_changes.py"
-      - "!src/analysis_service/report_conditions.py"
-      - "!src/analysis_service/s3_objects.py"
-      - "!src/analysis_service/settings_variables.py"
-      - "!src/analysis_service/smoke.py"
-      - "!src/analysis_service/sql_store.py"
-      - "!src/analysis_service/store_backends.py"
-      - "!src/analysis_service/store_settings.py"
-      - "!src/analysis_service/token_caps.py"
-      - "!src/analysis_service/verify_report.py"
+      - "src/katra/**"
+      - "!src/katra/answer_bodies.py"
+      - "!src/katra/api.py"
+      - "!src/katra/attestation.py"
+      - "!src/katra/auth.py"
+      - "!src/katra/aws_identity.py"
+      - "!src/katra/conformance.py"
+      - "!src/katra/detected_facts.py"
+      - "!src/katra/engine.py"
+      - "!src/katra/fixes.py"
+      - "!src/katra/gcp_identity.py"
+      - "!src/katra/gcs_objects.py"
+      - "!src/katra/job_answers.py"
+      - "!src/katra/job_state.py"
+      - "!src/katra/objects.py"
+      - "!src/katra/report_changes.py"
+      - "!src/katra/report_conditions.py"
+      - "!src/katra/s3_objects.py"
+      - "!src/katra/settings_variables.py"
+      - "!src/katra/smoke.py"
+      - "!src/katra/sql_store.py"
+      - "!src/katra/store_backends.py"
+      - "!src/katra/store_settings.py"
+      - "!src/katra/token_caps.py"
+      - "!src/katra/verify_report.py"
       - ".github/workflows/evals-live.yml"
   # NO `schedule`. A scheduled run fails closed when credentials are absent --
   # deliberately, see the preflight below -- and the federation is not
@@ -161,7 +161,7 @@ jobs:
       contents: read
       id-token: write # the OIDC token exchanged for short-lived Vertex credentials
 
-    # The vendor registry reads its own ANALYSIS_-prefixed variables and nothing
+    # The vendor registry reads its own KATRA_-prefixed variables and nothing
     # else (#9): an ambient credential this deployment did not declare must not
     # be able to authenticate a run, which is the ASI03 inherited-credential
     # path. So the project and location have to be handed over explicitly --
@@ -178,24 +178,24 @@ jobs:
     # the auth action below writes a credentials file, and Google's own ADC
     # chain finds it. The service names no credentials variable and reads none.
     #
-    # The ANALYSIS_MODEL_* four are the sweep's vendor choice. Nothing is selected
+    # The KATRA_MODEL_* four are the sweep's vendor choice. Nothing is selected
     # by default, so without them the run stops at config load with the
     # onboarding error rather than reaching a model. _VENDOR and _MODEL move
     # together per tier: a vendor without its model is rejected at startup.
     env:
-      ANALYSIS_MODEL_BASE_VENDOR: vertex
-      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash
-      ANALYSIS_MODEL_STRONG_VENDOR: vertex
-      ANALYSIS_MODEL_STRONG_MODEL: gemini-2.5-pro
+      KATRA_MODEL_BASE_VENDOR: vertex
+      KATRA_MODEL_BASE_MODEL: gemini-2.5-flash
+      KATRA_MODEL_STRONG_VENDOR: vertex
+      KATRA_MODEL_STRONG_MODEL: gemini-2.5-pro
       # `review` selects the same pair as `strong`. Every tier must name one or
       # the config refuses to load, and the shipped node map binds nothing to
       # this tier -- so no adapter is built for it and it costs no credential.
       # The shipped `review_independence = "shared"` is what makes a repeated
       # pair legal here.
-      ANALYSIS_MODEL_REVIEW_VENDOR: vertex
-      ANALYSIS_MODEL_REVIEW_MODEL: gemini-2.5-pro
-      ANALYSIS_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      ANALYSIS_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+      KATRA_MODEL_REVIEW_VENDOR: vertex
+      KATRA_MODEL_REVIEW_MODEL: gemini-2.5-pro
+      KATRA_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      KATRA_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
 
     steps:
       - name: Check out
@@ -339,7 +339,7 @@ jobs:
       # became hard to extract within a week; with no schedule, nothing does.
       # examples/README.md states the same limit -- keep the two in step.
       #
-      # Credentials come from the job-level ANALYSIS_VERTEX_* block, like every
+      # Credentials come from the job-level KATRA_VERTEX_* block, like every
       # other live step here.
       - name: Sample description still extracts (examples/embed.py)
         if: steps.preflight.outputs.configured == 'true'

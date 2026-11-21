@@ -79,7 +79,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.claim_identity import distinct_mechanisms
 from evals.harness.content import (
     PROSE_PREFIX,
     STRUCTURAL_PREFIX,
@@ -93,6 +92,7 @@ from evals.harness.fingerprint import (
     version_for,
     version_of,
 )
+from katra.claim_identity import distinct_mechanisms
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LEDGER_PATH = EVALS_ROOT / "review" / "votes"
@@ -530,7 +530,7 @@ class Ledger:
 
         Keyed by fingerprint, voter and mechanism. A later vote replaces an
         earlier vote by one voter on one key unless the two rest on distinct
-        mechanisms (:func:`~analysis_service.claim_identity.distinct_mechanisms`, ADR
+        mechanisms (:func:`~katra.claim_identity.distinct_mechanisms`, ADR
         0060): then both are live, because they answer two findings that
         share a key. Latest by position rather than by timestamp: the file is
         append-only, so position *is* chronology. Iteration order is the order

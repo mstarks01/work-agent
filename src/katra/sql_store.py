@@ -1,0 +1,2498 @@
+"""The ``sql`` job store: jobs in a database, sources and reports in an object store.
+
+ADR 0065 sets the split. A job row holds the record's fields, each JSON part as
+text and never as ``jsonb``, so one column type serves every database and the
+round trip gives the same bytes. The events are rows of their own. The
+sources and the report are objects under :func:`~katra.objects.object_key`,
+and the row holds the SHA-256 of each one.
+
+The rules this module keeps:
+
+* **The object first, the row second.** A reader never finds a row that names
+  a missing object. Where admission refuses a job, the objects written for it
+  go at once. A delete changes the row first and deletes the objects second.
+  An object whose delete fails stays, and the orphan sweep
+  (:meth:`SqlJobStore.sweep_orphans`) removes it later.
+* **The owner on the row before any object.** Each read selects the row by
+  job ID and owner ID, and builds each key from that row alone.
+* **A digest check on each object read.** A missing object, or one whose
+  digest does not match its row, raises :class:`CorruptObject` after one log
+  line with the job ID and the owner ID, and the API answers ``500`` with no
+  detail. A read can find a row, and then a delete can remove the row and its
+  objects before the read gets an object. So where an object is missing, the
+  read reads the row again, and a row that is gone reads as a missing job.
+* **The service writes a report once.** A save never writes a second report
+  over the one a row names.
+* **One code path for each database.** SQLAlchemy 2.0 async Core, with the
+  facts that differ in a row of :data:`DATABASES` (#1525). Admission takes a
+  global lock. On SQLite each write transaction opens with ``BEGIN
+  IMMEDIATE``, which is that lock, and serialises every other write with it.
+  On PostgreSQL admission takes ``pg_advisory_xact_lock``, and every
+  connection uses ``verify-full`` TLS.
+* **The service never migrates.** An operator runs
+  ``python -m katra.migrations`` as a deploy step, and
+  :meth:`SqlJobStore.startup_check` refuses a schema that is not at the latest
+  revision. The first-run app migrates a database whose row allows it, with
+  :func:`migrate_first_run_database`, before it builds the store (ADR 0110).
+  :func:`migrator` names the process that migrates a database.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hmac
+import json
+import logging
+import os
+import ssl
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
+from contextlib import asynccontextmanager, contextmanager, suppress
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Literal, get_args
+
+from alembic.migration import MigrationContext
+from alembic.util import CommandError
+from pydantic import TypeAdapter, ValidationError
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    ColumnElement,
+    CompoundSelect,
+    Connection,
+    DateTime,
+    Dialect,
+    ForeignKey,
+    Integer,
+    MetaData,
+    Row,
+    Select,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    delete,
+    event,
+    func,
+    insert,
+    inspect,
+    or_,
+    select,
+    union_all,
+    update,
+)
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import ArgumentError, IntegrityError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
+from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool, Pool
+from sqlalchemy.types import TypeDecorator
+from typing_extensions import override
+
+from katra import migrations
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.aws_identity import platform_session
+from katra.budgets import BudgetPolicy
+from katra.carried_renames import ElementRename
+from katra.claims import UnknownKey
+from katra.config_files import read_secret, refuse_bare_secret
+from katra.controls import (
+    Control,
+    ControlAdmission,
+    ControlDocument,
+    ControlLimits,
+    ControlReplacement,
+    EvidenceFile,
+    EvidenceRefusal,
+    check_texts,
+    control_refusal,
+    names_another_scope,
+)
+from katra.fact_answers import STORED, FactAnswer, SkipKey
+from katra.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+)
+from katra.jobs import (
+    RESTART_FAILURE_MESSAGE,
+    TERMINAL_STATUSES,
+    Admission,
+    Checkpoint,
+    DeleteRefusal,
+    Envelope,
+    JobEvent,
+    JobRecord,
+    JobStatus,
+    Resumption,
+    UnreadableRecord,
+    UnreadableSchema,
+    UsageRow,
+    check_bounds,
+    check_save,
+    ended,
+    envelope_parts,
+    holds_a_slot,
+    is_follow_up,
+    locks_its_parent,
+    object_digest,
+    parent_of,
+    stored_report,
+)
+from katra.objects import (
+    ControlKey,
+    FileKey,
+    JobKey,
+    ObjectName,
+    ObjectStore,
+    check_private,
+    evidence_key,
+    file_key,
+    key_parts,
+    object_key,
+)
+from katra.owner_files import FileAdmission, OwnerFile
+from katra.principals import Identity, Principal
+from katra.report import Report
+from katra.sources import Source
+from katra.store_settings import (
+    DATABASE_CA_FILE_VAR,
+    DATABASE_CREDENTIALS_VAR,
+    DATABASE_IAM_VAR,
+    DATABASE_PASSWORD_FILE_VAR,
+    DATABASE_REGION_VAR,
+    DATABASE_URL_VAR,
+    DatabaseCredentialMode,
+    DatabaseIamName,
+    StoreConfigError,
+    closed_setting,
+    holds_password,
+    refuse_unread,
+)
+from katra.vendors import REGION
+
+logger = logging.getLogger(__name__)
+
+
+class CorruptObject(RuntimeError):
+    """An object that a row names is missing, or its digest does not match."""
+
+
+class _UtcTime(TypeDecorator[datetime]):
+    """A time, stored and read in UTC. SQLite keeps no zone, so the store keeps one."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    @override
+    def process_bind_param(
+        self, value: datetime | None, dialect: Dialect
+    ) -> datetime | None:
+        return None if value is None else value.astimezone(UTC)
+
+    @override
+    def process_result_value(
+        self, value: datetime | None, dialect: Dialect
+    ) -> datetime | None:
+        if value is None or value.tzinfo is not None:
+            return value
+        return value.replace(tzinfo=UTC)
+
+
+class _Json(TypeDecorator[str]):
+    """A JSON part of a job row, as text and never as ``jsonb`` (ADR 0065)."""
+
+    impl = Text
+    cache_ok = True
+
+
+METADATA = MetaData()
+
+#: The ``principals`` table (ADR 0064): one row for each pair of issuer and
+#: ``sub``, and nothing more.
+principals = Table(
+    "principals",
+    METADATA,
+    Column("owner_id", String(64), primary_key=True),
+    Column("issuer", Text, nullable=False),
+    Column("sub", Text, nullable=False),
+    Column("created_at", _UtcTime, nullable=False),
+    UniqueConstraint("issuer", "sub"),
+)
+
+#: The ``jobs`` table: a column for each field of a :class:`JobRecord` but the
+#: two objects and the events.
+jobs = Table(
+    "jobs",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    # What parent_of reads off the record, so admission finds the children of
+    # a job with no read inside the JSON.
+    Column("parent_id", String(64), index=True),
+    Column("schema_version", Text, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", _UtcTime, nullable=False, index=True),
+    Column("updated_at", _UtcTime, nullable=False),
+    Column("reserved_tokens", BigInteger, nullable=False),
+    Column("measured_tokens", BigInteger),
+    Column("revision", Integer, nullable=False),
+    Column("parent_revision", Integer),
+    Column("system_name", Text),
+    Column("title", Text),
+    Column("amends", String(64)),
+    Column("error", Text),
+    Column("ask_questions", Boolean, nullable=False),
+    Column("continues_at_pause", Boolean, nullable=False),
+    Column("assertion_pass", Boolean, nullable=False),
+    Column("continue_refusal", Text),
+    Column("frameworks", _Json, nullable=False),
+    Column("answers", _Json, nullable=False),
+    Column("shown_early", _Json, nullable=False),
+    Column("corrections", _Json, nullable=False),
+    Column("draft", _Json, nullable=False),
+    Column("skipped_early", _Json, nullable=False),
+    Column("resumption", _Json, nullable=False),
+    Column("carried", _Json, nullable=False),
+    Column("carried_renames", _Json, nullable=False),
+    Column("control_scopes", _Json, nullable=False),
+    Column("control_facts", _Json, nullable=False),
+    Column("checkpoint", _Json, nullable=False),
+    Column("validation_issues", _Json, nullable=False),
+    Column("certification", _Json, nullable=False),
+    Column("unreported_nodes", _Json, nullable=False),
+    Column("sources_sha256", String(64), nullable=False),
+    Column("report_sha256", String(64)),
+    Column("controls_sha256", String(64)),
+)
+
+#: The ``job_events`` table: one row for each event, keyed by the job and the
+#: event's sequence number.
+job_events = Table(
+    "job_events",
+    METADATA,
+    Column("job_id", String(64), ForeignKey("jobs.id"), primary_key=True),
+    Column("seq", Integer, primary_key=True),
+    Column("event", _Json, nullable=False),
+)
+
+#: The usage rows (ADR 0066): what admission still reads of a deleted job.
+usage_rows = Table(
+    "usage_rows",
+    METADATA,
+    Column("job_id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    Column("created_at", _UtcTime, nullable=False, index=True),
+    Column("reserved_tokens", BigInteger, nullable=False),
+    Column("measured_tokens", BigInteger),
+    Column("status", String(32), nullable=False),
+    Column("parent_id", String(64), index=True),
+)
+
+#: The ``owner_files`` table (ADR 0118): one row for each Owner File, which
+#: names the object of its text.
+owner_files = Table(
+    "owner_files",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    Column("name", Text, nullable=False),
+    Column("kind", String(32), nullable=False),
+    Column("sha256", String(64), nullable=False),
+    Column("size_bytes", BigInteger, nullable=False),
+    Column("created_at", _UtcTime, nullable=False),
+    # Refuses a second file of one name for one owner: two names are one where
+    # the strings are equal. The in-memory store compares names in `add_file`.
+    UniqueConstraint("owner_id", "name"),
+)
+
+#: The ``controls`` table (ADR 0127): one row for each Control, which holds
+#: the authored document as JSON. The document lists the evidence objects.
+controls = Table(
+    "controls",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    # The document's name, which the constraint below reads.
+    Column("name", Text, nullable=False),
+    Column("updated_at", _UtcTime, nullable=False),
+    Column("document", _Json, nullable=False),
+    # Refuses a second Control of one name for one owner, as on owner_files.
+    # The in-memory store compares names in `add_control`.
+    UniqueConstraint("owner_id", "name"),
+)
+
+#: The column of a job row that holds the digest of each object. The table
+#: answers for every name of :data:`~katra.objects.ObjectName`.
+DIGEST_COLUMNS: dict[ObjectName, str] = {
+    "sources.json": "sources_sha256",
+    "report.json": "report_sha256",
+    "controls.json": "controls_sha256",
+}
+
+
+#: How many job IDs one query of the orphan sweep reads. SQLite and asyncpg
+#: both take this many bind values in one statement.
+_ID_BATCH = 500
+
+
+def _names(row: Row[Any], name: ObjectName) -> bool:
+    """Whether the job row ``row`` names its job's object ``name``.
+
+    **The one rule of a named object.** A row names an object where it holds
+    the object's digest. The sources digest is never null, so a row always
+    names its sources. A row names its report only after a save wrote the
+    report's digest. A usage row names no object. A save hands
+    :func:`~katra.jobs.check_save` that same digest column, which
+    holds ``None`` exactly where this says the row names no report.
+    """
+    return row._mapping[DIGEST_COLUMNS[name]] is not None
+
+
+def _object_keys(row: Row[Any], *, include_unnamed: bool = False) -> list[str]:
+    """The key of each object that the job row ``row`` names. With
+    ``include_unnamed``, the key of each object that its job can hold, named
+    or not."""
+    return [
+        object_key(row.owner_id, row.id, name)
+        for name in DIGEST_COLUMNS
+        if include_unnamed or _names(row, name)
+    ]
+
+
+#: The fields of a record that are objects or event rows, not job columns.
+RecordObjectField = Literal["sources", "report", "controls", "events"]
+_OUTSIDE_THE_ROW: frozenset[RecordObjectField] = frozenset(get_args(RecordObjectField))
+#: The fields a job row holds as JSON text.
+_JSON_FIELDS = frozenset(
+    column.name for column in jobs.columns if isinstance(column.type, _Json)
+)
+#: How each JSON field is checked and written: as :class:`JobRecord` holds it.
+_ADAPTERS: dict[str, TypeAdapter[Any]] = {
+    name: TypeAdapter(JobRecord.model_fields[name].rebuild_annotation())
+    for name in _JSON_FIELDS
+}
+_SOURCES: TypeAdapter[list[Source]] = TypeAdapter(list[Source])
+_CONTROLS: TypeAdapter[list[CopiedControl]] = TypeAdapter(list[CopiedControl])
+_STATUS: TypeAdapter[JobStatus] = TypeAdapter(JobStatus)
+_EVENTS: TypeAdapter[list[JobEvent]] = TypeAdapter(list[JobEvent])
+
+
+def _json(name: str, value: object) -> str:
+    """``value`` as the JSON part ``name`` of a job row, checked as the record checks it."""
+    adapter = _ADAPTERS[name]
+    return adapter.dump_json(adapter.validate_python(value)).decode()
+
+
+def _job_row(record: JobRecord) -> dict[str, Any]:
+    """The columns of ``record``'s job row, without the object digests.
+
+    Every field but the objects and the events, so a field with no column
+    fails the write rather than vanishing from it.
+    """
+    row = {
+        name: _json(name, value) if name in _JSON_FIELDS else value
+        for name, value in record
+        if name not in _OUTSIDE_THE_ROW
+    }
+    row["parent_id"] = parent_of(record)
+    return row
+
+
+#: The columns that the restart scan changes when it fails a job: what
+#: :meth:`JobRecord.transition` sets, and the error.
+_FAILED_COLUMNS = ("status", "measured_tokens", "updated_at", "error")
+
+
+def _loads(text: str | bytes, *loc: str | int) -> Any:
+    """``text`` parsed as JSON. Text that does not parse raises a
+    :class:`ValidationError` at ``loc``, as a part that does not validate
+    does, so one handler reads both (ADR 0095). The error never holds the
+    text."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValidationError.from_exception_data(
+            JobRecord.__name__,
+            [
+                {
+                    "type": "json_invalid",
+                    "loc": loc,
+                    "input": None,
+                    "ctx": {"error": error.msg},
+                }
+            ],
+        ) from None
+
+
+def _record(
+    row: Row[Any],
+    sources: bytes | None,
+    report: bytes | None,
+    events: Sequence[str],
+    controls: bytes | None = None,
+) -> JobRecord:
+    """The record a row and its objects hold. An envelope, where ``sources``
+    is ``None``, leaves out each part that :func:`envelope_parts` names, and
+    never parses one. ``controls`` is ``None`` where the row names no
+    Controls object."""
+    left_out = envelope_parts(row.schema_version) if sources is None else {}
+    data: dict[str, Any] = {}
+    for name in JobRecord.model_fields.keys() - _OUTSIDE_THE_ROW:
+        value = row._mapping[name]
+        if name in left_out:
+            data[name] = left_out[name]
+        elif name in _JSON_FIELDS:
+            data[name] = _loads(value, name)
+        else:
+            data[name] = value
+    data["sources"] = None if sources is None else _loads(sources, "sources")
+    data["report"] = None if report is None else _loads(report, "report")
+    data["controls"] = [] if controls is None else _loads(controls, "controls")
+    data["events"] = [
+        _loads(text, "events", index) for index, text in enumerate(events)
+    ]
+    return JobRecord.model_validate(data, context=STORED)
+
+
+def _unparsed(job_id: str, error: ValidationError) -> None:
+    """Log where a stored part of the job ``job_id`` does not parse. The log
+    names each field and never the value that the field holds."""
+    fields = sorted({".".join(map(str, item["loc"])) for item in error.errors()})
+    logger.warning("job %s holds a part this service cannot parse: %s", job_id, fields)
+
+
+def _envelope(row: Row[Any], events: Sequence[str]) -> Envelope:
+    """The envelope a row holds, or an :class:`UnreadableRecord` where a
+    stored part does not parse (ADR 0095). The list and the status route read
+    the unreadable record, so one row never stops them."""
+    try:
+        return _record(row, None, None, events)
+    except ValidationError as error:
+        _unparsed(row.id, error)
+    try:
+        status: JobStatus | None = _STATUS.validate_python(row.status)
+    except ValidationError:
+        status = None
+    return UnreadableRecord(
+        id=row.id,
+        owner_id=row.owner_id,
+        schema_version=row.schema_version,
+        system_name=row.system_name,
+        title=row.title,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        status=status,
+        reserved_tokens=row.reserved_tokens,
+        measured_tokens=row.measured_tokens,
+    )
+
+
+async def _events(connection: AsyncConnection, job_id: str) -> list[str]:
+    """The events of the job ``job_id``, as stored, in order."""
+    events = await connection.scalars(
+        select(job_events.c.event)
+        .where(job_events.c.job_id == job_id)
+        .order_by(job_events.c.seq)
+    )
+    return list(events.all())
+
+
+async def _ended(connection: AsyncConnection, row: Row[Any]) -> bool:
+    """:func:`~katra.jobs.ended` of the job that the job row
+    ``row`` holds. A terminal stored status ends a job whether it parses or
+    not, so only a row whose stored status leaves it in flight is parsed."""
+    if row.status in TERMINAL_STATUSES:
+        return True
+    return ended(_envelope(row, await _events(connection, row.id)))
+
+
+def _part_of(row: Row[Any], parse: Callable[[], Any]) -> Any:
+    """What ``parse`` reads of a part of the job ``row`` names, read by name.
+    Raises :class:`UnreadableSchema` where the part does not parse, as an
+    envelope that does not parse is unreadable (ADR 0095)."""
+    try:
+        return parse()
+    except ValidationError as error:
+        _unparsed(row.id, error)
+        raise UnreadableSchema(row.schema_version) from None
+
+
+def _stored_events(row: Row[Any], texts: Sequence[str]) -> list[JobEvent]:
+    """The events that the event rows ``texts`` of the job ``row`` hold.
+    Raises :class:`UnreadableSchema` where one does not parse (ADR 0095),
+    and the error never holds the text."""
+    return _part_of(
+        row,
+        lambda: _EVENTS.validate_python(
+            [_loads(text, index) for index, text in enumerate(texts)],
+            context=STORED,
+        ),
+    )
+
+
+def _event_rows(job_id: str, events: Sequence[JobEvent]) -> list[dict[str, Any]]:
+    return [
+        {"job_id": job_id, "seq": event.seq, "event": event.model_dump_json()}
+        for event in events
+    ]
+
+
+#: The execution option that marks a write transaction.
+_WRITES = "analysis_writes"
+
+
+def _prepare_sqlite(engine: AsyncEngine) -> None:
+    """Open each SQLite write transaction with ``BEGIN IMMEDIATE``.
+
+    The driver's own ``BEGIN`` is off, so the store states each one. A write
+    transaction takes the database's write lock when it begins, which makes
+    it the global lock of admission, and a write never starts as a read
+    that SQLite then refuses to upgrade. Foreign keys are on for each
+    connection, because SQLite leaves them off.
+    """
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _connect(dbapi_connection: Any, _record: Any) -> None:
+        dbapi_connection.isolation_level = None
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.close()
+
+    @event.listens_for(engine.sync_engine, "begin")
+    def _begin(connection: Connection) -> None:
+        writes = connection.get_execution_options().get(_WRITES, False)
+        connection.exec_driver_sql("BEGIN IMMEDIATE" if writes else "BEGIN")
+
+
+#: What asyncpg takes as a password: the text, or an async callable that it
+#: awaits for each new connection.
+Password = str | Callable[[], Awaitable[str]]
+
+
+@dataclass(frozen=True)
+class DatabaseIam:
+    """One provider of IAM tokens for a database: a row of :data:`DATABASE_IAM`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The extra that installs the library of the provider (ADR 0023).
+    extra: str
+    #: Builds the token callable for the database at the URL. It imports the
+    #: library of the provider, so a missing library raises
+    #: :class:`ModuleNotFoundError` here, at startup.
+    token: Callable[[URL, Mapping[str, str]], Callable[[], Awaitable[str]]]
+
+
+def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]:
+    """An RDS IAM token for each new connection (#1525).
+
+    ``boto3`` signs the token locally with the credentials of the platform
+    identity (:func:`~katra.aws_identity.platform_session`), so a
+    static key pair stops the startup. A token lasts 15 minutes, and RDS
+    checks it only when a connection opens. The signature runs in a worker
+    thread, because a refresh of the credentials goes over the network.
+    ``url`` holds the port that the connection uses (:func:`_postgres`).
+    """
+    region = env.get(DATABASE_REGION_VAR, "").strip()
+    if not region:
+        raise StoreConfigError(f"set {DATABASE_REGION_VAR} for an RDS IAM token")
+    if REGION.fullmatch(region) is None:
+        raise StoreConfigError(f"{DATABASE_REGION_VAR} must match {REGION.pattern}")
+    session = platform_session("the rds token of the database")
+    client = session.client("rds", region_name=region)
+
+    async def token() -> str:
+        return await asyncio.to_thread(
+            client.generate_db_auth_token,
+            DBHostname=url.host,
+            Port=url.port,
+            DBUsername=url.username,
+            Region=region,
+        )
+
+    return token
+
+
+#: Each provider of IAM tokens that ``KATRA_DATABASE_IAM`` can name. The
+#: table answers for every name of :data:`DatabaseIamName`.
+DATABASE_IAM: dict[DatabaseIamName, DatabaseIam] = {
+    "rds": DatabaseIam(extra="aws", token=_rds_token),
+}
+
+
+def _password_file(url: URL, env: Mapping[str, str]) -> Password:
+    """The password in the file that ``KATRA_DATABASE_PASSWORD_FILE`` names.
+
+    This file is the only way to give the password.
+    """
+    password = read_secret(env, DATABASE_PASSWORD_FILE_VAR, StoreConfigError)
+    if not password:
+        raise StoreConfigError(
+            f"set {DATABASE_PASSWORD_FILE_VAR} to a file that holds the database password"
+        )
+    return password
+
+
+def _iam_token(url: URL, env: Mapping[str, str]) -> Password:
+    """The token callable of the provider that ``KATRA_DATABASE_IAM`` names."""
+    name = closed_setting(env.get(DATABASE_IAM_VAR, ""), DATABASE_IAM_VAR, DATABASE_IAM)
+    iam = DATABASE_IAM[name]
+    try:
+        return iam.token(url, env)
+    except ModuleNotFoundError as missing:
+        raise StoreConfigError(
+            f"the {name} IAM token needs {missing.name}, which is not installed:"
+            f" install katra[{iam.extra}]"
+        ) from None
+
+
+@dataclass(frozen=True)
+class DatabaseCredentials:
+    """One way a connection gets its password: a row of
+    :data:`DATABASE_CREDENTIALS`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The password, or the token callable, for the database at the URL.
+    password: Callable[[URL, Mapping[str, str]], Password]
+    #: The database settings that this mode reads. :func:`_postgres` refuses
+    #: each other one, and the Settings page shows only these.
+    reads: tuple[str, ...]
+
+
+#: How a connection gets its password, for each value of
+#: ``KATRA_DATABASE_CREDENTIALS``. The table answers for every name of
+#: :data:`DatabaseCredentialMode`.
+DATABASE_CREDENTIALS: dict[DatabaseCredentialMode, DatabaseCredentials] = {
+    "password": DatabaseCredentials(
+        password=_password_file, reads=(DATABASE_PASSWORD_FILE_VAR,)
+    ),
+    "iam": DatabaseCredentials(
+        password=_iam_token, reads=(DATABASE_IAM_VAR, DATABASE_REGION_VAR)
+    ),
+}
+
+
+def _verify_full(env: Mapping[str, str]) -> ssl.SSLContext:
+    """A TLS context that checks the chain and the host name of the server.
+
+    This is libpq's ``verify-full``, and no setting turns it off. Where
+    ``KATRA_DATABASE_CA_FILE`` names a private CA, the context trusts that
+    CA only. Where the setting is unset, the context trusts the system CA
+    bundle.
+    """
+    ca_file = env.get(DATABASE_CA_FILE_VAR, "").strip() or None
+    try:
+        return ssl.create_default_context(cafile=ca_file)
+    except OSError as error:
+        # A missing or unreadable file (FileNotFoundError, PermissionError,
+        # IsADirectoryError) and a file that holds no PEM certificate
+        # (ssl.SSLError) are each an OSError.
+        raise StoreConfigError(
+            f"{DATABASE_CA_FILE_VAR} names a file that this service cannot read as a CA"
+            f" ({type(error).__name__})"
+        ) from None
+
+
+def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
+    """The connect arguments of PostgreSQL: the port, ``verify-full`` TLS and a
+    password.
+
+    The URL must name a user, a network host and a database, because asyncpg
+    uses no TLS on a Unix socket, and it fills each argument that the store
+    does not pass from the ``PG*`` variables of the process. For the same
+    reason the store always passes the port, and the token of the IAM
+    credentials is signed for that port. The service refuses a query in the
+    URL, because asyncpg takes it as connect arguments, and a ``host`` there
+    can name a Unix socket.
+    """
+    if url.query:
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} for PostgreSQL takes no query; remove it"
+        )
+    if not url.username or not url.host or url.host.startswith("/"):
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} for PostgreSQL needs a user and a network host"
+        )
+    if not url.database:
+        raise StoreConfigError(f"{DATABASE_URL_VAR} for PostgreSQL names no database")
+    url = url.set(port=url.port or 5432)
+    refuse_bare_secret(env, DATABASE_PASSWORD_FILE_VAR, StoreConfigError)
+    name = closed_setting(
+        env.get(DATABASE_CREDENTIALS_VAR, ""),
+        DATABASE_CREDENTIALS_VAR,
+        DATABASE_CREDENTIALS,
+    )
+    credentials = DATABASE_CREDENTIALS[name]
+    refuse_unread(
+        env,
+        ("KATRA_DATABASE_",),
+        DATABASES["postgresql+asyncpg"].reads + credentials.reads,
+        f"a PostgreSQL database with {name} credentials",
+    )
+    return {
+        "port": url.port,
+        "ssl": _verify_full(env),
+        "password": credentials.password(url, env),
+    }
+
+
+def _sqlite_file(url: URL) -> Path:
+    """The file of a SQLite database: an absolute path in a directory that
+    passes :func:`~katra.objects.check_private`, or the startup
+    stops.
+
+    The store checks the file once, and SQLite then opens it by its path for
+    each connection and follows a symbolic link. SQLite also makes and reads
+    its journal beside the file, and plays back a journal it finds there. So
+    a user who can write the directory can change what each connection
+    opens, and the private directory is what stops it. A user who can write a
+    directory above it can also replace the directory: the store assumes
+    that only root or the service user can write those, as the object root
+    does.
+    """
+    path = Path(url.database or "")
+    if not path.is_absolute():
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} must name a SQLite file by an absolute path"
+        )
+    check_private(
+        path.parent,
+        f"the directory of the database file that {DATABASE_URL_VAR} names",
+        directory=True,
+    )
+    return path
+
+
+def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
+    """No connect arguments: a SQLite database is a local file.
+
+    It takes no credentials and no TLS, so each database setting but the URL
+    stops the startup. The file holds content, so it must pass
+    :func:`~katra.objects.check_private`, as the object root does.
+    """
+    refuse_unread(
+        env,
+        ("KATRA_DATABASE_",),
+        DATABASES["sqlite+aiosqlite"].reads,
+        "a SQLite database",
+    )
+    check_private(
+        _sqlite_file(url),
+        f"the database file that {DATABASE_URL_VAR} names",
+        directory=False,
+    )
+    return {}
+
+
+def _create_sqlite(url: URL) -> None:
+    """Make the database file with mode ``0600`` where there is none.
+
+    SQLite makes a missing file with the mode that the umask gives, which
+    can let every local user read it.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    try:
+        os.close(os.open(_sqlite_file(url), flags, 0o600))
+    except FileExistsError:
+        pass
+
+
+def _no_creation(url: URL) -> None:
+    """Make nothing: the operator makes the database on its server."""
+
+
+def _no_preparation(engine: AsyncEngine) -> None:
+    """Set nothing on a new engine."""
+
+
+async def _held_by_begin_immediate(connection: AsyncConnection, *_: str) -> None:
+    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database.
+
+    It serves as the admission lock and as each owner's lock, so it takes the
+    owner ID of the second and reads nothing past the connection.
+    """
+
+
+#: The key of the advisory lock that admission takes on PostgreSQL. The value
+#: is arbitrary, and no other lock in the database uses it.
+_ADMISSION_LOCK_KEY = 1525
+
+#: The first key of the per-owner advisory lock of an Owner File upload and a
+#: Control save. The second key is a hash of the owner ID.
+_OWNER_LOCK_KEY = 2059
+
+
+async def _owner_advisory_lock(connection: AsyncConnection, owner_id: str) -> None:
+    """Take the owner's lock until the transaction ends (ADRs 0118 and 0127).
+
+    The count of an owner's files or Controls and the insert need one owner's
+    lock, so two owners' saves do not wait on each other. Two owner IDs with
+    one hash share a lock, which only makes their saves wait.
+    """
+    await connection.execute(
+        select(func.pg_advisory_xact_lock(_OWNER_LOCK_KEY, func.hashtext(owner_id)))
+    )
+
+
+async def _advisory_lock(connection: AsyncConnection) -> None:
+    """Take the advisory lock of admission until the transaction ends (#1525).
+
+    Admission sums the tokens of every owner, so a lock on one row cannot
+    serialise it. At ``READ COMMITTED``, each statement after the lock sees
+    each admission that committed before it.
+    """
+    await connection.execute(select(func.pg_advisory_xact_lock(_ADMISSION_LOCK_KEY)))
+
+
+@dataclass(frozen=True)
+class Database:
+    """One database the ``sql`` store runs on: a row of :data:`DATABASES`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The connection pool.
+    pool: type[Pool]
+    #: What the store sets on a new engine before its first connection.
+    prepare: Callable[[AsyncEngine], None]
+    #: The connect arguments of the driver for the URL and the settings. It
+    #: checks each setting that a connection reads, so a wrong one stops the
+    #: startup.
+    connect: Callable[[URL, Mapping[str, str]], dict[str, Any]]
+    #: Takes the global lock of admission, in the write transaction of
+    #: admission.
+    admission_lock: Callable[[AsyncConnection], Awaitable[None]]
+    #: Takes one owner's lock of an Owner File upload or a Control save, in its
+    #: write transaction.
+    owner_lock: Callable[[AsyncConnection, str], Awaitable[None]]
+    #: Makes the database where there is none. Only a migration calls it,
+    #: through :func:`create_database`; the service never makes one.
+    create: Callable[[URL], None]
+    #: Whether the first-run app migrates this database itself. True only
+    #: where one person owns the database and runs the app (ADR 0110).
+    first_run_migrates: bool
+    #: The database settings that this database reads itself, beside those of
+    #: its row of :data:`DATABASE_CREDENTIALS`. :attr:`connect` refuses each
+    #: other one, and the Settings page shows only these.
+    reads: tuple[str, ...]
+
+
+DatabaseDriver = Literal["sqlite+aiosqlite", "postgresql+asyncpg"]
+
+#: Each database a deployment can name in ``KATRA_DATABASE_URL``, keyed by
+#: the URL's driver name. The table answers for every name of
+#: :data:`DatabaseDriver`.
+DATABASES: dict[DatabaseDriver, Database] = {
+    # A connection opens a file, so a pool saves little, and a connection
+    # that no pool keeps belongs to no event loop.
+    "sqlite+aiosqlite": Database(
+        pool=NullPool,
+        prepare=_prepare_sqlite,
+        connect=_sqlite,
+        admission_lock=_held_by_begin_immediate,
+        owner_lock=_held_by_begin_immediate,
+        create=_create_sqlite,
+        first_run_migrates=True,
+        reads=(DATABASE_URL_VAR,),
+    ),
+    # The server checks a password or an IAM token only when a connection
+    # opens, so a pooled connection stays open after its token expires, and
+    # asyncpg calls the token callable for each new connection (#1525).
+    "postgresql+asyncpg": Database(
+        pool=AsyncAdaptedQueuePool,
+        prepare=_no_preparation,
+        connect=_postgres,
+        admission_lock=_advisory_lock,
+        owner_lock=_owner_advisory_lock,
+        create=_no_creation,
+        first_run_migrates=False,
+        reads=(DATABASE_URL_VAR, DATABASE_CREDENTIALS_VAR, DATABASE_CA_FILE_VAR),
+    ),
+}
+
+
+def database_url(env: Mapping[str, str]) -> URL:
+    """``KATRA_DATABASE_URL``, checked; fail closed.
+
+    A URL that holds a password stops the startup, so a password never sits
+    in an environment variable. No message repeats the URL.
+    """
+    value = env.get(DATABASE_URL_VAR, "").strip()
+    if not value:
+        raise StoreConfigError(f"set {DATABASE_URL_VAR} for the sql job store")
+    try:
+        url = make_url(value)
+    except (ArgumentError, ValueError):
+        # SQLAlchemy raises a bare ValueError for a host or a port that does
+        # not parse, and its message repeats a part of the URL.
+        raise StoreConfigError(f"{DATABASE_URL_VAR} is not a database URL") from None
+    if holds_password(value):
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} holds a password; remove it from the URL"
+        )
+    _database(url)
+    return url
+
+
+def _database(url: URL) -> Database:
+    """The row of :data:`DATABASES` for the driver of ``url``."""
+    return DATABASES[
+        closed_setting(url.drivername, f"the driver of {DATABASE_URL_VAR}", DATABASES)
+    ]
+
+
+def database_reads(env: Mapping[str, str]) -> tuple[str, ...]:
+    """The database settings that the settings in ``env`` select: the reads
+    of the row of :data:`DATABASES` for the driver of the URL, and of the row
+    of :data:`DATABASE_CREDENTIALS` where the database reads a mode.
+
+    The Settings page shows only these. Where the URL or the mode names no
+    row, the list stops at the setting that names none.
+    """
+    try:
+        reads = _database(database_url(env)).reads
+    except StoreConfigError:
+        return (DATABASE_URL_VAR,)
+    if DATABASE_CREDENTIALS_VAR not in reads:
+        return reads
+    try:
+        mode = closed_setting(
+            env.get(DATABASE_CREDENTIALS_VAR, ""),
+            DATABASE_CREDENTIALS_VAR,
+            DATABASE_CREDENTIALS,
+        )
+    except StoreConfigError:
+        return reads
+    return reads + DATABASE_CREDENTIALS[mode].reads
+
+
+def create_database(env: Mapping[str, str]) -> None:
+    """Make the database that the settings name where there is none, by the
+    ``create`` field of its row. The migration step calls it first."""
+    url = database_url(env)
+    _database(url).create(url)
+
+
+#: The process that brings a database to the latest revision (ADR 0110).
+Migrator = Literal["the first-run app", "the migration step"]
+
+
+def migrator(env: Mapping[str, str], *, first_run: bool) -> Migrator:
+    """The process that migrates the database that the settings name.
+
+    **The one reader of which process migrates a database.** It is the
+    first-run app where that app builds the store and the row of the database
+    sets ``first_run_migrates``, and the migration step otherwise. The build
+    of the store reads it, and the build decides from it whether to migrate
+    and which remedy :meth:`SqlJobStore.startup_check` gives.
+    """
+    if first_run and _database(database_url(env)).first_run_migrates:
+        return "the first-run app"
+    return "the migration step"
+
+
+def migrate_database(env: Mapping[str, str]) -> None:
+    """Migrate the database that the settings name to the latest revision:
+    the migration step.
+
+    A database at a revision that the tree does not hold raises
+    :class:`RevisionNotHeld`, with the remedy of the migration step. An error
+    of the database ends in a traceback. It runs event loops of its own, so
+    call it where none runs.
+    """
+    _migrate(env, "the migration step")
+
+
+def migrate_first_run_database(env: Mapping[str, str]) -> None:
+    """Migrate the database that the settings name to the latest revision:
+    the first-run app, where :func:`migrator` names it (ADR 0110).
+
+    A database at a revision that the tree does not hold stays as it is, and
+    the startup check refuses it. A database whose revision cannot be read,
+    or that cannot be migrated, stops the startup with a
+    :class:`StoreConfigError` that says which, and names no path. It runs
+    event loops of its own, so call it where none runs.
+    """
+    with suppress(RevisionNotHeld):
+        _migrate(env, "the first-run app")
+
+
+def _migrate(env: Mapping[str, str], by: Migrator) -> None:
+    """The steps of each migration: make the database where it does not
+    exist, read its revision, refuse a revision that the tree does not hold,
+    and upgrade a database below the latest revision, with one log line that
+    names the two revisions."""
+    create_database(env)
+    with _failed(by, "read"):
+        current = asyncio.run(_current_revision(env))
+    if not migrations.holds(current):
+        raise _not_held(current, by)
+    head = migrations.head()
+    if current == head:
+        return
+    with _failed(by, "migrated"):
+        migrations.upgrade(env)
+    logger.info(
+        "%s migrated the job database from revision %s to %s", by, current, head
+    )
+
+
+@contextmanager
+def _failed(by: Migrator, step: Literal["read", "migrated"]) -> Iterator[None]:
+    """Stop the first-run app with a :class:`StoreConfigError` where the
+    database cannot be ``step``. The refusal names no path, and the log says
+    why. The migration step keeps the error and its traceback."""
+    try:
+        yield
+    except (SQLAlchemyError, CommandError):
+        if by != "the first-run app":
+            raise
+        logger.exception("%s: the job database cannot be %s", by, step)
+        raise StoreConfigError(
+            f"the database that {DATABASE_URL_VAR} names cannot be {step};"
+            " the log says why"
+        ) from None
+
+
+async def _current_revision(env: Mapping[str, str]) -> str | None:
+    engine = engine_for(env)
+    try:
+        async with engine.connect() as connection:
+            return await connection.run_sync(_revision)
+    finally:
+        await engine.dispose()
+
+
+def engine_for(env: Mapping[str, str]) -> AsyncEngine:
+    """The engine of the database that the settings name, with the facts of its row.
+
+    It checks every database setting, and it opens no connection.
+    """
+    url = database_url(env)
+    database = _database(url)
+    engine = create_async_engine(
+        url, poolclass=database.pool, connect_args=database.connect(url, env)
+    )
+    database.prepare(engine)
+    return engine
+
+
+def _revision(connection: Connection) -> str | None:
+    return MigrationContext.configure(connection).get_current_revision()
+
+
+#: The remedy for a database that no migration can bring to the latest
+#: revision, by the process that migrates it. Each remedy names no path, so
+#: the refusal that holds it names none.
+REMAKE: dict[Migrator, str] = {
+    "the first-run app": (
+        "delete the database file, then start the app again: the app makes"
+        " a new database and migrates it"
+    ),
+    "the migration step": (
+        "remove the database (for SQLite, delete its file; for PostgreSQL, drop"
+        " the database and create it again), then run"
+        " python -m katra.migrations"
+    ),
+}
+
+
+class RevisionNotHeld(RuntimeError):
+    """A database at a revision that the tree does not hold, such as one that
+    a later build migrated. No migration of this build brings it to the
+    latest revision. The database is the fault, not a setting."""
+
+
+def _not_held(current: str | None, by: Migrator) -> RevisionNotHeld:
+    """**The one refusal of a revision that the tree does not hold**, with the
+    remedy of :data:`REMAKE`. The migrations and the startup check raise
+    it."""
+    return RevisionNotHeld(
+        f"the database schema is at revision {current}, which this build does"
+        f" not hold, so {REMAKE[by]}"
+    )
+
+
+def _schema_differences(connection: Connection) -> list[str]:
+    """Each table of :data:`METADATA` that the database lacks, and each column
+    that one of its tables lacks or holds beyond :data:`METADATA`.
+
+    An insert into a table that holds a column the service does not know
+    fails where that column takes no null.
+    """
+    inspector = inspect(connection)
+    held_tables = set(inspector.get_table_names())
+    differences = []
+    for name, table in sorted(METADATA.tables.items()):
+        if name not in held_tables:
+            differences.append(f"no {name} table")
+            continue
+        needed = set(table.columns.keys())
+        held = {column["name"] for column in inspector.get_columns(name)}
+        differences += [
+            f"no {name}.{column} column" for column in sorted(needed - held)
+        ]
+        differences += [
+            f"an unknown {name}.{column} column" for column in sorted(held - needed)
+        ]
+    return differences
+
+
+def _held(job_id: str) -> CompoundSelect:
+    """The ID ``job_id`` where a job row or a usage row holds it. A deleted
+    job keeps its ID, so a new job never takes it."""
+    return union_all(
+        select(jobs.c.id).where(jobs.c.id == job_id),
+        select(usage_rows.c.job_id).where(usage_rows.c.job_id == job_id),
+    )
+
+
+#: The columns of the admission view of a job beside its ID: the fields of a
+#: :class:`~katra.jobs.UsageRow`.
+_VIEW_COLUMNS = (
+    "owner_id",
+    "created_at",
+    "reserved_tokens",
+    "measured_tokens",
+    "status",
+    "parent_id",
+)
+
+
+def _admission_view(where: Callable[[Table], ColumnElement[bool]]) -> CompoundSelect:
+    """The admission view of each job row and usage row that ``where`` selects."""
+
+    def view(table: Table, job_id: Column[Any]) -> Select[Any]:
+        return select(
+            job_id.label("job_id"), *(table.c[name] for name in _VIEW_COLUMNS)
+        ).where(where(table))
+
+    return union_all(view(jobs, jobs.c.id), view(usage_rows, usage_rows.c.job_id))
+
+
+def _children(parent_id: str) -> CompoundSelect:
+    """The admission view of each job that names ``parent_id`` as its parent."""
+    return _admission_view(lambda table: table.c.parent_id == parent_id)
+
+
+def _counted(since: datetime) -> CompoundSelect:
+    """The admission view of each job a bound can count: those in flight, and
+    those that started inside the window."""
+    return _admission_view(
+        lambda table: or_(
+            table.c.created_at >= since,
+            table.c.status.not_in(sorted(TERMINAL_STATUSES)),
+        )
+    )
+
+
+class SqlJobStore:
+    """:class:`~katra.jobs.JobStore` on a database and an object store."""
+
+    #: The database and the object store keep each job through a restart.
+    durable = True
+
+    def __init__(
+        self, engine: AsyncEngine, objects: ObjectStore, *, migrator: Migrator
+    ) -> None:
+        """``migrator`` is the process that migrates the database, which
+        decides the remedy that :meth:`startup_check` gives."""
+        self._engine = engine
+        self._objects = objects
+        self._migrator = migrator
+        self._admission_lock = _database(engine.url).admission_lock
+        self._owner_lock = _database(engine.url).owner_lock
+
+    @asynccontextmanager
+    async def _transaction(
+        self, *, writes: bool = False
+    ) -> AsyncIterator[AsyncConnection]:
+        async with self._engine.connect() as connection:
+            if writes:
+                await connection.execution_options(**{_WRITES: True})
+            async with connection.begin():
+                yield connection
+
+    async def startup_check(self) -> None:
+        """Refuse a schema that is not at the latest revision, or that differs
+        from :data:`METADATA` in a table or a column, then check the object
+        store. The service never migrates."""
+        async with self._transaction() as connection:
+            current = await connection.run_sync(_revision)
+        head = migrations.head()
+        if not migrations.holds(current):
+            raise _not_held(current, self._migrator)
+        if current != head:
+            raise StoreConfigError(
+                f"the database schema is at revision {current}, and this service"
+                f" needs {head}: run python -m katra.migrations first"
+            )
+        async with self._transaction() as connection:
+            differences = await connection.run_sync(_schema_differences)
+        if differences:
+            # A schema change edits revision 0001 in place, so a database with
+            # another schema can be at the head revision, and a migration changes
+            # nothing in it.
+            raise StoreConfigError(
+                f"the database schema differs from the one this service needs"
+                f" ({'; '.join(differences)}): the database holds another"
+                f" schema at the head revision, and a migration does not change it, so"
+                f" {REMAKE[self._migrator]}"
+            )
+        await self._objects.check()
+
+    async def _object(self, row: Row[Any], name: ObjectName) -> bytes | None:
+        """The object ``name`` of the job ``row`` names, checked against the
+        digest the row holds in :data:`DIGEST_COLUMNS`.
+
+        ``None`` where the object is missing because a delete removed the row
+        after the caller read it. A delete changes the row first, so a row
+        that is still there names an object that must be there.
+        """
+        data = await self._objects.get(object_key(row.owner_id, row.id, name))
+        if data is None:
+            async with self._transaction() as connection:
+                held = await connection.scalar(
+                    select(jobs.c.id).where(jobs.c.id == row.id)
+                )
+            if held is None:
+                return None
+        digest = row._mapping[DIGEST_COLUMNS[name]]
+        if data is None or not hmac.compare_digest(object_digest(data), digest):
+            logger.error(
+                "job %s of owner %s: its %s object is missing or fails its digest"
+                " check",
+                row.id,
+                row.owner_id,
+                name,
+            )
+            raise CorruptObject(row.id)
+        return data
+
+    async def _lock(self, connection: AsyncConnection, job_id: str) -> None:
+        """Lock the row of ``job_id`` for this transaction. On SQLite the
+        transaction's write lock already holds it."""
+        await connection.execute(
+            select(jobs.c.id).where(jobs.c.id == job_id).with_for_update()
+        )
+
+    async def _resumed_by(
+        self, connection: AsyncConnection, parent_id: str
+    ) -> str | None:
+        """The child of ``parent_id`` that locks it, by :func:`locks_its_parent`."""
+        children = await connection.execute(_children(parent_id))
+        for row in children.all():
+            if locks_its_parent(await self._admission_record(connection, row)):
+                return row.job_id
+        return None
+
+    async def reserve(
+        self,
+        record: JobRecord,
+        *,
+        ceiling: int,
+        budget: BudgetPolicy,
+        principal: Principal | None,
+    ) -> Admission:
+        """Check every admission bound and insert, in one write transaction.
+
+        The objects go first, so the row never names an object that does not
+        exist, and they go again at once where admission refuses the job or
+        raises. A failed object delete there changes neither the refusal nor
+        the error. The admission of a child clears its parent's
+        ``continue_refusal`` in the same transaction (ADR 0125).
+        """
+        if principal is not None and principal.owner_id != record.owner_id:
+            raise ValueError(f"job {record.id} names another owner than its principal")
+        async with self._transaction() as connection:
+            held = await connection.scalar(_held(record.id))
+        if held is not None:
+            return Admission(outcome="duplicate", active=0)
+        objects: dict[ObjectName, bytes] = {
+            "sources.json": _SOURCES.dump_json(record.whole_sources())
+        }
+        if record.report is not None:
+            objects["report.json"] = stored_report(record.report)
+        if record.controls:
+            objects["controls.json"] = _CONTROLS.dump_json(record.controls)
+        keys = []
+        try:
+            for name, data in objects.items():
+                key = object_key(record.owner_id, record.id, name)
+                await self._objects.put(key, data)
+                keys.append(key)
+            admission = await self._admit(
+                record,
+                ceiling=ceiling,
+                budget=budget,
+                principal=principal,
+                digests={name: object_digest(data) for name, data in objects.items()},
+            )
+        except BaseException:
+            await self._remove(keys)
+            raise
+        if admission.outcome != "admitted":
+            await self._remove(keys)
+        return admission
+
+    async def _remove(self, keys: Sequence[str]) -> int:
+        """Delete the object under each key, and return how many the store removed.
+
+        A failed delete is logged with its key, and the next key follows. The
+        object then stays for the orphan sweep. Each caller calls this after
+        its row change committed, or in place of a row change, so no error of
+        an object delete can change the outcome of the caller. The catch is
+        :class:`Exception`, because the rows raise errors with no common base
+        below it: :class:`OSError` on a filesystem, and ``ClientError`` or
+        ``BotoCoreError`` from ``boto3``. A cancellation is not an
+        :class:`Exception`, so it goes to the caller.
+        """
+        removed = 0
+        for key in keys:
+            try:
+                removed += await self._objects.delete(key)
+            except Exception as error:  # noqa: BLE001 -- the docstring states why
+                logger.warning(
+                    "the object store did not delete the object %s (%s);"
+                    " the orphan sweep removes it",
+                    key,
+                    type(error).__name__,
+                )
+        return removed
+
+    async def _admit(
+        self,
+        record: JobRecord,
+        *,
+        ceiling: int,
+        budget: BudgetPolicy,
+        principal: Principal | None,
+        digests: Mapping[ObjectName, str],
+    ) -> Admission:
+        async with self._transaction(writes=True) as connection:
+            await self._admission_lock(connection)
+            if await connection.scalar(_held(record.id)) is not None:
+                return Admission(outcome="duplicate", active=0)
+            if not await self._principal_admits(connection, record.owner_id, principal):
+                return Admission(outcome="principal_exists", active=0)
+            parent = parent_of(record)
+            if parent is not None:
+                await self._lock(connection, parent)
+                revision = await connection.scalar(
+                    select(jobs.c.revision).where(
+                        jobs.c.id == parent, jobs.c.owner_id == record.owner_id
+                    )
+                )
+                if revision is None:
+                    return Admission(outcome="parent_missing", active=0)
+                if await self._resumed_by(connection, parent) is not None:
+                    return Admission(outcome="resumed_already", active=0)
+                if revision != record.parent_revision:
+                    return Admission(outcome="parent_stale", active=0)
+            counted = await connection.execute(_counted(budget.window_start()))
+            held: list[Envelope | UsageRow] = []
+            for row in counted.all():
+                if row.owner_id == record.owner_id:
+                    held.append(await self._admission_record(connection, row))
+                else:
+                    held.append(UsageRow(**row._mapping))
+            admission = check_bounds(record, held, ceiling=ceiling, budget=budget)
+            if admission.outcome != "admitted":
+                return admission
+            if principal is not None:
+                await self._add_principal(connection, principal)
+            if parent is not None:
+                await connection.execute(
+                    update(jobs)
+                    .where(jobs.c.id == parent)
+                    .values(continue_refusal=None)
+                )
+            await connection.execute(
+                insert(jobs).values(
+                    {
+                        **_job_row(record),
+                        "sources_sha256": digests["sources.json"],
+                        "report_sha256": digests.get("report.json"),
+                        "controls_sha256": digests.get("controls.json"),
+                    }
+                )
+            )
+            await connection.execute(
+                insert(job_events), _event_rows(record.id, record.events)
+            )
+        return admission
+
+    async def _principal(
+        self, connection: AsyncConnection, identity: Identity
+    ) -> Principal | None:
+        found = await connection.execute(
+            select(principals).where(
+                principals.c.issuer == identity.issuer,
+                principals.c.sub == identity.sub,
+            )
+        )
+        row = found.one_or_none()
+        return None if row is None else Principal(**row._mapping)
+
+    async def principal(self, identity: Identity) -> Principal | None:
+        """The principal of ``identity``, or ``None``. Creates nothing."""
+        async with self._transaction() as connection:
+            return await self._principal(connection, identity)
+
+    async def _row(self, query: Select[Any]) -> tuple[Row[Any], list[str]] | None:
+        """The job row that ``query`` selects, and its events as stored."""
+        async with self._transaction() as connection:
+            row = (await connection.execute(query)).one_or_none()
+            if row is None:
+                return None
+            return row, await _events(connection, row.id)
+
+    async def _admission_record(
+        self, connection: AsyncConnection, row: Row[Any]
+    ) -> Envelope | UsageRow:
+        """What admission reads of the job of the admission view row ``row``:
+        the envelope where the stored status leaves the job in flight and a
+        job row holds it, else the view row. A terminal stored status ends a
+        job whether it parses or not, so no other row is parsed."""
+        live = None
+        if row.status not in TERMINAL_STATUSES:
+            live = await self._envelope_in(connection, row.job_id)
+        return UsageRow(**row._mapping) if live is None else live
+
+    async def _envelope_in(
+        self, connection: AsyncConnection, job_id: str
+    ) -> Envelope | None:
+        """The envelope of the job row ``job_id``, read in ``connection``, or
+        ``None`` where no job row holds it: a usage row is all that is left."""
+        found = await connection.execute(select(jobs).where(jobs.c.id == job_id))
+        row = found.one_or_none()
+        if row is None:
+            return None
+        return _envelope(row, await _events(connection, job_id))
+
+    async def get(self, job_id: str) -> JobRecord | None:
+        found = await self._row(select(jobs).where(jobs.c.id == job_id))
+        if found is None:
+            return None
+        row, texts = found
+        sources = await self._object(row, "sources.json")
+        if sources is None:
+            return None
+        named: dict[ObjectName, bytes | None] = {}
+        for name in ("report.json", "controls.json"):
+            if _names(row, name):
+                named[name] = await self._object(row, name)
+                if named[name] is None:
+                    return None
+        return _record(
+            row,
+            sources,
+            named.get("report.json"),
+            texts,
+            named.get("controls.json"),
+        )
+
+    async def owned(self, job_id: str, owner_id: str) -> Envelope | None:
+        """The record ``owner_id`` owns, as an envelope, or ``None``.
+
+        It reads no object, and parses no part that the schema version covers.
+        """
+        query = select(jobs).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+        found = await self._row(query)
+        return None if found is None else _envelope(*found)
+
+    async def sources(self, job_id: str, owner_id: str) -> list[Source] | None:
+        """The owned job's sources. The owner is checked on the row, before
+        the object is read."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.sources_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            )
+            row = found.one_or_none()
+        if row is None:
+            return None
+        data = await self._object(row, "sources.json")
+        if data is None:
+            return None
+        return _part_of(row, lambda: _SOURCES.validate_json(data))
+
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        """The owned job's copy of its Controls. The owner is checked on the
+        row, before the object is read."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.controls_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            )
+            row = found.one_or_none()
+        if row is None:
+            return None
+        if not _names(row, "controls.json"):
+            return []
+        data = await self._object(row, "controls.json")
+        if data is None:
+            return None
+        return _part_of(row, lambda: _CONTROLS.validate_json(data, context=STORED))
+
+    async def _report(
+        self, job_id: str, owner_id: str
+    ) -> tuple[Row[Any], bytes] | None:
+        """The owned job's row and its report object, or ``None``."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.report_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            )
+            row = found.one_or_none()
+        if row is None or not _names(row, "report.json"):
+            return None
+        data = await self._object(row, "report.json")
+        return None if data is None else (row, data)
+
+    async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
+        """The owned job's report as the object holds it, parsed as JSON only.
+
+        It never parses the report as a :class:`Report`, so a report from an
+        older schema version reads as stored.
+        """
+        found = await self._report(job_id, owner_id)
+        return None if found is None else json.loads(found[1])
+
+    async def report(self, job_id: str, owner_id: str) -> Report | None:
+        found = await self._report(job_id, owner_id)
+        if found is None:
+            return None
+        row, data = found
+        return _part_of(row, lambda: Report.model_validate_json(data, context=STORED))
+
+    async def _part(self, name: str, job_id: str, owner_id: str) -> Any:
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.schema_version, jobs.c[name]).where(
+                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
+                )
+            )
+            row = found.one_or_none()
+        if row is None or row._mapping[name] is None:
+            return None
+        text = row._mapping[name]
+        return _part_of(
+            row, lambda: _ADAPTERS[name].validate_json(text, context=STORED)
+        )
+
+    async def checkpoint(self, job_id: str, owner_id: str) -> Checkpoint | None:
+        return await self._part("checkpoint", job_id, owner_id)
+
+    async def resumption(self, job_id: str, owner_id: str) -> Resumption | None:
+        return await self._part("resumption", job_id, owner_id)
+
+    async def resumed_by(self, job_id: str, owner_id: str) -> str | None:
+        """The ID of the owned job's resumed job that locks it, or ``None``."""
+        async with self._transaction() as connection:
+            owned = await connection.scalar(
+                select(jobs.c.id).where(
+                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
+                )
+            )
+            if owned is None:
+                return None
+            return await self._resumed_by(connection, job_id)
+
+    async def events_after(
+        self, job_id: str, seen: int
+    ) -> tuple[JobStatus, list[JobEvent]] | None:
+        """The job's status and the events past ``seen``, and nothing else.
+        Raises :class:`UnreadableSchema` where the status or an event does
+        not parse (ADR 0095)."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.status, jobs.c.schema_version).where(
+                    jobs.c.id == job_id
+                )
+            )
+            row = found.one_or_none()
+            if row is None:
+                return None
+            texts = await connection.scalars(
+                select(job_events.c.event)
+                .where(job_events.c.job_id == job_id, job_events.c.seq > seen)
+                .order_by(job_events.c.seq)
+            )
+            events = texts.all()
+        status = _part_of(row, lambda: _STATUS.validate_python(row.status))
+        return status, _stored_events(row, events)
+
+    async def save(self, record: JobRecord) -> None:
+        """Write the record back, and the events it gained.
+
+        The sources are written once, at admission. A save puts the report
+        where the row names none. A save that stopped after its put and before
+        its row write left a report object that no row names. A later save
+        puts its report there again.
+        """
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.report_sha256,
+                ).where(jobs.c.id == record.id)
+            )
+            row = found.one_or_none()
+            texts = await connection.scalars(
+                select(job_events.c.event)
+                .where(job_events.c.job_id == record.id)
+                .order_by(job_events.c.seq)
+            )
+            events = texts.all()
+        if row is None:
+            raise ValueError(f"job {record.id!r} does not exist")
+        check_save(record, row.report_sha256, _stored_events(row, events))
+        values = _job_row(record)
+        # Only set_title writes the title after admission (ADR 0106), and
+        # only set_continue_refusal and a child's admission write the
+        # continue refusal (ADR 0125), as
+        # `test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it`
+        # checks.
+        del values["title"]
+        del values["continue_refusal"]
+        if record.report is not None and not _names(row, "report.json"):
+            data = stored_report(record.report)
+            key = object_key(row.owner_id, row.id, "report.json")
+            try:
+                await self._objects.put(key, data)
+            except FileExistsError:
+                # No row names the object, so it is an orphan. The job is not
+                # terminal until the row write below, so the orphan sweep
+                # keeps the new object.
+                await self._objects.delete(key)
+                await self._objects.put(key, data)
+            values["report_sha256"] = object_digest(data)
+        await self._write(record, values)
+
+    async def _write(self, record: JobRecord, values: Mapping[str, Any]) -> None:
+        """Write ``values`` to the job row of ``record``, and the events that
+        ``record`` gained, in one write transaction."""
+        async with self._transaction(writes=True) as connection:
+            await connection.execute(
+                update(jobs).where(jobs.c.id == record.id).values(values)
+            )
+            stored = await connection.scalar(
+                select(func.count())
+                .select_from(job_events)
+                .where(job_events.c.job_id == record.id)
+            )
+            gained = record.events[stored or 0 :]
+            if gained:
+                await connection.execute(
+                    insert(job_events), _event_rows(record.id, gained)
+                )
+
+    async def save_answers(
+        self,
+        job_id: str,
+        owner_id: str,
+        answers: AnswerSet,
+        shown: Sequence[UnknownKey],
+        skipped: Sequence[SkipKey],
+        revision: int,
+        *,
+        renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
+    ) -> bool:
+        """Keep a waiting job's saved answers, as one conditional ``UPDATE`` on
+        the revision, under the lock on the job's row."""
+        values = {
+            "answers": _json("answers", answers),
+            "shown_early": _json("shown_early", list(shown)),
+            "skipped_early": _json("skipped_early", list(skipped)),
+            "carried_renames": _json("carried_renames", list(renames)),
+            "control_scopes": _json(
+                "control_scopes",
+                None if control_scopes is None else list(control_scopes),
+            ),
+            "control_facts": _json(
+                "control_facts",
+                None if control_facts is None else list(control_facts),
+            ),
+        }
+        async with self._transaction(writes=True) as connection:
+            await self._lock(connection, job_id)
+            if await self._resumed_by(connection, job_id) is not None:
+                return False
+            saved = await connection.execute(
+                update(jobs)
+                .where(
+                    jobs.c.id == job_id,
+                    jobs.c.owner_id == owner_id,
+                    jobs.c.status == "awaiting-answers",
+                    jobs.c.revision == revision,
+                )
+                .values(
+                    {
+                        **values,
+                        "revision": jobs.c.revision + 1,
+                        "updated_at": datetime.now(UTC),
+                    }
+                )
+            )
+            return saved.rowcount == 1
+
+    async def _report_state(
+        self, connection: AsyncConnection, job_id: str, owner_id: str
+    ) -> Literal["offers-follow-up", "final"] | None:
+        """Whether the owned, completed job's report still offers its follow-up
+        or is final (ADR 0054), or ``None`` where the job is not the owner's or
+        has no report."""
+        text = await connection.scalar(
+            select(jobs.c.resumption)
+            .where(
+                jobs.c.id == job_id,
+                jobs.c.owner_id == owner_id,
+                jobs.c.status == "completed",
+            )
+            .with_for_update()
+        )
+        if text is None:
+            return None
+        resumption = _ADAPTERS["resumption"].validate_json(text, context=STORED)
+        return "final" if is_follow_up(resumption) else "offers-follow-up"
+
+    async def save_draft(
+        self,
+        job_id: str,
+        owner_id: str,
+        draft: SentAnswers,
+        revision: int,
+    ) -> bool:
+        """Keep a finished report's draft answers, as one conditional
+        ``UPDATE`` on the revision (ADR 0070)."""
+        value = _json("draft", draft)
+        async with self._transaction(writes=True) as connection:
+            state = await self._report_state(connection, job_id, owner_id)
+            if state != "offers-follow-up":
+                return False
+            if await self._resumed_by(connection, job_id) is not None:
+                return False
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.revision == revision)
+                .values(
+                    draft=value,
+                    revision=jobs.c.revision + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            return saved.rowcount == 1
+
+    async def save_corrections(
+        self,
+        job_id: str,
+        owner_id: str,
+        corrections: Sequence[FactAnswer],
+        revision: int,
+    ) -> bool:
+        """Keep a final report's corrections, as one conditional ``UPDATE``
+        on the revision (ADR 0090)."""
+        value = _json("corrections", list(corrections))
+        async with self._transaction(writes=True) as connection:
+            if await self._report_state(connection, job_id, owner_id) != "final":
+                return False
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.revision == revision)
+                .values(
+                    corrections=value,
+                    revision=jobs.c.revision + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            return saved.rowcount == 1
+
+    async def set_title(self, job_id: str, owner_id: str, title: str | None) -> bool:
+        async with self._transaction(writes=True) as connection:
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+                .values(title=title)
+            )
+            return saved.rowcount == 1
+
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        async with self._transaction(writes=True) as connection:
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+                .values(continue_refusal=refusal)
+            )
+            return saved.rowcount == 1
+
+    async def owned_jobs(self, owner_id: str) -> list[Envelope]:
+        """Every job of the owner, as envelopes, oldest first. A job whose
+        envelope does not parse is an :class:`UnreadableRecord`."""
+        async with self._transaction() as connection:
+            found = await connection.scalars(
+                select(jobs.c.id)
+                .where(jobs.c.owner_id == owner_id)
+                .order_by(jobs.c.created_at, jobs.c.id)
+            )
+            job_ids = found.all()
+        listed = [await self.owned(job_id, owner_id) for job_id in job_ids]
+        return [record for record in listed if record is not None]
+
+    async def delete(
+        self, job_id: str, owner_id: str, *, updated_before: datetime | None = None
+    ) -> int | DeleteRefusal:
+        """Turn the owned job's row into a usage row, then delete its objects
+        (ADR 0066). The number of objects removed, or a
+        :class:`~katra.jobs.DeleteRefusal` where nothing changes.
+        The usage row keeps the stored status as it is. The row lock is the
+        one that admission takes on a child's parent, so a child admitted
+        first keeps the job, and a child admitted after finds no parent."""
+        query = (
+            select(jobs)
+            .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            .with_for_update()
+        )
+        async with self._transaction(writes=True) as connection:
+            found = await connection.execute(query)
+            row = found.one_or_none()
+            if row is None:
+                return DeleteRefusal("absent")
+            if not await _ended(connection, row):
+                return DeleteRefusal("in_flight")
+            if updated_before is not None and row.updated_at >= updated_before:
+                return DeleteRefusal("changed")
+            children = await connection.execute(_children(job_id))
+            for child in children.all():
+                if holds_a_slot(await self._admission_record(connection, child)):
+                    return DeleteRefusal("child", child.job_id)
+            await connection.execute(
+                insert(usage_rows).values(
+                    job_id=row.id,
+                    owner_id=row.owner_id,
+                    created_at=row.created_at,
+                    reserved_tokens=row.reserved_tokens,
+                    measured_tokens=row.measured_tokens,
+                    status=row.status,
+                    parent_id=row.parent_id,
+                )
+            )
+            await connection.execute(
+                delete(job_events).where(job_events.c.job_id == job_id)
+            )
+            await connection.execute(delete(jobs).where(jobs.c.id == job_id))
+        return await self._remove(_object_keys(row))
+
+    async def _kept_keys(self, job_ids: Sequence[str]) -> set[str]:
+        """The key of each object that the orphan sweep keeps for the job rows
+        of ``job_ids``: each object a terminal job's row names, and each
+        object of a job that is not terminal.
+
+        A save of a job that is not terminal can put its report before the
+        row write that names it, and over an orphan report of the job. The
+        row write makes the job terminal, so no object that a later save can
+        name is ever deleted. One read transaction, with :data:`_ID_BATCH` job
+        IDs in each query.
+        """
+        columns = (jobs.c[column] for column in DIGEST_COLUMNS.values())
+        query = select(jobs.c.id, jobs.c.owner_id, jobs.c.status, *columns)
+        kept = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(job_ids), _ID_BATCH):
+                batch = job_ids[start : start + _ID_BATCH]
+                for row in await connection.execute(query.where(jobs.c.id.in_(batch))):
+                    in_flight = row.status not in TERMINAL_STATUSES
+                    kept.update(_object_keys(row, include_unnamed=in_flight))
+        return kept
+
+    async def sweep_orphans(self, before: datetime) -> int:
+        """Delete each object last written before ``before`` that no job row
+        keeps, and return how many the store removed.
+
+        The sweep lists every key first. A key that no builder of
+        :func:`key_parts` can give stays, because the service never writes
+        one. Then it finds the keys that the rows of the listed job IDs keep
+        (:meth:`_kept_keys`), the keys that the rows of the listed Owner File
+        IDs keep (:meth:`_kept_file_keys`) and the keys that the rows of the
+        listed Control IDs keep (:meth:`_kept_evidence_keys`). A row keeps a
+        key only under its own owner ID. The sweep deletes each other listed
+        key.
+        """
+        listed = []
+        async for key, modified in self._objects.list():
+            parts = key_parts(key)
+            if parts is not None and modified < before:
+                listed.append((key, parts))
+        job_ids = {parts.job_id for _, parts in listed if isinstance(parts, JobKey)}
+        file_ids = {parts.file_id for _, parts in listed if isinstance(parts, FileKey)}
+        control_ids = {
+            parts.control_id for _, parts in listed if isinstance(parts, ControlKey)
+        }
+        kept = await self._kept_keys(sorted(job_ids))
+        kept |= await self._kept_file_keys(sorted(file_ids))
+        kept |= await self._kept_evidence_keys(sorted(control_ids))
+        return await self._remove([key for key, _ in listed if key not in kept])
+
+    async def _kept_evidence_keys(self, control_ids: Sequence[str]) -> set[str]:
+        """The key of each evidence object that a row of ``control_ids`` lists,
+        under the row's own owner ID. One read transaction, with
+        :data:`_ID_BATCH` Control IDs in each query."""
+        query = select(controls.c.id, controls.c.owner_id, controls.c.document)
+        kept: set[str] = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(control_ids), _ID_BATCH):
+                batch = control_ids[start : start + _ID_BATCH]
+                rows = await connection.execute(query.where(controls.c.id.in_(batch)))
+                kept.update(
+                    evidence_key(row.owner_id, row.id, file.id)
+                    for row in rows
+                    for file in _document(row.document).evidence
+                )
+        return kept
+
+    async def _kept_file_keys(self, file_ids: Sequence[str]) -> set[str]:
+        """The key of each Owner File object that a row of ``file_ids`` names,
+        under the row's own owner ID. One read transaction, with
+        :data:`_ID_BATCH` file IDs in each query."""
+        query = select(owner_files.c.id, owner_files.c.owner_id)
+        kept: set[str] = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(file_ids), _ID_BATCH):
+                batch = file_ids[start : start + _ID_BATCH]
+                rows = await connection.execute(
+                    query.where(owner_files.c.id.in_(batch))
+                )
+                kept.update(file_key(row.owner_id, row.id) for row in rows)
+        return kept
+
+    async def expired(self, before: datetime) -> list[tuple[str, str]]:
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs)
+                .where(jobs.c.updated_at < before)
+                .order_by(jobs.c.updated_at, jobs.c.id)
+            )
+            return [
+                (row.id, row.owner_id)
+                for row in found.all()
+                if await _ended(connection, row)
+            ]
+
+    async def fail_in_flight(self) -> list[str]:
+        """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
+
+        The restart scan (#1529), through :meth:`JobRecord.transition` as on
+        every store, so each failed job keeps its full charge and gets a
+        status event. It reads each job as an envelope and writes only the
+        columns that the transition and the error change, so it fails a job
+        of any schema version. A job in flight holds no report. It leaves an
+        :class:`UnreadableRecord` as stored and logs it: no transition reads
+        its events, and no migration rewrites it (ADR 0095).
+        """
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.owner_id)
+                .where(jobs.c.status.not_in(sorted(TERMINAL_STATUSES)))
+                .order_by(jobs.c.created_at, jobs.c.id)
+            )
+            in_flight = found.all()
+        failed = []
+        for job_id, owner_id in in_flight:
+            record = await self.owned(job_id, owner_id)
+            if record is None:
+                continue
+            if not isinstance(record, JobRecord):
+                logger.error("the restart scan cannot fail unreadable job %s", job_id)
+                continue
+            record.transition("failed")
+            record.error = RESTART_FAILURE_MESSAGE
+            await self._write(
+                record, {name: getattr(record, name) for name in _FAILED_COLUMNS}
+            )
+            failed.append(job_id)
+        return failed
+
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Put the text, then count and insert the row in one write
+        transaction (ADR 0118).
+
+        The object goes first, so a row never names an object that does not
+        exist, and it goes again at once where the insert is refused or raises.
+        """
+        if principal is not None and principal.owner_id != file.owner_id:
+            raise ValueError(f"file {file.id} names another owner than its principal")
+        data = text.encode("utf-8")
+        if file.sha256 != object_digest(data):
+            raise ValueError(f"file {file.id} holds another digest than its text")
+        key = file_key(file.owner_id, file.id)
+        await self._objects.put(key, data)
+        try:
+            outcome = await self._insert_file(file, limit=limit, principal=principal)
+        except BaseException:
+            await self._remove([key])
+            raise
+        if outcome != "added":
+            await self._remove([key])
+        return outcome
+
+    async def _principal_admits(
+        self,
+        connection: AsyncConnection,
+        owner_id: str,
+        principal: Principal | None,
+    ) -> bool:
+        """Whether a job, an upload or a save of ``owner_id`` may go on as to its
+        principal: ``principal`` is new and its identity holds none, or, without
+        ``principal``, the owner holds one. Without ``principal``, an owner who
+        holds none is a defect, and the call raises."""
+        if principal is not None:
+            return await self._principal(connection, principal.identity) is None
+        holder = select(principals.c.owner_id).where(principals.c.owner_id == owner_id)
+        if await connection.scalar(holder) is None:
+            raise ValueError(f"owner {owner_id} holds no principal")
+        return True
+
+    async def _add_principal(
+        self, connection: AsyncConnection, principal: Principal
+    ) -> None:
+        await connection.execute(
+            insert(principals).values(
+                owner_id=principal.owner_id,
+                issuer=principal.issuer,
+                sub=principal.sub,
+                created_at=principal.created_at,
+            )
+        )
+
+    async def _insert_file(
+        self, file: OwnerFile, *, limit: int, principal: Principal | None
+    ) -> FileAdmission:
+        """Count the owner's files and insert the row under the owner's lock.
+
+        ``UNIQUE (owner_id, name)`` refuses a duplicate name. Its refusal ends
+        the transaction, so the store reads the name again after the rollback,
+        and raises the error where no row holds it.
+        """
+        owned = owner_files.c.owner_id == file.owner_id
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_lock(connection, file.owner_id)
+                if not await self._principal_admits(
+                    connection, file.owner_id, principal
+                ):
+                    return "principal_exists"
+                count = select(func.count()).select_from(owner_files).where(owned)
+                if (await connection.scalar(count) or 0) >= limit:
+                    return "over_limit"
+                if principal is not None:
+                    await self._add_principal(connection, principal)
+                await connection.execute(insert(owner_files).values(file.model_dump()))
+        except IntegrityError:
+            named = select(owner_files.c.id).where(
+                owned, owner_files.c.name == file.name
+            )
+            async with self._transaction() as connection:
+                if await connection.scalar(named) is None:
+                    raise
+            return "name_in_use"
+        return "added"
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        async with self._transaction() as connection:
+            rows = await connection.execute(
+                select(owner_files)
+                .where(owner_files.c.owner_id == owner_id)
+                .order_by(owner_files.c.created_at.desc(), owner_files.c.id.desc())
+            )
+            return [OwnerFile(**row._mapping) for row in rows]
+
+    async def _file_row(self, file_id: str, owner_id: str) -> OwnerFile | None:
+        async with self._transaction() as connection:
+            row = (
+                await connection.execute(
+                    select(owner_files).where(
+                        owner_files.c.id == file_id, owner_files.c.owner_id == owner_id
+                    )
+                )
+            ).one_or_none()
+        return None if row is None else OwnerFile(**row._mapping)
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        """The row first, by the file ID and the owner ID, then the object
+        that the row names, checked against the row's digest."""
+        file = await self._file_row(file_id, owner_id)
+        if file is None:
+            return None
+        data = await self._objects.get(file_key(file.owner_id, file.id))
+        if data is None and await self._file_row(file_id, owner_id) is None:
+            # A delete removed the row after this read found it.
+            return None
+        if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
+            logger.error(
+                "Owner File %s of owner %s: its object is missing or fails its"
+                " digest check",
+                file.id,
+                file.owner_id,
+            )
+            raise CorruptObject(file.id)
+        return file, data.decode("utf-8")
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        """Delete the row, then the object. An object whose delete fails
+        stays for the orphan sweep."""
+        async with self._transaction(writes=True) as connection:
+            removed = await connection.execute(
+                delete(owner_files).where(
+                    owner_files.c.id == file_id, owner_files.c.owner_id == owner_id
+                )
+            )
+            held = removed.rowcount == 1
+        if not held:
+            return False
+        await self._remove([file_key(owner_id, file_id)])
+        return True
+
+    async def add_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        principal: Principal | None,
+    ) -> ControlAdmission | EvidenceRefusal:
+        """Put each evidence text, then count and insert the row in one write
+        transaction (ADR 0127).
+
+        The objects go first, so a row never lists an object that does not
+        exist, and they go again at once where the insert is refused or raises.
+        """
+        if principal is not None and principal.owner_id != control.owner_id:
+            raise ValueError(
+                f"control {control.document.id} names another owner than its principal"
+            )
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        check_texts(control.document, texts)
+        async with self._transaction() as connection:
+            held = select(controls.c.id).where(controls.c.id == control.document.id)
+            if await connection.scalar(held) is not None:
+                raise ValueError(
+                    f"the store already holds control {control.document.id}"
+                )
+        keys = await self._put_evidence(control, texts)
+        try:
+            outcome = await self._insert_control(
+                control, limit=limits.max_controls, principal=principal
+            )
+        except BaseException:
+            await self._remove(keys)
+            raise
+        if outcome != "added":
+            await self._remove(keys)
+        return outcome
+
+    async def _put_evidence(
+        self, control: Control, texts: Mapping[str, str]
+    ) -> list[str]:
+        """Put each text under its evidence key, and return the keys."""
+        keys = []
+        try:
+            for evidence_id, text in texts.items():
+                key = evidence_key(control.owner_id, control.document.id, evidence_id)
+                await self._objects.put(key, text.encode("utf-8"))
+                keys.append(key)
+        except BaseException:
+            await self._remove(keys)
+            raise
+        return keys
+
+    async def _scope_refusal(
+        self, connection: AsyncConnection, control: Control
+    ) -> Literal["alias_in_use"] | None:
+        """``alias_in_use`` where the scope's alias names the scope of another
+        Control of the owner. The caller holds the owner's lock."""
+        others = await connection.execute(
+            select(controls.c.document).where(
+                controls.c.owner_id == control.owner_id,
+                controls.c.id != control.document.id,
+            )
+        )
+        scope = control.document.scope
+        if any(
+            names_another_scope(scope, _document(row.document).scope) for row in others
+        ):
+            return "alias_in_use"
+        return None
+
+    async def _name_in_use(self, control: Control) -> bool:
+        """Whether another Control of the owner holds the name. The store reads
+        it after ``UNIQUE (owner_id, name)`` refused a write, because the
+        refusal ends the transaction."""
+        named = select(controls.c.id).where(
+            controls.c.owner_id == control.owner_id,
+            controls.c.name == control.document.name,
+            controls.c.id != control.document.id,
+        )
+        async with self._transaction() as connection:
+            return await connection.scalar(named) is not None
+
+    async def _insert_control(
+        self, control: Control, *, limit: int, principal: Principal | None
+    ) -> ControlAdmission:
+        """Count the owner's Controls and insert the row under the owner's lock,
+        as :meth:`_insert_file` does."""
+        owned = controls.c.owner_id == control.owner_id
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_lock(connection, control.owner_id)
+                if not await self._principal_admits(
+                    connection, control.owner_id, principal
+                ):
+                    return "principal_exists"
+                count = select(func.count()).select_from(controls).where(owned)
+                if (await connection.scalar(count) or 0) >= limit:
+                    return "over_limit"
+                refused = await self._scope_refusal(connection, control)
+                if refused is not None:
+                    return refused
+                if principal is not None:
+                    await self._add_principal(connection, principal)
+                await connection.execute(insert(controls).values(_control_row(control)))
+        except IntegrityError:
+            if not await self._name_in_use(control):
+                raise
+            return "name_in_use"
+        return "added"
+
+    async def list_controls(self, owner_id: str) -> list[Control]:
+        async with self._transaction() as connection:
+            rows = await connection.execute(
+                select(controls)
+                .where(controls.c.owner_id == owner_id)
+                .order_by(controls.c.updated_at.desc(), controls.c.id.desc())
+            )
+            return [_control(row) for row in rows]
+
+    async def get_control(self, control_id: str, owner_id: str) -> Control | None:
+        async with self._transaction() as connection:
+            row = (
+                await connection.execute(
+                    select(controls).where(
+                        controls.c.id == control_id, controls.c.owner_id == owner_id
+                    )
+                )
+            ).one_or_none()
+        return None if row is None else _control(row)
+
+    async def replace_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        expected_updated_at: datetime,
+    ) -> ControlReplacement | EvidenceRefusal:
+        """Put each new evidence text, then update the row under the owner's
+        lock, then remove each evidence object that the new document no
+        longer lists. A refused or failed update removes the new objects."""
+        held = await self.get_control(control.document.id, control.owner_id)
+        if held is None:
+            return "absent"
+        if held.updated_at != expected_updated_at:
+            return "stale"
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        check_texts(control.document, texts, held.document.evidence)
+        keys = await self._put_evidence(control, texts)
+        try:
+            outcome = await self._update_control(control, texts, expected_updated_at)
+        except BaseException:
+            await self._remove(keys)
+            raise
+        if isinstance(outcome, Control):
+            listed = {file.id for file in control.document.evidence}
+            await self._remove(
+                [
+                    evidence_key(control.owner_id, control.document.id, file.id)
+                    for file in outcome.document.evidence
+                    if file.id not in listed
+                ]
+            )
+            return "replaced"
+        await self._remove(keys)
+        return outcome
+
+    async def _update_control(
+        self, control: Control, texts: Mapping[str, str], expected_updated_at: datetime
+    ) -> Control | Literal["absent", "stale", "name_in_use", "alias_in_use"]:
+        """Write the row of ``control`` under the owner's lock, and return the
+        Control that it replaced. A row whose ``updated_at`` is not
+        ``expected_updated_at`` is ``stale``, so a save in between never
+        lands under this one."""
+        owned = (controls.c.id == control.document.id) & (
+            controls.c.owner_id == control.owner_id
+        )
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_lock(connection, control.owner_id)
+                row = (
+                    await connection.execute(select(controls).where(owned))
+                ).one_or_none()
+                if row is None:
+                    return "absent"
+                held = _control(row)
+                if held.updated_at != expected_updated_at:
+                    return "stale"
+                check_texts(control.document, texts, held.document.evidence)
+                refused = await self._scope_refusal(connection, control)
+                if refused is not None:
+                    return refused
+                await connection.execute(
+                    update(controls).where(owned).values(_control_row(control))
+                )
+        except IntegrityError:
+            if not await self._name_in_use(control):
+                raise
+            return "name_in_use"
+        return held
+
+    async def delete_control(self, control_id: str, owner_id: str) -> bool:
+        """Delete the row, then each evidence object. An object whose delete
+        fails stays for the orphan sweep."""
+        owned = (controls.c.id == control_id) & (controls.c.owner_id == owner_id)
+        async with self._transaction(writes=True) as connection:
+            row = (
+                await connection.execute(select(controls).where(owned))
+            ).one_or_none()
+            if row is None:
+                return False
+            await connection.execute(delete(controls).where(owned))
+        await self._remove(
+            [
+                evidence_key(owner_id, control_id, file.id)
+                for file in _document(row.document).evidence
+            ]
+        )
+        return True
+
+    async def read_evidence(
+        self, control_id: str, evidence_id: str, owner_id: str
+    ) -> str | None:
+        """The row first, by the Control ID and the owner ID, then the object
+        that the document lists, checked against the document's digest."""
+        file = _listed(await self.get_control(control_id, owner_id), evidence_id)
+        if file is None:
+            return None
+        data = await self._objects.get(evidence_key(owner_id, control_id, evidence_id))
+        if (
+            data is None
+            and _listed(await self.get_control(control_id, owner_id), evidence_id)
+            is None
+        ):
+            # A delete or a replace removed the file after this read found it.
+            return None
+        if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
+            logger.error(
+                "evidence %s of Control %s of owner %s: its object is missing or"
+                " fails its digest check",
+                evidence_id,
+                control_id,
+                owner_id,
+            )
+            raise CorruptObject(evidence_id)
+        return data.decode("utf-8")
+
+
+def _listed(held: Control | None, evidence_id: str) -> EvidenceFile | None:
+    """The evidence file ``evidence_id`` that ``held`` lists, or ``None``."""
+    return None if held is None else held.document.file(evidence_id)
+
+
+def _document(document: str) -> ControlDocument:
+    """A stored document, read back as the store wrote it."""
+    return ControlDocument.model_validate_json(document, context=STORED)
+
+
+def _control(row: Row[Any]) -> Control:
+    return Control(
+        owner_id=row.owner_id,
+        updated_at=row.updated_at,
+        document=_document(row.document),
+    )
+
+
+def _control_row(control: Control) -> dict[str, Any]:
+    """The columns of the row of ``control``. The name column copies the
+    document's name, which ``UNIQUE (owner_id, name)`` reads."""
+    return {
+        "id": control.document.id,
+        "owner_id": control.owner_id,
+        "name": control.document.name,
+        "updated_at": control.updated_at,
+        "document": control.document.model_dump_json(),
+    }

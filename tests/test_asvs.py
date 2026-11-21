@@ -24,9 +24,9 @@ from typing import Any, get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.analysis import TEXT_ATTRIBUTES, WHOLE_WORD, matches_term
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import (
+from katra.analysis import TEXT_ATTRIBUTES, WHOLE_WORD, matches_term
+from katra.capabilities import CAPABILITIES
+from katra.claims import (
     Ground,
     QuoteCandidate,
     Refusal,
@@ -35,13 +35,13 @@ from analysis_service.claims import (
     UnknownRef,
     Verdict,
 )
-from analysis_service.engine import EngineInputError
-from analysis_service.evidence import (
+from katra.engine import EngineInputError
+from katra.evidence import (
     evidence_catalog,
     known_proposals,
     resolve_proposals,
 )
-from analysis_service.frameworks import (
+from katra.frameworks import (
     PACKAGES,
     SCHEMAS,
     SEVERITY_RUBRIC_DOC,
@@ -49,8 +49,8 @@ from analysis_service.frameworks import (
     selectable_without_options,
     validate_package,
 )
-from analysis_service.frameworks.asvs import rules
-from analysis_service.frameworks.asvs.catalog import (
+from katra.frameworks.asvs import rules
+from katra.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTERS,
     LANES,
@@ -59,7 +59,7 @@ from analysis_service.frameworks.asvs.catalog import (
     AsvsLevel,
     requirements_for,
 )
-from analysis_service.frameworks.asvs.record import (
+from katra.frameworks.asvs.record import (
     AsvsAnalysis,
     AsvsOptions,
     DraftRequirementRuling,
@@ -67,16 +67,16 @@ from analysis_service.frameworks.asvs.record import (
     RequirementRuling,
     requirement_of,
 )
-from analysis_service.frameworks.asvs.roster import replace_roster, roster_block
-from analysis_service.jobs import StubPipelineRunner
-from analysis_service.markdown_loader import MarkdownLoader, split_sections
-from analysis_service.report import (
+from katra.frameworks.asvs.roster import replace_roster, roster_block
+from katra.jobs import StubPipelineRunner
+from katra.markdown_loader import MarkdownLoader, split_sections
+from katra.report import (
     FrameworkSelection,
     Report,
 )
-from analysis_service.skills import lane_skill_doc
-from analysis_service.sources import SourceLimits
-from analysis_service.system_model import CapabilityStatement, Process, SystemModel
+from katra.skills import lane_skill_doc
+from katra.sources import SourceLimits
+from katra.system_model import CapabilityStatement, Process, SystemModel
 from tests.factories import (
     PROJECT_ROOT,
     asvs_draft,
@@ -217,7 +217,7 @@ def test_each_lane_skill_carries_the_roster_the_catalog_composes(lane):
     assert roster_block(lane) in skill, (
         f"{lane}/skill.md's roster is not what the catalog composes. Do not"
         " edit it by hand — run"
-        " `python -m analysis_service.frameworks.asvs.roster`."
+        " `python -m katra.frameworks.asvs.roster`."
     )
 
 
@@ -1061,7 +1061,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
 
 def test_a_package_that_defers_nothing_inherits_the_neutral_default():
     """STRIDE's claims rest on the system's own shape, so it defers none."""
-    from analysis_service.frameworks.stride.record import DraftThreat
+    from katra.frameworks.stride.record import DraftThreat
 
     assert DraftThreat.partition_proposals(["a", "b"], "spoofing", ["prose"], ()) == (
         ["a", "b"],
@@ -1085,8 +1085,8 @@ class TestScopeEntryNamesWhatWouldSettleIt:
     def test_a_ruled_in_unit_nobody_filed_on_says_so(self):
         """The rule applied it and no lane filed: a gap in the output, not an
         open question, and the entry's reason says which."""
-        from analysis_service.claims import RULED_IN_UNRAISED_REASON
-        from analysis_service.frameworks.asvs.record import AsvsAnalysis
+        from katra.claims import RULED_IN_UNRAISED_REASON
+        from katra.frameworks.asvs.record import AsvsAnalysis
 
         entries = AsvsAnalysis.scope_entries(
             lanes=["authentication"],
@@ -1179,7 +1179,7 @@ class TestThisPackageCarriesNoActionVerb:
 
     def test_stride_still_requires_one(self):
         """The narrowing is this package's, not a change to the neutral shape."""
-        from analysis_service.frameworks.stride.record import ThreatProposal
+        from katra.frameworks.stride.record import ThreatProposal
 
         assert "verb" in ThreatProposal.model_json_schema()["properties"]
 
@@ -1265,7 +1265,7 @@ class TestNothingIsRuledOutByVocabulary:
 
     def test_the_upload_words_still_raise_a_candidate(self):
         """The vocabulary keeps its honest job: a lead for the lane agent."""
-        from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
+        from katra.frameworks.asvs.rules import PRESENCE_TESTS
 
         (upload,) = [t for t in PRESENCE_TESTS if t.predicate == "file-upload"]
         model = SystemModel.model_validate(
@@ -1334,11 +1334,11 @@ class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
 
     @staticmethod
     def _rejected(requirement: str, cause: RejectionStep):
-        from analysis_service.claims import (
+        from katra.claims import (
             Ground,
             Verdict,
         )
-        from analysis_service.frameworks.asvs.record import RequirementRuling
+        from katra.frameworks.asvs.record import RequirementRuling
 
         return RequirementRuling(
             id=f"v5.0.0-{requirement[1:]}",
@@ -1434,7 +1434,7 @@ class TestTheCatalogCarriesItsOwnProvenance:
     """The loader compares its pinned version and digest to the payload (#659)."""
 
     def test_the_shipped_catalog_matches_both_pins(self):
-        from analysis_service.frameworks.asvs import catalog
+        from katra.frameworks.asvs import catalog
 
         assert (
             catalog.provenance_issues(catalog._PAYLOAD_VERSION, catalog._PAYLOAD_SHA256)
@@ -1442,7 +1442,7 @@ class TestTheCatalogCarriesItsOwnProvenance:
         )
 
     def test_a_payload_from_another_release_is_refused(self):
-        from analysis_service.frameworks.asvs.catalog import (
+        from katra.frameworks.asvs.catalog import (
             CATALOG_SHA256,
             provenance_issues,
         )
@@ -1451,7 +1451,7 @@ class TestTheCatalogCarriesItsOwnProvenance:
         assert "4.0.3" in issue and "5.0.0" in issue
 
     def test_an_edit_that_keeps_the_version_is_refused(self):
-        from analysis_service.frameworks.asvs.catalog import (
+        from katra.frameworks.asvs.catalog import (
             ASVS_VERSION,
             provenance_issues,
         )
@@ -1478,7 +1478,7 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
         assert one < two
 
     def test_the_scope_line_lists_them_and_says_no_other(self):
-        from analysis_service.coverage import lane_scope
+        from katra.coverage import lane_scope
 
         line = lane_scope(
             "authentication",
@@ -1499,7 +1499,7 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
 
     def test_the_scope_line_gives_the_lane_the_rule_for_each_unit(self):
         """#1291: the lane reads the table's answer, not its own presence test."""
-        from analysis_service.coverage import lane_scope
+        from katra.coverage import lane_scope
 
         def stated(capability, state):
             return CapabilityStatement(
@@ -1611,7 +1611,7 @@ class TestTheCriticGetsTheRequirementsOwnWords:
     """#659: a verdict reached against the draft's paraphrase is the gap F01 exploited."""
 
     def test_the_record_hands_over_the_catalog_text(self):
-        from analysis_service.frameworks.asvs.catalog import requirement_text
+        from katra.frameworks.asvs.catalog import requirement_text
 
         draft = sample_asvs_claim("v5.0.0-6.2.1", "authentication")
 
@@ -1619,12 +1619,12 @@ class TestTheCriticGetsTheRequirementsOwnWords:
         assert requirement_text("V6.2.1").startswith("Verify that")
 
     def test_an_unknown_identifier_hands_over_nothing(self):
-        from analysis_service.frameworks.asvs.catalog import requirement_text
+        from katra.frameworks.asvs.catalog import requirement_text
 
         assert requirement_text("V6.99.99") == ""
 
     def test_every_published_requirement_has_text(self):
-        from analysis_service.frameworks.asvs.catalog import requirement_text
+        from katra.frameworks.asvs.catalog import requirement_text
 
         assert all(requirement_text(req.id) for req in requirements_for(3))
 
@@ -1698,8 +1698,8 @@ class TestADraftStatesItsDirection:
         assert "direction" in schema["required"]
 
     def test_the_draft_carries_the_direction_to_the_critic(self):
-        from analysis_service.critic import critic_view
-        from analysis_service.evidence import evidence_catalog, resolve_proposals
+        from katra.critic import critic_view
+        from katra.evidence import evidence_catalog, resolve_proposals
         from tests.factories import valid_model
 
         model = valid_model()

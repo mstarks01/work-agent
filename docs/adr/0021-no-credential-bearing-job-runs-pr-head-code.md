@@ -10,14 +10,14 @@
 Three workflows hand a job live provider authority. `evals-live.yml` and the
 Vertex lane of `provider-smoke.yml` hold `id-token: write`, which they exchange
 for short-lived Vertex credentials. `evals-live-api-key.yml` and the API-key
-lane of `provider-smoke.yml` mount `secrets.ANALYSIS_*_API_KEY`.
+lane of `provider-smoke.yml` mount `secrets.KATRA_*_API_KEY`.
 
 Two of them triggered on `pull_request`. Both skipped fork pull requests, and
 both said so in their headers: this repository takes no fork contributions, a
 fork gets no secrets, so a fork lane could only report itself unexercised.
 
 **The fork check is not the boundary.** A collaborator who can push a branch and
-open a pull request can edit `src/analysis_service/**`, which every one of these
+open a pull request can edit `src/katra/**`, which every one of these
 lanes imports, or edit the lane's own workflow file. The edit then executes
 while the job holds the credential. The OIDC token minted for that run carries
 the same `repository` claim as one minted on `main`, so the federation's

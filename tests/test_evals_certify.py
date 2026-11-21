@@ -11,19 +11,19 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.certification import (
+from evals.harness import modes
+from evals.harness.certify import TierIdentityKey, promote
+from katra.certification import (
     BlessedManifest,
     CertificationError,
     certify,
     load_manifest,
 )
-from analysis_service.deployment import SAMPLING_VAR, Deployment
-from analysis_service.graph import ENTRY_EXTRACT, tier_node_by_graph_node
-from analysis_service.identity import build_identity
-from analysis_service.model_tiers import TierName
-from analysis_service.sampling import load_sampling
-from evals.harness import modes
-from evals.harness.certify import TierIdentityKey, promote
+from katra.deployment import SAMPLING_VAR, Deployment
+from katra.graph import ENTRY_EXTRACT, tier_node_by_graph_node
+from katra.identity import build_identity
+from katra.model_tiers import TierName
+from katra.sampling import load_sampling
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SAMPLE_INSTRUCTIONS,
@@ -101,7 +101,7 @@ def _build_fingerprints(sampling, served="vertex_ai/fake-model-001"):
 def test_a_pro_override_reprints_only_pro_nodes():
     default = load_sampling(SAMPLING_PATH, env={})
     overridden = load_sampling(
-        SAMPLING_PATH, env={"ANALYSIS_SAMPLING_STRONG_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"KATRA_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
 
     base = _build_fingerprints(default)
@@ -116,7 +116,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
 def test_certify_flags_an_override_drifted_run():
     default = load_sampling(SAMPLING_PATH, env={})
     overridden = load_sampling(
-        SAMPLING_PATH, env={"ANALYSIS_SAMPLING_STRONG_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"KATRA_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
     manifest = _blessed_from(_build_fingerprints(default))
 

@@ -53,8 +53,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claims import FrameworkName
-from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
@@ -64,6 +62,8 @@ from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
 from evals.harness.rates import jaccard, mean, presence, ratio, rounded_figure
 from evals.harness.reference import MUST_FIND
+from katra.claims import FrameworkName
+from katra.system_model import ModelIndex, SystemModel
 
 #: One case of one framework. Stability is per framework because the two
 #: instruments answer over different sets — STRIDE's open claim set through a

@@ -4,22 +4,22 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.budgets import (
+from katra.budgets import (
     estimate,
     llm_calls_for,
     measured_tokens,
     spent_tokens,
     widest_llm_calls,
 )
-from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import Admission
-from analysis_service.report import (
+from katra.frameworks import PACKAGES
+from katra.jobs import Admission
+from katra.report import (
     FrameworkSelection,
     NodeRun,
     Report,
     TokenUsage,
 )
-from analysis_service.sources import Source
+from katra.sources import Source
 from tests.factories import sample_report
 from tests.test_job_store import new_record
 
@@ -166,7 +166,7 @@ def test_the_admission_result_carries_no_other_subjects_activity():
 
 
 def test_a_report_settles_to_what_its_nodes_measured():
-    from analysis_service.report import NodeRun
+    from katra.report import NodeRun
 
     usages = [
         TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
@@ -180,7 +180,7 @@ def test_a_report_settles_to_what_its_nodes_measured():
 def test_a_retried_node_is_charged_the_prompt_it_sent_each_failed_attempt():
     # The provider meters only the attempt that answered, so the two that
     # failed before it are settled at the prompt they carried: 15 + 2 * 10.
-    from analysis_service.report import NodeRun
+    from katra.report import NodeRun
 
     usage = TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
     retried = NodeRun(node="n", duration_ms=1, usage=usage, attempts=3)

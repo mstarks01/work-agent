@@ -10,8 +10,8 @@ cannot parse, as it does for a person. Run it as
 import sys
 from pathlib import Path
 
-from analysis_service.system_model import SystemModel
 from evals.harness.reference import development_cases, load_corpus
+from katra.system_model import SystemModel
 
 ICON = {
     "external_entities": "internet",

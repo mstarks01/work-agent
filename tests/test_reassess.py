@@ -11,7 +11,7 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     PROJECTS_UNDER,
     Assertion,
@@ -25,15 +25,15 @@ from analysis_service.assertions import (
     settled,
     support_span,
 )
-from analysis_service.claims import Ground
-from analysis_service.evidence import evidence_catalog
-from analysis_service.reassess import (
+from katra.claims import Ground
+from katra.evidence import evidence_catalog
+from katra.reassess import (
     ReviewerAssessment,
     ReviewError,
     reassess,
     reviewed,
 )
-from analysis_service.sources import ANSWERS_LABEL
+from katra.sources import ANSWERS_LABEL
 from tests.factories import sample_report, sample_threat
 
 SHOPPERS = Subject(
@@ -193,7 +193,7 @@ class TestTheReportDisclosesReview:
     """Option (ii)'s disclosure, kept beside the guarantees (never instead)."""
 
     def test_a_job_with_no_assertion_pass_says_what_it_always_said(self) -> None:
-        from analysis_service.report import DEFAULT_DISCLAIMER, disclaimer_for
+        from katra.report import DEFAULT_DISCLAIMER, disclaimer_for
 
         assert disclaimer_for(None) == DEFAULT_DISCLAIMER
 
@@ -203,7 +203,7 @@ class TestTheReportDisclosesReview:
     ) -> None:
         """One rule: a row the projection refuses is a row the report calls
         rejected, read off ``PROJECTS_UNDER`` rather than a second list."""
-        from analysis_service.report import disclaimer_for
+        from katra.report import disclaimer_for
 
         row = ABSENCE.model_copy(
             update={"assessment": assessment, "assessor": REVIEWER}
@@ -215,7 +215,7 @@ class TestTheReportDisclosesReview:
         assert f"{rejected} rejected" in text
 
     def test_the_disclosure_counts_each_review_state(self) -> None:
-        from analysis_service.report import disclaimer_for
+        from katra.report import disclaimer_for
 
         catalog = reviewed(report().assertions.catalog, reject(ABSENCE) | {})
         text = disclaimer_for(AssertionRecord(proposed=2, catalog=catalog))

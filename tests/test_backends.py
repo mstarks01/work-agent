@@ -12,13 +12,13 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.objects import (
+from katra.objects import (
     OBJECT_STORES,
     ObjectName,
     ObjectStoreBackend,
     ObjectStoreName,
 )
-from analysis_service.sql_store import (
+from katra.sql_store import (
     DATABASE_CREDENTIALS,
     DATABASE_IAM,
     DATABASES,
@@ -28,8 +28,8 @@ from analysis_service.sql_store import (
     DatabaseDriver,
     DatabaseIam,
 )
-from analysis_service.store_backends import JOB_STORES, JobStoreBackend, JobStoreName
-from analysis_service.store_settings import DatabaseCredentialMode, DatabaseIamName
+from katra.store_backends import JOB_STORES, JobStoreBackend, JobStoreName
+from katra.store_settings import DatabaseCredentialMode, DatabaseIamName
 from tests.sql_stores import OBJECT_ENVS, ObjectStoreEnv
 from tests.test_job_store import BACKEND_PAIRS
 

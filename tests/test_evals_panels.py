@@ -12,8 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.graph import LANE_SHARED_KEYS
-from analysis_service.prompts import EXTRACTION_DELTAS, PROMPT_BODY_NAMES
 from evals.harness import audit, delivery, panels
 from evals.harness.artifact import load_artifact
 from evals.harness.delivery import (
@@ -29,6 +27,8 @@ from evals.harness.reference import development_cases, load_corpus
 from evals.harness.replay import pooled_assertions, pooled_extraction
 from evals.harness.run import main, panels_of, replay_artifact, scorecard_of
 from evals.harness.scorecard import Rate
+from katra.graph import LANE_SHARED_KEYS
+from katra.prompts import EXTRACTION_DELTAS, PROMPT_BODY_NAMES
 from tests.source_tree import REPO_ROOT
 
 CORPUS = REPO_ROOT / "evals/corpus"

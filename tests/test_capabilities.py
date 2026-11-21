@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.capabilities import (
+from katra.capabilities import (
     ALWAYS,
     CAPABILITIES,
     CapabilityFact,
@@ -129,7 +129,7 @@ def test_resolve_answers_for_every_capability():
 
 
 def test_every_parent_is_a_capability_and_no_lineage_loops():
-    from analysis_service.capabilities import lineage_issues
+    from katra.capabilities import lineage_issues
 
     assert lineage_issues(CAPABILITIES) == []
 
@@ -137,7 +137,7 @@ def test_every_parent_is_a_capability_and_no_lineage_loops():
 def test_a_table_with_a_loop_or_a_stray_parent_fails_validation():
     """A loop would make ``lineage`` walk for ever; the check names it and
     the module refuses to load such a table (#1632)."""
-    from analysis_service.capabilities import Capability, lineage_issues
+    from katra.capabilities import Capability, lineage_issues
 
     def row(parent):
         return Capability(
@@ -187,7 +187,7 @@ def test_expression_keys_lists_each_key_once():
 
 def test_a_need_counts_each_unit_once_and_keeps_its_highest_band():
     """The band a capability question is ranked by (#1289)."""
-    from analysis_service.capabilities import Decision, lineage, open_capability_needs
+    from katra.capabilities import Decision, lineage, open_capability_needs
 
     child = next(key for key in CAPABILITIES if next(lineage(key), None))
     parent = next(lineage(child))
@@ -204,7 +204,7 @@ def test_a_need_counts_each_unit_once_and_keeps_its_highest_band():
 
 def test_a_need_never_credits_a_capability_the_facts_settle():
     """An answer to a parent already present settles nothing, so it is not asked."""
-    from analysis_service.capabilities import Decision, lineage, open_capability_needs
+    from katra.capabilities import Decision, lineage, open_capability_needs
 
     child = next(key for key in CAPABILITIES if next(lineage(key), None))
     parent = next(lineage(child))

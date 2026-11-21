@@ -1,9 +1,9 @@
 """A route that parses a stored record refuses one of another version (#1532).
 
 Each test seeds a job, then states an older ``schema_version`` on its record
-through :meth:`~analysis_service.jobs.JobStore.save`. The record content stays
+through :meth:`~katra.jobs.JobStore.save`. The record content stays
 current, so a route that does not ask
-:func:`~analysis_service.jobs.same_schema` serves it, and only the gate refuses.
+:func:`~katra.jobs.same_schema` serves it, and only the gate refuses.
 """
 
 from __future__ import annotations
@@ -12,11 +12,11 @@ import asyncio
 
 import pytest
 
-from analysis_service.claims import UnknownRef, Verdict
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.jobs import JobRecord
-from analysis_service.report import SCHEMA_VERSION
-from analysis_service.sources import Source
+from katra.claims import UnknownRef, Verdict
+from katra.fact_answers import FactAnswer
+from katra.jobs import JobRecord
+from katra.report import SCHEMA_VERSION
+from katra.sources import Source
 from tests.factories import admit, sample_report, sample_selection, sample_threat
 from tests.test_api import auth, submission
 from tests.test_corrections import ASKED, finished

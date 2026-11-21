@@ -8,19 +8,19 @@ from dataclasses import replace
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from analysis_service.answer_bodies import BodyRefused, read_answers
-from analysis_service.answer_sets import (
+from evals.harness.early_rounds import paused_state
+from katra.answer_bodies import BodyRefused, read_answers
+from katra.answer_sets import (
     AnswerSet,
     HeldAnswerSet,
     HeldSentAnswers,
     SentAnswers,
 )
-from analysis_service.answer_shares import SharedAnswer, check_shares
-from analysis_service.answer_state import Answers, SavedAnswers
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
-from analysis_service.jobs import JobRecord
-from analysis_service.system_model import ELEMENT_ID_MAX_CHARS, SystemModel
-from evals.harness.early_rounds import paused_state
+from katra.answer_shares import SharedAnswer, check_shares
+from katra.answer_state import Answers, SavedAnswers
+from katra.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
+from katra.jobs import JobRecord
+from katra.system_model import ELEMENT_ID_MAX_CHARS, SystemModel
 from tests.factories import sample_report, sample_selection, sample_threat, valid_model
 from tests.test_api import admit, auth, make_client
 from tests.test_questions import DESCRIPTION

@@ -2,13 +2,13 @@
 
 import pytest
 
-from analysis_service.domains import (
+from katra.domains import (
     DETECTORS,
     MAX_PACKS,
     pack_evidence,
     select_domain_packs,
 )
-from analysis_service.system_model import (
+from katra.system_model import (
     DataFlow,
     DataStore,
     Process,

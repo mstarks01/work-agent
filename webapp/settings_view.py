@@ -37,9 +37,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, TypedDict, get_args
 
-from analysis_service import resilience
-from analysis_service.claims import FRAMEWORK_NAMES
-from analysis_service.config_files import (
+from katra import resilience
+from katra.claims import FRAMEWORK_NAMES
+from katra.config_files import (
     MAX_VALUE_CHARS,
     SETTINGS_FILE,
     SettingsFileError,
@@ -49,24 +49,24 @@ from analysis_service.config_files import (
     read_toml,
     settings_dir,
 )
-from analysis_service.deployment import (
+from katra.deployment import (
     CONFIG_PATHS,
     PASS_FLAGS,
     ConfigPathName,
     config_path,
 )
-from analysis_service.errors import ConfigError
-from analysis_service.model_gate import no_thinking_models, tool_models
-from analysis_service.model_tiers import (
+from katra.errors import ConfigError
+from katra.model_gate import no_thinking_models, tool_models
+from katra.model_tiers import (
     TIER_NAMES,
     charges_env_var_for,
     credentials_env_var_for,
     upstreams_env_var_for,
 )
-from analysis_service.objects import OBJECT_ROOT_VAR, OBJECT_STORE_VAR, object_reads
-from analysis_service.sampling import ReasoningEffort
-from analysis_service.settings_variables import deployment_variables, secret_vars
-from analysis_service.store_backends import (
+from katra.objects import OBJECT_ROOT_VAR, OBJECT_STORE_VAR, object_reads
+from katra.sampling import ReasoningEffort
+from katra.settings_variables import deployment_variables, secret_vars
+from katra.store_backends import (
     CLOSED_SETTINGS,
     JOB_STORE_VAR,
     JOB_STORES,
@@ -77,16 +77,16 @@ from analysis_service.store_backends import (
     build_store,
     job_store_name,
 )
-from analysis_service.store_backends import (
+from katra.store_backends import (
     env_variables as store_variables,
 )
-from analysis_service.store_settings import (
+from katra.store_settings import (
     DATABASE_URL_VAR,
     DATABASE_VARIABLES,
     StoreConfigError,
     holds_password,
 )
-from analysis_service.vendors import VENDOR_NAMES, VENDORS
+from katra.vendors import VENDOR_NAMES, VENDORS
 from webapp.settings_page import (
     CHANGED_SAMPLING,
     EXAMPLES,
@@ -553,7 +553,7 @@ def _store_rows(merged: Mapping[str, str]) -> set[str]:
             shown.update(object_reads(env))
     if DATABASE_URL_VAR in job_store.reads:
         try:
-            from analysis_service.sql_store import database_reads
+            from katra.sql_store import database_reads
         except ModuleNotFoundError:
             shown.update(DATABASE_VARIABLES)
         else:

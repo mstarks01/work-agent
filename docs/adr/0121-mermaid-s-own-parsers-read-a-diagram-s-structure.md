@@ -41,7 +41,7 @@ architecture service keeps its icon as written, because an icon names a
 component kind. A flowchart node carries no shape: a flowchart shape is a
 drawing choice with no fixed meaning, and the diagram text still shows it.
 An edge end marked `{group}` is the group that holds the node. The versions are pinned in
-`diagram_reader/package-lock.json`. `analysis_service.diagrams` calls the
+`diagram_reader/package-lock.json`. `katra.diagrams` calls the
 reader as a subprocess with a time and memory limit.
 
 **The structure is evidence beside the text, and extraction still writes the

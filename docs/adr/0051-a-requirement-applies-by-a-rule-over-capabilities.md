@@ -31,7 +31,7 @@ stated reason", or "the input does not say, and this is the fact we need".
 ## Decision
 
 **A capability is a closed fact about the whole application.**
-`analysis_service.capabilities.CAPABILITIES` holds 166 of them, such as
+`katra.capabilities.CAPABILITIES` holds 166 of them, such as
 `browser-frontend`, `oauth-client` and `turn-server`. Each has a meaning, a
 yes-or-no question and an optional parent. The table is framework-neutral: a
 capability says what the application has, never what a framework asks of it.

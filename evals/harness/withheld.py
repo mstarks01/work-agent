@@ -40,17 +40,17 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.claims import FrameworkName
-from analysis_service.execution import source_texts
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.fact_writes import check_fact_answers
-from analysis_service.parsing import signer, strings
-from analysis_service.sources import Source
-from analysis_service.system_model import SystemModel
-from analysis_service.validation import validate
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase
+from katra.answer_sets import AnswerSet
+from katra.claims import FrameworkName
+from katra.execution import source_texts
+from katra.fact_answers import FactAnswer
+from katra.fact_writes import check_fact_answers
+from katra.parsing import signer, strings
+from katra.sources import Source
+from katra.system_model import SystemModel
+from katra.validation import validate
 
 __all__ = [
     "AnswerFile",
@@ -199,10 +199,10 @@ def answers_within_saves(
     does (:func:`~evals.harness.modes.select_frameworks`), so the pause asks
     for the frameworks the run builds.
     """
-    from analysis_service.answer_state import question_set
-    from analysis_service.assertions import UNKNOWN
-    from analysis_service.fact_answers import merged_facts
     from evals.harness.modes import case_framework_options, select_frameworks
+    from katra.answer_state import question_set
+    from katra.assertions import UNKNOWN
+    from katra.fact_answers import merged_facts
 
     signed = {answer.key: answer for answer in answer_file.answers}
     model = withheld_case(case, answer_file).model

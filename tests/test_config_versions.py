@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.certification import load_manifest
-from analysis_service.framework_config import load_frameworks
-from analysis_service.model_tiers import load_model_tiers
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
 from evals.harness.artifact import load_artifact
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
+from katra.certification import load_manifest
+from katra.framework_config import load_frameworks
+from katra.model_tiers import load_model_tiers
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
 from tests.factories import TEST_TIER_ENV
 
 CONFIG = REPO_ROOT / "config"

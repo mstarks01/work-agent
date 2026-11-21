@@ -38,8 +38,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from analysis_service.claims import FrameworkName
-from analysis_service.graph import Pipeline
+from katra.claims import FrameworkName
+from katra.graph import Pipeline
 
 #: What a node with no framework half in its tier key is filed under. A string
 #: rather than ``None`` so the artifact's rows are one shape, and one nothing

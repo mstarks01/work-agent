@@ -124,8 +124,8 @@ beside it.
   build, as the tickets #1768 to #1777.
   - The loaders stay the only source of each type, closed set and bound. One page module holds
     the group, the label and the mark of each **Deployment Setting** (ADR 0091).
-  - The page writes each change as an `ANALYSIS_*` override in `settings.env`, in
-    `$XDG_CONFIG_HOME/work-agent/`. It writes no TOML file. `settings.env` is strict `KEY=value`
+  - The page writes each change as an `KATRA_*` override in `settings.env`, in
+    `$XDG_CONFIG_HOME/katra/`. It writes no TOML file. `settings.env` is strict `KEY=value`
     with no quotes and no comments (ADR 0092).
   - A save names its keys from an allow list, and the loaders hold each positive value rule
     ([#1766](https://github.com/mstarks01/work-agent/issues/1766)).
@@ -137,8 +137,8 @@ beside it.
     of scope.
   - The prototype is the tag `archive/prototype/settings-page-1762`.
 - [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
-  reports and sources. The build is in the tree: `analysis_service.sql_store`,
-  `analysis_service.objects` and `analysis_service.store_backends` hold it.
+  reports and sources. The build is in the tree: `katra.sql_store`,
+  `katra.objects` and `katra.store_backends` hold it.
   - PostgreSQL, or SQLite on one host, holds the job records and principals. `boto3` over the S3 API,
     or the filesystem, holds the sources and the report. Native GCS and Azure backends are a
     separate effort.

@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from pydantic import ValidationError
 
-from analysis_service.auth import (
+from katra.auth import (
     ALLOWED_ALGORITHMS,
     DEFAULT_ALGORITHMS,
     JWKS_TIMEOUT_SECONDS,
@@ -22,11 +22,11 @@ from analysis_service.auth import (
     _CooldownSigningKeyClient,
     build_verifier,
 )
-from analysis_service.principals import Identity
-from analysis_service.sources import plain_name
+from katra.principals import Identity
+from katra.sources import plain_name
 
 ISSUER = "https://idp.example.com"
-AUDIENCE = "analysis-service"
+AUDIENCE = "katra"
 
 _PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _PRIVATE_PEM = _PRIVATE_KEY.private_bytes(
@@ -179,9 +179,9 @@ class TestARejectedTokenLogsOneRecord:
     def test_a_line_terminator_in_crit_stays_inside_one_record(
         self, caplog, terminator
     ):
-        forged = f"b64{terminator}INFO analysis_service.auth: accepted admin"
+        forged = f"b64{terminator}INFO katra.auth: accepted admin"
         with (
-            caplog.at_level("INFO", logger="analysis_service.auth"),
+            caplog.at_level("INFO", logger="katra.auth"),
             pytest.raises(AuthenticationError),
         ):
             verifier().verify(self._token_with_crit(forged))
@@ -195,28 +195,26 @@ class TestARejectedTokenLogsOneRecord:
 class TestOidcSettings:
     def test_from_env_reads_all_three_vars(self):
         env = {
-            "ANALYSIS_OIDC_ISSUER": ISSUER,
-            "ANALYSIS_OIDC_AUDIENCE": AUDIENCE,
-            "ANALYSIS_OIDC_JWKS_URL": "https://idp.example.com/jwks",
+            "KATRA_OIDC_ISSUER": ISSUER,
+            "KATRA_OIDC_AUDIENCE": AUDIENCE,
+            "KATRA_OIDC_JWKS_URL": "https://idp.example.com/jwks",
         }
-        loaded = OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+        loaded = OidcSettings.from_env(env, prefix="KATRA_OIDC")
         assert loaded.issuer == ISSUER
         assert loaded.audience == AUDIENCE
         assert loaded.algorithms == ("RS256",)
 
     def test_from_env_fails_closed_when_missing(self):
-        with pytest.raises(AuthConfigError, match="ANALYSIS_OIDC_AUDIENCE"):
-            OidcSettings.from_env(
-                {"ANALYSIS_OIDC_ISSUER": ISSUER}, prefix="ANALYSIS_OIDC"
-            )
+        with pytest.raises(AuthConfigError, match="KATRA_OIDC_AUDIENCE"):
+            OidcSettings.from_env({"KATRA_OIDC_ISSUER": ISSUER}, prefix="KATRA_OIDC")
 
     def test_from_env_honours_prefix(self):
         env = {
-            "ANALYSIS_ALT_ISSUER": ISSUER,
-            "ANALYSIS_ALT_AUDIENCE": AUDIENCE,
-            "ANALYSIS_ALT_JWKS_URL": "https://alt.example.com/jwks",
+            "KATRA_ALT_ISSUER": ISSUER,
+            "KATRA_ALT_AUDIENCE": AUDIENCE,
+            "KATRA_ALT_JWKS_URL": "https://alt.example.com/jwks",
         }
-        loaded = OidcSettings.from_env(env, prefix="ANALYSIS_ALT")
+        loaded = OidcSettings.from_env(env, prefix="KATRA_ALT")
         assert loaded.jwks_url == "https://alt.example.com/jwks"
 
 
@@ -231,40 +229,36 @@ class TestSigningAlgorithms:
 
     def _env(self, **extra: str) -> dict[str, str]:
         return {
-            "ANALYSIS_OIDC_ISSUER": ISSUER,
-            "ANALYSIS_OIDC_AUDIENCE": AUDIENCE,
-            "ANALYSIS_OIDC_JWKS_URL": "https://idp.example.com/jwks",
+            "KATRA_OIDC_ISSUER": ISSUER,
+            "KATRA_OIDC_AUDIENCE": AUDIENCE,
+            "KATRA_OIDC_JWKS_URL": "https://idp.example.com/jwks",
         } | extra
 
     def test_the_default_is_unchanged_when_nothing_is_configured(self):
         # A deployment that sets nothing verifies the one default algorithm.
-        loaded = OidcSettings.from_env(self._env(), prefix="ANALYSIS_OIDC")
+        loaded = OidcSettings.from_env(self._env(), prefix="KATRA_OIDC")
         assert loaded.algorithms == DEFAULT_ALGORITHMS == ("RS256",)
 
     def test_an_allowed_algorithm_can_be_configured(self):
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="ES256")
-        loaded = OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+        env = self._env(KATRA_OIDC_ALGORITHMS="ES256")
+        loaded = OidcSettings.from_env(env, prefix="KATRA_OIDC")
         assert loaded.algorithms == ("ES256",)
 
     def test_several_algorithms_can_be_configured(self):
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="RS256, ES256")
-        loaded = OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+        env = self._env(KATRA_OIDC_ALGORITHMS="RS256, ES256")
+        loaded = OidcSettings.from_env(env, prefix="KATRA_OIDC")
         assert loaded.algorithms == ("RS256", "ES256")
 
     def test_names_are_matched_case_insensitively(self):
         # 'rs256' in a deployment manifest is a typo, not a different algorithm.
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="rs256")
-        assert OidcSettings.from_env(env, prefix="ANALYSIS_OIDC").algorithms == (
-            "RS256",
-        )
+        env = self._env(KATRA_OIDC_ALGORITHMS="rs256")
+        assert OidcSettings.from_env(env, prefix="KATRA_OIDC").algorithms == ("RS256",)
 
     def test_eddsa_keeps_its_mixed_case_spelling(self):
         # The one non-upper-case name in the set; upper-casing input blindly
         # would make it the one algorithm nobody could configure.
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="eddsa")
-        assert OidcSettings.from_env(env, prefix="ANALYSIS_OIDC").algorithms == (
-            "EdDSA",
-        )
+        env = self._env(KATRA_OIDC_ALGORITHMS="eddsa")
+        assert OidcSettings.from_env(env, prefix="KATRA_OIDC").algorithms == ("EdDSA",)
 
     @pytest.mark.parametrize("algorithm", ["HS256", "HS384", "HS512"])
     def test_symmetric_algorithms_are_refused(self, algorithm):
@@ -275,34 +269,32 @@ class TestSigningAlgorithms:
         public key as the shared secret, because it treated a verification key
         as a signing key.
         """
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS=algorithm)
+        env = self._env(KATRA_OIDC_ALGORITHMS=algorithm)
         with pytest.raises(AuthConfigError, match="unsupported signing algorithm"):
-            OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+            OidcSettings.from_env(env, prefix="KATRA_OIDC")
 
     def test_the_none_algorithm_is_refused(self):
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="none")
+        env = self._env(KATRA_OIDC_ALGORITHMS="none")
         with pytest.raises(AuthConfigError, match="unsupported signing algorithm"):
-            OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+            OidcSettings.from_env(env, prefix="KATRA_OIDC")
 
     def test_one_bad_entry_rejects_the_whole_list(self):
         # Not "drop the bad one and carry on": an operator who wrote HS256 must
         # get an error, and a silently-ignored entry reads as an accepted one.
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="RS256,HS256")
+        env = self._env(KATRA_OIDC_ALGORITHMS="RS256,HS256")
         with pytest.raises(AuthConfigError, match="HS256"):
-            OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+            OidcSettings.from_env(env, prefix="KATRA_OIDC")
 
     def test_a_variable_set_to_only_separators_fails_closed(self):
         # Set-but-empty is an operator who meant something; it must not silently
         # fall back to the default.
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS=",,")
+        env = self._env(KATRA_OIDC_ALGORITHMS=",,")
         with pytest.raises(AuthConfigError, match="at least one"):
-            OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+            OidcSettings.from_env(env, prefix="KATRA_OIDC")
 
     def test_an_unset_variable_is_not_the_same_as_an_empty_one(self):
-        env = self._env(ANALYSIS_OIDC_ALGORITHMS="   ")
-        assert OidcSettings.from_env(env, prefix="ANALYSIS_OIDC").algorithms == (
-            "RS256",
-        )
+        env = self._env(KATRA_OIDC_ALGORITHMS="   ")
+        assert OidcSettings.from_env(env, prefix="KATRA_OIDC").algorithms == ("RS256",)
 
     def test_the_allowlist_admits_no_symmetric_or_unsigned_algorithm(self):
         # Guards the guard: the constant itself, so widening it is a deliberate
@@ -329,31 +321,31 @@ class TestSigningAlgorithms:
 class TestBuildVerifier:
     def _oidc_env(self) -> dict[str, str]:
         return {
-            "ANALYSIS_AUTH_PROVIDER": "oidc",
-            "ANALYSIS_OIDC_ISSUER": ISSUER,
-            "ANALYSIS_OIDC_AUDIENCE": AUDIENCE,
-            "ANALYSIS_OIDC_JWKS_URL": "https://idp.example.com/jwks",
+            "KATRA_AUTH_PROVIDER": "oidc",
+            "KATRA_OIDC_ISSUER": ISSUER,
+            "KATRA_OIDC_AUDIENCE": AUDIENCE,
+            "KATRA_OIDC_JWKS_URL": "https://idp.example.com/jwks",
         }
 
     def test_builds_configured_provider(self):
         assert isinstance(build_verifier(self._oidc_env()), OidcJwtVerifier)
 
     def test_provider_selection_is_case_insensitive(self):
-        env = self._oidc_env() | {"ANALYSIS_AUTH_PROVIDER": "  Oidc  "}
+        env = self._oidc_env() | {"KATRA_AUTH_PROVIDER": "  Oidc  "}
         assert isinstance(build_verifier(env), OidcJwtVerifier)
 
     def test_unset_provider_fails_closed(self):
-        with pytest.raises(AuthConfigError, match="ANALYSIS_AUTH_PROVIDER"):
+        with pytest.raises(AuthConfigError, match="KATRA_AUTH_PROVIDER"):
             build_verifier({})
 
     def test_unknown_provider_fails_closed(self):
-        env = self._oidc_env() | {"ANALYSIS_AUTH_PROVIDER": "nope"}
+        env = self._oidc_env() | {"KATRA_AUTH_PROVIDER": "nope"}
         with pytest.raises(AuthConfigError, match="unknown auth provider 'nope'"):
             build_verifier(env)
 
     def test_selected_provider_still_needs_its_config(self):
-        with pytest.raises(AuthConfigError, match="ANALYSIS_OIDC_ISSUER"):
-            build_verifier({"ANALYSIS_AUTH_PROVIDER": "oidc"})
+        with pytest.raises(AuthConfigError, match="KATRA_OIDC_ISSUER"):
+            build_verifier({"KATRA_AUTH_PROVIDER": "oidc"})
 
 
 class TestJwksTransport:
@@ -373,12 +365,12 @@ class TestJwksTransport:
         # caller covering configuration mistakes should not have to catch
         # pydantic's exception as well to cover the same class of mistake.
         env = {
-            "ANALYSIS_OIDC_ISSUER": ISSUER,
-            "ANALYSIS_OIDC_AUDIENCE": AUDIENCE,
-            "ANALYSIS_OIDC_JWKS_URL": "http://idp.example.com/jwks",
+            "KATRA_OIDC_ISSUER": ISSUER,
+            "KATRA_OIDC_AUDIENCE": AUDIENCE,
+            "KATRA_OIDC_JWKS_URL": "http://idp.example.com/jwks",
         }
         with pytest.raises(AuthConfigError, match="https"):
-            OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
+            OidcSettings.from_env(env, prefix="KATRA_OIDC")
 
     def test_the_jwks_fetch_carries_this_services_timeout(self):
         # Stated rather than inherited: PyJWKClient's own default is 30s, which

@@ -15,15 +15,15 @@ from typing import get_args, get_type_hints
 
 import pytest
 
-from analysis_service.assertions import AssertionCatalog, AssertionRecord
-from analysis_service.claims import ReturnedClaim
-from analysis_service.graph import STATE_ASSERTION_CATALOG
-from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness import critic_replay, critic_yield
 from evals.harness.bundle import case_file, reports_dir, write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.run_record import loaded
+from katra.assertions import AssertionCatalog, AssertionRecord
+from katra.claims import ReturnedClaim
+from katra.graph import STATE_ASSERTION_CATALOG
+from katra.markdown_loader import MarkdownLoader
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)

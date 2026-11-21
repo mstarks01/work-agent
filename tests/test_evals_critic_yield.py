@@ -14,8 +14,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claim_identity import NO_ROWS
-from analysis_service.claims import ReturnedClaim, Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
 from evals.harness.critic_yield import (
@@ -31,6 +29,8 @@ from evals.harness.rates import Rate
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import rebuilt_lane_inputs
+from katra.claim_identity import NO_ROWS
+from katra.claims import ReturnedClaim, Verdict
 from tests.eval_factories import (
     ScriptedMatcher,
     cast,
@@ -422,11 +422,11 @@ def _report_with(case, threats):
     """A minimal report carrying the given threats, as the modes build one."""
     from datetime import UTC, datetime
 
-    from analysis_service.frameworks.stride.record import (
+    from katra.frameworks.stride.record import (
         STRIDE_VERSION,
         StrideAnalysis,
     )
-    from analysis_service.report import (
+    from katra.report import (
         FrameworkSelection,
         InputRef,
         Job,
@@ -614,9 +614,9 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
 
 def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
     """Two readers of one fact — a must-find the critic lost for good — tested against each other."""
-    from analysis_service.system_model import ModelIndex
     from evals.harness.identity import SubsetVerbIdentity
     from evals.harness.losses import attribute_case
+    from katra.system_model import ModelIndex
     from tests.test_evals_applicability import Block
 
     reference = _must_find(case)

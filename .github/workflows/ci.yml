@@ -158,7 +158,7 @@ jobs:
           {
             echo "## Provider capability matrix"
             echo
-            uv run python -m analysis_service.conformance
+            uv run python -m katra.conformance
           } >>"$GITHUB_STEP_SUMMARY"
 
       # Says what did NOT run, in the same summary as what did.
@@ -328,7 +328,7 @@ jobs:
       # skip. -v lists each lane test, and the last line counts them.
       - name: Server lane
         env:
-          ANALYSIS_OFFLINE: "1"
+          KATRA_OFFLINE: "1"
           REQUIRE_POSTGRES: "1"
           REQUIRE_GCS: "1"
           TEST_GCS_ENDPOINT: http://localhost:4443

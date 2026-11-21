@@ -1,0 +1,234 @@
+"""Per-owner and global consumption budgets over a rolling window.
+
+The concurrency ceiling bounds how many jobs a caller may run at once. It is
+self-clearing by design, because finishing a job buys the next one, and that is
+why it bounds no spend at all. A caller who submits serially, and lets each job
+finish before sending the next, stays inside the ceiling for ever while running
+an unbounded number of paid jobs. That is the unbounded-consumption half of
+OWASP LLM10, and ADR 0007 named it as the integrator's to close. This module is
+where the service closes it instead.
+
+There are two bounds over one window. An owner gets a job count and a token
+budget per rolling window, and the deployment gets a token budget of its own
+across every owner. The count stops a burst of trivial submissions. The token
+budget stops one large submission doing the same damage in a single job. Neither
+substitutes for the other. The global bound is not the sum of the per-owner
+ones: it is the provider quota's share, which a deployment with ten owners
+divides rather than multiplies.
+
+The bounds are in tokens rather than dollars, and the difference is not a
+shortcut. A price is vendor data with an expiry date. ``evals/`` carries a price
+table because a sweep reports what it spent, after the fact, and can be re-priced
+when the table moves. A gate that refuses a submission cannot be re-priced after
+it has refused one, so pinning prices in the service would put a number that
+drifts into a decision that is final. Tokens are what this service can count
+exactly. A deployment that wants a dollar bound converts once, at the knob,
+where it can see the rate it used. The provider's own spend limit is the
+backstop behind both, and ``docs/Configuration.md`` says so.
+
+The estimate is deliberately coarse, and it is **lower** than the truth rather
+than higher. :func:`estimate` multiplies the submission's own byte count by
+every LLM call the selection implies. Two errors run in opposite directions and
+they do not cancel: not every call carries the whole input, which pulls the
+number up, and none of them counts the instruction text every call does carry,
+which pulls it down by far more. Measured, a small submission reserves 318 times
+less than it spends.
+
+Over-counting is the direction a bound that must hold before anything is spent
+should err in, and this does not, so it is a floor rather than a bound today.
+What keeps that from being an exposure is that ``max_jobs_per_window`` refuses an
+owner first at every shipped deployment. :func:`estimate` records what fixing
+it takes. The service replaces the
+reservation with the measured usage the moment the job reaches a terminal state,
+so a window's accounting converges on what happened rather than on what was
+feared.
+
+A job that nothing measured keeps its reservation, and that is the direction
+that matters. A completed run settles from its report, and a rejected one
+settles from the nodes that ran before the validity gate refused their output. A
+job that failed part-way through the graph returned no measurement. It is also
+the one case where getting this wrong is unbounded: it had already paid for
+every node it reached, so freeing its estimate would make this whole module a
+bound that any failing job clears, and a caller whose submissions outrun the
+deadline would spend without limit while their window read empty.
+
+Reconciliation is a scan rather than a ledger. :func:`spent_tokens` reads the
+records: a terminal job contributes what it measured, and a live one, or one
+nothing measured, contributes what it reserved. That is the same choice the
+concurrency count makes, and for the same reason. A maintained counter is a
+second copy of the truth, and the path that forgets to decrement leaks budget
+until the process restarts. It also makes double credit and negative credit
+unrepresentable rather than merely tested for, because nothing is ever added to
+or subtracted from anything.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, timedelta
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from katra.frameworks import PACKAGES, reads_capabilities
+from katra.report import (
+    FrameworkSelection,
+    NodeRun,
+)
+from katra.sources import Source
+
+# Calls a job makes whatever it selects: one extraction, the repair that may
+# follow it, and the assertion pass. Each is counted whether or not it runs,
+# because a bound has to hold for the job that needs it.
+_SHARED_LLM_CALLS = 3
+
+# Calls one framework adds beyond its lanes: its critic and the bounded re-ask.
+_PER_FRAMEWORK_REVIEW_CALLS = 2
+
+# The capability reader, which a job makes once where any selected framework
+# reads capabilities (ADR 0086), counted whether or not it runs.
+_READER_CALLS = 1
+
+
+def llm_calls_for(frameworks: Sequence[FrameworkSelection]) -> int:
+    """How many LLM calls a selection implies, at most.
+
+    Derived from ``PACKAGES`` rather than written down, for the reason
+    :func:`~katra.frameworks.widest_fan_out` exists: a lane count in
+    prose goes stale when a package changes the fan-out. A package registered
+    tomorrow moves this number with no edit here.
+    """
+    reader = reads_capabilities(selection.name for selection in frameworks)
+    return (
+        _SHARED_LLM_CALLS
+        + (_READER_CALLS if reader else 0)
+        + sum(
+            len(PACKAGES[selection.name].lanes) + _PER_FRAMEWORK_REVIEW_CALLS
+            for selection in frameworks
+        )
+    )
+
+
+def widest_llm_calls() -> int:
+    """The LLM calls of a job that selects every framework in ``PACKAGES``."""
+    return llm_calls_for([FrameworkSelection(name=name) for name in PACKAGES])
+
+
+def estimate(
+    sources: Iterable[Source], frameworks: Sequence[FrameworkSelection]
+) -> int:
+    """The tokens a submission reserves before anything is spent.
+
+    One token per UTF-8 byte of the submission, times every call the selection
+    implies. A byte is the unit because it is the one thing a caller cannot
+    shrink. A word count would read a 100 KiB base64 blob as two tokens while a
+    tokenizer meters it near one token per byte, so only a byte count
+    over-counts every text a caller can send.
+    **It under-counts, and the direction was measured rather than reasoned.**
+    Assuming every call sees the whole input does not pull the number up harder
+    than ignoring instruction text pulls it down, wherever the submission is
+    small, which is the ordinary case:
+    a 133-byte submission naming both frameworks reserves 3,857 tokens against
+    1,225,788 bytes of real prompt, 318 times short, because 986,348 of those
+    bytes are instruction text the inputs cannot predict. At the largest
+    submission the service accepts it is still 1.24 times short.
+
+    What limits the damage today is that this is not the bound that binds:
+    ``max_jobs_per_window`` refuses an owner before ``max_tokens_per_window``
+    does, at every deployment shipped. So the bound the configuration names as
+    the spend bound is the inert one, which is worth fixing and is not an
+    exposure while that holds.
+
+    The fix is to derive the instruction bytes from ``PACKAGES`` the way
+    :func:`llm_calls_for` derives the call count, rather than to add a constant
+    somebody has to maintain. Until then this number is a floor, not a bound.
+    """
+    submitted = sum(source.size_bytes() for source in sources)
+    return submitted * llm_calls_for(frameworks)
+
+
+class BudgetPolicy(BaseModel):
+    """What one deployment allows per rolling window.
+
+    ``window_seconds`` is the width of the window every bound here is measured
+    over. It is rolling rather than aligned to a clock boundary: a fixed hourly
+    window lets a caller spend a full allowance at 10:59 and another at 11:00,
+    which is the burst the bound exists to stop.
+
+    Every value is required and none may be zero. A budget nobody has chosen is
+    the state this module exists to end, and a deployment that admits no jobs
+    should not be running — the same argument ``max_active_jobs`` already makes
+    from both directions.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    window_seconds: int = Field(gt=0)
+    max_jobs_per_window: int = Field(ge=1)
+    max_tokens_per_window: int = Field(ge=1)
+    #: Across every owner, not the sum of their allowances. This is the
+    #: provider quota's share, which a deployment with ten owners divides
+    #: rather than multiplies.
+    global_max_tokens_per_window: int = Field(ge=1)
+
+    def window_start(self) -> datetime:
+        """The oldest instant still inside the window."""
+        return datetime.now(UTC) - timedelta(seconds=self.window_seconds)
+
+
+def spent_tokens(charges: Iterable[tuple[int, int | None]]) -> int:
+    """What a set of jobs has committed: measured where known, reserved where not.
+
+    Each entry is one job's ``(reserved, measured)``. A terminal job contributes
+    what it measured — the reconciliation — and a live one contributes what it
+    reserved. Nothing accumulates, so a window's total cannot double-count a job
+    or fall below zero however a job ended.
+    """
+    return sum(
+        reserved if measured is None else measured for reserved, measured in charges
+    )
+
+
+def retried_prompt_tokens(node: NodeRun) -> int:
+    """The prompt tokens a node's *failed* attempts sent, and nobody metered.
+
+    One reader for a rule two callers need. `measured_tokens` charges these to
+    a window; `evals.harness.consent` prices them into the figure a contributor
+    is asked to accept. Both callers read this function, so the window charge
+    and the consent price agree.
+
+    Only the calls that answered are metered: one, or two where the node took a
+    schema re-ask. Every attempt that failed before them sent a prompt no larger
+    than theirs together. `katra.retry` stamps the count for exactly
+    this (OWASP LLM10). This over-counts an attempt the provider refused before
+    reading the prompt, which is the direction a settlement should err in.
+    """
+    unmetered = node.attempts - 1 - node.reasks
+    return 0 if node.usage is None else node.usage.prompt_tokens * unmetered
+
+
+def measured_tokens(nodes: Iterable[NodeRun]) -> int:
+    """What a finished job's node runs actually cost, or 0 if nothing metered.
+
+    Zero and not ``None`` for an unmetered run, because this is the number that
+    *replaces* a reservation: leaving the reservation standing would charge a
+    caller for a job whose cost nobody knows, and forever, since a terminal job
+    never reports again. Under-charging a run the provider declined to meter is
+    the safer error, and the unmetered call is visible in the report either way.
+
+    A retried node cost more than its usage says. Only the attempt that answered
+    is metered, and each failed attempt before it sent the same prompt, so every
+    attempt past the first is charged the answering call's prompt tokens. That
+    over-counts an attempt the provider refused before reading the prompt, which
+    is the direction a settlement should err in.
+
+    Typed against :class:`~katra.report.NodeRun` rather than read off
+    any object that happens to carry the attributes. A ``getattr`` with a zero
+    default answers 0 for a usage record whose field was renamed, which silently
+    undercharges every window and no type checker can see — the number that
+    decides a budget must not have a quiet default behind it.
+    """
+    return sum(
+        node.usage.total_tokens + retried_prompt_tokens(node)
+        for node in nodes
+        if node.usage is not None
+    )

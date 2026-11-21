@@ -20,17 +20,17 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
-from analysis_service.basis import IN_SCOPE
-from analysis_service.evidence import evidence_catalog
-from analysis_service.system_model import attribute_names
+from katra.analysis import CONTROL_ATTRIBUTES, control_state
+from katra.basis import IN_SCOPE
+from katra.evidence import evidence_catalog
+from katra.system_model import attribute_names
 from evals.harness.reference import load_case
 
 CORPUS = Path("evals/corpus")
 
 # A stated value that also states an absence or a gap. The words are English
 # negations, not a vocabulary fitted to what the corpus turned out to hold:
-# `analysis_service.grounding._NEGATIONS` is the same list, and it was written
+# `katra.grounding._NEGATIONS` is the same list, and it was written
 # for the repair rung's meaning check long before this probe.
 NEGATION = re.compile(
     r"\b(no|not|never|none|nor|neither|without|cannot)\b",

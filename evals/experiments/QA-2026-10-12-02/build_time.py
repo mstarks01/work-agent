@@ -1,6 +1,6 @@
 """Time the early question set of a paused job on one corpus model (E6).
 
-Run from the repository root, with ``ANALYSIS_OFFLINE=1``::
+Run from the repository root, with ``KATRA_OFFLINE=1``::
 
     python evals/experiments/QA-2026-10-12-02/build_time.py CASE SELECTION
 
@@ -22,13 +22,13 @@ import sys
 import time
 from pathlib import Path
 
-from analysis_service import answer_effects, early_questions
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.system_model import SystemModel
 from evals.harness.early_answerers import ANSWERERS, walk
 from evals.harness.early_policies import Selection
 from evals.harness.early_rounds import paused_state
 from evals.harness.reference import refuse_holdout
+from katra import answer_effects, early_questions
+from katra.fact_answers import FactAnswer
+from katra.system_model import SystemModel
 
 #: Reads per row, and "yes" answers in the answered state.
 READS = 20

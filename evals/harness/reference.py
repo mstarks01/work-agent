@@ -1,7 +1,7 @@
 """``ReferenceClaim``, its STRIDE narrowing, and the loader for the golden corpus.
 
 ``ReferenceClaim`` is an eval-side model, and deliberately not
-:class:`~analysis_service.claims.Claim`. A produced claim carries fields that
+:class:`~katra.claims.Claim`. A produced claim carries fields that
 must not be graded, such as a 4000-character ``description`` nobody asked the
 model to reproduce verbatim. It also lacks ``tier``, which is the field that
 makes a recall threshold mean anything. Its ``id`` would be actively misleading:
@@ -29,7 +29,7 @@ blessed model rot apart. The records split instead, into
 for.
 
 Loading fails closed, in the shape
-:class:`~analysis_service.markdown_loader.MarkdownLoader` established. A missing
+:class:`~katra.markdown_loader.MarkdownLoader` established. A missing
 file, a malformed case, a model that fails the shipped validity gate, or a
 reference citing an element the blessed model does not contain raises
 :class:`CorpusError`. The last of those mirrors the exemplar lint: a reference
@@ -60,38 +60,38 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.actions import ActionVerb
-from analysis_service.claim_identity import sibling_flows
-from analysis_service.claims import (
+from evals.harness.identity import CaseFlows
+from katra.actions import ActionVerb
+from katra.claim_identity import sibling_flows
+from katra.claims import (
     FrameworkName,
     Rating,
     SeverityLevel,
     derive_severity_level,
 )
-from analysis_service.deployment import ConfigPaths
-from analysis_service.frameworks.asvs.catalog import AsvsChapter
-from analysis_service.frameworks.stride.record import (
+from katra.deployment import ConfigPaths
+from katra.frameworks.asvs.catalog import AsvsChapter
+from katra.frameworks.stride.record import (
     LANES_OF_VERB,
     AttackerPosition,
     StrideCategory,
 )
-from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.parsing import Sha256Hex, signer
-from analysis_service.resilience import load_resilience
-from analysis_service.sources import (
+from katra.markdown_loader import RESOLVE_ERRORS
+from katra.parsing import Sha256Hex, signer
+from katra.resilience import load_resilience
+from katra.sources import (
     MAX_LABEL_CHARS,
     Source,
     SourceKind,
     SourceLimits,
     clean_system_name,
 )
-from analysis_service.system_model import (
+from katra.system_model import (
     ELEMENT_ID_MAX_CHARS,
     EXCERPT_MAX_CHARS,
     SystemModel,
 )
-from analysis_service.validation import parse_and_validate
-from evals.harness.identity import CaseFlows
+from katra.validation import parse_and_validate
 
 # Two tiers, because one weight makes every threshold wrong. ``must-find``
 # drives the hard recall gate, ``expected`` a tracked, softer number.
@@ -186,7 +186,7 @@ class ReferenceClaim(BaseModel):
 
         Declared on the base and answered by each record, so a scorer reading a
         lane never spells ``category`` or ``chapter`` — the same separation
-        :attr:`~analysis_service.frameworks.IdRule.lane_field` makes on the
+        :attr:`~katra.frameworks.IdRule.lane_field` makes on the
         service side. A framework whose records carry no lane answers the empty
         string, which is legal rather than a defect.
         """
@@ -213,7 +213,7 @@ class ReferenceThreat(ReferenceClaim):
     """STRIDE's reference record: a category and a graded severity.
 
     ``affected_element_ids`` is narrowed to non-empty for the same reason
-    :class:`~analysis_service.frameworks.stride.record.DraftThreat` narrows it:
+    :class:`~katra.frameworks.stride.record.DraftThreat` narrows it:
     every STRIDE finding is about something in the graph, so a reference threat
     naming no element is unscoreable rather than a legal shape.
     """
@@ -447,7 +447,7 @@ class ReferenceRequirement(ReferenceClaim):
 
 
 #: The reference record each framework's corpus file validates as. Harness data
-#: keyed off the closed :data:`~analysis_service.claims.FrameworkName`, not a
+#: keyed off the closed :data:`~katra.claims.FrameworkName`, not a
 #: tenth package member: what a reference set looks like is the *eval's*
 #: business, and a package that shipped its own would be asserting how well it
 #: must be measured.
@@ -986,7 +986,7 @@ def _load_rulings(
     Fails closed on each way a ruling can stop meaning what it was ruled on: a
     reference that no longer reads as it did, an element the model does not
     carry, and a verb the lane does not admit. The last is
-    :data:`~analysis_service.frameworks.stride.record.LANES_OF_VERB`, the table
+    :data:`~katra.frameworks.stride.record.LANES_OF_VERB`, the table
     the service files drafts by, so a ruling cannot accept a draft the service
     itself would refuse. A claim takes one position ruling at most, a position
     or an ``any_positions`` entry, so a second one is refused rather than left

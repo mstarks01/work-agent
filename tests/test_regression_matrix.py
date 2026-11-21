@@ -15,12 +15,12 @@ import json
 
 import pytest
 
-from analysis_service import fan_in as fan_in_module
-from analysis_service import graph
-from analysis_service.critic import CriticOutputError
-from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
-from analysis_service.jobs import PipelineCompleted
 from evals.harness import fan_in_accounting
+from katra import fan_in as fan_in_module
+from katra import graph
+from katra.critic import CriticOutputError
+from katra.frameworks import PACKAGES, FrameworkName, schemas_for
+from katra.jobs import PipelineCompleted
 from tests.factories import (
     EMPTY_CLAIMS,
     SCRIPTED_FRAMEWORKS,

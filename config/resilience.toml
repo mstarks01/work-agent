@@ -8,7 +8,7 @@
 # parks a job in `running` forever. `attempts` and `timeout_ms` fix both.
 #
 # Unlike config/sampling.toml, every value here IS env-overridable, each by an
-# ANALYSIS_* variable that docs/Configuration.md lists.
+# KATRA_* variable that docs/Configuration.md lists.
 # Sampling decides WHAT the model produces; nothing in this file can. Attempts, timeout and the budget change only HOW
 # HARD we try; the input bounds and the concurrency ceiling decide only whether
 # a submission is accepted at all, and the deadline only whether an answer
@@ -23,8 +23,8 @@
 # `job_deadline_ms` and `retry_budget_ratio` have no value meaning "unbounded".
 #
 # The file has no backoff keys (initial_delay, max_delay, exp_base, jitter), and
-# the service reads no ANALYSIS_RETRY_INITIAL_DELAY, _MAX_DELAY, _EXP_BASE or
-# _JITTER variable: the retry curve is pinned in analysis_service.retry, because
+# the service reads no KATRA_RETRY_INITIAL_DELAY, _MAX_DELAY, _EXP_BASE or
+# _JITTER variable: the retry curve is pinned in katra.retry, because
 # it does not vary by deployment.
 #
 # `attempts` is a TOTAL count: the request count per node. LiteLLM's
@@ -38,7 +38,7 @@
 #
 # So the library's layer is OFF — binding.py sends num_retries = 0, which is
 # exactly one request per call — and the loop runs one level up in
-# analysis_service.retry, under `retry_budget_ratio` below. Turning `attempts`
+# katra.retry, under `retry_budget_ratio` below. Turning `attempts`
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
@@ -148,7 +148,7 @@ max_control_evidence = 10
 # reason it is enforced through `JobStore.active_for` rather than out of process
 # memory. Behind two instances with the per-instance `memory` store, each
 # instance enforces this number and the effective ceiling is the sum — the same
-# defect `ANALYSIS_JOB_STORE` fails closed over. Configure it against one
+# defect `KATRA_JOB_STORE` fails closed over. Configure it against one
 # instance's share, or register a shared store and get a shared ceiling with no
 # change here.
 #
@@ -158,7 +158,7 @@ max_control_evidence = 10
 # declares 17, so a job naming both is 23 and three of them are 69 concurrent
 # `strong`-tier requests. Those three numbers are checked against the registry
 # by `tests/test_fan_out_lints.py` rather than trusted (#286); see
-# `analysis_service.frameworks.widest_fan_out`. That is the burst a per-minute request quota actually
+# `katra.frameworks.widest_fan_out`. That is the burst a per-minute request quota actually
 # sees. Turn it UP only with a quota that has been checked against the new
 # number times the widest framework selection this deployment offers; turn it
 # DOWN to shed load mid-incident. 1 is legal and makes the service strictly
@@ -208,7 +208,7 @@ max_jobs_per_window = 30
 # times every LLM call its framework selection implies -- and that reservation is
 # replaced by the measured usage the moment the job reaches a terminal state.
 # The estimate deliberately over-counts, because a bound that must hold before
-# anything is spent has to err upward. See `analysis_service.budgets`.
+# anything is spent has to err upward. See `katra.budgets`.
 #
 # 20,000,000 is roughly what the byte cap allows a caller to spend at this
 # ceiling and this rate: 102,400 bytes reserves 102,400 tokens, a job naming
@@ -242,7 +242,7 @@ global_max_tokens_per_window = 100000000
 # OpenAI's flex tier serves the same weights at half the price, slower, and its
 # guide asks for a timeout above the ten-minute default (read 2026-09-12). The
 # row states thirty minutes for both. Edit it to choose another bound, or add a
-# row for another slow upstream. ANALYSIS_TIMEOUT_MS and ANALYSIS_JOB_DEADLINE_MS
+# row for another slow upstream. KATRA_TIMEOUT_MS and KATRA_JOB_DEADLINE_MS
 # set the base values alone and never a row. Version 8 requires the table; a
 # file that wants no per-upstream bound writes it empty.
 [bounds_by_upstream."openai/flex"]

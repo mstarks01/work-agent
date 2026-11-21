@@ -12,11 +12,11 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.deployment import Deployment, FrameworkNotCarried
-from analysis_service.errors import ConfigError
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.framework_config import CARRIED_VAR
-from analysis_service.jobs import InMemoryJobStore, JobRecord
+from katra.deployment import Deployment, FrameworkNotCarried
+from katra.errors import ConfigError
+from katra.fact_answers import FactAnswer
+from katra.framework_config import CARRIED_VAR
+from katra.jobs import InMemoryJobStore, JobRecord
 from tests import test_webapp
 from tests.factories import sample_selection
 from tests.test_answer_admission import _known_answer

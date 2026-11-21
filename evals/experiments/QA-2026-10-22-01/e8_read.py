@@ -4,14 +4,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from analysis_service.frameworks.stride.record import Threat
-from analysis_service.report import Report
-from analysis_service.system_model import ModelIndex
 from evals.harness.bundle import finished_file, load_artifact, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.reference import flows_by_case, load_corpus
 from evals.harness.scorer import score_case
+from katra.frameworks.stride.record import Threat
+from katra.report import Report
+from katra.system_model import ModelIndex
 
 corpus = {case.id: case for case in load_corpus(Path("evals/corpus"))}
 artifact = load_artifact(Path(sys.argv[1]))

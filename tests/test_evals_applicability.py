@@ -17,17 +17,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import (
-    FrameworkAnalysis,
-    Ground,
-    RejectionStep,
-    UnknownRef,
-    Verdict,
-    VerdictStatus,
-)
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.asvs.catalog import requirements_for
-from analysis_service.frameworks.asvs.record import RequirementRuling
 from evals import verify_corpus
 from evals.harness.applicability import (
     APPLIES,
@@ -45,6 +34,17 @@ from evals.harness.applicability import (
 )
 from evals.harness.modes import case_frameworks
 from evals.harness.reference import load_corpus
+from katra.claims import (
+    FrameworkAnalysis,
+    Ground,
+    RejectionStep,
+    UnknownRef,
+    Verdict,
+    VerdictStatus,
+)
+from katra.frameworks import PACKAGES
+from katra.frameworks.asvs.catalog import requirements_for
+from katra.frameworks.asvs.record import RequirementRuling
 
 CASE_ID = "01-payments-checkout"
 
@@ -482,12 +482,12 @@ def test_grounds_reads_a_lane_without_naming_any_framework_s_field():
     STRIDE stamps its lane into ``category`` and ASVS into ``chapter``. A fold
     that spelled either would be a second definition to drift, so the grounds
     count and the corpus lint read ``IdRule.lane_field`` through
-    :func:`~analysis_service.frameworks.lane_of` and
+    :func:`~katra.frameworks.lane_of` and
     :func:`~evals.verify_corpus.record_lane` — the same declaration the neutral
     resolver stamps through.
     """
-    from analysis_service.frameworks import lane_of
     from evals.verify_corpus import record_lane
+    from katra.frameworks import lane_of
 
     claim = ruling("V6.2.1")
 
@@ -564,10 +564,10 @@ def test_stability_reads_the_applicability_block_too():
     ASVS matches by requirement ID with no model call, so a sweep of
     ASVS-only cases still carries a comparable half where STRIDE's is absent.
     """
-    from analysis_service.identity import IDENTITY_VERSION
     from evals.harness.artifact import DECLARED_KEYS, EvalArtifact, RepoCommit
     from evals.harness.provenance import RunProvenance
     from evals.harness.stability import read_run
+    from katra.identity import IDENTITY_VERSION
 
     artifact = EvalArtifact(
         path=Path("sweep.json"),
@@ -884,7 +884,7 @@ class TestObservingOneRequirement:
 
 def _surfaces(block):
     """The three lookups :func:`observe` takes, built as the scorer builds them."""
-    from analysis_service.frameworks.asvs.record import requirement_of
+    from katra.frameworks.asvs.record import requirement_of
 
     return (
         {requirement_of(c.id): c for c in block.claims if requirement_of(c.id)},

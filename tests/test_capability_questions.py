@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
-from analysis_service.answer_state import question_set
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import UnknownRef
-from analysis_service.early_questions import capability_questions
-from analysis_service.fact_answers import FactAnswer, fact_line
-from analysis_service.fact_writes import answered_model, check_fact_answers
-from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-from analysis_service.links import with_link_answers
-from analysis_service.sources import ANSWERS_LABEL, Source
-from analysis_service.system_model import CapabilityStatement, SystemModel
-from analysis_service.validation import validate
+from katra.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
+from katra.answer_state import question_set
+from katra.capabilities import CAPABILITIES
+from katra.claims import UnknownRef
+from katra.early_questions import capability_questions
+from katra.fact_answers import FactAnswer, fact_line
+from katra.fact_writes import answered_model, check_fact_answers
+from katra.frameworks.asvs.record import DraftRequirementRuling
+from katra.links import with_link_answers
+from katra.sources import ANSWERS_LABEL, Source
+from katra.system_model import CapabilityStatement, SystemModel
+from katra.validation import validate
 from tests.factories import DESCRIPTION_TEXT, adk_runner, valid_model
 
 ASVS_L1 = {"asvs": {"level": 1}}
@@ -231,10 +231,10 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
     """The real resumed graph: the answer reaches the lanes' scope and the report."""
     import asyncio
 
-    from analysis_service import graph
-    from analysis_service.jobs import Checkpoint, JobRecord, Resumption
-    from analysis_service.pipeline import PipelineCompleted
-    from analysis_service.report import FrameworkSelection
+    from katra import graph
+    from katra.jobs import Checkpoint, JobRecord, Resumption
+    from katra.pipeline import PipelineCompleted
+    from katra.report import FrameworkSelection
     from tests.factories import scripted_pipeline
 
     answer = _answer("oauth", "no")
@@ -273,7 +273,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
 
 class TestTheReportStatesEachDecision:
     def test_every_selected_requirement_has_one_entry(self):
-        from analysis_service.frameworks.asvs.catalog import requirements_for
+        from katra.frameworks.asvs.catalog import requirements_for
 
         for level in (1, 2, 3):
             entries = DraftRequirementRuling.applicability(
@@ -321,7 +321,7 @@ class TestTheReportStatesEachDecision:
         }
 
     def test_a_framework_with_no_rule_writes_no_entry(self):
-        from analysis_service.frameworks import PACKAGES
+        from katra.frameworks import PACKAGES
 
         assert PACKAGES["stride"].record.applicability(valid_model(), {}) == []
 
@@ -344,7 +344,7 @@ class TestTheEntryShape:
     def test_an_entry_that_says_less_than_its_state_needs_is_refused(self, fields):
         from pydantic import ValidationError
 
-        from analysis_service.claims import ApplicabilityEntry
+        from katra.claims import ApplicabilityEntry
 
         with pytest.raises(ValidationError):
             ApplicabilityEntry(unit="V1.1.1", reason="why", **fields)

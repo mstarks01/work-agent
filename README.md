@@ -1,8 +1,8 @@
-# Work Agent
+# Katra
 
 **Early active development:** expect breaking changes.
 
-Work Agent turns a written description of a software system into a structured
+Katra turns a written description of a software system into a structured
 security analysis. It currently supports:
 
 - **STRIDE threat modeling** — credible attacker actions, questions that need
@@ -77,7 +77,7 @@ A completed report contains:
 - per-node timing, token use when the provider returns it, requested and served
   model identifiers, and execution fingerprints.
 
-Work Agent does **not** prove that a system is secure. The reports are generated
+Katra does **not** prove that a system is secure. The reports are generated
 by models and are not human-reviewed. Sparse or inaccurate input produces a
 sparse or inaccurate system model, which limits everything downstream.
 
@@ -178,7 +178,7 @@ uv run python examples/sync_docs.py --check
 
 Two commands do call configured providers:
 
-- `uv run python -m analysis_service.smoke` runs a small end-to-end analysis.
+- `uv run python -m katra.smoke` runs a small end-to-end analysis.
 - `uv run python -m evals.harness.run run --mode end-to-end` evaluates the corpus.
 
 The code is Apache-2.0. The ASVS catalog and the 17 ASVS lane skill files

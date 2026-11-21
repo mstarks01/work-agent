@@ -24,9 +24,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from analysis_service.report import NodeRun
 from evals.harness.archive import case_suffix
 from evals.harness.bundle import read_report
+from katra.report import NodeRun
 
 #: The path an execution that sent no schema counts under.
 NO_SCHEMA = "none"

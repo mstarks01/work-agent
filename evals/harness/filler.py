@@ -22,13 +22,13 @@ resolve and quotes always verify, and every check here passes against a scripted
 model. This instrument therefore reads finished reports rather than fixtures.
 
 There are two readings, and both are neutral. Each reads only the shared
-:class:`~analysis_service.claims.Claim` and
-:class:`~analysis_service.claims.Verdict` shape, so a package nobody has written
+:class:`~katra.claims.Claim` and
+:class:`~katra.claims.Verdict` shape, so a package nobody has written
 is measured on arrival, with no entry added here.
 
 Ineligible pointers is the crisper of the two, and it is not a threshold. The
 evidence catalog already decides which attributes carry information.
-:func:`~analysis_service.system_model.attribute_names` admits the type-specific
+:func:`~katra.system_model.attribute_names` admits the type-specific
 ones and refuses ``notes``, ``description`` and the rest, on the stated grounds
 that a note "is a sentence, not an unstated control". A ``needs-info`` that
 points at an attribute that rule refuses is naming a field the repository has
@@ -54,9 +54,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from analysis_service.report import Report
-from analysis_service.system_model import attribute_names
 from evals.harness.rates import Rate, ratio, rounded_figure, shown_figure
+from katra.report import Report
+from katra.system_model import attribute_names
 
 __all__ = ["FillerRow", "artifact", "render", "rows"]
 

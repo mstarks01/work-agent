@@ -6,7 +6,7 @@ retrospectively* — so this table is written now, against the one baseline that
 exists, and the runs that follow are read against it rather than the other way
 round.
 
-**What these gates read.** Whether a measured promotion of ``ANALYSIS_ASSERTIONS``
+**What these gates read.** Whether a measured promotion of ``KATRA_ASSERTIONS``
 would pass: a job with the pass pays one base-tier call and gets a catalog
 its lanes may cite. The pass runs by default by the owner's decision (ADR
 0075), which these gates did not make; they state what a measured promotion
@@ -63,9 +63,6 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from analysis_service.assertions import AssertionRecord
-from analysis_service.parsing import member, non_negative, table_entry
-from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, finished_file
@@ -77,6 +74,9 @@ from evals.harness.replay import (
     signed_reference,
     unsigned_reason,
 )
+from katra.assertions import AssertionRecord
+from katra.parsing import member, non_negative, table_entry
+from katra.sources import text_digest
 
 #: A figure the baseline arm recorded, which a gate's limit is relative to.
 FigureName = Literal[
@@ -89,7 +89,7 @@ FigureName = Literal[
 ]
 
 #: The baseline arm the budgets below were set from: one case, STRIDE only,
-#: ``analysis`` mode so the blessed model is fixed, `ANALYSIS_ASSERTIONS`
+#: ``analysis`` mode so the blessed model is fixed, `KATRA_ASSERTIONS`
 #: unset. Recorded as values rather than as a path, because the artifacts are
 #: under the gitignored ``evals/runs/`` and a budget nobody can re-read is a
 #: number with no provenance.

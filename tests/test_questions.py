@@ -12,17 +12,17 @@ import asyncio
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
-from analysis_service.answer_forms import (
+from katra import graph
+from katra.analysis import CONTROL_ATTRIBUTES, control_state
+from katra.answer_forms import (
     CONTROL_SUGGESTIONS,
     answer_choices,
     answer_form,
     answer_suggestions,
 )
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
-from analysis_service.answer_state import question_set
-from analysis_service.assertions import (
+from katra.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
+from katra.answer_state import question_set
+from katra.assertions import (
     UNKNOWN,
     Assertion,
     AssertionCatalog,
@@ -34,16 +34,16 @@ from analysis_service.assertions import (
     assertion_id,
     support_span,
 )
-from analysis_service.claims import FrameworkAnalysis, Ground, UnknownRef, Verdict
-from analysis_service.fact_answers import FactAnswer, fact_kind
-from analysis_service.fact_writes import answered_model, check_fact_answers
-from analysis_service.jobs import (
+from katra.claims import FrameworkAnalysis, Ground, UnknownRef, Verdict
+from katra.fact_answers import FactAnswer, fact_kind
+from katra.fact_writes import answered_model, check_fact_answers
+from katra.jobs import (
     Checkpoint,
     JobRecord,
     PipelineCompleted,
     Resumption,
 )
-from analysis_service.links import (
+from katra.links import (
     LinkAnswer,
     apply_answers,
     check_answers,
@@ -51,13 +51,13 @@ from analysis_service.links import (
     resumed_sources,
     with_link_answers,
 )
-from analysis_service.open_facts import open_attribute
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import _by_band, fact_questions
-from analysis_service.report import Report
-from analysis_service.report_conditions import conditions
-from analysis_service.sources import ANSWERS_LABEL, Source, text_digest
-from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
+from katra.open_facts import open_attribute
+from katra.question_kinds import QUESTION_KINDS
+from katra.questions import _by_band, fact_questions
+from katra.report import Report
+from katra.report_conditions import conditions
+from katra.sources import ANSWERS_LABEL, Source, text_digest
+from katra.system_model import ZONE_ATTRIBUTE, Assumption
 from tests import test_open_facts
 from tests.factories import (
     DESCRIPTION_TEXT,
@@ -172,7 +172,7 @@ class TestTheRanking:
         assert set(_by_band(waiting, band, needed)[:2]) == {limits, subject("A")}
 
     def test_each_question_names_the_highest_band_that_waits_on_it(self, report):
-        from analysis_service.frameworks import PACKAGES
+        from katra.frameworks import PACKAGES
 
         bands = {
             f"{block.framework}/{claim.id}": PACKAGES[block.framework].rank(claim)
@@ -254,7 +254,7 @@ class TestTheWaitingFindingsDecideTheOrder:
 class TestTheAnswerForms:
     def question_for(self, key):
         """A one-finding report is overkill here; the forms read the key alone."""
-        from analysis_service.answer_forms import answer_choices
+        from katra.answer_forms import answer_choices
 
         return answer_choices(key, valid_model(), None)
 
@@ -1304,8 +1304,8 @@ class TestTheMostImportantFindingsFirst:
 
     @staticmethod
     def needs(evidence, *, named=None, waiting=None, bands):
-        from analysis_service.bands import Band
-        from analysis_service.questions import FollowUpNeeds
+        from katra.bands import Band
+        from katra.questions import FollowUpNeeds
 
         named = named or {}
         return FollowUpNeeds(
@@ -1317,7 +1317,7 @@ class TestTheMostImportantFindingsFirst:
         )
 
     def order(self, needs):
-        from analysis_service.questions import follow_up_order
+        from katra.questions import follow_up_order
 
         return [(basis, k[3]) for basis, k in follow_up_order(needs)]
 
@@ -1383,8 +1383,8 @@ class TestTheMostImportantFindingsFirst:
 
 def test_a_report_question_carries_the_group_the_early_list_shows_it_in(report):
     """The report's questions group as the early list groups (#1884)."""
-    from analysis_service.fact_answers import key_ref
-    from analysis_service.open_facts import group_of
+    from katra.fact_answers import key_ref
+    from katra.open_facts import group_of
 
     for question in ask(report):
         assert (question.group, question.group_heading) == group_of(

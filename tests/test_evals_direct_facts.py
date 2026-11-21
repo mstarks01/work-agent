@@ -13,13 +13,13 @@ import asyncio
 import pytest
 from google.adk.models.base_llm import BaseLlm
 
-from analysis_service.assertions import assertion_id
-from analysis_service.deployment import Deployment
-from analysis_service.graph import ASSERT_NODE
 from evals.harness import modes, replay, run
 from evals.harness.audit import CONDITION_STAGES
 from evals.harness.provenance import REPO_ROOT
 from evals.reference_facts import load_facts, signed_proposal
+from katra.assertions import assertion_id
+from katra.deployment import Deployment
+from katra.graph import ASSERT_NODE
 from tests.factories import EVAL_MODEL, TEST_TIER_ENV
 from tests.test_evals_modes import (
     CASE_DIR,

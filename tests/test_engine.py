@@ -16,29 +16,29 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.deployment import DEFAULT_RESILIENCE_PATH
-from analysis_service.engine import (
+from katra.deployment import DEFAULT_RESILIENCE_PATH
+from katra.engine import (
     DEFAULT_CALLER,
     Engine,
     EngineDeadlineError,
     EngineInputError,
 )
-from analysis_service.execution import GraphFailed
-from analysis_service.framework_config import CARRIED_VAR
-from analysis_service.frameworks import PACKAGES
-from analysis_service.graph import ENTRY_EXTRACT
-from analysis_service.jobs import (
+from katra.execution import GraphFailed
+from katra.framework_config import CARRIED_VAR
+from katra.frameworks import PACKAGES
+from katra.graph import ENTRY_EXTRACT
+from katra.jobs import (
     JobRecord,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
     StubPipelineRunner,
 )
-from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.principals import LOCAL_ISSUER
-from analysis_service.report import FrameworkSelection
-from analysis_service.resilience import load_resilience
-from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, SourceLimits
+from katra.pipeline import AdkPipelineRunner
+from katra.principals import LOCAL_ISSUER
+from katra.report import FrameworkSelection
+from katra.resilience import load_resilience
+from katra.sources import MAX_SYSTEM_NAME_CHARS, Source, SourceLimits
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
@@ -147,7 +147,7 @@ def test_a_caller_maps_to_one_principal_under_the_local_issuer(caplog):
     runner = RecordingRunner(PipelineRejected(issues=[]))
     engine = engine_for(runner)
 
-    with caplog.at_level(logging.INFO, logger="analysis_service.principals"):
+    with caplog.at_level(logging.INFO, logger="katra.principals"):
         for caller in ("tenant-42", "tenant-42", "tenant-7"):
             analyze(engine, "text", caller=caller)
 
@@ -163,7 +163,7 @@ def test_a_refused_submission_creates_no_principal(caplog):
     engine = engine_for(RecordingRunner(PipelineRejected(issues=[])))
 
     with (
-        caplog.at_level(logging.INFO, logger="analysis_service.principals"),
+        caplog.at_level(logging.INFO, logger="katra.principals"),
         pytest.raises(EngineInputError),
     ):
         analyze(engine, "text", system_name="s" * (MAX_SYSTEM_NAME_CHARS + 1))
@@ -316,14 +316,14 @@ def test_analyze_sync_refuses_a_running_loop():
 #: so the vendor is named here too. Vertex's credential mode is ADC, and the
 #: check is a build-time gate.
 DEPLOYMENT_ENV = {
-    "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
-    "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
-    "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
-    "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
-    "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-    "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-    "ANALYSIS_VERTEX_PROJECT": "test-project",
-    "ANALYSIS_VERTEX_LOCATION": "us-central1",
+    "KATRA_MODEL_BASE_VENDOR": "vertex",
+    "KATRA_MODEL_BASE_MODEL": "gemini-2.5-flash",
+    "KATRA_MODEL_STRONG_VENDOR": "vertex",
+    "KATRA_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+    "KATRA_MODEL_REVIEW_MODEL": "claude-opus-5",
+    "KATRA_VERTEX_PROJECT": "test-project",
+    "KATRA_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 

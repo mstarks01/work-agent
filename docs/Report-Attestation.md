@@ -29,7 +29,7 @@ inside the report would have to be excluded from its own coverage, and
 ```json
 {
   "canonical_version": 1,
-  "payload_type": "application/vnd.work-agent.report+json",
+  "payload_type": "application/vnd.katra.report+json",
   "report_sha256": "…",
   "key_id": "deployment-2026-09",
   "signature": "…",
@@ -73,7 +73,7 @@ the right one for a signature nobody will tune.
 ## Verifying
 
 ```sh
-python -m analysis_service.verify_report report.json \
+python -m katra.verify_report report.json \
     --keyring keyring.toml --attestation report.sig.json
 ```
 

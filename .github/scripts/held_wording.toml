@@ -53,14 +53,14 @@ reason = "a prompt edit changes model input; change it with a measured prompt ch
 # --- Ruled held on 2026-11-02 ----------------------------------------------------
 
 [[held]]
-file = "src/analysis_service/field_capabilities.py"
+file = "src/katra/field_capabilities.py"
 phrase = "two parts of the application talk over a TLS-family protocol"
 rule = "element-term"
 reason = """a model reads the basis through the System Model, so an edit changes
 model input; change it with a measured prompt change"""
 
 [[held]]
-file = "src/analysis_service/field_capabilities.py"
+file = "src/katra/field_capabilities.py"
 phrase = "two parts of the application talk over an HTTP-family protocol"
 rule = "element-term"
 reason = """a model reads the basis through the System Model, so an edit changes
@@ -83,7 +83,7 @@ reason = "a prompt edit changes model input; change it with a measured prompt ch
 # --- Ruled held on 2026-11-10, from the reviewed/2026-11-10 round ---
 
 [[held]]
-file = "src/analysis_service/frameworks/stride/rules.py"
+file = "src/katra/frameworks/stride/rules.py"
 phrase = "This flow crosses a privilege or tenant boundary"
 rule = "boundary-term"
 reason = """a model reads the rule question with each candidate, also with one
@@ -91,7 +91,7 @@ whose crossing is undecided, so an edit changes model input; change it with a
 measured prompt change"""
 
 [[held]]
-file = "src/analysis_service/frameworks/stride/rules.py"
+file = "src/katra/frameworks/stride/rules.py"
 phrase = "This flow crosses a trust boundary and states no verified caller"
 rule = "boundary-term"
 reason = """a model reads the rule question with each candidate, also with one
@@ -99,7 +99,7 @@ whose crossing is undecided, so an edit changes model input; change it with a
 measured prompt change"""
 
 [[held]]
-file = "src/analysis_service/frameworks/stride/rules.py"
+file = "src/katra/frameworks/stride/rules.py"
 phrase = "This flow crosses a trust boundary with no verified transport"
 rule = "boundary-term"
 reason = """a model reads the rule question with each candidate, also with one
@@ -107,7 +107,7 @@ whose crossing is undecided, so an edit changes model input; change it with a
 measured prompt change"""
 
 [[held]]
-file = "src/analysis_service/frameworks/stride/rules.py"
+file = "src/katra/frameworks/stride/rules.py"
 phrase = "An internet-facing process exercises authority across a boundary"
 rule = "boundary-term"
 reason = """a model reads the rule question with each candidate, also with one
@@ -115,7 +115,7 @@ whose crossing is undecided, so an edit changes model input; change it with a
 measured prompt change"""
 
 [[held]]
-file = "src/analysis_service/frameworks/asvs/rules.py"
+file = "src/katra/frameworks/asvs/rules.py"
 phrase = "A party outside the system's control submits this flow across a"
 rule = "boundary-term"
 reason = """a model reads the rule question with each candidate, also with one

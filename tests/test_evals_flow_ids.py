@@ -16,11 +16,6 @@ from typing import ClassVar
 
 import pytest
 
-from analysis_service.system_model import (
-    FLOW_ID_VERSION,
-    flow_id_rule,
-    flow_id_version,
-)
 from evals.harness import flow_ids
 from evals.harness.artifact import load_artifact
 from evals.harness.flow_ids import (
@@ -31,6 +26,11 @@ from evals.harness.flow_ids import (
     table_between,
 )
 from evals.harness.provenance import REPO_ROOT
+from katra.system_model import (
+    FLOW_ID_VERSION,
+    flow_id_rule,
+    flow_id_version,
+)
 
 CORPUS = REPO_ROOT / "evals" / "corpus"
 EMISSIONS = REPO_ROOT / "evals" / "emissions"

@@ -10,8 +10,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pydantic import ValidationError
 
-from analysis_service import verify_report
-from analysis_service.attestation import (
+from katra import verify_report
+from katra.attestation import (
     CANONICAL_VERSION,
     PAYLOAD_TYPE,
     Attestation,

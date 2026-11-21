@@ -35,7 +35,7 @@ credential from the metadata server.**
 > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
 > The row also has the `api_key` mode.
 
-- `ANALYSIS_OBJECT_CREDENTIALS` stays required. `api_key` stops the startup,
+- `KATRA_OBJECT_CREDENTIALS` stays required. `api_key` stops the startup,
   and the message says that a key file and an HMAC key are out of scope.
 
   > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**

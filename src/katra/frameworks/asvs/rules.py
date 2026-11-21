@@ -1,0 +1,1163 @@
+"""ASVS's applicability rules, and the tier-0 test the standard never states.
+
+These rules are this repository's own, and all of them are. ASVS publishes a
+requirement's chapter, section, identifier, description and level, and nothing
+else. There is no applies-when field, no tag and no technology list, and the CWE
+and NIST mappings of 4.x are gone in 5.0. Nothing therefore selects a
+requirement for a system unless this repository writes it.
+
+Most rules are presence tests. The #160 research derived 16 predicates across
+the 70 level 1 requirements, and all 16 ask whether the application has a thing:
+a browser frontend, cookies, a database, OAuth, a file upload, a session. Six
+more cover the chapters the #160 predicates do not reach, and they ask the same
+shape of question. Five more, in ``STRUCTURAL_RULES``, read what the
+corpus's own reference claims read: a stated credential on one attribute, a
+classification, a write with no record named anywhere, a crossing from an
+external entity, and a channel with no stated protection. Those are the leads a
+term cannot raise.
+
+Each rule reads free text by string match, because no attribute in the **System
+Model** is a closed enum an ASVS predicate can test. #162 ruled that controls
+stay string attributes, so this is the mechanism the model offers.
+
+A **Candidate** is a lead rather than a gate, and it decides no applicability.
+Whether one requirement applies is the rule in
+:mod:`katra.frameworks.asvs.applicability`, which reads typed
+capabilities and never a term. A lane agent still analyses its chapter when no
+rule fires. Rules are authored for the level 1 requirements
+first, so a requirement at level 2 or 3 with no rule reaches its lane agent
+without a candidate. That is a weaker lead rather than an absent one.
+
+Every lane carries at least one rule, and that is load-bearing beyond the lead.
+Retrieval is keyed by fired rule, so a lane with no rule would receive no
+reference note and no worked case, whatever the knowledge tables hold.
+
+A term is chosen against what a submitter writes, and checked for what it also
+matches. An OAuth product name misses a submitter who writes "SSO" (#189). The
+opposite failure is as easy: bare ``log`` matches ``login``, bare
+``audit`` matches a food safety audit, and bare ``build`` matches building a
+weekly rota. Where a single word is ambiguous, the term here is the phrase.
+
+This is a term table rather than 17 functions. STRIDE writes one function per
+rule, because each reads a different structure. Every rule here runs one matcher
+over one attribute list, so 17 copies of that matcher would be 17 places for it
+to drift. What a maintainer edits is the term list. The matcher is written once
+below, and the table is the whole of what is authored.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
+
+from katra.analysis import (
+    TEXT_ATTRIBUTES,
+    comparable_asset_tags,
+    control_state,
+    crossing_facts,
+    is_unverified,
+    matches_term,
+    model_text,
+    names_term,
+    states_a_protocol,
+)
+from katra.assertions import AssertionCatalog, PredicateName
+from katra.candidates import Match, Rule, clip_fact, with_rule_tables
+from katra.claims import UnknownRef
+from katra.frameworks import NoRule, PreconditionResult, PredicateReader
+from katra.protocol_defaults import NEGATED
+from katra.system_model import SystemModel
+
+__all__ = [
+    "PREDICATE_READERS",
+    "PRESENCE_TESTS",
+    "RULES",
+    "STRUCTURAL_RULES",
+    "WEB_PROTOCOL_TERMS",
+    "asvs_precondition",
+    "asvs_precondition_facts",
+]
+
+
+@dataclass(frozen=True)
+class PresenceTest:
+    """One predicate: the lane it leads, and the terms that answer it.
+
+    ``attributes`` narrows what the terms are matched against. A predicate about
+    a wire protocol reads ``protocol`` and nothing else, so a process *named*
+    "websocket gateway" does not answer a question about a flow.
+    """
+
+    predicate: str
+    lane: str
+    question: str
+    terms: tuple[str, ...]
+    attributes: tuple[str, ...] = TEXT_ATTRIBUTES
+
+    @property
+    def rule_id(self) -> str:
+        """This test's rule ID, which carries its lane like STRIDE's do."""
+        return f"{self.lane}-{self.predicate}"
+
+
+def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
+    """Every element whose text answers this presence test, in model order.
+
+    One match per element rather than one per term: a store named
+    "PostgreSQL orders database" answers ``tech:database`` once, and the fact
+    records which attribute and which term answered it.
+
+    A term the whole model's text does not name matches no single value, so
+    only the terms :func:`names_term` finds are tried value by value (#1316).
+    That holds while ``test.attributes`` is a subset of
+    :data:`TEXT_ATTRIBUTES`, which ``tests/test_asvs.py`` checks.
+    """
+    text = model_text(model)
+    terms = [term for term in test.terms if names_term(text, term)]
+    if not terms:
+        return
+    for element in model.elements():
+        for attribute in test.attributes:
+            value = getattr(element, attribute, "")
+            if not isinstance(value, str):
+                continue
+            lowered = value.lower()
+            term = next((term for term in terms if matches_term(term, lowered)), "")
+            if not term:
+                continue
+            yield (
+                (element.id,),
+                {"attribute": attribute, "value": clip_fact(value), "term": term},
+            )
+            break
+
+
+def _rule_of(test: PresenceTest) -> Rule:
+    """One presence test as the neutral :class:`~katra.candidates.Rule`."""
+
+    def find(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
+        return _hits(model, test)
+
+    return Rule(
+        rule_id=test.rule_id,
+        lane=test.lane,
+        question=test.question,
+        find=find,
+    )
+
+
+# 23 rules over 17 lanes. The first 17 are the #160 research's 16 predicates —
+# ``tech:browser frontend`` appears twice because it leads requirements in two
+# chapters, and a rule belongs to exactly one lane, so the two carry the same
+# terms and put a different question. The last six give each remaining
+# chapter a rule, and so retrieval.
+#: The submitter's words for an upload, not the protocol's: a supplier "sends
+#: documents", a user "imports a CSV", a member "sets an avatar". **These raise
+#: a candidate and rule nothing out** (#659): a word nobody listed is a lead
+#: this lane never gets, which the lane agent can still find for itself, and
+#: which is the whole of what a vocabulary can lose.
+#:
+#: **Two are anchored, because a prefix match made them nearly always true.**
+#: A term matches at the start of a word, so bare ``document`` answered for
+#: "documented policy" and "documentation", and bare ``import`` answered for
+#: "important". Both words are ordinary in a description of any system, and a
+#: predicate that fires on every model tests nothing. The inflections are
+#: listed rather than stemmed: this module matches text, and a stemmer is a
+#: second rule about English that nothing here would test.
+UPLOAD_TERMS: tuple[str, ...] = (
+    "upload",
+    "attachment",
+    "multipart",
+    "artifact",
+    "registry",
+    "document$",
+    "documents$",
+    "import$",
+    "imports$",
+    "imported$",
+    "avatar",
+    "image",
+    "photo",
+    "csv",
+    "spreadsheet",
+)
+
+
+PRESENCE_TESTS: tuple[PresenceTest, ...] = (
+    PresenceTest(
+        predicate="database",
+        lane="encoding-and-sanitization",
+        question=(
+            "This system stores data in a query-driven store. Does the"
+            " application build queries from input, and how?"
+        ),
+        terms=(
+            "sql",
+            "postgres",
+            "mysql",
+            "mariadb",
+            "sqlite",
+            "oracle",
+            "mongo",
+            "dynamodb",
+            "cassandra",
+            "bigquery",
+            "redshift",
+            "database",
+        ),
+    ),
+    PresenceTest(
+        predicate="rich-text-input",
+        lane="encoding-and-sanitization",
+        question=(
+            "This system accepts authored text from a user. Does anything"
+            " sanitize it before it is rendered or stored?"
+        ),
+        terms=(
+            "rich text",
+            "wysiwyg",
+            "markdown",
+            "user-generated",
+            "user generated",
+            "comment",
+            "html editor",
+        ),
+    ),
+    PresenceTest(
+        predicate="xml-parser",
+        lane="encoding-and-sanitization",
+        question=(
+            "This system parses XML. Are external entities and schema"
+            " references disabled?"
+        ),
+        terms=("xml", "soap", "xslt", "xsd", "svg"),
+    ),
+    PresenceTest(
+        predicate="client-side-code",
+        lane="validation-and-business-logic",
+        question=(
+            "This system runs code on an untrusted side. Which side enforces"
+            " each validation rule?"
+        ),
+        terms=(
+            "javascript",
+            "browser",
+            "single-page",
+            "single page",
+            "client-side",
+            "react",
+            "angular",
+            "vue",
+            "mobile app",
+        ),
+    ),
+    PresenceTest(
+        predicate="multi-step-flow",
+        lane="validation-and-business-logic",
+        question=(
+            "This system runs a business flow in stages. Can a stage be"
+            " reached out of order or replayed?"
+        ),
+        terms=(
+            "checkout",
+            "wizard",
+            "multi-step",
+            "multi step",
+            "onboarding",
+            "workflow",
+        ),
+    ),
+    PresenceTest(
+        predicate="browser-frontend",
+        lane="web-frontend-security",
+        question=(
+            "This system serves a browser. Which response headers, cookie"
+            " attributes and origin rules does it set?"
+        ),
+        terms=(
+            "browser",
+            "web ui",
+            "web app",
+            "webapp",
+            "web frontend",
+            "web portal",
+            "html",
+            "single-page",
+            "single page",
+            "react",
+            "angular",
+            "vue",
+        ),
+    ),
+    PresenceTest(
+        predicate="cookies",
+        lane="web-frontend-security",
+        question=("This system sets cookies. Which attributes does each one carry?"),
+        terms=("cookie", "set-cookie"),
+    ),
+    PresenceTest(
+        predicate="cors",
+        lane="web-frontend-security",
+        question=(
+            "This system answers a cross-origin caller. Which origins does it"
+            " allow, and does it allow credentials?"
+        ),
+        terms=("cors", "cross-origin", "cross origin", "access-control-allow"),
+    ),
+    PresenceTest(
+        predicate="websocket",
+        lane="api-and-web-service",
+        question=(
+            "This system carries a WebSocket. Is the handshake authenticated"
+            " and the transport protected?"
+        ),
+        terms=("websocket", "ws://", "wss://", "socket.io"),
+        attributes=("protocol", "technology", "description"),
+    ),
+    PresenceTest(
+        predicate="file-upload",
+        lane="file-handling",
+        question=(
+            "This system accepts an uploaded file. What limits its size, its"
+            " type and where it lands?"
+        ),
+        terms=UPLOAD_TERMS,
+    ),
+    PresenceTest(
+        predicate="authentication",
+        lane="authentication",
+        question=(
+            "This system authenticates a caller. Which factors does it accept"
+            " and what documents them?"
+        ),
+        terms=(
+            "authenticat",
+            "login",
+            "log in",
+            "sign-in",
+            "sign in",
+            "sso",
+            "credential",
+            "mfa",
+        ),
+    ),
+    PresenceTest(
+        predicate="password-auth",
+        lane="authentication",
+        question=(
+            "This system accepts a password. What rules govern its length,"
+            " its storage and its rotation?"
+        ),
+        terms=("password", "passphrase", "basic auth"),
+    ),
+    PresenceTest(
+        predicate="sessions",
+        lane="session-management",
+        question=(
+            "This system holds a session. How is its token generated, bound"
+            " and terminated?"
+        ),
+        terms=("session", "cookie", "jsessionid"),
+    ),
+    PresenceTest(
+        predicate="self-contained-tokens",
+        lane="self-contained-tokens",
+        question=(
+            "This system carries a self-contained token. Which algorithms and"
+            " claims does the verifier accept?"
+        ),
+        # The last four name self-containment rather than a format, because a
+        # submitter states the property long before they state the standard: a
+        # SAML assertion is self-contained by construction, and "signed token"
+        # says the verifier trusts the bytes. The bare word ``token`` is
+        # deliberately absent — an opaque session or build token is looked up
+        # server-side and is what this lane is not about. ``claims`` is absent
+        # for the same reason from the other direction: in this corpus it
+        # matches insurance claim data.
+        terms=(
+            "jwt",
+            "json web token",
+            "jws",
+            "jwe",
+            "bearer token",
+            "id token",
+            "assertion",
+            "signed token",
+            "stateless token",
+            "self-contained",
+        ),
+    ),
+    PresenceTest(
+        predicate="oauth",
+        lane="oauth-and-oidc",
+        question=(
+            "This system uses OAuth or OIDC. Which grant, which redirect URIs"
+            " and which client authentication?"
+        ),
+        # The federation terms carry the weight here. A submitter writes "company
+        # SSO" and "identity provider"; the protocol acronyms and product names
+        # appear only when someone already knows which standard they run. "SSO"
+        # can mean SAML, which is not this chapter — accepted, because a
+        # candidate is a lead the lane agent judges, ASVS declares no federation
+        # lane closer to it, and the alternative is that a system whose whole
+        # subject is federated sign-in gets no lead at all.
+        terms=(
+            "oauth",
+            "oidc",
+            "openid",
+            "authorization server",
+            "keycloak",
+            "auth0",
+            "okta",
+            "sso",
+            "single sign-on",
+            "single sign on",
+            "identity provider",
+            "identity broker",
+            "federated",
+            "federation",
+        ),
+    ),
+    PresenceTest(
+        predicate="encryption",
+        lane="cryptography",
+        question=(
+            "This system encrypts something. Which algorithm, which mode and"
+            " which key management?"
+        ),
+        terms=("encrypt", "aes", "cipher", "kms", "hsm", "tls"),
+    ),
+    PresenceTest(
+        predicate="browser-frontend",
+        lane="data-protection",
+        question=(
+            "This system serves a browser. Does anything stop sensitive data"
+            " being cached or stored on the client?"
+        ),
+        terms=(
+            "browser",
+            "web ui",
+            "web app",
+            "webapp",
+            "web frontend",
+            "web portal",
+            "html",
+            "single-page",
+            "single page",
+            "react",
+            "angular",
+            "vue",
+        ),
+    ),
+    PresenceTest(
+        predicate="privileged-role",
+        lane="authorization",
+        question=(
+            "This system distinguishes one kind of caller from another. What"
+            " decides which functions and which records each may reach?"
+        ),
+        terms=(
+            "admin",
+            "administrator",
+            "role",
+            "permission",
+            "rbac",
+            "entitlement",
+            "tenant",
+            "privileged",
+            "moderator",
+            "back-office",
+            "superuser",
+        ),
+    ),
+    PresenceTest(
+        predicate="transport",
+        lane="secure-communication",
+        question=(
+            "This system speaks over a network. What protects the channel, and"
+            " which party's certificate is verified?"
+        ),
+        # The wire attributes and nothing else, on the rule this table already
+        # states: a process *named* "tls terminator" is not a flow that speaks
+        # TLS. Reading the free text here would fire on every mention of a
+        # certificate as a business document -- the corpus carries insurance
+        # certificates -- and the chapter is about the channel.
+        terms=("http", "tls", "ssl", "mtls", "certificate", "wss"),
+        attributes=("protocol", "encryption_in_transit"),
+    ),
+    PresenceTest(
+        predicate="secret-material",
+        lane="configuration",
+        question=(
+            "This system holds configuration or a secret. Where does it live,"
+            " who can read it, and how is it rotated?"
+        ),
+        # Not bare "config" or "deploy". Both are ordinary English in a system
+        # description -- the corpus has a "deployed sensor" and "device
+        # configuration and diagnostics" -- and neither is this chapter's
+        # subject. The terms below name the thing itself.
+        terms=(
+            "secret",
+            "credential",
+            "environment variable",
+            "env var",
+            "vault",
+            "feature flag",
+            "api key",
+            "access key",
+            "iam role",
+            "service account",
+            "application config",
+        ),
+    ),
+    PresenceTest(
+        predicate="third-party-component",
+        lane="secure-coding-and-architecture",
+        question=(
+            "This system runs code or trusts a component it did not author."
+            " What fixes the version, and what checks it before it runs?"
+        ),
+        # Not bare "build": the corpus "builds the weekly rota for a store",
+        # which is a business verb and not a release pipeline.
+        terms=(
+            "dependency",
+            "dependencies",
+            "lockfile",
+            "package registry",
+            "container image",
+            "third-party",
+            "third party",
+            "open source",
+            "sbom",
+            "artifact",
+            "ci/cd",
+            "build pipeline",
+            "npm",
+            "pypi",
+            "maven",
+        ),
+    ),
+    PresenceTest(
+        predicate="log-or-audit-trail",
+        lane="security-logging-and-error-handling",
+        question=(
+            "This system records what happened. What reaches the log, what is"
+            " kept out of it, and who is alerted?"
+        ),
+        # Not bare "log", which is a substring of "login", and not bare "audit",
+        # which the corpus uses for food safety audits.
+        terms=(
+            "logging",
+            "logs",
+            "log file",
+            "log record",
+            "audit log",
+            "audit trail",
+            "siem",
+            "alerting",
+            "telemetry",
+            "stack trace",
+            "error handling",
+        ),
+    ),
+    PresenceTest(
+        predicate="real-time-media",
+        lane="webrtc",
+        question=(
+            "This system carries real-time media or a peer connection. What"
+            " authenticates the signalling, and what encrypts the media?"
+        ),
+        # Multi-word on purpose. "turn" and "stun" are ordinary words; the
+        # server roles they name are not.
+        terms=(
+            "webrtc",
+            "stun server",
+            "turn server",
+            "sdp",
+            "peer connection",
+            "peer-to-peer",
+            "video call",
+            "voice call",
+            "screen share",
+            "data channel",
+        ),
+    ),
+)
+
+
+# --- Leads the term table cannot raise ---------------------------------------
+#
+# #430 measured the term table against the corpus: 43 of 99 reference claims
+# sat in a lane that raised no candidate, because the references are written
+# from the model's structure and the terms ask whether a technology exists.
+# These read the structure the references read. Two are narrowed term tests on
+# one attribute; two read the graph the way STRIDE's rules do.
+
+SHARED_ACCOUNT_TEST = PresenceTest(
+    predicate="shared-account",
+    lane="authorization",
+    question=(
+        "One credential reaches this store for every caller. What restricts"
+        " which records each caller may reach through it?"
+    ),
+    terms=(
+        "shared",
+        "single account",
+        "single credential",
+        "single user",
+        "same account",
+        "one account",
+        "full read",
+        "read/write",
+        "read-write",
+        "read and write",
+        "all tables",
+    ),
+    attributes=("authentication",),
+)
+
+CLASSIFIED_STORE_TEST = PresenceTest(
+    predicate="classified-store",
+    lane="data-protection",
+    question=(
+        "This store carries a stated classification. What protection does"
+        " that classification require, and what states it is in place?"
+    ),
+    terms=("confidential", "restricted", "secret", "sensitive", "regulated", "pii"),
+    attributes=("data_classification",),
+)
+
+#: Store asset tags whose writes the standard expects a record of.
+AUDITED_ASSET_TAGS = frozenset({"financial", "business-critical-data", "pii", "health"})
+
+#: What a store or process says when it holds a record of what happened.
+AUDIT_TERMS = (
+    "log$",
+    "logs$",
+    "logging",
+    "logged",
+    "audit",
+    "receipt",
+    "journal",
+    "history",
+    "event",
+)
+
+
+def _mentions_a_record(model: SystemModel) -> bool:
+    """Whether any element's text says it holds a log, an audit trail or a receipt."""
+    return any(
+        matches_term(term, f"{element.name} {element.description}".lower())
+        for element in model.elements()
+        for term in AUDIT_TERMS
+    )
+
+
+def _write_with_no_record(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A process writing an audited asset into a store, in a model naming no record.
+
+    The V16 finding the corpus writes is that the record names the service and
+    not the actor, or that there is no record at all. A term test cannot raise
+    it: a submitter writes "the receipt records that the order service wrote
+    it", never the word "log".
+    """
+    stores = {store.id: store for store in model.data_stores}
+    mentions = _mentions_a_record(model)
+    for flow in model.data_flows:
+        store = stores.get(flow.destination)
+        if store is None or not AUDITED_ASSET_TAGS & set(store.assets):
+            continue
+        yield (
+            (flow.source, store.id, flow.id),
+            {
+                "assets": ", ".join(
+                    comparable_asset_tags(AUDITED_ASSET_TAGS & set(store.assets))
+                ),
+                "authentication": clip_fact(flow.authentication),
+                "record_named_anywhere": mentions,
+            },
+        )
+
+
+def _crossing_from_an_entity(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A boundary crossing whose source is an external entity.
+
+    The V2 requirements ask which side enforces validation of what a caller
+    submits, and the crossing from a zone the system does not control is the
+    fact that makes them apply.
+    """
+    entities = {entity.id: entity for entity in model.external_entities}
+    flows = {flow.id: flow for flow in model.data_flows}
+    for crossing in model.boundary_crossings():
+        flow = flows[crossing.flow_id]
+        entity = entities.get(flow.source)
+        if entity is None:
+            continue
+        yield (
+            (flow.id, entity.id, flow.destination),
+            {
+                "source_kind": entity.kind,
+                "data_description": clip_fact(flow.data_description),
+                **crossing_facts(crossing, flow),
+            },
+        )
+
+
+def _unverified_transit(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A flow whose transport protection the input never settled or ruled out.
+
+    The transport term test reads ``protocol``, so a flow that says gRPC and
+    nothing about encryption raises no lead in the chapter that asks about
+    exactly that.
+    """
+    for flow in model.data_flows:
+        if not is_unverified(flow.encryption_in_transit):
+            continue
+        yield (
+            (flow.id, flow.source, flow.destination),
+            {
+                "protocol": clip_fact(flow.protocol),
+                "encryption_in_transit": clip_fact(flow.encryption_in_transit),
+                "encryption_state": control_state(flow.encryption_in_transit),
+            },
+        )
+
+
+STRUCTURAL_RULES: tuple[Rule, ...] = (
+    Rule(
+        rule_id="secure-communication-unverified-transit",
+        lane="secure-communication",
+        question=(
+            "Nothing states what protects this channel. Which requirement of"
+            " the chapter does the input leave open, and which does it settle?"
+        ),
+        find=_unverified_transit,
+    ),
+    _rule_of(SHARED_ACCOUNT_TEST),
+    _rule_of(CLASSIFIED_STORE_TEST),
+    Rule(
+        rule_id="security-logging-and-error-handling-write-with-no-record",
+        lane="security-logging-and-error-handling",
+        question=(
+            "This process writes an asset the standard expects a record of."
+            " What records the write, and does the record name the actor or"
+            " only the service?"
+        ),
+        find=_write_with_no_record,
+    ),
+    Rule(
+        rule_id="validation-and-business-logic-crossing-from-an-entity",
+        lane="validation-and-business-logic",
+        question=(
+            "A party outside the system's control submits this flow across a"
+            " boundary. Which side validates what it carries, and what says so?"
+        ),
+        find=_crossing_from_an_entity,
+    ),
+)
+
+
+#: What an answer about a fact each rule reads informs, as the early list shows
+#: it to the owner.
+EFFECTS: Mapping[str, str] = MappingProxyType(
+    {
+        "encoding-and-sanitization-database": (
+            "Informs whether the checks for queries built from input apply."
+        ),
+        "encoding-and-sanitization-rich-text-input": (
+            "Informs whether the checks for text that users author apply."
+        ),
+        "encoding-and-sanitization-xml-parser": (
+            "Informs whether the checks for unsafe XML parsing apply."
+        ),
+        "validation-and-business-logic-client-side-code": (
+            "Informs whether the checks for validation on an untrusted side apply."
+        ),
+        "validation-and-business-logic-multi-step-flow": (
+            "Informs whether the checks for steps taken out of order apply."
+        ),
+        "web-frontend-security-browser-frontend": (
+            "Informs whether the checks for browser headers and origin rules apply."
+        ),
+        "web-frontend-security-cookies": (
+            "Informs whether the checks for cookie attributes apply."
+        ),
+        "web-frontend-security-cors": (
+            "Informs whether the checks for cross-origin access apply."
+        ),
+        "api-and-web-service-websocket": (
+            "Informs whether the checks for WebSocket connections apply."
+        ),
+        "file-handling-file-upload": (
+            "Informs whether the checks for uploaded files apply."
+        ),
+        "authentication-authentication": (
+            "Informs whether the authentication checks apply."
+        ),
+        "authentication-password-auth": ("Informs whether the password checks apply."),
+        "session-management-sessions": ("Informs whether the session checks apply."),
+        "self-contained-tokens-self-contained-tokens": (
+            "Informs whether the checks for self-contained tokens apply."
+        ),
+        "oauth-and-oidc-oauth": (
+            "Informs whether the OAuth and OpenID Connect checks apply."
+        ),
+        "cryptography-encryption": (
+            "Informs whether the encryption and key checks apply."
+        ),
+        "data-protection-browser-frontend": (
+            "Informs whether the checks for sensitive data kept in a browser apply."
+        ),
+        "authorization-privileged-role": (
+            "Informs whether the checks for access to functions and records apply."
+        ),
+        "secure-communication-transport": (
+            "Informs whether the checks for channel protection apply."
+        ),
+        "configuration-secret-material": (
+            "Informs whether the checks for secrets and configuration apply."
+        ),
+        "secure-coding-and-architecture-third-party-component": (
+            "Informs whether the checks for third-party components apply."
+        ),
+        "security-logging-and-error-handling-log-or-audit-trail": (
+            "Informs whether the logging and alert checks apply."
+        ),
+        "webrtc-real-time-media": (
+            "Informs whether the checks for real-time media apply."
+        ),
+        "secure-communication-unverified-transit": (
+            "Informs which checks for channel protection stay open."
+        ),
+        "authorization-shared-account": (
+            "Informs whether the checks for one credential that all callers "
+            "share apply."
+        ),
+        "data-protection-classified-store": (
+            "Informs whether the checks for classified data in this store apply."
+        ),
+        "security-logging-and-error-handling-write-with-no-record": (
+            "Informs whether the checks for writes that no record names apply."
+        ),
+        "validation-and-business-logic-crossing-from-an-entity": (
+            "Informs whether the checks for input from an outside party apply."
+        ),
+    }
+)
+
+#: The predicates whose fact bears on whether each rule's requirements apply
+#: (ADR 0117). The early list ranks a question kind by the rules that name one
+#: of its parts (:func:`~katra.early_questions.reads`), but this
+#: framework's prior names no question kind, so these rows do not move the
+#: early order. ``tests/test_rule_informed_by.py`` holds each lane to at least
+#: one predicate.
+INFORMED_BY: Mapping[str, frozenset[PredicateName]] = MappingProxyType(
+    {
+        "encoding-and-sanitization-database": frozenset({"content-validation-encodes"}),
+        "encoding-and-sanitization-rich-text-input": frozenset(
+            {"content-validation-encodes"}
+        ),
+        "encoding-and-sanitization-xml-parser": frozenset(
+            {"content-validation-encodes", "code-execution"}
+        ),
+        "validation-and-business-logic-client-side-code": frozenset(
+            {"content-validation-validates"}
+        ),
+        "validation-and-business-logic-multi-step-flow": frozenset(
+            {"authorization-scope-checks-each-request"}
+        ),
+        "validation-and-business-logic-crossing-from-an-entity": frozenset(
+            {
+                "content-validation-validates",
+                "capacity-limits-rate",
+                "capacity-limits-quota",
+            }
+        ),
+        "web-frontend-security-browser-frontend": frozenset(
+            {"security-configuration-headers"}
+        ),
+        "web-frontend-security-cookies": frozenset({"security-configuration-cookies"}),
+        "web-frontend-security-cors": frozenset(
+            {"security-configuration-cross-origin"}
+        ),
+        "api-and-web-service-websocket": frozenset(
+            {"security-configuration-cross-origin", "capacity-limits-size"}
+        ),
+        "file-handling-file-upload": frozenset(
+            {"capacity-limits-size", "code-execution", "content-validation-validates"}
+        ),
+        "authentication-authentication": frozenset({"capacity-limits-rate"}),
+        "authentication-password-auth": frozenset({"capacity-limits-rate"}),
+        "session-management-sessions": frozenset({"security-configuration-cookies"}),
+        "authorization-privileged-role": frozenset(
+            {
+                "authorization-scope-checks-each-request",
+                "authorization-scope-least-privilege",
+                "authorization-scope-checks-ownership",
+            }
+        ),
+        "authorization-shared-account": frozenset({"record-attribution"}),
+        "self-contained-tokens-self-contained-tokens": frozenset(
+            {"provenance-sender", "provenance-integrity"}
+        ),
+        "oauth-and-oidc-oauth": frozenset({"destination", "provenance-sender"}),
+        "cryptography-encryption": frozenset(
+            {"stored-copy-access-encrypted", "security-configuration-secret-store"}
+        ),
+        "secure-communication-transport": frozenset({"transport-encryption"}),
+        "secure-communication-unverified-transit": frozenset({"transport-encryption"}),
+        "configuration-secret-material": frozenset(
+            {"security-configuration-secret-store"}
+        ),
+        "data-protection-browser-frontend": frozenset({"data-exposure-minimal-fields"}),
+        "data-protection-classified-store": frozenset(
+            {"data-exposure-restricted-readers", "stored-copy-access-restricted"}
+        ),
+        "secure-coding-and-architecture-third-party-component": frozenset(
+            {
+                "update-process-scheduled",
+                "update-process-vulnerability-alerts",
+                "update-process-tested",
+            }
+        ),
+        "security-logging-and-error-handling-log-or-audit-trail": frozenset(
+            {
+                "audit-evidence-record-protected",
+                "data-exposure-clean-logs",
+                "failure-handling-alerts",
+            }
+        ),
+        "security-logging-and-error-handling-write-with-no-record": frozenset(
+            {"record-attribution"}
+        ),
+        "webrtc-real-time-media": frozenset(
+            {"capacity-limits-rate", "capacity-limits-size"}
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_rule_tables(
+    (*(_rule_of(test) for test in PRESENCE_TESTS), *STRUCTURAL_RULES),
+    EFFECTS,
+    INFORMED_BY,
+)
+
+
+#: What a **Data Flow**'s ``protocol`` says when the flow carries the web. ASVS
+#: scopes itself to "web applications and services", so an API over HTTP is in
+#: scope and a message bus is not. Each term matches at the start of a word
+#: (:func:`~katra.analysis.matches_term`), and ``rest`` matches only
+#: as a whole word, so "restricted" is not REST.
+WEB_PROTOCOL_TERMS: tuple[str, ...] = (
+    "http",
+    "rest$",
+    "restful",
+    "graphql",
+    "soap",
+    "grpc",
+    "websocket",
+    "ws://",
+    "wss://",
+)
+
+
+def _names_web(protocol: str) -> bool:
+    lowered = protocol.lower()
+    return any(matches_term(term, lowered) for term in WEB_PROTOCOL_TERMS)
+
+
+def _speaks_web(protocol: str) -> bool:
+    """Whether a flow's ``protocol`` names a web protocol and negates nothing."""
+    return _names_web(protocol) and not NEGATED.search(protocol)
+
+
+def _protocol_unsettled(protocol: str) -> bool:
+    """Whether a flow's ``protocol`` leaves open if the flow carries the web.
+
+    **The one reader of an open protocol for the precondition and its facts.**
+    A field that states nothing is open. So is a field that names a web
+    protocol and also negates: "AMQP, not HTTP" and "HTTPS, not HTTP/2" read
+    the same to a word match, and only the owner can say which one is web.
+    """
+    negated_web = _names_web(protocol) and NEGATED.search(protocol) is not None
+    return not states_a_protocol(protocol) or negated_web
+
+
+def asvs_precondition(model: SystemModel) -> PreconditionResult:
+    """Is the target a web application or service?
+
+    **The tier-0 test the standard never states as a requirement.** ASVS defines
+    security requirements for "web applications and services" in its first
+    sentence, and no requirement asks whether the target is one: the standard
+    assumes an operator settled that before opening it. STRIDE's precondition is
+    total, so ASVS is the first framework here that can answer no.
+
+    **The read is what the processes say they present**, not what the flows say
+    they carry. Those are different facts. An unstated protocol must not make a
+    web interface undecidable
+    ([#219](https://github.com/mstarks01/work-agent/issues/219)): a flow's
+    ``protocol`` can correctly read ``unknown`` while a process states that it
+    presents a web interface. The applicability question is not a question
+    about transport.
+
+    **A protocol answers only where no process states an interface.** A flow
+    that says HTTPS says the same thing by another route, but it says it more
+    weakly, and `prompts/extract.md` makes that concrete: "A backup agent
+    shipping files over HTTPS is not a web application: ``protocol: "https"``,
+    ``interface_kind: "non-web"``." The extraction prompt teaches a model to
+    write exactly that pair, so a transport that outranked the interface would
+    read every such model as a web application and open 17 lanes on a system
+    the same repository had just called non-web. The two readers of "is this a
+    web application" agree, and ``tests/test_asvs.py`` drives them against
+    each other over that sentence.
+
+    So the protocol is consulted only where the interfaces leave the question
+    open — no process at all, or a process whose ``interface_kind`` is
+    ``unknown``. A transport can still satisfy and can still refuse on its own,
+    but it never contradicts a process that answered.
+
+    * ``satisfied`` — a process presents a web interface; or the interfaces
+      never settled it and a flow speaks a web protocol.
+    * ``undecidable`` — nothing says web and something never said. The input
+      never settled it, and submitting more about the system does.
+    * ``refuted`` — every process states a non-web interface, or (for a model
+      carrying no processes) every flow states a non-web protocol.
+
+    A model with no processes and no flows is ``undecidable`` on the same terms:
+    nothing said, rather than nothing there.
+
+    **Anything that never said is enough to hold the answer open**, and that is
+    the whole point of carrying three states rather than two. Reading silence as
+    a refusal would tell an operator "do not name ASVS for this system" when the
+    truth is "your input did not say" — and those two have different remedies,
+    which is the distinction this repo refuses to collapse anywhere else.
+    """
+    kinds = [process.interface_kind for process in model.processes]
+    if "web" in kinds:
+        return "satisfied"
+    # Every process answered, and every answer was non-web. The model settled
+    # the question, so no flow's transport is read: this is the branch that
+    # keeps the backup agent of ``prompts/extract.md`` out of ASVS.
+    #
+    # Spelled as "all of them say non-web" rather than "none of them says
+    # unknown", because the two are the same sentence only while
+    # ``interface_kind`` has exactly three values. A fourth would refuse every
+    # model carrying it, silently and on a value this rule has never been shown.
+    # Written this way a new kind falls through to the flows and then to
+    # ``undecidable``, which is the honest answer for a value nobody has taught
+    # this rule to read.
+    if kinds and all(kind == "non-web" for kind in kinds):
+        return "refuted"
+
+    # The interfaces left it open, so the flows are asked.
+    if any(_speaks_web(flow.protocol) for flow in model.data_flows):
+        return "satisfied"
+
+    # No process to read: the flows are the whole of what a model carrying only
+    # stores and entities can be asked, so there they may refuse as well.
+    if not kinds:
+        silent = any(_protocol_unsettled(flow.protocol) for flow in model.data_flows)
+        return "undecidable" if silent or not model.data_flows else "refuted"
+
+    return "undecidable"
+
+
+def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
+    """The facts whose answers decide :func:`asvs_precondition` where it is undecidable.
+
+    **The precondition reads a process's interface first**, so each process
+    that never stated one is asked: one "web" answer satisfies it, and "non-web"
+    from every process refutes it. A model with no process is read off its
+    flows alone, so there each flow whose protocol leaves the web open is asked
+    (:func:`_protocol_unsettled`). Every
+    fact is a field the precondition reads, so the answer the resumed job
+    writes onto the model is the one the gate reads.
+    """
+    if model.processes:
+        return tuple(
+            UnknownRef(element_id=process.id, attribute="interface_kind")
+            for process in model.processes
+            if process.interface_kind == "unknown"
+        )
+    return tuple(
+        UnknownRef(element_id=flow.id, attribute="protocol")
+        for flow in model.data_flows
+        if _protocol_unsettled(flow.protocol)
+    )
+
+
+#: Why no ASVS candidate rule fires on an assertion predicate. The rules here
+#: find where a requirement applies, by a technology or a structure the graph
+#: shows, and a requirement is a control the lane checks rather than a weakness
+#: it is led to. So a stated fact changes how a lane rules a requirement, never
+#: which requirements it is shown, and the lane reads the settled row as
+#: evidence. Each rule that a fact informs names its predicate in
+#: :data:`INFORMED_BY`.
+_RULED_AS_EVIDENCE = NoRule(
+    "a candidate rule of this framework selects requirements by what the graph"
+    " shows is present; a stated fact bears on how a lane rules a requirement,"
+    " and the lane reads the settled row as evidence"
+)
+
+#: Every predicate with no graph field, each written out rather than generated,
+#: so a predicate added to the registry fails the package gate until somebody
+#: decides whether this framework needs a rule for it.
+PREDICATE_READERS: Mapping[str, PredicateReader] = MappingProxyType(
+    {
+        "administrative-authority": _RULED_AS_EVIDENCE,
+        "audit-evidence-record-protected": _RULED_AS_EVIDENCE,
+        "authorization-grant": _RULED_AS_EVIDENCE,
+        "authorization-scope-checks-each-request": _RULED_AS_EVIDENCE,
+        "authorization-scope-checks-ownership": _RULED_AS_EVIDENCE,
+        "authorization-scope-least-privilege": _RULED_AS_EVIDENCE,
+        "capacity-limits-concurrency": _RULED_AS_EVIDENCE,
+        "capacity-limits-quota": _RULED_AS_EVIDENCE,
+        "capacity-limits-rate": _RULED_AS_EVIDENCE,
+        "capacity-limits-size": _RULED_AS_EVIDENCE,
+        "code-execution": _RULED_AS_EVIDENCE,
+        "content-validation": _RULED_AS_EVIDENCE,
+        "content-validation-encodes": _RULED_AS_EVIDENCE,
+        "content-validation-validates": _RULED_AS_EVIDENCE,
+        "credential-custody": _RULED_AS_EVIDENCE,
+        "credential-expiry": _RULED_AS_EVIDENCE,
+        "credential-lifetime": _RULED_AS_EVIDENCE,
+        "credential-revocation": _RULED_AS_EVIDENCE,
+        "credential-rotation": _RULED_AS_EVIDENCE,
+        "credential-sharing": _RULED_AS_EVIDENCE,
+        "data-exposure-clean-logs": _RULED_AS_EVIDENCE,
+        "data-exposure-minimal-fields": _RULED_AS_EVIDENCE,
+        "data-exposure-restricted-readers": _RULED_AS_EVIDENCE,
+        "destination": _RULED_AS_EVIDENCE,
+        "destination-verification": _RULED_AS_EVIDENCE,
+        "failure-handling-alerts": _RULED_AS_EVIDENCE,
+        "failure-handling-fails-closed": _RULED_AS_EVIDENCE,
+        "failure-handling-recovers": _RULED_AS_EVIDENCE,
+        "mfa-requirement": _RULED_AS_EVIDENCE,
+        "origin-verification": _RULED_AS_EVIDENCE,
+        "physical-access": _RULED_AS_EVIDENCE,
+        "provenance-integrity": _RULED_AS_EVIDENCE,
+        "provenance-sender": _RULED_AS_EVIDENCE,
+        "reachability-named-callers": _RULED_AS_EVIDENCE,
+        "record-attribution": _RULED_AS_EVIDENCE,
+        "represented-by": _RULED_AS_EVIDENCE,
+        "security-configuration-cookies": _RULED_AS_EVIDENCE,
+        "security-configuration-cross-origin": _RULED_AS_EVIDENCE,
+        "security-configuration-headers": _RULED_AS_EVIDENCE,
+        "security-configuration-secret-store": _RULED_AS_EVIDENCE,
+        "signature-verification": _RULED_AS_EVIDENCE,
+        "stored-copy-access-encrypted": _RULED_AS_EVIDENCE,
+        "stored-copy-access-restricted": _RULED_AS_EVIDENCE,
+        "stored-copy-integrity": _RULED_AS_EVIDENCE,
+        "tenant-ownership": _RULED_AS_EVIDENCE,
+        "update-process-scheduled": _RULED_AS_EVIDENCE,
+        "update-process-tested": _RULED_AS_EVIDENCE,
+        "update-process-vulnerability-alerts": _RULED_AS_EVIDENCE,
+    }
+)

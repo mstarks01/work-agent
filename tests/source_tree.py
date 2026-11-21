@@ -24,7 +24,7 @@ from collections.abc import Iterable, Mapping
 from functools import cache
 from pathlib import Path
 
-from analysis_service.frameworks import (
+from katra.frameworks import (
     CRITIC_DOC,
     LANE_CLOSING_DOC,
     LANE_EXEMPLARS_DOC,

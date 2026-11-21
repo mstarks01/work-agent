@@ -5,15 +5,15 @@ import dataclasses
 
 import pytest
 
-from analysis_service.frameworks import LANE_SECTION_HEADINGS
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, Claim
-from analysis_service.markdown_loader import (
+from katra.frameworks import LANE_SECTION_HEADINGS
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import STRIDE_CATEGORIES, Claim
+from katra.markdown_loader import (
     MarkdownFormatError,
     MarkdownLoader,
     MarkdownNotFoundError,
 )
-from analysis_service.skills import (
+from katra.skills import (
     compose_critic_skills,
     compose_domain_skills,
     compose_lane_skills,

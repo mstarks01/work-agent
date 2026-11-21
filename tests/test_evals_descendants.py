@@ -11,8 +11,6 @@ import json
 
 import pytest
 
-from analysis_service.report import Report
-from analysis_service.system_model import ModelIndex
 from evals.harness import descendants
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir, stride_threats
@@ -20,6 +18,8 @@ from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.reference import flows_by_case
 from evals.harness.scorer import score_case
+from katra.report import Report
+from katra.system_model import ModelIndex
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_finished_sweep
 from tests.test_evals_modes import reaching_refs

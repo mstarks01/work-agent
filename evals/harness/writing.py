@@ -46,19 +46,19 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from analysis_service.claim_identity import mechanism_of, report_rows
-from analysis_service.claims import (
-    Claim,
-    FrameworkName,
-)
-from analysis_service.report import Report
-from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import CaseFlows
 from evals.harness.ledger import STYLE_REASONS, Ledger
 from evals.harness.rates import ratio, rounded_figure, shown_figure
 from evals.harness.reference import GoldenCase
+from katra.claim_identity import mechanism_of, report_rows
+from katra.claims import (
+    Claim,
+    FrameworkName,
+)
+from katra.report import Report
+from katra.system_model import ModelIndex
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases

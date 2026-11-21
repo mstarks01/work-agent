@@ -60,8 +60,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import EXTRACTED, REGISTRY
-from analysis_service.frameworks import widest_fan_out
 from evals import verify_corpus
 from evals.harness.calibration import (
     AGREEMENT_BAR,
@@ -73,6 +71,8 @@ from evals.harness.calibration import (
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.replay import unsigned_rows
+from katra.assertions import EXTRACTED, REGISTRY
+from katra.frameworks import widest_fan_out
 
 pytestmark = pytest.mark.lint
 

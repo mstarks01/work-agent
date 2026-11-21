@@ -34,7 +34,7 @@ module writes and starts a job for both surfaces.**
 > Where no store is set, the app uses a `sql` store on SQLite in its data
 > directory.
 
-- `analysis_service.job_answers` reads a job from the store, builds its
+- `katra.job_answers` reads a job from the store, builds its
   Answer State, stores a round, a draft or a correction, or creates the
   Resumed Job, admits it and starts it. It raises a typed refusal; the `/v1`
   routes map each to a problem response, the app to a page message.

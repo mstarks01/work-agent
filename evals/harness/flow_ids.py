@@ -28,7 +28,7 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from analysis_service.system_model import (
+from katra.system_model import (
     FLOW_ID_VERSION,
     FlowIdError,
     flow_id_rule,

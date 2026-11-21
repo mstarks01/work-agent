@@ -2,8 +2,8 @@
 secret rule (ADR 0092).
 
 The tests make real files with real modes in a temporary directory. The loader
-tests drive :func:`~analysis_service.config_files.private_fd` and
-:func:`~analysis_service.config_files.read_secret`. The app tests drive the
+tests drive :func:`~katra.config_files.private_fd` and
+:func:`~katra.config_files.read_secret`. The app tests drive the
 first-run app and ``/v1``, and read only the HTTP response and the log.
 """
 
@@ -16,18 +16,18 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import config_files
-from analysis_service.api import create_app as create_v1_app
-from analysis_service.config_files import (
+from katra import config_files
+from katra.api import create_app as create_v1_app
+from katra.config_files import (
     MAX_VALUE_CHARS,
     SettingsFileError,
     read_private,
     read_secret,
     read_settings_env,
 )
-from analysis_service.deployment import Deployment
-from analysis_service.jobs import InMemoryJobStore
-from analysis_service.vendors import ProviderAuthError
+from katra.deployment import Deployment
+from katra.jobs import InMemoryJobStore
+from katra.vendors import ProviderAuthError
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_api import FakeVerifier, auth, submission
 from tests.test_settings_env import (
@@ -38,7 +38,7 @@ from tests.test_settings_env import (
 )
 
 #: The key file of the base tier, which the runner build reads.
-KEY_VAR = "ANALYSIS_OPENAI_API_KEY_FILE"
+KEY_VAR = "KATRA_OPENAI_API_KEY_FILE"
 
 #: Each secret that the secret rule refuses. Each one holds a marker that a
 #: message must never repeat.
@@ -118,8 +118,8 @@ class TestTheSecretRule:
     def test_a_secret_in_the_environment_itself_is_refused(self, tmp_path):
         """``read_secret`` refuses it, so a new reader cannot skip the rule."""
         path = private_file(tmp_path / "key", "SECRET", 0o600)
-        env = key_env(path) | {"ANALYSIS_OPENAI_API_KEY": "SECRET"}
-        with pytest.raises(ProviderAuthError, match="unset ANALYSIS_OPENAI_API_KEY,"):
+        env = key_env(path) | {"KATRA_OPENAI_API_KEY": "SECRET"}
+        with pytest.raises(ProviderAuthError, match="unset KATRA_OPENAI_API_KEY,"):
             read_secret(env, KEY_VAR, ProviderAuthError)
 
     def test_one_final_newline_is_not_part_of_the_secret(self, tmp_path):

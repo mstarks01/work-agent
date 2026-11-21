@@ -19,20 +19,20 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import (
-    Assertion,
-    AssertionCatalog,
-    AssertionRecord,
-    CatalogIssue,
-    Subject,
-)
-from analysis_service.sources import text_digest
 from evals.harness import promotion
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case, load_corpus
 from evals.harness.replay import signed_reference
 from evals.harness.run import COMMANDS
 from evals.harness.scorer import score_case
+from katra.assertions import (
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    CatalogIssue,
+    Subject,
+)
+from katra.sources import text_digest
 from tests.eval_factories import ScriptedMatcher
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)

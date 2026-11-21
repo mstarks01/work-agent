@@ -53,20 +53,20 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.execution import (
+from katra.binding import build_tier_adapters
+from katra.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
+from katra.conformance import REFERENCE_MODELS
+from katra.execution import (
     _attempts_of,
     _reported_charge_of,
     _served_route,
     _served_upstream_of,
     _usage_of,
 )
-from analysis_service.provider import REASKS_METADATA_KEY
-from analysis_service.report import TokenUsage
-from analysis_service.resilience import load_resilience
-from analysis_service.retry import (
+from katra.provider import REASKS_METADATA_KEY
+from katra.report import TokenUsage
+from katra.resilience import load_resilience
+from katra.retry import (
     ATTEMPTS_METADATA_KEY,
     RefusedCompletionError,
     TruncatedCompletionError,
@@ -74,9 +74,9 @@ from analysis_service.retry import (
     _is_transient,
     _retry_after_seconds,
 )
-from analysis_service.sampling import load_sampling
-from analysis_service.system_model import SystemModel
-from analysis_service.vendors import VendorName, vendor_for
+from katra.sampling import load_sampling
+from katra.system_model import SystemModel
+from katra.vendors import VendorName, vendor_for
 from tests.factories import (
     PROJECT_ROOT,
     inject_transport,
@@ -270,7 +270,7 @@ def no_real_sleeping(monkeypatch):
 
 
 class TestWhatTheExecutorReadsOffAnEvent:
-    """The five facts ``analysis_service.execution`` stamps a node run from.
+    """The five facts ``katra.execution`` stamps a node run from.
 
     Each is read by the shipped reader, imported rather than restated, off an
     event ADK built from a response litellm parsed from bytes a provider sent.

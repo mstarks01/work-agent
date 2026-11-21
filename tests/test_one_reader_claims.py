@@ -137,64 +137,64 @@ UNGUARDED_CLAIMS: dict[Site, str] = dict.fromkeys(
         ("evals/harness/verbs.py", "EQUIVALENT"),
         ("evals/reference_facts.py", "signed_proposal"),
         ("evals/review_submission.py", "_case_problems"),
-        ("src/analysis_service/analysis.py", "comparable_asset_tags"),
-        ("src/analysis_service/analysis.py", "crossings_by_flow"),
-        ("src/analysis_service/analysis.py", "leading_word"),
-        ("src/analysis_service/answer_forms.py", "answer_limit"),
-        ("src/analysis_service/answer_sets.py", "within_held_limits"),
-        ("src/analysis_service/answer_state.py", "passes_floor"),
-        ("src/analysis_service/answer_state.py", "recommended"),
-        ("src/analysis_service/assertion_use.py", MODULE_OWNER),
-        ("src/analysis_service/assertions.py", "settled"),
-        ("src/analysis_service/assertions.py", "_bounded"),
-        ("src/analysis_service/assertions.py", "admissible"),
-        ("src/analysis_service/assertions.py", "conflicts"),
-        ("src/analysis_service/assertions.py", "projected_attribute"),
-        ("src/analysis_service/assertions.py", "quarantine"),
-        ("src/analysis_service/bands.py", "band_of"),
-        ("src/analysis_service/charges.py", "recordable_charge"),
-        ("src/analysis_service/charges.py", "records_reported_charge"),
-        ("src/analysis_service/claim_identity.py", "distinct_mechanisms"),
-        ("src/analysis_service/claims.py", "dismissed_refs"),
-        ("src/analysis_service/claims.py", "re_ask_kinds"),
-        ("src/analysis_service/compact.py", "parse_extraction"),
-        ("src/analysis_service/critic_round.py", "rulings_of"),
-        ("src/analysis_service/deployment.py", "job_deadline_seconds"),
-        ("src/analysis_service/evidence.py", "lead_topics"),
-        ("src/analysis_service/evidence.py", "ground_gloss"),
-        ("src/analysis_service/evidence.py", "ground_issues"),
-        ("src/analysis_service/evidence.py", "ground_places"),
-        ("src/analysis_service/evidence.py", "prepared_view"),
-        ("src/analysis_service/fan_in.py", "within_bound"),
-        ("src/analysis_service/frameworks/__init__.py", "lane_of"),
-        ("src/analysis_service/graph.py", "JOIN_ROLE"),
-        ("src/analysis_service/graph.py", "LANE_ARTIFACTS"),
-        ("src/analysis_service/graph.py", "fired_by_lane"),
-        ("src/analysis_service/graph.py", "framework_lane_inputs"),
-        ("src/analysis_service/graph.py", "render_model"),
-        ("src/analysis_service/grounding.py", "match_normalized"),
-        ("src/analysis_service/jobs.py", "envelope_parts"),
-        ("src/analysis_service/jobs.py", "event_frames"),
-        ("src/analysis_service/jobs.py", "execute_job"),
-        ("src/analysis_service/jobs.py", "parent_of"),
-        ("src/analysis_service/knowledge.py", "select_per_lane"),
-        ("src/analysis_service/links.py", "resumed_sources"),
-        ("src/analysis_service/model_gate.py", "library_sends_no_native_schema"),
-        ("src/analysis_service/model_gate.py", "schema_support"),
-        ("src/analysis_service/model_gate.py", "takes_thinking"),
-        ("src/analysis_service/model_gate.py", "tool_models"),
-        ("src/analysis_service/model_tiers.py", "bound_tiers"),
-        ("src/analysis_service/model_tiers.py", "charge_mode"),
-        ("src/analysis_service/model_tiers.py", "credential_mode"),
-        ("src/analysis_service/model_tiers.py", "upstreams_for"),
-        ("src/analysis_service/open_facts.py", "gaps"),
-        ("src/analysis_service/pipeline.py", "entry_of"),
-        ("src/analysis_service/report_conditions.py", "corrected_findings"),
-        ("src/analysis_service/sources.py", "plain_name"),
-        ("src/analysis_service/settings_variables.py", "secret_vars"),
-        ("src/analysis_service/system_model.py", "capability_facts"),
-        ("src/analysis_service/vendors.py", "litellm_provider"),
-        ("src/analysis_service/vendors.py", "vendor_for_route"),
+        ("src/katra/analysis.py", "comparable_asset_tags"),
+        ("src/katra/analysis.py", "crossings_by_flow"),
+        ("src/katra/analysis.py", "leading_word"),
+        ("src/katra/answer_forms.py", "answer_limit"),
+        ("src/katra/answer_sets.py", "within_held_limits"),
+        ("src/katra/answer_state.py", "passes_floor"),
+        ("src/katra/answer_state.py", "recommended"),
+        ("src/katra/assertion_use.py", MODULE_OWNER),
+        ("src/katra/assertions.py", "settled"),
+        ("src/katra/assertions.py", "_bounded"),
+        ("src/katra/assertions.py", "admissible"),
+        ("src/katra/assertions.py", "conflicts"),
+        ("src/katra/assertions.py", "projected_attribute"),
+        ("src/katra/assertions.py", "quarantine"),
+        ("src/katra/bands.py", "band_of"),
+        ("src/katra/charges.py", "recordable_charge"),
+        ("src/katra/charges.py", "records_reported_charge"),
+        ("src/katra/claim_identity.py", "distinct_mechanisms"),
+        ("src/katra/claims.py", "dismissed_refs"),
+        ("src/katra/claims.py", "re_ask_kinds"),
+        ("src/katra/compact.py", "parse_extraction"),
+        ("src/katra/critic_round.py", "rulings_of"),
+        ("src/katra/deployment.py", "job_deadline_seconds"),
+        ("src/katra/evidence.py", "lead_topics"),
+        ("src/katra/evidence.py", "ground_gloss"),
+        ("src/katra/evidence.py", "ground_issues"),
+        ("src/katra/evidence.py", "ground_places"),
+        ("src/katra/evidence.py", "prepared_view"),
+        ("src/katra/fan_in.py", "within_bound"),
+        ("src/katra/frameworks/__init__.py", "lane_of"),
+        ("src/katra/graph.py", "JOIN_ROLE"),
+        ("src/katra/graph.py", "LANE_ARTIFACTS"),
+        ("src/katra/graph.py", "fired_by_lane"),
+        ("src/katra/graph.py", "framework_lane_inputs"),
+        ("src/katra/graph.py", "render_model"),
+        ("src/katra/grounding.py", "match_normalized"),
+        ("src/katra/jobs.py", "envelope_parts"),
+        ("src/katra/jobs.py", "event_frames"),
+        ("src/katra/jobs.py", "execute_job"),
+        ("src/katra/jobs.py", "parent_of"),
+        ("src/katra/knowledge.py", "select_per_lane"),
+        ("src/katra/links.py", "resumed_sources"),
+        ("src/katra/model_gate.py", "library_sends_no_native_schema"),
+        ("src/katra/model_gate.py", "schema_support"),
+        ("src/katra/model_gate.py", "takes_thinking"),
+        ("src/katra/model_gate.py", "tool_models"),
+        ("src/katra/model_tiers.py", "bound_tiers"),
+        ("src/katra/model_tiers.py", "charge_mode"),
+        ("src/katra/model_tiers.py", "credential_mode"),
+        ("src/katra/model_tiers.py", "upstreams_for"),
+        ("src/katra/open_facts.py", "gaps"),
+        ("src/katra/pipeline.py", "entry_of"),
+        ("src/katra/report_conditions.py", "corrected_findings"),
+        ("src/katra/sources.py", "plain_name"),
+        ("src/katra/settings_variables.py", "secret_vars"),
+        ("src/katra/system_model.py", "capability_facts"),
+        ("src/katra/vendors.py", "litellm_provider"),
+        ("src/katra/vendors.py", "vendor_for_route"),
         ("webapp/static/report_view.js", "GROUND_KIND"),
     ],
     _RULED,
@@ -615,7 +615,7 @@ def test_a_planted_claim_in_each_new_word_fails(tmp_path):
         ),
         encoding="utf-8",
     )
-    found = _claims_in(probe, "src/analysis_service/elsewhere.py")
+    found = _claims_in(probe, "src/katra/elsewhere.py")
 
     assert sorted(claim.owner for claim in found) == sorted(
         f"unheld_{index}" for index, _ in enumerate(words)
@@ -645,7 +645,7 @@ def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
         encoding="utf-8",
     )
     found = sorted(_claims_in(probe, place), key=lambda claim: claim.line)
-    elsewhere = _claims_in(probe, "src/analysis_service/elsewhere.py")
+    elsewhere = _claims_in(probe, "src/katra/elsewhere.py")
 
     assert [(claim.line, claim.owner) for claim in found] == [
         (1, "PROBE_TABLE"),
@@ -664,13 +664,13 @@ def test_a_dotted_name_resolves_through_its_module_and_the_imports(tmp_path):
     reader's name under another module does not resolve to the reader.
     """
     place, reader = ONE_READERS["the frameworks a job names"].reader
-    importer = "src/analysis_service/deployment.py"
+    importer = "src/katra/deployment.py"
     probe = tmp_path / "probe.py"
     probe.write_text(
         f"#: :func:`{module_name(REPO_ROOT / place)}.{reader}` is the one reader.\n"
         "FIRST = 1\n"
         "\n"
-        f"#: :func:`analysis_service.jobs.{reader}` is the one reader of them.\n"
+        f"#: :func:`katra.jobs.{reader}` is the one reader of them.\n"
         "SECOND = 2\n"
         "\n"
         f"#: :func:`{reader}` is the one reader of the rule.\n"
@@ -702,9 +702,9 @@ def test_a_site_a_row_exempts_guards_nothing(tmp_path):
 def test_a_site_among_several_in_an_assert_guards_nothing():
     """Negative check: a site that an assert lists beside other sites is no
     one reader, so it guards nothing."""
-    assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
-    assert ("src/analysis_service/fixes.py", "missing_rows") not in guarded_sites()
-    assert ("src/analysis_service/claim_identity.py", "report_rows") in guarded_sites()
+    assert ("src/katra/job_answers.py", "amend") not in guarded_sites()
+    assert ("src/katra/fixes.py", "missing_rows") not in guarded_sites()
+    assert ("src/katra/claim_identity.py", "report_rows") in guarded_sites()
 
 
 def test_a_comment_inside_a_table_belongs_to_the_table(tmp_path):
@@ -742,7 +742,7 @@ def test_an_assert_guards_only_where_it_names_one_site_of_the_whole_tree():
     )
 
     assert list(_asserted_sites(probe)) == [("a.py", "f"), ("a.py", "n")]
-    assert ("src/analysis_service/config_files.py", "refused_var") in guarded_sites()
+    assert ("src/katra/config_files.py", "refused_var") in guarded_sites()
 
 
 def test_the_lint_reads_a_real_population():

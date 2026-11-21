@@ -24,12 +24,12 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from analysis_service.actions import ACTION_VERBS, family_of
 from evals import review_submission as review_submissions
 from evals import verify_corpus
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness.reference import CorpusError, load_case
+from katra.actions import ACTION_VERBS, family_of
 from webapp.page import client_script
 from webapp.sitting import _PAGE, build_session, create_app
 from webapp.sitting import main as app_main
@@ -1929,12 +1929,12 @@ class TestTheDraftStore:
         that must never merge belongs."""
         monkeypatch.delenv("XDG_STATE_HOME", raising=False)
         root = sittings.draft_root()
-        assert root.parts[-4:] == (".local", "state", "work-agent", "sittings")
+        assert root.parts[-4:] == (".local", "state", "katra", "sittings")
         assert root.is_absolute()
 
     def test_the_default_root_follows_xdg_state_home(self, monkeypatch, tmp_path):
         monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
-        assert sittings.draft_root() == tmp_path / "work-agent" / "sittings"
+        assert sittings.draft_root() == tmp_path / "katra" / "sittings"
 
     def test_a_session_takes_the_root_its_caller_names(self, tree, tmp_path):
         """The whole reason the root is a field: a test points it at a
@@ -2400,7 +2400,7 @@ class TestTheStandardsOwnWordsRideOnTheRecord:
         "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
     )
     def test_every_record_names_what_it_quotes(self, case_dir):
-        from analysis_service.frameworks.asvs.catalog import requirement_text
+        from katra.frameworks.asvs.catalog import requirement_text
 
         prepared = sittings.prepare(case_dir)
         for framework, part in prepared.part_two_blocks.items():

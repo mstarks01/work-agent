@@ -9,11 +9,11 @@ wrote exactly the signed rows would hold.
 import sys
 from pathlib import Path
 
-from analysis_service.candidates import generate_candidates
-from analysis_service.frameworks import package_for
-from analysis_service.open_facts import prepared_model
 from evals.harness.reference import MUST_FIND, development_cases, load_corpus
 from evals.reference_facts import FACTS_FILE, load_facts, reference_catalog
+from katra.candidates import generate_candidates
+from katra.frameworks import package_for
+from katra.open_facts import prepared_model
 
 CORPUS = Path("evals/corpus")
 

@@ -14,15 +14,15 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.assertions import (
+from evals.harness import modes, replay
+from evals.harness.artifact import EvalArtifact
+from evals.harness.bundle import heads_from_reports
+from katra import graph
+from katra.assertions import (
     Assertion,
     AssertionCatalog,
     Subject,
 )
-from evals.harness import modes, replay
-from evals.harness.artifact import EvalArtifact
-from evals.harness.bundle import heads_from_reports
 from tests.eval_factories import write_emission_sweep
 
 

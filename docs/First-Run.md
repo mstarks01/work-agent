@@ -1,6 +1,6 @@
 # First run
 
-This guide gets a real analysis running locally. Work Agent has no offline demo
+This guide gets a real analysis running locally. Katra has no offline demo
 mode: the local app calls the models you configure.
 
 ## 1. Install
@@ -32,18 +32,18 @@ The shipped [`config/model_tiers.toml`](../config/model_tiers.toml) deliberately
 selects neither tier. Choose a vendor and model for both. No node uses
 `review` until you move a critic onto it, so a first run needs no `review`
 selection. The following pairs are the reference pairs declared in
-`analysis_service.conformance.REFERENCE_MODELS`:
+`katra.conformance.REFERENCE_MODELS`:
 
 <!-- every-vendor -->
 
 | Vendor | `base` | `strong` | Credentials read by the code |
 | --- | --- | --- | --- |
-| Anthropic | `claude-sonnet-5` | `claude-opus-5-5` | `ANALYSIS_ANTHROPIC_API_KEY_FILE` |
-| Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5-5` | `ANALYSIS_BEDROCK_API_KEY_FILE`, `ANALYSIS_BEDROCK_REGION` |
-| Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY_FILE` |
-| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6-sol` | `ANALYSIS_OPENAI_API_KEY_FILE` |
-| OpenRouter | `anthropic/claude-sonnet-5` | `anthropic/claude-opus-5.5` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
-| Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
+| Anthropic | `claude-sonnet-5` | `claude-opus-5-5` | `KATRA_ANTHROPIC_API_KEY_FILE` |
+| Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5-5` | `KATRA_BEDROCK_API_KEY_FILE`, `KATRA_BEDROCK_REGION` |
+| Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `KATRA_GEMINI_API_KEY_FILE` |
+| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6-sol` | `KATRA_OPENAI_API_KEY_FILE` |
+| OpenRouter | `anthropic/claude-sonnet-5` | `anthropic/claude-opus-5.5` | `KATRA_OPENROUTER_API_KEY_FILE` |
+| Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `KATRA_VERTEX_PROJECT`, `KATRA_VERTEX_LOCATION` |
 
 <!-- /every-vendor -->
 
@@ -64,7 +64,7 @@ diagnostic page, and that page links to the Settings page.
 3. Click **Check and save**.
 
 The app checks the settings before it saves them. It writes each key to a new
-file in `~/.config/work-agent/`, with mode `0600`, and the other values to
+file in `~/.config/katra/`, with mode `0600`, and the other values to
 `settings.env` in the same directory. The page never shows a key again. It says
 "A key is saved." The next analysis uses the new settings, with no restart. A
 save that leaves no tier on a vendor deletes the key file of that vendor, and
@@ -92,20 +92,20 @@ Then export the credentials for the vendor or vendors you selected.
 
 Each API key lives in a file, and a `_FILE` variable holds the file's path. An
 environment variable passes to each child process, but a file can have mode
-`0400`. The service refuses a key in `ANALYSIS_{VENDOR}_API_KEY`, and a tier on
+`0400`. The service refuses a key in `KATRA_{VENDOR}_API_KEY`, and a tier on
 that vendor does not build. The service also refuses a key file that other
 users can read ([File permissions](Configuration.md#file-permissions)). Write
 the key to a file that only you can read:
 
 ```sh
-(umask 077 && mkdir -p ~/.config/work-agent &&
-  printf '%s' 'sk-ant-...' >~/.config/work-agent/anthropic_api_key)
+(umask 077 && mkdir -p ~/.config/katra &&
+  printf '%s' 'sk-ant-...' >~/.config/katra/anthropic_api_key)
 ```
 
 ### Anthropic
 
 ```sh
-export ANALYSIS_ANTHROPIC_API_KEY_FILE=~/.config/work-agent/anthropic_api_key
+export KATRA_ANTHROPIC_API_KEY_FILE=~/.config/katra/anthropic_api_key
 ```
 
 ### Bedrock
@@ -127,8 +127,8 @@ bedrock = "api_key"    # or "iam"
 Under `api_key`, export the key file and the region:
 
 ```sh
-export ANALYSIS_BEDROCK_API_KEY_FILE=~/.config/work-agent/bedrock_api_key
-export ANALYSIS_BEDROCK_REGION=us-east-1
+export KATRA_BEDROCK_API_KEY_FILE=~/.config/katra/bedrock_api_key
+export KATRA_BEDROCK_REGION=us-east-1
 ```
 
 An AWS short-term Bedrock key lasts twelve hours and nothing here refreshes it,
@@ -137,10 +137,10 @@ so rotate the variable before it expires.
 Under `iam`, export the region alone:
 
 ```sh
-export ANALYSIS_BEDROCK_REGION=us-east-1
+export KATRA_BEDROCK_REGION=us-east-1
 ```
 
-Work Agent then passes no credential, and boto3's own chain resolves the
+Katra then passes no credential, and boto3's own chain resolves the
 identity — an attached role, `AWS_PROFILE`, or SSO.
 
 Both reference models carry a `global.` prefix. That names a cross-Region
@@ -159,7 +159,7 @@ foundation model in each Region associated with it."
 ### Gemini
 
 ```sh
-export ANALYSIS_GEMINI_API_KEY_FILE=~/.config/work-agent/gemini_api_key
+export KATRA_GEMINI_API_KEY_FILE=~/.config/katra/gemini_api_key
 ```
 
 This is the Gemini Developer API, with a key from Google AI Studio. It serves
@@ -169,13 +169,13 @@ Cloud project. Select `vertex` when the platform supplies the identity.
 ### OpenAI
 
 ```sh
-export ANALYSIS_OPENAI_API_KEY_FILE=~/.config/work-agent/openai_api_key
+export KATRA_OPENAI_API_KEY_FILE=~/.config/katra/openai_api_key
 ```
 
 ### OpenRouter
 
 ```sh
-export ANALYSIS_OPENROUTER_API_KEY_FILE=~/.config/work-agent/openrouter_api_key
+export KATRA_OPENROUTER_API_KEY_FILE=~/.config/katra/openrouter_api_key
 ```
 
 OpenRouter is an aggregator: one endpoint in front of many providers' models.
@@ -192,7 +192,7 @@ the route and the one upstream the record says served it, because a Baseline's
 value is that its runs are comparable. A sweep whose nodes were served from two
 upstreams, or whose record names none, is refused. Pin the upstream before a
 sweep you mean to publish, in the `[upstreams]` table of the tiers file or
-through `ANALYSIS_MODEL_UPSTREAMS_OPENROUTER`:
+through `KATRA_MODEL_UPSTREAMS_OPENROUTER`:
 
 ```toml
 [upstreams]
@@ -221,7 +221,7 @@ spending OpenRouter credit. Each node's record then carries the charge beside
 its token counts. Use `own_upstream_key` when OpenRouter routes the call under a
 provider key of your own: it then charges a routing fee and the provider charges
 you for the tokens, so the figure it reports is a fraction of the cost and
-nothing records it. `ANALYSIS_MODEL_CHARGES_OPENROUTER` sets the same value from
+nothing records it. `KATRA_MODEL_CHARGES_OPENROUTER` sets the same value from
 the environment.
 
 If you declare the wrong one, the first call says so and the run stops: every
@@ -248,8 +248,8 @@ blessed fingerprint.
 gcloud auth application-default login
 gcloud services enable aiplatform.googleapis.com --project your-gcp-project
 
-export ANALYSIS_VERTEX_PROJECT=your-gcp-project
-export ANALYSIS_VERTEX_LOCATION=us-central1
+export KATRA_VERTEX_PROJECT=your-gcp-project
+export KATRA_VERTEX_LOCATION=us-central1
 ```
 
 `us-central1` serves both models in the table above. Check Google's [model
@@ -263,7 +263,7 @@ multi-region endpoints serve neither model. Set `global` to serve both from
 anywhere; Google states that the global endpoint carries its own quota and
 supports no data residency requirement.
 
-The Vertex identity needs `roles/aiplatform.user`. Work Agent passes no
+The Vertex identity needs `roles/aiplatform.user`. Katra passes no
 credential to Vertex: it passes the project and the location, and Google's own
 Application Default Credentials chain resolves the identity. The `gcloud`
 command above writes the file that chain finds on a workstation. On GKE or Cloud
@@ -273,10 +273,10 @@ The tiers may use different vendors. In that case, set credentials for each
 vendor a tier the node map binds selects — the shipped map binds `base` and
 `strong`, so `review` needs neither a selection nor a credential until you move
 criticism onto it, and the loader asks for both at that edit. You may also select models through the matching
-`ANALYSIS_MODEL_BASE_{VENDOR,MODEL}`, `ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` and
-`ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables, and a credential
-mode through `ANALYSIS_MODEL_CREDENTIALS_{VENDOR}` and a charge arrangement
-through `ANALYSIS_MODEL_CHARGES_{VENDOR}`. See
+`KATRA_MODEL_BASE_{VENDOR,MODEL}`, `KATRA_MODEL_STRONG_{VENDOR,MODEL}` and
+`KATRA_MODEL_REVIEW_{VENDOR,MODEL}` environment variables, and a credential
+mode through `KATRA_MODEL_CREDENTIALS_{VENDOR}` and a charge arrangement
+through `KATRA_MODEL_CHARGES_{VENDOR}`. See
 [Configuration](Configuration.md#model-overrides-deploy-time-no-image-rebuild)
 for the exact override rules.
 
@@ -286,7 +286,7 @@ This command uses the pinned LiteLLM model map locally. It makes no network
 request and needs no credentials:
 
 ```sh
-uv run python -m analysis_service.conformance
+uv run python -m katra.conformance
 ```
 
 It reports whether the known provider mapping accepts the exposed sampling
@@ -297,7 +297,7 @@ not mean supported or unsupported.
 After setting credentials, run the end-to-end smoke check:
 
 ```sh
-uv run python -m analysis_service.smoke
+uv run python -m katra.smoke
 ```
 
 This is the first command in the guide that proves the selected providers
@@ -315,7 +315,7 @@ Open <http://127.0.0.1:8000>.
 The app is a local demonstration, not a production service. The implementation
 hard-codes `127.0.0.1:8000`, performs no user authentication, allows one active
 run, and keeps at most 20 recent runs. With no store setting, it keeps them in
-SQLite in `~/.local/share/work-agent`, so a restart keeps them. You run no
+SQLite in `~/.local/share/katra`, so a restart keeps them. You run no
 command to set this up. [The web app guide](Web-App.md#where-the-runs-are-kept)
 states the defaults and how to keep nothing on disk.
 When the app must remove a run, it removes the oldest run that does not wait

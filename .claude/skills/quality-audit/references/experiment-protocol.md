@@ -137,7 +137,7 @@ in this conversation.
   `evals/harness/consent.py`, and they are the only spend enforcement that
   exists. `--accept-cost unknown` removes the hold entirely — never pass it to
   raise a budget.
-- **Set `ANALYSIS_OFFLINE` for offline work.** It refuses a live provider call
+- **Set `KATRA_OFFLINE` for offline work.** It refuses a live provider call
   before it leaves the process, on every node, every retry and every
   single-node replay. It guards against an accident and is not consent.
 - **Classify a command by what it does.** `score` and `replay` re-read an

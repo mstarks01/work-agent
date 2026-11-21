@@ -1,6 +1,6 @@
 """What a provider said it charged, from its response to the record.
 
-Three layers, matching the three seams in :mod:`analysis_service.charges`: the
+Three layers, matching the three seams in :mod:`katra.charges`: the
 shapes a figure can arrive in, the rule that decides whether it may be recorded,
 and the two subclasses that carry it. The rule's other half — which arrangement
 a deployment declares — is tested beside the loader that reads it, in
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.charges import (
+from katra.charges import (
     CHARGE_METADATA_KEY,
     MAX_CALL_CHARGE_USD,
     UPSTREAM_METADATA_KEY,
@@ -30,7 +30,7 @@ from analysis_service.charges import (
     served_upstream_of,
     stated_arrangement_of,
 )
-from analysis_service.vendors import VENDOR_NAMES, ChargeMode, vendor_for
+from katra.vendors import VENDOR_NAMES, ChargeMode, vendor_for
 
 _COST_HEADER = "llm_provider-x-litellm-response-cost"
 
@@ -126,7 +126,7 @@ class TestTheShapesAFigureArrivesIn:
     def test_the_stored_charge_has_the_reader_s_bound(self):
         """The reader and the record hold one constant, so the record never
         refuses what the reader writes, nor stores what it refuses."""
-        from analysis_service.report import NodeRun
+        from katra.report import NodeRun
 
         kept = NodeRun(node="x", duration_ms=1, reported_charge_usd=MAX_CALL_CHARGE_USD)
         assert kept.reported_charge_usd == MAX_CALL_CHARGE_USD
@@ -552,7 +552,7 @@ class TestTheStoredFigureIsHeldToTheRuleThatWroteIt:
         because ``json.loads`` accepts ``Infinity`` and pydantic's own parser
         does too.
         """
-        from analysis_service.report import NodeRun
+        from katra.report import NodeRun
 
         raw = '{"node":"x","duration_ms":1,"reported_charge_usd":Infinity}'
         with pytest.raises(ValidationError):
@@ -567,9 +567,9 @@ class TestTheStoredFigureIsHeldToTheRuleThatWroteIt:
         moves all three together instead of making two readers refuse what the
         third writes.
         """
-        from analysis_service.charges import UPSTREAM_MAX_CHARS
-        from analysis_service.report import NodeRun
         from evals.harness.provenance import NodeExecution
+        from katra.charges import UPSTREAM_MAX_CHARS
+        from katra.report import NodeRun
 
         longest = "u" * UPSTREAM_MAX_CHARS
         assert (

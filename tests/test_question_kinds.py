@@ -13,19 +13,19 @@ import re
 
 import pytest
 
-from analysis_service.assertions import AssertionCatalog, AssertionRecord
-from analysis_service.claims import ProposedVerdict, UnknownRef
-from analysis_service.critic import review_issues, snap_rulings
-from analysis_service.fact_answers import STORED, FactAnswer
-from analysis_service.fact_writes import check_fact_answers
-from analysis_service.jobs import Checkpoint
-from analysis_service.links import with_link_answers
-from analysis_service.open_facts import element_names, label_of
-from analysis_service.prompts import compose_critic_prompt, compose_recritic_prompt
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.questions import question_fallback
-from analysis_service.sources import Source
-from analysis_service.system_model import UNKNOWN
+from katra.assertions import AssertionCatalog, AssertionRecord
+from katra.claims import ProposedVerdict, UnknownRef
+from katra.critic import review_issues, snap_rulings
+from katra.fact_answers import STORED, FactAnswer
+from katra.fact_writes import check_fact_answers
+from katra.jobs import Checkpoint
+from katra.links import with_link_answers
+from katra.open_facts import element_names, label_of
+from katra.prompts import compose_critic_prompt, compose_recritic_prompt
+from katra.question_kinds import QUESTION_KINDS
+from katra.questions import question_fallback
+from katra.sources import Source
+from katra.system_model import UNKNOWN
 from tests import test_critic_review_replay
 from tests.factories import sample_draft, sample_report, sample_ruling, valid_model
 from tests.test_questions import resume
@@ -293,7 +293,7 @@ def test_a_blank_assertion_names_no_open_row_on_any_surface():
     """``spellings`` reads a field of blank padding as unused, and the label and
     the re-ask sentence read the spelling through it, so all three name the
     attribute (#1745 read ``fact_kind`` the same way)."""
-    from analysis_service.claims import name_unknown
+    from katra.claims import name_unknown
 
     ref = UnknownRef(element_id="e1", attribute="authentication", assertion=" ")
 
@@ -325,9 +325,9 @@ def test_every_surface_names_the_kind_that_fact_kind_reads(first, second):
     sentence and ``names_an_element`` each equal those of the sound reference
     of that kind alone.
     """
-    from analysis_service.claims import name_unknown
-    from analysis_service.fact_answers import fact_kind
-    from analysis_service.open_facts import group_of
+    from katra.claims import name_unknown
+    from katra.fact_answers import fact_kind
+    from katra.open_facts import group_of
 
     ref = UnknownRef(**(_ONE_KIND[first] | _ONE_KIND[second]))
     sound = UnknownRef(**_ONE_KIND[fact_kind(ref.key)])
@@ -351,8 +351,8 @@ def test_a_gate_asks_a_question_that_names_a_closed_attribute_too(monkeypatch):
     """The gate list routes on the kind, not on the attribute field."""
     from dataclasses import replace
 
-    from analysis_service import early_questions
-    from analysis_service.frameworks import PACKAGES
+    from katra import early_questions
+    from katra.frameworks import PACKAGES
 
     ref = _QUESTION_OVER_CLOSED_ATTRIBUTE
     package = replace(PACKAGES["asvs"], precondition_facts=lambda model: (ref,))
@@ -368,8 +368,8 @@ def test_a_gate_asks_a_question_that_names_a_closed_attribute_too(monkeypatch):
 def test_a_question_left_out_is_not_settled_by_a_closed_attribute():
     """The reason a listed question left routes on the kind, not on the
     attribute field."""
-    from analysis_service.answer_state import _left_out
-    from analysis_service.early_questions import _question
+    from katra.answer_state import _left_out
+    from katra.early_questions import _question
 
     model = valid_model()
     question = _question(

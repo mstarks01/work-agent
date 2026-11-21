@@ -19,7 +19,7 @@
   by [ADR 0088](0088-field-questions-have-no-limit.md), under which field
   questions have no limit; and by
   [#1672](https://github.com/mstarks01/work-agent/issues/1672), under which a
-  paused job survives a restart where `ANALYSIS_JOB_STORE` is `sql`
+  paused job survives a restart where `KATRA_JOB_STORE` is `sql`
 
 ## Context
 
@@ -175,7 +175,7 @@ writes the answers and nothing else. A first-run app restart still loses a
 paused run (#1282).
 
 > **Amended by [#1672](https://github.com/mstarks01/work-agent/issues/1672).**
-> A paused job survives a restart where `ANALYSIS_JOB_STORE` is `sql`.
+> A paused job survives a restart where `KATRA_JOB_STORE` is `sql`.
 
 **A capability and an attribute can ask about related facts, and neither
 answer writes the other.** A flow's authentication and the `oauth`,

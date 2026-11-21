@@ -3,7 +3,7 @@
 Two properties carry the whole design and both are pinned here: the catalog is
 a pure function of the validated System Model, and resolution is total over the
 catalog and refuses everything else. Together they are what makes a mis-shaped
-:class:`~analysis_service.claims.Ground` unreachable from an agent rather than
+:class:`~katra.claims.Ground` unreachable from an agent rather than
 merely rare — the last class in this module is the traceback that motivated the
 cutover, asserted to be inexpressible.
 """
@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     REGISTRY,
     Assertion,
@@ -24,14 +24,14 @@ from analysis_service.assertions import (
     assertion_id,
     catalog_coverage,
 )
-from analysis_service.claims import (
+from katra.claims import (
     ASSERTION_GROUNDS,
     CONDITIONAL_GROUNDS,
     GROUND_TERM_MAX_CHARS,
     Ground,
 )
-from analysis_service.critic import critic_view
-from analysis_service.evidence import (
+from katra.critic import critic_view
+from katra.evidence import (
     ASSERTION_GLOSSES,
     absent_evidence_ref,
     catalog_refs,
@@ -47,14 +47,14 @@ from analysis_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import (
+from katra.frameworks import PACKAGES
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import (
     DraftThreat,
     ThreatProposal,
     ThreatProposals,
 )
-from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
+from katra.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import (
     sample_draft,
     sample_proposal,
@@ -521,7 +521,7 @@ class TestRenderCatalog:
     A JSON array of IDs reads as a specimen of the format; these pin the
     properties that make the rendering a menu instead. The shape is the half of
     the fix that stops the reference being composed — once it is, the drop
-    loses its entry and not the job (:class:`~analysis_service.claims.UnresolvedEvidence`).
+    loses its entry and not the job (:class:`~katra.claims.UnresolvedEvidence`).
     """
 
     def test_every_entry_appears_as_its_own_row(self):
@@ -1361,8 +1361,8 @@ def test_every_assertion_ground_kind_has_a_gloss():
     """The table against the set that names its keys.
 
     ``_gloss`` dispatches assertion grounds through
-    :data:`~analysis_service.evidence.ASSERTION_GLOSSES`, and a kind in
-    :data:`~analysis_service.claims.ASSERTION_GROUNDS` with no entry would fall
+    :data:`~katra.evidence.ASSERTION_GLOSSES`, and a kind in
+    :data:`~katra.claims.ASSERTION_GROUNDS` with no entry would fall
     past the dispatch and read as an unstated attribute. That is a wrong
     sentence in a lane agent's catalog rather than a raise, so the comparison
     is here.
@@ -1449,12 +1449,12 @@ class TestACitedRowIsPartOfAClaimsMechanism:
     def test_a_row_and_an_unknown_attribute_are_two_mechanisms(self):
         """Case 01's leaked password rests on stated rows, its offline copy on
         an unstated attribute: two findings under one key."""
-        from analysis_service.claim_identity import (
+        from katra.claim_identity import (
             distinct_mechanisms,
             grounded_mechanism,
             row_controls,
         )
-        from analysis_service.claims import Ground
+        from katra.claims import Ground
 
         held = assertions(row())
         stated = evidence_catalog(valid_model(), held)[assertion_id(row())]
@@ -1475,7 +1475,7 @@ class TestACitedRowIsPartOfAClaimsMechanism:
 
     def test_a_row_names_the_attribute_its_predicate_projects_into(self):
         """A row and an attribute ground about one control read alike."""
-        from analysis_service.claim_identity import row_controls
+        from katra.claim_identity import row_controls
 
         exposed = row(
             subject=LOGIN_FLOW,
@@ -1489,15 +1489,15 @@ class TestACitedRowIsPartOfAClaimsMechanism:
 
     def test_a_job_with_no_catalog_reads_no_row(self):
         """The layer off: no row is cited and the mechanism is the attributes."""
-        from analysis_service.claim_identity import NO_ROWS, row_controls
+        from katra.claim_identity import NO_ROWS, row_controls
 
         assert row_controls(None) is NO_ROWS
 
     def test_a_report_reads_the_rows_of_its_own_catalog(self):
         """A Report with no assertion record reads no row, and one with a
         record reads its catalog's rows."""
-        from analysis_service.assertions import AssertionRecord
-        from analysis_service.claim_identity import NO_ROWS, report_rows, row_controls
+        from katra.assertions import AssertionRecord
+        from katra.claim_identity import NO_ROWS, report_rows, row_controls
         from tests.factories import sample_report
 
         held = assertions(row())

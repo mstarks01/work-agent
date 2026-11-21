@@ -2,7 +2,7 @@
 
 import pytest
 
-from analysis_service.references import canonical, fold
+from katra.references import canonical, fold
 
 ELEMENT_IDS = frozenset(
     {

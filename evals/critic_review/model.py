@@ -26,10 +26,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.claims import RejectionStep
-from analysis_service.frameworks import FrameworkName
-from analysis_service.job_controls import AppliedControl
-from analysis_service.parsing import Signer
+from katra.claims import RejectionStep
+from katra.frameworks import FrameworkName
+from katra.job_controls import AppliedControl
+from katra.parsing import Signer
 
 #: What each fixture is built to catch, and the four the review change turns on.
 #:
@@ -92,7 +92,7 @@ class Expectation(BaseModel):
     ``status`` is optional first because code decides it from the ruling's
     fields. A draft citing an unknown reads ``confirmed`` only where the critic
     names every such pair in ``immaterial_unknowns``, and
-    :func:`~analysis_service.critic.complete_rulings` turns any pair it leaves
+    :func:`~katra.critic.complete_rulings` turns any pair it leaves
     out into a ``needs-info``. So the ruling states whether the critic judged
     the unknown irrelevant, and ``judged_the_unknown`` on the replay's outcome
     reads it. Which surviving verdict a fixture deserves is a separate question

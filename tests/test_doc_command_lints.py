@@ -47,7 +47,7 @@ pytestmark = pytest.mark.lint
 SEARCHED = guide_files()
 
 #: The module whose commands this lint knows how to check. Others are named in
-#: the prose too -- ``python -m analysis_service.smoke`` and friends -- and are
+#: the prose too -- ``python -m katra.smoke`` and friends -- and are
 #: left alone rather than half-checked: they take their arguments from their own
 #: parsers, and a lint that guessed would be the second list this avoids.
 MODULE = "evals.harness.run"

@@ -34,7 +34,7 @@ promotion needs. Their quality gates are not read.
 ## Decision
 
 **The assertion pass runs on every job by default** (maintainer's decision of
-2026-10-09). `ANALYSIS_ASSERTIONS` set to a non-empty value that is not an
+2026-10-09). `KATRA_ASSERTIONS` set to a non-empty value that is not an
 affirmative turns it off. An unset or empty variable keeps the default. A
 deployment that selects a facts-first reading runs no pass, because that
 reading writes its own rows.
@@ -53,6 +53,6 @@ They stay as the record of what a measured promotion needs.
   a catalog.
 - An eval sweep runs the pass unless its environment turns it off. The
   archived Baselines ran without it, so a run compared with one of them sets
-  `ANALYSIS_ASSERTIONS=false`.
+  `KATRA_ASSERTIONS=false`.
 - The scripted test environment (`tests/factories.TEST_TIER_ENV`) turns the
   pass off, because it scripts no `assert` node. A test of the pass turns it on.

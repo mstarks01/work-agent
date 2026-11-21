@@ -43,7 +43,7 @@ job runs it. It differs from a job in three ways:
 The precision of the node as a job runs it, and on other models, is
 unmeasured.
 
-`ANALYSIS_CAPABILITY_READER=false` turns the reader off. An unset or empty
+`KATRA_CAPABILITY_READER=false` turns the reader off. An unset or empty
 variable keeps it on, and a non-empty value other than an affirmative turns it
 off, as for the assertion pass.
 

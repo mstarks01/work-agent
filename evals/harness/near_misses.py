@@ -32,7 +32,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import CaseFlows, endpoint_subset
 from evals.harness.losses import SILENT, CaseLosses, Loss
 from evals.harness.reference import (
@@ -44,6 +43,7 @@ from evals.harness.reference import (
 )
 from evals.harness.scorer import CaseScore, VoteStatus
 from evals.harness.verbs import same_action
+from katra.frameworks.stride.record import DraftThreat
 
 #: What the reader fills in, and the answers the recorder accepts.
 NearMissVerdict = Literal[RulingVerdict, "unsure"]

@@ -18,37 +18,37 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.controls import (
+from katra.controls import (
     Control,
     ControlDocument,
     ControlScope,
     scope_phrase,
 )
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.graph import (
+from katra.fact_answers import FactAnswer
+from katra.graph import (
     PAUSE_NODE,
     STATE_CONTROL_LINES,
     STATE_FACT_ANSWERS,
 )
-from analysis_service.job_answers import JobAnswers
-from analysis_service.job_controls import (
+from katra.job_answers import JobAnswers
+from katra.job_controls import (
     COVER_MEANINGS,
     FACT_MEANINGS,
     NOT_COPIED,
     resolutions,
 )
-from analysis_service.job_state import StoredRefusal, why_not_continued
-from analysis_service.jobs import (
+from katra.job_state import StoredRefusal, why_not_continued
+from katra.jobs import (
     Admission,
     Checkpoint,
     InMemoryJobStore,
     PipelineAwaiting,
 )
-from analysis_service.links import with_link_answers
-from analysis_service.pipeline import _seeded_state
-from analysis_service.principals import Identity, Principal
-from analysis_service.sources import text_digest
-from analysis_service.system_model import Assumption, DataStore, TrustBoundary
+from katra.links import with_link_answers
+from katra.pipeline import _seeded_state
+from katra.principals import Identity, Principal
+from katra.sources import text_digest
+from katra.system_model import Assumption, DataStore, TrustBoundary
 from tests import test_webapp
 from tests.factories import valid_model
 from tests.test_api import auth, make_client, one_framework, one_source

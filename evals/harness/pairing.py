@@ -40,12 +40,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claims import (
-    FrameworkAnalysis,
-    RuledClaim,
-)
-from analysis_service.frameworks.asvs.catalog import Requirement, requirements_for
-from analysis_service.frameworks.asvs.record import requirement_of
 from evals.harness.applicability import (
     APPLIED_CELLS,
     FRAMEWORK,
@@ -54,6 +48,12 @@ from evals.harness.applicability import (
     score_applicability,
 )
 from evals.harness.reference import GoldenCase
+from katra.claims import (
+    FrameworkAnalysis,
+    RuledClaim,
+)
+from katra.frameworks.asvs.catalog import Requirement, requirements_for
+from katra.frameworks.asvs.record import requirement_of
 
 #: The repository this module lives in. A rendered pairing may not be written
 #: inside it; see the licensing note above.

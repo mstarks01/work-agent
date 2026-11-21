@@ -31,13 +31,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-from analysis_service.certification import CertifyResult
-from analysis_service.execution import seed_state
-from analysis_service.graph import STATE_INPUT_TEXT
-from analysis_service.identity import IDENTITY_VERSION
-from analysis_service.parsing import is_version
-from analysis_service.sources import text_digest
-from analysis_service.system_model import FLOW_ID_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.modes import SweepMode
 from evals.harness.provenance import (
@@ -47,6 +40,13 @@ from evals.harness.provenance import (
     checkout_state,
 )
 from evals.harness.reference import GoldenCase
+from katra.certification import CertifyResult
+from katra.execution import seed_state
+from katra.graph import STATE_INPUT_TEXT
+from katra.identity import IDENTITY_VERSION
+from katra.parsing import is_version
+from katra.sources import text_digest
+from katra.system_model import FLOW_ID_VERSION
 
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
@@ -63,7 +63,7 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #
 # ``flow_identity_version`` is optional at the top level. ``carries`` says
 # whether an artifact holds it, and each flow ID states its version by its
-# shape (:func:`~analysis_service.system_model.flow_id_version`), so an
+# shape (:func:`~katra.system_model.flow_id_version`), so an
 # artifact without the key still reads.
 #
 # The version declares:
@@ -164,7 +164,7 @@ def rendered_sources(cases: Iterable[GoldenCase]) -> dict[str, str]:
     The rendered text is what the model reads, so the digest moves when a
     Source moves and when the render moves, such as a change to the diagram
     reader. The corpus digest moves for neither of the two. Rendered through
-    :func:`~analysis_service.execution.seed_state`, the one writer of the
+    :func:`~katra.execution.seed_state`, the one writer of the
     rendered text, before the sweep spends.
     """
     return {
@@ -270,7 +270,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     """Read a sweep artifact's provenance, or refuse it.
 
     The version is checked before the shape, as
-    :func:`~analysis_service.certification.load_manifest` does: an artifact from
+    :func:`~katra.certification.load_manifest` does: an artifact from
     another schema should be named as such, not reported as a heap of stray
     keys. There is no best-effort read of an unversioned artifact — those
     record no served identities, so anything recovered from one would be a
@@ -397,7 +397,7 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     # cannot tell the two shapes apart from their contents; here it can, twice
     # over: ``carries`` answers whether an artifact holds the key at all, and a
     # flow ID states its own version by shape, because
-    # :data:`~analysis_service.system_model.FLOW_DELIMITER` is outside the
+    # :data:`~katra.system_model.FLOW_DELIMITER` is outside the
     # alphabet every earlier version's parts are drawn from.
     "flow_identity_version",
     "frameworks",

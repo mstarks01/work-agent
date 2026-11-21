@@ -13,9 +13,9 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from analysis_service.config_files import SETTINGS_DIR_VAR, refused_var
-from analysis_service.offline import OFFLINE_ENV
-from analysis_service.vendors import VENDORS
+from katra.config_files import SETTINGS_DIR_VAR, refused_var, retired_settings
+from katra.offline import OFFLINE_ENV
+from katra.vendors import VENDORS
 
 # The shared assertion helpers in ``tests.factories`` show their values in a
 # failure only where pytest rewrites the module before its first import.
@@ -43,6 +43,9 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
     for vendor in VENDORS.values():
         for var in vendor.all_secret_env_vars():
             monkeypatch.delenv(refused_var(var), raising=False)
+    # So would a setting with the prefix that the service does not read.
+    for var in retired_settings(os.environ):
+        monkeypatch.delenv(var)
 
 
 @pytest.fixture(scope="session")
@@ -62,9 +65,7 @@ def _isolate_data_dir(
     """
     base = tmp_path_factory.mktemp("data")
     monkeypatch.setenv("XDG_DATA_HOME", str(base))
-    monkeypatch.setattr(
-        "webapp.settings_view.data_dir", lambda env: base / "work-agent"
-    )
+    monkeypatch.setattr("webapp.settings_view.data_dir", lambda env: base / "katra")
 
 
 @pytest.fixture
@@ -84,7 +85,7 @@ def _memory_app_store(
     """
     if "default_store" in request.fixturenames:
         return
-    from analysis_service.store_backends import JOB_STORE_VAR
+    from katra.store_backends import JOB_STORE_VAR
     from webapp import main
 
     built = main.build_app_store
@@ -166,7 +167,7 @@ def fake_gcs(monkeypatch: pytest.MonkeyPatch) -> None:
     from google.auth.credentials import AnonymousCredentials
     from google.cloud import storage
 
-    from analysis_service import gcs_objects
+    from katra import gcs_objects
     from tests.sql_stores import PLATFORM_CREDENTIAL, gcs_endpoint
 
     endpoint = gcs_endpoint()
@@ -249,12 +250,12 @@ def refused_projection(monkeypatch: pytest.MonkeyPatch) -> None:
     """The projection that ``prepared_view`` runs is refused whole.
 
     It stands for the validity gate refusing the projected model, where
-    :func:`~analysis_service.assertions.apply_projection` returns the model
+    :func:`~katra.assertions.apply_projection` returns the model
     unchanged with nothing applied, so a graph attribute keeps what extraction
     wrote beside the rows authoritative for it. A caller that imports
     ``apply_projection`` from ``assertions`` still projects.
     """
-    from analysis_service import evidence
+    from katra import evidence
 
     monkeypatch.setattr(
         evidence, "apply_projection", lambda model, catalog: (model, ())

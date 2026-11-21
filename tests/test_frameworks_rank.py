@@ -7,11 +7,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from analysis_service.bands import UNRANKED, Band, band_of
-from analysis_service.claims import Rating, Severity
-from analysis_service.frameworks import PACKAGES, _declaration_issues
-from analysis_service.frameworks.asvs import ASVS
-from analysis_service.frameworks.stride import STRIDE
+from katra.bands import UNRANKED, Band, band_of
+from katra.claims import Rating, Severity
+from katra.frameworks import PACKAGES, _declaration_issues
+from katra.frameworks.asvs import ASVS
+from katra.frameworks.stride import STRIDE
 from tests.factories import sample_threat
 
 

@@ -76,8 +76,9 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from analysis_service.analysis import states_a_protocol
-from analysis_service.system_model import (
+from evals.harness.reference import GoldenCase
+from katra.analysis import states_a_protocol
+from katra.system_model import (
     UNKNOWN,
     DataFlow,
     Element,
@@ -87,7 +88,6 @@ from analysis_service.system_model import (
     make_element_id,
     normalize_name,
 )
-from evals.harness.reference import GoldenCase
 
 #: What a pair rests on, in the order the rules run.
 Evidence = Literal[
@@ -127,7 +127,7 @@ def placeholder_zones(model: SystemModel) -> frozenset[str]:
     records — the schema requires a zone and the source gives none — is a
     placement, not a fact the source states, and a reader has ruled that a
     producer is not required to draw it (#961 step 6). Read off
-    :meth:`~analysis_service.system_model.SystemModel.assumed_zone_elements`,
+    :meth:`~katra.system_model.SystemModel.assumed_zone_elements`,
     the one reader of which placements are inferred, so the rule has no
     second spelling here. A zone with no member is not a placeholder: nothing
     says why it exists.
@@ -300,7 +300,7 @@ def _align_nodes(
     **An alias is matched against a produced element's name, not its ID.** The
     two agree on any model the gate passed, because ``id-mismatch`` holds an ID
     to the slug its name derives. They part on an *archived* model, whose ID
-    was derived under whatever :func:`~analysis_service.system_model.normalize_name`
+    was derived under whatever :func:`~katra.system_model.normalize_name`
     said on the day — and this rule re-derives the alias's slug today. Keying
     on the ID made those two readings of one rule, and a normalization change
     then broke a reader's ruling that is still correct about the words.
@@ -521,13 +521,13 @@ def _label(flow: DataFlow) -> str:
     ``make_flow_id`` and the gate's ``id-mismatch`` holds every flow to that —
     so the two agree on any model the gate passed. They part on an **archived**
     flow, whose ID was slugged under whatever
-    :func:`~analysis_service.system_model.normalize_name` said on the day, and
+    :func:`~katra.system_model.normalize_name` said on the day, and
     a reader's flow alias is slugged here *today*. Keying on the ID made those
     two readings of one rule.
 
     The ID answers where the name cannot be slugged at all: an archived flow
     carrying an empty or symbol-only name still has to compare with something,
-    and :func:`~analysis_service.system_model.flow_label` reads it under
+    and :func:`~katra.system_model.flow_label` reads it under
     whichever version wrote it.
 
     Measured over the whole of ``evals/emissions/`` when this moved off the ID:

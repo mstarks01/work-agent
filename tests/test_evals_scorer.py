@@ -14,7 +14,6 @@ from types import MappingProxyType
 
 import pytest
 
-from analysis_service.claims import Ground
 from evals.harness.calibration import load_pairs
 from evals.harness.content import structural
 from evals.harness.fingerprint import components_for, version_for
@@ -30,6 +29,7 @@ from evals.harness.scorer import (
     unlisted_for_promotion,
     vote_coverage,
 )
+from katra.claims import Ground
 from tests.eval_factories import (
     ScriptedMatcher,
     cast,

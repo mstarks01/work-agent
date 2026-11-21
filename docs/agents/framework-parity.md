@@ -8,7 +8,7 @@ means for each of the others.
 The answer may be "nothing". That is a legitimate outcome and often the right
 one. What is not legitimate is silence.
 
-The set is `PACKAGES` in `src/analysis_service/frameworks/__init__.py`, whatever is
+The set is `PACKAGES` in `src/katra/frameworks/__init__.py`, whatever is
 in it at the time you read this — two today, and
 [#170](https://github.com/mstarks01/work-agent/issues/170) files LINDDUN as a
 candidate. **Read this document as N frameworks, never as a pair.** Every rule

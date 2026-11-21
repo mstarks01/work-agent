@@ -18,36 +18,36 @@ import pytest
 from google.adk.agents import LlmAgent
 from google.adk.models import LlmResponse
 
-from analysis_service import graph
-from analysis_service.api import create_app
-from analysis_service.assertions import (
+from katra import graph
+from katra.api import create_app
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionProposal,
     CatalogProposal,
     assertion_id,
 )
-from analysis_service.claims import ProposedVerdict, UnknownRef
-from analysis_service.frameworks import PACKAGES, FrameworkName
-from analysis_service.frameworks.asvs.catalog import requirements_for
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.identity import IDENTITY_VERSION, build_identity
-from analysis_service.jobs import (
+from katra.claims import ProposedVerdict, UnknownRef
+from katra.frameworks import PACKAGES, FrameworkName
+from katra.frameworks.asvs.catalog import requirements_for
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.identity import IDENTITY_VERSION, build_identity
+from katra.jobs import (
     InMemoryJobStore,
     JobRecord,
     PipelineCompleted,
     PipelineRejected,
     StubPipelineRunner,
 )
-from analysis_service.pipeline import AdkPipelineRunner, PipelineError
-from analysis_service.principals import Identity
-from analysis_service.prompt_cache import stable_prefix
-from analysis_service.report import (
+from katra.pipeline import AdkPipelineRunner, PipelineError
+from katra.principals import Identity
+from katra.prompt_cache import stable_prefix
+from katra.report import (
     FrameworkSelection,
     InputRef,
 )
-from analysis_service.sampling import TierSampling, load_sampling
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
+from katra.sampling import TierSampling, load_sampling
+from katra.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
     BASE_MODEL,
     DEFAULT_FRAMEWORKS,
@@ -86,8 +86,8 @@ ANALYZE_NODES = tuple(lane.node_name for lane in STRIDE_NODES.lanes)
 TIER_NODES = graph.tier_node_by_graph_node(("stride",))
 
 VERTEX_ENV = {
-    "ANALYSIS_VERTEX_PROJECT": "test-project",
-    "ANALYSIS_VERTEX_LOCATION": "us-central1",
+    "KATRA_VERTEX_PROJECT": "test-project",
+    "KATRA_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 
@@ -440,7 +440,7 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
     }
     pipeline, _ = build(replies)
 
-    with caplog.at_level(logging.WARNING, logger="analysis_service.graph"):
+    with caplog.at_level(logging.WARNING, logger="katra.graph"):
         outcome, _ = run(pipeline, job())
 
     assert [threat.id for threat in block(outcome.report).claims] == ["S-01", "S-05"]
@@ -481,7 +481,7 @@ def test_the_report_carries_the_graph_runs_node_stamps():
     """Assembly's job: what the executor stamped reaches the report unaltered.
 
     The stamping itself — served-build join, fingerprints, durations — is
-    :mod:`analysis_service.execution`'s and is tested at that interface.
+    :mod:`katra.execution`'s and is tested at that interface.
     """
     pipeline, _ = build(happy_replies())
     outcome, visited = run(pipeline, job())
@@ -515,7 +515,7 @@ def test_a_tier_running_a_reasoning_effort_still_produces_a_report():
     """
     sampling = load_sampling(
         PROJECT_ROOT / "config" / "sampling.toml",
-        env={"ANALYSIS_SAMPLING_STRONG_THINKING": "low"},
+        env={"KATRA_SAMPLING_STRONG_THINKING": "low"},
     )
     pipeline, _ = build(happy_replies(), sampling=sampling)
 
@@ -857,7 +857,7 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     ).source_sha256
 
     with (
-        caplog.at_level(logging.WARNING, logger="analysis_service.pipeline"),
+        caplog.at_level(logging.WARNING, logger="katra.pipeline"),
         pytest.raises(Exception, match="T-02"),
     ):
         run(pipeline, record)
@@ -1092,7 +1092,7 @@ def test_both_review_passes_read_the_submitted_sources(role):
 def test_every_node_s_system_text_starts_with_its_stable_prefix():
     """The prefix read off the template at build time leads what the node sends.
 
-    :mod:`analysis_service.prompt_cache` marks a prefix only where the system
+    :mod:`katra.prompt_cache` marks a prefix only where the system
     text starts with it, so a node whose rendered text did not would lose its
     cache silently.
     """

@@ -22,7 +22,7 @@ valid token, without breaking a single documented bound.
 > **Amended by [#286](https://github.com/mstarks01/work-agent/issues/286).** Six
 > was the whole fan-out when this was written. It is now one `strong`-tier
 > request per lane of every framework a job names —
-> `analysis_service.frameworks.widest_fan_out`, 23 today — so the burst this ADR
+> `katra.frameworks.widest_fan_out`, 23 today — so the burst this ADR
 > sizes against is larger than the number above. The decision it argues for is
 > unchanged and the arithmetic behind it moved, which is the reason that
 > function exists rather than a number in prose. The byte cap already
@@ -87,7 +87,7 @@ anyone running it any other way.
 `max_active_jobs` goes in `config/resilience.toml` beside the other six. It
 meets that file's stated criterion exactly: an operational bound that cannot
 change *which* answer a job produces, only whether the submission is accepted —
-so it is env-overridable (`ANALYSIS_MAX_ACTIVE_JOBS`) and can be turned down
+so it is env-overridable (`KATRA_MAX_ACTIVE_JOBS`) and can be turned down
 mid-incident without an image rebuild.
 
 Per the repo's no-shim rule, `SUPPORTED_VERSION` moves 4 → 5 and a version-4
@@ -134,7 +134,7 @@ caller's reaching a terminal state, not the passage of time.
 
   > **Closed by [#503](https://github.com/mstarks01/work-agent/issues/503).**
   > It was left to the integrator, with a per-caller rate limit at the edge. It
-  > is now enforced by the service: `analysis_service.budgets` adds a per-subject
+  > is now enforced by the service: `katra.budgets` adds a per-subject
   > job rate, a per-subject token budget and a deployment-wide token budget over
   > a rolling window, all decided inside the same `reserve` call as the ceiling.
   > An edge that meters per caller should keep doing so, and a provider-side

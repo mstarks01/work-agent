@@ -6,7 +6,7 @@ same checks in CI.
 
 One of these is a real security check rather than a hygiene one.
 :func:`fencing_issues` renders every poisoned source through the shipped
-:func:`~analysis_service.sources.render_sources`, and asserts the injection is
+:func:`~katra.sources.render_sources`, and asserts the injection is
 still inside its block afterwards. A case whose text escaped its own fence would
 be a defect in the renderer, on the one path every submitted byte takes, and
 this is what would find it. The rest check that the corpus describes itself
@@ -24,7 +24,6 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 
-from analysis_service.sources import Source, fence_for, render_sources
 from evals.adversarial.model import (
     ATTACK_CLASSES,
     CASES_DIR,
@@ -32,6 +31,7 @@ from evals.adversarial.model import (
     digest_of,
     load_corpus,
 )
+from katra.sources import Source, fence_for, render_sources
 
 
 def digest_issues(cases: Iterable[AdversarialCase]) -> list[str]:

@@ -114,7 +114,7 @@ whole reported charge on every call and reports a cost of nothing.
 ## One trap, for whoever runs the probe next
 
 The service refuses a completion that stopped at `max_output_tokens`
-(`analysis_service.retry`), so a one-token call raises `TruncatedCompletionError`
+(`katra.retry`), so a one-token call raises `TruncatedCompletionError`
 after the provider has already charged for it. The smallest call this service
 will *accept* is one the model finishes on its own. The probe asks for a
 one-word reply under a cap of 16.

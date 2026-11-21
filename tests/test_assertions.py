@@ -14,8 +14,8 @@ from typing import get_args
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from analysis_service.analysis import ABSENT_WORD
-from analysis_service.assertions import (
+from katra.analysis import ABSENT_WORD
+from katra.assertions import (
     _QUALIFIED_BECAUSE,
     ABSENT,
     BASIS_RANK,
@@ -70,11 +70,11 @@ from analysis_service.assertions import (
     subject_id,
     support_span,
 )
-from analysis_service.claims import Ground
-from analysis_service.deployment import DEFAULT_PROMPTS_DIR
-from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import (
+from katra.claims import Ground
+from katra.deployment import DEFAULT_PROMPTS_DIR
+from katra.evidence import evidence_catalog, unknown_evidence_ref
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import (
     EXCERPT_MAX_CHARS,
     UNKNOWN,
     CapabilityStatement,
@@ -2032,7 +2032,7 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
 
         The projected half is spelled ``"none"`` rather than ``absent``: a
         projection writes the word the **System Model** uses, which is what
-        :func:`~analysis_service.analysis.control_state` reads as an absence.
+        :func:`~katra.analysis.control_state` reads as an absence.
         The two spellings of one fact are why this is asserted rather than
         assumed.
         """

@@ -1,9 +1,9 @@
 """The progress line of a run comes from one module.
 
 :mod:`webapp.progress` names the Progress Stage and the words of each
-:data:`~analysis_service.graph.NodeStep`, and counts the stages of the full
+:data:`~katra.graph.NodeStep`, and counts the stages of the full
 graph of a run's mode. The tests build each graph of each selection, hold its
-steps to :func:`~analysis_service.graph.entry_steps`, and hold each node of it
+steps to :func:`~katra.graph.entry_steps`, and hold each node of it
 to a row. No page script names a node or chooses the words of a line.
 """
 
@@ -22,10 +22,10 @@ from typing import NamedTuple, get_args
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import StubPipelineRunner, graph
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES, reads_capabilities
-from analysis_service.job_state import (
+from katra import StubPipelineRunner, graph
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES, reads_capabilities
+from katra.job_state import (
     InFlightJobState,
     RunOrigin,
     RunStart,
@@ -33,15 +33,15 @@ from analysis_service.job_state import (
     run_origin,
     run_start_of,
 )
-from analysis_service.jobs import (
+from katra.jobs import (
     Checkpoint,
     InMemoryJobStore,
     JobEvent,
     JobRecord,
     Resumption,
 )
-from analysis_service.pipeline import entry_of
-from analysis_service.sources import Source
+from katra.pipeline import entry_of
+from katra.sources import Source
 from tests import test_webapp
 from tests.factories import (
     DESCRIPTION_TEXT,
@@ -350,7 +350,7 @@ def stages_on_each_path(
 @pytest.mark.parametrize("selection", SELECTIONS, ids="+".join)
 def test_a_run_that_asks_shows_each_stage_of_its_graph(selection):
     """The ``assert`` step completes the ``checks`` stage. A deployment that
-    turns ``ANALYSIS_ASSERTIONS`` off builds no ``assert`` step, so its run
+    turns ``KATRA_ASSERTIONS`` off builds no ``assert`` step, so its run
     that asks has one stage less, and the bar shows each stage it has."""
     asking = [
         built

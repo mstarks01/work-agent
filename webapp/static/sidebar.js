@@ -1,7 +1,7 @@
 (() => {
   const workspace = document.querySelector(".workspace");
   const toggle = document.getElementById("sidebar-toggle");
-  const key = "work-agent-sidebar-collapsed";
+  const key = "katra-sidebar-collapsed";
 
   // The page a link opens is the current page; the root serves several views,
   // so its links mark none.
@@ -40,7 +40,7 @@
   showTheme();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", showTheme);
   themeButtons.forEach((button) => button.addEventListener("click", () => {
-    window.workAgentTheme.choose(button.dataset.themeChoice);
+    window.katraTheme.choose(button.dataset.themeChoice);
     showTheme();
   }));
 

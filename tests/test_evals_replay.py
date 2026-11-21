@@ -17,31 +17,6 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.assertions import (
-    ABSENT,
-    GATE_REFUSALS,
-    MAX_ASSERTIONS,
-    SPAN_REFUSALS,
-    UNKNOWN,
-    Assertion,
-    AssertionCatalog,
-    AssertionRecord,
-    CatalogIssue,
-    Subject,
-    assertion_id,
-    identity_parts,
-)
-from analysis_service.execution import seed_state
-from analysis_service.graph import STATE_INPUT_TEXT
-from analysis_service.system_model import (
-    DataFlow,
-    SystemModel,
-    flow_id_version,
-    make_flow_id,
-    normalize_element_ids,
-    parse_flow_id,
-)
-from analysis_service.validation import parse_and_validate
 from evals.harness import audit, bundle, replay
 from evals.harness import run as run_module
 from evals.harness.alignment import align, placeholder_zones
@@ -58,6 +33,31 @@ from evals.harness.bundle import (
 from evals.harness.modes import AssertionResult, EvalRunError, ExtractionResult
 from evals.harness.reference import load_corpus
 from evals.harness.run import main, replay_artifact
+from katra.assertions import (
+    ABSENT,
+    GATE_REFUSALS,
+    MAX_ASSERTIONS,
+    SPAN_REFUSALS,
+    UNKNOWN,
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    CatalogIssue,
+    Subject,
+    assertion_id,
+    identity_parts,
+)
+from katra.execution import seed_state
+from katra.graph import STATE_INPUT_TEXT
+from katra.system_model import (
+    DataFlow,
+    SystemModel,
+    flow_id_version,
+    make_flow_id,
+    normalize_element_ids,
+    parse_flow_id,
+)
+from katra.validation import parse_and_validate
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_alignment import case, renamed
 from tests.test_evals_extraction_losses import CASE
@@ -380,7 +380,7 @@ class TestOneProducedRowAnswersOneReferenceRow:
     """The matcher assigns, and an assignment is one-to-one and order-free."""
 
     def scoped(self, value: str) -> list:
-        from analysis_service.assertions import Qualifier
+        from katra.assertions import Qualifier
 
         return [Qualifier(kind="resource", value=value)]
 
@@ -848,7 +848,7 @@ class TestEveryReferenceRowTakesOneFate:
         assert sum(r.basis_overstated for r in graded.rows) == 1
 
     def test_a_rejected_row_is_counted_by_row_not_by_issue(self, golden, reference):
-        from analysis_service.assertions import CatalogIssue
+        from katra.assertions import CatalogIssue
 
         issues = [
             CatalogIssue(code="illegal-value", message="x", row=3),
@@ -1756,7 +1756,7 @@ class TestBindingAProposalToAnExtractedGraph:
     ):
         """A quarantined row carries an identity and no proposed row, and each
         proposed row that built it is lost."""
-        from analysis_service.assertions import Refusal, _identity
+        from katra.assertions import Refusal, _identity
 
         kept = self.bound(golden, proposal, golden.model).counts["refused"]
         refusals = AssertionRecord.refusals

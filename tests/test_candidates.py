@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
@@ -17,12 +17,12 @@ from analysis_service.assertions import (
     SupportSpan,
     catalog_issues,
 )
-from analysis_service.candidates import Candidate, generate_candidates
-from analysis_service.claims import Ground
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.sources import text_digest
-from analysis_service.system_model import (
+from katra.candidates import Candidate, generate_candidates
+from katra.claims import Ground
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.sources import text_digest
+from katra.system_model import (
     UNKNOWN,
     DataFlow,
     DataStore,
@@ -715,8 +715,8 @@ class TestTheStoreReadersRule:
     RULE = "information-disclosure-store-readers"
 
     def _fired(self, model):
-        from analysis_service.assertions import AssertionCatalog
-        from analysis_service.frameworks.stride.rules import RULES
+        from katra.assertions import AssertionCatalog
+        from katra.frameworks.stride.rules import RULES
 
         rule = next(rule for rule in RULES if rule.rule_id == self.RULE)
         return {c.element_ids[0]: c for c in rule.fire(model, AssertionCatalog())}
@@ -812,7 +812,7 @@ class TestTheStoreReadersRule:
         assert len(candidate.element_ids) == len(set(candidate.element_ids)) == 6
 
     def test_the_lane_reads_both_statuses_and_the_conditional_question(self):
-        from analysis_service.graph import FrameworkNodes, framework_lane_inputs
+        from katra.graph import FrameworkNodes, framework_lane_inputs
         from tests.test_prompt_lints import PACKAGE_LOADERS
 
         inputs = framework_lane_inputs(

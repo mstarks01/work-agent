@@ -83,10 +83,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.frameworks import FrameworkName
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
-from analysis_service.parsing import strings
-from analysis_service.sources import text_digest
 from evals.harness.identity import (
     NO_FLOWS,
     CaseFlows,
@@ -102,6 +98,10 @@ from evals.harness.identity import (
 from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import GoldenCase
 from evals.harness.verbs import UNSEPARATED, same_action
+from katra.frameworks import FrameworkName
+from katra.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
+from katra.parsing import strings
+from katra.sources import text_digest
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PAIRS_PATH = EVALS_ROOT / "calibration_labels" / "pairs.json"

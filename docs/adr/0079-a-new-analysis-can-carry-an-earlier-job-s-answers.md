@@ -8,7 +8,7 @@
   durable store will keep the earlier jobs this reads
 - **Amended by**: [#1672](https://github.com/mstarks01/work-agent/issues/1672),
   under which the carried answers survive a restart where
-  `ANALYSIS_JOB_STORE` is `sql`
+  `KATRA_JOB_STORE` is `sql`
 - **Amended by**: [ADR 0116](0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md),
   where the owner maps a carried answer's element to an element of the new
   model under another name
@@ -62,7 +62,7 @@ server session. A durable job store (ADR 0065) extends this to every job the
 store keeps, with no change to the rule.
 
 > **Amended by [#1672](https://github.com/mstarks01/work-agent/issues/1672).**
-> The job store holds the jobs. Where `ANALYSIS_JOB_STORE` is `sql`, an owner
+> The job store holds the jobs. Where `KATRA_JOB_STORE` is `sql`, an owner
 > can carry from every job the store keeps, and the carried answers survive a
 > restart.
 

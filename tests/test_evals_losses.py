@@ -15,14 +15,6 @@ from types import MappingProxyType
 
 import pytest
 
-from analysis_service.claims import (
-    BEYOND_GROUNDS,
-    DROPPED_TITLE_MAX_CHARS,
-    DroppedClaim,
-    Ground,
-    UnresolvedReference,
-)
-from analysis_service.system_model import ModelIndex
 from evals.harness import losses
 from evals.harness.content import prose, structural
 from evals.harness.fingerprint import key_claim
@@ -38,6 +30,14 @@ from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall, rebuilt_lane_inputs
 from evals.harness.verbs import same_action
+from katra.claims import (
+    BEYOND_GROUNDS,
+    DROPPED_TITLE_MAX_CHARS,
+    DroppedClaim,
+    Ground,
+    UnresolvedReference,
+)
+from katra.system_model import ModelIndex
 from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
 from tests.test_evals_critic_yield import _report_with
@@ -1151,7 +1151,7 @@ class TestWhatTheAssertionLayerBacked:
         """Zero is the reading, not an absence: the layer backed nothing.
 
         Every sweep this repository has archived reads this, because none ran
-        with ``ANALYSIS_ASSERTIONS`` set.
+        with ``KATRA_ASSERTIONS`` set.
         """
         reference = case.stride_claims()[0]
         draft = at(case, reference, 1, reference.verb)

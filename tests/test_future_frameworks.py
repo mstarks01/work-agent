@@ -17,15 +17,15 @@ from typing import Any, ClassVar
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import EARLY_RULES, question_set
-from analysis_service.capabilities import CapabilityNeed
-from analysis_service.claims import UnknownRef
-from analysis_service.early_questions import QUESTION_PRIOR, PriorRow
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.frameworks import PACKAGES, Unit, check_unit
-from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-from analysis_service.system_model import SystemModel
+from katra.answer_sets import AnswerSet
+from katra.answer_state import EARLY_RULES, question_set
+from katra.capabilities import CapabilityNeed
+from katra.claims import UnknownRef
+from katra.early_questions import QUESTION_PRIOR, PriorRow
+from katra.fact_answers import FactAnswer
+from katra.frameworks import PACKAGES, Unit, check_unit
+from katra.frameworks.asvs.record import DraftRequirementRuling
+from katra.system_model import SystemModel
 from tests.factories import carrying, valid_model
 
 THIRD = "third"
@@ -97,8 +97,8 @@ def third(monkeypatch):
     )
     carrying(monkeypatch, package)
     # The planner's modules read the registry by the name they imported.
-    from analysis_service import answer_effects, answer_state, early_questions
-    from analysis_service.frameworks import PACKAGES as registered
+    from katra import answer_effects, answer_state, early_questions
+    from katra.frameworks import PACKAGES as registered
 
     held = {**registered, THIRD: package}
     monkeypatch.setattr(early_questions, "PACKAGES", held)
@@ -113,7 +113,7 @@ ALL = {"stride": {}, "asvs": {"level": 2}, THIRD: {"level": 2}}
 
 
 def _paused(selection, answers=(), model=None):
-    from analysis_service import early_questions
+    from katra import early_questions
 
     # The question set reads the planner's default prior; the third package's
     # row is an empty one, as ``run.py question-prior`` writes for a package

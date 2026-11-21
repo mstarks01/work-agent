@@ -34,8 +34,8 @@ row does not serve GCS.**
   the `s3` row.
 - The row always passes `api_endpoint`, so `STORAGE_EMULATOR_HOST` and
   `API_ENDPOINT_OVERRIDE` cannot redirect it. It reads no endpoint setting.
-- The row reads the shared `ANALYSIS_OBJECT_BUCKET`, with its own bucket
-  shape, and the shared `ANALYSIS_OBJECT_CREDENTIALS`.
+- The row reads the shared `KATRA_OBJECT_BUCKET`, with its own bucket
+  shape, and the shared `KATRA_OBJECT_CREDENTIALS`.
 - The client is in an extra named `gcs`.
 - The `s3` row refuses an endpoint host that does not accept `If-None-Match`
   on a write, from one table. The table holds the GCS hosts and the Backblaze

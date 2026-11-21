@@ -1,13 +1,13 @@
 ---
 name: verify
-description: Launch and drive the analysis_service /v1 job API locally to verify changes at the HTTP surface.
+description: Launch and drive the katra /v1 job API locally to verify changes at the HTTP surface.
 ---
 
-# Verifying analysis_service
+# Verifying Katra
 
-The runtime surface is the FastAPI app from `analysis_service.api.create_app()`.
-Production auth needs `ANALYSIS_AUTH_PROVIDER=oidc` plus `ANALYSIS_OIDC_ISSUER`,
-`ANALYSIS_OIDC_AUDIENCE`, and `ANALYSIS_OIDC_JWKS_URL`; `create_app()` fails closed
+The runtime surface is the FastAPI app from `katra.api.create_app()`.
+Production auth needs `KATRA_AUTH_PROVIDER=oidc` plus `KATRA_OIDC_ISSUER`,
+`KATRA_OIDC_AUDIENCE`, and `KATRA_OIDC_JWKS_URL`; `create_app()` fails closed
 without them.
 
 ## Launch offline
@@ -22,12 +22,12 @@ each setting the Deployment would give. Take them from `tests/test_api.py`, as
 import os
 import sys
 
-os.environ |= {"ANALYSIS_OFFLINE": "1", "ANALYSIS_JOB_STORE": "memory"}
+os.environ |= {"KATRA_OFFLINE": "1", "KATRA_JOB_STORE": "memory"}
 sys.path.insert(0, os.getcwd())  # run from the repository root
 
 import uvicorn
-from analysis_service import StubPipelineRunner
-from analysis_service.api import create_app
+from katra import StubPipelineRunner
+from katra.api import create_app
 from tests import test_api
 from tests.factories import SEEDING_BUDGET
 
@@ -46,16 +46,16 @@ uvicorn.run(app, port=8470)
 
 - Send `test_api.auth("alice-token")` as the header. `bob-token` and
   `carol-token` are the other owners in `test_api.TOKENS`.
-- Set the env vars **before** you import `analysis_service.api`.
-- `ANALYSIS_JOB_STORE` has no default. For the `sql` store on SQLite, merge
+- Set the env vars **before** you import `katra.api`.
+- `KATRA_JOB_STORE` has no default. For the `sql` store on SQLite, merge
   `tests.sql_stores.sql_env(<new directory>)` into the environment in place of
   `memory`.
 - uvicorn is a `web` dependency-group member, not a wheel dependency. The
   group is in `[tool.uv] default-groups`, so `uv sync` installs it.
 
 `create_app()` with no runner uses the real ADK graph: the **Deployment**
-builds an `analysis_service.pipeline.AdkPipelineRunner` for each framework
-selection (`analysis_service.deployment.Deployment.runner`). A submitted job
+builds an `katra.pipeline.AdkPipelineRunner` for each framework
+selection (`katra.deployment.Deployment.runner`). A submitted job
 then calls the vendor that each model tier names, and it fails without a tier
 config and credentials. To run the real graph on canned model output, build a
 pipeline with a `resolve_model` that returns a `BaseLlm` stand-in, as

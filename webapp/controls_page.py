@@ -17,8 +17,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.claims import UnknownRef
-from analysis_service.controls import (
+from katra.claims import UnknownRef
+from katra.controls import (
     ALIASES_FULL,
     ATTRIBUTE_STATEMENTS,
     EVIDENCE_ID,
@@ -39,14 +39,14 @@ from analysis_service.controls import (
     evidence_full,
     scope_phrase,
 )
-from analysis_service.errors import refusal_text
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.frameworks import PACKAGES, FrameworkPackage
-from analysis_service.job_controls import current_row
-from analysis_service.owner_files import NOT_UTF_8
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
-from analysis_service.system_model import (
+from katra.errors import refusal_text
+from katra.fact_answers import FactAnswer
+from katra.frameworks import PACKAGES, FrameworkPackage
+from katra.job_controls import current_row
+from katra.owner_files import NOT_UTF_8
+from katra.question_kinds import QUESTION_KINDS
+from katra.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
+from katra.system_model import (
     CONTROL_VALUE_MAX_CHARS,
     Element,
     ZonedElement,
@@ -124,7 +124,7 @@ def _question_statements() -> list[dict[str, object]]:
 
 
 #: The statements the page offers of each kind of fact that a scope writes
-#: (:data:`~analysis_service.controls.SCOPE_FACT_KINDS`).
+#: (:data:`~katra.controls.SCOPE_FACT_KINDS`).
 _FACT_OFFERS: Mapping[
     ControlFactKind, Callable[[ScopeType], list[dict[str, object]]]
 ] = MappingProxyType(
@@ -161,7 +161,7 @@ def scope_types() -> list[dict[str, object]]:
     """Each scope type, with its words and the protections a Control of that
     scope may state.
 
-    The kinds come from :data:`~analysis_service.controls.SCOPE_FACT_KINDS`.
+    The kinds come from :data:`~katra.controls.SCOPE_FACT_KINDS`.
     """
     return [
         {

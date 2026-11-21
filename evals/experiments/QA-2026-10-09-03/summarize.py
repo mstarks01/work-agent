@@ -12,11 +12,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from analysis_service.frameworks.stride.record import ArchivedThreatProposals
 from evals.harness.descendants import FRAMEWORK, lane_must_finds
 from evals.harness.lane_replay import prepare_today
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS, load_case
+from katra.frameworks.stride.record import ArchivedThreatProposals
 
 TARGETS = Path(__file__).parent / "targets.json"
 SPENT = re.compile(r"^spent: \$([0-9.]+)", re.MULTILINE)

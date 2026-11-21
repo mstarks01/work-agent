@@ -27,7 +27,7 @@ STRIDE override lost their one caller and passed both earlier lints.
 ``frameworks/`` is where a package's own helpers live.
 
 **Public names are in scope.** The service's API is what its package root
-exports: ``src/analysis_service/__init__.py`` imports each name in its
+exports: ``src/katra/__init__.py`` imports each name in its
 ``__all__``, and that import is a use, so an exported name is never reported.
 Every other public name is judged like a private one, in the service as in
 ``evals/`` and ``webapp/``. A public name in a submodule that only a test
@@ -85,7 +85,7 @@ SCOPES = source_files(*PYTHON)
 #: name, with the reason. No code in the tree calls these names, so the lints
 #: do not judge them.
 NAMED_BY_A_LIBRARY: dict[str, str] = {
-    "src/analysis_service/migrations/scripts/versions/": (
+    "src/katra/migrations/scripts/versions/": (
         "Alembic loads each revision module and reads revision, down_revision,"
         " branch_labels, depends_on, upgrade and downgrade by name"
     ),
@@ -450,9 +450,7 @@ def test_a_public_service_name_only_a_test_reaches_is_reported():
     package root does not export is judged, and one it exports is not."""
     reported = test_only()
 
-    assert reported["PROMPT_SECTION_HEADINGS"].startswith(
-        "src/analysis_service/prompts.py:"
-    )
+    assert reported["PROMPT_SECTION_HEADINGS"].startswith("src/katra/prompts.py:")
     assert "Deployment" in _definitions() and "Deployment" not in reported
 
 

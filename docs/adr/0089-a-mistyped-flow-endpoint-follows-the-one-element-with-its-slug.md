@@ -29,7 +29,7 @@ own ID is then derived from the followed endpoints as before. The rule reads
 only the `entity`, `process` and `store` prefixes, because a flow endpoint
 has no other legal type.
 
-`follow_by_slug` in `src/analysis_service/system_model.py` is the one reader
+`follow_by_slug` in `src/katra/system_model.py` is the one reader
 of the rule, and both extraction routes call it. The full route calls it in
 `normalize_element_ids` over element IDs. The compact route calls it in
 `expand` over refs, with the tags `e`, `p` and `s`, before a ref resolves to

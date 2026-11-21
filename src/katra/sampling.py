@@ -1,0 +1,465 @@
+"""Per-tier sampling configuration for the graph's LLM nodes.
+
+Decoding parameters are pinned per tier in a versioned TOML file, and eval and
+production read it from the same place. ``base`` and ``strong`` carry their own
+params. The node-to-tier map lives once in ``model_tiers.toml``, and this module
+reuses it through :meth:`~katra.model_tiers.ModelTierConfig.resolve_tier` rather than duplicating
+it.
+
+Four things about the surface:
+
+* ``top_k`` is not on it. It is absent from
+  ``litellm.utils.get_optional_params``'s signature, so it is the one param the
+  build-time gate cannot cover: LiteLLM re-injects it raw into the request body
+  after the check. A wrong value would then be silent, while the fingerprint
+  would go on attesting to it.
+* ``thinking`` is a uniform ``low``/``medium``/``high`` enum rather than a
+  per-tier integer budget. ``reasoning_effort`` reaches every vendor — Anthropic
+  through adaptive ``thinking`` plus ``output_config.effort``, identically
+  through Vertex; Gemini through ``thinkingConfig``; OpenAI by passthrough — so
+  no per-vendor budget range is mirrored here. ``auto`` and ``off`` are
+  excluded. ``auto`` raises on two vendors. ``off`` is worse than unportable:
+  ``gemini-2.5-pro`` with ``none`` passes the gate as ``thinkingBudget: 0`` and
+  then returns a 400 at request time.
+* ``max_output_tokens`` is pinned, because the default is vendor-dependent.
+  Anthropic derives a 5,120 to 8,192 cap only when the caller is silent. The
+  file pins it per tier, at a value sized against measured output: the tiers
+  emit different things, and the strong tier rules on every draft in one pass
+  and reasons against the same cap, so it needs several times what one
+  extraction does. Undersizing it does not truncate visibly. The completion
+  returns no text, the node writes no output key, and the next FunctionNode
+  fails to bind. ``binding.py`` checks each tier's value against its model's
+  published ceiling, which :func:`~katra.model_gate.check_supported`
+  cannot: every provider accepts the param, and only the serving model objects
+  to the value.
+* ``constrain_output`` decides whether the node's schema is sent at all.
+  Constrained generation is the default and the better answer where a provider
+  will take it. Whether a provider will take it is a property of the schema and
+  of the provider's own limits, because a grammar compiler can reject a schema
+  it would otherwise honour, and nothing computes that offline. It is therefore
+  a per-tier choice a deployment makes rather than one derived from the vendor.
+  Every LLM node carries a schema the adapter can convert, so this field is the
+  only thing that decides whether one is sent.
+
+  Turning it off is not currently a working configuration. Measured against Claude Sonnet 4.6 with the extraction schema suppressed, the
+  model fenced its JSON in a ```` ```json ```` block, which ADK hands to
+  validation unstripped, so it fails before anything reads it. The model also
+  omitted required fields, including every ``trust_boundaries[*].kind``. The
+  repair node sits on the same tier and is equally unconstrained, so the repair
+  loop does not rescue it. The field stays because the mechanism is right, but a
+  tier that turns it off needs the graph to tolerate a fenced response first.
+
+Loading fails closed (OWASP A02 and A10). An unsupported version, an unknown key
+or tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
+:class:`SamplingConfigError`, rather than falling back to a library default. A
+node that quietly runs on different sampling from what the config records
+invalidates every eval result taken against it.
+
+The value check on ``thinking`` is this module's rather than the gate's.
+``reasoning_effort = "banana"`` passes ``get_optional_params`` on ``o3``, which
+would be another silently wrong param. A pydantic ``Literal`` catches it here.
+
+``KATRA_SAMPLING_{TIER}_{PARAM}`` env overrides retune the offered params at
+deploy time, and the service validates them exactly as it validates a file
+value. An env var that names a reserved or forbidden param raises, so the live
+knob surface is exactly the offered surface and no wider.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from pathlib import Path
+from typing import Any, Literal, Self
+
+from google.genai import types
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+
+from katra.config_files import read_toml, validation_problems
+from katra.errors import ConfigError
+from katra.model_tiers import TIER_NAMES, TierName
+from katra.parsing import is_version
+
+# The only schema version this loader accepts. Every config file pins its own
+# version and every loader exact-matches it, so the numbers are independent: a
+# shared one would gain nothing, since a stale file fails its own check.
+#
+# Every tier's block is required, the ``review`` tier's included: a file that
+# could omit a tier would run criticism moved onto ``review`` on values nobody
+# chose. ``constrain_output`` enters the execution identity, so a change to it
+# re-baselines every blessed number.
+SUPPORTED_VERSION = 5
+
+# The uniform reasoning surface. Deliberately not per-vendor data: the enum is
+# what every vendor accepts, and the wire value it becomes (Gemini derives a
+# budget from it, so "low" is 1024 tokens rather than the config's own word) is
+# LiteLLM's business, not this file's.
+ReasoningEffort = Literal["low", "medium", "high"]
+
+#: Which rungs of the format ladder a tier allows (ADR 0058). ``auto`` allows
+#: every rung its pair supports, from the provider's own structured-output field
+#: down to the schema stated in the request. ``native`` allows the first rung
+#: alone and refuses a model without it. ``tool`` allows the two tool rungs.
+StructuredOutput = Literal["auto", "native", "tool"]
+
+#: Each field of :class:`TierSampling`, by name.
+SamplingParam = Literal[
+    "temperature",
+    "top_p",
+    "seed",
+    "max_output_tokens",
+    "candidate_count",
+    "presence_penalty",
+    "frequency_penalty",
+    "thinking",
+    "constrain_output",
+    "structured_output",
+]
+
+# Env override surface: only these params are overridable. A var naming any
+# other param — reserved (``candidate_count``) or forbidden — raises.
+_ENV_PREFIX = "KATRA_SAMPLING_"
+OFFERED_PARAMS: tuple[SamplingParam, ...] = (
+    "temperature",
+    "top_p",
+    "seed",
+    "thinking",
+    "max_output_tokens",
+    "constrain_output",
+    "structured_output",
+)
+
+# The only two strings ``constrain_output`` accepts from the environment.
+# Python's own truthiness would read "false" as True, which is the classic way
+# a deployment ends up running the opposite of what its config says.
+_BOOL_LITERALS = {"true": True, "false": False}
+
+
+class SamplingConfigError(ConfigError):
+    """The sampling configuration is invalid or unusable."""
+
+
+class _TierParams(BaseModel):
+    """The decoding params one tier carries, declared once for both shapes.
+
+    :class:`_RawTier` is the file's shape and adds the bounds the loader
+    enforces; :class:`TierSampling` is the resolved shape and adds the methods
+    that split the params at the point of use. The fields, their types and
+    their defaults are the same in both, so they are written here once.
+
+    ``extra="forbid"`` rejects an unknown or misspelled key rather than
+    silently ignoring it — which is also how a stray ``top_k`` line is caught
+    rather than quietly dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    temperature: float | None = None
+    top_p: float | None = None
+    seed: int | None = None
+    max_output_tokens: int | None = None
+    candidate_count: int = 1
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    thinking: ReasoningEffort | None = None
+    constrain_output: bool = True
+    structured_output: StructuredOutput = "auto"
+
+
+class _RawTier(_TierParams):
+    """One tier's decoding params exactly as written in the file / overrides.
+
+    The five bounded fields are redeclared here with their bounds, and the
+    reserved ``candidate_count`` value is checked here, so an out-of-range
+    value fails at the loader and never reaches a resolved tier.
+
+    **The two penalties are bounded for finiteness and not for range.** TOML
+    reads ``inf`` and ``nan`` as float literals, so ``presence_penalty = inf``
+    parsed, resolved, crossed the seam and reached
+    :meth:`~katra.provider.GenerationRequest.payload`, where
+    ``json.dumps`` writes ``Infinity`` — a token RFC 8259 has no name for. The
+    build gate does not catch it: measured over the pinned map, 363 pairs
+    accept ``presence_penalty=0.5`` and all 363 accept ``inf`` too, because
+    :func:`~katra.model_gate.check_supported` asks whether the
+    param maps rather than whether the value is sane.
+
+    Their *range* stays unbounded here for the reason ``max_output_tokens``
+    does: what a provider will take is a per-``(vendor, model)`` fact, and a
+    copy of it drifts against the provider actually serving the request.
+
+    No upper bound is placed on ``max_output_tokens``: the ceiling is a
+    per-``(vendor, model)`` fact, and mirroring one here would be a table that
+    drifts against the provider actually serving the request. It is enforced
+    where the pair is known — :func:`katra.binding._check_output_ceiling`
+    asks the model map at build time — so "unbounded here" means unbounded by
+    the *loader*, not unchecked.
+    """
+
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    top_p: float | None = Field(default=None, gt=0.0, le=1.0)
+    max_output_tokens: int | None = Field(default=None, ge=1)
+    presence_penalty: float | None = Field(default=None, allow_inf_nan=False)
+    frequency_penalty: float | None = Field(default=None, allow_inf_nan=False)
+
+    @field_validator("candidate_count")
+    @classmethod
+    def _reserved_candidate_count(cls, value: int) -> int:
+        # The Self-MoA lever: >1 silently drops candidates, so it is reserved,
+        # not offered, and pinned at 1 until routed through the union/dedupe
+        # path.
+        if value != 1:
+            raise ValueError(
+                f"candidate_count must be 1 (reserved Self-MoA lever); got {value}"
+            )
+        return value
+
+
+class _RawSampling(BaseModel):
+    """The whole file's shape before per-tier resolution."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    version: int
+    tiers: dict[TierName, _RawTier]
+
+
+class TierSampling(_TierParams):
+    """One tier's resolved decoding params, ready to bind onto a tier's adapter.
+
+    Split three ways at the point of use, because ADK carries only some of it:
+
+    * :meth:`constructor_kwargs` — ``seed`` and ``reasoning_effort``, which
+      ADK's request map forwards *neither* of. Passing them on the
+      generate-content config would mean the fingerprint attests to a seed the
+      request never carried.
+    * :meth:`to_generate_content_config` — the params ADK does forward.
+    * :meth:`gate_params` — everything, for the build-time supported-param
+      check.
+    """
+
+    def constructor_kwargs(self) -> dict[str, Any]:
+        """The params that must ride the ``LiteLlm`` constructor, not the config.
+
+        ADK 2.5.0's request map (``lite_llm.py:2404-2419``) forwards neither
+        ``seed`` nor any reasoning parameter, and fail-closed ``drop_params``
+        cannot fail closed on what LiteLLM is never told. Constructor kwargs
+        reach ``acompletion`` via ``_additional_args`` *before* ``generation_params``,
+        so the value survives and the fingerprint stays honest.
+
+        ``constrain_output = false`` rides the same seam for the opposite
+        reason. ADK derives ``response_format`` from the node's
+        ``output_schema`` and then applies ``_additional_args`` *over* it
+        (``lite_llm.py:2744-2750``), so an explicit ``None`` here is what
+        suppresses the schema on the wire. The node keeps its
+        ``output_schema``, so the response is still validated on arrival —
+        what is given up is constrained *generation*, not the check.
+        """
+        kwargs: dict[str, Any] = {}
+        if self.seed is not None:
+            kwargs["seed"] = self.seed
+        if self.thinking is not None:
+            kwargs["reasoning_effort"] = self.thinking
+        if not self.constrain_output:
+            kwargs["response_format"] = None
+        return kwargs
+
+    def to_generate_content_config(self) -> types.GenerateContentConfig:
+        """The ADK/GenAI object a node on this tier is configured with.
+
+        An unset param is sent as ``None``, leaving the model's own default.
+        ``seed`` and ``thinking`` are deliberately absent — see
+        :meth:`constructor_kwargs`.
+        """
+        return types.GenerateContentConfig(
+            temperature=self.temperature,
+            top_p=self.top_p,
+            max_output_tokens=self.max_output_tokens,
+            candidate_count=self.candidate_count,
+            presence_penalty=self.presence_penalty,
+            frequency_penalty=self.frequency_penalty,
+        )
+
+    def identity_params(self) -> dict[str, Any]:
+        """This tier's sampling as the **Execution Identity** hashes it.
+
+        Every field, except ``structured_output`` at ``auto``. Under ``auto``
+        the path follows from the vendor, the model and the installed library,
+        and the identity hashes all three already, so the setting adds nothing.
+        An explicit ``native`` or ``tool`` is a choice the deployment made, and
+        it is hashed. One reader for every site that computes a fingerprint, so
+        a live run, a verified archive and a promotion hash the same payload.
+        """
+        params = self.model_dump()
+        if params["structured_output"] == "auto":
+            del params["structured_output"]
+        return params
+
+    def gate_params(self) -> dict[str, Any]:
+        """Every set param, named as LiteLLM names it, for the build-time gate.
+
+        ``candidate_count`` is LiteLLM's ``n``. Unset params are omitted rather
+        than sent as ``None``: the gate asks "would this provider accept this
+        request", and a param the request will not carry is not part of it.
+        """
+        params: dict[str, Any] = {
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "seed": self.seed,
+            "max_tokens": self.max_output_tokens,
+            "n": self.candidate_count,
+            "presence_penalty": self.presence_penalty,
+            "frequency_penalty": self.frequency_penalty,
+            "reasoning_effort": self.thinking,
+        }
+        return {name: value for name, value in params.items() if value is not None}
+
+
+class SamplingConfig(BaseModel):
+    """Validated per-tier sampling, keyed by tier."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    version: int
+    tiers: dict[TierName, TierSampling]
+
+    @model_validator(mode="after")
+    def _check_complete(self) -> Self:
+        missing = [tier for tier in TIER_NAMES if tier not in self.tiers]
+        if missing:
+            raise ValueError(f"tiers missing entries for: {missing}")
+        return self
+
+    def for_tier(self, tier: TierName) -> TierSampling:
+        """The resolved sampling params for one tier."""
+        return self.tiers[tier]
+
+
+SamplingResolver = Callable[[str], TierSampling]
+
+
+def env_var_for(tier: TierName, param: str) -> str:
+    """The env var that overrides one offered param on one tier."""
+    return f"{_ENV_PREFIX}{tier.upper()}_{param.upper()}"
+
+
+def make_resolve_sampling(
+    config: SamplingConfig, resolve_tier: Callable[[str], TierName]
+) -> SamplingResolver:
+    """The injected sibling of ``resolve_model``: node -> its tier's sampling.
+
+    ``resolve_tier`` is :meth:`~katra.model_tiers.ModelTierConfig.resolve_tier`, so the node -> tier
+    walk lives once in the tier config and the graph stays purely node-centric.
+    """
+
+    def resolve_sampling(node: str) -> TierSampling:
+        return config.for_tier(resolve_tier(node))
+
+    return resolve_sampling
+
+
+def _parse_env_value(var: str, param: str, value: str) -> float | int | bool | str:
+    """Parse an override string to its param's type; raise on a bad literal.
+
+    Range and enum legality stay in :class:`_RawTier`, so an override is
+    validated identically to a file value — this only converts the string to the
+    type the file would hold.
+    """
+    if param in ("temperature", "top_p"):
+        try:
+            return float(value)
+        except ValueError:
+            raise SamplingConfigError(f"{var}: is not a number") from None
+    if param in ("seed", "max_output_tokens"):
+        try:
+            return int(value)
+        except ValueError:
+            raise SamplingConfigError(f"{var}: is not an integer") from None
+    if param == "constrain_output":
+        parsed = _BOOL_LITERALS.get(value.lower())
+        if parsed is None:
+            expected = ", ".join(sorted(_BOOL_LITERALS))
+            raise SamplingConfigError(f"{var}: is not one of {expected}")
+        return parsed
+    # thinking and structured_output: left as the raw string for _RawTier's
+    # Literal to accept or reject.
+    return value
+
+
+def env_variables() -> tuple[str, ...]:
+    """Every ``KATRA_SAMPLING_{TIER}_{PARAM}`` override this loader reads:
+    one for each tier and each offered param."""
+    return tuple(
+        env_var_for(tier, param) for tier in TIER_NAMES for param in OFFERED_PARAMS
+    )
+
+
+def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
+    """Fold ``KATRA_SAMPLING_{TIER}_{PARAM}`` overrides into the raw tables.
+
+    Only the offered params are overridable; a var naming a reserved or
+    forbidden param raises — the live-knob surface equals the offered surface,
+    no wider. A set-but-empty override is a deploy mistake and raises rather
+    than being silently ignored.
+    """
+    if not isinstance(tiers_raw, dict):
+        # A malformed / missing ``tiers`` shape: leave it for _RawSampling to
+        # reject rather than silently accepting an override against nothing.
+        return
+    for var, value in env.items():
+        if not var.startswith(_ENV_PREFIX):
+            continue
+        tier_token, _, param_token = var[len(_ENV_PREFIX) :].partition("_")
+        tier = tier_token.lower()
+        param = param_token.lower()
+        if tier not in TIER_NAMES:
+            raise SamplingConfigError(f"{var}: unknown tier {tier_token!r}")
+        if param not in OFFERED_PARAMS:
+            offered = ", ".join(OFFERED_PARAMS)
+            raise SamplingConfigError(
+                f"{var}: {param_token or '(missing param)'} is not overridable"
+                f" (only {offered})"
+            )
+        if not value.strip():
+            raise SamplingConfigError(f"{var} is set but empty")
+        table = tiers_raw.setdefault(tier, {})
+        if not isinstance(table, dict):
+            raise SamplingConfigError(f"tiers.{tier}: not a table")
+        table[param] = _parse_env_value(var, param, value.strip())
+
+
+def load_sampling(path: Path | str, env: Mapping[str, str]) -> SamplingConfig:
+    """Load and validate the per-tier sampling config, applying env overrides.
+
+    Overrides are folded in before validation, so an out-of-range value arriving
+    via the environment fails closed exactly like one in the file. Every failure
+    path raises :class:`SamplingConfigError`.
+    """
+    raw = read_toml(path, SamplingConfigError)
+
+    version = raw.get("version")
+    if not is_version(version, SUPPORTED_VERSION):
+        raise SamplingConfigError(
+            f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
+        )
+
+    _apply_env_overrides(raw.get("tiers"), env)
+
+    try:
+        parsed = _RawSampling(**raw)
+    except ValidationError as exc:
+        raise SamplingConfigError(f"{path}: {validation_problems(exc)}") from exc
+
+    resolved = {
+        tier: TierSampling(**raw_tier.model_dump())
+        for tier, raw_tier in parsed.tiers.items()
+    }
+    try:
+        return SamplingConfig(version=parsed.version, tiers=resolved)
+    except ValidationError as exc:
+        raise SamplingConfigError(f"{path}: {validation_problems(exc)}") from exc

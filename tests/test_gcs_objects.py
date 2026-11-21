@@ -33,18 +33,18 @@ from google.cloud import storage
 from google.oauth2 import credentials as user_credentials
 from google.oauth2 import service_account
 
-from analysis_service import gcs_objects
-from analysis_service.gcp_identity import STORAGE_SCOPE
-from analysis_service.objects import GCS_KEY_FILE_VAR, build_object_store
-from analysis_service.store_settings import StoreConfigError
+from katra import gcs_objects
+from katra.gcp_identity import STORAGE_SCOPE
+from katra.objects import GCS_KEY_FILE_VAR, build_object_store
+from katra.store_settings import StoreConfigError
 from tests.sql_stores import PLATFORM_CREDENTIAL, gcs_env
 from tests.test_object_stores import changed, every_call
 
 #: The settings of a ``gcs`` store that builds with no server.
 SETTINGS = {
-    "ANALYSIS_OBJECT_STORE": "gcs",
-    "ANALYSIS_OBJECT_BUCKET": "analysis-jobs",
-    "ANALYSIS_OBJECT_CREDENTIALS": "iam",
+    "KATRA_OBJECT_STORE": "gcs",
+    "KATRA_OBJECT_BUCKET": "analysis-jobs",
+    "KATRA_OBJECT_CREDENTIALS": "iam",
 }
 
 
@@ -73,34 +73,34 @@ class TestTheSettings:
     @pytest.mark.parametrize(
         ("change", "message"),
         [
-            ({"ANALYSIS_OBJECT_BUCKET": None}, "set ANALYSIS_OBJECT_BUCKET"),
-            ({"ANALYSIS_OBJECT_BUCKET": " "}, "set ANALYSIS_OBJECT_BUCKET"),
-            ({"ANALYSIS_OBJECT_BUCKET": "Jobs"}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_BUCKET": "jo"}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_BUCKET": "j" * 64}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_BUCKET": "-jobs"}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_BUCKET": "jobs_"}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_CREDENTIALS": None}, "set ANALYSIS_OBJECT_CREDENTIALS"),
-            ({"ANALYSIS_OBJECT_CREDENTIALS": "token"}, "unknown value for"),
+            ({"KATRA_OBJECT_BUCKET": None}, "set KATRA_OBJECT_BUCKET"),
+            ({"KATRA_OBJECT_BUCKET": " "}, "set KATRA_OBJECT_BUCKET"),
+            ({"KATRA_OBJECT_BUCKET": "Jobs"}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": "jo"}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": "j" * 64}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": "-jobs"}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": "jobs_"}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_CREDENTIALS": None}, "set KATRA_OBJECT_CREDENTIALS"),
+            ({"KATRA_OBJECT_CREDENTIALS": "token"}, "unknown value for"),
             (
-                {"ANALYSIS_OBJECT_CREDENTIALS": "api_key"},
-                "needs ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset",
+                {"KATRA_OBJECT_CREDENTIALS": "api_key"},
+                "needs KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset",
             ),
             (
-                {"ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY": "hunter2"},
-                "unset ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY, which this service refuses",
+                {"KATRA_OBJECT_SERVICE_ACCOUNT_KEY": "hunter2"},
+                "unset KATRA_OBJECT_SERVICE_ACCOUNT_KEY, which this service refuses",
             ),
             *(
                 ({var: value}, f"gcs object store takes no {var}")
                 for var, value in [
-                    ("ANALYSIS_OBJECT_REGION", "us-east1"),
-                    ("ANALYSIS_OBJECT_ENDPOINT", "https://objects.example"),
-                    ("ANALYSIS_OBJECT_ADDRESSING", "path"),
-                    ("ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE", "/run/hunter2"),
-                    ("ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE", "/run/hunter2"),
-                    ("ANALYSIS_OBJECT_SECRET_ACCESS_KEY", "hunter2"),
-                    ("ANALYSIS_OBJECT_ROOT", "/srv/objects"),
-                    ("ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE", "/run/hunter2"),
+                    ("KATRA_OBJECT_REGION", "us-east1"),
+                    ("KATRA_OBJECT_ENDPOINT", "https://objects.example"),
+                    ("KATRA_OBJECT_ADDRESSING", "path"),
+                    ("KATRA_OBJECT_ACCESS_KEY_ID_FILE", "/run/hunter2"),
+                    ("KATRA_OBJECT_SECRET_ACCESS_KEY_FILE", "/run/hunter2"),
+                    ("KATRA_OBJECT_SECRET_ACCESS_KEY", "hunter2"),
+                    ("KATRA_OBJECT_ROOT", "/srv/objects"),
+                    ("KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE", "/run/hunter2"),
                 ]
             ),
         ],
@@ -112,7 +112,7 @@ class TestTheSettings:
 
     @pytest.mark.parametrize("bucket", ["abc", "jobs.example_1", "a" * 63, "0-0"])
     def test_a_usable_store_builds(self, env, bucket):
-        build_object_store(changed(env, {"ANALYSIS_OBJECT_BUCKET": bucket}))
+        build_object_store(changed(env, {"KATRA_OBJECT_BUCKET": bucket}))
 
     def test_the_endpoint_in_the_environment_is_ignored(self, env, monkeypatch):
         """The client would send each request to either one."""
@@ -156,7 +156,7 @@ class TestTheIdentity:
         def unreachable(credentials):
             raise GoogleAuthError("metadata server unreachable")
 
-        monkeypatch.setattr("analysis_service.gcs_objects.make_client", unreachable)
+        monkeypatch.setattr("katra.gcs_objects.make_client", unreachable)
         with pytest.raises(
             StoreConfigError, match=r"cannot read the universe domain .*GoogleAuthError"
         ):
@@ -226,7 +226,7 @@ def key_env(tmp_path, content: str | bytes, mode: int = 0o600) -> dict[str, str]
     path.chmod(mode)
     return {
         **SETTINGS,
-        "ANALYSIS_OBJECT_CREDENTIALS": "api_key",
+        "KATRA_OBJECT_CREDENTIALS": "api_key",
         GCS_KEY_FILE_VAR: str(path),
     }
 
@@ -280,7 +280,7 @@ class TestTheApiKeyMode:
         def too_deep(*_, **__):
             raise RecursionError
 
-        monkeypatch.setattr("analysis_service.gcs_objects.json.loads", too_deep)
+        monkeypatch.setattr("katra.gcs_objects.json.loads", too_deep)
         with pytest.raises(StoreConfigError, match="is not UTF-8 JSON"):
             build_object_store(key_env(tmp_path, json.dumps(key_info)))
 
@@ -521,7 +521,7 @@ class TestTheStartupCheck:
 
 @pytest.mark.gcs
 def test_a_missing_bucket_stops_the_startup(fake_gcs):
-    env = changed(dict(SETTINGS), {"ANALYSIS_OBJECT_BUCKET": "no-such-bucket"})
+    env = changed(dict(SETTINGS), {"KATRA_OBJECT_BUCKET": "no-such-bucket"})
     with pytest.raises(StoreConfigError, match="'no-such-bucket' does not exist"):
         asyncio.run(build_object_store(env).check())
 
@@ -549,8 +549,8 @@ def test_without_the_client_the_startup_names_the_gcs_extra(monkeypatch):
     """The image without the ``gcs`` extra: the client cannot be imported."""
     monkeypatch.setitem(sys.modules, "google.cloud.storage", None)
     monkeypatch.delattr(google.cloud, "storage")
-    monkeypatch.delitem(sys.modules, "analysis_service.gcs_objects", raising=False)
-    with pytest.raises(StoreConfigError, match=r"install analysis-service\[gcs\]"):
+    monkeypatch.delitem(sys.modules, "katra.gcs_objects", raising=False)
+    with pytest.raises(StoreConfigError, match=r"install katra\[gcs\]"):
         build_object_store(dict(SETTINGS))
 
 

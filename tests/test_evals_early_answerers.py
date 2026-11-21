@@ -5,9 +5,6 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FactAnswer, key_ref
-from analysis_service.report import Report
 from evals.harness import early_answerers
 from evals.harness.early_answerers import (
     ANSWERERS,
@@ -18,6 +15,9 @@ from evals.harness.early_answerers import (
     walk,
 )
 from evals.harness.early_policies import Selection
+from katra.claims import UnknownRef
+from katra.fact_answers import FactAnswer, key_ref
+from katra.report import Report
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
 

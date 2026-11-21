@@ -13,7 +13,7 @@ category-agent failure or an element ``extract`` never produced.
 * end-to-end — text in, report out. This is the integration smoke test.
 
 All three drive the shipped graph through
-:func:`~analysis_service.graph.build_pipeline`, and differ only in its ``entry``
+:func:`~katra.graph.build_pipeline`, and differ only in its ``entry``
 and the state seeded into the session. Nothing about the topology, the prompts,
 the skills, the tier config or the sampling config is eval-specific. Grading a
 configuration you do not ship is the failure this whole design rejects.
@@ -39,12 +39,23 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from analysis_service.analysis import (
+from evals.harness.alignment import (
+    Alignment,
+    Pair,
+    align,
+    element_type,
+    protocol_state,
+    singular,
+)
+from evals.harness.identity import comparable_elements
+from evals.harness.rates import mean, ratio, rounded_figure, shown_figure
+from evals.harness.reference import GoldenCase
+from katra.analysis import (
     ControlAttribute,
     comparable_asset_tags,
     control_state,
 )
-from analysis_service.assertions import (
+from katra.assertions import (
     REGISTRY,
     AssertionCatalog,
     AssertionRecord,
@@ -57,31 +68,31 @@ from analysis_service.assertions import (
     projection_fields,
     states_missing,
 )
-from analysis_service.basis import (
+from katra.basis import (
     IN_SCOPE,
     UnbasedControl,
     read_controls,
 )
-from analysis_service.basis import (
+from katra.basis import (
     Coverage as BasisCoverage,
 )
-from analysis_service.binding import build_tier_adapters, make_resolve_model
-from analysis_service.claims import (
+from katra.binding import build_tier_adapters, make_resolve_model
+from katra.claims import (
     Claim,
     FrameworkName,
 )
-from analysis_service.compact import FULL_FORMAT, parse_extraction
-from analysis_service.deployment import Deployment
-from analysis_service.execution import (
+from katra.compact import FULL_FORMAT, parse_extraction
+from katra.deployment import Deployment
+from katra.execution import (
     GraphExecutor,
     GraphFailed,
     GraphRun,
     emitted_state,
     source_texts,
 )
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.frameworks.stride.record import DraftThreat
-from analysis_service.graph import (
+from katra.fact_answers import FactAnswer
+from katra.frameworks.stride.record import DraftThreat
+from katra.graph import (
     ASSERT_NODE,
     ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
@@ -108,20 +119,20 @@ from analysis_service.graph import (
     seeded_source_texts,
     tier_node_by_graph_node,
 )
-from analysis_service.links import with_link_answers
-from analysis_service.pipeline import answered_state
-from analysis_service.report import (
+from katra.links import with_link_answers
+from katra.pipeline import answered_state
+from katra.report import (
     FrameworkSelection,
     InputRef,
     Job,
     NodeRun,
     Report,
 )
-from analysis_service.sampling import (
+from katra.sampling import (
     SamplingConfig,
 )
-from analysis_service.sources import Source
-from analysis_service.system_model import (
+from katra.sources import Source
+from katra.system_model import (
     FLOW_DELIMITER,
     UNKNOWN,
     DataFlow,
@@ -136,18 +147,7 @@ from analysis_service.system_model import (
     is_zone,
     parse_flow_id,
 )
-from analysis_service.validation import ValidationIssue
-from evals.harness.alignment import (
-    Alignment,
-    Pair,
-    align,
-    element_type,
-    protocol_state,
-    singular,
-)
-from evals.harness.identity import comparable_elements
-from evals.harness.rates import mean, ratio, rounded_figure, shown_figure
-from evals.harness.reference import GoldenCase
+from katra.validation import ValidationIssue
 
 EVAL_APP_NAME = "analysis-evals"
 EVAL_USER = "eval-harness"
@@ -163,7 +163,7 @@ class CaseFailure(GraphFailed):
     Two ways in. The graph ran to the end and the result failed to build, in
     which case every node was billed (#707). Or a node raised inside the graph,
     in which case every node that finished before it was billed and the
-    executor hands those out as :class:`~analysis_service.execution.GraphFailed`
+    executor hands those out as :class:`~katra.execution.GraphFailed`
     (#711). Either way the provider billed what ran whatever came next, and a
     sweep that read a case's node runs off its finished report alone would let
     a failed case contribute nothing to the usage the artifact prices, so a run
@@ -182,7 +182,7 @@ class CaseFailure(GraphFailed):
     sweep that archived nothing for it left the question unanswerable.
 
     ``state`` is what the session held when the case failed, less the job's
-    own text: see :class:`~analysis_service.execution.GraphFailed`.
+    own text: see :class:`~katra.execution.GraphFailed`.
     """
 
     def __init__(
@@ -232,7 +232,7 @@ class AnalysisRun:
 
     The drafts are what each framework's fan-in parked on the way into that
     framework's critic, read back through
-    :meth:`~analysis_service.execution.GraphRun.drafts_of` as **the package's
+    :meth:`~katra.execution.GraphRun.drafts_of` as **the package's
     own record**, so every scorer stays typed against the shipped model and no
     harness code spells a state key.
 
@@ -278,7 +278,7 @@ def _tags(value: list[str]) -> str:
     Every tag counts, on both sides. Every tag names what an element holds,
     never what a failure would cost (#877), so every tag counts.
 
-    :func:`~analysis_service.analysis.comparable_asset_tags` builds the value,
+    :func:`~katra.analysis.comparable_asset_tags` builds the value,
     here and in the candidate rule that reports an element's tags, so the
     scorer and the rule cannot part company about what they compare.
     """
@@ -292,7 +292,7 @@ def _tags(value: list[str]) -> str:
 #: **Two kinds of attribute, and nothing else.** A closed vocabulary — ``kind``,
 #: ``exposure``, the asset tags — is set arithmetic against the blessed model,
 #: exact and needs no interpretation. A free-text control is not, but
-#: :func:`~analysis_service.analysis.control_state` reduces it to ``unverified`` /
+#: :func:`~katra.analysis.control_state` reduces it to ``unverified`` /
 #: ``absent`` / ``stated`` by its leading token, and *that* is comparable. So
 #: this measures the state rather than the wording, which keeps interpretation out
 #: and still catches the corpus's most repeated extraction failure: a control
@@ -302,7 +302,7 @@ def _tags(value: list[str]) -> str:
 #: precondition reads: a process extracted as ``web`` where the blessed model
 #: says ``non-web`` moves whether the framework runs at all. ``protocol`` is
 #: free text, so only its *state* is compared — stated or silent, through
-#: :func:`~analysis_service.analysis.states_a_protocol`, the same reader the
+#: :func:`~katra.analysis.states_a_protocol`, the same reader the
 #: precondition uses — because a silent protocol is what holds that gate open,
 #: and an extraction that invents one closes it (#659).
 #:
@@ -361,7 +361,7 @@ STATE_REDUCED: frozenset[ScoredAttribute] = frozenset(
 #: The state-reduced fields no basis check can answer for, derived from the two
 #: registries rather than listed. A state agreement on one of these is reported
 #: with nothing beside it, and that is a property of the field rather than an
-#: omission: ``analysis_service.basis`` is out of scope on
+#: omission: ``katra.basis`` is out of scope on
 #: ``data_classification`` because it holds *schema* words where the source holds
 #: its own — "not exposed outside the cluster" is correctly written ``internal``
 #: and shares no word with it — and ``protocol`` is not a control attribute at
@@ -536,7 +536,7 @@ class ExtractionScore:
     #: separated a pair, and it has not put the pair together either.
     extracted_undecidable_crossings: tuple[str, ...] | None = None
     #: The extraction's stated controls that its own cited source does not echo
-    #: (:mod:`analysis_service.basis`). The same failure the ``unverified ->
+    #: (:mod:`katra.basis`). The same failure the ``unverified ->
     #: stated`` attribute check names, read from the other side: that check asks
     #: what the blessed model says, and this one asks what the *source* says, so
     #: it fires on an invented control the blessed model happens to state too.
@@ -935,7 +935,7 @@ class ExtractionScore:
         """The half :attr:`endpoint_recall` does not count: the trust zones.
 
         Kept apart rather than dropped. A zone name reaches no claim, but the
-        zones are what :meth:`~analysis_service.system_model.SystemModel.boundary_crossings`
+        zones are what :meth:`~katra.system_model.SystemModel.boundary_crossings`
         is derived from, so a model that invents its own set is a finding even
         though the identity rule never reads one.
         """
@@ -1303,7 +1303,7 @@ def select_frameworks(
 
     **Why it exists is capacity, not preference.** One job fans out one
     ``strong``-tier request per lane of every framework it names, all at the
-    barrier — :func:`~analysis_service.frameworks.widest_fan_out`, 23 today. On a
+    barrier — :func:`~katra.frameworks.widest_fan_out`, 23 today. On a
     200,000 token-per-minute quota that burst is over budget on a single job,
     and no per-caller ceiling helps: ``max_active_jobs`` bounds jobs, and this
     is one job. Narrowing the selection is the only lever inside the harness.
@@ -1367,7 +1367,7 @@ def build_eval_pipeline(
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 
-    Built from a :class:`~analysis_service.deployment.Deployment`, which is the
+    Built from a :class:`~katra.deployment.Deployment`, which is the
     same thing the service is built from — including the retry and per-request
     timeout, so a scheduled sweep does not die on one 429 after hours of work.
     Locating config through the deployment rather than the repo root is what
@@ -1399,12 +1399,12 @@ async def run_graph(
 ) -> GraphRun:
     """Drive one graph to completion and hand back the Graph Run.
 
-    The shipped :class:`~analysis_service.execution.GraphExecutor` drives it, so
+    The shipped :class:`~katra.execution.GraphExecutor` drives it, so
     a sweep stamps each node execution exactly as the service does — the served
     build it presented, and the execution-identity fingerprint that build is
     one of seven parts of.
     Stamping this here rather than in the harness is what makes the eval CLI a
-    real second caller of :func:`~analysis_service.certification.certify` rather
+    real second caller of :func:`~katra.certification.certify` rather
     than one certifying an empty observation set.
     """
     executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
@@ -1427,7 +1427,7 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
         raise EvalRunError(f"{case.id}: extract produced no model")
     # The transport is read off the built graph rather than guessed from the
     # payload, and the expansion runs through the same
-    # :func:`~analysis_service.compact.parse_extraction` the ``validate`` node
+    # :func:`~katra.compact.parse_extraction` the ``validate`` node
     # calls — so a compact run is graded on the model production would have
     # built from the same emission, not on a second reading of the wire form.
     # First-pass semantics are unchanged: this mode still runs no repair.
@@ -1556,7 +1556,7 @@ class AssertionScore:
 
     ``absences`` is the one number that answers the audit directly. It counts
     rows that state a control **not there**
-    (:func:`~analysis_service.assertions.states_missing`), which is the fact
+    (:func:`~katra.assertions.states_missing`), which is the fact
     the graph's own attributes read as a stated control in ten of the corpus's
     21 stated mechanism values.
 
@@ -1586,7 +1586,7 @@ class AssertionScore:
     conflicts: int
     subjects_reached: float | None
     #: The control facts the blessed model states that some predicate in
-    #: :data:`~analysis_service.assertions.REGISTRY` can project into, and how
+    #: :data:`~katra.assertions.REGISTRY` can project into, and how
     #: many of them the catalog's own rows reach. **This is the denominator the
     #: projection had none of**: ``projected`` counts what the catalog emitted,
     #: so a catalog reaching one attribute and getting it right read 1/1.
@@ -1599,7 +1599,7 @@ class AssertionScore:
     reached: int
     #: The same pair of counts over the facts the blessed model states as
     #: **absent** — a control the sources say is not there, which
-    #: :func:`~analysis_service.analysis.control_state` reads as ``absent``.
+    #: :func:`~katra.analysis.control_state` reads as ``absent``.
     #: A second stratum rather than a share of the first, because omitting an
     #: explicit absence is the loss this layer exists to prevent and a
     #: denominator of stated facts alone could not see it: seven such pairs
@@ -1704,7 +1704,7 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
     a whole head recovers, so seeding would answer half of it in advance.
 
     The catalog is read back rather than resolved here: ``park_catalog`` has
-    already put it through :func:`~analysis_service.graph._resolve_assertions`,
+    already put it through :func:`~katra.graph._resolve_assertions`,
     the seam every catalog reaches a reader through, and resolving it a second
     time here would be a second answer to what one proposal came to.
     """
@@ -1777,7 +1777,7 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
 
 #: Why a projected value degraded rather than carrying the catalog's answer.
 #: Read off the projection's own reasons rather than listed again, so a reason
-#: added to :data:`~analysis_service.assertions.ProjectionReason` is counted the
+#: added to :data:`~katra.assertions.ProjectionReason` is counted the
 #: day it lands.
 _DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) - {
     "stated",
@@ -1802,7 +1802,7 @@ ComparedAttribute = Literal[ScoredAttribute, "trust_zone"]
 #: ``internet-facing``: both are stated (#961). A field a predicate projects
 #: into that has no entry here raises at the first projection, which
 #: ``tests/test_evals_modes.py`` holds against
-#: :func:`~analysis_service.assertions.projection_fields`.
+#: :func:`~katra.assertions.projection_fields`.
 PROJECTION_COMPARED: Mapping[ComparedAttribute, Callable[[Any], str]] = {
     **{name: scored.reduce for name, scored in _SCORED_ATTRIBUTES.items()},
     "trust_zone": str,
@@ -1819,7 +1819,7 @@ def reachable_controls(model: SystemModel) -> Mapping[tuple[str, str], Stratum]:
 
     The projection's denominator, derived from the blessed model rather than
     authored: an attribute is reachable when some predicate in
-    :data:`~analysis_service.assertions.REGISTRY` projects into it, the element
+    :data:`~katra.assertions.REGISTRY` projects into it, the element
     carries it, and the blessed value reads as ``stated`` or ``absent``.
 
     **Two strata, and never a pooled one.** A stated fact and a stated absence
@@ -1838,9 +1838,9 @@ def reachable_controls(model: SystemModel) -> Mapping[tuple[str, str], Stratum]:
     sixteen in registry version 2.
 
     The attribute set comes from
-    :func:`~analysis_service.assertions.projection_fields`, the one reader of
+    :func:`~katra.assertions.projection_fields`, the one reader of
     which field each predicate is authoritative for, rather than folded out of
-    :data:`~analysis_service.assertions.REGISTRY` a second time here.
+    :data:`~katra.assertions.REGISTRY` a second time here.
     """
     attributes = sorted(set(projection_fields().values()))
     strata: dict[tuple[str, str], Stratum] = {}
@@ -2037,7 +2037,7 @@ def _basis(
     Read against the **extracted** model, not the blessed one: the question is
     what this run asserted about the text it was given. The blessed model's own
     rate is the false-rejection figure published in
-    :mod:`analysis_service.basis`, and ``tests/test_basis.py`` re-derives it.
+    :mod:`katra.basis`, and ``tests/test_basis.py`` re-derives it.
 
     Both halves come from one call, which is one walk and one scan budget: a
     flag count paired with a denominator taken over a second walk is the defect
@@ -2207,7 +2207,7 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
     rather than crashing the sweep.
 
     **Compares names, and that is the reading it is for.** A
-    :class:`~analysis_service.report.BoundaryCrossing` carries ``flow_id`` and two
+    :class:`~katra.report.BoundaryCrossing` carries ``flow_id`` and two
     zones, and both zones hold a boundary *ID*. A reader of the report sees
     those strings, so a crossing naming a zone they do not hold is wrong for
     them. :func:`crossing_keys` is the other reading — see #297.
@@ -2253,7 +2253,7 @@ def crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
     zones", and that sentence contains no zone name.** Two extractions can
     partition the same elements identically and name the partitions
     differently; compared as lists of
-    :class:`~analysis_service.report.BoundaryCrossing`, that reads as total
+    :class:`~katra.report.BoundaryCrossing`, that reads as total
     disagreement, and on the 2026-08-23 sweeps it did — ``crossings DIFFER`` on
     13 of 13 cases for two models five times apart in price.
 
@@ -2419,7 +2419,7 @@ async def run_answered(
     The answers reach the graph as they reach a resumed production job, through
     the two functions that job calls: :func:`with_link_answers` composes every
     answer as a line of the answers Source, and
-    :func:`~analysis_service.pipeline.answered_state` seeds the model and the
+    :func:`~katra.pipeline.answered_state` seeds the model and the
     catalog pass.
     """
     # One case for the graph and the report, so the report names the answers
@@ -2476,10 +2476,10 @@ def _report_of(
     pipeline: Pipeline,
     extraction: ExtractionResult | None,
 ) -> AnalysisRun:
-    """Complete the graph's :class:`~analysis_service.graph.Analysis` into a report, as production does.
+    """Complete the graph's :class:`~katra.graph.Analysis` into a report, as production does.
 
-    The report is built by :meth:`~analysis_service.graph.Analysis.into_report`,
-    the same method :class:`~analysis_service.pipeline.AdkPipelineRunner` calls,
+    The report is built by :meth:`~katra.graph.Analysis.into_report`,
+    the same method :class:`~katra.pipeline.AdkPipelineRunner` calls,
     so a sweep's reports carry every block a job's do. The Tier 1 gates check a
     whole ``Report`` — including the self-containment invariants — and a
     stripped-down payload would test a shape production never emits.
@@ -2729,7 +2729,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     print(
         f"unbased controls: {unbased} stated with no word in the cited source,"
         f" out of {read} read of {stated} stated"
-        f" — a diagnostic, gating nothing (analysis_service.basis)"
+        f" — a diagnostic, gating nothing (katra.basis)"
     )
     # Beside the agreement rather than under the flags, because the number it
     # qualifies is the agreement: a state comparison folds the mechanism away,

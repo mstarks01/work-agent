@@ -39,10 +39,10 @@ from types import FunctionType
 
 import pytest
 
-from analysis_service.claims import FRAMEWORK_NAMES, Claim, FrameworkAnalysis
-from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
 from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
+from katra.claims import FRAMEWORK_NAMES, Claim, FrameworkAnalysis
+from katra.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
 from tests.factories import SCRIPTED_FRAMEWORKS
 from tests.source_tree import (
     MODEL_TEXT,
@@ -58,7 +58,7 @@ pytestmark = pytest.mark.lint
 SEARCHED = source_files(*PYTHON)
 
 #: A string literal naming a framework. Import paths and module names are not
-#: matched — ``analysis_service`` is this distribution's name, not a package
+#: matched — ``katra`` is this distribution's name, not a package
 #: selection, and ``frameworks.stride.record`` is a module.
 #:
 #: **The name may sit anywhere inside the string, and in any case.** A pattern
@@ -85,7 +85,7 @@ IN_WORD = re.compile(r"stride|asvs", re.IGNORECASE)
 #: reason has to say which:
 #:
 #: **"a table keyed by framework"** — self-completing. A package added to
-#: :data:`~analysis_service.frameworks.PACKAGES` and missing here raises at the
+#: :data:`~katra.frameworks.PACKAGES` and missing here raises at the
 #: first call, so nothing can be silently half-done.
 #:
 #: **"this code is that framework's"** — a framework-specific instrument naming
@@ -95,15 +95,15 @@ IN_WORD = re.compile(r"stride|asvs", re.IGNORECASE)
 #: An entry that is neither is a gap. There are none today; if one appears, say
 #: so in the reason rather than filing it beside the legitimate ones.
 DECLARED: dict[str, str] = {
-    "src/analysis_service/claims.py": (
+    "src/katra/claims.py": (
         "The registry. `FrameworkName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
     ),
-    "src/analysis_service/frameworks/__init__.py": (
+    "src/katra/frameworks/__init__.py": (
         "Tables keyed by framework: PACKAGES and SCHEMAS. Self-completing — a"
         " package missing from either raises at `package_for`."
     ),
-    "src/analysis_service/engine.py": (
+    "src/katra/engine.py": (
         "A module-level demo entry point selecting one framework to run, the"
         " way a caller does. Not a code path any job takes."
     ),
@@ -740,7 +740,7 @@ def test_every_declaration_gives_a_reason(literals):
 def test_the_service_carries_no_framework_selection_of_its_own():
     """`src/` is the boundary the cutover got right, and it stays right.
 
-    Everything under `src/analysis_service/` outside the two package roots names a
+    Everything under `src/katra/` outside the two package roots names a
     framework in exactly three places: the closed type, the two registry tables,
     and one demo entry point. A fourth is a job path choosing a framework for a
     caller, which is the caller's decision.
@@ -748,12 +748,12 @@ def test_the_service_carries_no_framework_selection_of_its_own():
     service = {
         name
         for name in framework_literals()
-        if name.startswith("src/") and name not in {"src/analysis_service/engine.py"}
+        if name.startswith("src/") and name not in {"src/katra/engine.py"}
     }
 
     assert service == {
-        "src/analysis_service/claims.py",
-        "src/analysis_service/frameworks/__init__.py",
+        "src/katra/claims.py",
+        "src/katra/frameworks/__init__.py",
     }
 
 
@@ -772,7 +772,7 @@ def test_every_registered_package_is_a_declared_name(framework):
 
 def test_the_pattern_covers_the_whole_registry():
     """And the parametrize above covers the whole registry, not a fixed pair."""
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
 
     assert set(PACKAGES) == {"stride", "asvs"}, (
         "PACKAGES has changed. Widen LITERAL and the parametrize above it, then"
@@ -908,7 +908,7 @@ def test_no_scorer_names_a_package_this_build_does_not_carry():
 # package's files unchecked, and it passes.
 #
 # **The signal is an import, not a literal.** A lint reaches one package
-# through ``from analysis_service.frameworks.<name>...``, and the literal scan
+# through ``from katra.frameworks.<name>...``, and the literal scan
 # above sees only a directory path. So this asks
 # a different question of a smaller set of files, and asks it of the syntax tree
 # rather than the text, because a docstring naming a framework is prose.
@@ -947,7 +947,7 @@ DECLARED_LINT_IMPORTS: dict[str, str] = {
 
 
 def _package_imports(source: Path) -> list[str]:
-    """Every ``analysis_service.frameworks.<package>`` module ``source`` imports.
+    """Every ``katra.frameworks.<package>`` module ``source`` imports.
 
     Parsed rather than grepped. These files argue about frameworks by name in
     almost every docstring — the reasons #276 and #280 happened are written in
@@ -960,7 +960,7 @@ def _package_imports(source: Path) -> list[str]:
             for node in ast.walk(tree)
             if isinstance(node, ast.ImportFrom) and node.module
             for name in PACKAGES
-            if node.module.startswith(f"analysis_service.frameworks.{name}")
+            if node.module.startswith(f"katra.frameworks.{name}")
         }
     )
 
@@ -1100,12 +1100,10 @@ NEUTRAL_HOOKS: dict[str, str] = {
 
 def _package_modules(name: str):
     """Every module of one package, so a definition anywhere is found."""
-    package = importlib.import_module(f"analysis_service.frameworks.{name}")
+    package = importlib.import_module(f"katra.frameworks.{name}")
     yield package
     for found in pkgutil.iter_modules(package.__path__):
-        yield importlib.import_module(
-            f"analysis_service.frameworks.{name}.{found.name}"
-        )
+        yield importlib.import_module(f"katra.frameworks.{name}.{found.name}")
 
 
 def orphaned_overrides() -> dict[str, list[str]]:
@@ -1125,7 +1123,7 @@ def orphaned_overrides() -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
     for name in sorted(PACKAGES):
         reached_by = {"record": PACKAGES[name].record, "block": SCHEMAS[name].block}
-        home = f"analysis_service.frameworks.{name}"
+        home = f"katra.frameworks.{name}"
         for hook, attribute in NEUTRAL_HOOKS.items():
             defines = any(
                 hook in vars(obj)
@@ -1253,7 +1251,7 @@ def test_no_shared_instruction_file_names_a_framework():
 def test_no_shared_instruction_file_files_a_finding_under_a_lane():
     """A shared pack may not assign a technology's failure to somebody's lane.
 
-    This is the check ``analysis_service.skills`` has always described and
+    This is the check ``katra.skills`` has always described and
     nothing implemented. Its word list comes from the packages' own ``lanes``
     members rather than from a list somebody maintains, so a package that
     declares a new lane is covered on the day it registers.
@@ -1324,8 +1322,8 @@ def test_one_reader_bounds_every_package_s_emission():
     and the guard still has to see 401 of them. It counts what the agent wrote,
     not what survived.
     """
-    from analysis_service.claims import MAX_CLAIMS_PER_BATCH
-    from analysis_service.fan_in import DraftJoinError, fan_in
+    from katra.claims import MAX_CLAIMS_PER_BATCH
+    from katra.fan_in import DraftJoinError, fan_in
     from tests.factories import valid_model
 
     model = valid_model()
@@ -1443,7 +1441,7 @@ def test_a_package_that_rules_on_a_unit_declares_a_direction():
     registry rather than as a name, so a package nobody has written yet answers
     for itself: one that overrides ``unit_of`` emits the field, one that keeps
     the neutral default does not."""
-    from analysis_service.claims import Claim
+    from katra.claims import Claim
 
     for name, schemas in SCHEMAS.items():
         draft = schemas.proposals.model_fields["claims"].annotation.__args__[0]

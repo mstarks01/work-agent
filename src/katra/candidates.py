@@ -1,0 +1,222 @@
+"""The candidate machinery: how a rule fires and how its hits are grouped.
+
+A **Candidate** is a structural condition a deterministic rule found in the
+validated System Model and handed to one lane agent to investigate. It carries a
+rule ID, the elements it is about, and the model facts that made it fire.
+
+This module is neutral by design, and holds no rules. The rules belong to a
+**Framework Package**, because a rule decides which lane sees a lead and a lane
+is a framework's own unit. STRIDE's eleven therefore live in
+:mod:`katra.frameworks.stride.rules`. What is here is the shape a rule
+takes, the shape a hit takes, and the fold that evaluates a package's whole
+table against one model.
+
+There is a line this module does not cross: a candidate is never evidence. It
+carries no severity, no attacker story and no claim that anything is wrong, and
+it cannot become a :class:`~katra.claims.Claim`. Nothing downstream
+of the prompt reads a candidate at all. A rule's whole contribution is
+attention.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, replace
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from katra.assertions import AssertionCatalog, PredicateName
+from katra.system_model import SystemModel
+
+__all__ = [
+    "MAX_FACT_CHARS",
+    "Candidate",
+    "CandidateSet",
+    "Fact",
+    "Match",
+    "Rule",
+    "clip_fact",
+    "generate_candidates",
+    "leads",
+    "with_rule_tables",
+]
+
+# How much of a caller-authored attribute value a fact carries. Facts exist to
+# say which state an attribute is in, not to re-render the model — the agent
+# has the whole thing under ``{system_model}``.
+MAX_FACT_CHARS = 200
+
+Fact = str | int | bool
+Match = tuple[tuple[str, ...], dict[str, Fact]]
+"""One rule hit: the element IDs it is about, and the facts that made it fire."""
+
+
+def clip_fact(value: str) -> str:
+    """A caller-authored attribute value, cut to what a fact may carry."""
+    return value[:MAX_FACT_CHARS]
+
+
+class Candidate(BaseModel):
+    """One fired trigger: a condition to investigate, with the facts behind it.
+
+    ``facts`` are the model values the rule read, so the agent can see the
+    trigger without taking the rule's word for it — an ``authentication`` of
+    ``unknown`` is a question to ask, one of ``none`` is a control the
+    submitter said is not there, and the two produce different findings.
+
+    ``lane`` is a plain string rather than a typed enum, because the legal set
+    is whatever package declared the rule. The package gate checks that every
+    rule names a lane its package declares.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rule_id: str = Field(min_length=1, max_length=100)
+    lane: str = Field(min_length=1, max_length=100)
+    element_ids: tuple[str, ...] = Field(min_length=1)
+    facts: dict[str, Fact] = Field(default_factory=dict)
+
+
+def with_rule_tables(
+    rules: Sequence[Rule],
+    effects: Mapping[str, str],
+    informed_by: Mapping[str, frozenset[PredicateName]],
+) -> tuple[Rule, ...]:
+    """``rules``, each with its row of a package's ``effects`` and ``informed_by`` tables.
+
+    Each table is checked against the rules: a rule with no row, or a row for
+    no rule, raises. So a new rule cannot reach the early list with the
+    analyst's question as its reason, and cannot leave out which predicates
+    inform it.
+    """
+    ids = {rule.rule_id for rule in rules}
+    for name, table in (("effect sentence", effects), ("informed_by row", informed_by)):
+        if missing := sorted(ids - table.keys()):
+            raise ValueError(f"no {name} for the rules {missing}")
+        if extra := sorted(table.keys() - ids):
+            raise ValueError(f"{name}s for no rule: {extra}")
+    return tuple(
+        replace(
+            rule,
+            effect=effects[rule.rule_id],
+            informed_by=informed_by[rule.rule_id],
+        )
+        for rule in rules
+    )
+
+
+class CandidateSet(BaseModel):
+    """One lane's candidates, plus the questions their rules put.
+
+    The questions ride beside the candidates rather than inside each one: a
+    rule that fires eight times would otherwise repeat its sentence eight
+    times, and the agent reads the question once per rule either way.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lane: str = Field(min_length=1, max_length=100)
+    questions: dict[str, str] = Field(default_factory=dict)
+    candidates: tuple[Candidate, ...] = ()
+
+
+@dataclass(frozen=True)
+class Rule:
+    """One deterministic trigger: its lane, its question, and how it fires.
+
+    ``find`` yields :data:`Match` values rather than :class:`Candidate` ones,
+    so a rule cannot file under a lane that is not its own — the ID and the
+    lane are stamped by :meth:`fire`, from the rule's own fields.
+    """
+
+    rule_id: str
+    lane: str
+    question: str
+    find: Callable[[SystemModel, AssertionCatalog], Iterator[Match]]
+    #: What an answer about a fact the rule reads informs, as the early list
+    #: shows it to the owner (:func:`with_rule_tables`). ``question`` is what the
+    #: lane reads.
+    effect: str = ""
+    #: The predicates whose fact bears on this rule's finding (ADR 0117), from
+    #: its package's table (:func:`with_rule_tables`). The rule need not fire
+    #: on a row of one; the early list reads this to rank a question kind.
+    informed_by: frozenset[PredicateName] = frozenset()
+
+    def fire(self, model: SystemModel, catalog: AssertionCatalog) -> list[Candidate]:
+        """Every candidate this rule produces for this model, in model order."""
+        return [
+            Candidate(
+                rule_id=self.rule_id,
+                lane=self.lane,
+                element_ids=element_ids,
+                facts=facts,
+            )
+            for element_ids, facts in self.find(model, catalog)
+        ]
+
+
+def generate_candidates(
+    model: SystemModel,
+    lanes: Sequence[str],
+    rules: Sequence[Rule],
+    catalog: AssertionCatalog | None = None,
+) -> dict[str, CandidateSet]:
+    """One package's rules evaluated against the model, grouped into its lanes.
+
+    Every lane gets an entry, including one whose rules all found nothing: an
+    empty candidate set is the honest statement that deterministic analysis
+    surfaced no structural lead here, and it is a different thing from a lane
+    that was never offered any.
+
+    **A rule reads the graph and the catalog, because some facts are in only
+    one of them.** Ten of the sixteen predicates project into no graph
+    attribute, so a rule that took the model alone could never see a second
+    factor, a grant or a rotation — the facts the assertion layer exists to
+    capture. A rule still decides for itself whether it reads the catalog, and
+    most read only the graph.
+
+    ``catalog`` of ``None`` is a job whose deployment ran no assertion pass. It
+    becomes an empty catalog here rather than in each rule, so "no pass ran"
+    and "the pass found nothing" reach a rule as the same thing — which they
+    are, to a rule — and no rule carries a branch for it.
+    """
+    held = catalog if catalog is not None else AssertionCatalog()
+    return {lane: _candidate_set(lane, model, rules, held) for lane in lanes}
+
+
+def _candidate_set(
+    lane: str, model: SystemModel, rules: Sequence[Rule], catalog: AssertionCatalog
+) -> CandidateSet:
+    in_lane = [rule for rule in rules if rule.lane == lane]
+    fired = [candidate for rule in in_lane for candidate in rule.fire(model, catalog)]
+    return CandidateSet(
+        lane=lane,
+        questions={
+            rule.rule_id: rule.question
+            for rule in in_lane
+            if any(candidate.rule_id == rule.rule_id for candidate in fired)
+        },
+        candidates=tuple(fired),
+    )
+
+
+def leads(sets: Mapping[str, CandidateSet]) -> set[tuple[str, str, tuple[str, ...]]]:
+    """Each lead in ``sets``, as its lane, its rule and its elements.
+
+    A lead is a rule fired in a lane on a set of elements, so a rule that fires
+    on one more element counts once more. The facts a candidate carries are not
+    part of it: the same lead with a projected value in place of ``unknown`` is
+    the same attention. The questions a set carries are not part of it either.
+    """
+    return {
+        (candidate.lane, candidate.rule_id, candidate.element_ids)
+        for candidate_set in sets.values()
+        for candidate in candidate_set.candidates
+    }
+
+
+def catalog_leads(
+    held: Mapping[str, CandidateSet], without: Mapping[str, CandidateSet]
+) -> int:
+    """How many :func:`leads` in ``held`` the rules give no lane in ``without``."""
+    return len(leads(held) - leads(without))

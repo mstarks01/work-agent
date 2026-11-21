@@ -72,9 +72,9 @@ from pydantic import BaseModel
 
 # Imported first so the model-cost map is pinned before anything reaches
 # litellm; `vendor_keyed_tables` imports every shipped module.
-from analysis_service import model_gate  # noqa: F401
-from analysis_service.store_settings import DatabaseCredentialMode
-from analysis_service.vendors import (
+from katra import model_gate  # noqa: F401
+from katra.store_settings import DatabaseCredentialMode
+from katra.vendors import (
     VENDOR_NAMES,
     VENDORS,
     CredentialMode,
@@ -99,12 +99,10 @@ VOCABULARIES: tuple[tuple[str, frozenset], ...] = (
 #: closed set of its own, with that set. The completeness check reads each one
 #: against its own set instead.
 OWN_VOCABULARIES: dict[str, frozenset] = {
-    # ANALYSIS_DATABASE_CREDENTIALS takes `password` or `iam` (#1531). Its
+    # KATRA_DATABASE_CREDENTIALS takes `password` or `iam` (#1531). Its
     # `iam` is the word that CredentialMode uses, and a database has no
     # `api_key`.
-    "analysis_service.sql_store.DATABASE_CREDENTIALS": frozenset(
-        get_args(DatabaseCredentialMode)
-    ),
+    "katra.sql_store.DATABASE_CREDENTIALS": frozenset(get_args(DatabaseCredentialMode)),
 }
 
 #: Every vendor name, as one alternation, built from the registry. Written down
@@ -144,7 +142,7 @@ DECLARED: dict[str, str] = {
         " a recall measured on another model is not read against it. No code"
         " routes by it."
     ),
-    "src/analysis_service/vendors.py": (
+    "src/katra/vendors.py": (
         "The registry. `VendorName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
         " VENDORS is its one table, keyed by vendor and self-completing, and"
@@ -153,7 +151,7 @@ DECLARED: dict[str, str] = {
         " VERTEX_LOCATION_VAR and BEDROCK_REGION_VAR name one vendor's own"
         " addressing config, which no other vendor reads."
     ),
-    "src/analysis_service/conformance.py": (
+    "src/katra/conformance.py": (
         "REFERENCE_MODELS is a table keyed by vendor: the pair the offline"
         " capability matrix profiles for each row. A vendor missing from it"
         " has no profiled pair, which the matrix fails on rather than"
@@ -165,7 +163,7 @@ DECLARED: dict[str, str] = {
         " vendor. tests/test_settings_page.py holds its keys against VENDORS"
         " and its None entries against each row's credential modes."
     ),
-    "src/analysis_service/binding.py": (
+    "src/katra/binding.py": (
         "An error message naming the model family a rule matched, not a vendor"
         " selection. `openai_reasoning_model` is keyed on the identifier and"
         " runs under every vendor — see OPEN_BY_DECISION — so the message has"
@@ -229,7 +227,7 @@ def _shipped_modules() -> list[str]:
     tables are: a module added tomorrow is covered without an edit.
     """
     names = []
-    for root, package in (("src", "analysis_service"), ("evals", "evals")):
+    for root, package in (("src", "katra"), ("evals", "evals")):
         base = REPO_ROOT / root / package.replace(".", "/")
         if not base.is_dir():
             continue
@@ -346,8 +344,8 @@ def test_the_scan_finds_the_tables_we_already_know_about(tables):
     every other per-vendor fact as a required field, and the reference matrix.
     """
     expected = {
-        "analysis_service.vendors.VENDORS",
-        "analysis_service.conformance.REFERENCE_MODELS",
+        "katra.vendors.VENDORS",
+        "katra.conformance.REFERENCE_MODELS",
     }
     assert expected <= set(tables), (
         f"the scan no longer finds: {sorted(expected - set(tables))}."
@@ -796,8 +794,8 @@ def test_no_document_counts_the_ground_kinds(path):
 #:
 #: **Empty, and meant to stay that way** (#942). A bound on what a model may
 #: emit belongs where code reads the output —
-#: :func:`~analysis_service.fan_in.fan_in` carries the lane-emission cap, and
-#: :meth:`~analysis_service.assertions.AssertionRecord.of` carries the catalog's.
+#: :func:`~katra.fan_in.fan_in` carries the lane-emission cap, and
+#: :meth:`~katra.assertions.AssertionRecord.of` carries the catalog's.
 #: An entry here is a node that has lost a vendor, so this declaration is where
 #: the trade has to be argued.
 ROOT_CAPPED_SCHEMAS: dict[str, str] = {}
@@ -840,7 +838,7 @@ def test_every_node_s_output_schema_is_one_the_enumerator_reaches():
     A vendor refuses a shape, not a node, so a scan that misses one schema
     reports a portability the tree does not have.
     """
-    path = REPO_ROOT / "src" / "analysis_service" / "graph.py"
+    path = REPO_ROOT / "src" / "katra" / "graph.py"
     assert path in SEARCHED
     passed = {
         ast.unparse(keyword.value)
@@ -863,10 +861,10 @@ def _model_facing_schemas() -> dict[str, type[BaseModel]]:
     Held to the graph's own nodes by
     :func:`test_every_node_s_output_schema_is_one_the_enumerator_reaches`.
     """
-    from analysis_service.assertions import CatalogProposal
-    from analysis_service.capability_reader import CapabilityReading
-    from analysis_service.frameworks import PACKAGES, schemas_for
-    from analysis_service.graph import EXTRACTION_SCHEMAS
+    from katra.assertions import CatalogProposal
+    from katra.capability_reader import CapabilityReading
+    from katra.frameworks import PACKAGES, schemas_for
+    from katra.graph import EXTRACTION_SCHEMAS
 
     found: dict[str, type[BaseModel]] = {
         cls.__name__: cls for cls in EXTRACTION_SCHEMAS.values()

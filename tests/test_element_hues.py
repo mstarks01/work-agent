@@ -7,9 +7,9 @@ import re
 from itertools import pairwise
 from pathlib import Path
 
-from analysis_service.element_hues import FILL, LINE, element_hues, hsl_hex
-from analysis_service.mermaid import model_mermaid, styled_mermaid
-from analysis_service.sources import Source
+from katra.element_hues import FILL, LINE, element_hues, hsl_hex
+from katra.mermaid import model_mermaid, styled_mermaid
+from katra.sources import Source
 from tests.factories import valid_model
 
 

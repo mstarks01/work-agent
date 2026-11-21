@@ -39,14 +39,14 @@ the form. It never validates a value.
   "shows", or "excluded" with a reason. The key of an entry is the Deployment
   Setting, such as `tiers.strong.model`, and not the env var or the TOML key
   that sets it.
-- `secret_vars()` in `analysis_service` is the one reader of "this variable
+- `secret_vars()` in `katra` is the one reader of "this variable
   names a secret file". It collects the flags from `VENDORS`, from the S3 key
   files and from the database password file. Only the Settings page modules
   call it: the page and its write-only key field. The file permission check
   does not call it. Each loader reads its secret file through `read_secret`,
   which applies the rule of a secret file through `private_fd`. A variable is
-  not a secret because its name ends in `_FILE`: `ANALYSIS_TIERS_FILE` and
-  `ANALYSIS_DATABASE_CA_FILE` are not secrets.
+  not a secret because its name ends in `_FILE`: `KATRA_TIERS_FILE` and
+  `KATRA_DATABASE_CA_FILE` are not secrets.
 
   > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
   > The `gcs` loader reads its service account key through `read_secret_file`,
@@ -60,7 +60,7 @@ the form. It never validates a value.
   `DATABASE_CREDENTIALS`) declares a `reads` tuple. `refuse_unread` and the
   page both read it, so the page shows only the fields of the selected
   backend.
-- `deployment_variables()` in `analysis_service` collects the variable names
+- `deployment_variables()` in `katra` collects the variable names
   that each loader family exports. A test requires one page-module entry for
   each name. A loader that reads a new variable must export it, or the test
   fails.

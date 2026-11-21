@@ -10,10 +10,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from analysis_service.sources import Source
-from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
 from evals.harness.reference import load_case
+from katra.sources import Source
+from katra.system_model import SystemModel
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CASES = REPO_ROOT / "evals" / "critic_review" / "cases.json"

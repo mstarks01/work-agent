@@ -1,6 +1,6 @@
 """The live sweep's path filter, kept honest against what ``evals/`` imports.
 
-``.github/workflows/evals-live.yml`` sweeps ``src/analysis_service/**`` and
+``.github/workflows/evals-live.yml`` sweeps ``src/katra/**`` and
 subtracts the modules the eval harness cannot reach. The subtraction is the
 part that rots: a module that acquires a job on the eval path stays excluded,
 and the sweep silently stops covering it. So the closure is recomputed here
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.config_files import SECRET_FILE_SUFFIX
+from katra.config_files import SECRET_FILE_SUFFIX
 from tests.source_tree import (
     PYTHON,
     REPO_ROOT,
@@ -33,9 +33,9 @@ from tests.source_tree import (
 
 pytestmark = pytest.mark.lint
 
-PACKAGE = REPO_ROOT / "src" / "analysis_service"
+PACKAGE = REPO_ROOT / "src" / "katra"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "evals-live.yml"
-PACKAGE_GLOB = "src/analysis_service/**"
+PACKAGE_GLOB = "src/katra/**"
 
 #: Every workflow whose ``pull_request`` trigger is path-filtered to the agentic
 #: surface. Both name the same text trees and can go wrong the same way, so
@@ -52,7 +52,7 @@ def _package_modules() -> set[str]:
 
 
 def _module_file(dotted: str) -> Path | None:
-    """The file behind one ``analysis_service`` module, or ``None``."""
+    """The file behind one ``katra`` module, or ``None``."""
     path = PACKAGE.parent.joinpath(*dotted.split("."))
     for candidate in (path.with_suffix(".py"), path / "__init__.py"):
         if candidate.is_file():
@@ -65,7 +65,7 @@ _TYPE_CHECKING = frozenset({"TYPE_CHECKING", "typing.TYPE_CHECKING"})
 
 
 def _imported(source: Path) -> set[str]:
-    """Every ``analysis_service`` module ``source`` imports, dotted.
+    """Every ``katra`` module ``source`` imports, dotted.
 
     A ``from`` import names a module or a name inside one, so each name is
     tried as a submodule and kept only where a file stands behind it.
@@ -84,14 +84,12 @@ def _imported(source: Path) -> set[str]:
         pending.extend(ast.iter_child_nodes(node))
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            if module.startswith("analysis_service"):
+            if module.startswith("katra"):
                 found.add(module)
                 found |= {f"{module}.{alias.name}" for alias in node.names}
         elif isinstance(node, ast.Import):
             found |= {
-                alias.name
-                for alias in node.names
-                if alias.name.startswith("analysis_service")
+                alias.name for alias in node.names if alias.name.startswith("katra")
             }
     return {module for module in found if _module_file(module) is not None}
 
@@ -113,7 +111,7 @@ def _reachable_from_evals() -> set[str]:
         module = pending.pop()
         reached.add(module)
         path = _module_file(module)
-        if path is not None and module != "analysis_service":
+        if path is not None and module != "katra":
             pending |= _imported(path) - reached
     return {module.split(".")[1] for module in reached if module.count(".") >= 1}
 
@@ -172,13 +170,13 @@ def test_the_walk_skips_a_type_only_import(tmp_path):
     source.write_text(
         "from typing import TYPE_CHECKING\n"
         "if TYPE_CHECKING:\n"
-        "    from analysis_service.store_settings import StoreConfigError\n"
+        "    from katra.store_settings import StoreConfigError\n"
         "else:\n"
-        "    from analysis_service import report\n",
+        "    from katra import report\n",
         encoding="utf-8",
     )
 
-    assert _imported(source) == {"analysis_service", "analysis_service.report"}
+    assert _imported(source) == {"katra", "katra.report"}
 
 
 def test_the_walk_follows_a_subpackage():
@@ -199,7 +197,7 @@ def test_every_swept_path_still_exists(workflow):
     A glob that resolves to nothing does not fail; it quietly narrows what
     fires, and it stays quiet until the one PR that needs it.
 
-    The negations are not checked. ``!src/analysis_service/token_caps.py``
+    The negations are not checked. ``!src/katra/token_caps.py``
     subtracts a real file today, and the test above already holds the exclusion
     list to ``evals/``'s import closure.
     """

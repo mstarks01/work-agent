@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.claim_identity import NO_ROWS
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness import writing
 from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import NO_FLOWS
 from evals.harness.ledger import Ledger, Vote
+from katra.claim_identity import NO_ROWS
+from katra.claims import FrameworkName
+from katra.frameworks.stride.record import StrideCategory
 from tests.eval_factories import SAMPLE_CONTENT, produced_threat
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block

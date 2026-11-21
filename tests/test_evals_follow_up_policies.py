@@ -7,15 +7,15 @@ import json
 
 import pytest
 
-from analysis_service.bands import Band
-from analysis_service.claims import UnknownRef
-from analysis_service.questions import FollowUpNeeds
 from evals.harness.follow_up_policies import (
     EFFORTS,
     POLICIES,
     command_follow_up_policies,
     readings,
 )
+from katra.bands import Band
+from katra.claims import UnknownRef
+from katra.questions import FollowUpNeeds
 from tests.factories import asking_threat, sample_analysis, sample_report
 
 CRITICAL, LOW = 0, -3

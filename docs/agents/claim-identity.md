@@ -22,9 +22,9 @@ what?**
 | lane | the block, from the field its package's `id_rule` declares (`lane_field`) | v4, v5, v6 |
 | targets | `affected_element_ids`, endpoint-resolved | v4, v5, v6 |
 | scope | the case ID, which names the **System Model** the claim was reached in | v4, v5, v6 |
-| action verb, as written | `analysis_service.actions`, a closed set of 21 | v4 only |
+| action verb, as written | `katra.actions`, a closed set of 21 | v4 only |
 | catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v5 only |
-| action verb, read through `evals.harness.verbs.EQUIVALENT` | `analysis_service.actions`, a closed set of 21 | v6 only |
+| action verb, read through `evals.harness.verbs.EQUIVALENT` | `katra.actions`, a closed set of 21 | v6 only |
 
 `SUPPORTED_VERSIONS` in `evals/harness/fingerprint.py` holds the versions the
 code computes, and `EXTRA_COMPONENT` holds the part each version reads beside
@@ -47,7 +47,7 @@ differently and one finding becomes two.
 **A flow's own identity is versioned too, and separately.** A claim fingerprint
 reads a cited flow through the model's flow map, so a change to how a flow ID is
 spelled moves no fingerprint — which is why the two versions are independent
-tables rather than one. `analysis_service.system_model.FLOW_ID_RULES` holds each
+tables rather than one. `katra.system_model.FLOW_ID_RULES` holds each
 version's shape, its builder and its decoder, `FLOW_ID_VERSION` is the one the
 service writes, and `flow_id_version` says which rule wrote any single ID
 because the versions' shapes are disjoint by construction. A version's decoder
@@ -423,7 +423,7 @@ one requirement in one place, and one vote answering for both.
 
 | Module | What it owns |
 |---|---|
-| `src/analysis_service/claim_identity.py` | The service's half: `finding_key`, the endpoint fold `endpoint_targets`, the sibling flows, a claim's mechanism, `distinct_mechanisms`, and the row controls of a catalog (`row_controls`) and of a **Report** (`report_rows`). Each caller passes the flow map of the graph its claims were reached in. |
+| `src/katra/claim_identity.py` | The service's half: `finding_key`, the endpoint fold `endpoint_targets`, the sibling flows, a claim's mechanism, `distinct_mechanisms`, and the row controls of a catalog (`row_controls`) and of a **Report** (`report_rows`). Each caller passes the flow map of the graph its claims were reached in. |
 | `evals/harness/verbs.py` | The closed vocabulary, the equivalence table, the two it cannot separate. |
 | `evals/harness/fingerprint.py` | `Components`, the versioned hash, and the version read back off the value. |
 | `evals/harness/identity.py` | `endpoint_subset`, `SubsetVerbIdentity`, and the `Matcher` protocol one scoreboard scores every rule through. |

@@ -14,20 +14,20 @@ identity and follow-up readers that read the report.
 
 import json
 
-from analysis_service import graph
-from analysis_service.claim_identity import (
+from katra import graph
+from katra.claim_identity import (
     distinct_mechanisms,
     finding_key,
     mechanism_of,
     report_rows,
 )
-from analysis_service.fan_in import fan_in
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.jobs import JobRecord, PipelineCompleted
-from analysis_service.prompts import lane_exemplars_doc
-from analysis_service.report_changes import report_changes
-from analysis_service.sources import Source
-from analysis_service.system_model import ModelIndex
+from katra.fan_in import fan_in
+from katra.frameworks import PACKAGES, schemas_for
+from katra.jobs import JobRecord, PipelineCompleted
+from katra.prompts import lane_exemplars_doc
+from katra.report_changes import report_changes
+from katra.sources import Source
+from katra.system_model import ModelIndex
 from tests.factories import claims_json, emitted, sample_ruling, sample_selection
 from tests.factories import scripted_pipeline as build
 from tests.test_exemplar_fan_in import fixture_model, sources_of

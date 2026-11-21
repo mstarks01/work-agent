@@ -3,7 +3,7 @@
 A package declares ``units``, its closed set of unit rows, and
 ``control_unit_of``, the unit one of its claims sits in. The package gate checks
 the table when the package is built,
-:func:`~analysis_service.frameworks.check_unit` checks a row's framework and
+:func:`~katra.frameworks.check_unit` checks a row's framework and
 unit, and a replay over the Baseline reports and each ASVS reference record of
 the corpus holds ``control_unit_of`` to the set through that check.
 """
@@ -14,8 +14,11 @@ from dataclasses import fields, replace
 
 import pytest
 
-from analysis_service.claims import Claim
-from analysis_service.frameworks import (
+from evals.harness.artifact import CORPUS_DIR
+from evals.harness.bundle import read_report
+from evals.harness.reference import load_corpus
+from katra.claims import Claim
+from katra.frameworks import (
     PACKAGES,
     FrameworkPackage,
     FrameworkPackageError,
@@ -24,11 +27,8 @@ from analysis_service.frameworks import (
     package_for,
     validate_package,
 )
-from analysis_service.frameworks.asvs.catalog import CHAPTERS, REQUIREMENTS
-from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-from evals.harness.artifact import CORPUS_DIR
-from evals.harness.bundle import read_report
-from evals.harness.reference import load_corpus
+from katra.frameworks.asvs.catalog import CHAPTERS, REQUIREMENTS
+from katra.frameworks.asvs.record import DraftRequirementRuling
 from tests.factories import PROJECT_ROOT, carrying
 
 BASELINE_REPORTS = sorted((PROJECT_ROOT / "evals/baselines").rglob("*.report.json"))

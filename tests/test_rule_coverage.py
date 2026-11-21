@@ -30,12 +30,12 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import generate_candidates
-from analysis_service.frameworks import PACKAGES
-from analysis_service.knowledge import MAX_CASES, MAX_NOTES, select_per_lane
-from analysis_service.system_model import SystemModel
-from analysis_service.validation import parse_and_validate
+from katra.assertions import AssertionCatalog
+from katra.candidates import generate_candidates
+from katra.frameworks import PACKAGES
+from katra.knowledge import MAX_CASES, MAX_NOTES, select_per_lane
+from katra.system_model import SystemModel
+from katra.validation import parse_and_validate
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
@@ -188,7 +188,7 @@ def selected_documents(models: list[SystemModel]) -> set[str]:
     documents a rule *could* select answers a different question, and it is the
     question the package gate already answers.
 
-    Through :func:`~analysis_service.knowledge.select_per_lane`, because a
+    Through :func:`~katra.knowledge.select_per_lane`, because a
     lane's tie-break reads what earlier lanes were sent — so calling
     ``select_documents`` per lane here would measure a selection the graph does
     not make, and this lint would go on reporting a document as unreachable

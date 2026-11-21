@@ -13,14 +13,14 @@ import shutil
 
 import pytest
 
-from analysis_service.grounding import verify_quote
-from analysis_service.report import (
+from evals import build_review_docs, verify_corpus
+from katra.grounding import verify_quote
+from katra.report import (
     InputRef,
     SourceRef,
 )
-from analysis_service.system_model import ELEMENT_GROUPS
-from analysis_service.validation import parse_and_validate, validate
-from evals import build_review_docs, verify_corpus
+from katra.system_model import ELEMENT_GROUPS
+from katra.validation import parse_and_validate, validate
 from tests.factories import valid_model
 from tests.source_tree import PYTHON, source_files
 
@@ -430,7 +430,7 @@ def test_the_gate_and_the_corpus_lint_refuse_the_same_citation_shapes(
     """Two readers of one rule, held to each other rather than each to itself.
 
     ``verify_corpus._check_citations`` deliberately does not call
-    :func:`~analysis_service.validation.validate`: a check that would weaken
+    :func:`~katra.validation.validate`: a check that would weaken
     the moment somebody relaxed the shipped gate is not a check. That decision
     gains independence and loses agreement, and this test checks the agreement.
     Two readers can each pass an element that carries no excerpt, each with a
@@ -827,8 +827,8 @@ class TestTheReviewedAliases:
         `store:vendor-platform`, which is not the zone, so a model that wrote
         the store as its zone still pairs nothing.
         """
-        from analysis_service.system_model import make_element_id
         from evals.harness.reference import load_case
+        from katra.system_model import make_element_id
 
         case = load_case(verify_corpus.CORPUS_DIR / "12-overclaiming-supplier-portal")
         store = next(
@@ -874,7 +874,7 @@ class TestTheReviewedAliases:
         a different judgement about what the thing is. Crediting that as a
         naming difference would erase the disagreement."""
         for (case_id, element), alias in self.aliases().items():
-            from analysis_service.system_model import make_element_id
+            from katra.system_model import make_element_id
 
             derived = make_element_id(element.split(":", 1)[0], alias.name)
             assert derived.split(":", 1)[0] == element.split(":", 1)[0], case_id
@@ -883,7 +883,7 @@ class TestTheReviewedAliases:
 class TestTheTwoReadersOfTheIdRule:
     """Which builder derives an element's ID is one rule, and it has two readers.
 
-    :func:`~analysis_service.system_model.derive_element_id` is the single
+    :func:`~katra.system_model.derive_element_id` is the single
     definition, and it branches on ``isinstance(element, DataFlow)``. The
     corpus alias lint cannot call it — it reads a recorded graph as JSON,
     before any schema admits it, and it derives an ID for the *alias's* name
@@ -897,7 +897,7 @@ class TestTheTwoReadersOfTheIdRule:
     """
 
     def test_both_readers_choose_one_builder_for_every_blessed_element(self):
-        from analysis_service.system_model import (
+        from katra.system_model import (
             DataFlow,
             derive_element_id,
             make_element_id,

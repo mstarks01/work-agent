@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import deployment
-from analysis_service.diagrams import (
+from katra import deployment
+from katra.diagrams import (
     Arrow,
     DiagramEdge,
     DiagramGroup,
@@ -24,11 +24,11 @@ from analysis_service.diagrams import (
     read_diagram,
     reader_fault,
 )
-from analysis_service.execution import seed_state
-from analysis_service.graph import STATE_DIAGRAM_READINGS, STATE_INPUT_TEXT
-from analysis_service.mermaid import model_mermaid
-from analysis_service.sources import Source, render_sources
-from analysis_service.validation import validate
+from katra.execution import seed_state
+from katra.graph import STATE_DIAGRAM_READINGS, STATE_INPUT_TEXT
+from katra.mermaid import model_mermaid
+from katra.sources import Source, render_sources
+from katra.validation import validate
 from tests.factories import valid_model
 from tests.test_sources import DIAGRAM_HEADERS, lines_outside_fences
 from webapp.main import prepare_diagram_reader

@@ -3,10 +3,10 @@
 import sys
 from pathlib import Path
 
-from analysis_service.frameworks.stride.rules import zone_kinds
 from evals.harness.alignment import align
 from evals.harness.reference import load_corpus
 from evals.harness.run import extractions_from_reports, load_artifact
+from katra.frameworks.stride.rules import zone_kinds
 
 
 def crossing_of(model, flow_id):

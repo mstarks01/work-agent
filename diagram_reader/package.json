@@ -1,5 +1,5 @@
 {
-  "name": "analysis-service-diagram-reader",
+  "name": "katra-diagram-reader",
   "private": true,
   "type": "module",
   "description": "Reads a Mermaid diagram's structure with Mermaid's own parsers (ADR 0121).",

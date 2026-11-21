@@ -13,13 +13,13 @@ holds two frameworks, so each framework is measured on its own reports: the
 order is built for that report's extracted model with every framework
 selected, and scored against that report's findings. A conditional finding is
 complete when every open fact it waits on is among the questions answered
-(:func:`~analysis_service.questions.fact_questions` names them). A unit of a
+(:func:`~katra.questions.fact_questions` names them). A unit of a
 framework whose units apply by a rule over capabilities is settled when every
 capability its decision misses is answered. Both are counts of dependency
 sets an order completes, never a count of findings an answer changes.
 
 **Effort is choices**: one for each facet of a question with facets, and one
-for every other question (:attr:`~analysis_service.early_questions.EarlyQuestion.decisions`).
+for every other question (:attr:`~katra.early_questions.EarlyQuestion.decisions`).
 The submitter answers every question shown, the parts of a capability included.
 
 **Each order is a policy in** :data:`POLICIES`, built from the production
@@ -55,22 +55,22 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-import analysis_service.early_questions as early_module
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import passes_floor, question_set, whose_turn
-from analysis_service.claims import FrameworkName, UnknownKey
-from analysis_service.early_questions import EarlyQuestion, early_questions
-from analysis_service.fact_answers import FactAnswer, key_ref
-from analysis_service.frameworks import PACKAGES
-from analysis_service.open_facts import CAPABILITY_GROUP
-from analysis_service.questions import fact_questions
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
+import katra.early_questions as early_module
 from evals.harness import audit
 from evals.harness.archive import case_suffix
 from evals.harness.bundle import read_report
 from evals.harness.early_rounds import MAX_SAVES, dont_know
 from evals.harness.run_record import run_record
+from katra.answer_sets import AnswerSet
+from katra.answer_state import passes_floor, question_set, whose_turn
+from katra.claims import FrameworkName, UnknownKey
+from katra.early_questions import EarlyQuestion, early_questions
+from katra.fact_answers import FactAnswer, key_ref
+from katra.frameworks import PACKAGES
+from katra.open_facts import CAPABILITY_GROUP
+from katra.questions import fact_questions
+from katra.report import Report
+from katra.system_model import SystemModel
 
 #: The frameworks a job selects, each with its options.
 Selection = Mapping[FrameworkName, Mapping[str, Any]]
@@ -172,7 +172,7 @@ def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion
 
 def _shipped_list(model: SystemModel, frameworks: Selection) -> list[EarlyQuestion]:
     """The shipped order: the list after each save, in the order the page
-    shows it (:func:`~analysis_service.answer_state.recommended`)."""
+    shows it (:func:`~katra.answer_state.recommended`)."""
     return [question for shown in _lists(model, frameworks) for question in shown]
 
 
@@ -194,7 +194,7 @@ def _merge(
     """Each framework's own order, taken in turn by the effort each has had.
 
     The next pick goes to the framework that
-    :func:`~analysis_service.answer_state.whose_turn` names. A question one framework's list shares with
+    :func:`~katra.answer_state.whose_turn` names. A question one framework's list shares with
     another is asked once, and charged to every framework that lists it.
     ``grouped`` takes a framework's next group whole, as the page shows a
     group, rather than its next question.

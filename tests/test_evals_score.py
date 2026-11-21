@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.report import Report
 from evals.harness.artifact import corpus_digest, load_artifact
 from evals.harness.bundle import (
     reports_dir,
@@ -30,6 +29,7 @@ from evals.harness.ledger import append
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import load_case
 from evals.harness.run import main
+from katra.report import Report
 from tests.eval_factories import cast, write_finished_sweep
 from tests.test_evals_run_grounds import CASE_DIR, sweep
 

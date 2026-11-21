@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from analysis_service.assertions import (
+from evals.harness import guard_cost
+from evals.harness.reference import load_corpus
+from evals.harness.run import COMMANDS
+from katra.assertions import (
     Assertion,
     AssertionCatalog,
     AssertionRecord,
     Subject,
 )
-from evals.harness import guard_cost
-from evals.harness.reference import load_corpus
-from evals.harness.run import COMMANDS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CORPUS = REPO_ROOT / "evals" / "corpus"

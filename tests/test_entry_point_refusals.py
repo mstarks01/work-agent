@@ -1,7 +1,7 @@
 """Each command-line entry point refuses a configuration it cannot run on in one line.
 
 The harness loads the resilience file to bound each corpus source, and a
-replay loads the model tiers. A :class:`~analysis_service.errors.ConfigError`
+replay loads the model tiers. A :class:`~katra.errors.ConfigError`
 from either names the file or the variable to fix, and a traceback over it
 hides that line. ``tests/test_evals_run.py`` holds the same refusal for
 ``run.main``.
@@ -10,7 +10,7 @@ The migration step reads the database settings, and the service's startup
 tells an operator to run it. A store setting it cannot run on ends in the same
 one line. A database at a revision this build does not hold ends in one line
 of its own, with the remedy that the startup gives.
-:data:`SERVICE_ENTRY_POINTS` holds each ``python -m analysis_service...``
+:data:`SERVICE_ENTRY_POINTS` holds each ``python -m katra...``
 command to a stated answer.
 """
 
@@ -25,11 +25,11 @@ from pathlib import Path
 import pytest
 from sqlalchemy import create_engine
 
-from analysis_service.deployment import RESILIENCE_VAR
-from analysis_service.migrations.__main__ import main as migrations_main
-from analysis_service.store_settings import DATABASE_URL_VAR
 from evals import build_diagrams
 from evals.critic_review.__main__ import main as critic_review_main
+from katra.deployment import RESILIENCE_VAR
+from katra.migrations.__main__ import main as migrations_main
+from katra.store_settings import DATABASE_URL_VAR
 from tests.factories import TEST_TIER_ENV
 from tests.source_tree import PYTHON, module_name, parse, source_files, without
 from tests.sql_stores import migrate, sqlite_url
@@ -134,7 +134,7 @@ def test_the_migration_step_refuses_a_revision_this_build_does_not_hold(
 def test_the_migration_command_exits_1_with_one_line(tmp_path):
     """The command as an operator runs it, so the ``__main__`` guard is read."""
     done = subprocess.run(
-        [sys.executable, "-m", "analysis_service.migrations"],
+        [sys.executable, "-m", "katra.migrations"],
         env={"PATH": "", "PYTHONPATH": ":".join(sys.path), DATABASE_URL_VAR: ""},
         cwd=tmp_path,
         capture_output=True,
@@ -146,26 +146,26 @@ def test_the_migration_command_exits_1_with_one_line(tmp_path):
     assert done.stderr == f"{REFUSAL}set {DATABASE_URL_VAR} for the sql job store\n"
 
 
-#: Each ``python -m analysis_service...`` command, and how it meets a
+#: Each ``python -m katra...`` command, and how it meets a
 #: configuration it cannot run on. A new command needs a row.
 SERVICE_ENTRY_POINTS: dict[str, str] = {
-    "analysis_service.migrations": (
+    "katra.migrations": (
         "refuses an unusable database setting and a revision this build does"
         " not hold in one line; the tests above drive each"
     ),
-    "analysis_service.smoke": (
+    "katra.smoke": (
         "run_smoke raises on a broken deployment by design: its docstring says"
         " an unreadable or invalid config file is not a fact about a provider"
     ),
-    "analysis_service.conformance": (
+    "katra.conformance": (
         "reads no setting: it profiles the constant REFERENCE_MODELS table"
         " against the pinned LiteLLM model map"
     ),
-    "analysis_service.verify_report": (
+    "katra.verify_report": (
         "reads no setting: its inputs are named files, and it refuses an"
         " unreadable keyring, report or attestation in one line with exit 2"
     ),
-    "analysis_service.frameworks.asvs.roster": (
+    "katra.frameworks.asvs.roster": (
         "reads no setting: it rewrites the ASVS lane skills from the catalog"
         " the package holds"
     ),

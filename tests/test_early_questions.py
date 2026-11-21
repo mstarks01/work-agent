@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_forms import YES_NO, answer_choices
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
-from analysis_service.answer_state import EARLY_RULES, passes_floor
-from analysis_service.candidates import generate_candidates
-from analysis_service.claims import UnknownRef
-from analysis_service.early_questions import (
+from katra.answer_forms import YES_NO, answer_choices
+from katra.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
+from katra.answer_state import EARLY_RULES, passes_floor
+from katra.candidates import generate_candidates
+from katra.claims import UnknownRef
+from katra.early_questions import (
     KIND_REASON,
     PRIOR_REASON,
     QUESTION_PRIOR,
@@ -23,12 +23,12 @@ from analysis_service.early_questions import (
     element_type,
     reads,
 )
-from analysis_service.fact_answers import FactAnswer, key_ref
-from analysis_service.fact_writes import check_fact_answers
-from analysis_service.frameworks import PACKAGES
-from analysis_service.open_facts import group_of
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.system_model import (
+from katra.fact_answers import FactAnswer, key_ref
+from katra.fact_writes import check_fact_answers
+from katra.frameworks import PACKAGES
+from katra.open_facts import group_of
+from katra.question_kinds import QUESTION_KINDS
+from katra.system_model import (
     UNKNOWN,
     ZONE_ATTRIBUTE,
     Assumption,
@@ -505,7 +505,7 @@ def _with_interfaces(kind, *, protocols=None):
 
 
 def _paused(model, selection, answers=()):
-    from analysis_service.answer_state import question_set
+    from katra.answer_state import question_set
 
     return question_set(
         model,
@@ -576,9 +576,9 @@ class TestTheFrameworkGates:
         """The answer is written where the precondition reads, as the resumed
         job's ``prepare`` reads it: through the one writer of answers into a
         run, and the gate it runs."""
-        from analysis_service.frameworks import PACKAGES, run_precondition
-        from analysis_service.graph import STATE_VALID_MODEL
-        from analysis_service.pipeline import answered_state
+        from katra.frameworks import PACKAGES, run_precondition
+        from katra.graph import STATE_VALID_MODEL
+        from katra.pipeline import answered_state
 
         model = _with_interfaces("unknown", protocols="unknown")
         asked = _paused(model, LEVEL_2)
@@ -605,7 +605,7 @@ class TestTheFrameworkGates:
         """The gate question is the list; the framework's own questions wait
         under ``gate-undecided``, at or above the floor, so a page can say
         what a gate answer unlocks (ADR 0078)."""
-        from analysis_service.answer_state import passes_floor
+        from katra.answer_state import passes_floor
 
         model = _with_interfaces("unknown", protocols="unknown")
         asked = _paused(model, LEVEL_2)
@@ -641,8 +641,8 @@ class TestTheFrameworkGates:
         model that stated the interface would hold. Under a field limit of two,
         one earlier field answer leaves one place, which a counted gate answer
         would take."""
-        from analysis_service import answer_state
-        from analysis_service.answer_state import EarlyRule
+        from katra import answer_state
+        from katra.answer_state import EarlyRule
 
         monkeypatch.setitem(answer_state.EARLY_RULES, "field", EarlyRule(1.0, 2))
         selection = {**LEVEL_2, "stride": {}}
@@ -668,7 +668,7 @@ class TestTheFrameworkGates:
             assert not any(q.gates for q in asked), case.name
 
     def test_a_model_with_no_process_asks_each_flow_that_states_no_protocol(self):
-        from analysis_service.frameworks.asvs.rules import asvs_precondition_facts
+        from katra.frameworks.asvs.rules import asvs_precondition_facts
 
         model = valid_model()
         flows = model.model_copy(update={"processes": []})
@@ -690,7 +690,7 @@ class TestTheListIsKept:
         assert early_questions(valid_model(), {"asvs": {"level": 1}}, None) is not first
 
     def test_an_answer_written_in_gives_a_new_list(self):
-        from analysis_service.fact_writes import answered_model
+        from katra.fact_writes import answered_model
 
         before = early_questions(valid_model(), LEVEL_2, None)
         capability = next(q for q in before if q.kind == "capability")

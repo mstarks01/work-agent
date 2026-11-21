@@ -19,8 +19,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.system_model import ModelIndex
 from evals.harness.identity import CaseFlows, endpoint_subset
 from evals.harness.reference import (
     MUST_FIND,
@@ -29,6 +27,8 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.verbs import same_action
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.system_model import ModelIndex
 
 #: The classification of each verb row, keyed by case ID and
 #: reference index, with the mechanism the draft states in place of the

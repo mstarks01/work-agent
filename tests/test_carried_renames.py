@@ -7,13 +7,13 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_bodies import read_answers
-from analysis_service.answer_sets import AnswerSet, SentAnswers
-from analysis_service.answer_state import Answers
-from analysis_service.carried_renames import ElementRename, renamed
-from analysis_service.fact_answers import FactAnswer, key_ref
-from analysis_service.fact_writes import capability_statements
 from evals.harness.early_rounds import paused_state
+from katra.answer_bodies import read_answers
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.answer_state import Answers
+from katra.carried_renames import ElementRename, renamed
+from katra.fact_answers import FactAnswer, key_ref
+from katra.fact_writes import capability_statements
 from tests.test_answer_shares import MODEL, STORE
 from tests.test_api import auth, submission
 from tests.test_evals_early_answerers import _capability

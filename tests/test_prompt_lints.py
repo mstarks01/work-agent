@@ -47,34 +47,35 @@ from typing import Literal, get_args, get_origin
 
 import pytest
 
-from analysis_service.actions import menu
-from analysis_service.claims import (
+from evals.harness.exemplar_verbs import _JSON_BLOCK, proposal_type
+from katra.actions import menu
+from katra.claims import (
     CriticStep,
     Ground,
     Proposal,
     RejectionStep,
 )
-from analysis_service.compact import (
+from katra.compact import (
     COMPACT_FORMAT,
     FULL_FORMAT,
     OMITTABLE_FIELDS,
     REFERENCE_FIELDS,
 )
-from analysis_service.evidence import (
+from katra.evidence import (
     _RESOLVED_AWAY,
     ABSENT_PREFIX,
     CROSSING_PREFIX,
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from analysis_service.frameworks import CRITIC_DOC, PACKAGES
-from analysis_service.frameworks.stride.record import (
+from katra.frameworks import CRITIC_DOC, PACKAGES
+from katra.frameworks.stride.record import (
     LANES_OF_VERB,
     STRIDE_CATEGORIES,
 )
-from analysis_service.grounding import verify_quote
-from analysis_service.markdown_loader import MarkdownLoader, split_sections
-from analysis_service.prompts import (
+from katra.grounding import verify_quote
+from katra.markdown_loader import MarkdownLoader, split_sections
+from katra.prompts import (
     ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
     EXTRACT_COMPACT_PROMPT_NAME,
@@ -86,9 +87,9 @@ from analysis_service.prompts import (
     compose_extract_prompt,
     lane_exemplars_doc,
 )
-from analysis_service.skills import estimate_tokens
-from analysis_service.sources import Source, render_sources
-from analysis_service.system_model import (
+from katra.skills import estimate_tokens
+from katra.sources import Source, render_sources
+from katra.system_model import (
     ELEMENT_ID,
     ENDPOINT_PREFIXES,
     FLOW_ID_VERSION,
@@ -97,13 +98,12 @@ from analysis_service.system_model import (
     mentioned_ids,
     parse_flow_id,
 )
-from analysis_service.token_caps import (
+from katra.token_caps import (
     COMPOSED_ANALYZE_CAP,
     COMPOSED_EXTRACT_COMPACT_CAP,
     TOKEN_CAPS,
     prompt_key,
 )
-from evals.harness.exemplar_verbs import _JSON_BLOCK, proposal_type
 from tests.source_tree import (
     MODEL_TEXT,
     REPO_ROOT,
@@ -224,7 +224,7 @@ def source_block(system):
     """One exemplar system's source, as ``(label, text)``.
 
     Found by shape rather than by position: a fenced block whose first line is
-    ``label:`` is exactly what :func:`~analysis_service.sources.render_sources`
+    ``label:`` is exactly what :func:`~katra.sources.render_sources`
     emits, which is the shape the block exists to depict.
     """
     match = SOURCE_BLOCK_RE.search(system)
@@ -237,7 +237,7 @@ def catalog(system):
 
     Found by shape, like the source block: the rows of the table whose left
     column is a backticked ID, which is exactly what ``prepare_analysis`` puts
-    in front of an agent (:func:`~analysis_service.evidence.render_catalog`).
+    in front of an agent (:func:`~katra.evidence.render_catalog`).
     A table rather than a JSON array because a list of well-formed IDs reads as
     a specimen of the format and got composed from rather than selected out of
     (#138); the exemplars show the shape an agent actually receives, so they
@@ -668,7 +668,7 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
     is the #138 fix rather than decoration, so an exemplar drifting from it
     would teach agents to read a table they will not be given, which is the
     failure the fix exists to prevent. Without this the drift is silent in the
-    direction that matters: :func:`~analysis_service.evidence._gloss` is free to
+    direction that matters: :func:`~katra.evidence._gloss` is free to
     change and nothing here would notice.
 
     Rebuilding the grounds from the refs is exact rather than approximate — a
@@ -735,7 +735,7 @@ def test_no_prompt_file_writes_a_fence_around_a_placeholder():
     """A fence written beside a ``{placeholder}`` is sized before the value
     arrives, so a value that holds a fence of its own closes it early.
     Interpolate the value on its own line and let
-    :func:`~analysis_service.sources.render_fenced` size the fence over it."""
+    :func:`~katra.sources.render_fenced` size the fence over it."""
     offenders = [
         path.relative_to(REPO_ROOT).as_posix()
         for path in prompt_files()
@@ -776,7 +776,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     """``frameworks/stride/output.md`` carries exactly ``actions.menu()``.
 
     Without this the menu is a static copy that happens to match. A verb added
-    to :data:`~analysis_service.actions.ActionVerb` would reach the response
+    to :data:`~katra.actions.ActionVerb` would reach the response
     schema — so the provider would accept it — and never reach the prompt, so no
     agent would learn the distinction exists. The field would be enforceable and
     unfillable, which is worse than either alone.
@@ -797,7 +797,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     in_contract = [line for line in contract.splitlines() if family_line.match(line)]
     assert in_contract == menu().splitlines(), (
         "the verb menu in frameworks/stride/output.md is not what"
-        " analysis_service.actions.menu() emits. Regenerate it:\n\n" + menu()
+        " katra.actions.menu() emits. Regenerate it:\n\n" + menu()
     )
 
 
@@ -856,7 +856,7 @@ CLOSED_VOCABULARIES = "closed vocabularies that reject `unknown`"
 
 def _literal_vocabularies():
     """Every `Literal` field on an element type, with the values it admits."""
-    from analysis_service.system_model import (
+    from katra.system_model import (
         DataFlow,
         DataStore,
         ExternalEntity,
@@ -872,7 +872,7 @@ def _literal_vocabularies():
 
 def test_the_asset_vocabulary_still_rejects_unknown():
     """The schema half of the trap, pinned so the prose below stays necessary."""
-    from analysis_service.system_model import CORE_ASSET_TAGS
+    from katra.system_model import CORE_ASSET_TAGS
 
     assert "unknown" not in CORE_ASSET_TAGS
 
@@ -969,7 +969,7 @@ def test_the_critic_prompt_names_every_rejection_step(step):
 
 
 def _computed_view_keys() -> frozenset[str]:
-    """Every key :func:`~analysis_service.critic._ruling_view` can put on a draft.
+    """Every key :func:`~katra.critic._ruling_view` can put on a draft.
 
     Read off the source with ``ast`` rather than listed, so a key added
     tomorrow fails the lint below until the prompt accounts for it. Listing
@@ -981,7 +981,7 @@ def _computed_view_keys() -> frozenset[str]:
     """
     import ast
 
-    source = (REPO_ROOT / "src" / "analysis_service" / "critic.py").read_text("utf-8")
+    source = (REPO_ROOT / "src" / "katra" / "critic.py").read_text("utf-8")
     fn = next(
         node
         for node in ast.walk(ast.parse(source))

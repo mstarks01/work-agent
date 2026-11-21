@@ -21,14 +21,14 @@ from typing import Literal
 import litellm
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from analysis_service import model_gate  # noqa: F401  (pins the cost map first)
-from analysis_service.assertions import (
+from katra import model_gate  # noqa: F401  (pins the cost map first)
+from katra.assertions import (
     MAX_ASSERTIONS,
     AssertionProposal,
     CatalogProposal,
 )
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.system_model import SystemModel
+from katra.frameworks import PACKAGES, schemas_for
+from katra.system_model import SystemModel
 
 MODEL = "openrouter/google/gemini-3.5-flash-lite"
 PROMPT = [{"role": "user", "content": "Reply with an empty object."}]

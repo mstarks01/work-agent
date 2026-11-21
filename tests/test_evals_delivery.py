@@ -11,21 +11,6 @@ from typing import Any
 
 import pytest
 
-from analysis_service.analysis import control_state
-from analysis_service.assertions import (
-    AssertionCatalog,
-    AssertionRecord,
-    Projection,
-    assertion_id,
-    offered,
-    project,
-    projected_attribute,
-)
-from analysis_service.candidates import CandidateSet, generate_candidates
-from analysis_service.evidence import evidence_catalog, prepared_view, render_catalog
-from analysis_service.frameworks import package_for
-from analysis_service.graph import render_model, unfence
-from analysis_service.sources import render_fenced
 from evals.harness import delivery, losses, panels, run
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import read_report, stride_block
@@ -36,6 +21,21 @@ from evals.harness.reference import development_cases, flows_by_case, load_corpu
 from evals.harness.replay import replay_assertions, signed_reference
 from evals.harness.scorecard import charged_misses
 from evals.harness.triggers import rebuilt_lane_inputs
+from katra.analysis import control_state
+from katra.assertions import (
+    AssertionCatalog,
+    AssertionRecord,
+    Projection,
+    assertion_id,
+    offered,
+    project,
+    projected_attribute,
+)
+from katra.candidates import CandidateSet, generate_candidates
+from katra.evidence import evidence_catalog, prepared_view, render_catalog
+from katra.frameworks import package_for
+from katra.graph import render_model, unfence
+from katra.sources import render_fenced
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CASE = "05-cookbook-queue-webapp"

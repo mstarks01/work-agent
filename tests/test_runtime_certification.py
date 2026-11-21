@@ -13,15 +13,15 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.api import create_app
-from analysis_service.certification import (
+from katra.api import create_app
+from katra.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
     CertificationGate,
     CertifyResult,
 )
-from analysis_service.deployment import Deployment
-from analysis_service.jobs import (
+from katra.deployment import Deployment
+from katra.jobs import (
     InMemoryJobStore,
     JobRecord,
     NodeCallback,
@@ -29,7 +29,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     StubPipelineRunner,
 )
-from analysis_service.sources import Source, SourceLimits
+from katra.sources import Source, SourceLimits
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SEEDING_BUDGET,
@@ -221,7 +221,7 @@ class TestWithholdingIsARuleOfTheHttpSurfaces:
         deployment = Deployment.from_env(
             env=TEST_TIER_ENV
             | TEST_CREDENTIAL_ENV
-            | {"ANALYSIS_REQUIRE_CERTIFIED": "true"}
+            | {"KATRA_REQUIRE_CERTIFIED": "true"}
         )
         assert deployment.gate.withholds(result)
         engine = stand_in_engine(

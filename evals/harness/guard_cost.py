@@ -1,6 +1,6 @@
 """What ADR 0041's guard holds back, read over archived proposals and graphs.
 
-The guard (:func:`~analysis_service.assertions.apply_projection`'s
+The guard (:func:`~katra.assertions.apply_projection`'s
 ``hold_unchecked``) stops an unchecked assertion from turning a lead into a
 stated value. This instrument prices that offline, before anyone pays for a
 run. It pairs every archived assertion proposal with every archived extracted
@@ -35,16 +35,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from analysis_service.assertions import (
-    AssertionRecord,
-    CatalogProposal,
-    apply_projection,
-)
-from analysis_service.candidates import generate_candidates
-from analysis_service.execution import source_texts
-from analysis_service.frameworks import PACKAGES, FrameworkName
-from analysis_service.system_model import SystemModel
-from analysis_service.validation import validate
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, listed_extractions
 from evals.harness.modes import EvalRunError
@@ -55,6 +45,16 @@ from evals.harness.reference import (
     development_cases,
     load_corpus,
 )
+from katra.assertions import (
+    AssertionRecord,
+    CatalogProposal,
+    apply_projection,
+)
+from katra.candidates import generate_candidates
+from katra.execution import source_texts
+from katra.frameworks import PACKAGES, FrameworkName
+from katra.system_model import SystemModel
+from katra.validation import validate
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 

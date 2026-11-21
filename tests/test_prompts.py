@@ -5,14 +5,14 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.assertions import REGISTRY
-from analysis_service.compact import FULL_FORMAT
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.markdown_loader import (
+from katra.assertions import REGISTRY
+from katra.compact import FULL_FORMAT
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.markdown_loader import (
     MarkdownLoader,
     MarkdownNotFoundError,
 )
-from analysis_service.prompts import (
+from katra.prompts import (
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
     REFERENCE_FORMS,
@@ -24,7 +24,7 @@ from analysis_service.prompts import (
     compose_repair_prompt,
     render_predicates,
 )
-from analysis_service.skills import lane_exemplars_doc
+from katra.skills import lane_exemplars_doc
 
 
 def prompt_text(title, body="Body."):

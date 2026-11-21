@@ -3,9 +3,9 @@
 ``evals/corpus/<case>/facts.json`` holds what a reader says a case's sources
 state, in the shape the assertion node proposes: a subject, a predicate, a
 value, a scope, a basis and the quotes that carry it. :func:`reference_catalog`
-resolves those rows through :meth:`analysis_service.assertions.AssertionRecord.of`,
+resolves those rows through :meth:`katra.assertions.AssertionRecord.of`,
 which reads them through
-:meth:`analysis_service.assertions.AssertionRecord.resolved`, the one reader of
+:meth:`katra.assertions.AssertionRecord.resolved`, the one reader of
 what a proposed row means, so a reference row is held to
 every rule a produced row is — its quote is located in the source, its subject
 snaps to the blessed model, its value is one the predicate admits — and a row
@@ -37,7 +37,7 @@ leaves this list.
 Two conventions the rows follow, because the projection reads them. A fact
 that projects into a graph field — a mechanism, a transport, a zone, an
 exposure — sits on the graph subject, unscoped and under one predicate, so
-:func:`~analysis_service.assertions.project` writes a value rather than a
+:func:`~katra.assertions.project` writes a value rather than a
 degraded ``unknown``; a credential is recorded on the principal that presents
 it rather than as a second predicate on the interaction. An ``unknown`` row is
 written where the source raises the predicate and does not answer it, which is
@@ -63,7 +63,8 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from analysis_service.assertions import (
+from evals.harness.reference import CorpusError
+from katra.assertions import (
     GRAPH_BOUND,
     SUBJECT_PREFIXES,
     AssertionCatalog,
@@ -76,10 +77,9 @@ from analysis_service.assertions import (
     parse_subject_type,
     subject_id,
 )
-from analysis_service.claims import FrameworkName
-from analysis_service.parsing import Sha256Hex, Signer
-from analysis_service.system_model import SystemModel
-from evals.harness.reference import CorpusError
+from katra.claims import FrameworkName
+from katra.parsing import Sha256Hex, Signer
+from katra.system_model import SystemModel
 
 #: The ID prefixes of the graph-bound subject types, whose aliases are the
 #: case's element aliases, and of the layer's own, which this file may alias.
@@ -156,7 +156,7 @@ class RestingClaim(BaseModel):
 
     framework: FrameworkName
     index: int = Field(ge=0)
-    #: :func:`~analysis_service.sources.text_digest` of the claim's sentence,
+    #: :func:`~katra.sources.text_digest` of the claim's sentence,
     #: so the entry stops matching the moment the claim moves or changes. A
     #: digest rather than the sentence, because this file is a generation
     #: input and the leakage lint refuses a reference claim in one.
@@ -327,8 +327,8 @@ def reference_catalog(
 ) -> AssertionCatalog:
     """The rows resolved against the case's own blessed model and sources.
 
-    Through :meth:`~analysis_service.assertions.AssertionRecord.of`, which
-    reads it through :meth:`~analysis_service.assertions.AssertionRecord.resolved`,
+    Through :meth:`~katra.assertions.AssertionRecord.of`, which
+    reads it through :meth:`~katra.assertions.AssertionRecord.resolved`,
     the one reader of what a proposal comes to, so a reference row that would
     not survive as a produced row cannot stand as a reference.
 

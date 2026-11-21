@@ -36,7 +36,7 @@ runs" in [`AGENTS.md`](../AGENTS.md).
 - **Classify a command by what it does, not by its name.** `score`, `replay`,
   `stability` and the other re-reads of an archive are offline. `run`,
   `lane-replay`, `critic-replay` and `recritic-replay` send requests and are paid. Set
-  `ANALYSIS_OFFLINE=1` for offline work, and a paid path fails before it
+  `KATRA_OFFLINE=1` for offline work, and a paid path fails before it
   reaches a provider.
 
 ## Before you start
@@ -186,7 +186,7 @@ judge was guessing at.
 
 **One job fires one `strong`-tier request per lane of every framework it names,
 all together at the barrier.** That is
-`analysis_service.frameworks.widest_fan_out()` — 23 today — and at roughly 14K
+`katra.frameworks.widest_fan_out()` — 23 today — and at roughly 14K
 input per lane it is a **~322K token burst from a single job**.
 
 Against a 200,000 tokens-per-minute quota that job cannot complete, and no
@@ -576,7 +576,7 @@ what a sweep does:
 
 ```sh
 # Try a stated temperature on the strong-tier category agents for one run:
-ANALYSIS_SAMPLING_STRONG_TEMPERATURE=0.4 \
+KATRA_SAMPLING_STRONG_TEMPERATURE=0.4 \
   python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
 
@@ -584,7 +584,7 @@ The canonical sampling experiment is three arms on the same corpus, **decided
 by the far-domain cases**:
 
 1. **the model's own default** — the shipped state, which sets no temperature.
-2. **`temperature = 0`** — greedy (`ANALYSIS_SAMPLING_*_TEMPERATURE=0`).
+2. **`temperature = 0`** — greedy (`KATRA_SAMPLING_*_TEMPERATURE=0`).
 3. **k-of-n sampling** — draw several candidates and union them (higher recall,
    but several times the cost, so it has to clearly earn it).
 
@@ -805,7 +805,7 @@ Two refusals worth knowing about, both deliberate:
 
 Once promoted, a production run's fingerprints match the blessed list and the
 run reports **certified**. Until then — and for any run driven by a temporary
-`ANALYSIS_SAMPLING_*` override, since an override changes the fingerprint — the
+`KATRA_SAMPLING_*` override, since an override changes the fingerprint — the
 run is **uncertified**, and its scores are surfaced as untrusted rather than
 folded quietly into a baseline. To make an uncertified run fail outright (in CI,
 say):
@@ -826,7 +826,7 @@ as untrusted whether or not `--require-certified` is set.
 
 The service applies the same check to jobs it completes, using the same
 `config/blessed-fingerprints.toml` — there, the equivalent switch is
-`ANALYSIS_REQUIRE_CERTIFIED` and it withholds the report rather than failing the
+`KATRA_REQUIRE_CERTIFIED` and it withholds the report rather than failing the
 job. See
 [Architecture](../docs/Architecture.md#provenance-and-certification).
 

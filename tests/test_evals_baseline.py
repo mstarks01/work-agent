@@ -16,8 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.report import TokenUsage
-from analysis_service.vendors import VENDORS, vendor_for
 from evals.harness import baseline, prices
 from evals.harness.artifact import REPO_ROOT, load_artifact
 from evals.harness.baseline import (
@@ -36,6 +34,8 @@ from evals.harness.baseline import (
 from evals.harness.bundle import FINISHED_KINDS, case_file, reports_dir
 from evals.harness.prices import UnitPrices
 from evals.harness.submit import BASE_REF
+from katra.report import TokenUsage
+from katra.vendors import VENDORS, vendor_for
 from tests.eval_factories import SWEEP_COMMIT, sweep_document
 
 #: A corpus case, because ``case_file`` refuses a case ID outside the corpus.
@@ -575,7 +575,7 @@ class TestThePrefixFallbackStopsAtOneSegment:
         this answers for a row nobody has written: a vendor in front of many
         providers has no unit price to lose.
         """
-        from analysis_service.conformance import REFERENCE_MODELS
+        from katra.conformance import REFERENCE_MODELS
 
         unpriced = [
             route
@@ -599,7 +599,7 @@ class TestAGatewayRouteCarriesNoUnitPrice:
         "name", [name for name, v in VENDORS.items() if not v.routes_to_one_provider]
     )
     def test_no_route_on_a_gateway_vendor_is_priced(self, name):
-        from analysis_service.conformance import REFERENCE_MODELS
+        from katra.conformance import REFERENCE_MODELS
 
         vendor = vendor_for(name)
         for model in REFERENCE_MODELS[name]:

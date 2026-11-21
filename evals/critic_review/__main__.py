@@ -26,10 +26,6 @@ import json
 import sys
 from pathlib import Path
 
-from analysis_service.deployment import Deployment
-from analysis_service.errors import ConfigError, config_refusal
-from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
-from analysis_service.markdown_loader import MarkdownLoader
 from evals.critic_review.loading import (
     CASES,
     REPO_ROOT,
@@ -44,6 +40,10 @@ from evals.harness.bundle import check_out
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
 from evals.harness.run_record import loaded, run_record_for
+from katra.deployment import Deployment
+from katra.errors import ConfigError, config_refusal
+from katra.frameworks import PACKAGES, FrameworkName, schemas_for
+from katra.markdown_loader import MarkdownLoader
 
 
 def _one_framework(fixtures: list[CriticFixture]) -> FrameworkName:
@@ -69,7 +69,7 @@ def _one_case(fixtures: list[CriticFixture]) -> str:
 def _critic_node(framework: FrameworkName) -> str:
     """This package's critic node, as the *graph* names it.
 
-    :meth:`~analysis_service.deployment.Deployment.tier_of` takes this spelling
+    :meth:`~katra.deployment.Deployment.tier_of` takes this spelling
     and walks it to a tier — graph node to canonical tier node to tier. The
     tiers file spells the same node ``critic/<framework>``, so a caller that
     asked ``tiers.resolve_tier`` with this name is a second reader of that

@@ -14,7 +14,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import FrameworkName
 from evals.harness import fan_in_accounting, roster, run, scorecard
 from evals.harness.artifact import RepoCommit, ScoredAgainst, load_artifact
 from evals.harness.assembly import AssemblySweep, replay_artifact
@@ -39,6 +38,7 @@ from evals.harness.scorecard import (
     summarize,
 )
 from evals.harness.scorer import none_stated, score_case
+from katra.claims import FrameworkName
 from tests.source_tree import REPO_ROOT
 
 BASELINE = (

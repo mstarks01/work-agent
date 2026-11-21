@@ -7,9 +7,11 @@ from unittest import mock
 
 import pytest
 
-from analysis_service import basis
-from analysis_service.analysis import CONTROL_ATTRIBUTES, matches_term
-from analysis_service.basis import (
+from evals import verify_corpus
+from evals.harness.reference import load_case
+from katra import basis
+from katra.analysis import CONTROL_ATTRIBUTES, matches_term
+from katra.basis import (
     CONTROL_SCOPE,
     IN_SCOPE,
     MAX_SCAN_WORK,
@@ -19,9 +21,7 @@ from analysis_service.basis import (
     read_controls,
     unbased_controls,
 )
-from analysis_service.system_model import SystemModel
-from evals import verify_corpus
-from evals.harness.reference import load_case
+from katra.system_model import SystemModel
 
 # The figures published in the module docstring's table. Re-derived below, so
 # the prose and the code cannot drift apart.
@@ -246,8 +246,8 @@ def _corpus_values() -> list[tuple[str, tuple[str, ...], str]]:
 
     One row per value: the case, the value's content tokens, and the lowered
     text of the source it cites. Walked through the ``measurable`` half of
-    :func:`~analysis_service.basis.control_measurability`, which is the same walk
-    :func:`~analysis_service.basis.unbased_controls` scans, so the published
+    :func:`~katra.basis.control_measurability`, which is the same walk
+    :func:`~katra.basis.unbased_controls` scans, so the published
     denominator and the published rates cannot be computed over two different
     sets of values. Only the rung differs between them: ``any`` here, ``all``
     below.
@@ -375,7 +375,7 @@ def test_the_scan_stops_at_the_budget_and_says_so(caplog):
     source = "quaternary " * 200
     model = _model(authentication="zeta eta theta iota", encryption_in_transit="kappa")
 
-    with caplog.at_level(logging.WARNING, logger="analysis_service.basis"):
+    with caplog.at_level(logging.WARNING, logger="katra.basis"):
         flagged = unbased_controls(model, {"System description": source})
         with mock.patch.object(basis, "MAX_SCAN_WORK", 2 * len(source)):
             budgeted = unbased_controls(model, {"System description": source})

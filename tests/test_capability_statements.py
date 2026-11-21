@@ -5,16 +5,16 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.compact import expand
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import (
+from katra.capabilities import CAPABILITIES
+from katra.compact import expand
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import (
     CapabilityStatement,
     EmittedSystemModel,
     SystemModel,
     normalize_element_ids,
 )
-from analysis_service.validation import validate
+from katra.validation import validate
 from tests.factories import valid_model
 
 SOURCES = {"Kickoff call": "Ana: we never accept files. Customers upload PDFs."}

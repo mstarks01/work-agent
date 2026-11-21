@@ -58,15 +58,15 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import get_args
 
-from analysis_service.actions import family_of
-from analysis_service.claims import FrameworkName
-from analysis_service.deployment import DEFAULT_FRAMEWORKS_DIR
-from analysis_service.frameworks import PACKAGES, package_for, schemas_for
-from analysis_service.markdown_loader import MarkdownLoader, split_sections
-from analysis_service.skills import lane_exemplars_doc
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import NO_FLOWS, endpoint_subset
 from evals.harness.reference import MUST_FIND, GoldenCase, development_cases
+from katra.actions import family_of
+from katra.claims import FrameworkName
+from katra.deployment import DEFAULT_FRAMEWORKS_DIR
+from katra.frameworks import PACKAGES, package_for, schemas_for
+from katra.markdown_loader import MarkdownLoader, split_sections
+from katra.skills import lane_exemplars_doc
 
 __all__ = [
     "Collision",

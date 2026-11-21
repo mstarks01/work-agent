@@ -12,17 +12,17 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import UnknownRef
-from analysis_service.evidence import evidence_catalog
-from analysis_service.open_facts import (
+from katra.claims import UnknownRef
+from katra.evidence import evidence_catalog
+from katra.open_facts import (
     ASSET_WORDS,
     element_names,
     gaps,
     label_of,
     reference_labels,
 )
-from analysis_service.report import Report
-from analysis_service.system_model import CORE_ASSET_TAGS
+from katra.report import Report
+from katra.system_model import CORE_ASSET_TAGS
 from tests.factories import valid_model
 
 REPORTS = sorted(
@@ -47,7 +47,7 @@ def test_the_archive_is_there_to_read():
 
 
 def test_a_flow_reads_as_its_two_endpoints(report):
-    from analysis_service.report_conditions import conditions
+    from katra.report_conditions import conditions
 
     names = {element.id: element.name for element in report.system_model.elements()}
     flows = {flow.id: flow for flow in report.system_model.data_flows}
@@ -65,7 +65,7 @@ def test_a_flow_reads_as_its_two_endpoints(report):
 
 
 def test_a_flow_authentication_question_names_the_initiator():
-    from analysis_service.claims import UnknownRef
+    from katra.claims import UnknownRef
     from tests.factories import valid_model
 
     model = valid_model()
@@ -85,7 +85,7 @@ def test_two_free_text_questions_are_two_facts():
     Without it every free-text question keyed as ``("", "", "")``, so a report
     grouped all of them under whichever it met first.
     """
-    from analysis_service.claims import UnknownRef
+    from katra.claims import UnknownRef
 
     first = UnknownRef(subject="whether queries are parameterized")
     second = UnknownRef(subject="whether an authorization policy is documented")
@@ -94,7 +94,7 @@ def test_two_free_text_questions_are_two_facts():
 
 @pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
 def test_every_free_text_subject_is_its_own_fact(path):
-    from analysis_service.report_conditions import conditions
+    from katra.report_conditions import conditions
 
     report = Report.model_validate_json(path.read_text(encoding="utf-8"))
     for block in report.analyses:
@@ -182,7 +182,7 @@ def test_a_gap_names_each_element_by_its_open_fact_key():
 
 
 def _grant_catalog():
-    from analysis_service.assertions import (
+    from katra.assertions import (
         Assertion,
         AssertionCatalog,
         Qualifier,
@@ -210,7 +210,7 @@ def _grant_catalog():
 
 
 def test_an_assertion_question_reads_as_its_predicate_question_never_its_reference():
-    from analysis_service.assertions import UNKNOWN, assertion_id
+    from katra.assertions import UNKNOWN, assertion_id
 
     catalog, row = _grant_catalog()
     expected = (
@@ -227,7 +227,7 @@ def test_an_assertion_question_reads_as_its_predicate_question_never_its_referen
 
 
 def test_an_assertion_the_catalog_does_not_hold_has_no_reference_in_its_label():
-    from analysis_service.open_facts import UNWORDED_ASSERTION
+    from katra.open_facts import UNWORDED_ASSERTION
 
     catalog, _ = _grant_catalog()
     identity = "assertion:authorization-grant~principal:customers~any~unknown"
@@ -239,7 +239,7 @@ def test_an_assertion_the_catalog_does_not_hold_has_no_reference_in_its_label():
 
 def test_a_reference_of_another_shape_has_no_reference_in_its_label():
     """A reference the ID decoder refuses is worded like one the catalog lacks."""
-    from analysis_service.open_facts import UNWORDED_ASSERTION
+    from katra.open_facts import UNWORDED_ASSERTION
 
     catalog, _ = _grant_catalog()
     for identity in ("assertion:authorization-grant", "ground:anything"):
@@ -249,7 +249,7 @@ def test_a_reference_of_another_shape_has_no_reference_in_its_label():
 
 
 def test_every_predicate_asks_a_question_about_its_subject():
-    from analysis_service.assertions import REGISTRY
+    from katra.assertions import REGISTRY
 
     for name, predicate in REGISTRY.items():
         assert predicate.question.count("{subject}") == 1, name
@@ -257,7 +257,7 @@ def test_every_predicate_asks_a_question_about_its_subject():
 
 
 def test_assertions_share_one_group_and_subjects_share_another():
-    from analysis_service.open_facts import group_of
+    from katra.open_facts import group_of
 
     assert group_of(UnknownRef(assertion="assertion:a~b~any~unknown")) == group_of(
         UnknownRef(assertion="assertion:c~d~any~unknown")
@@ -271,7 +271,7 @@ def test_assertions_share_one_group_and_subjects_share_another():
 def test_a_report_names_each_assertion_it_cites_in_words():
     """An assertion ground showed its reference on the report (#1884): a stated
     row reads as its subject, meaning and value, an open row as its question."""
-    from analysis_service.assertions import UNKNOWN, AssertionCatalog, assertion_id
+    from katra.assertions import UNKNOWN, AssertionCatalog, assertion_id
 
     catalog, row = _grant_catalog()
     open_row = row.model_copy(update={"value": UNKNOWN, "reason": "not-stated"})

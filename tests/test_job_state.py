@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from analysis_service.job_state import (
+from katra.job_state import (
     EndedJobState,
     InFlightJobState,
     RunOrigin,
@@ -24,7 +24,7 @@ from analysis_service.job_state import (
     waits_for_answers,
     why_not_continued,
 )
-from analysis_service.jobs import (
+from katra.jobs import (
     Checkpoint,
     Envelope,
     InMemoryJobStore,
@@ -34,7 +34,7 @@ from analysis_service.jobs import (
     UnreadableRecord,
     UnreadableSchema,
 )
-from analysis_service.sources import Source
+from katra.sources import Source
 from tests.factories import DESCRIPTION_TEXT, admit, sample_report, sample_selection
 
 

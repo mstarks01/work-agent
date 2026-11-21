@@ -53,13 +53,13 @@ from typing import Any, Literal, get_args
 
 from typing_extensions import TypeIs
 
-from analysis_service.claims import FrameworkAnalysis, RejectionStep, VerdictStatus
-from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
 from evals.harness.rates import Rate
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, VoteStatus, candidate_claim, score_case
+from katra.claims import FrameworkAnalysis, RejectionStep, VerdictStatus
+from katra.frameworks.stride.record import DraftThreat, StrideCategory
 
 #: The scored outcomes that matched a reference.
 MatchedOutcome = Literal["matched-must-find", "matched-expected"]
@@ -366,7 +366,7 @@ class KilledDraft:
     fate: CriticFate
     #: The step the critic said it rejected the draft at, off the block's own
     #: verdict: ``lane``, ``reasoning``, ``duplicate``, ``evidence`` and the
-    #: rest of :data:`~analysis_service.claims.RejectionStep`. ``None`` where
+    #: rest of :data:`~katra.claims.RejectionStep`. ``None`` where
     #: the verdict names no step, or the block carries no verdict for the
     #: draft. :attr:`CriticYield.killed_by_cause` counts the first under
     #: :data:`UNSTATED` and the second under its fate, so neither is folded
@@ -654,7 +654,7 @@ def _yield(
 def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | None]]:
     """Every produced threat's scored outcome in one pass, keyed by threat ID.
 
-    Threat IDs are unique within a run — :func:`~analysis_service.critic.
+    Threat IDs are unique within a run — :func:`~katra.critic.
     join_drafts` fails closed if two category agents reuse one — so a dict is a safe
     index. The scorer's outcomes are mutually exclusive by construction: a
     threat is matched, or a lane error, or unlisted with exactly one

@@ -169,26 +169,26 @@ like `vertex` + an API key cannot be written down:
 
 | Vendor | Credential mode | Required environment |
 | --- | --- | --- |
-| `vertex` | `iam` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
-| `anthropic` | `api_key` | `ANALYSIS_ANTHROPIC_API_KEY_FILE` |
-| `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY_FILE` |
-| `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY_FILE`, `ANALYSIS_BEDROCK_REGION` |
-| `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
-| `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY_FILE` |
-| `openrouter` | `api_key` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
+| `vertex` | `iam` | `KATRA_VERTEX_PROJECT`, `KATRA_VERTEX_LOCATION` |
+| `anthropic` | `api_key` | `KATRA_ANTHROPIC_API_KEY_FILE` |
+| `openai` | `api_key` | `KATRA_OPENAI_API_KEY_FILE` |
+| `bedrock` | `api_key` | `KATRA_BEDROCK_API_KEY_FILE`, `KATRA_BEDROCK_REGION` |
+| `bedrock` | `iam` | `KATRA_BEDROCK_REGION` |
+| `gemini` | `api_key` | `KATRA_GEMINI_API_KEY_FILE` |
+| `openrouter` | `api_key` | `KATRA_OPENROUTER_API_KEY_FILE` |
 
 <!-- /every-vendor -->
 
 Each variable that is not a key must match a pattern, or the tier does not
-build. A region or a location, such as `ANALYSIS_BEDROCK_REGION`, matches
-`[a-z0-9-]{1,32}`. `ANALYSIS_VERTEX_PROJECT` matches
+build. A region or a location, such as `KATRA_BEDROCK_REGION`, matches
+`[a-z0-9-]{1,32}`. `KATRA_VERTEX_PROJECT` matches
 `[a-z][a-z0-9-]{4,28}[a-z0-9]`, so the service refuses a domain-scoped project
 such as `example.com:proj`.
 
 `api_key` means the deployment passes the key. The service reads the key only
 from the file that the `_FILE` variable above names. It refuses a key in the
 environment variable without the `_FILE` suffix, such as
-`ANALYSIS_ANTHROPIC_API_KEY`, and a tier on that vendor does not build. An
+`KATRA_ANTHROPIC_API_KEY`, and a tier on that vendor does not build. An
 environment variable passes to each child process and shows in
 `/proc/<pid>/environ`, but a file can have mode `0400`. The service refuses a
 key file that other users can read; see [File permissions](#file-permissions).
@@ -212,7 +212,7 @@ keyed by vendor, and the loader requires an entry:
 bedrock = "api_key"    # or "iam"
 ```
 
-`ANALYSIS_MODEL_CREDENTIALS_BEDROCK` sets the same value from the environment,
+`KATRA_MODEL_CREDENTIALS_BEDROCK` sets the same value from the environment,
 and wins over the file — the same precedence a tier's own vendor and model
 override carries.
 
@@ -246,7 +246,7 @@ under, in a `[charges]` table keyed by vendor:
 openrouter = "direct"    # or "own_upstream_key"
 ```
 
-`ANALYSIS_MODEL_CHARGES_OPENROUTER` sets the same value from the environment and
+`KATRA_MODEL_CHARGES_OPENROUTER` sets the same value from the environment and
 wins over the file.
 
 Under `direct`, every node's record carries `reported_charge_usd` beside its
@@ -282,7 +282,7 @@ may reach, in an `[upstreams]` table keyed by vendor:
 openrouter = ["openai"]
 ```
 
-`ANALYSIS_MODEL_UPSTREAMS_OPENROUTER` sets the same list from the environment as
+`KATRA_MODEL_UPSTREAMS_OPENROUTER` sets the same list from the environment as
 comma-separated slugs, and wins over the file. The slugs are the gateway's own:
 `openai`, `azure`, `amazon-bedrock/us-east-1`, and an endpoint variant takes a
 tag, `openai/flex`. The request then carries the list with fallbacks off, so a
@@ -299,7 +299,7 @@ tier you leave unpinned records an empty list, which says the gateway chose;
 that is a configuration of its own and not the same as a sweep that carries
 no pin key.
 
-Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
+Under `iam`, Katra passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the
 process environment whenever no key is passed, authenticates with it and skips
 request signing. AWS tooling sets that variable for its own reasons, so an
@@ -308,14 +308,14 @@ a run. Stating the choice is what closes it.
 
 **A Bedrock API key expires, and nothing here refreshes it.** AWS's short-term
 Bedrock key lasts twelve hours, and LiteLLM never refreshes a bearer token, so
-under `api_key` the operator rotates the key in `ANALYSIS_BEDROCK_API_KEY_FILE`
+under `api_key` the operator rotates the key in `KATRA_BEDROCK_API_KEY_FILE`
 before it expires. Under `iam` the problem does not arise, because boto3 refreshes the
 identity it resolved. The service detects neither state, by decision: it holds
 no schedule and a key that still works is indistinguishable here from one that
 was renewed a minute ago.
 
 **Bedrock needs its client library in the image.** Install it with
-`pip install analysis-service[bedrock]`, which adds `boto3`. Both credential
+`pip install katra[bedrock]`, which adds `boto3`. Both credential
 modes need it: LiteLLM's Converse handler resolves credentials through a bare
 `import boto3` before anything reads a bearer token. A tier that selects
 `bedrock` refuses to bind without it and names the extra; a deployment that
@@ -455,9 +455,9 @@ install selects. The first two agree at import; the third is checked when a
 rather than failing on the first job. A deployment missing an
 `analyze/<name>` key for a framework it carries fails the same way.
 
-`ANALYSIS_FRAMEWORKS_CARRIED` replaces the `carried` list of the file. Its value
+`KATRA_FRAMEWORKS_CARRIED` replaces the `carried` list of the file. Its value
 is framework names separated by commas, with no spaces, for example
-`ANALYSIS_FRAMEWORKS_CARRIED=stride`. The loader refuses an empty value, a
+`KATRA_FRAMEWORKS_CARRIED=stride`. The loader refuses an empty value, a
 space, an empty name, a name that occurs two times and a name that this build
 does not know. Each refusal names the variable.
 
@@ -795,7 +795,7 @@ than smoothing it over. To see what a pair supports before selecting it — no
 credentials, no network:
 
 ```sh
-uv run python -m analysis_service.conformance
+uv run python -m katra.conformance
 ```
 
 Every cell is one of three words, and the third one is the point:
@@ -842,7 +842,7 @@ opposite — it needs credentials, and it is the only thing here that shows a
 vendor answering:
 
 ```sh
-uv run python -m analysis_service.smoke
+uv run python -m katra.smoke
 ```
 
 One small system, once, through the shipped graph, on whichever pair your tiers
@@ -904,7 +904,7 @@ agent per lane of every framework it runs, in parallel on the `strong` tier.
 So one caller can hold `max_active_jobs` times that lane count in concurrent
 `strong`-tier requests — the burst a per-minute quota actually sees, and the
 arithmetic to redo before raising the ceiling or carrying another framework.
-`analysis_service.frameworks.widest_fan_out` gives the widest lane count a job
+`katra.frameworks.widest_fan_out` gives the widest lane count a job
 can name. A submission past
 the ceiling is refused with `429`, never queued: a queued job holds the caller's
 place in the quota anyway, so only a refusal sheds load. It counts jobs **in
@@ -915,7 +915,7 @@ window, no timer and no state the job store does not already hold.
 The ceiling is exactly **as shared as the job store is**, which is why it is
 enforced through `JobStore.reserve` rather than out of process memory. Behind
 two instances of the per-instance `memory` store, each instance enforces the
-number and the effective ceiling is the sum — the same defect `ANALYSIS_JOB_STORE`
+number and the effective ceiling is the sum — the same defect `KATRA_JOB_STORE`
 [fails closed](HTTP-API.md#job-storage) over. Size it against one instance's share, or
 register a shared store and get a shared ceiling with no config change. Where
 the edge (a load balancer or API gateway) already enforces a per-caller quota,
@@ -1012,8 +1012,8 @@ and `job_deadline_ms`. OpenAI's flex tier serves the same weights at half the
 price and slower, and its guide asks for a timeout above ten minutes, so the
 shipped row states thirty minutes for both. Edit the row for another bound. A
 row states both bounds or is refused, so a long request is never cut by a
-shorter deadline the row did not raise. `ANALYSIS_TIMEOUT_MS` and
-`ANALYSIS_JOB_DEADLINE_MS` set the base values alone and never a row.
+shorter deadline the row did not raise. `KATRA_TIMEOUT_MS` and
+`KATRA_JOB_DEADLINE_MS` set the base values alone and never a row.
 
 `attempts` is a **total** count: the request count per node. On the
 OpenAI/Azure path LiteLLM sets the provider SDK's own `max_retries` from the
@@ -1025,8 +1025,8 @@ prevent it, because the retry count LiteLLM is given overwrites it.
 
 So the library's retry layer is **off** (`num_retries = 0`, one request per call)
 and the loop runs a level up, above the provider seam, where it can be bounded.
-`analysis_service.retry` holds the rules it decides from and
-`analysis_service.provider` holds the loop. Two things become possible there
+`katra.retry` holds the rules it decides from and
+`katra.provider` holds the loop. Two things become possible there
 that could not exist below the adapter:
 
 - **A shared budget.** `retry_budget_ratio` is one process-wide token bucket: a
@@ -1046,7 +1046,7 @@ that could not exist below the adapter:
   answered the question a retry exists to ask, so the node fails instead of
   sleeping on a third party's number.
 
-Lowering `ANALYSIS_RETRY_ATTEMPTS` still works and is still the blunt instrument.
+Lowering `KATRA_RETRY_ATTEMPTS` still works and is still the blunt instrument.
 The budget is what makes reaching for it rare.
 
 `max_source_bytes` is the **total across all of a job's sources**, not a bound
@@ -1057,10 +1057,16 @@ changes vendor.
 
 A file on any version other than the one the loader supports fails to load, so
 every deployment edits its file rather than inheriting a default for a contract
-its callers can see. There are no backoff knobs: `analysis_service.retry` pins
+its callers can see. There are no backoff knobs: `katra.retry` pins
 the curve, because it does not vary by deployment.
 
 ## Environment variables
+
+Each variable that the service reads has the prefix `KATRA_`. The service
+reads no variable with the prefix `ANALYSIS_`, and it stops when one is set:
+the startup fails with a message that names each one, and each provider call
+is refused. So a switch such as `ANALYSIS_OFFLINE` cannot look as if it is on
+while the service ignores it. Give each such variable the prefix `KATRA_`.
 
 ### The settings directory of the first-run app
 
@@ -1068,11 +1074,11 @@ The first-run app reads its settings from the process environment and from
 `settings.env` in one settings directory. The `/v1` service reads only the
 process environment.
 
-The settings directory is `$XDG_CONFIG_HOME/work-agent/`. When
+The settings directory is `$XDG_CONFIG_HOME/katra/`. When
 `XDG_CONFIG_HOME` is unset or is not an absolute path, it is
-`~/.config/work-agent/`. Set `ANALYSIS_SETTINGS_DIR` in the process
+`~/.config/katra/`. Set `KATRA_SETTINGS_DIR` in the process
 environment to use another directory. `settings.env` cannot set
-`ANALYSIS_SETTINGS_DIR`. A missing directory or a missing `settings.env` is not
+`KATRA_SETTINGS_DIR`. A missing directory or a missing `settings.env` is not
 an error.
 
 `settings.env` has a strict format, so that the same file loads in systemd
@@ -1080,7 +1086,7 @@ an error.
 
 - Each line is `KEY=value` or an empty line. The app splits the file on `\n`
   only.
-- `KEY` matches `ANALYSIS_[A-Z0-9_]+`, and it is one of the variables on this
+- `KEY` matches `KATRA_[A-Z0-9_]+`, and it is one of the variables on this
   page. Each key occurs one time.
 - The value is all of the text after the first `=`. The format has no quotes,
   no `export`, no `$` expansion and no comments.
@@ -1089,9 +1095,9 @@ an error.
   same rule applies to each of these variables in the process environment.
 
 ```text
-ANALYSIS_MODEL_BASE_VENDOR=anthropic
-ANALYSIS_MODEL_BASE_MODEL=claude-sonnet-5
-ANALYSIS_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/work-agent/anthropic_api_key.3f9c0a1b2d4e5f60
+KATRA_MODEL_BASE_VENDOR=anthropic
+KATRA_MODEL_BASE_MODEL=claude-sonnet-5
+KATRA_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/katra/anthropic_api_key.3f9c0a1b2d4e5f60
 ```
 
 The engine does not start when a line breaks one of these rules, or when the
@@ -1101,8 +1107,8 @@ page names the variable and the line number, and never the value.
 The Settings page of the first-run app writes `settings.env`. It writes each
 saved key to a new file in the settings directory, with mode `0600`, and sets
 the `_FILE` variable of the key to the absolute path of the file. The file name
-is the variable without `ANALYSIS_` and `_FILE`, in lower case, then a dot and
-16 random hexadecimal characters: `ANALYSIS_ANTHROPIC_API_KEY_FILE` names a file
+is the variable without `KATRA_` and `_FILE`, in lower case, then a dot and
+16 random hexadecimal characters: `KATRA_ANTHROPIC_API_KEY_FILE` names a file
 such as `anthropic_api_key.3f9c0a1b2d4e5f60`. A save writes the new key files
 first, checks the settings on them, and then writes `settings.env`. The write of
 `settings.env` commits the save. When the save stops before that write, the old
@@ -1132,17 +1138,17 @@ A refusal names the file and its mode. A Kubernetes secret volume has mode
 `0440` or `0400`.
 
 A secret file is a file that one of these variables names: the `_FILE`
-variable of each vendor key, `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`,
-`ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE`,
-`ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` and
-`ANALYSIS_DATABASE_PASSWORD_FILE`. `ANALYSIS_TIERS_FILE` and
-`ANALYSIS_DATABASE_CA_FILE` do not name a secret.
+variable of each vendor key, `KATRA_OBJECT_ACCESS_KEY_ID_FILE`,
+`KATRA_OBJECT_SECRET_ACCESS_KEY_FILE`,
+`KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE` and
+`KATRA_DATABASE_PASSWORD_FILE`. `KATRA_TIERS_FILE` and
+`KATRA_DATABASE_CA_FILE` do not name a secret.
 
 The secret is the content of the file without one final newline, because an
 editor ends a file with a newline. The secret must not be empty, must be printable, must have no whitespace at either end,
 and must have 4,096 characters or fewer. A space, a `\` or a `$` inside a
 secret is allowed. A refusal names the variable and the rule, and never the
-secret. The service account key of `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE`
+secret. The service account key of `KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE`
 is the one exception: it is the JSON file as Google downloads it, with its line
 breaks, and at most 16 KiB. Its `token_uri` must be
 `https://oauth2.googleapis.com/token`, and its `universe_domain` must be absent
@@ -1153,14 +1159,14 @@ line of 4,096 characters or fewer, under the rule of each other secret.
 
 | Variable | Overrides |
 | --- | --- |
-| `ANALYSIS_DOMAINS_DIR` | `domains/` |
-| `ANALYSIS_PROMPTS_DIR` | `prompts/` |
-| `ANALYSIS_FRAMEWORKS_DIR` | `frameworks/` |
-| `ANALYSIS_TIERS_FILE` | `config/model_tiers.toml` |
-| `ANALYSIS_SAMPLING` | `config/sampling.toml` |
-| `ANALYSIS_RESILIENCE` | `config/resilience.toml` |
-| `ANALYSIS_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
-| `ANALYSIS_FRAMEWORKS_FILE` | `config/frameworks.toml` |
+| `KATRA_DOMAINS_DIR` | `domains/` |
+| `KATRA_PROMPTS_DIR` | `prompts/` |
+| `KATRA_FRAMEWORKS_DIR` | `frameworks/` |
+| `KATRA_TIERS_FILE` | `config/model_tiers.toml` |
+| `KATRA_SAMPLING` | `config/sampling.toml` |
+| `KATRA_RESILIENCE` | `config/resilience.toml` |
+| `KATRA_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
+| `KATRA_FRAMEWORKS_FILE` | `config/frameworks.toml` |
 
 **Three text roots, not four.** `frameworks/<name>/` holds one framework
 package's text — its lanes' skills and exemplars, its critic, its disclaimer, its
@@ -1178,7 +1184,7 @@ A variable **picks which file is read**; it never layers a second file over the
 first. A set-but-empty value is a deploy mistake and raises rather than
 falling back to a default. Unset, the default is this checkout's top-level
 copy when running from a clone, or the copy bundled into the wheel
-(`analysis_service/_bundled/`) when installed via `pip` — whichever the
+(`katra/_bundled/`) when installed via `pip` — whichever the
 installation has. Either way exactly one file exists at a resolved default
 path; nothing merges the two.
 
@@ -1194,9 +1200,9 @@ tracked, so an edit to `config/model_tiers.toml` in a clone blocks the next
 the checkout, point the variable at that path, and restore the tracked file:
 
 ```bash
-cp config/model_tiers.toml ~/.config/analysis-service/model_tiers.toml
+cp config/model_tiers.toml ~/.config/katra/model_tiers.toml
 git checkout -- config/model_tiers.toml
-export ANALYSIS_TIERS_FILE=~/.config/analysis-service/model_tiers.toml
+export KATRA_TIERS_FILE=~/.config/katra/model_tiers.toml
 ```
 
 Set the variable in whatever starts the process: the shell profile, the
@@ -1211,34 +1217,34 @@ want. The same pattern covers `sampling.toml` and `resilience.toml`.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_MODEL_BASE_VENDOR` / `ANALYSIS_MODEL_BASE_MODEL` | Overrides the `base` tier's pair. |
-| `ANALYSIS_MODEL_STRONG_VENDOR` / `ANALYSIS_MODEL_STRONG_MODEL` | Overrides the `strong` tier's pair. |
-| `ANALYSIS_MODEL_REVIEW_VENDOR` / `ANALYSIS_MODEL_REVIEW_MODEL` | Overrides the `review` tier's pair. |
+| `KATRA_MODEL_BASE_VENDOR` / `KATRA_MODEL_BASE_MODEL` | Overrides the `base` tier's pair. |
+| `KATRA_MODEL_STRONG_VENDOR` / `KATRA_MODEL_STRONG_MODEL` | Overrides the `strong` tier's pair. |
+| `KATRA_MODEL_REVIEW_VENDOR` / `KATRA_MODEL_REVIEW_MODEL` | Overrides the `review` tier's pair. |
 
 `_MODEL` **alone** is the ordinary case — retune a tier's model on a deployed
 revision. `_VENDOR` alone is a **startup error**: a mismatched pair such as
 `anthropic` + `gemini-2.5-pro` passes every downstream check and would only die
 on the first node of a paid-for job.
 
-Any unrecognised `ANALYSIS_MODEL_*` variable also raises. That is deliberate: a
-deployment still carrying version 2's `ANALYSIS_MODEL_FLASH` must fail loudly
+Any unrecognised `KATRA_MODEL_*` variable also raises. That is deliberate: a
+deployment still carrying version 2's `KATRA_MODEL_FLASH` must fail loudly
 rather than have it silently ignored while the tier quietly runs the file's
 model.
 
 ### Sampling overrides
 
-`ANALYSIS_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time,
+`KATRA_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time,
 validated **identically** to a file value. `{TIER}` is `BASE`, `STRONG` or `REVIEW`.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_SAMPLING_{TIER}_TEMPERATURE` | Overrides the tier's `temperature`. |
-| `ANALYSIS_SAMPLING_{TIER}_TOP_P` | Overrides the tier's `top_p`. |
-| `ANALYSIS_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
-| `ANALYSIS_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
-| `ANALYSIS_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
-| `ANALYSIS_SAMPLING_{TIER}_CONSTRAIN_OUTPUT` | Overrides the tier's `constrain_output`. Only the literals `true` and `false` are accepted — anything else raises. |
-| `ANALYSIS_SAMPLING_{TIER}_STRUCTURED_OUTPUT` | Overrides the tier's `structured_output` (`auto`/`native`/`tool`). |
+| `KATRA_SAMPLING_{TIER}_TEMPERATURE` | Overrides the tier's `temperature`. |
+| `KATRA_SAMPLING_{TIER}_TOP_P` | Overrides the tier's `top_p`. |
+| `KATRA_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
+| `KATRA_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
+| `KATRA_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
+| `KATRA_SAMPLING_{TIER}_CONSTRAIN_OUTPUT` | Overrides the tier's `constrain_output`. Only the literals `true` and `false` are accepted — anything else raises. |
+| `KATRA_SAMPLING_{TIER}_STRUCTURED_OUTPUT` | Overrides the tier's `structured_output` (`auto`/`native`/`tool`). |
 
 Only these are overridable. A variable naming a reserved (`candidate_count`),
 unsupported (`top_k`) or forbidden param raises `not overridable`. Treat this as a
@@ -1250,20 +1256,20 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
 | Variable | Effect | Range |
 | --- | --- | --- |
-| `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. | 1 to 10 |
-| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. | 1 to 3,600,000 |
-| `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. | 1 to 10,485,760 |
-| `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. | 1 to 100 |
-| `ANALYSIS_MAX_OWNER_FILES` | How many Owner Files one owner keeps in the web app's Files section. | 1 to 10,000 |
-| `ANALYSIS_MAX_CONTROLS` | How many Controls one owner keeps in the web app's Controls section. | 1 to 1,000 |
-| `ANALYSIS_MAX_CONTROL_EVIDENCE` | How many evidence files one Control holds. | 1 to 100 |
-| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. | 1 to 86,400,000 |
-| `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. | over 0, to 1 |
-| `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. | 1 to 2,592,000 |
-| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. | 1 to 100,000 |
-| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. | 1 to 10<sup>12</sup> |
-| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. | 1 to 10<sup>12</sup> |
-| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. | 1 to 100 |
+| `KATRA_RETRY_ATTEMPTS` | Total attempts per LLM call. | 1 to 10 |
+| `KATRA_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. | 1 to 3,600,000 |
+| `KATRA_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. | 1 to 10,485,760 |
+| `KATRA_MAX_SOURCES` | How many sources one job may carry. | 1 to 100 |
+| `KATRA_MAX_OWNER_FILES` | How many Owner Files one owner keeps in the web app's Files section. | 1 to 10,000 |
+| `KATRA_MAX_CONTROLS` | How many Controls one owner keeps in the web app's Controls section. | 1 to 1,000 |
+| `KATRA_MAX_CONTROL_EVIDENCE` | How many evidence files one Control holds. | 1 to 100 |
+| `KATRA_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. | 1 to 86,400,000 |
+| `KATRA_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. | over 0, to 1 |
+| `KATRA_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. | 1 to 2,592,000 |
+| `KATRA_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. | 1 to 100,000 |
+| `KATRA_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. | 1 to 10<sup>12</sup> |
+| `KATRA_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. | 1 to 10<sup>12</sup> |
+| `KATRA_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. | 1 to 100 |
 
 The loader refuses a value outside its range, and so does a save on the
 Settings page. The page shows each range and checks it before it saves.
@@ -1281,17 +1287,17 @@ no effect.
 
 | You set | Result |
 | --- | --- |
-| `ANALYSIS_MODEL_BASE_MODLE` (typo) | **Startup fails**: `unrecognised model override(s)` |
-| `ANALYSIS_MODEL_FLASH` (stale v2 name) | **Startup fails**: same check |
-| `ANALYSIS_SAMPLING_BSAE_SEED` (typo'd tier) | **Startup fails**: `unknown tier 'BSAE'` |
-| `ANALYSIS_SAMPLING_BASE_TOP_K` (unsupported param) | **Startup fails**: `TOP_K is not overridable` |
-| `ANALYSIS_RETRY_ATEMPTS` (typo) | **Silently ignored** — the file's value stands |
-| `ANALYSIS_TIMEOUT_MSEC` (typo) | **Silently ignored** — the file's value stands |
+| `KATRA_MODEL_BASE_MODLE` (typo) | **Startup fails**: `unrecognised model override(s)` |
+| `KATRA_MODEL_FLASH` (stale v2 name) | **Startup fails**: same check |
+| `KATRA_SAMPLING_BSAE_SEED` (typo'd tier) | **Startup fails**: `unknown tier 'BSAE'` |
+| `KATRA_SAMPLING_BASE_TOP_K` (unsupported param) | **Startup fails**: `TOP_K is not overridable` |
+| `KATRA_RETRY_ATEMPTS` (typo) | **Silently ignored** — the file's value stands |
+| `KATRA_TIMEOUT_MSEC` (typo) | **Silently ignored** — the file's value stands |
 
-The reason is naming, not intent. `ANALYSIS_MODEL_*` and `ANALYSIS_SAMPLING_*` are
+The reason is naming, not intent. `KATRA_MODEL_*` and `KATRA_SAMPLING_*` are
 namespaces those two loaders own, so each can enumerate every variable it
 accepts and reject anything else in its namespace. The resilience knobs are bare
-`ANALYSIS_`-prefixed names, and `ANALYSIS_` belongs to the whole application — it
+`KATRA_`-prefixed names, and `KATRA_` belongs to the whole application — it
 also holds the config paths, the provider credentials and the job-store
 selector. No single loader can claim it, so the resilience loader reads the
 names it knows and cannot see that you meant another.
@@ -1309,7 +1315,7 @@ why the two families differ in the first place:
 
 So: **when a retry or timeout change appears to do nothing, suspect the variable
 name first.** Nothing echoes these values back, and a set-but-empty value *is*
-caught (`ANALYSIS_RETRY_ATTEMPTS=` raises `is set but empty`) — it is only a
+caught (`KATRA_RETRY_ATTEMPTS=` raises `is set but empty`) — it is only a
 misspelled *name* that passes unnoticed.
 
 ### Optional passes
@@ -1324,9 +1330,9 @@ restart.
 
 | Variable | Status | What it does |
 | --- | --- | --- |
-| `ANALYSIS_ASSERTIONS` | supported | Runs the assertion pass on every job. On by default; `false` turns it off (see below). |
-| `ANALYSIS_CAPABILITY_READER` | supported | Runs the capability reader on every job whose selection reads capabilities. On by default; `false` turns it off (see below). |
-| `ANALYSIS_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
+| `KATRA_ASSERTIONS` | supported | Runs the assertion pass on every job. On by default; `false` turns it off (see below). |
+| `KATRA_CAPABILITY_READER` | supported | Runs the capability reader on every job whose selection reads capabilities. On by default; `false` turns it off (see below). |
+| `KATRA_COMPACT_EXTRACTION` | experiment (#938) | Extraction writes a compact form that code expands into the same system model. |
 
 Use the experiments only to measure them. Their results are recorded on the
 issues named in the table.
@@ -1334,12 +1340,12 @@ issues named in the table.
 A retired experiment flag leaves the table and the code together, and a value
 left set is ignored. A retired variable is refused only when a value left set
 would leak a secret or would silently change a deployment's result, as the
-bare `ANALYSIS_<VENDOR>_API_KEY` is (see
+bare `KATRA_<VENDOR>_API_KEY` is (see
 [Provider environment](#provider-environment)).
 
 **The assertion pass.** By default, an `assert` node runs after the model
 passes its validity check and before the lanes start. Set
-`ANALYSIS_ASSERTIONS=false` to turn it off. It reads
+`KATRA_ASSERTIONS=false` to turn it off. It reads
 the same sources as extraction and records what they state as **assertions**:
 one row for each fact, with its subject, its value, and the quote that supports
 it. Code checks each quote against the source text and drops a row whose quote
@@ -1361,12 +1367,12 @@ it cannot find. See [Concepts](Concepts.md#assertion) for what the rows do.
   rest only on rows, and `catalog_leads`. The job store keeps no history, so
   collect these lines from the log. `run.py assertion-use` reads the same
   figures from archived reports.
-- **Turn it off.** Set `ANALYSIS_ASSERTIONS=false` and restart. Nothing stored
+- **Turn it off.** Set `KATRA_ASSERTIONS=false` and restart. Nothing stored
   changes shape.
 
 **The capability reader.** By default, a `capabilities` node runs after the
 model passes its validity check, in a job whose selected framework applies its
-units by a rule over capabilities. Set `ANALYSIS_CAPABILITY_READER=false` to
+units by a rule over capabilities. Set `KATRA_CAPABILITY_READER=false` to
 turn it off. It
 reads the same sources as extraction and lists each capability the text says
 the application has, with the quote that says it. Code keeps a row only where
@@ -1384,7 +1390,7 @@ decides before its lanes run, then read it.
 - **What it states.** Only `present`. A capability that an answer or another
   statement names is left as it is, and a later answer replaces the reader's
   statement.
-- **Turn it off.** Set `ANALYSIS_CAPABILITY_READER=false` and restart.
+- **Turn it off.** Set `KATRA_CAPABILITY_READER=false` and restart.
   Nothing stored changes shape.
 
 ### Provider environment
@@ -1395,7 +1401,7 @@ credentials are missing, the service still starts. The first submission
 that needs them returns `503`, and the log names the missing variable. Offline
 tests and the in-memory [stub runner](Integration-Guide.md) need none of this.
 
-**`ANALYSIS_OFFLINE`** refuses every live provider call. With it on (`1`,
+**`KATRA_OFFLINE`** refuses every live provider call. With it on (`1`,
 `true`, `yes` or `on`), a call that would reach a provider raises an error
 that names the route, before any request leaves the process. This covers
 every graph node, every retry and the single-node replays. A scripted or
@@ -1406,7 +1412,7 @@ It guards against an accidental paid call; it is not a spend control.
 
 The [HTTP app](HTTP-API.md) reads these variables at startup. The in-process
 engine keeps no jobs and does not read them. An unset or unknown backend value
-stops the startup. A set `ANALYSIS_DATABASE_*` or `ANALYSIS_OBJECT_*` variable
+stops the startup. A set `KATRA_DATABASE_*` or `KATRA_OBJECT_*` variable
 that the selected backend does not read also stops the startup. [Job
 storage](HTTP-API.md#job-storage) in the HTTP API guide tells how to set up each
 backend. The first-run app reads the same variables, and gives a SQLite
@@ -1415,39 +1421,39 @@ default for each one that is unset; see
 
 | Variable | Values | Rule |
 | --- | --- | --- |
-| `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
-| `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3`, `gcs` | Required by `sql`. Refused by `memory`. `gcs` needs the `gcs` extra. |
-| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
-| `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
-| `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
-| `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
-| `ANALYSIS_DATABASE_REGION` | an AWS region that matches `[a-z0-9-]{1,32}`, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
-| `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
-| `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
-| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end. `gcs` also accepts `_` | Required by `s3` and `gcs`. |
-| `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
-| `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
-| `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
-| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` reads a service account key file. |
-| `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
-| `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` | a path to a service account key file | Required by `api_key` on `gcs`. Refused by `iam` and by `s3`. |
-| `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](HTTP-API.md#retention). |
+| `KATRA_JOB_STORE` | `memory`, `sql` | Required. |
+| `KATRA_OBJECT_STORE` | `filesystem`, `s3`, `gcs` | Required by `sql`. Refused by `memory`. `gcs` needs the `gcs` extra. |
+| `KATRA_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
+| `KATRA_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
+| `KATRA_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
+| `KATRA_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
+| `KATRA_DATABASE_REGION` | an AWS region that matches `[a-z0-9-]{1,32}`, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
+| `KATRA_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
+| `KATRA_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
+| `KATRA_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end. `gcs` also accepts `_` | Required by `s3` and `gcs`. |
+| `KATRA_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
+| `KATRA_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
+| `KATRA_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
+| `KATRA_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` reads a service account key file. |
+| `KATRA_OBJECT_ACCESS_KEY_ID_FILE`, `KATRA_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
+| `KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE` | a path to a service account key file | Required by `api_key` on `gcs`. Refused by `iam` and by `s3`. |
+| `KATRA_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](HTTP-API.md#retention). |
 
 ### Bearer auth
 
 The [HTTP app](HTTP-API.md) reads these variables at startup and uses them to
 check the bearer token on each `/v1` request. The in-process engine does not
-read them. An unset or unknown `ANALYSIS_AUTH_PROVIDER` stops the startup.
+read them. An unset or unknown `KATRA_AUTH_PROVIDER` stops the startup.
 [Bearer auth](HTTP-API.md#bearer-auth) in the HTTP API guide lists the
 accepted signing algorithms and shows how to set up an identity provider.
 
 | Variable | Purpose |
 | --- | --- |
-| `ANALYSIS_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
-| `ANALYSIS_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
-| `ANALYSIS_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
-| `ANALYSIS_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
-| `ANALYSIS_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
+| `KATRA_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
+| `KATRA_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
+| `KATRA_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
+| `KATRA_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
+| `KATRA_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
 
 ## Input limits
 

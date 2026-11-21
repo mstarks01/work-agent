@@ -1,7 +1,7 @@
 """Nothing outside a package states the fan-out as a fixed number.
 
 A job fans out to one ``strong``-tier request per lane of every framework the
-job names: :func:`~analysis_service.frameworks.widest_fan_out`, 23 today. No
+job names: :func:`~katra.frameworks.widest_fan_out`, 23 today. No
 bound in the package is *computed* from a fixed count, so a stale count in prose
 fails nothing. But a maintainer reads that prose before turning a knob such as
 the retry budget, the jitter policy or the admission cap.
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES, widest_fan_out
+from katra.frameworks import PACKAGES, widest_fan_out
 from tests.source_tree import REPO_ROOT, TESTS, WHOLE_TREE, source_files, without
 
 pytestmark = pytest.mark.lint
@@ -97,7 +97,7 @@ def test_no_fixed_count_of_lane_agents_outside_a_package():
 
     Failing here does not mean deleting the sentence. State the rule instead —
     "one request per lane of every framework the job names", or point at
-    :func:`~analysis_service.frameworks.widest_fan_out` — because that stays true
+    :func:`~katra.frameworks.widest_fan_out` — because that stays true
     for a package nobody has written yet.
     """
     hits = [

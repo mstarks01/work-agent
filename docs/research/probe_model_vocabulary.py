@@ -25,9 +25,9 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, matches_term
-from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
-from analysis_service.system_model import SystemModel
+from katra.analysis import CONTROL_ATTRIBUTES, control_state, matches_term
+from katra.frameworks.asvs.rules import PRESENCE_TESTS
+from katra.system_model import SystemModel
 
 CORPUS = Path("evals/corpus")
 PROSE_ATTRIBUTES = frozenset({"description", "notes"})

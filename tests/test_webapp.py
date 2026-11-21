@@ -27,33 +27,33 @@ from typing import Any, get_args
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import (
+from katra import (
     FrameworkName,
     PipelineCompleted,
     Source,
     SourceLimits,
     StubPipelineRunner,
 )
-from analysis_service.answer_shares import SharedAnswer
-from analysis_service.answer_state import ANSWER_LIMITS
-from analysis_service.api import (
+from katra.answer_shares import SharedAnswer
+from katra.answer_state import ANSWER_LIMITS
+from katra.api import (
     JOB_REFUSAL_STATUS,
     max_body_bytes,
     max_control_body_bytes,
 )
-from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import UNKNOWN_KEY_FIELDS
-from analysis_service.controls import ControlLimits
-from analysis_service.deployment import Deployment
-from analysis_service.fact_answers import FactAnswer, key_ref
-from analysis_service.job_answers import OWNER_FILE_GONE
-from analysis_service.jobs import (
+from katra.budgets import BudgetPolicy
+from katra.claims import UNKNOWN_KEY_FIELDS
+from katra.controls import ControlLimits
+from katra.deployment import Deployment
+from katra.fact_answers import FactAnswer, key_ref
+from katra.job_answers import OWNER_FILE_GONE
+from katra.jobs import (
     JOB_ID_PATTERN,
     InMemoryJobStore,
     JobRecord,
     RefusalOutcome,
 )
-from analysis_service.owner_files import (
+from katra.owner_files import (
     CONTROL_CHARACTER,
     NO_TEXT,
     NOT_PLAIN_TEXT,
@@ -63,10 +63,10 @@ from analysis_service.owner_files import (
     over_limit,
     too_large,
 )
-from analysis_service.principals import LOCAL_ISSUER, Principal
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.sources import ANSWERS_LABEL, FORMATS
-from analysis_service.vendors import ProviderAuthError
+from katra.principals import LOCAL_ISSUER, Principal
+from katra.question_kinds import QUESTION_KINDS
+from katra.sources import ANSWERS_LABEL, FORMATS
+from katra.vendors import ProviderAuthError
 from tests.factories import (
     A_FACT_ANSWER,
     TEST_TIER_ENV,
@@ -170,7 +170,7 @@ def broken_client(tiers):
         carried_frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
-            "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
+            "vendor 'vertex' needs KATRA_VERTEX_PROJECT; it is unset or empty"
         ),
     )
     return TestClient(create_app(startup), base_url=LOOPBACK)
@@ -251,7 +251,7 @@ def _island(page: str, name: str) -> Any:
 
 def test_the_form_page_reads_the_service_s_element_type_nouns(client):
     """The form page names an element type with the words the server sends."""
-    from analysis_service.system_model import ELEMENT_TYPE_NOUNS
+    from katra.system_model import ELEMENT_TYPE_NOUNS
 
     page = client.get("/").text
     assert _island(page, "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
@@ -264,7 +264,7 @@ def test_the_form_page_reads_the_service_s_element_type_nouns(client):
 def test_the_form_page_reads_its_word_tables_from_the_service(client):
     """The form page carries each table of ``FORM_WORDS`` and the facet
     answers, and its scripts read them from the islands."""
-    from analysis_service.assertions import FACET_ANSWERS
+    from katra.assertions import FACET_ANSWERS
     from webapp.page_words import FORM_WORDS, island_tables
 
     page = client.get("/").text
@@ -332,7 +332,7 @@ def test_the_only_controls_are_the_picker_and_the_description(client):
 
 def _reusing(tiers):
     """A client, and a finished run of its own that holds one answer."""
-    from analysis_service.answer_sets import AnswerSet
+    from katra.answer_sets import AnswerSet
 
     startup = startup_for(tiers)
     workspace = Workspace(store=InMemoryJobStore())
@@ -556,7 +556,7 @@ def test_the_offline_lanes_tables_cover_the_whole_registry():
     can carry. Comparing here is what makes that a failure at the next run
     rather than a gap nobody sees.
     """
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
 
     assert set(CARRIED) == set(PACKAGES), (
         "PACKAGES has changed. Widen CARRIED so this lane still exercises the"
@@ -575,7 +575,7 @@ def test_every_complete_option_set_really_is_complete():
     being complete — a package that adds a required field — fails here instead
     of turning every submission in this file into a 400.
     """
-    from analysis_service.frameworks import package_for
+    from katra.frameworks import package_for
 
     for name, options in COMPLETE_OPTIONS.items():
         package_for(name).options.model_validate(options)
@@ -594,7 +594,7 @@ def test_a_package_that_declares_an_option_gets_a_control_for_it(client):
     Read off the package rather than spelled here, so this asks the question of
     whichever package declares a closed-set option rather than of one by name.
     """
-    from analysis_service.frameworks import package_for
+    from katra.frameworks import package_for
     from webapp.main import _option_fields
 
     page = client.get("/").text
@@ -944,8 +944,8 @@ def test_a_config_failure_renders_the_diagnostic_instead_of_the_form(broken_clie
     assert "<textarea" not in page
     assert "Analyze" not in page
     # The raised message, and the vendor's *whole* required set.
-    assert "ANALYSIS_VERTEX_PROJECT" in page
-    assert "ANALYSIS_VERTEX_LOCATION" in page
+    assert "KATRA_VERTEX_PROJECT" in page
+    assert "KATRA_VERTEX_LOCATION" in page
     # The declared mode, and what the platform has to supply under it. Vertex
     # passes no credential material, so no credentials file is named: an
     # operator who sets one still gets it, through ADC's own chain.
@@ -964,23 +964,23 @@ def test_the_diagnostic_reports_the_client_library_a_vendor_needs():
     deployment ready and the run would refuse — which is the drift the section
     reads the registry to avoid.
     """
-    from analysis_service.model_tiers import load_model_tiers
+    from katra.model_tiers import load_model_tiers
     from webapp.main import _vendor_sections
 
     tiers = load_model_tiers(
         PROJECT_ROOT / "config" / "model_tiers.toml",
         env={
-            "ANALYSIS_MODEL_BASE_VENDOR": "bedrock",
-            "ANALYSIS_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
-            "ANALYSIS_MODEL_STRONG_VENDOR": "bedrock",
-            "ANALYSIS_MODEL_STRONG_MODEL": "anthropic.claude-opus-5",
-            "ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "api_key",
+            "KATRA_MODEL_BASE_VENDOR": "bedrock",
+            "KATRA_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
+            "KATRA_MODEL_STRONG_VENDOR": "bedrock",
+            "KATRA_MODEL_STRONG_MODEL": "anthropic.claude-opus-5",
+            "KATRA_MODEL_CREDENTIALS_BEDROCK": "api_key",
         },
     )
     section = _vendor_sections(tiers, env={})
-    assert "ANALYSIS_BEDROCK_REGION" in section
+    assert "KATRA_BEDROCK_REGION" in section
     assert "boto3" in section
-    assert "analysis-service[bedrock]" in section
+    assert "katra[bedrock]" in section
 
 
 def test_the_diagnostic_reports_the_vendors_the_build_actually_binds():
@@ -996,22 +996,22 @@ def test_the_diagnostic_reports_the_vendors_the_build_actually_binds():
     The assertion is the agreement rather than either answer, because each
     answer alone agrees with its own code.
     """
-    from analysis_service.binding import build_tier_adapters
-    from analysis_service.model_tiers import load_model_tiers
-    from analysis_service.resilience import load_resilience
-    from analysis_service.sampling import load_sampling
+    from katra.binding import build_tier_adapters
+    from katra.model_tiers import load_model_tiers
+    from katra.resilience import load_resilience
+    from katra.sampling import load_sampling
     from webapp.main import _vendor_sections
 
     env = {
-        "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
-        "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
+        "KATRA_MODEL_BASE_VENDOR": "anthropic",
+        "KATRA_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "KATRA_MODEL_STRONG_VENDOR": "anthropic",
+        "KATRA_MODEL_STRONG_MODEL": "claude-opus-5",
         # Bound to nothing by the shipped node map, and deliberately a vendor
         # the other two tiers do not use.
-        "ANALYSIS_MODEL_REVIEW_VENDOR": "bedrock",
-        "ANALYSIS_MODEL_REVIEW_MODEL": "anthropic.claude-opus-5",
-        **secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "declared"),
+        "KATRA_MODEL_REVIEW_VENDOR": "bedrock",
+        "KATRA_MODEL_REVIEW_MODEL": "anthropic.claude-opus-5",
+        **secret_env("KATRA_ANTHROPIC_API_KEY_FILE", "declared"),
     }
     config = PROJECT_ROOT / "config"
     tiers = load_model_tiers(config / "model_tiers.toml", env=env)
@@ -1035,23 +1035,23 @@ def test_the_diagnostic_reports_the_vendors_the_build_actually_binds():
 
 def test_the_diagnostic_names_no_library_for_a_vendor_that_needs_none():
     """An empty statement reads as a missing one, so there is no row at all."""
-    from analysis_service.model_tiers import load_model_tiers
+    from katra.model_tiers import load_model_tiers
     from webapp.main import _vendor_sections
 
     tiers = load_model_tiers(
         PROJECT_ROOT / "config" / "model_tiers.toml",
         env={
-            "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
-            "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
+            "KATRA_MODEL_BASE_VENDOR": "anthropic",
+            "KATRA_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+            "KATRA_MODEL_STRONG_VENDOR": "anthropic",
+            "KATRA_MODEL_STRONG_MODEL": "claude-opus-5",
         },
     )
     assert "pip install" not in _vendor_sections(tiers, env={})
 
 
 def test_the_diagnostic_never_prints_a_credential_value(broken_client, monkeypatch):
-    monkeypatch.setenv("ANALYSIS_VERTEX_PROJECT", "super-secret-project-id")
+    monkeypatch.setenv("KATRA_VERTEX_PROJECT", "super-secret-project-id")
     page = broken_client.get("/").text
     assert "super-secret-project-id" not in page
     assert "set" in page
@@ -1116,9 +1116,9 @@ def _table_keys(page: str, table: str) -> set[str]:
 
 def test_the_first_run_page_reads_each_carried_reason():
     """``first_run.js`` says for each
-    :data:`~analysis_service.answer_state.CarriedReason` whether a dropped
+    :data:`~katra.answer_state.CarriedReason` whether a dropped
     answer waits for an element, and for no other reason."""
-    from analysis_service.answer_state import CarriedReason
+    from katra.answer_state import CarriedReason
 
     assert _table_keys("first_run.js", "waitsForElement") == set(
         get_args(CarriedReason)
@@ -1142,7 +1142,7 @@ def test_the_first_run_page_listens_for_each_end_of_a_stream():
     """``first_run.js`` listens for each :data:`~webapp.main.EndFrame`, for
     the node event, and for the connection's own ``error``. A frame it does
     not listen for leaves the page waiting."""
-    from analysis_service.jobs import EventKind
+    from katra.jobs import EventKind
     from webapp.main import EndFrame
 
     listened = set(
@@ -1212,8 +1212,8 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
     """
     from typing import get_args, get_origin
 
-    from analysis_service.claims import FrameworkAnalysis
-    from analysis_service.frameworks import SCHEMAS
+    from katra.claims import FrameworkAnalysis
+    from katra.frameworks import SCHEMAS
 
     block_types = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
     marks = set()
@@ -1410,7 +1410,7 @@ def report_with_markup_everywhere():
     attribute ground carries no prose: its two fields are references the
     report refuses unless they resolve in the embedded model's catalog.
     """
-    from analysis_service.claims import (
+    from katra.claims import (
         Ground,
         Mitigation,
         Severity,
@@ -1547,7 +1547,7 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
 
 def test_the_page_carries_the_link_questions_its_catalog_raises():
     """The questions are computed server-side and handed over, like the units."""
-    from analysis_service.links import link_questions
+    from katra.links import link_questions
     from tests.factories import sample_report
 
     report = sample_report()
@@ -1731,7 +1731,7 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
     An error message is content. One that happens to spell the placeholder must
     come back as those characters rather than become a live nonce.
     """
-    from analysis_service import ConfigError
+    from katra import ConfigError
     from webapp.main import diagnostic_page
 
     page = diagnostic_page(
@@ -2305,7 +2305,7 @@ def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
     """
     from dataclasses import replace
 
-    message = "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
+    message = "vendor 'vertex' needs KATRA_VERTEX_PROJECT; it is unset or empty"
 
     def unconfigured(selection, entry):
         raise ProviderAuthError(message)
@@ -2321,7 +2321,7 @@ def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
 
     assert response.status_code == 503
     assert "configuration is incomplete" in response.json()["message"]
-    assert "ANALYSIS_VERTEX_PROJECT" not in response.text
+    assert "KATRA_VERTEX_PROJECT" not in response.text
     assert message in caplog.text
     assert client.get("/workspace/runs").json() == []
 
@@ -2360,7 +2360,7 @@ def _raised_by(module) -> set[type[Exception]]:
 def test_both_drivers_answer_every_refusal_of_the_module(tiers):
     """A refusal neither driver handles is answered as a 500, so each driver
     holds a handler for every exception the module exports or raises."""
-    import analysis_service.job_answers as module
+    import katra.job_answers as module
 
     exported = {
         held
@@ -2623,7 +2623,7 @@ def test_the_files_page_reads_only_a_files_limit():
 
 def test_each_page_reads_only_an_answer_limit():
     """A script reads only a key of
-    :data:`~analysis_service.answer_state.ANSWER_LIMITS`. A key the server does
+    :data:`~katra.answer_state.ANSWER_LIMITS`. A key the server does
     not send reads as ``undefined``, and a cap of ``undefined`` caps nothing."""
     read = {
         key

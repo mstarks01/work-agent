@@ -29,7 +29,11 @@ from typing import Any, get_args
 
 from pydantic import ValidationError
 
-from analysis_service.assertions import (
+from evals.harness import flow_ids, modes, replay
+from evals.harness.archive import CaseKind, archive_bytes, case_suffix
+from evals.harness.artifact import CORPUS_DIR, EvalArtifact, load_artifact
+from evals.harness.reference import GoldenCase, case_ids
+from katra.assertions import (
     GRAPH_BOUND,
     REGISTRY,
     AssertionCatalog,
@@ -41,22 +45,18 @@ from analysis_service.assertions import (
     project,
     subject_id,
 )
-from analysis_service.claims import FrameworkAnalysis, FrameworkName
-from analysis_service.compact import FULL_FORMAT, parse_extraction
-from analysis_service.errors import refusal_text
-from analysis_service.execution import seed_state, source_texts
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.stride.record import Threat
-from analysis_service.graph import (
+from katra.claims import FrameworkAnalysis, FrameworkName
+from katra.compact import FULL_FORMAT, parse_extraction
+from katra.errors import refusal_text
+from katra.execution import seed_state, source_texts
+from katra.frameworks import PACKAGES
+from katra.frameworks.stride.record import Threat
+from katra.graph import (
     STATE_DIAGRAM_READINGS,
     diagram_readings,
 )
-from analysis_service.report import Report
-from analysis_service.system_model import FLOW_ID_RULES
-from evals.harness import flow_ids, modes, replay
-from evals.harness.archive import CaseKind, archive_bytes, case_suffix
-from evals.harness.artifact import CORPUS_DIR, EvalArtifact, load_artifact
-from evals.harness.reference import GoldenCase, case_ids
+from katra.report import Report
+from katra.system_model import FLOW_ID_RULES
 
 
 class UnreadableReport(modes.EvalRunError):
@@ -114,7 +114,7 @@ def stride_block(report: Report) -> FrameworkAnalysis:
 def stride_threats(report: Report) -> list[Threat]:
     """This report's STRIDE claims, at the record type they validate as.
 
-    ``claims`` is annotated at the neutral :class:`~analysis_service.claims.RuledClaim` because a block
+    ``claims`` is annotated at the neutral :class:`~katra.claims.RuledClaim` because a block
     holds whatever its own package produced; the scorers grade ``category`` and
     ``severity``, which only STRIDE's record carries. The envelope already
     validated this block as its package's own shape, so this re-states that
@@ -286,7 +286,7 @@ def write_assertions(
       would receive it.
     * ``proposed`` and ``quarantined`` — how many rows were proposed, and the
       built rows the gate removed. With ``issues`` they are what
-      :meth:`~analysis_service.assertions.AssertionRecord.refused_rows` reads,
+      :meth:`~katra.assertions.AssertionRecord.refused_rows` reads,
       so a replay counts a refused catalog as the loss it was.
     * ``projection`` — what each graph attribute the rows reach would hold, the
       reason it reads that way, and the rows behind it. It is here rather than
@@ -589,7 +589,7 @@ def extractions_from_reports(
 
     :func:`runs_from_reports`'s counterpart for the extraction mode. It reads
     ``raw`` — what ``extract`` emitted — and derives the model again through
-    the :func:`~analysis_service.compact.parse_extraction` the ``validate``
+    the :func:`~katra.compact.parse_extraction` the ``validate``
     node calls **today**, with the case's own sources so the citation half
     of the gate runs. The ``normalized`` model and ``issues`` beside it are
     what the sweep scored on the day; a replay wants the emission under the
@@ -597,7 +597,7 @@ def extractions_from_reports(
     (#925, #961). A reader that wants the recorded model opens the file.
 
     Every saved emission is in the full transport: the compact route has
-    never persisted one, and :data:`~analysis_service.compact.COMPACT_FORMAT`
+    never persisted one, and :data:`~katra.compact.COMPACT_FORMAT`
     says so. A payload in another shape parses to no model with the gate's
     own issues, which the replay reports rather than skips.
     """
@@ -640,7 +640,7 @@ def assertions_from_reports(
     """Read a finished assertion sweep's saved proposals back, re-resolved.
 
     Reads ``proposal`` — what ``assert`` emitted — and builds the catalog
-    again through :meth:`~analysis_service.assertions.AssertionRecord.of`,
+    again through :meth:`~katra.assertions.AssertionRecord.of`,
     the resolver and the gate as one reader, exactly as
     :func:`~evals.harness.modes.run_assertions` and the production ``prepare``
     node do over a live emission. The ``catalog`` beside it is what the sweep
@@ -678,9 +678,9 @@ def redrawn(catalog: AssertionCatalog) -> AssertionCatalog:
     **A slug rule that moves re-keys the reference and not the archive (#1044).**
     A principal, a credential and an artifact carry an ID that is a pure
     function of the words a source used, through
-    :func:`~analysis_service.assertions.subject_id`. The signed reference
+    :func:`~katra.assertions.subject_id`. The signed reference
     derives it today; an archived catalog holds the ID the run wrote on the day.
-    So a change to :func:`~analysis_service.system_model.normalize_name` moved
+    So a change to :func:`~katra.system_model.normalize_name` moved
     one side and not the other, and an archived row lost the reference row that
     took it.
 

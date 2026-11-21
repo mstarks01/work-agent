@@ -18,8 +18,8 @@ from typing import ClassVar, get_args
 
 import pytest
 
-from analysis_service.config_files import SECRET_FILE_SUFFIX, refused_var
-from analysis_service.vendors import (
+from katra.config_files import SECRET_FILE_SUFFIX, refused_var
+from katra.vendors import (
     _CATCH_ALL,
     _CLAUDE_MODERN,
     _CLAUDE_RULE,
@@ -105,14 +105,12 @@ class TestVendorSdks:
         by making the probe answer the way it would on an image without it,
         which is the same call the gate makes.
         """
-        monkeypatch.setattr(
-            "analysis_service.vendors.importlib.util.find_spec", lambda name: None
-        )
+        monkeypatch.setattr("katra.vendors.importlib.util.find_spec", lambda name: None)
         with pytest.raises(VendorSdkError) as raised:
             require_sdk("bedrock")
         message = str(raised.value)
         assert "boto3" in message
-        assert "analysis-service[bedrock]" in message
+        assert "katra[bedrock]" in message
 
     def test_the_probe_never_imports_the_library(self, monkeypatch):
         """Asking whether a library is there must not pull it in.
@@ -175,9 +173,9 @@ class TestCredentialModes:
         assert not vendor.secret_env_vars(mode)
 
     def test_the_key_var_is_vendor_scoped(self):
-        assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY_FILE"
-        assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY_FILE"
-        assert vendor_for("gemini").api_key_var == "ANALYSIS_GEMINI_API_KEY_FILE"
+        assert vendor_for("anthropic").api_key_var == "KATRA_ANTHROPIC_API_KEY_FILE"
+        assert vendor_for("openai").api_key_var == "KATRA_OPENAI_API_KEY_FILE"
+        assert vendor_for("gemini").api_key_var == "KATRA_GEMINI_API_KEY_FILE"
 
     def test_a_vendor_with_a_choice_refuses_to_answer_for_the_deployment(self):
         """A caller that never learned about the choice must not make it.
@@ -197,8 +195,8 @@ class TestCredentialModes:
         which is what lets the vendor's SDK resolve an identity of its own.
         """
         bedrock = vendor_for("bedrock")
-        env = secret_env("ANALYSIS_BEDROCK_API_KEY_FILE", API_KEY) | {
-            "ANALYSIS_BEDROCK_REGION": "us-east-1",
+        env = secret_env("KATRA_BEDROCK_API_KEY_FILE", API_KEY) | {
+            "KATRA_BEDROCK_REGION": "us-east-1",
         }
         assert bedrock.credential_kwargs(env, CredentialMode.API_KEY) == {
             "api_key": API_KEY,
@@ -211,7 +209,7 @@ class TestCredentialModes:
             "aws_region_name": "us-east-1",
         }
         assert bedrock.secret_env_vars(CredentialMode.API_KEY) == (
-            "ANALYSIS_BEDROCK_API_KEY_FILE",
+            "KATRA_BEDROCK_API_KEY_FILE",
         )
         assert bedrock.secret_env_vars(CredentialMode.IAM) == ()
 
@@ -221,28 +219,26 @@ class TestCredentialModes:
 
     def test_the_key_is_read_from_the_file_the_vendor_scoped_var_names(self):
         kwargs = vendor_for("anthropic").credential_kwargs(
-            secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", f"{API_KEY}\n"),
+            secret_env("KATRA_ANTHROPIC_API_KEY_FILE", f"{API_KEY}\n"),
             CredentialMode.API_KEY,
         )
         assert kwargs == {"api_key": API_KEY}
 
     def test_a_key_in_the_environment_is_refused(self):
         """A key in a variable passes to every child process; only a file is read."""
-        env = secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", API_KEY) | {
-            "ANALYSIS_ANTHROPIC_API_KEY": API_KEY
+        env = secret_env("KATRA_ANTHROPIC_API_KEY_FILE", API_KEY) | {
+            "KATRA_ANTHROPIC_API_KEY": API_KEY
         }
-        with pytest.raises(
-            ProviderAuthError, match="unset ANALYSIS_ANTHROPIC_API_KEY,"
-        ):
+        with pytest.raises(ProviderAuthError, match="unset KATRA_ANTHROPIC_API_KEY,"):
             vendor_for("anthropic").credential_kwargs(env, CredentialMode.API_KEY)
 
     def test_an_unreadable_key_file_fails_closed_naming_the_var(self, tmp_path):
         missing = str(tmp_path / "absent")
         with pytest.raises(ProviderAuthError) as excinfo:
             vendor_for("openai").credential_kwargs(
-                {"ANALYSIS_OPENAI_API_KEY_FILE": missing}, CredentialMode.API_KEY
+                {"KATRA_OPENAI_API_KEY_FILE": missing}, CredentialMode.API_KEY
             )
-        assert "ANALYSIS_OPENAI_API_KEY_FILE" in str(excinfo.value)
+        assert "KATRA_OPENAI_API_KEY_FILE" in str(excinfo.value)
         assert missing not in str(excinfo.value)
 
     # Read from ``VENDORS`` rather than from ``VENDOR_NAMES``: this check runs
@@ -279,12 +275,12 @@ class TestCredentialModes:
     def test_a_missing_key_fails_closed_naming_the_var_not_the_value(self):
         with pytest.raises(ProviderAuthError) as excinfo:
             vendor_for("openai").credential_kwargs({}, CredentialMode.API_KEY)
-        assert "ANALYSIS_OPENAI_API_KEY_FILE" in str(excinfo.value)
+        assert "KATRA_OPENAI_API_KEY_FILE" in str(excinfo.value)
 
     def test_an_empty_key_is_a_deploy_mistake_not_an_absence(self):
         with pytest.raises(ProviderAuthError):
             vendor_for("openai").credential_kwargs(
-                secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "   "),
+                secret_env("KATRA_OPENAI_API_KEY_FILE", "   "),
                 CredentialMode.API_KEY,
             )
 
@@ -292,7 +288,7 @@ class TestCredentialModes:
         # OWASP A09: a key echoed into a log or a problem+json body has leaked.
         with pytest.raises(ProviderAuthError) as excinfo:
             vendor_for("openai").credential_kwargs(
-                {"ANALYSIS_OPENAI_API_KEY_FILE": ""}, CredentialMode.API_KEY
+                {"KATRA_OPENAI_API_KEY_FILE": ""}, CredentialMode.API_KEY
             )
         assert API_KEY not in str(excinfo.value)
 
@@ -303,8 +299,8 @@ class TestPlatformIdentity:
     def test_vertex_passes_a_project_and_a_location_and_no_credential(self):
         kwargs = vendor_for("vertex").credential_kwargs(
             {
-                "ANALYSIS_VERTEX_PROJECT": "my-project",
-                "ANALYSIS_VERTEX_LOCATION": "us-east5",
+                "KATRA_VERTEX_PROJECT": "my-project",
+                "KATRA_VERTEX_LOCATION": "us-east5",
             },
             CredentialMode.IAM,
         )
@@ -322,8 +318,8 @@ class TestPlatformIdentity:
         ``google.auth.default()``, which resolves exactly that identity.
         """
         env = {
-            "ANALYSIS_VERTEX_PROJECT": "my-project",
-            "ANALYSIS_VERTEX_LOCATION": "us-east5",
+            "KATRA_VERTEX_PROJECT": "my-project",
+            "KATRA_VERTEX_LOCATION": "us-east5",
         }
         assert "GOOGLE_APPLICATION_CREDENTIALS" not in env
         assert vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
@@ -337,12 +333,12 @@ class TestPlatformIdentity:
                     assert entry.var != "GOOGLE_APPLICATION_CREDENTIALS"
 
     @pytest.mark.parametrize(
-        "missing", ["ANALYSIS_VERTEX_PROJECT", "ANALYSIS_VERTEX_LOCATION"]
+        "missing", ["KATRA_VERTEX_PROJECT", "KATRA_VERTEX_LOCATION"]
     )
     def test_each_addressing_variable_is_still_required(self, missing):
         env = {
-            "ANALYSIS_VERTEX_PROJECT": "my-project",
-            "ANALYSIS_VERTEX_LOCATION": "us-east5",
+            "KATRA_VERTEX_PROJECT": "my-project",
+            "KATRA_VERTEX_LOCATION": "us-east5",
         }
         del env[missing]
         with pytest.raises(ProviderAuthError, match=missing):
@@ -353,18 +349,18 @@ class TestValueShapes:
     """A model name, a project and a region each match one pattern in full."""
 
     VERTEX_ENV: ClassVar[dict[str, str]] = {
-        "ANALYSIS_VERTEX_PROJECT": "my-project",
-        "ANALYSIS_VERTEX_LOCATION": "us-east5",
+        "KATRA_VERTEX_PROJECT": "my-project",
+        "KATRA_VERTEX_LOCATION": "us-east5",
     }
 
     @pytest.mark.parametrize(
         ("var", "value"),
         [
-            ("ANALYSIS_VERTEX_PROJECT", "example.com:proj"),
-            ("ANALYSIS_VERTEX_PROJECT", "proj"),
-            ("ANALYSIS_VERTEX_PROJECT", "my-project-"),
-            ("ANALYSIS_VERTEX_LOCATION", "US-EAST5"),
-            ("ANALYSIS_VERTEX_LOCATION", "r" * 33),
+            ("KATRA_VERTEX_PROJECT", "example.com:proj"),
+            ("KATRA_VERTEX_PROJECT", "proj"),
+            ("KATRA_VERTEX_PROJECT", "my-project-"),
+            ("KATRA_VERTEX_LOCATION", "US-EAST5"),
+            ("KATRA_VERTEX_LOCATION", "r" * 33),
         ],
     )
     def test_a_vertex_value_off_its_shape_is_refused(self, var, value):
@@ -373,18 +369,18 @@ class TestValueShapes:
             vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
 
     def test_the_refusal_does_not_repeat_the_value(self):
-        env = {**self.VERTEX_ENV, "ANALYSIS_VERTEX_PROJECT": "example.com:proj"}
+        env = {**self.VERTEX_ENV, "KATRA_VERTEX_PROJECT": "example.com:proj"}
         with pytest.raises(ProviderAuthError) as refused:
             vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
         assert "example.com" not in str(refused.value)
 
     def test_a_bedrock_region_off_its_shape_is_refused(self):
-        env = {"ANALYSIS_BEDROCK_REGION": "us_east_1"}
-        with pytest.raises(ProviderAuthError, match="ANALYSIS_BEDROCK_REGION"):
+        env = {"KATRA_BEDROCK_REGION": "us_east_1"}
+        with pytest.raises(ProviderAuthError, match="KATRA_BEDROCK_REGION"):
             vendor_for("bedrock").credential_kwargs(env, CredentialMode.IAM)
 
     def test_every_region_reads_one_constant(self):
-        from analysis_service import s3_objects, sql_store
+        from katra import s3_objects, sql_store
 
         regions = {
             entry.var: entry.shape
@@ -393,7 +389,7 @@ class TestValueShapes:
             for entry in source.env
             if entry.kwarg in {"vertex_location", "aws_region_name"}
         }
-        assert set(regions) == {"ANALYSIS_VERTEX_LOCATION", "ANALYSIS_BEDROCK_REGION"}
+        assert set(regions) == {"KATRA_VERTEX_LOCATION", "KATRA_BEDROCK_REGION"}
         assert all(shape is REGION for shape in regions.values())
         assert s3_objects.REGION is REGION
         assert sql_store.REGION is REGION
@@ -439,8 +435,8 @@ class TestWhichVariablesAreSecret:
     def test_every_required_variable_is_reported(self):
         vertex = vendor_for("vertex")
         assert vertex.required_env_vars(CredentialMode.IAM) == (
-            "ANALYSIS_VERTEX_PROJECT",
-            "ANALYSIS_VERTEX_LOCATION",
+            "KATRA_VERTEX_PROJECT",
+            "KATRA_VERTEX_LOCATION",
         )
 
     def test_a_region_is_required_and_is_not_a_secret(self):
@@ -448,9 +444,7 @@ class TestWhichVariablesAreSecret:
         out of provider error text, and the region is the one fact that
         diagnoses a wrong-region request."""
         vertex = vendor_for("vertex")
-        assert "ANALYSIS_VERTEX_LOCATION" in vertex.required_env_vars(
-            CredentialMode.IAM
-        )
+        assert "KATRA_VERTEX_LOCATION" in vertex.required_env_vars(CredentialMode.IAM)
         assert vertex.secret_env_vars(CredentialMode.IAM) == ()
 
     @pytest.mark.parametrize(
@@ -468,7 +462,7 @@ class TestWhichVariablesAreSecret:
     def test_an_api_key_is_secret(self):
         anthropic = vendor_for("anthropic")
         assert anthropic.secret_env_vars(CredentialMode.API_KEY) == (
-            "ANALYSIS_ANTHROPIC_API_KEY_FILE",
+            "KATRA_ANTHROPIC_API_KEY_FILE",
         )
 
     # Sorted so the parameter ids are stable; ``CredentialMode`` is a

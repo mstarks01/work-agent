@@ -15,10 +15,10 @@ import json
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
 from evals.harness import audit, gain
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.run import COMMANDS
+from katra.frameworks import PACKAGES
 
 SEALED = (
     REPO_ROOT / "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json"

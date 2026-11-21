@@ -2,11 +2,11 @@
 
 import pytest
 
-from analysis_service.candidates import generate_candidates
-from analysis_service.claims import Ground
-from analysis_service.coverage import build_coverage, cited_element_ids, lane_scope
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.candidates import generate_candidates
+from katra.claims import Ground
+from katra.coverage import build_coverage, cited_element_ids, lane_scope
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
 from tests.factories import sample_draft, valid_model
 
 

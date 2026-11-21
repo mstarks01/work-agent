@@ -14,7 +14,6 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
 from evals.harness import fingerprint as fingerprint_module
 from evals.harness.fingerprint import (
     EXTRA_COMPONENT,
@@ -32,6 +31,7 @@ from evals.harness.fingerprint import (
 )
 from evals.harness.reference import ReferenceRequirement, ReferenceThreat
 from evals.harness.verbs import VerbError
+from katra.frameworks import PACKAGES
 from tests.test_parsing import ISDIGIT_TRAPS
 
 FLOWS = {

@@ -18,15 +18,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.certification import MANIFEST_VERSION, load_manifest
-from analysis_service.deployment import (
-    BLESSED_FINGERPRINTS_VAR,
-    SAMPLING_VAR,
-)
-from analysis_service.graph import tier_node_by_graph_node
-from analysis_service.identity import build_identity
-from analysis_service.report import NodeRun
-from analysis_service.sampling import load_sampling
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.certify import plan_promotion
 from evals.harness.provenance import (
@@ -35,6 +26,15 @@ from evals.harness.provenance import (
 )
 from evals.harness.reference import load_case
 from evals.harness.run import main
+from katra.certification import MANIFEST_VERSION, load_manifest
+from katra.deployment import (
+    BLESSED_FINGERPRINTS_VAR,
+    SAMPLING_VAR,
+)
+from katra.graph import tier_node_by_graph_node
+from katra.identity import build_identity
+from katra.report import NodeRun
+from katra.sampling import load_sampling
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     EVAL_MODEL,
@@ -675,7 +675,7 @@ class TestPromoteCommand:
         # A param the file pins: promotion re-pins those, and refuses to pin one
         # the file deliberately leaves unset.
         measured = load_sampling(
-            SAMPLING_PATH, env={"ANALYSIS_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "12288"}
+            SAMPLING_PATH, env={"KATRA_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "12288"}
         )
         artifact = write_artifact(tmp_path, provenance(measured))
 

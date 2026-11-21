@@ -1,9 +1,9 @@
 """The **Framework Package** contract's precondition: declared, and run.
 
 Two checks in two places, because one needs a **Valid System Model** and the
-other does not. :func:`~analysis_service.frameworks.validate_package` checks the
+other does not. :func:`~katra.frameworks.validate_package` checks the
 member is callable, beside the checks it already runs on the other eight.
-:func:`~analysis_service.frameworks.run_precondition` checks what the member
+:func:`~katra.frameworks.run_precondition` checks what the member
 *returns*, which nothing can know until a model exists.
 
 Every test here builds its package from the shipped one
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.frameworks import (
+from katra.frameworks import (
     PACKAGES,
     PRECONDITION_RESULTS,
     FrameworkPackageError,
@@ -24,7 +24,7 @@ from analysis_service.frameworks import (
     run_precondition,
     validate_package,
 )
-from analysis_service.markdown_loader import MarkdownLoader, MarkdownNotFoundError
+from katra.markdown_loader import MarkdownLoader, MarkdownNotFoundError
 from tests.factories import (
     PROJECT_ROOT,
     package_answering,
@@ -173,7 +173,7 @@ def test_precondition_facts_that_are_not_callable_fail_the_gate():
 def _undecidable_models():
     """Every corpus model, and the shared model with nothing said about its
     interfaces or its transport (#1542 F1)."""
-    from analysis_service.system_model import SystemModel
+    from katra.system_model import SystemModel
 
     models = [
         (case.name, SystemModel.model_validate_json((case / "model.json").read_text()))
@@ -195,9 +195,9 @@ def test_every_undecidable_precondition_offers_an_answer_that_decides_it(name):
     the choices the question offers, decides the gate ``prepare`` runs. Vacuous
     for a package whose precondition is total, which is the point: the test
     binds the next package that can be undecidable."""
-    from analysis_service.answer_forms import answer_choices
-    from analysis_service.fact_answers import FactAnswer
-    from analysis_service.fact_writes import answered_model, check_fact_answers
+    from katra.answer_forms import answer_choices
+    from katra.fact_answers import FactAnswer
+    from katra.fact_writes import answered_model, check_fact_answers
 
     package = PACKAGES[name]
     for label, model in _undecidable_models():
@@ -225,7 +225,7 @@ def test_a_severity_field_that_is_not_a_severity_fails_the_gate():
     """
     from dataclasses import replace
 
-    from analysis_service.frameworks.stride.record import DraftThreat
+    from katra.frameworks.stride.record import DraftThreat
 
     class WordSeverity(DraftThreat):
         severity: str  # type: ignore[assignment]

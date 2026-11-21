@@ -4,7 +4,7 @@ Everything here is deterministic and credential-free by construction, and
 ``tests/test_corpus_lints.py`` runs the same checks in CI.
 
 This module is also the merge bar. A deployment cannot read ``evals/``, because
-``pyproject.toml`` packages ``src/analysis_service`` alone, so no load-time gate
+``pyproject.toml`` packages ``src/katra`` alone, so no load-time gate
 can check that a framework was ever measured. A package that asserted such a
 measurement would be the shape Promotion already rejects. The floor sits here instead,
 and it draws the same line the package gate does: the gate checks what the code
@@ -45,33 +45,6 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 # twenty verbs twice would guarantee the two copies drift.
 sys.path.insert(0, str(_REPO_ROOT))
 
-from analysis_service.actions import FAMILIES
-from analysis_service.assertions import support_span
-from analysis_service.claim_identity import endpoint_targets
-from analysis_service.claims import (
-    FrameworkName,
-    Rating,
-    derive_severity_level,
-)
-from analysis_service.frameworks import PACKAGES, run_precondition
-from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.grounding import verify_quote
-from analysis_service.parsing import strings
-from analysis_service.report import (
-    InputRef,
-    SourceRef,
-)
-from analysis_service.sources import SourceKind, text_digest
-from analysis_service.system_model import (
-    ELEMENT_GROUPS,
-    UNKNOWN,
-    ModelIndex,
-    SystemModel,
-    make_element_id,
-    make_flow_id,
-)
-from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
 from evals.harness.leakage import answer_leaks
 from evals.harness.reference import (
@@ -91,6 +64,33 @@ from evals.reference_facts import (
     load_facts,
     reference_catalog,
 )
+from katra.actions import FAMILIES
+from katra.assertions import support_span
+from katra.claim_identity import endpoint_targets
+from katra.claims import (
+    FrameworkName,
+    Rating,
+    derive_severity_level,
+)
+from katra.frameworks import PACKAGES, run_precondition
+from katra.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.grounding import verify_quote
+from katra.parsing import strings
+from katra.report import (
+    InputRef,
+    SourceRef,
+)
+from katra.sources import SourceKind, text_digest
+from katra.system_model import (
+    ELEMENT_GROUPS,
+    UNKNOWN,
+    ModelIndex,
+    SystemModel,
+    make_element_id,
+    make_flow_id,
+)
+from katra.validation import parse_and_validate
 
 SOURCE_KINDS: frozenset[SourceKind] = frozenset(get_args(SourceKind))
 
@@ -107,7 +107,7 @@ CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pai
 # system they always described; what grew is how much of it the reference
 # admits, and refusing that would hold the corpus at a size reached by leaving
 # named components out. 22 leaves one slot, on the reasoning
-# `analysis_service.token_caps.alarm_at` states: nothing has to leave to make
+# `katra.token_caps.alarm_at` states: nothing has to leave to make
 # room for it.
 MIN_ELEMENTS = 8
 MAX_ELEMENTS = 22
@@ -369,7 +369,7 @@ def record_lane(framework: FrameworkName, record: dict) -> object:
 
     A record carries its lane in the field the package's ``IdRule`` stamps,
     so this reads that declaration, as
-    :func:`~analysis_service.frameworks.lane_of` does for a claim. Read by
+    :func:`~katra.frameworks.lane_of` does for a claim. Read by
     :func:`lane_coverage_issues`, which is the check that an unmeasured lane —
     one ``strong`` call per lane, which is the granularity that spends money —
     cannot reach a deployment.
@@ -559,7 +559,7 @@ SOURCE_FIELDS = frozenset(("kind", "label", "file", "sha256"))
 
 
 def source_sha256(source_path: Path) -> str:
-    """One source's digest: :func:`~analysis_service.sources.text_digest` of the
+    """One source's digest: :func:`~katra.sources.text_digest` of the
     text a run submits, read as the corpus loader reads it."""
     return text_digest(source_path.read_text(encoding="utf-8"))
 
@@ -1228,7 +1228,7 @@ def _placement_issues(facts: ReferenceFacts, model: SystemModel) -> Iterator[str
     A placement the source states carries no ``trust_zone`` assumption. One
     the reference infers, or leaves ``unknown`` because the schema forced a
     zone the source never gave, carries one.
-    :meth:`~analysis_service.system_model.SystemModel.assumed_zone_elements`
+    :meth:`~katra.system_model.SystemModel.assumed_zone_elements`
     is the one reader of the model's side, and a signed ``network-membership``
     row is the reference's own word on the same placement. The replay reads
     the model's side alone, so a row the reference infers with no assumption
@@ -1258,7 +1258,7 @@ def _unheld_issues(
 ) -> Iterator[str]:
     """Each unheld fact is stated once, quotes its source and names held claims.
 
-    A quote is located by :func:`~analysis_service.assertions.support_span`,
+    A quote is located by :func:`~katra.assertions.support_span`,
     the reader that locates a row's quote, so the two lists cannot disagree
     about what the source says. A claim is matched by its place and its
     digest, so an edit to either leaves the entry stale and fails here.

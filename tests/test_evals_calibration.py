@@ -18,7 +18,6 @@ import json
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     IDENTITY_VALIDATION,
@@ -31,6 +30,7 @@ from evals.harness.calibration import (
 )
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.reference import flows_by_case, load_corpus
+from katra.frameworks import PACKAGES
 from tests.eval_factories import LabelReplayMatcher
 
 

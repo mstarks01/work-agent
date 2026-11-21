@@ -1,6 +1,6 @@
 """``run.py assertion-use``: each archived report's use of its assertion catalog.
 
-Reads the figures :func:`~analysis_service.assertion_use.assertion_use` gives a
+Reads the figures :func:`~katra.assertion_use.assertion_use` gives a
 finished job, over the ``*.report.json`` files of a sweep's ``.reports``
 directory. A report that today's model refuses is skipped and counted, and a
 report whose job ran no pass is counted apart. It runs no model and reads no
@@ -14,10 +14,10 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from analysis_service.assertion_use import AssertionUse, assertion_use
 from evals.harness.archive import case_suffix
 from evals.harness.bundle import UnreadableReport, read_report
 from evals.harness.rates import shown_figure
+from katra.assertion_use import AssertionUse, assertion_use
 
 REPORT_GLOB = f"*{case_suffix('report')}"
 

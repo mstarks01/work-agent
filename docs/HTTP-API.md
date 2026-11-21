@@ -9,14 +9,14 @@ Build the app with `create_app()`; every seam is injectable, defaulting to
 production wiring.
 
 ```python
-from analysis_service import create_app
+from katra import create_app
 
 app = create_app()  # configured store, real pipeline, configured JWT verifier
 ```
 
 See [Configuration](Configuration.md) for the required
-[`ANALYSIS_AUTH_PROVIDER` / `ANALYSIS_OIDC_*`](#bearer-auth),
-the [`ANALYSIS_JOB_STORE`](#job-storage) backend
+[`KATRA_AUTH_PROVIDER` / `KATRA_OIDC_*`](#bearer-auth),
+the [`KATRA_JOB_STORE`](#job-storage) backend
 selection, and the
 [credentials](Configuration.md#provider-environment) for whichever model vendor
 each tier uses.
@@ -66,7 +66,7 @@ has **blessed** (approved by a measured run, in
 `config/blessed-fingerprints.toml`). Two cases refuse with `409`:
 
 - the run is **uncertified** (a fingerprint isn't blessed) *and*
-  `ANALYSIS_REQUIRE_CERTIFIED` is set — off by default;
+  `KATRA_REQUIRE_CERTIFIED` is set — off by default;
 - the run is **unexercised** (a tier the graph declares produced no fingerprint
   at all) — always refused, and not reachable on a run that produced a report.
 
@@ -666,7 +666,7 @@ or waits on it. The analysis does not run again. A correction carries the
 | `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. That problem body carries `contradiction`, `{"part", "ancestor"}`: the two capability questions' keys, which a client can answer together in one request. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
-| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, was stopped, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `ANALYSIS_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
+| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, was stopped, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `KATRA_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
 | `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved answer holds a job that no start could run. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 | `422` | The body has a `control_scopes` key. Only the web app applies Controls (ADR 0127). |
@@ -822,24 +822,24 @@ line that records a new principal.
 
 ### How the provider is chosen
 
-`ANALYSIS_AUTH_PROVIDER` selects the backend at deploy time and **fails closed** —
+`KATRA_AUTH_PROVIDER` selects the backend at deploy time and **fails closed** —
 an unset or unknown value stops startup rather than weakening or skipping the
 check. The value is never read from the request, so a token can't pick its own
 verifier.
 
 | Variable | Purpose |
 | --- | --- |
-| `ANALYSIS_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
+| `KATRA_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
 
 Each backend reads its own prefixed settings. The `oidc` backend is a standard
-**OIDC JWT verifier**, configured through `ANALYSIS_OIDC_*`:
+**OIDC JWT verifier**, configured through `KATRA_OIDC_*`:
 
 | Variable | Purpose |
 | --- | --- |
-| `ANALYSIS_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
-| `ANALYSIS_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
-| `ANALYSIS_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
-| `ANALYSIS_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
+| `KATRA_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
+| `KATRA_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
+| `KATRA_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
+| `KATRA_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
 
 Tokens must carry `exp`, `iss`, `aud`, and `sub`, and be signed with one of the
 accepted algorithms; anything else is rejected with a single generic error (the
@@ -852,7 +852,7 @@ algorithm, so a deployment that sets nothing works against any compliant IdP. An
 IdP signing something else — `ES256` is common — is configured, not code-changed:
 
 ```bash
-export ANALYSIS_OIDC_ALGORITHMS="ES256"        # or "RS256,ES256" during a rotation
+export KATRA_OIDC_ALGORITHMS="ES256"        # or "RS256,ES256" during a rotation
 ```
 
 The accepted set is an **allowlist**, and configuration chooses from it rather
@@ -882,14 +882,14 @@ which is OIDC's own vocabulary. For each provider, the settings come from its
 discovery document (`<issuer>/.well-known/openid-configuration` → `issuer`,
 `jwks_uri` and `id_token_signing_alg_values_supported`); the audience is the
 API/resource identifier you register for this service. Switching providers is a
-values change only — the variable names stay `ANALYSIS_OIDC_*`. A principal
+values change only — the variable names stay `KATRA_OIDC_*`. A principal
 of one issuer owns no job of a principal of another issuer, so a new issuer
 starts with no jobs.
 
 Listed alphabetically. None is more supported than any other, and the list is
 illustrative rather than exhaustive — an IdP absent from it is not unsupported.
 
-| Provider | Typical issuer (`ANALYSIS_OIDC_ISSUER`) |
+| Provider | Typical issuer (`KATRA_OIDC_ISSUER`) |
 | --- | --- |
 | Auth0 | `https://<tenant>.auth0.com/` |
 | AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<pool-id>` |
@@ -901,7 +901,7 @@ illustrative rather than exhaustive — an IdP absent from it is not unsupported
 ### Example: Okta
 
 1. In the IdP, register this service as an API/resource and note the **audience**
-   (resource identifier) clients will request tokens for — e.g. `analysis-service`.
+   (resource identifier) clients will request tokens for — e.g. `katra`.
 2. Fetch the discovery document to read the issuer and JWKS URL:
    ```bash
    curl -s https://<org>.okta.com/oauth2/<auth-server-id>/.well-known/openid-configuration \
@@ -909,10 +909,10 @@ illustrative rather than exhaustive — an IdP absent from it is not unsupported
    ```
 3. Set the environment:
    ```bash
-   export ANALYSIS_AUTH_PROVIDER=oidc
-   export ANALYSIS_OIDC_ISSUER="https://<org>.okta.com/oauth2/<auth-server-id>"
-   export ANALYSIS_OIDC_AUDIENCE="analysis-service"
-   export ANALYSIS_OIDC_JWKS_URL="https://<org>.okta.com/oauth2/<auth-server-id>/v1/keys"
+   export KATRA_AUTH_PROVIDER=oidc
+   export KATRA_OIDC_ISSUER="https://<org>.okta.com/oauth2/<auth-server-id>"
+   export KATRA_OIDC_AUDIENCE="katra"
+   export KATRA_OIDC_JWKS_URL="https://<org>.okta.com/oauth2/<auth-server-id>/v1/keys"
    ```
 4. Start the app. Callers pass `Authorization: Bearer <token>` on every `/v1`
    request; see the [HTTP API](HTTP-API.md) for the routes.
@@ -920,13 +920,13 @@ illustrative rather than exhaustive — an IdP absent from it is not unsupported
 Okta is the worked example because one had to be, not because it is preferred.
 Pointing at a different OIDC IdP (Auth0, Entra, Ping, …) is the same settings
 read from that IdP's discovery document — no code change, and a different
-signing algorithm is `ANALYSIS_OIDC_ALGORITHMS` rather than a patch.
+signing algorithm is `KATRA_OIDC_ALGORITHMS` rather than a patch.
 
 ### Adding a new backend
 
 A backend with a distinct name (or a non-OIDC mechanism — opaque-token
 introspection, mTLS, an API key) is a new entry in the `_FACTORIES` registry in
-[`src/analysis_service/auth.py`](../src/analysis_service/auth.py). Reuse
+[`src/katra/auth.py`](../src/katra/auth.py). Reuse
 `OidcJwtVerifier` for another OIDC issuer, or implement the `TokenVerifier`
 protocol (`verify(token) -> Identity`) for anything else; the API layer is unchanged.
 
@@ -939,28 +939,28 @@ choice.
 Two settings select the backends at startup, and each one **fails closed**: an
 unset or unknown value stops the startup. The service never falls back to
 `memory`, and it never reads a backend value from a request. A set
-`ANALYSIS_DATABASE_*` or `ANALYSIS_OBJECT_*` variable that the selected backend
+`KATRA_DATABASE_*` or `KATRA_OBJECT_*` variable that the selected backend
 does not read also stops the startup.
 
 | Variable | Values | Rule |
 | --- | --- | --- |
-| `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
-| `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3`, `gcs` | Required by `sql`. Refused by `memory`. `gcs` needs the `gcs` extra. |
-| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
-| `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
-| `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
-| `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
-| `ANALYSIS_DATABASE_REGION` | an AWS region that matches `[a-z0-9-]{1,32}`, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
-| `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
-| `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
-| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end. `gcs` also accepts `_` | Required by `s3` and `gcs`. |
-| `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
-| `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
-| `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
-| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` reads a service account key file. |
-| `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
-| `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` | a path to a service account key file | Required by `api_key` on `gcs`. Refused by `iam` and by `s3`. |
-| `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](#retention). |
+| `KATRA_JOB_STORE` | `memory`, `sql` | Required. |
+| `KATRA_OBJECT_STORE` | `filesystem`, `s3`, `gcs` | Required by `sql`. Refused by `memory`. `gcs` needs the `gcs` extra. |
+| `KATRA_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
+| `KATRA_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
+| `KATRA_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
+| `KATRA_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
+| `KATRA_DATABASE_REGION` | an AWS region that matches `[a-z0-9-]{1,32}`, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
+| `KATRA_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
+| `KATRA_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
+| `KATRA_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end. `gcs` also accepts `_` | Required by `s3` and `gcs`. |
+| `KATRA_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
+| `KATRA_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
+| `KATRA_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
+| `KATRA_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` reads a service account key file. |
+| `KATRA_OBJECT_ACCESS_KEY_ID_FILE`, `KATRA_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
+| `KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE` | a path to a service account key file | Required by `api_key` on `gcs`. Refused by `iam` and by `s3`. |
+| `KATRA_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](#retention). |
 
 ### The `memory` store
 
@@ -976,7 +976,7 @@ completed report, the events of a job and the answers that a new analysis
 carries all live through a restart. Install the `sql` extra for it:
 
 ```bash
-pip install 'analysis-service[sql]'
+pip install 'katra[sql]'
 ```
 
 The extra holds SQLAlchemy, Alembic, `asyncpg` and `aiosqlite`. A `memory`
@@ -984,7 +984,7 @@ deployment installs none of them.
 
 The database is PostgreSQL, or SQLite on one host.
 
-For SQLite, give `ANALYSIS_DATABASE_URL` an absolute path, which takes four
+For SQLite, give `KATRA_DATABASE_URL` an absolute path, which takes four
 slashes: `sqlite+aiosqlite:////var/lib/analysis/jobs.db`. A relative path
 stops the startup. The database file holds the answers, the drafts and the
 checkpoint of each job, so it has the rule of the object root. The
@@ -1000,7 +1000,7 @@ each one stops the startup.
 
 #### PostgreSQL
 
-For PostgreSQL, give `ANALYSIS_DATABASE_URL` a user, a network host and a
+For PostgreSQL, give `KATRA_DATABASE_URL` a user, a network host and a
 database, for example
 `postgresql+asyncpg://analysis@db.internal:5432/analysis`. The URL must not
 hold a password or a query. A URL without a user, a network host or a
@@ -1012,24 +1012,24 @@ Each connection uses TLS with `verify-full`: the service checks the
 certificate chain of the server and its host name. No setting turns this off,
 and a server without TLS refuses each connection. By default the service
 trusts the system CA bundle. For a server with a private CA, set
-`ANALYSIS_DATABASE_CA_FILE` to the CA certificate. The service then trusts
+`KATRA_DATABASE_CA_FILE` to the CA certificate. The service then trusts
 that CA only. For Amazon RDS, give it the RDS `global-bundle.pem`.
 
-`ANALYSIS_DATABASE_CREDENTIALS` selects how the service gets the password:
+`KATRA_DATABASE_CREDENTIALS` selects how the service gets the password:
 
 - `password`: the service reads the password from the file that
-  `ANALYSIS_DATABASE_PASSWORD_FILE` names. Give the file mode `0400` and the
+  `KATRA_DATABASE_PASSWORD_FILE` names. Give the file mode `0400` and the
   service user as its owner. The service refuses a file that breaks the
   [permission rule](Configuration.md#file-permissions). It refuses a password in
-  `ANALYSIS_DATABASE_PASSWORD`, because an environment variable passes to
+  `KATRA_DATABASE_PASSWORD`, because an environment variable passes to
   each child process.
-- `iam`: the deployment holds no password. `ANALYSIS_DATABASE_IAM` names the
+- `iam`: the deployment holds no password. `KATRA_DATABASE_IAM` names the
   provider of the token. The provider today is `rds`: the service signs an
   Amazon RDS IAM token with the AWS credentials of its platform identity.
   The service accepts the same identities as the `iam` mode of the `s3`
   object store, and refuses the same static credentials. It
-  needs `ANALYSIS_DATABASE_REGION` and the `aws` extra
-  (`pip install 'analysis-service[sql,aws]'`). Without the extra, the startup
+  needs `KATRA_DATABASE_REGION` and the `aws` extra
+  (`pip install 'katra[sql,aws]'`). Without the extra, the startup
   stops with a message that names it. The database user needs the
   `rds_iam` role.
 
@@ -1043,7 +1043,7 @@ in its transaction, so the service admits one job at a time. Do not use this
 lock key for another purpose in the same database.
 
 The `filesystem` object store keeps each object as a file under
-`ANALYSIS_OBJECT_ROOT`. The startup stops when the root does not exist, is not
+`KATRA_OBJECT_ROOT`. The startup stops when the root does not exist, is not
 a directory, has another owner than the service user, or a group or others
 can open it. Make the root as the service user with `install -d -m 0700
 /var/lib/analysis/objects`.
@@ -1062,7 +1062,7 @@ The `s3` object store keeps each object in a bucket of a store that speaks the
 S3 API. It uses `boto3`, which the `aws` extra holds. Install both extras:
 
 ```bash
-pip install 'analysis-service[sql,aws]'
+pip install 'katra[sql,aws]'
 ```
 
 When `s3` is selected and `boto3` is not installed, the startup stops with a
@@ -1077,24 +1077,24 @@ documentation confirms the header on `PutObject`.
 
 Set these values for each provider whose documentation confirms the header:
 
-| Provider | `ANALYSIS_OBJECT_ENDPOINT` | `ANALYSIS_OBJECT_REGION` | `ANALYSIS_OBJECT_CREDENTIALS` |
+| Provider | `KATRA_OBJECT_ENDPOINT` | `KATRA_OBJECT_REGION` | `KATRA_OBJECT_CREDENTIALS` |
 | --- | --- | --- | --- |
 | AWS S3 | unset | the region of the bucket, for example `eu-west-1` | `iam` for a role that the platform attaches, or `api_key` |
 | Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | `api_key`, with an R2 access key ID and secret access key |
 
-The startup stops when `ANALYSIS_OBJECT_ENDPOINT` names a Google Cloud
+The startup stops when `KATRA_OBJECT_ENDPOINT` names a Google Cloud
 Storage host (`googleapis.com`) or a Backblaze B2 host (`backblazeb2.com`).
 Neither host accepts `If-None-Match` on a write. For Google Cloud Storage, set
-`ANALYSIS_OBJECT_STORE=gcs`.
+`KATRA_OBJECT_STORE=gcs`.
 
-`ANALYSIS_OBJECT_ADDRESSING` sets where a request names the bucket. `virtual`
+`KATRA_OBJECT_ADDRESSING` sets where a request names the bucket. `virtual`
 puts the bucket in the host name, `<bucket>.<host>`, and `path` puts it in the
 path, `<host>/<bucket>`. AWS S3 and Cloudflare R2 support `virtual`, so keep
 the default for them. With `virtual`, use a bucket name that has no dot: the
 TLS certificate of AWS S3 matches only a bucket name without a dot. Set `path`
 for a store that does not resolve `<bucket>.<host>`.
 
-`ANALYSIS_OBJECT_CREDENTIALS` declares the credential mode:
+`KATRA_OBJECT_CREDENTIALS` declares the credential mode:
 
 - `iam`: the service gives no key. `boto3` finds the identity in its own
   chain, and the service accepts only an identity that the platform issues:
@@ -1104,18 +1104,18 @@ for a store that does not resolve `<bucket>.<host>`.
   profile, an SSO login and a credential process each stop the startup. So
   does a key file setting.
 - `api_key`: the service reads a static key pair from two files.
-  `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE` names the file that holds the access
-  key ID, and `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` names the file that
+  `KATRA_OBJECT_ACCESS_KEY_ID_FILE` names the file that holds the access
+  key ID, and `KATRA_OBJECT_SECRET_ACCESS_KEY_FILE` names the file that
   holds the secret access key. Give each file permissions that only the
   service user can read. The service refuses a file that breaks the
   [permission rule](Configuration.md#file-permissions).
-  `ANALYSIS_OBJECT_ACCESS_KEY_ID` and
-  `ANALYSIS_OBJECT_SECRET_ACCESS_KEY` stop the startup, so a key never sits in
+  `KATRA_OBJECT_ACCESS_KEY_ID` and
+  `KATRA_OBJECT_SECRET_ACCESS_KEY` stop the startup, so a key never sits in
   an environment variable.
 
 Each request uses TLS, and the service always verifies the certificate of the
 endpoint. The service ignores the endpoint that `AWS_ENDPOINT_URL` or a `boto3`
-profile names, so only `ANALYSIS_OBJECT_ENDPOINT` selects the endpoint.
+profile names, so only `KATRA_OBJECT_ENDPOINT` selects the endpoint.
 
 Prepare the bucket before the first start:
 
@@ -1145,7 +1145,7 @@ The `gcs` object store keeps each object in a Google Cloud Storage bucket. It
 uses `google-cloud-storage`, which the `gcs` extra holds. Install both extras:
 
 ```bash
-pip install 'analysis-service[sql,gcs]'
+pip install 'katra[sql,gcs]'
 ```
 
 When `gcs` is selected and the client is not installed, the startup stops with
@@ -1156,12 +1156,12 @@ never replaces an object. Google Cloud Storage refuses that write with HTTP
 412 when the key holds an object.
 
 The store always uses `https://storage.googleapis.com`. So
-`ANALYSIS_OBJECT_ENDPOINT`, `ANALYSIS_OBJECT_REGION` and
-`ANALYSIS_OBJECT_ADDRESSING` stop the startup, and the service ignores
+`KATRA_OBJECT_ENDPOINT`, `KATRA_OBJECT_REGION` and
+`KATRA_OBJECT_ADDRESSING` stop the startup, and the service ignores
 `STORAGE_EMULATOR_HOST` and `API_ENDPOINT_OVERRIDE`. Each request uses TLS,
 and the client always verifies the certificate of the endpoint.
 
-`ANALYSIS_OBJECT_CREDENTIALS` declares the credential mode. In each mode, the
+`KATRA_OBJECT_CREDENTIALS` declares the credential mode. In each mode, the
 token holds only the scope
 `https://www.googleapis.com/auth/devstorage.read_write`.
 
@@ -1170,10 +1170,10 @@ token holds only the scope
   GKE pod with Workload Identity, or of a GCE instance. Each other identity
   stops the startup: a service account key file, a gcloud user login, an
   impersonated credential and Workload Identity Federation. So does
-  `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE`. The message names the type of
+  `KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE`. The message names the type of
   credential that the service found, and never the credential.
 - `api_key`: the service reads a service account key from the file that
-  `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` names (ADR 0108). Use the JSON key
+  `KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE` names (ADR 0108). Use the JSON key
   file as Google downloads it. Give the file permissions that only the service
   user can read; the service refuses a file that breaks the
   [permission rule](Configuration.md#file-permissions). The file must be
@@ -1273,8 +1273,8 @@ applies to SQLite too. Only the first-run app migrates a SQLite database
 itself ([ADR 0110](adr/0110-the-first-run-app-migrates-a-sqlite-job-store.md)):
 
 ```bash
-ANALYSIS_DATABASE_URL=sqlite+aiosqlite:////var/lib/analysis/jobs.db \
-  python -m analysis_service.migrations
+KATRA_DATABASE_URL=sqlite+aiosqlite:////var/lib/analysis/jobs.db \
+  python -m katra.migrations
 ```
 
 The command reads the same database settings as the service, with the same
@@ -1294,10 +1294,10 @@ Then run the step with the migration role in the URL, and its own
 credentials:
 
 ```bash
-ANALYSIS_DATABASE_URL=postgresql+asyncpg://analysis_migrate@db.internal:5432/analysis \
-ANALYSIS_DATABASE_CREDENTIALS=password \
-ANALYSIS_DATABASE_PASSWORD_FILE=/run/secrets/analysis-migrate-password \
-  python -m analysis_service.migrations
+KATRA_DATABASE_URL=postgresql+asyncpg://analysis_migrate@db.internal:5432/analysis \
+KATRA_DATABASE_CREDENTIALS=password \
+KATRA_DATABASE_PASSWORD_FILE=/run/secrets/analysis-migrate-password \
+  python -m katra.migrations
 ```
 
 The command migrates the database to the latest revision. On SQLite it
@@ -1327,12 +1327,12 @@ npm ci --ignore-scripts --prefix diagram_reader
 
 `npm ci` installs only the versions that `package-lock.json` locks, and
 `--ignore-scripts` runs no package's own install script. A wheel install
-holds the reader at `analysis_service/_bundled/diagram_reader`, in the
+holds the reader at `katra/_bundled/diagram_reader`, in the
 directory of the installed package. Give that directory to `--prefix`, as a
 user that can write to it. This command prints it:
 
 ```bash
-python -c "from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR as d; print(d)"
+python -c "from katra.deployment import DEFAULT_DIAGRAM_READER_DIR as d; print(d)"
 ```
 
 Without Node or the packages, a job with a `diagram` Source fails, and the
@@ -1345,7 +1345,7 @@ The service starts in this order, and a failure at a step stops the startup:
 
 1. It reads the backend settings and builds the store. For SQLite, it checks
    the database file and its directory.
-2. It reads `ANALYSIS_RETENTION_DAYS`.
+2. It reads `KATRA_RETENTION_DAYS`.
 3. The `sql` store checks that the schema is at the latest revision and
    that it holds each table and column that the service needs, and no other
    column.
@@ -1372,7 +1372,7 @@ or `running`, the log names the job, and the restart scan fails it.
 
 ### Retention
 
-`ANALYSIS_RETENTION_DAYS` sets the retention period of a job, in days. The
+`KATRA_RETENTION_DAYS` sets the retention period of a job, in days. The
 period starts at the last update of the job. When the setting is unset, the
 service keeps every job for ever. The value must be a whole number from 1 to
 36500. Any other value stops the startup, and an empty value also stops it.
@@ -1410,7 +1410,7 @@ also never deletes a key that the service does not write, for example a file tha
 operator puts under the object root. The `filesystem` store enters no
 symbolic link when it lists the root.
 
-The orphan sweep runs on every start-up, also when `ANALYSIS_RETENTION_DAYS`
+The orphan sweep runs on every start-up, also when `KATRA_RETENTION_DAYS`
 is unset. It runs after the retention sweep, at the same times. Each pass
 writes one line to the service log with the number of objects that it
 removed. A failed pass writes the error to the log, and the next pass runs.
@@ -1419,14 +1419,14 @@ The `memory` store holds no objects, so its sweep removes nothing.
 ### Adding a new backend
 
 Each backend value is a row of a table, and no code branches on a backend
-name. `JOB_STORES` in [`src/analysis_service/store_backends.py`](../src/analysis_service/store_backends.py)
+name. `JOB_STORES` in [`src/katra/store_backends.py`](../src/katra/store_backends.py)
 holds the job stores, `OBJECT_STORES` in
-[`src/analysis_service/objects.py`](../src/analysis_service/objects.py) holds
+[`src/katra/objects.py`](../src/katra/objects.py) holds
 the object stores, and `DATABASES` in
-[`src/analysis_service/sql_store.py`](../src/analysis_service/sql_store.py)
+[`src/katra/sql_store.py`](../src/katra/sql_store.py)
 holds the databases of the `sql` store, keyed by the driver of the URL.
 `DATABASE_CREDENTIALS` and `DATABASE_IAM` in the same file hold the values of
-`ANALYSIS_DATABASE_CREDENTIALS` and `ANALYSIS_DATABASE_IAM`. A row
+`KATRA_DATABASE_CREDENTIALS` and `KATRA_DATABASE_IAM`. A row
 field has no default, so a new row states every fact.
 [`tests/test_backends.py`](../tests/test_backends.py) checks each table against
 the `Literal` that names its values. It also checks that the contract suite in
@@ -1460,14 +1460,14 @@ reads at all.
 ## Logs
 
 The service writes its log lines through the Python `logging` module, under
-the logger `analysis_service`. The app does not configure logging, so the
+the logger `katra`. The app does not configure logging, so the
 server must do it. Without a log configuration, Python drops each `INFO` line
 of the service. These lines include the line of each
 [delete](#deleting-a-job) and the line of each pass of the
 [orphan sweep](#orphan-objects).
 
 Give `uvicorn` a log configuration that keeps the `INFO` lines of
-`analysis_service`, for example this `/etc/analysis/logging.json`:
+`katra`, for example this `/etc/analysis/logging.json`:
 
 ```json
 {
@@ -1477,12 +1477,12 @@ Give `uvicorn` a log configuration that keeps the `INFO` lines of
   "handlers": {"stderr": {"class": "logging.StreamHandler", "formatter": "plain"}},
   "root": {"level": "WARNING", "handlers": ["stderr"]},
   "loggers": {
-    "analysis_service": {"level": "INFO"},
+    "katra": {"level": "INFO"},
     "uvicorn": {"level": "INFO"}
   }
 }
 ```
 
 ```bash
-uvicorn --factory analysis_service:create_app --log-config /etc/analysis/logging.json
+uvicorn --factory katra:create_app --log-config /etc/analysis/logging.json
 ```

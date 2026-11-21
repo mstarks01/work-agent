@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import sys
 
-from analysis_service.errors import ConfigError, config_refusal
 from evals.harness.reference import CorpusError
+from katra.errors import ConfigError, config_refusal
 
 
 def corpus_refusal(error: CorpusError) -> str:

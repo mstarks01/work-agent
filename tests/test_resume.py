@@ -13,9 +13,9 @@ from types import MappingProxyType
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.assertions import (
+from katra import graph
+from katra.answer_sets import AnswerSet
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
@@ -23,14 +23,14 @@ from analysis_service.assertions import (
     Subject,
     answer,
 )
-from analysis_service.jobs import (
+from katra.jobs import (
     Checkpoint,
     JobRecord,
     PipelineCompleted,
     Resumption,
 )
-from analysis_service.links import LinkAnswer, with_link_answers
-from analysis_service.sources import Source
+from katra.links import LinkAnswer, with_link_answers
+from katra.sources import Source
 from tests.factories import (
     DESCRIPTION_TEXT,
     adk_runner,

@@ -10,15 +10,15 @@ import json
 
 import pytest
 
-from analysis_service.claims import QuoteCandidate
-from analysis_service.fan_in import fan_in
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.asvs.record import RequirementProposal
-from analysis_service.frameworks.stride import STRIDE
 from evals.harness import fan_in_accounting
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.run import main
+from katra.claims import QuoteCandidate
+from katra.fan_in import fan_in
+from katra.frameworks import PACKAGES, schemas_for
+from katra.frameworks.asvs.record import RequirementProposal
+from katra.frameworks.stride import STRIDE
 from tests.factories import sample_proposal, valid_model
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)

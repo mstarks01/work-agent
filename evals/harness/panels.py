@@ -29,8 +29,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.graph import LANE_SHARED_KEYS
-from analysis_service.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 from evals.harness.audit import Experiment, Phase, changed_since, phase_of
 from evals.harness.delivery import FACT_DELIVERIES, PLACE_FACT_SETS, Delivery
 from evals.harness.provenance import REPO_ROOT
@@ -45,6 +43,8 @@ from evals.harness.replay import (
     pooled_extraction,
 )
 from evals.harness.scorecard import Rate
+from katra.graph import LANE_SHARED_KEYS
+from katra.prompts import EXTRACT_PROMPT_NAME, EXTRACTION_DELTAS
 
 #: How a panel's reading stands to what a job runs today.
 Fidelity = Literal["known-different", "unverified"]

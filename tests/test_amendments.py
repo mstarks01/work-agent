@@ -13,8 +13,8 @@ import asyncio
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import (
+from katra.answer_sets import AnswerSet
+from katra.answer_state import (
     AMENDMENT_LABEL,
     AlreadyResumed,
     Answers,
@@ -23,11 +23,11 @@ from analysis_service.answer_state import (
     ResumedJob,
     StaleRevision,
 )
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.jobs import Checkpoint, JobRecord
-from analysis_service.pipeline import _seeded_state
-from analysis_service.sources import ANSWERS_LABEL, Source, SourceLimits
+from katra.claims import UnknownRef
+from katra.fact_answers import FactAnswer
+from katra.jobs import Checkpoint, JobRecord
+from katra.pipeline import _seeded_state
+from katra.sources import ANSWERS_LABEL, Source, SourceLimits
 from tests.factories import DESCRIPTION_TEXT, sample_selection, valid_model
 from tests.test_api import auth
 from tests.test_links import catalog_client

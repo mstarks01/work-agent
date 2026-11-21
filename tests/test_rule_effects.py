@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.candidates import Rule, with_rule_tables
-from analysis_service.frameworks import PACKAGES
+from katra.candidates import Rule, with_rule_tables
+from katra.frameworks import PACKAGES
 
 
 def _rule(rule_id: str) -> Rule:

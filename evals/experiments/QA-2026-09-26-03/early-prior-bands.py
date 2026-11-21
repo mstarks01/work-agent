@@ -16,7 +16,7 @@ choices. A case's figure is the mean over its reports, so each case weighs
 one.
 
 Run from the repository root:
-``ANALYSIS_OFFLINE=1 uv run python evals/experiments/QA-2026-09-26-03/early-prior-bands.py``
+``KATRA_OFFLINE=1 uv run python evals/experiments/QA-2026-09-26-03/early-prior-bands.py``
 """
 
 from __future__ import annotations
@@ -26,13 +26,13 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from analysis_service import early_questions as eq
-from analysis_service.early_questions import PriorRow, early_questions
-from analysis_service.frameworks import PACKAGES
-from analysis_service.report import Report
 from evals.harness.bundle import reports_dir
 from evals.harness.early_policies import _prefix, _shipped_list, needs_of
 from evals.harness.question_prior import count
+from katra import early_questions as eq
+from katra.early_questions import PriorRow, early_questions
+from katra.frameworks import PACKAGES
+from katra.report import Report
 
 PRIOR_RUN = Path("evals/runs/20260906T234806Z-asvs-two-question-t1/analysis-asvs.json")
 BUDGETS = (5, 10, 15, 20, 30, None)

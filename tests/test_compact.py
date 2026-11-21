@@ -23,7 +23,8 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.compact import (
+from evals.bench.deterministic import as_compact
+from katra.compact import (
     COMPACT_ELEMENTS,
     COMPACT_FORMAT,
     EXTRACTION_FORMATS,
@@ -38,16 +39,16 @@ from analysis_service.compact import (
     expand,
     parse_extraction,
 )
-from analysis_service.graph import EXTRACTION_SCHEMAS
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.prompts import (
+from katra.graph import EXTRACTION_SCHEMAS
+from katra.markdown_loader import MarkdownLoader
+from katra.prompts import (
     EXTRACT_COMPACT_PROMPT_NAME,
     EXTRACT_PROMPT_NAME,
     EXTRACTION_DELTAS,
     compose_extract_prompt,
 )
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
-from analysis_service.system_model import (
+from katra.sources import DEFAULT_DESCRIPTION_LABEL
+from katra.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
     Assumption,
@@ -58,8 +59,7 @@ from analysis_service.system_model import (
     _Element,
     normalize_element_ids,
 )
-from analysis_service.validation import repair_scope
-from evals.bench.deterministic import as_compact
+from katra.validation import repair_scope
 from tests.factories import valid_model
 from tests.test_validation import codes
 
@@ -533,7 +533,7 @@ class TestMalformedOutputFailsExplicitly:
     def test_an_omitted_required_field_is_a_transport_failure(self):
         """A missing epistemic field is malformed output, not an unknown fact.
 
-        ``operations`` carries a default on a :class:`~analysis_service.system_model.DataFlow` so archived
+        ``operations`` carries a default on a :class:`~katra.system_model.DataFlow` so archived
         artifacts keep loading. Nothing archived is in this format, so the wire
         form asks for it outright.
         """
@@ -701,7 +701,7 @@ class TestTheTablesAnswerTheirRegistries:
         """An omission has to mean the same thing on both routes.
 
         ``operations`` is the one declared exception: required here, defaulted
-        on a :class:`~analysis_service.system_model.DataFlow`. Anything else diverging would make a compact run
+        on a :class:`~katra.system_model.DataFlow`. Anything else diverging would make a compact run
         and a full run fail different models for the same emission.
         """
         diverging = {}

@@ -20,8 +20,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from analysis_service.frameworks import schemas_for
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import CORPUS_DIR
 from evals.harness.descendants import lane_drafts
 from evals.harness.identity import SubsetVerbIdentity
@@ -29,6 +27,8 @@ from evals.harness.lane_replay import STATE_VALID_MODEL, prepare_today
 from evals.harness.ledger import Ledger
 from evals.harness.reference import flows_by_case, load_case
 from evals.harness.scorer import _match_in_lane, score_case
+from katra.frameworks import schemas_for
+from katra.system_model import SystemModel
 
 HERE = Path(__file__).parent
 RUNS = HERE / "runs"

@@ -3,7 +3,7 @@
 A ``diagram`` Source holds Mermaid text. To measure how extraction reads one,
 a case needs a diagram of the same system its description states. This writes
 ``diagrams/<case>.mmd`` from each case's blessed ``model.json`` through
-:func:`~analysis_service.mermaid.model_mermaid`, the plain text that the
+:func:`~katra.mermaid.model_mermaid`, the plain text that the
 report's **Download as Mermaid** link adds its colours to. So the diagram states what the reference
 model states and nothing more, and an extraction of it is scored against that
 same model.
@@ -25,12 +25,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from analysis_service.mermaid import model_mermaid
 from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.reference import (
     development_cases,
     load_corpus,
 )
+from katra.mermaid import model_mermaid
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"

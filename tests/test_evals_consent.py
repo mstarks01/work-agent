@@ -17,18 +17,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from analysis_service.budgets import measured_tokens
-from analysis_service.identity import IDENTITY_VERSION, build_identity
-from analysis_service.report import (
-    NodeRun,
-    TokenUsage,
-)
-from analysis_service.sampling import TierSampling
 from evals.harness import consent, modes, prices, run
 from evals.harness.artifact import ARTIFACT_VERSION, RepoCommit
 from evals.harness.consent import UNKNOWN, Estimate, Refused, gate, hold
 from evals.harness.prices import UnitPrices
 from evals.harness.provenance import RunProvenance
+from katra.budgets import measured_tokens
+from katra.identity import IDENTITY_VERSION, build_identity
+from katra.report import (
+    NodeRun,
+    TokenUsage,
+)
+from katra.sampling import TierSampling
 from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
 
 ARTIFACT_COMMIT = RepoCommit(commit="c" * 40, clean=True)
@@ -734,9 +734,9 @@ class TestAStoppedSweepSaysSo:
     def artifact(self, stopped, cases, payloads=()):
         from dataclasses import replace
 
-        from analysis_service.certification import CertifyResult
         from evals.harness.artifact import build
         from evals.harness.instruments import ModeRun, Sweep
+        from katra.certification import CertifyResult
 
         run = replace(
             ModeRun.empty(("stride",)),

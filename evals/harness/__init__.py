@@ -1,7 +1,7 @@
 """The golden-case eval harness.
 
 Nothing here ships in the production image, because the wheel builds only
-``src/analysis_service``.
+``src/katra``.
 
 The modules, in the order a run uses them:
 

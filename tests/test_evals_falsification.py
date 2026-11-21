@@ -16,7 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import (
+from evals.harness import falsify
+from evals.harness.replay import ROW_FATES
+from evals.harness.run import COMMANDS
+from katra.assertions import (
     ABSENT,
     GATE_REFUSALS,
     Assertion,
@@ -24,9 +27,6 @@ from analysis_service.assertions import (
     Subject,
     assertion_id,
 )
-from evals.harness import falsify
-from evals.harness.replay import ROW_FATES
-from evals.harness.run import COMMANDS
 from tests.test_assertions import (
     FLOW,
     SOURCES,
@@ -163,7 +163,7 @@ class TestAProbeThatCostsNothingFails:
     def test_the_gate_reports_a_refusal_from_a_later_round(self, monkeypatch) -> None:
         """An inference whose premise the first round removes is refused in the
         second, and the probe's gate reads every round as the job's gate does."""
-        from analysis_service.assertions import assertion_id
+        from katra.assertions import assertion_id
 
         def corrupt(reference, case):
             premise = falsify._find(reference, "credential-custody")
@@ -262,11 +262,11 @@ def _arguments():
 @pytest.mark.parametrize("name", sorted(falsify.PROBES))
 def test_the_reading_without_the_corrupted_rows_keeps_no_subject_behind(name):
     """``without`` retracts the corrupted rows through
-    :func:`~analysis_service.assertions.without`, so a subject whose only row
+    :func:`~katra.assertions.without`, so a subject whose only row
     the probe changed leaves the table with it."""
-    from analysis_service.assertions import without
     from evals.harness.reference import load_corpus
     from evals.harness.replay import signed_reference
+    from katra.assertions import without
 
     corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
     case = next(

@@ -8,8 +8,8 @@ rebuilds the request the lane made from ``<case>.lanes.json`` and sends that
 request again, or a changed one.
 
 **The graph's readers, never a second copy.** The instruction is
-:func:`~analysis_service.graph.analyze_instruction`, and
-:func:`~analysis_service.node_requests.node_request` templates it over the
+:func:`~katra.graph.analyze_instruction`, and
+:func:`~katra.node_requests.node_request` templates it over the
 captured state keys and builds the user turn from ``prepare``'s captured
 output, the way ADK does for the node. The answer parses under the package's own proposal schema.
 ``tests/test_evals_lane_replay.py`` holds the rebuilt request against the one a
@@ -29,7 +29,7 @@ tries its instruction this way, so both of its arms read the same prompt files.
 request from the case instead of from a sweep: the real ``prepare`` node runs
 offline over the case's blessed model, with no catalog or with the case's
 signed facts as the assertion proposal. The two arms differ only in that
-catalog, so a pair of replays measures what ``ANALYSIS_ASSERTIONS`` can give a
+catalog, so a pair of replays measures what ``KATRA_ASSERTIONS`` can give a
 lane when its pass writes exactly the signed rows (#1231). The lane's drafts
 are then scored by :func:`~evals.harness.descendants.lane_must_finds`, for the
 package that scores drafts by an action and a place.
@@ -50,29 +50,6 @@ from typing import Any, Literal, get_args
 from google.genai import types
 from pydantic import BaseModel
 
-from analysis_service.claims import FrameworkName, ProposalBatch
-from analysis_service.deployment import Deployment
-from analysis_service.execution import GraphRun, seed_state
-from analysis_service.frameworks import PACKAGES, package_for, schemas_for
-from analysis_service.graph import (
-    STATE_ASSERTION_PROPOSAL,
-    STATE_EVIDENCE_CATALOG,
-    STATE_FRAMEWORK_OPTIONS,
-    STATE_SYSTEM_MODEL,
-    STATE_VALID_MODEL,
-    FrameworkNodes,
-    GraphKeys,
-    Lane,
-    LaneArtifact,
-    analyze_instruction,
-    framework_lane_inputs,
-    prepare_analysis,
-    unfence,
-)
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.node_requests import node_request
-from analysis_service.prompts import lane_closing
-from analysis_service.system_model import ELEMENT_GROUPS
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
@@ -95,9 +72,32 @@ from evals.harness.reference import (
 )
 from evals.harness.run_record import Selections, loaded, run_record_for
 from evals.reference_facts import load_facts, signed_proposal
+from katra.claims import FrameworkName, ProposalBatch
+from katra.deployment import Deployment
+from katra.execution import GraphRun, seed_state
+from katra.frameworks import PACKAGES, package_for, schemas_for
+from katra.graph import (
+    STATE_ASSERTION_PROPOSAL,
+    STATE_EVIDENCE_CATALOG,
+    STATE_FRAMEWORK_OPTIONS,
+    STATE_SYSTEM_MODEL,
+    STATE_VALID_MODEL,
+    FrameworkNodes,
+    GraphKeys,
+    Lane,
+    LaneArtifact,
+    analyze_instruction,
+    framework_lane_inputs,
+    prepare_analysis,
+    unfence,
+)
+from katra.markdown_loader import MarkdownLoader
+from katra.node_requests import node_request
+from katra.prompts import lane_closing
+from katra.system_model import ELEMENT_GROUPS
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
-#: job with ``ANALYSIS_ASSERTIONS`` off, or the case's signed facts.
+#: job with ``KATRA_ASSERTIONS`` off, or the case's signed facts.
 CatalogArm = Literal["none", "signed"]
 CATALOG_ARMS: tuple[CatalogArm, ...] = get_args(CatalogArm)
 
@@ -150,8 +150,8 @@ def captured_lane(
     """One lane's captured artifacts in ``material``, keyed by placeholder, or a refusal.
 
     The one reader of a lane's artifacts in a lane capture.
-    The capture holds each :data:`~analysis_service.graph.LANE_ARTIFACTS` key
-    and no other, as :meth:`~analysis_service.graph.Lane.state` requires of
+    The capture holds each :data:`~katra.graph.LANE_ARTIFACTS` key
+    and no other, as :meth:`~katra.graph.Lane.state` requires of
     what ``prepare`` writes, and each value is text.
     """
     lanes = material.get("lanes")
@@ -268,7 +268,7 @@ def fresh_leads(
     The captured leads are the rules of the day the sweep ran. A replay that
     measures a rule change needs the lead the graph would send now, so this
     rebuilds the lane's four inputs from the case's blessed model through
-    :func:`~analysis_service.graph.framework_lane_inputs`, the function the
+    :func:`~katra.graph.framework_lane_inputs`, the function the
     prepare node calls. The shared inputs stay as captured. It reads the
     blessed model, so it is exact for an analysis-mode sweep, where the lanes
     read that model, with the assertion layer off.
@@ -302,11 +302,11 @@ def prepare_today(
     """Every lane input today's ``prepare`` writes over the case's blessed model.
 
     The real node over a plain session, seeded by
-    :func:`~analysis_service.execution.seed_state` as a graph run is, with the
+    :func:`~katra.execution.seed_state` as a graph run is, with the
     case's options. On the ``signed`` arm the case's signed facts are the
     assertion proposal, and ``prepare`` resolves and gates them itself, as it
     does an ``assert`` node's. The material is read through
-    :meth:`~analysis_service.execution.GraphRun.lane_material`, the reader a
+    :meth:`~katra.execution.GraphRun.lane_material`, the reader a
     sweep's lane capture uses.
     """
     if arm not in CATALOG_ARMS:

@@ -12,18 +12,18 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.deployment import (
+from katra.deployment import (
     DEFAULT_RESILIENCE_PATH,
     RESILIENCE_VAR,
     ConfigPaths,
 )
-from analysis_service.errors import ConfigError
-from analysis_service.jobs import InMemoryJobStore
-from analysis_service.model_gate import tool_models
-from analysis_service.model_tiers import TIER_NAMES, env_vars_for
-from analysis_service.settings_variables import secret_vars
-from analysis_service.store_backends import env_variables as store_variables
-from analysis_service.vendors import VENDOR_NAMES
+from katra.errors import ConfigError
+from katra.jobs import InMemoryJobStore
+from katra.model_gate import tool_models
+from katra.model_tiers import TIER_NAMES, env_vars_for
+from katra.settings_variables import secret_vars
+from katra.store_backends import env_variables as store_variables
+from katra.vendors import VENDOR_NAMES
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV, secret_env
 from tests.test_settings_env import (
     env_in,
@@ -84,8 +84,8 @@ class TestTheRows:
             )
 
     def test_each_numeric_entry_carries_the_bounds_the_loader_takes(self, tmp_path):
-        from analysis_service.config_files import MAX_VALUE_CHARS
-        from analysis_service.store_backends import (
+        from katra.config_files import MAX_VALUE_CHARS
+        from katra.store_backends import (
             MAX_RETENTION_DAYS,
             MIN_RETENTION_DAYS,
             RETENTION_DAYS_VAR,
@@ -175,15 +175,15 @@ class TestTheRows:
 
 class TestTheSource:
     def test_each_source_shows(self, tmp_path):
-        settings = hand_written(ANALYSIS_TIMEOUT_MS="1000")
-        rows = rows_of(client_for(tmp_path, settings, ANALYSIS_MAX_SOURCES="5"))
+        settings = hand_written(KATRA_TIMEOUT_MS="1000")
+        rows = rows_of(client_for(tmp_path, settings, KATRA_MAX_SOURCES="5"))
 
         assert (
             rows["resilience.max_sources"].items()
             >= {
                 "value": "5",
                 "source": "process",
-                "variable": "ANALYSIS_MAX_SOURCES",
+                "variable": "KATRA_MAX_SOURCES",
             }.items()
         )
         assert (
@@ -211,7 +211,7 @@ class TestTheSource:
         )
 
     def test_only_a_process_value_names_its_variable(self, tmp_path):
-        rows = rows_of(client_for(tmp_path, hand_written(), ANALYSIS_MAX_SOURCES="5"))
+        rows = rows_of(client_for(tmp_path, hand_written(), KATRA_MAX_SOURCES="5"))
 
         named = {key for key, row in rows.items() if "variable" in row}
         assert named == {"resilience.max_sources"}
@@ -231,7 +231,7 @@ class TestTheSource:
             encoding="utf-8",
         )
         rows = rows_of(
-            client_for(tmp_path, hand_written(), ANALYSIS_RESILIENCE=str(moved))
+            client_for(tmp_path, hand_written(), KATRA_RESILIENCE=str(moved))
         )
 
         assert rows["resilience.attempts"]["value"] == "4"
@@ -241,7 +241,7 @@ class TestTheSource:
         """The page reads a config path with the loader's reader, so a path
         with spaces around it names the same file at both."""
         padded = f"  {DEFAULT_RESILIENCE_PATH}  "
-        rows = rows_of(client_for(tmp_path, hand_written(), ANALYSIS_RESILIENCE=padded))
+        rows = rows_of(client_for(tmp_path, hand_written(), KATRA_RESILIENCE=padded))
 
         loaded = ConfigPaths.from_env({RESILIENCE_VAR: padded}).resilience
         assert rows["resilience.attempts"]["file"] == str(loaded)
@@ -249,7 +249,7 @@ class TestTheSource:
     def test_a_config_path_the_loader_refuses_shows_the_refusal(self, tmp_path):
         """A set-but-empty path stops the startup, and a row of its file shows
         that refusal in place of a value of the shipped file."""
-        rows = rows_of(client_for(tmp_path, hand_written(), ANALYSIS_RESILIENCE=""))
+        rows = rows_of(client_for(tmp_path, hand_written(), KATRA_RESILIENCE=""))
 
         with pytest.raises(ConfigError) as refusal:
             ConfigPaths.from_env({RESILIENCE_VAR: ""})
@@ -267,8 +267,8 @@ class TestTheSource:
 
 class TestSecrets:
     def test_no_key_and_no_key_path_reaches_the_page_or_a_log(self, tmp_path, caplog):
-        key_env = secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", KEY)
-        path = key_env["ANALYSIS_ANTHROPIC_API_KEY_FILE"]
+        key_env = secret_env("KATRA_ANTHROPIC_API_KEY_FILE", KEY)
+        path = key_env["KATRA_ANTHROPIC_API_KEY_FILE"]
         caplog.set_level(logging.DEBUG)
         client = client_for(tmp_path, hand_written(**key_env))
 
@@ -295,9 +295,7 @@ class TestSecrets:
             assert {"value", "shipped", "file"}.isdisjoint(row)
 
     def test_a_missing_key_file_reads_as_no_key(self, tmp_path):
-        settings = hand_written(
-            ANALYSIS_ANTHROPIC_API_KEY_FILE=str(tmp_path / "absent")
-        )
+        settings = hand_written(KATRA_ANTHROPIC_API_KEY_FILE=str(tmp_path / "absent"))
         rows = rows_of(client_for(tmp_path, settings))
 
         assert rows["credentials.anthropic.api_key"]["key_saved"] is False
@@ -319,9 +317,7 @@ class TestSecrets:
         ],
     )
     def test_a_url_password_is_withheld(self, tmp_path, url):
-        client = memory_client(
-            tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_DATABASE_URL=url
-        )
+        client = memory_client(tmp_path, KATRA_JOB_STORE="sql", KATRA_DATABASE_URL=url)
 
         response = client.get("/settings")
 
@@ -331,9 +327,7 @@ class TestSecrets:
 
     def test_a_url_with_no_password_is_shown(self, tmp_path):
         url = "postgresql+asyncpg://user@db/jobs?ssl=require"
-        client = memory_client(
-            tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_DATABASE_URL=url
-        )
+        client = memory_client(tmp_path, KATRA_JOB_STORE="sql", KATRA_DATABASE_URL=url)
 
         response = client.get("/settings")
 
@@ -395,12 +389,12 @@ class TestWhatTheSelectionShows:
         database = rows["store.database_url"]
         assert database["source"] == "default"
         assert database["value"].startswith("sqlite+aiosqlite:///")
-        assert database["value"].endswith("/work-agent/jobs.db")
+        assert database["value"].endswith("/katra/jobs.db")
         assert rows["store.object_store"]["value"] == "filesystem"
 
     def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
         data = page_data(
-            client_for(tmp_path, hand_written(ANALYSIS_JOB_STORE="memory")).get(
+            client_for(tmp_path, hand_written(KATRA_JOB_STORE="memory")).get(
                 "/settings"
             )
         )
@@ -422,8 +416,8 @@ class TestWhatTheSelectionShows:
         shown = store_shown_of(
             memory_client(
                 tmp_path,
-                ANALYSIS_JOB_STORE="sql",
-                ANALYSIS_OBJECT_STORE="filesystem",
+                KATRA_JOB_STORE="sql",
+                KATRA_OBJECT_STORE="filesystem",
             )
         )
 
@@ -434,7 +428,7 @@ class TestWhatTheSelectionShows:
 
     def test_the_gcs_store_shows_only_the_settings_it_reads(self, tmp_path):
         client = memory_client(
-            tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_OBJECT_STORE="gcs"
+            tmp_path, KATRA_JOB_STORE="sql", KATRA_OBJECT_STORE="gcs"
         )
 
         assert {
@@ -516,7 +510,7 @@ class TestTheStoreRowsOfUnsavedChanges:
         assert "value" not in row
 
     def test_a_null_change_unsets_a_saved_store_setting(self, tmp_path):
-        write_settings(tmp_path, hand_written(ANALYSIS_JOB_STORE="sql"))
+        write_settings(tmp_path, hand_written(KATRA_JOB_STORE="sql"))
         client = TestClient(
             create_app(
                 workspace=Workspace(store=InMemoryJobStore()), env=env_in(tmp_path)
@@ -530,7 +524,7 @@ class TestTheStoreRowsOfUnsavedChanges:
         assert answer.json()["shown"] == DEFAULT_SHOWN
 
     def test_the_process_environment_wins_over_a_change(self, tmp_path):
-        client = memory_client(tmp_path, ANALYSIS_JOB_STORE="memory")
+        client = memory_client(tmp_path, KATRA_JOB_STORE="memory")
 
         answer = rows_for(client, {"store.job_store": "sql"})
 
@@ -601,7 +595,7 @@ class TestModelSuggestions:
         assert not [name for name in names if name.lower().endswith(":batch")]
 
     def test_a_model_outside_the_map_serves_without_a_refusal(self, tmp_path):
-        settings = hand_written(ANALYSIS_MODEL_REVIEW_MODEL="claude-sonnet-5-5")
+        settings = hand_written(KATRA_MODEL_REVIEW_MODEL="claude-sonnet-5-5")
         client = client_for(tmp_path, settings)
 
         assert "claude-sonnet-5-5" not in tool_models("anthropic")
@@ -630,13 +624,13 @@ class TestAnEngineThatDoesNotBuild:
         assert 'href="/settings"' in response.text
 
     def test_an_unknown_line_shows_its_key_and_line_number(self, tmp_path):
-        client = client_for(tmp_path, hand_written() + "ANALYSIS_RENAMED=1\n")
+        client = client_for(tmp_path, hand_written() + "KATRA_RENAMED=1\n")
 
         data = page_data(client.get("/settings"))
 
         line = len(TEST_TIER_ENV | TEST_CREDENTIAL_ENV) + 1
-        assert data["unknown"] == [{"key": "ANALYSIS_RENAMED", "line": line}]
-        assert "ANALYSIS_RENAMED" in data["error"]
+        assert data["unknown"] == [{"key": "KATRA_RENAMED", "line": line}]
+        assert "KATRA_RENAMED" in data["error"]
         assert rows_of(client)["tiers.base.model"]["source"] == "page"
 
 

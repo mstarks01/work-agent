@@ -1,6 +1,6 @@
 """Trace case 05 STRIDE references 6 and 7 through each committed STRIDE Baseline.
 
-Run from the repository root with ``ANALYSIS_OFFLINE=1``. The one argument is a
+Run from the repository root with ``KATRA_OFFLINE=1``. The one argument is a
 folder holding one subfolder per Baseline, named as the Baseline is, each with
 a ``rescored.json`` that ``run.py score <run> --corpus evals/corpus --out``
 wrote. The Baselines were scored on older reference sets, so their own
@@ -11,8 +11,8 @@ import json
 import sys
 from pathlib import Path
 
-from analysis_service.graph import FrameworkNodes, framework_lane_inputs
-from analysis_service.system_model import SystemModel
+from katra.graph import FrameworkNodes, framework_lane_inputs
+from katra.system_model import SystemModel
 from tests.test_prompt_lints import PACKAGE_LOADERS
 
 CASE = "05-cookbook-queue-webapp"

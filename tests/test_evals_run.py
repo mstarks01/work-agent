@@ -1,6 +1,6 @@
 """What the eval CLI claims about a sweep it certified.
 
-``certified`` is narrow by design (see :mod:`analysis_service.certification`): it
+``certified`` is narrow by design (see :mod:`katra.certification`): it
 means no *observed* fingerprint went unblessed, and is therefore vacuously true
 of a sweep that observed none. Printed alone, it would announce "all node
 fingerprints blessed" for a run that certified nothing and write
@@ -18,8 +18,6 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from analysis_service.certification import CertifyResult, UncertifiedNode
-from analysis_service.deployment import Deployment
 from evals.harness import run
 from evals.harness.bundle import reports_dir
 from evals.harness.modes import (
@@ -30,6 +28,8 @@ from evals.harness.modes import (
 )
 from evals.harness.reference import CorpusError
 from evals.harness.run import _models_record, _print_certification
+from katra.certification import CertifyResult, UncertifiedNode
+from katra.deployment import Deployment
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.source_tree import REPO_ROOT
 from tests.test_evals_assembly import UNREADABLE_CASE, unreadable_sweep  # noqa: F401
@@ -174,11 +174,11 @@ class TestTheArtifactCanActuallyBeWritten:
 
         assert (
             record["tiers"]["base"]["vendor"]
-            == TEST_TIER_ENV["ANALYSIS_MODEL_BASE_VENDOR"]
+            == TEST_TIER_ENV["KATRA_MODEL_BASE_VENDOR"]
         )
         assert (
             record["tiers"]["strong"]["model"]
-            == TEST_TIER_ENV["ANALYSIS_MODEL_STRONG_MODEL"]
+            == TEST_TIER_ENV["KATRA_MODEL_STRONG_MODEL"]
         )
 
 

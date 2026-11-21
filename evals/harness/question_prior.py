@@ -1,7 +1,7 @@
 """Count the early-question prior from archived runs (``QA-2026-09-26-03-E13``).
 
 The prior says how often a framework's findings cite each attribute or
-question kind, per element of one type. :mod:`analysis_service.early_questions`
+question kind, per element of one type. :mod:`katra.early_questions`
 ranks the questions a paused job asks with it. This command counts it from a
 sweep's reports, or from critic replays of that sweep's drafts, and writes the
 one framework's row of ``question_prior.json`` with the runs it read and the
@@ -24,16 +24,6 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-from analysis_service.claims import FrameworkName, UnknownRef
-from analysis_service.early_questions import (
-    QUESTION_PRIOR_PATH,
-    PriorRow,
-    element_type,
-    load_prior,
-)
-from analysis_service.frameworks import PACKAGES
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.bundle import finished_file, read_report
 from evals.harness.modes import EvalRunError
@@ -44,6 +34,16 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.run_record import run_record, sweep_inputs
+from katra.claims import FrameworkName, UnknownRef
+from katra.early_questions import (
+    QUESTION_PRIOR_PATH,
+    PriorRow,
+    element_type,
+    load_prior,
+)
+from katra.frameworks import PACKAGES
+from katra.report import Report
+from katra.system_model import SystemModel
 
 #: One case's sample: the case, its model and each finding's open facts.
 Sample = tuple[str, SystemModel, list[list[UnknownRef]]]

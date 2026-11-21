@@ -16,19 +16,19 @@ import pytest
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.ladder import OUTPUT_TOOL_NAME, REFUSAL_SCOPE, SCHEMA_REFUSALS
-from analysis_service.model_gate import _litellm
-from analysis_service.provider import (
+from katra.binding import build_tier_adapters
+from katra.ladder import OUTPUT_TOOL_NAME, REFUSAL_SCOPE, SCHEMA_REFUSALS
+from katra.model_gate import _litellm
+from katra.provider import (
     PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_FALLBACK_METADATA_KEY,
     SCHEMA_PATH_METADATA_KEY,
     InProcessExecutor,
 )
-from analysis_service.resilience import load_resilience
-from analysis_service.retry import classify
-from analysis_service.sampling import load_sampling
-from analysis_service.system_model import SystemModel
+from katra.resilience import load_resilience
+from katra.retry import classify
+from katra.sampling import load_sampling
+from katra.system_model import SystemModel
 from tests.factories import collected, rungs_of, tiers_for
 from tests.test_schema_rules import BEDROCK_SONNET_4_6, CONFIG, FAKE_ENV, SCHEMA
 from tests.test_tool_path import tool_call_message
@@ -147,7 +147,7 @@ def test_an_auto_tier_has_every_rung_its_pair_supports():
     [("native", ["native"]), ("tool", ["forced_tool", "offered_tool"])],
 )
 def test_an_explicit_setting_limits_the_ladder(setting, rungs):
-    adapter = _strong_adapter({"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": setting})
+    adapter = _strong_adapter({"KATRA_SAMPLING_STRONG_STRUCTURED_OUTPUT": setting})
 
     assert rungs_of(adapter) == rungs
 
@@ -307,7 +307,7 @@ def test_a_model_that_refuses_tools_gets_the_schema_in_its_prompt():
 
 
 def test_a_refusal_on_the_last_rung_fails_the_call():
-    adapter = _strong_adapter({"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": "native"})
+    adapter = _strong_adapter({"KATRA_SAMPLING_STRONG_STRUCTURED_OUTPUT": "native"})
     provider = _Provider(_bad_request(BEDROCK_REFUSAL))
     _wire(adapter, provider)
 

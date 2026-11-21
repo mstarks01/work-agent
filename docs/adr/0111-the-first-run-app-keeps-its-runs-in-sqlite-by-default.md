@@ -17,9 +17,9 @@ these steps stayed.
 ## Decision
 
 **With no store setting, the app keeps its runs in SQLite** (maintainer's
-decision, 2026-10-30). `store_defaults` gives `ANALYSIS_JOB_STORE=sql`, a
+decision, 2026-10-30). `store_defaults` gives `KATRA_JOB_STORE=sql`, a
 SQLite database `jobs.db` and a `filesystem` object root `objects` in the
-data directory, `$XDG_DATA_HOME/work-agent` or `~/.local/share/work-agent`.
+data directory, `$XDG_DATA_HOME/katra` or `~/.local/share/katra`.
 A default applies only where the selected rows read it, so an explicit
 `memory` store or another object store gets no setting that its row refuses.
 

@@ -5,8 +5,8 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service import critic
-from analysis_service.claims import (
+from katra import critic
+from katra.claims import (
     REASON_MAX_CHARS,
     Ground,
     Mitigation,
@@ -17,19 +17,19 @@ from analysis_service.claims import (
     Verdict,
     rests_on,
 )
-from analysis_service.critic import (
+from katra.critic import (
     CriticOutputError,
     assemble_claims,
     complete_rulings,
     review_issues,
     snap_rulings,
 )
-from analysis_service.fan_in import join_drafts, snap_drafts
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import RecommendationReading
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
-from analysis_service.system_model import mentioned_ids
+from katra.fan_in import join_drafts, snap_drafts
+from katra.frameworks import PACKAGES, schemas_for
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import RecommendationReading
+from katra.sources import DEFAULT_DESCRIPTION_LABEL
+from katra.system_model import mentioned_ids
 from tests.factories import (
     asvs_draft,
     sample_draft,
@@ -1329,12 +1329,12 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
     STRIDE has no unit text, so its view carries no key; an ASVS draft carries
     the catalog's words for the requirement it rules on.
     """
-    from analysis_service.claims import (
+    from katra.claims import (
         Ground,
         Verdict,
     )
-    from analysis_service.frameworks.asvs.catalog import requirement_text
-    from analysis_service.frameworks.asvs.record import RequirementRuling
+    from katra.frameworks.asvs.catalog import requirement_text
+    from katra.frameworks.asvs.record import RequirementRuling
 
     (stride_view,) = critic._ruling_view(
         [sample_draft("S-01", "spoofing")],
@@ -1374,7 +1374,7 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
     assert "8 characters" in asvs_view["unit_text"]
 
 
-#: Each :data:`~analysis_service.claims.UnreconciledKind` against a check that
+#: Each :data:`~katra.claims.UnreconciledKind` against a check that
 #: writes it and the claim it names. The two-in-one entry is deliberate: one
 #: malformed ID is both halves.
 PRODUCERS = {
@@ -1472,7 +1472,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         vocabulary does not hold cannot be recorded at all."""
         from typing import get_args
 
-        from analysis_service.claims import (
+        from katra.claims import (
             ARCHIVED_UNRECONCILED_KINDS,
             UnreconciledKind,
         )
@@ -1503,7 +1503,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         """Every sentence composes below the bound today, so this is the
         fail-safe: a producer that quotes more agent text than the eight do
         must not fail the job, with no report for this mark to annotate."""
-        from analysis_service.claims import (
+        from katra.claims import (
             UNRECONCILED_MESSAGE_MAX_CHARS,
             UnreconciledRuling,
         )
@@ -1517,7 +1517,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
     def test_the_bound_sits_above_what_a_check_composes(self):
         """A cut that fired on a real message would leave the mark and the
         re-ask's prompt reading two different sentences."""
-        from analysis_service.claims import UNRECONCILED_MESSAGE_MAX_CHARS
+        from katra.claims import UNRECONCILED_MESSAGE_MAX_CHARS
 
         for producer, _ in PRODUCERS.values():
             for problem in getattr(self, producer)():
@@ -1527,7 +1527,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
         """``Ruling.id`` carries no ``min_length`` on purpose: an empty ID is
         one more ID no lane agent drafted, and the re-ask is asked to drop it.
         The mark that records that must not be what raises instead."""
-        from analysis_service.claims import UNNAMED_CLAIM
+        from katra.claims import UNNAMED_CLAIM
 
         ruling = sample_ruling("S-01").model_copy(update={"id": ""})
 
@@ -1542,7 +1542,7 @@ def test_the_critic_cannot_reject_a_draft_as_a_duplicate():
     (QA-2026-10-03-02-E3), so the critic rules each draft on its own."""
     from pydantic import ValidationError
 
-    from analysis_service.claims import Verdict
+    from katra.claims import Verdict
 
     with pytest.raises(
         ValidationError, match="'evidence', 'reasoning', 'lane' or 'control'"

@@ -36,10 +36,10 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.asvs.catalog import ASVS_VERSION, requirement_text
 from evals.harness.reference import read_digest
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
+from katra.frameworks.asvs.catalog import ASVS_VERSION, requirement_text
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"

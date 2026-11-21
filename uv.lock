@@ -220,113 +220,6 @@ wheels = [
 ]
 
 [[package]]
-name = "analysis-service"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "anyio" },
-    { name = "cryptography" },
-    { name = "fastapi" },
-    { name = "google-adk" },
-    { name = "google-genai" },
-    { name = "litellm" },
-    { name = "pydantic" },
-    { name = "pyjwt", extra = ["crypto"] },
-    { name = "starlette" },
-]
-
-[package.optional-dependencies]
-aws = [
-    { name = "boto3" },
-    { name = "botocore" },
-]
-bedrock = [
-    { name = "boto3" },
-    { name = "botocore" },
-]
-gcs = [
-    { name = "google-api-core" },
-    { name = "google-auth" },
-    { name = "google-cloud-storage" },
-]
-sql = [
-    { name = "aiosqlite" },
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "typing-extensions" },
-]
-
-[package.dev-dependencies]
-browser = [
-    { name = "analysis-service", extra = ["sql"] },
-    { name = "playwright" },
-    { name = "uvicorn" },
-]
-dev = [
-    { name = "analysis-service", extra = ["bedrock", "gcs", "sql"] },
-    { name = "httpx" },
-    { name = "moto", extra = ["s3"] },
-    { name = "mypy" },
-    { name = "pip-audit" },
-    { name = "pytest" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-]
-web = [
-    { name = "analysis-service", extra = ["sql"] },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosqlite", marker = "extra == 'sql'", specifier = ">=0.22.1,<0.23" },
-    { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20.0,<1.21" },
-    { name = "analysis-service", extras = ["aws"], marker = "extra == 'bedrock'" },
-    { name = "anyio", specifier = ">=4" },
-    { name = "asyncpg", marker = "extra == 'sql'", specifier = ">=0.31.0,<0.32" },
-    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.43.1,<2.0" },
-    { name = "botocore", marker = "extra == 'aws'" },
-    { name = "cryptography", specifier = ">=45" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "google-adk", specifier = "==2.5.0" },
-    { name = "google-api-core", marker = "extra == 'gcs'" },
-    { name = "google-auth", marker = "extra == 'gcs'" },
-    { name = "google-cloud-storage", marker = "extra == 'gcs'", specifier = ">=3.17.1,<4.0" },
-    { name = "google-genai", specifier = ">=2.9" },
-    { name = "litellm", specifier = "==1.104.0" },
-    { name = "pydantic", specifier = ">=2.7" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.0.54,<2.1" },
-    { name = "starlette", specifier = ">=0.40" },
-    { name = "typing-extensions", marker = "extra == 'sql'", specifier = ">=4.12" },
-]
-provides-extras = ["aws", "bedrock", "gcs", "sql"]
-
-[package.metadata.requires-dev]
-browser = [
-    { name = "analysis-service", extras = ["sql"] },
-    { name = "playwright", specifier = ">=1.55" },
-    { name = "uvicorn", specifier = ">=0.30" },
-]
-dev = [
-    { name = "analysis-service", extras = ["bedrock"] },
-    { name = "analysis-service", extras = ["gcs"] },
-    { name = "analysis-service", extras = ["sql"] },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "moto", extras = ["s3"], specifier = ">=5.1" },
-    { name = "mypy", specifier = ">=1.18" },
-    { name = "pip-audit", specifier = ">=2.9" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-xdist", specifier = ">=3.8" },
-    { name = "ruff", specifier = ">=0.16.0" },
-]
-web = [
-    { name = "analysis-service", extras = ["sql"] },
-    { name = "uvicorn", specifier = ">=0.30" },
-]
-
-[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1596,6 +1489,113 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/19/74/a633ee74eb36c44aa6d1095e7cc5569bebf04342ee146178e2d36600708b/jsonschema_specifications-2025.9.1.tar.gz", hash = "sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d", size = 32855, upload-time = "2025-09-08T01:34:59.186Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe", size = 18437, upload-time = "2025-09-08T01:34:57.871Z" },
+]
+
+[[package]]
+name = "katra"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "anyio" },
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "google-adk" },
+    { name = "google-genai" },
+    { name = "litellm" },
+    { name = "pydantic" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "starlette" },
+]
+
+[package.optional-dependencies]
+aws = [
+    { name = "boto3" },
+    { name = "botocore" },
+]
+bedrock = [
+    { name = "boto3" },
+    { name = "botocore" },
+]
+gcs = [
+    { name = "google-api-core" },
+    { name = "google-auth" },
+    { name = "google-cloud-storage" },
+]
+sql = [
+    { name = "aiosqlite" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "typing-extensions" },
+]
+
+[package.dev-dependencies]
+browser = [
+    { name = "katra", extra = ["sql"] },
+    { name = "playwright" },
+    { name = "uvicorn" },
+]
+dev = [
+    { name = "httpx" },
+    { name = "katra", extra = ["bedrock", "gcs", "sql"] },
+    { name = "moto", extra = ["s3"] },
+    { name = "mypy" },
+    { name = "pip-audit" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
+]
+web = [
+    { name = "katra", extra = ["sql"] },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite", marker = "extra == 'sql'", specifier = ">=0.22.1,<0.23" },
+    { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.20.0,<1.21" },
+    { name = "anyio", specifier = ">=4" },
+    { name = "asyncpg", marker = "extra == 'sql'", specifier = ">=0.31.0,<0.32" },
+    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.43.1,<2.0" },
+    { name = "botocore", marker = "extra == 'aws'" },
+    { name = "cryptography", specifier = ">=45" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "google-adk", specifier = "==2.5.0" },
+    { name = "google-api-core", marker = "extra == 'gcs'" },
+    { name = "google-auth", marker = "extra == 'gcs'" },
+    { name = "google-cloud-storage", marker = "extra == 'gcs'", specifier = ">=3.17.1,<4.0" },
+    { name = "google-genai", specifier = ">=2.9" },
+    { name = "katra", extras = ["aws"], marker = "extra == 'bedrock'" },
+    { name = "litellm", specifier = "==1.104.0" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9" },
+    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.0.54,<2.1" },
+    { name = "starlette", specifier = ">=0.40" },
+    { name = "typing-extensions", marker = "extra == 'sql'", specifier = ">=4.12" },
+]
+provides-extras = ["aws", "bedrock", "gcs", "sql"]
+
+[package.metadata.requires-dev]
+browser = [
+    { name = "katra", extras = ["sql"] },
+    { name = "playwright", specifier = ">=1.55" },
+    { name = "uvicorn", specifier = ">=0.30" },
+]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "katra", extras = ["bedrock"] },
+    { name = "katra", extras = ["gcs"] },
+    { name = "katra", extras = ["sql"] },
+    { name = "moto", extras = ["s3"], specifier = ">=5.1" },
+    { name = "mypy", specifier = ">=1.18" },
+    { name = "pip-audit", specifier = ">=2.9" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-xdist", specifier = ">=3.8" },
+    { name = "ruff", specifier = ">=0.16.0" },
+]
+web = [
+    { name = "katra", extras = ["sql"] },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 
 [[package]]

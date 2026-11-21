@@ -93,15 +93,15 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Generic, Literal, TypeVar, get_args
 
-from analysis_service.candidates import CandidateSet
-from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
-from analysis_service.frameworks.stride.record import DraftThreat
-from analysis_service.parsing import strings
 from evals.harness.identity import CaseFlows, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, VoteStatus, holds_position, none_stated
 from evals.harness.triggers import archived_lead_rules
 from evals.harness.verbs import same_action
+from katra.candidates import CandidateSet
+from katra.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
+from katra.frameworks.stride.record import DraftThreat
+from katra.parsing import strings
 
 #: The causes a miss is charged to, in the order of the stages that decide
 #: them. ``position`` and ``unstated`` can come from the surviving-claim,
@@ -180,7 +180,7 @@ class Loss:
     draft_id: str | None = None
     draft_verb: str | None = None
     #: What the *first* critic pass got wrong on ``draft_id``, from
-    #: :meth:`~analysis_service.claims.FrameworkAnalysis.re_ask_kinds`. Empty
+    #: :meth:`~katra.claims.FrameworkAnalysis.re_ask_kinds`. Empty
     #: is the common case and means the ruling that lost this reference is the
     #: one the first pass wrote. Non-empty splits a ``critic`` charge in two: a
     #: kill the critic argued for is priced against its reasoning, and one that
@@ -260,7 +260,7 @@ class AssertionBacking:
 
     ``resting`` counts claims rather than grounds, because one claim citing two
     rows is one finding the layer contributed to. Which kinds count is
-    :data:`~analysis_service.claims.ASSERTION_GROUNDS`, read rather than spelled
+    :data:`~katra.claims.ASSERTION_GROUNDS`, read rather than spelled
     here, so a kind added to that set reaches this number too.
     """
 
@@ -576,7 +576,7 @@ def attribute_case(
     ``block`` is the report's own STRIDE block, read for one fact the drafts do
     not carry: whether the ruling on the draft a row names came out of a
     bounded re-ask (#796). Asked through the block's own
-    :meth:`~analysis_service.claims.FrameworkAnalysis.re_ask_kinds`, so this
+    :meth:`~katra.claims.FrameworkAnalysis.re_ask_kinds`, so this
     and the ASVS instrument cannot disagree about what a re-asked claim is.
     """
     references = case.stride_claims()

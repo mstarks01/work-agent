@@ -17,8 +17,8 @@ from types import MappingProxyType
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import config_files
-from analysis_service.config_files import (
+from katra import config_files
+from katra.config_files import (
     MAX_VALUE_CHARS,
     SETTINGS_DIR_VAR,
     SettingsFileError,
@@ -30,7 +30,7 @@ from analysis_service.config_files import (
     value_refusal,
     write_settings_env,
 )
-from analysis_service.settings_variables import deployment_env
+from katra.settings_variables import deployment_env
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_webapp import LOOPBACK
 from webapp.main import Startup, build_startup, create_app
@@ -87,19 +87,19 @@ class TestTheWriter:
     def test_the_reader_reads_what_it_writes_with_the_same_revision(self, tmp_path):
         path = tmp_path / "settings.env"
 
-        write_settings_env(path, {"ANALYSIS_A": "1", "ANALYSIS_B": "x/y"})
+        write_settings_env(path, {"KATRA_A": "1", "KATRA_B": "x/y"})
 
-        assert path.read_text() == "ANALYSIS_A=1\nANALYSIS_B=x/y\n"
+        assert path.read_text() == "KATRA_A=1\nKATRA_B=x/y\n"
         assert read_settings(path).revision == sha256(path.read_bytes()).hexdigest()
-        assert read_settings_env(path)["ANALYSIS_B"].value == "x/y"
+        assert read_settings_env(path)["KATRA_B"].value == "x/y"
 
     def test_a_missing_file_has_the_revision_of_no_bytes(self, tmp_path):
         assert read_settings(tmp_path / "settings.env").revision == sha256().hexdigest()
 
     def test_the_first_write_makes_a_private_directory(self, tmp_path):
-        path = tmp_path / "a" / "work-agent" / "settings.env"
+        path = tmp_path / "a" / "katra" / "settings.env"
 
-        write_settings_env(path, {"ANALYSIS_A": "1"})
+        write_settings_env(path, {"KATRA_A": "1"})
 
         assert path.parent.stat().st_mode & 0o777 == 0o700
         assert path.stat().st_mode & 0o777 == 0o600
@@ -108,7 +108,7 @@ class TestTheWriter:
     def test_it_keeps_the_mode_of_a_directory_that_exists(self, tmp_path):
         tmp_path.chmod(0o750)
 
-        write_settings_env(tmp_path / "settings.env", {"ANALYSIS_A": "1"})
+        write_settings_env(tmp_path / "settings.env", {"KATRA_A": "1"})
 
         assert tmp_path.stat().st_mode & 0o777 == 0o750
 
@@ -116,12 +116,12 @@ class TestTheWriter:
         tmp_path.chmod(0o777)
 
         with pytest.raises(SettingsFileError, match="mode 0777"):
-            write_settings_env(tmp_path / "settings.env", {"ANALYSIS_A": "1"})
+            write_settings_env(tmp_path / "settings.env", {"KATRA_A": "1"})
         tmp_path.chmod(0o700)
         assert not list(tmp_path.iterdir())
 
     def test_a_new_file_is_private_and_never_replaces_one(self, tmp_path):
-        path = tmp_path / "work-agent" / "key"
+        path = tmp_path / "katra" / "key"
 
         create_private(path, b"first")
         with pytest.raises(FileExistsError):
@@ -144,12 +144,12 @@ class TestTheWriter:
         self, tmp_path, monkeypatch, caplog
     ):
         path = tmp_path / "settings.env"
-        write_settings_env(path, {"ANALYSIS_A": "1"})
+        write_settings_env(path, {"KATRA_A": "1"})
         fail_directory_fsync(monkeypatch)
 
-        write_settings_env(path, {"ANALYSIS_A": "2"})
+        write_settings_env(path, {"KATRA_A": "2"})
 
-        assert path.read_text() == "ANALYSIS_A=2\n"
+        assert path.read_text() == "KATRA_A=2\n"
         assert [entry.name for entry in tmp_path.iterdir()] == ["settings.env"]
         assert "Input/output error" in caplog.text
 
@@ -158,12 +158,12 @@ class TestTheWriter:
         path = tmp_path / "settings.env"
 
         with pytest.raises(SettingsFileError) as refused:
-            write_settings_env(path, {"ANALYSIS_A": REFUSED_VALUES[form]})
+            write_settings_env(path, {"KATRA_A": REFUSED_VALUES[form]})
 
         assert "SECRET" not in str(refused.value)
         assert not path.exists()
 
-    @pytest.mark.parametrize("key", ["analysis_a", "ANALYSIS_A=B", "OTHER"])
+    @pytest.mark.parametrize("key", ["analysis_a", "KATRA_A=B", "OTHER"])
     def test_it_writes_no_key_outside_the_pattern(self, tmp_path, key):
         with pytest.raises(SettingsFileError):
             write_settings_env(tmp_path / "settings.env", {key: "1"})
@@ -174,24 +174,22 @@ class TestTheSettingsDirectory:
         assert settings_dir({SETTINGS_DIR_VAR: str(tmp_path)}) == tmp_path
 
     def test_it_sits_under_an_absolute_xdg_config_home(self, tmp_path):
-        assert (
-            settings_dir({"XDG_CONFIG_HOME": str(tmp_path)}) == tmp_path / "work-agent"
-        )
+        assert settings_dir({"XDG_CONFIG_HOME": str(tmp_path)}) == tmp_path / "katra"
 
     @pytest.mark.parametrize("xdg", [None, "", "relative/config"])
     def test_it_falls_back_to_dot_config(self, xdg):
         env = {} if xdg is None else {"XDG_CONFIG_HOME": xdg}
-        assert settings_dir(env) == Path.home() / ".config" / "work-agent"
+        assert settings_dir(env) == Path.home() / ".config" / "katra"
 
 
 class TestTheDataDirectory:
     def test_it_sits_under_an_absolute_xdg_data_home(self, tmp_path):
-        assert data_dir({"XDG_DATA_HOME": str(tmp_path)}) == tmp_path / "work-agent"
+        assert data_dir({"XDG_DATA_HOME": str(tmp_path)}) == tmp_path / "katra"
 
     @pytest.mark.parametrize("xdg", [None, "", "relative/data"])
     def test_it_falls_back_to_dot_local_share(self, xdg):
         env = {} if xdg is None else {"XDG_DATA_HOME": xdg}
-        assert data_dir(env) == Path.home() / ".local" / "share" / "work-agent"
+        assert data_dir(env) == Path.home() / ".local" / "share" / "katra"
 
 
 class TestTheReader:
@@ -199,32 +197,30 @@ class TestTheReader:
         assert read_settings_env(tmp_path / "absent" / "settings.env") == {}
 
     def test_each_value_is_the_text_after_the_first_equals(self, tmp_path):
-        path = write_settings(
-            tmp_path, "ANALYSIS_A=x=y\n\nANALYSIS_B=\nANALYSIS_C=a b\n"
-        )
+        path = write_settings(tmp_path, "KATRA_A=x=y\n\nKATRA_B=\nKATRA_C=a b\n")
         lines = read_settings_env(path)
         assert {key: line.value for key, line in lines.items()} == {
-            "ANALYSIS_A": "x=y",
-            "ANALYSIS_B": "",
-            "ANALYSIS_C": "a b",
+            "KATRA_A": "x=y",
+            "KATRA_B": "",
+            "KATRA_C": "a b",
         }
-        assert lines["ANALYSIS_C"].number == 4
+        assert lines["KATRA_C"].number == 4
 
     @pytest.mark.parametrize(
         "line",
         [
-            "export ANALYSIS_A=1",
+            "export KATRA_A=1",
             "# a comment",
             "analysis_a=1",
-            "ANALYSIS_A",
-            " ANALYSIS_A=1",
-            "ANALYSIS_A =1",
+            "KATRA_A",
+            " KATRA_A=1",
+            "KATRA_A =1",
             "OTHER_A=1",
-            "﻿ANALYSIS_A=1",
+            "﻿KATRA_A=1",
         ],
     )
     def test_each_other_line_is_refused_with_its_number(self, tmp_path, line):
-        path = write_settings(tmp_path, f"ANALYSIS_OK=1\n{line}\n")
+        path = write_settings(tmp_path, f"KATRA_OK=1\n{line}\n")
         with pytest.raises(
             SettingsFileError, match=r"settings\.env line 2: "
         ) as caught:
@@ -232,24 +228,24 @@ class TestTheReader:
         assert "=1" not in str(caught.value)
 
     def test_a_key_that_occurs_two_times_is_refused(self, tmp_path):
-        path = write_settings(tmp_path, "ANALYSIS_A=1\nANALYSIS_B=2\nANALYSIS_A=3\n")
+        path = write_settings(tmp_path, "KATRA_A=1\nKATRA_B=2\nKATRA_A=3\n")
         with pytest.raises(
-            SettingsFileError, match=r"line 3: sets ANALYSIS_A again, after line 1"
+            SettingsFileError, match=r"line 3: sets KATRA_A again, after line 1"
         ):
             read_settings_env(path)
 
     def test_a_file_that_is_not_utf8_is_refused(self, tmp_path):
-        (tmp_path / "settings.env").write_bytes(b"ANALYSIS_A=\xff\n")
+        (tmp_path / "settings.env").write_bytes(b"KATRA_A=\xff\n")
         (tmp_path / "settings.env").chmod(0o600)
         with pytest.raises(SettingsFileError, match="is not UTF-8"):
             read_settings_env(tmp_path / "settings.env")
 
     @pytest.mark.parametrize("char", LINE_BREAKS, ids=repr)
     def test_it_does_not_split_on_another_line_break(self, tmp_path, char):
-        path = write_settings(tmp_path, f"ANALYSIS_A=1{char}ANALYSIS_B=2\n")
+        path = write_settings(tmp_path, f"KATRA_A=1{char}KATRA_B=2\n")
         lines = read_settings_env(path)
-        assert list(lines) == ["ANALYSIS_A"]
-        assert value_refusal(lines["ANALYSIS_A"].value) is not None
+        assert list(lines) == ["KATRA_A"]
+        assert value_refusal(lines["KATRA_A"].value) is not None
 
 
 class TestTheValueRule:
@@ -266,9 +262,9 @@ class TestTheValueRule:
 
 class TestTheMerge:
     def test_settings_env_adds_its_lines(self, tmp_path):
-        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={OTHER_MODEL}\n")
+        write_settings(tmp_path, f"KATRA_MODEL_BASE_MODEL={OTHER_MODEL}\n")
         env = deployment_env(env_in(tmp_path, PATH="/usr/bin"))
-        assert env["ANALYSIS_MODEL_BASE_MODEL"] == OTHER_MODEL
+        assert env["KATRA_MODEL_BASE_MODEL"] == OTHER_MODEL
         assert env["PATH"] == "/usr/bin"
 
     def test_a_missing_directory_adds_nothing(self, tmp_path):
@@ -276,19 +272,19 @@ class TestTheMerge:
         assert deployment_env(process) == process
 
     def test_a_variable_that_both_sources_set_is_refused(self, tmp_path):
-        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={OTHER_MODEL}\n")
-        process = env_in(tmp_path, ANALYSIS_MODEL_BASE_MODEL="gpt-4.1-mini")
+        write_settings(tmp_path, f"KATRA_MODEL_BASE_MODEL={OTHER_MODEL}\n")
+        process = env_in(tmp_path, KATRA_MODEL_BASE_MODEL="gpt-4.1-mini")
         with pytest.raises(
             SettingsFileError,
-            match="line 1: ANALYSIS_MODEL_BASE_MODEL is also set in the process",
+            match="line 1: KATRA_MODEL_BASE_MODEL is also set in the process",
         ):
             deployment_env(process)
 
     def test_an_unknown_key_is_refused_with_its_line_number(self, tmp_path):
-        write_settings(tmp_path, "ANALYSIS_TIMEOUT_MS=1000\nANALYSIS_RENAMED=1\n")
+        write_settings(tmp_path, "KATRA_TIMEOUT_MS=1000\nKATRA_RENAMED=1\n")
         with pytest.raises(
             SettingsFileError,
-            match="line 2: ANALYSIS_RENAMED is not a setting that this version reads",
+            match="line 2: KATRA_RENAMED is not a setting that this version reads",
         ):
             deployment_env(env_in(tmp_path))
 
@@ -301,19 +297,19 @@ class TestTheMerge:
 
     @pytest.mark.parametrize("value", REFUSED_VALUES.values(), ids=REFUSED_VALUES)
     def test_the_value_rule_refuses_a_line(self, tmp_path, value):
-        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={value}\n")
+        write_settings(tmp_path, f"KATRA_MODEL_BASE_MODEL={value}\n")
         with pytest.raises(
-            SettingsFileError, match="line 1: ANALYSIS_MODEL_BASE_MODEL "
+            SettingsFileError, match="line 1: KATRA_MODEL_BASE_MODEL "
         ) as caught:
             deployment_env(env_in(tmp_path))
         assert "SECRET" not in str(caught.value)
 
     @pytest.mark.parametrize("value", REFUSED_VALUES.values(), ids=REFUSED_VALUES)
     def test_the_value_rule_refuses_a_process_variable(self, tmp_path, value):
-        process = env_in(tmp_path, ANALYSIS_MODEL_BASE_MODEL=value)
+        process = env_in(tmp_path, KATRA_MODEL_BASE_MODEL=value)
         with pytest.raises(
             SettingsFileError,
-            match="ANALYSIS_MODEL_BASE_MODEL in the process environment ",
+            match="KATRA_MODEL_BASE_MODEL in the process environment ",
         ) as caught:
             deployment_env(process)
         assert "SECRET" not in str(caught.value)
@@ -342,7 +338,7 @@ def hand_written(**overrides: str) -> str:
 
 class TestTheFirstRunApp:
     def test_it_runs_on_a_hand_written_settings_env(self, tmp_path):
-        write_settings(tmp_path, hand_written(ANALYSIS_MODEL_BASE_MODEL=OTHER_MODEL))
+        write_settings(tmp_path, hand_written(KATRA_MODEL_BASE_MODEL=OTHER_MODEL))
         client = settings_client(tmp_path)
 
         page = client.get("/")
@@ -352,7 +348,7 @@ class TestTheFirstRunApp:
         assert OTHER_MODEL in client.get("/settings").text
 
     def test_it_carries_what_settings_env_names(self, tmp_path):
-        write_settings(tmp_path, hand_written(ANALYSIS_FRAMEWORKS_CARRIED="stride"))
+        write_settings(tmp_path, hand_written(KATRA_FRAMEWORKS_CARRIED="stride"))
         client = settings_client(tmp_path)
 
         page = client.get("/")
@@ -363,29 +359,29 @@ class TestTheFirstRunApp:
 
     def test_a_conflict_stops_it_and_names_the_variable(self, tmp_path):
         write_settings(tmp_path, hand_written())
-        client = settings_client(tmp_path, {"ANALYSIS_MODEL_BASE_MODEL": OTHER_MODEL})
+        client = settings_client(tmp_path, {"KATRA_MODEL_BASE_MODEL": OTHER_MODEL})
 
         page = client.get("/")
 
         assert page.status_code == 503
-        assert "ANALYSIS_MODEL_BASE_MODEL is also set in the process" in page.text
+        assert "KATRA_MODEL_BASE_MODEL is also set in the process" in page.text
 
     def test_an_unknown_key_stops_it_and_names_the_key_and_line(self, tmp_path):
-        write_settings(tmp_path, hand_written() + "ANALYSIS_RENAMED=1\n")
+        write_settings(tmp_path, hand_written() + "KATRA_RENAMED=1\n")
         client = settings_client(tmp_path)
 
         page = client.get("/")
 
         assert page.status_code == 503
         line = len(TEST_TIER_ENV | TEST_CREDENTIAL_ENV) + 1
-        assert f"line {line}: ANALYSIS_RENAMED is not a setting" in page.text
+        assert f"line {line}: KATRA_RENAMED is not a setting" in page.text
 
     def test_a_refused_value_stops_it_without_the_value(self, tmp_path):
-        write_settings(tmp_path, hand_written(ANALYSIS_MODEL_BASE_MODEL="SECRET\\x"))
+        write_settings(tmp_path, hand_written(KATRA_MODEL_BASE_MODEL="SECRET\\x"))
         client = settings_client(tmp_path)
 
         page = client.get("/")
 
         assert page.status_code == 503
-        assert "ANALYSIS_MODEL_BASE_MODEL holds a" in page.text
+        assert "KATRA_MODEL_BASE_MODEL holds a" in page.text
         assert "SECRET" not in page.text

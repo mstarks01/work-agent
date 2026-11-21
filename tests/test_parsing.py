@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.parsing import (
+from katra.parsing import (
     ascii_int,
     is_version,
     member,

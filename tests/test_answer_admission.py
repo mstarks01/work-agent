@@ -17,14 +17,14 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.answer_forms import answer_choices, answer_limit
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
-from analysis_service.answer_state import question_set
-from analysis_service.assertions import AssertionCatalog
-from analysis_service.capabilities import lineage
-from analysis_service.claims import _KIND_ORDER
-from analysis_service.early_questions import early_questions
-from analysis_service.fact_answers import (
+from katra.answer_forms import answer_choices, answer_limit
+from katra.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
+from katra.answer_state import question_set
+from katra.assertions import AssertionCatalog
+from katra.capabilities import lineage
+from katra.claims import _KIND_ORDER
+from katra.early_questions import early_questions
+from katra.fact_answers import (
     MAX_DETAIL_CHARS,
     FactAnswer,
     FactKind,
@@ -33,17 +33,17 @@ from analysis_service.fact_answers import (
     fact_line,
     key_ref,
 )
-from analysis_service.fact_writes import check_fact_answers
-from analysis_service.links import (
+from katra.fact_writes import check_fact_answers
+from katra.links import (
     LinkAnswer,
     NoCatalogError,
     apply_answers,
     check_answers,
     merged_facts,
 )
-from analysis_service.open_facts import open_attribute
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.system_model import EXCERPT_MAX_CHARS, attribute_names
+from katra.open_facts import open_attribute
+from katra.question_kinds import QUESTION_KINDS
+from katra.system_model import EXCERPT_MAX_CHARS, attribute_names
 from tests import test_webapp
 from tests.factories import valid_model
 from tests.test_api import auth
@@ -459,8 +459,8 @@ class TestTheAdaptiveList:
     """A waiting job asks one adaptive list (ADR 0078)."""
 
     def test_the_list_holds_each_kind_up_to_its_limit_above_the_floor(self):
-        from analysis_service.answer_state import EARLY_RULES, passes_floor
-        from analysis_service.early_questions import early_questions
+        from katra.answer_state import EARLY_RULES, passes_floor
+        from katra.early_questions import early_questions
 
         asked = _asked_after([])
         checkpoint = held()
@@ -480,7 +480,7 @@ class TestTheAdaptiveList:
         assert asked.to_json()["policy_version"] == "adaptive-1"
 
     def test_a_question_counts_as_one_whatever_its_facets(self):
-        from analysis_service.answer_state import recommended
+        from katra.answer_state import recommended
 
         wide = SimpleNamespace(
             key=CAPACITY,
@@ -506,7 +506,7 @@ class TestTheAdaptiveList:
     def test_field_questions_have_no_limit(self):
         """However many places saved field answers take, every field question
         above the floor is listed (ADR 0088)."""
-        from analysis_service.answer_state import recommended
+        from katra.answer_state import recommended
 
         listed = _asked_after([]).early
         answered_for = {
@@ -537,8 +537,8 @@ class TestTheAdaptiveList:
     def test_a_second_framework_takes_no_place_from_the_first(self, monkeypatch):
         """Each framework has its own limit, so a joint pause asks STRIDE what
         it asks alone (QA-2026-10-09-01-E1). A limit counts groups (ADR 0081)."""
-        from analysis_service import answer_state
-        from analysis_service.answer_state import EarlyRule, recommended
+        from katra import answer_state
+        from katra.answer_state import EarlyRule, recommended
 
         monkeypatch.setitem(answer_state.EARLY_RULES, "field", EarlyRule(1.0, 2))
         field = self._field
@@ -564,8 +564,8 @@ class TestTheAdaptiveList:
         """A group with a partial answer stays listed and takes one place, so a
         new row of it is listed too, while a new group waits for a place
         (#1289, B3; ADR 0081)."""
-        from analysis_service import answer_state
-        from analysis_service.answer_state import EarlyRule, recommended
+        from katra import answer_state
+        from katra.answer_state import EarlyRule, recommended
 
         monkeypatch.setitem(answer_state.EARLY_RULES, "field", EarlyRule(1.0, 1))
         facets = QUESTION_KINDS["capacity-limits"].facets
@@ -600,7 +600,7 @@ class TestTheAdaptiveList:
         """The saved answers charge each framework, and so does a question's
         place in the list. A question answered in part is charged once, so
         its framework's turn is not passed over for it twice."""
-        from analysis_service.answer_state import recommended
+        from katra.answer_state import recommended
 
         def field(name, framework, facets=()):
             return SimpleNamespace(
@@ -675,7 +675,7 @@ class TestTheAdaptiveList:
 
     def test_the_route_saves_every_list_and_only_a_continue_starts(self):
         """The last save started the analysis by itself (#1289, item 7)."""
-        from analysis_service.sources import SourceLimits
+        from katra.sources import SourceLimits
 
         client, store = catalog_client()
         # Room for the answers source every save's answers compose.
@@ -809,7 +809,7 @@ class TestSkipForNow:
             admit(asked, links=[answer], save=True, skips=[link.key])
 
     def test_the_route_keeps_a_link_skip_on_the_job(self):
-        from analysis_service.sources import SourceLimits
+        from katra.sources import SourceLimits
 
         client, store = catalog_client()
         client.app.state.limits = SourceLimits(max_total_bytes=100_000, max_sources=3)
@@ -827,7 +827,7 @@ class TestSkipForNow:
         assert [q["key"] for q in after["skipped_links"]] == [key]
 
     def test_the_route_keeps_a_skip_on_the_job(self):
-        from analysis_service.sources import SourceLimits
+        from katra.sources import SourceLimits
 
         client, store = catalog_client()
         client.app.state.limits = SourceLimits(max_total_bytes=100_000, max_sources=3)
@@ -1006,7 +1006,7 @@ class TestAFollowUpMustAddSomething:
         ],
     )
     def test_only_known_content_that_changes_is_information(self, earlier, sent, adds):
-        from analysis_service.answer_state import _adds_information
+        from katra.answer_state import _adds_information
 
         assert (
             _adds_information(
@@ -1017,7 +1017,7 @@ class TestAFollowUpMustAddSomething:
 
     @pytest.mark.parametrize(("earlier", "adds"), [([], True), ([LINK], False)])
     def test_a_link_is_information_where_it_places_anew(self, earlier, adds):
-        from analysis_service.answer_state import _adds_information
+        from katra.answer_state import _adds_information
 
         assert (
             _adds_information(
@@ -1085,7 +1085,7 @@ class TestARefusalNamesItsFactByLabel:
         assert "('" not in message, message
 
     def test_a_line_too_long(self):
-        from analysis_service.fact_answers import fact_label
+        from katra.fact_answers import fact_label
 
         key = (FLOW, "data_description", "", "", "", "")
         model = open_description()
@@ -1094,7 +1094,7 @@ class TestARefusalNamesItsFactByLabel:
         self.assert_readable(excinfo, fact_label(key, open_description()))
 
     def test_a_skip_of_a_question_not_shown_and_of_an_answered_one(self):
-        from analysis_service.fact_answers import fact_label
+        from katra.fact_answers import fact_label
 
         asked = _asked_after([])
         shown = asked.early[0].key
@@ -1225,7 +1225,7 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
 def test_answers_that_break_the_input_limits_are_refused_at_once(save):
     """The service refuses a save over the input limits at once, so a later
     start cannot fail on it."""
-    from analysis_service.sources import SourceLimits, total_bytes
+    from katra.sources import SourceLimits, total_bytes
 
     client, store = catalog_client()
     waited = waiting(store)
@@ -1469,7 +1469,7 @@ class TestTheFrameworksTakeTurns:
         assert [q.key for q in shown] == [q.key for q in listed]
 
     def test_a_gate_question_comes_first(self):
-        from analysis_service.answer_state import recommended
+        from katra.answer_state import recommended
 
         def question(key, gates=()):
             return SimpleNamespace(
@@ -1491,8 +1491,8 @@ class TestTheFrameworksTakeTurns:
     def test_each_question_kind_is_listed_once_at_its_first_row(self):
         """A kind's rows follow its first row; a capability keeps its place,
         because every capability shares one group (ADR 0080)."""
-        from analysis_service.answer_state import grouped
-        from analysis_service.open_facts import CAPABILITY_GROUP
+        from katra.answer_state import grouped
+        from katra.open_facts import CAPABILITY_GROUP
 
         def question(key, group):
             return SimpleNamespace(key=(key,), group=group)
@@ -1515,7 +1515,7 @@ class TestTheFrameworksTakeTurns:
         ]
 
     def test_a_shared_question_is_charged_to_each_framework_it_serves(self):
-        from analysis_service.answer_state import by_turn
+        from katra.answer_state import by_turn
 
         def question(key, *frameworks):
             return SimpleNamespace(

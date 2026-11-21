@@ -1,0 +1,231 @@
+"""The STRIDE framework package: this repo's original analysis, as a package.
+
+Fifteen members and a text root at ``frameworks/stride/``. Everything here is
+*profile* — the tailoring this service applies — and nothing declares a catalog:
+STRIDE is a method rather than a published requirement set, so there is no
+external artifact to carry or to check a declaration against.
+"""
+
+from __future__ import annotations
+
+from types import MappingProxyType
+from typing import cast, get_args
+
+from pydantic import BaseModel, ConfigDict
+
+from katra.bands import Band, band_of
+from katra.claims import (
+    Claim,
+    SeverityLevel,
+    UnknownRef,
+    derive_severity_level,
+)
+from katra.frameworks import (
+    FrameworkPackage,
+    IdRule,
+    KnowledgeTables,
+    PreconditionResult,
+    Unit,
+    lane_of,
+)
+from katra.frameworks.stride.record import (
+    CATEGORY_LETTERS,
+    ID_FORMAT,
+    STRIDE_CATEGORIES,
+    STRIDE_VERSION,
+    DraftThreat,
+)
+from katra.frameworks.stride.rules import PREDICATE_READERS, RULES
+from katra.system_model import SystemModel
+
+__all__ = ["CASES", "NOTES", "STRIDE", "StrideOptions"]
+
+
+class StrideOptions(BaseModel):
+    """The job-level values STRIDE needs, of which there are none.
+
+    A declared empty model rather than an absent member. Every package declares
+    its options, so a caller submitting ``{"name": "stride"}`` is submitting a
+    complete selection rather than relying on an omission, and ``extra="forbid"``
+    means an option a caller invented for STRIDE is refused on the input ladder
+    instead of being ignored.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
+def stride_precondition(model: SystemModel) -> PreconditionResult:
+    """What STRIDE asks of a **Valid System Model**: nothing beyond validity.
+
+    **Total, and declared rather than absent.** STRIDE-per-element applies to
+    any system that can be drawn as a data-flow graph, which is exactly what a
+    valid model is, so every one of them satisfies this. Writing it out is what
+    keeps the precondition a required member: a package exempt from declaring
+    one would be a package whose scope nothing states, and a framework that
+    *does* scope itself would then be the odd case rather than the ordinary one.
+    """
+    del model  # every valid model satisfies STRIDE
+    return "satisfied"
+
+
+def stride_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
+    """No fact decides STRIDE's precondition: it is total, so never undecidable."""
+    del model
+    return ()
+
+
+# Document -> the candidate rules that select it. The direction is
+# document-to-rules because what a maintainer edits is a document and its
+# applicability, and a rule-keyed table would spread one document's entry
+# across the file.
+#
+# Every rule ID here must exist in :data:`~katra.frameworks.stride.
+# rules.RULES` and every document must exist under this package's text root.
+# The package gate holds both true at deployment construction, so an edit to
+# either side that forgets the other refuses to start rather than silently
+# dropping material out of an agent's context.
+NOTES: dict[str, tuple[str, ...]] = {
+    "identity-at-a-boundary": (
+        "spoofing-unverified-boundary-auth",
+        "spoofing-unverified-external-caller",
+        # A stated absence of a second factor is this note's subject twice
+        # over: its "credential versus identity" paragraph is about what one
+        # factor proves, and its guardrail already separates an unknown
+        # control from a stated absence, which is the distinction the rule
+        # fires on.
+        "spoofing-second-factor-stated-absent",
+        # A receiver that does not check who supplied a thing is the note's
+        # "claim, not an assertion" failure, and a credential that stays valid
+        # is its distribution-versus-longevity paragraph.
+        "spoofing-origin-stated-unverified",
+        "spoofing-standing-credential",
+    ),
+    "callback-and-webhook-trust": ("spoofing-unverified-external-caller",),
+    "transport-protection": (
+        "tampering-unprotected-transit-crossing",
+        "information-disclosure-unprotected-sensitive-transit",
+    ),
+    "write-path-integrity": (
+        "tampering-unverified-write-to-store",
+        # An unsigned artifact is dangerous where its second reader runs it,
+        # which is this note's first point.
+        "tampering-signature-stated-unverified",
+        # Values nobody checks are this note's "stored content that becomes
+        # instruction", reached through a reader that trusts the shape alone.
+        "tampering-content-stated-unvalidated",
+    ),
+    "attribution-and-audit": (
+        "repudiation-unattributable-action",
+        "repudiation-shared-credential",
+        # A record naming the conduit rather than the actor is this note's
+        # first point.
+        "repudiation-record-names-intermediary",
+    ),
+    "protection-at-rest": ("information-disclosure-store-at-rest-unverified",),
+    "cost-of-an-unauthenticated-request": (
+        "denial-of-service-internet-exposed-process",
+    ),
+    "failure-coupling": ("denial-of-service-shared-dependency",),
+    "privilege-transitions": ("elevation-of-privilege-privilege-zone-crossing",),
+    # The store-readers rule asks what a compromised reader of a store exposes,
+    # which is this note's pivot from the component to "the store it can read".
+    "compromise-inheritance": (
+        "elevation-of-privilege-inbound-from-exposed-process",
+        "information-disclosure-store-readers",
+    ),
+}
+
+# The same table for worked cases. A case may be selected by rules in several
+# lanes on purpose: the judgement it demonstrates — an unknown control is not a
+# missing one, a candidate the prose already answers — is not a property of one
+# lane, and the agent that receives it is whichever lane's rule fired.
+CASES: dict[str, tuple[str, ...]] = {
+    "unknown-is-not-absent": (
+        "spoofing-unverified-boundary-auth",
+        "information-disclosure-store-at-rest-unverified",
+        "tampering-unprotected-transit-crossing",
+        # The case teaches the reading the rule depends on. A row saying no
+        # second factor is required is a stated absence, so the threat is not
+        # conditional — which is the half of this case an agent gets wrong in
+        # the other direction.
+        "spoofing-second-factor-stated-absent",
+        # Each of these leads with a fact the sources state, not an unknown,
+        # so a finding on it is not conditional: the comparison half of this
+        # case.
+        "spoofing-origin-stated-unverified",
+        "spoofing-standing-credential",
+        "tampering-signature-stated-unverified",
+        "information-disclosure-destination-stated-unverified",
+        "tampering-content-stated-unvalidated",
+    ),
+    "stated-control-outside-the-model": (
+        "spoofing-unverified-boundary-auth",
+        "tampering-unverified-write-to-store",
+    ),
+    "spoofing-or-elevation": (
+        "elevation-of-privilege-privilege-zone-crossing",
+        "spoofing-unverified-external-caller",
+    ),
+    "two-threats-one-flow": (
+        "information-disclosure-unprotected-sensitive-transit",
+        "tampering-unverified-write-to-store",
+    ),
+    "chained-benign-facts": (
+        "elevation-of-privilege-inbound-from-exposed-process",
+        "denial-of-service-shared-dependency",
+    ),
+    "shared-credential-attribution": (
+        "repudiation-unattributable-action",
+        "repudiation-shared-credential",
+        "repudiation-record-names-intermediary",
+    ),
+}
+
+
+#: STRIDE's bands, the highest first: the severity bands the lane rates.
+_BANDS: tuple[SeverityLevel, ...] = tuple(reversed(get_args(SeverityLevel)))
+
+
+def _rank(claim: Claim) -> Band:
+    """A threat's severity band: a critical threat first."""
+    severity = cast(DraftThreat, claim).severity
+    level = derive_severity_level(severity.likelihood, severity.impact)
+    return band_of(_BANDS, level)
+
+
+def _control_unit_of(claim: Claim) -> str:
+    """A threat's lane, which is the finest unit a method with no catalog offers."""
+    return lane_of(claim) or ""
+
+
+STRIDE = FrameworkPackage(
+    name="stride",
+    version=STRIDE_VERSION,
+    lanes=STRIDE_CATEGORIES,
+    rules=RULES,
+    record=DraftThreat,
+    id_rule=IdRule(
+        template=ID_FORMAT,
+        # Widened from ``StrideCategory`` to ``str``, because ``IdRule`` keys by
+        # lane and a lane is a plain slug on the contract: the package gate is
+        # what checks this table covers every declared lane.
+        prefix=MappingProxyType(
+            {str(lane): letter for lane, letter in CATEGORY_LETTERS.items()}
+        ),
+        lane_field="category",
+    ),
+    options=StrideOptions,
+    precondition=stride_precondition,
+    precondition_facts=stride_precondition_facts,
+    knowledge=KnowledgeTables(
+        notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
+    ),
+    predicate_readers=PREDICATE_READERS,
+    bands=_BANDS,
+    rank=_rank,
+    units=tuple(
+        Unit(id=lane, grain="lane", lane=lane, inside=None)
+        for lane in STRIDE_CATEGORIES
+    ),
+    control_unit_of=_control_unit_of,
+)

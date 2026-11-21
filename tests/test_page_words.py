@@ -13,19 +13,19 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.answer_state import EmptyListReason
-from analysis_service.assertions import FACET_ANSWERS
-from analysis_service.claims import (
+from katra.answer_state import EmptyListReason
+from katra.assertions import FACET_ANSWERS
+from katra.claims import (
     GroundKind,
     ScopeState,
     SeverityLevel,
     UnitRuling,
     VerdictStatus,
 )
-from analysis_service.fact_answers import FactStatus
-from analysis_service.frameworks import PreconditionResult
-from analysis_service.job_state import PageStatus
-from analysis_service.report_changes import Change, FindingChange
+from katra.fact_answers import FactStatus
+from katra.frameworks import PreconditionResult
+from katra.job_state import PageStatus
+from katra.report_changes import Change, FindingChange
 from tests.factories import report_state, sample_report
 from tests.test_webapp import PROJECT_ROOT, _island, page_javascript
 from webapp import page_words, review, settings_view

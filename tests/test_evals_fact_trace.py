@@ -6,12 +6,12 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.analysis import ControlState
-from analysis_service.compact import FULL_FORMAT, parse_extraction
 from evals.harness import fact_trace, replay
 from evals.harness.alignment import ProtocolState
 from evals.harness.fact_trace import FactTrace
 from evals.harness.modes import AttributeCheck, ExtractionResult
+from katra.analysis import ControlState
+from katra.compact import FULL_FORMAT, parse_extraction
 from tests.test_evals_alignment import case
 
 PROCESS = "process:order-service"

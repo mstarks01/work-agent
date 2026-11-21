@@ -41,15 +41,15 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.errors import MAX_RENDERED_ERRORS, shown_errors
-from analysis_service.parsing import Sha256Hex
-from analysis_service.sources import carries_line_break
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
     MAX_NAME,
     SUBMITTED_FOR_PATTERN,
 )
 from evals.harness.sitting import Mark, Store
+from katra.errors import MAX_RENDERED_ERRORS, shown_errors
+from katra.parsing import Sha256Hex
+from katra.sources import carries_line_break
 
 #: The envelope format, so a file written by an older page refuses loudly
 #: rather than being read under rules it was not built for. There is one
@@ -79,7 +79,7 @@ def _one_line(value: str) -> str:
     untrusted. A break here forges headings in the committed reading document,
     because the sink joins these into Markdown with `- ` in front of each.
 
-    The rule is :func:`~analysis_service.sources.carries_line_break`, **called
+    The rule is :func:`~katra.sources.carries_line_break`, **called
     rather than half-copied**. ``str.splitlines`` splits on ten characters, so
     a local tuple of four terminators would let the other ``Cc`` terminators
     through.

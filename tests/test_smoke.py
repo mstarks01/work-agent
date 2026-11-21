@@ -19,27 +19,27 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from analysis_service import smoke
-from analysis_service.deployment import Deployment
-from analysis_service.graph import (
+from katra import smoke
+from katra.deployment import Deployment
+from katra.graph import (
     ASSEMBLE_NODE,
     EXTRACT_NODE,
     tier_node_by_graph_node,
 )
-from analysis_service.identity import IDENTITY_VERSION, build_identity
-from analysis_service.jobs import (
+from katra.identity import IDENTITY_VERSION, build_identity
+from katra.jobs import (
     JobRecord,
     NodeCallback,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.report import (
+from katra.report import (
     ExecutionEnvelope,
     NodeRun,
     Report,
 )
-from analysis_service.smoke import (
+from katra.smoke import (
     ANALYST,
     BINDING,
     CHECKS,
@@ -61,8 +61,8 @@ from analysis_service.smoke import (
     required_nodes,
     run_smoke,
 )
-from analysis_service.validation import ValidationIssue
-from analysis_service.vendors import join_served
+from katra.validation import ValidationIssue
+from katra.vendors import join_served
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SAMPLE_INSTRUCTIONS,
@@ -91,7 +91,7 @@ DEPLOYMENT = Deployment.from_env(env=TEST_TIER_ENV)
 # because each brings tier keys an operator may point at a different vendor.
 LLM_NODES = required_nodes(DEFAULT_FRAMEWORKS)
 ANALYZE_NODES = analyze_nodes(DEFAULT_FRAMEWORKS)
-(ANALYSIS_CRITIC_NODE,) = critic_nodes(DEFAULT_FRAMEWORKS)
+(KATRA_CRITIC_NODE,) = critic_nodes(DEFAULT_FRAMEWORKS)
 #: This graph's node -> tier map, built for the selection above.
 TIER_NODES = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
@@ -234,7 +234,7 @@ class TestTheApplicationsFailures:
 
     def test_a_run_with_no_critic_fails_the_critic_check(self):
         report = smoke_report(
-            nodes=[node_run(node) for node in LLM_NODES if node != ANALYSIS_CRITIC_NODE]
+            nodes=[node_run(node) for node in LLM_NODES if node != KATRA_CRITIC_NODE]
         )
         assert result_for(report)[CRITIC].result is CheckResult.FAILED
 
@@ -338,7 +338,7 @@ class TestALaneThatNeverRan:
         assert not result.exercised
         assert result.failed
         assert all(check.result is CheckResult.UNKNOWN for check in result.checks)
-        assert "ANALYSIS_OPENAI_API_KEY_FILE" in (result.failure or "")
+        assert "KATRA_OPENAI_API_KEY_FILE" in (result.failure or "")
 
     def test_the_failure_text_carries_no_credential_value(self):
         """Provider errors can echo the request; a job summary outlives the run.
@@ -349,20 +349,20 @@ class TestALaneThatNeverRan:
         """
         key = "sk-live-do-not-log-me"
         deployment = Deployment.from_env(
-            env=TEST_TIER_ENV | secret_env("ANALYSIS_OPENAI_API_KEY_FILE", key)
+            env=TEST_TIER_ENV | secret_env("KATRA_OPENAI_API_KEY_FILE", key)
         )
         redacted = _redacted(
             f"provider rejected Authorization: Bearer {key}", deployment
         )
 
         assert key not in redacted
-        assert "ANALYSIS_OPENAI_API_KEY_FILE" in redacted
+        assert "KATRA_OPENAI_API_KEY_FILE" in redacted
 
     def test_a_region_survives_the_redactor(self):
         """#601: the redactor read the list that answers a different question.
 
         ``required_env_vars`` says which variables an operator must set;
-        ``ANALYSIS_VERTEX_LOCATION`` belongs there and is not a secret. Reading
+        ``KATRA_VERTEX_LOCATION`` belongs there and is not a secret. Reading
         that list to decide what must not reach a job summary substituted the
         region out of provider error text — and the region is the one fact that
         diagnoses a wrong-region request, in the summary whose whole job is to
@@ -370,7 +370,7 @@ class TestALaneThatNeverRan:
         """
         region = "us-east5"
         deployment = Deployment.from_env(
-            env=TEST_TIER_ENV | {"ANALYSIS_VERTEX_LOCATION": region}
+            env=TEST_TIER_ENV | {"KATRA_VERTEX_LOCATION": region}
         )
         text = f"404 Publisher Model not found in region {region}"
 
@@ -451,8 +451,7 @@ class TestDrivingTheEngine:
         # provider it never called.
         assert set(result.tiers) == {"base", "strong"}
         assert (
-            result.tiers["base"]["vendor"]
-            == TEST_TIER_ENV["ANALYSIS_MODEL_BASE_VENDOR"]
+            result.tiers["base"]["vendor"] == TEST_TIER_ENV["KATRA_MODEL_BASE_VENDOR"]
         )
 
     def test_a_rejected_input_is_an_extraction_finding_not_a_crash(self, monkeypatch):
@@ -522,11 +521,11 @@ class TestTheRenderedSummary:
                 checks=tuple(
                     Check(name, CheckResult.UNKNOWN, "nothing ran") for name in CHECKS
                 ),
-                failure="ProviderAuthError: vendor 'openai' needs ANALYSIS_OPENAI_API_KEY_FILE",
+                failure="ProviderAuthError: vendor 'openai' needs KATRA_OPENAI_API_KEY_FILE",
             )
         )
         assert "unexercised" in rendered
-        assert "ANALYSIS_OPENAI_API_KEY_FILE" in rendered
+        assert "KATRA_OPENAI_API_KEY_FILE" in rendered
 
 
 class TestTheFixture:

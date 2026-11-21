@@ -1,7 +1,7 @@
 """What counts as one action, and the pairs this corpus cannot separate.
 
-The vocabulary itself is :mod:`analysis_service.actions`, and it lives there
-because :class:`~analysis_service.claims.Claim` carries the field: a vocabulary
+The vocabulary itself is :mod:`katra.actions`, and it lives there
+because :class:`~katra.claims.Claim` carries the field: a vocabulary
 that validates a shipped model has to ship with it. This module is the
 measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from analysis_service.actions import (
+from katra.actions import (
     ACTION_VERBS,
     FAMILIES,
     GLOSS,

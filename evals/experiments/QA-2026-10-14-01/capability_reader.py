@@ -16,12 +16,12 @@ import os
 import sys
 from pathlib import Path
 
-from analysis_service import model_gate
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.grounding import verify_quote
-from analysis_service.offline import refuse_live_inference
-from analysis_service.sources import fenced
-from analysis_service.vendors import CredentialMode, vendor_for_route
+from katra import model_gate
+from katra.capabilities import CAPABILITIES
+from katra.grounding import verify_quote
+from katra.offline import refuse_live_inference
+from katra.sources import fenced
+from katra.vendors import CredentialMode, vendor_for_route
 
 PROMPT = """You read a description of a software system. List each capability from the table below that the description says the application has or does.
 

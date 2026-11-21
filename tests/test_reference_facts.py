@@ -23,9 +23,6 @@ import shutil
 import pytest
 from pydantic import BeforeValidator
 
-from analysis_service.assertions import project
-from analysis_service.parsing import signer
-from analysis_service.sources import text_digest
 from evals import verify_corpus
 from evals.critic_review.model import CriticFixture
 from evals.harness import replay
@@ -43,6 +40,9 @@ from evals.reference_facts import (
     load_facts,
     reference_catalog,
 )
+from katra.assertions import project
+from katra.parsing import signer
+from katra.sources import text_digest
 
 #: The cases #961 step 3 names for the first sitting, each of which must carry
 #: a draft: mixed authentication and MFA, actor naming and an unsupported key

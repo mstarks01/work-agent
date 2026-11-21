@@ -12,7 +12,7 @@
   --error-bg:light-dark(#fff2ef,#402925)
 }
 /* An element's tag: its hue (element_hues) at these saturations and
-   lightnesses. analysis_service.element_hues states the light ones too. A
+   lightnesses. katra.element_hues states the light ones too. A
    print is always light. */
 :root {
   --tag-fill-s:25%; --tag-fill-l:96%;

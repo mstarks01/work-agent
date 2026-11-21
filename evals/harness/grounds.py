@@ -20,16 +20,16 @@ the agents follow them:
 It is credential-free, like :mod:`evals.harness.scorer` and
 :mod:`evals.harness.critic_yield`. It takes plain data — the merged drafts and
 the report's marks — and computes. Nothing here re-implements the ladder. The
-marks it counts are the ones :func:`~analysis_service.fan_in.join_drafts`
+marks it counts are the ones :func:`~katra.fan_in.join_drafts`
 already produced with the shipped checker, so a sweep cannot grade a
 normalization policy the service does not run.
 
 Two more readings:
 
 * The repair rung. Read :attr:`CaseGrounds.repaired_count`, which is the quotes
-  the ladder refused and :func:`~analysis_service.grounding.faithful_repair`
+  the ladder refused and :func:`~katra.grounding.faithful_repair`
   then rewrote to the source's nearest span. That is the number that moves
-  :data:`~analysis_service.grounding.REPAIR_THRESHOLD`.
+  :data:`~katra.grounding.REPAIR_THRESHOLD`.
 * A claim that lost every ground. Read :attr:`CaseGrounds.dropped_count`, which
   is the claims the service dropped and marked because nothing they cited held:
   every quote absent from its source, or every reference outside the catalog.
@@ -57,7 +57,8 @@ from typing import Any, Literal, get_args
 
 from pydantic import ValidationError
 
-from analysis_service.claims import (
+from evals.harness.rates import ratio, rounded_figure, shown_figure
+from katra.claims import (
     Claim,
     DroppedClaim,
     FrameworkName,
@@ -65,9 +66,8 @@ from analysis_service.claims import (
     RepairedQuote,
     UnverifiedGround,
 )
-from analysis_service.fan_in import DraftJoinError
-from analysis_service.frameworks import lane_of
-from evals.harness.rates import ratio, rounded_figure, shown_figure
+from katra.fan_in import DraftJoinError
+from katra.frameworks import lane_of
 
 # Why the fan-in killed a case. A claim that loses every ground loses its own
 # entry and not the case: it is dropped and marked, and
@@ -101,7 +101,7 @@ class ThreatGrounds:
 
     The audit trail under the aggregates. ``unverified`` holds indices into the
     draft's own ``grounds`` list, exactly as
-    :class:`~analysis_service.claims.UnverifiedGround` records them, so a
+    :class:`~katra.claims.UnverifiedGround` records them, so a
     surprising rate can be walked back to the quote that produced it.
     """
 
@@ -148,7 +148,7 @@ class CaseGrounds:
     reasons that agree: the rules being measured are the *category agents'*, so
     a draft the critic later rejected is still evidence about how the agent
     grounded it; and the unverified marks were computed over exactly this set
-    at :func:`~analysis_service.fan_in.join_drafts`, so numerator and denominator
+    at :func:`~katra.fan_in.join_drafts`, so numerator and denominator
     come from one population rather than two.
     """
 
@@ -156,7 +156,7 @@ class CaseGrounds:
     framework: FrameworkName
     threats: tuple[ThreatGrounds, ...]
     #: Whether the fan-in ran the quote check over these drafts
-    #: (:func:`~analysis_service.claims.quote_check_ran`).
+    #: (:func:`~katra.claims.quote_check_ran`).
     quotes_checked: bool
     #: The claims this block dropped for losing every ground, as the report
     #: marks them. Not in ``threats``: a dropped claim never reached the critic.
@@ -276,7 +276,7 @@ class GroundMisShape(RuntimeError):
     """A ``Ground`` this service assembled wrongly. Never an agent's doing.
 
     THE EXPECTED RATE OF THIS IS ZERO. No model writes a ``Ground``: a category agent selects catalog entries and
-    proposes quotes, and :func:`~analysis_service.evidence.resolve_proposals`
+    proposes quotes, and :func:`~katra.evidence.resolve_proposals`
     builds the record out of the entry it looked up. So a mis-shape is this
     service mis-assembling its own data structure, and there is no agent
     behaviour behind it to have a rate.
@@ -324,7 +324,7 @@ def measure_grounds(
     packages' drafts here would put one number over two populations whose agents
     were given different instructions.
 
-    Typed against the neutral :class:`~analysis_service.claims.Claim` because that
+    Typed against the neutral :class:`~katra.claims.Claim` because that
     is what carries ``grounds``. Nothing here reads a field a package declares.
 
     ``quotes_checked`` says whether the fan-in ran the quote check. Where it

@@ -13,27 +13,6 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
-from analysis_service.actions import ActionVerb
-from analysis_service.claims import (
-    Ground,
-    Rating,
-    Severity,
-    UnknownRef,
-    UnreconciledKind,
-    UnreconciledRuling,
-    Verdict,
-)
-from analysis_service.frameworks.stride.record import (
-    STRIDE_VERSION,
-    AttackerPosition,
-    DraftThreat,
-    StrideCategory,
-    Threat,
-    _threat_id,
-)
-from analysis_service.identity import IDENTITY_VERSION, build_identity
-from analysis_service.sampling import TierSampling
-from analysis_service.vendors import vendor_for_route
 from evals import verify_corpus
 from evals.harness import ledger
 from evals.harness.artifact import ARTIFACT_VERSION, EvalArtifact, load_artifact
@@ -42,6 +21,27 @@ from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.ledger import Vote
 from evals.harness.provenance import RunProvenance
 from evals.harness.reference import GoldenCase, ReferenceThreat, load_corpus
+from katra.actions import ActionVerb
+from katra.claims import (
+    Ground,
+    Rating,
+    Severity,
+    UnknownRef,
+    UnreconciledKind,
+    UnreconciledRuling,
+    Verdict,
+)
+from katra.frameworks.stride.record import (
+    STRIDE_VERSION,
+    AttackerPosition,
+    DraftThreat,
+    StrideCategory,
+    Threat,
+    _threat_id,
+)
+from katra.identity import IDENTITY_VERSION, build_identity
+from katra.sampling import TierSampling
+from katra.vendors import vendor_for_route
 from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
 
 #: The commit and the corpus digest a synthetic sweep names. Neither is real,

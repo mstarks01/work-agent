@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from analysis_service.refusal_categories import refusal_category_of
+from katra.refusal_categories import refusal_category_of
 
 
 @pytest.mark.parametrize("category", ["bio", "x" * 40])

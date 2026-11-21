@@ -24,7 +24,7 @@ from alembic.migration import MigrationContext
 from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 
-from analysis_service.sql_store import (
+from katra.sql_store import (
     DATABASE_IAM,
     DATABASES,
     METADATA,
@@ -32,7 +32,7 @@ from analysis_service.sql_store import (
     database_url,
     engine_for,
 )
-from analysis_service.store_settings import StoreConfigError
+from katra.store_settings import StoreConfigError
 from tests.sql_stores import admin, lane_env, lane_url, new_database, upgrade
 
 URL = "postgresql+asyncpg://analysis@db.internal:5432/jobs"
@@ -44,19 +44,19 @@ def env(tmp_path) -> dict[str, str]:
     password.write_text("hunter2\n")
     password.chmod(0o600)
     return {
-        "ANALYSIS_DATABASE_URL": URL,
-        "ANALYSIS_DATABASE_CREDENTIALS": "password",
-        "ANALYSIS_DATABASE_PASSWORD_FILE": str(password),
+        "KATRA_DATABASE_URL": URL,
+        "KATRA_DATABASE_CREDENTIALS": "password",
+        "KATRA_DATABASE_PASSWORD_FILE": str(password),
     }
 
 
 @pytest.fixture
 def iam_env(env) -> dict[str, str]:
-    del env["ANALYSIS_DATABASE_PASSWORD_FILE"]
+    del env["KATRA_DATABASE_PASSWORD_FILE"]
     return env | {
-        "ANALYSIS_DATABASE_CREDENTIALS": "iam",
-        "ANALYSIS_DATABASE_IAM": "rds",
-        "ANALYSIS_DATABASE_REGION": "eu-west-1",
+        "KATRA_DATABASE_CREDENTIALS": "iam",
+        "KATRA_DATABASE_IAM": "rds",
+        "KATRA_DATABASE_REGION": "eu-west-1",
     }
 
 
@@ -77,67 +77,64 @@ class TestTheSettings:
         ("change", "message"),
         [
             (
-                {"ANALYSIS_DATABASE_CREDENTIALS": None},
-                "set ANALYSIS_DATABASE_CREDENTIALS",
+                {"KATRA_DATABASE_CREDENTIALS": None},
+                "set KATRA_DATABASE_CREDENTIALS",
             ),
-            ({"ANALYSIS_DATABASE_CREDENTIALS": "trust"}, "unknown value for"),
+            ({"KATRA_DATABASE_CREDENTIALS": "trust"}, "unknown value for"),
             (
-                {"ANALYSIS_DATABASE_PASSWORD_FILE": None},
-                "set ANALYSIS_DATABASE_PASSWORD_FILE",
+                {"KATRA_DATABASE_PASSWORD_FILE": None},
+                "set KATRA_DATABASE_PASSWORD_FILE",
             ),
             (
-                {"ANALYSIS_DATABASE_PASSWORD_FILE": "/nonexistent/password"},
+                {"KATRA_DATABASE_PASSWORD_FILE": "/nonexistent/password"},
                 r"cannot read \(FileNotFoundError\)",
             ),
             (
-                {"ANALYSIS_DATABASE_PASSWORD": "hunter2"},
-                "unset ANALYSIS_DATABASE_PASSWORD, which this service refuses$",
+                {"KATRA_DATABASE_PASSWORD": "hunter2"},
+                "unset KATRA_DATABASE_PASSWORD, which this service refuses$",
             ),
             (
-                {"ANALYSIS_DATABASE_IAM": "rds"},
-                "with password credentials takes no ANALYSIS_DATABASE_IAM; unset it$",
+                {"KATRA_DATABASE_IAM": "rds"},
+                "with password credentials takes no KATRA_DATABASE_IAM; unset it$",
             ),
             (
-                {"ANALYSIS_DATABASE_REGION": "eu-west-1"},
-                (
-                    "with password credentials takes no ANALYSIS_DATABASE_REGION;"
-                    " unset it$"
-                ),
+                {"KATRA_DATABASE_REGION": "eu-west-1"},
+                ("with password credentials takes no KATRA_DATABASE_REGION; unset it$"),
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis:hunter2@db/x"},
+                {"KATRA_DATABASE_URL": "postgresql+asyncpg://analysis:hunter2@db/x"},
                 "holds a password",
             ),
-            ({"ANALYSIS_DATABASE_URL": URL + "?ssl=disable"}, "takes no query"),
+            ({"KATRA_DATABASE_URL": URL + "?ssl=disable"}, "takes no query"),
             (
-                {"ANALYSIS_DATABASE_URL": URL + "?host=/run/postgresql"},
+                {"KATRA_DATABASE_URL": URL + "?host=/run/postgresql"},
                 "takes no query",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis@/jobs"},
+                {"KATRA_DATABASE_URL": "postgresql+asyncpg://analysis@/jobs"},
                 "needs a user and a network host",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://db.internal/jobs"},
+                {"KATRA_DATABASE_URL": "postgresql+asyncpg://db.internal/jobs"},
                 "needs a user and a network host",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},
+                {"KATRA_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},
                 "names no database",
             ),
             (
-                {"ANALYSIS_DATABASE_CA_FILE": "/nonexistent/ca.pem"},
+                {"KATRA_DATABASE_CA_FILE": "/nonexistent/ca.pem"},
                 r"cannot read as a CA \(FileNotFoundError\)",
             ),
             (
-                {"ANALYSIS_DATABASE_CA_FILE": os.devnull},
+                {"KATRA_DATABASE_CA_FILE": os.devnull},
                 r"cannot read as a CA \(SSLError\)",
             ),
             (
-                {"ANALYSIS_DATABASE_CAFILE": "/etc/ssl/ca.pem"},
+                {"KATRA_DATABASE_CAFILE": "/etc/ssl/ca.pem"},
                 (
                     "PostgreSQL database with password credentials takes no"
-                    " ANALYSIS_DATABASE_CAFILE; unset it$"
+                    " KATRA_DATABASE_CAFILE; unset it$"
                 ),
             ),
         ],
@@ -162,13 +159,13 @@ class TestTheSettings:
     def test_the_port_of_the_url_or_the_default_reaches_the_driver(
         self, env, url, port
     ):
-        env["ANALYSIS_DATABASE_URL"] = url
+        env["KATRA_DATABASE_URL"] = url
         assert connect_args(env)["port"] == port
 
     def test_the_libpq_variables_do_not_change_the_connection(self, env, monkeypatch):
         """asyncpg fills each argument that the store does not pass from the
         ``PG*`` variables, so the store passes each one that names a server."""
-        env["ANALYSIS_DATABASE_URL"] = "postgresql+asyncpg://analysis@db.internal/jobs"
+        env["KATRA_DATABASE_URL"] = "postgresql+asyncpg://analysis@db.internal/jobs"
         clean = connect_args(env)
         libpq = {"PGPORT": "6543", "PGDATABASE": "other", "PGHOST": "elsewhere"}
         for name, value in libpq.items():
@@ -183,9 +180,9 @@ class TestTheSettings:
         empty = tmp_path / "empty"
         empty.write_text("\n")
         empty.chmod(0o600)
-        env["ANALYSIS_DATABASE_PASSWORD_FILE"] = str(empty)
+        env["KATRA_DATABASE_PASSWORD_FILE"] = str(empty)
         with pytest.raises(
-            StoreConfigError, match="ANALYSIS_DATABASE_PASSWORD_FILE names is empty"
+            StoreConfigError, match="KATRA_DATABASE_PASSWORD_FILE names is empty"
         ):
             engine_for(env)
 
@@ -221,17 +218,17 @@ class TestTheIamCredentials:
     @pytest.mark.parametrize(
         ("change", "message"),
         [
-            ({"ANALYSIS_DATABASE_IAM": None}, "set ANALYSIS_DATABASE_IAM"),
-            ({"ANALYSIS_DATABASE_IAM": "entra"}, "unknown value for"),
-            ({"ANALYSIS_DATABASE_REGION": None}, "set ANALYSIS_DATABASE_REGION"),
+            ({"KATRA_DATABASE_IAM": None}, "set KATRA_DATABASE_IAM"),
+            ({"KATRA_DATABASE_IAM": "entra"}, "unknown value for"),
+            ({"KATRA_DATABASE_REGION": None}, "set KATRA_DATABASE_REGION"),
             (
-                {"ANALYSIS_DATABASE_REGION": "EU_WEST_1"},
-                "ANALYSIS_DATABASE_REGION must match",
+                {"KATRA_DATABASE_REGION": "EU_WEST_1"},
+                "KATRA_DATABASE_REGION must match",
             ),
             (
-                {"ANALYSIS_DATABASE_PASSWORD_FILE": "/run/secrets/password"},
+                {"KATRA_DATABASE_PASSWORD_FILE": "/run/secrets/password"},
                 (
-                    "with iam credentials takes no ANALYSIS_DATABASE_PASSWORD_FILE;"
+                    "with iam credentials takes no KATRA_DATABASE_PASSWORD_FILE;"
                     " unset it$"
                 ),
             ),
@@ -264,9 +261,7 @@ class TestTheIamCredentials:
 
     def test_a_missing_boto3_names_the_aws_extra(self, iam_env, monkeypatch):
         monkeypatch.setitem(sys.modules, "boto3", None)
-        with pytest.raises(
-            StoreConfigError, match=r"needs boto3.*analysis-service\[aws\]"
-        ):
+        with pytest.raises(StoreConfigError, match=r"needs boto3.*katra\[aws\]"):
             engine_for(iam_env)
 
     def test_each_call_signs_a_new_rds_token_for_the_url(self, iam_env, monkeypatch):
@@ -289,9 +284,7 @@ class TestTheIamCredentials:
         rds = StubRds()
         stub_boto3(monkeypatch, rds)
         monkeypatch.setenv("PGPORT", "6543")
-        iam_env["ANALYSIS_DATABASE_URL"] = (
-            "postgresql+asyncpg://analysis@db.internal/jobs"
-        )
+        iam_env["KATRA_DATABASE_URL"] = "postgresql+asyncpg://analysis@db.internal/jobs"
         args = connect_args(iam_env)
         asyncio.run(args["password"]())
         assert rds.requests[0]["Port"] == args["port"] == 5432
@@ -314,9 +307,9 @@ def stub_token(monkeypatch, tokens: list[str]) -> list[str]:
 def iam_lane_env(url) -> dict[str, str]:
     return lane_env(
         url,
-        ANALYSIS_DATABASE_CREDENTIALS="iam",
-        ANALYSIS_DATABASE_PASSWORD_FILE="",
-        ANALYSIS_DATABASE_IAM="rds",
+        KATRA_DATABASE_CREDENTIALS="iam",
+        KATRA_DATABASE_PASSWORD_FILE="",
+        KATRA_DATABASE_IAM="rds",
     )
 
 
@@ -360,7 +353,7 @@ class TestTheLane:
             asyncio.run(select_one(lane_env(other_host)))
 
     def test_a_certificate_from_an_untrusted_ca_is_refused(self):
-        system_bundle = lane_env(ANALYSIS_DATABASE_CA_FILE="")
+        system_bundle = lane_env(KATRA_DATABASE_CA_FILE="")
         with pytest.raises(ssl.SSLCertVerificationError):
             asyncio.run(select_one(system_bundle))
 

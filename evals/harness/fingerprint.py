@@ -58,13 +58,13 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.asvs.record import requirement_of
-from analysis_service.sources import text_digest
 from evals.harness.content import stored_version
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.verbs import canonical, check_verb
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
+from katra.frameworks.asvs.record import requirement_of
+from katra.sources import text_digest
 
 #: The version a caller gets when it does not choose. Bumping it is a re-keying
 #: event, so it is a reviewed edit rather than a default that drifts — and a
@@ -162,9 +162,9 @@ class Components:
     #: another. Every version refuses an empty one.
     scope: str = ""
     #: The controls the claim's grounds say are unstated or missing, sorted,
-    #: from :func:`~analysis_service.claim_identity.grounded_mechanism`. **Not part of
+    #: from :func:`~katra.claim_identity.grounded_mechanism`. **Not part of
     #: the fingerprint**: it tells apart two findings that share one key, by
-    #: :func:`~analysis_service.claim_identity.distinct_mechanisms`, and a vote stored
+    #: :func:`~katra.claim_identity.distinct_mechanisms`, and a vote stored
     #: without it reads as empty, which binds on the key alone (ADR 0060).
     mechanism: tuple[str, ...] = ()
 

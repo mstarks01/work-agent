@@ -6,13 +6,13 @@ ASVS chapter and whose evidence is one file of max_source_bytes.
 
 import sys
 
-from analysis_service.claims import AnalysisMarks
-from analysis_service.controls import Control, ControlDocument
-from analysis_service.critic_round import CriticRound
-from analysis_service.job_controls import CopiedControl
-from analysis_service.markdown_loader import estimate_tokens
-from analysis_service.resilience import load_resilience
-from analysis_service.sources import render_fenced, text_digest
+from katra.claims import AnalysisMarks
+from katra.controls import Control, ControlDocument
+from katra.critic_round import CriticRound
+from katra.job_controls import CopiedControl
+from katra.markdown_loader import estimate_tokens
+from katra.resilience import load_resilience
+from katra.sources import render_fenced, text_digest
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_critic_controls import (

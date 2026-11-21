@@ -408,7 +408,7 @@ def test_the_history_phrases_hold_to_their_history_reading():
         "Nothing reads it anymore.",
         "Version 2 (wayfinder #15) dropped the four backoff knobs.",
         "The predecessor to this rule was an allowlist.",
-        "a deployment still carrying v2's ANALYSIS_MODEL_FLASH",
+        "a deployment still carrying v2's KATRA_MODEL_FLASH",
         "The first version of these tests called the override.",
         "Per block since schema 3.0.",
         "Cases that shipped before this was enforced are unread.",

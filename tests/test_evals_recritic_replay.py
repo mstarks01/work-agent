@@ -15,8 +15,13 @@ from typing import get_args
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.claims import (
+from evals.harness import critic_replay, modes, recritic_replay
+from evals.harness.bundle import write_failures, write_reports
+from evals.harness.modes import EvalRunError
+from evals.harness.provenance import REPO_ROOT
+from evals.harness.run_record import loaded
+from katra import graph
+from katra.claims import (
     ARCHIVED_UNRECONCILED_KINDS,
     ProposedVerdict,
     RefusedControl,
@@ -24,15 +29,10 @@ from analysis_service.claims import (
     UnknownRef,
     UnreconciledKind,
 )
-from analysis_service.critic import review_issues
-from analysis_service.frameworks import PACKAGES
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.system_model import attribute_names
-from evals.harness import critic_replay, modes, recritic_replay
-from evals.harness.bundle import write_failures, write_reports
-from evals.harness.modes import EvalRunError
-from evals.harness.provenance import REPO_ROOT
-from evals.harness.run_record import loaded
+from katra.critic import review_issues
+from katra.frameworks import PACKAGES
+from katra.markdown_loader import MarkdownLoader
+from katra.system_model import attribute_names
 from tests import test_evals_run_grounds as grounds
 from tests.factories import asvs_draft, valid_model
 from tests.test_critic_review_replay import EVERY_LANE

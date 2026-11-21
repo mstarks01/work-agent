@@ -28,9 +28,9 @@ import pytest
 from fastapi.testclient import TestClient
 from google.auth.exceptions import DefaultCredentialsError
 
-from analysis_service import config_files
-from analysis_service.certification import CertifyResult
-from analysis_service.model_gate import tool_models
+from katra import config_files
+from katra.certification import CertifyResult
+from katra.model_gate import tool_models
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_runtime_certification import FP_A, CertifyingRunner
 from tests.test_settings_env import (
@@ -55,7 +55,7 @@ from webapp.settings_save import (
     apply_save,
 )
 
-BASE_MODEL = TEST_TIER_ENV["ANALYSIS_MODEL_BASE_MODEL"]
+BASE_MODEL = TEST_TIER_ENV["KATRA_MODEL_BASE_MODEL"]
 
 
 def test_the_other_model_is_one_the_list_suggests():
@@ -129,7 +129,7 @@ class TestASaveThatPasses:
         assert saved.status_code == 200, saved.text
         lines = settings_text(tmp_path).splitlines()
         assert [line for line in lines if "BASE_MODEL" in line] == [
-            f"ANALYSIS_MODEL_BASE_MODEL={OTHER_MODEL}"
+            f"KATRA_MODEL_BASE_MODEL={OTHER_MODEL}"
         ]
         assert builds.models == [BASE_MODEL, OTHER_MODEL]
         assert builds.runners[1].jobs and not builds.runners[0].jobs
@@ -193,7 +193,7 @@ class TestASaveThatPasses:
         assert (served.status_code, withheld.status_code) == (200, 404)
 
     def test_the_first_save_makes_the_directory_and_the_file_private(self, tmp_path):
-        directory = tmp_path / "new" / "work-agent"
+        directory = tmp_path / "new" / "katra"
         client = settings_client(
             directory, TEST_TIER_ENV | TEST_CREDENTIAL_ENV, build=Builds()
         )
@@ -225,7 +225,7 @@ class TestASaveThatPasses:
         saved = save(client, {"sampling.strong.thinking": "medium"})
 
         assert saved.status_code == 200, saved.text
-        assert "ANALYSIS_SAMPLING_STRONG_THINKING=medium" in settings_text(tmp_path)
+        assert "KATRA_SAMPLING_STRONG_THINKING=medium" in settings_text(tmp_path)
         assert rows_of(client)["sampling.strong.thinking"]["value"] == "medium"
         assert len(builds.models) == 2
         reset = save(client, {"sampling.strong.thinking": None})
@@ -277,19 +277,19 @@ class TestASaveThatPasses:
 
 class TestAReset:
     def test_it_removes_the_line_and_the_page_shows_the_shipped_value(self, tmp_path):
-        client, _ = app_on(tmp_path, hand_written(ANALYSIS_TIMEOUT_MS="5000"))
+        client, _ = app_on(tmp_path, hand_written(KATRA_TIMEOUT_MS="5000"))
 
         saved = save(client, {"resilience.timeout_ms": None})
 
         assert saved.status_code == 200, saved.text
-        assert "ANALYSIS_TIMEOUT_MS" not in settings_text(tmp_path)
+        assert "KATRA_TIMEOUT_MS" not in settings_text(tmp_path)
         assert rows_of(client)["resilience.timeout_ms"]["source"] == "file"
 
     def test_the_removal_of_an_unknown_line_lets_the_next_startup_pass(self, tmp_path):
-        client, _ = app_on(tmp_path, hand_written(ANALYSIS_NOT_A_SETTING="1"))
+        client, _ = app_on(tmp_path, hand_written(KATRA_NOT_A_SETTING="1"))
         assert client.get("/").status_code == 503
 
-        saved = save(client, remove=["ANALYSIS_NOT_A_SETTING"])
+        saved = save(client, remove=["KATRA_NOT_A_SETTING"])
         restarted, _ = app_on(tmp_path)
 
         assert saved.status_code == 200, saved.text
@@ -299,13 +299,13 @@ class TestAReset:
     def test_a_known_line_is_not_an_unknown_one(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
 
-        refused = save(client, remove=["ANALYSIS_MODEL_BASE_MODEL", "ANALYSIS_ABSENT"])
+        refused = save(client, remove=["KATRA_MODEL_BASE_MODEL", "KATRA_ABSENT"])
 
         assert refused.status_code == 422
         errors = refused.json()["errors"]
-        assert [error["key"] for error in errors] == ["ANALYSIS_MODEL_BASE_MODEL", None]
+        assert [error["key"] for error in errors] == ["KATRA_MODEL_BASE_MODEL", None]
         assert errors[1]["message"].startswith("remove[1] ")
-        assert "ANALYSIS_ABSENT" not in refused.text
+        assert "KATRA_ABSENT" not in refused.text
 
 
 class TestARefusedSave:
@@ -331,8 +331,8 @@ class TestARefusedSave:
         ("changes", "names"),
         [
             ({"tiers.base.model": "not-a-model!"}, "tiers.base.model"),
-            ({"store.job_store": "nowhere"}, "ANALYSIS_JOB_STORE"),
-            ({"store.retention_days": "0"}, "ANALYSIS_RETENTION_DAYS"),
+            ({"store.job_store": "nowhere"}, "KATRA_JOB_STORE"),
+            ({"store.retention_days": "0"}, "KATRA_RETENTION_DAYS"),
             ({"resilience.timeout_ms": "-1"}, "timeout_ms"),
         ],
     )
@@ -393,12 +393,12 @@ class TestARefusedSave:
         assert (key in refused.text) == (named is not None)
 
     def test_a_key_that_the_process_environment_sets_is_refused(self, tmp_path):
-        client, _ = app_on(tmp_path, hand_written(), ANALYSIS_TIMEOUT_MS="5000")
+        client, _ = app_on(tmp_path, hand_written(), KATRA_TIMEOUT_MS="5000")
 
         refused = save(client, {"resilience.timeout_ms": "6000"})
 
         assert refused.status_code == 422
-        assert "ANALYSIS_TIMEOUT_MS" in refused.json()["errors"][0]["message"]
+        assert "KATRA_TIMEOUT_MS" in refused.json()["errors"][0]["message"]
 
     def test_a_body_over_the_limit_is_refused(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
@@ -462,12 +462,12 @@ class TestAStaleSave:
     def test_a_hand_edit_after_the_load_is_a_409(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
         loaded = revision(client)
-        write_settings(tmp_path, hand_written(ANALYSIS_TIMEOUT_MS="7000"))
+        write_settings(tmp_path, hand_written(KATRA_TIMEOUT_MS="7000"))
 
         stale = save(client, {"resilience.attempts": "2"}, rev=loaded)
 
         assert stale.status_code == 409
-        assert "ANALYSIS_TIMEOUT_MS=7000" in settings_text(tmp_path)
+        assert "KATRA_TIMEOUT_MS=7000" in settings_text(tmp_path)
 
     def test_two_saves_at_the_same_time_do_not_interleave(self, tmp_path):
         """The second save waits for the first, then reads its revision as
@@ -537,7 +537,7 @@ class TestAStoreChange:
         directory = tmp_path / "data"
         directory.mkdir(mode=0o700)
         database = directory / "jobs.db"
-        root = filesystem_env(directory)["ANALYSIS_OBJECT_ROOT"]
+        root = filesystem_env(directory)["KATRA_OBJECT_ROOT"]
 
         saved = save(
             client,
@@ -570,7 +570,7 @@ class TestAStoreChange:
         (error,) = refused.json()["errors"]
         assert error["message"] == (
             "the store cannot load a library (cannot import name 'connect' from"
-            " 'aiosqlite'): install analysis-service again with the extra that"
+            " 'aiosqlite'): install katra again with the extra that"
             " the store needs"
         )
         assert settings_text(tmp_path) == before
@@ -578,7 +578,7 @@ class TestAStoreChange:
     @pytest.mark.parametrize(
         ("credentials", "message"),
         [
-            ("api_key", "needs ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset"),
+            ("api_key", "needs KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset"),
             ("iam", "reads only the identity of the metadata server"),
         ],
     )
@@ -631,7 +631,7 @@ class TestAStoreChange:
         lines = dict(
             line.split("=", 1) for line in settings_text(tmp_path).splitlines()
         )
-        path = Path(lines["ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE"])
+        path = Path(lines["KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE"])
         assert path.stat().st_mode & 0o077 == 0
         assert json.loads(path.read_text()) == key_info
         assert key_info["private_key"] not in settings_text(tmp_path)
@@ -656,7 +656,7 @@ def key_on_disk(tmp_path, name: str = "anthropic_api_key.0123456789abcdef") -> s
     return str(path)
 
 
-def named_key(tmp_path, var: str = "ANALYSIS_ANTHROPIC_API_KEY_FILE") -> Path:
+def named_key(tmp_path, var: str = "KATRA_ANTHROPIC_API_KEY_FILE") -> Path:
     """The key file that the ``var`` line of ``settings.env`` names."""
     [value] = [
         line.partition("=")[2]
@@ -714,9 +714,7 @@ class TestAKeySave:
 
     def test_each_save_writes_a_new_file_and_deletes_the_old_one(self, tmp_path):
         old_key = key_on_disk(tmp_path)
-        client, _ = app_on(
-            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
-        )
+        client, _ = app_on(tmp_path, hand_written(KATRA_ANTHROPIC_API_KEY_FILE=old_key))
 
         saved = save(client, {ANTHROPIC_KEY: KEY})
 
@@ -797,7 +795,7 @@ class TestAKeySave:
     ):
         old_key = key_on_disk(tmp_path)
         client, builds = app_on(
-            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+            tmp_path, hand_written(KATRA_ANTHROPIC_API_KEY_FILE=old_key)
         )
         directory_fsync_fails_after_replace(monkeypatch)
 
@@ -805,7 +803,7 @@ class TestAKeySave:
         run_to_completion(client)
 
         assert saved.status_code == 200, saved.text
-        assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={named_key(tmp_path)}" in (
+        assert f"KATRA_ANTHROPIC_API_KEY_FILE={named_key(tmp_path)}" in (
             settings_text(tmp_path).splitlines()
         )
         assert named_key(tmp_path).read_text(encoding="utf-8") == KEY
@@ -824,8 +822,8 @@ class TestAKeySave:
             key_on_disk(tmp_path, name)
         client, _ = app_on(
             tmp_path,
-            hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=named),
-            ANALYSIS_GEMINI_API_KEY_FILE=process,
+            hand_written(KATRA_ANTHROPIC_API_KEY_FILE=named),
+            KATRA_GEMINI_API_KEY_FILE=process,
         )
 
         saved = save(client, {"resilience.timeout_ms": "5000"})
@@ -837,26 +835,24 @@ class TestAKeySave:
 
     def test_a_save_that_leaves_a_tier_on_the_vendor_keeps_its_key(self, tmp_path):
         old_key = key_on_disk(tmp_path)
-        client, _ = app_on(
-            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
-        )
+        client, _ = app_on(tmp_path, hand_written(KATRA_ANTHROPIC_API_KEY_FILE=old_key))
 
         saved = save(client, {"resilience.timeout_ms": "5000"})
 
         assert saved.status_code == 200, saved.text
         assert Path(old_key).is_file()
-        assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={old_key}" in settings_text(tmp_path)
+        assert f"KATRA_ANTHROPIC_API_KEY_FILE={old_key}" in settings_text(tmp_path)
 
 
 class TestAFirstRun:
     def test_one_save_of_models_and_keys_fills_the_cell(self, tmp_path):
         vertex = {
             var: TEST_CREDENTIAL_ENV[var]
-            for var in ("ANALYSIS_VERTEX_PROJECT", "ANALYSIS_VERTEX_LOCATION")
+            for var in ("KATRA_VERTEX_PROJECT", "KATRA_VERTEX_LOCATION")
         }
         flags = {
             var: TEST_TIER_ENV[var]
-            for var in ("ANALYSIS_ASSERTIONS", "ANALYSIS_CAPABILITY_READER")
+            for var in ("KATRA_ASSERTIONS", "KATRA_CAPABILITY_READER")
         }
         client, builds = app_on(tmp_path, **vertex, **flags)
         assert client.get("/").status_code == 503
@@ -866,7 +862,7 @@ class TestAFirstRun:
             {
                 **{
                     f"tiers.{tier}.{field}": TEST_TIER_ENV[
-                        f"ANALYSIS_MODEL_{tier.upper()}_{field.upper()}"
+                        f"KATRA_MODEL_{tier.upper()}_{field.upper()}"
                     ]
                     for tier in ("base", "strong", "review")
                     for field in ("vendor", "model")
@@ -920,9 +916,9 @@ class TestTheSaveOperation:
 
         assert isinstance(outcome, Saved), outcome
         path = named_key(tmp_path)
-        assert outcome.env["ANALYSIS_ANTHROPIC_API_KEY_FILE"] == str(path)
-        assert outcome.env["ANALYSIS_TIMEOUT_MS"] == "5000"
-        assert "ANALYSIS_TIMEOUT_MS=5000" in settings_text(tmp_path).splitlines()
+        assert outcome.env["KATRA_ANTHROPIC_API_KEY_FILE"] == str(path)
+        assert outcome.env["KATRA_TIMEOUT_MS"] == "5000"
+        assert "KATRA_TIMEOUT_MS=5000" in settings_text(tmp_path).splitlines()
         assert KEY_FILE.fullmatch(path.name)["stem"] == "anthropic_api_key"
         assert path.read_text(encoding="utf-8") == KEY
         assert path.stat().st_mode & 0o777 == 0o600
@@ -952,7 +948,7 @@ class TestTheSaveOperation:
 
     def test_a_check_refusal_deletes_the_new_key_files(self, tmp_path):
         old_key = key_on_disk(tmp_path)
-        write_settings(tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key))
+        write_settings(tmp_path, hand_written(KATRA_ANTHROPIC_API_KEY_FILE=old_key))
         before = settings_text(tmp_path)
         swapped: list[Startup] = []
 
@@ -974,7 +970,7 @@ class TestTheSaveOperation:
         self, tmp_path, monkeypatch
     ):
         old_key = key_on_disk(tmp_path)
-        write_settings(tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key))
+        write_settings(tmp_path, hand_written(KATRA_ANTHROPIC_API_KEY_FILE=old_key))
         before = settings_text(tmp_path)
         monkeypatch.setattr(config_files.os, "replace", failing)
         swapped: list[Startup] = []
@@ -1029,7 +1025,7 @@ class TestTheSaveOperation:
 
         def editing(env) -> Startup:
             with (tmp_path / "settings.env").open("a", encoding="utf-8") as file:
-                file.write("ANALYSIS_TIMEOUT_MS=7000\n")
+                file.write("KATRA_TIMEOUT_MS=7000\n")
             return build_startup(env)
 
         outcome = applied(
@@ -1040,8 +1036,8 @@ class TestTheSaveOperation:
         )
 
         assert outcome == SaveConflict()
-        assert "ANALYSIS_TIMEOUT_MS=7000" in settings_text(tmp_path)
-        assert "ANALYSIS_RETRY_ATTEMPTS" not in settings_text(tmp_path)
+        assert "KATRA_TIMEOUT_MS=7000" in settings_text(tmp_path)
+        assert "KATRA_RETRY_ATTEMPTS" not in settings_text(tmp_path)
         assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
         assert swapped == []
 
@@ -1059,7 +1055,7 @@ class TestTheSaveOperation:
 
     def test_the_key_files_come_first_and_the_deletion_last(self, tmp_path):
         old_key = key_on_disk(tmp_path)
-        write_settings(tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key))
+        write_settings(tmp_path, hand_written(KATRA_ANTHROPIC_API_KEY_FILE=old_key))
         seen = []
 
         def recording(env) -> Startup:
@@ -1081,8 +1077,8 @@ class TestTheSaveOperation:
         both = ["anthropic_api_key.*", "openai_api_key.*", "settings.env"]
         assert seen == [("check", both), ("swap", both)]
         assert stems(tmp_path) == ["openai_api_key.*", "settings.env"]
-        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in settings_text(tmp_path)
-        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in outcome.env
+        assert "KATRA_ANTHROPIC_API_KEY_FILE" not in settings_text(tmp_path)
+        assert "KATRA_ANTHROPIC_API_KEY_FILE" not in outcome.env
 
     def test_a_second_key_save_deletes_the_key_file_of_the_first(self, tmp_path):
         write_settings(tmp_path, hand_written())

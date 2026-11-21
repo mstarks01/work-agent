@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import question_set
-from analysis_service.report import Report
 from evals.harness import audit, early_policies
 from evals.harness.bundle import UnreadableReport
 from evals.harness.early_policies import POLICIES, _answer_within, needs_of, readings
+from katra.answer_sets import AnswerSet
+from katra.answer_state import question_set
+from katra.report import Report
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
 
@@ -94,7 +94,7 @@ def test_a_group_is_one_charge_for_its_rows_and_a_capability_its_own():
     at its widest row's parts, answers every row of the run."""
     from itertools import groupby
 
-    from analysis_service.open_facts import CAPABILITY_GROUP
+    from katra.open_facts import CAPABILITY_GROUP
 
     shown = early_policies._lists(valid_model(), BOTH)[0]
     charges = POLICIES["group-question"](valid_model(), BOTH)
@@ -116,8 +116,8 @@ def test_no_to_the_rest_answers_every_capability_left_in_one_choice(name):
     """``no-to-the-rest`` keeps each capability question at its place: the
     "yes" answers come one at a time, and the first question after them is
     one choice answering every capability question of the list left."""
-    from analysis_service.fact_answers import key_ref
-    from analysis_service.open_facts import CAPABILITY_GROUP
+    from katra.fact_answers import key_ref
+    from katra.open_facts import CAPABILITY_GROUP
 
     shown = early_policies._lists(valid_model(), BOTH)[0]
     capabilities = [q for q in shown if q.group == CAPABILITY_GROUP]

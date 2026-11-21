@@ -35,13 +35,13 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from analysis_service.claims import ATTRIBUTE_GROUNDS
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import runs_from_reports, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.scorer import _match_in_lane, score_case
+from katra.claims import ATTRIBUTE_GROUNDS
 
 RUNS = Path(__file__).parent / "runs"
 #: The control attributes of a model element that proxy B reads.

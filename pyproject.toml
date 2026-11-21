@@ -3,7 +3,7 @@ requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "analysis-service"
+name = "katra"
 version = "0.1.0"
 description = "Agentic security-analysis service: many frameworks, one system model"
 requires-python = ">=3.11"
@@ -75,7 +75,7 @@ dependencies = [
 # It has no range of its own: each `boto3` release requires one `botocore`
 # version range.
 aws = ["boto3>=1.43.1,<2.0", "botocore"]
-bedrock = ["analysis-service[aws]"]
+bedrock = ["katra[aws]"]
 # The `gcs` object store (ADR 0103). It stays out of `BUILD_DISTRIBUTIONS`
 # for the reason that `boto3` does: it stores bytes and never changes what a
 # node answers. The store imports `google-api-core` and `google-auth` by name,
@@ -103,12 +103,12 @@ dev = [
     # vendor whose client library were absent would be the one vendor that
     # suite could not cover. One place states the version range. The extra
     # also brings the `aws` extra, which the `s3` object store needs.
-    "analysis-service[bedrock]",
+    "katra[bedrock]",
     # The `sql` extra, named for the same reason: the job store contract suite
     # runs on every backend, so CI installs the `sql` store's libraries.
-    "analysis-service[sql]",
+    "katra[sql]",
     # The `gcs` extra, named for the same reason.
-    "analysis-service[gcs]",
+    "katra[gcs]",
     "httpx>=0.27",
     # The `s3` object store's contract suite runs on an S3 API that moto
     # serves in the test process, so no test reaches a network.
@@ -121,18 +121,18 @@ dev = [
 ]
 # The lite first-run web app's server (#32). A dependency-group, not an extra
 # and not a wheel dependency: `webapp/main.py` is a standalone driver script
-# outside `src/analysis_service`, same as `examples/`, so no `pip install` path
+# outside `src/katra`, same as `examples/`, so no `pip install` path
 # names it — there is no console script and no `[web]` extra. That is
 # independent of what the wheel bundles for the *engine* (see force-include
 # below): the app itself simply isn't packaged. Groups never enter the built
 # distribution either, so the integrator at route step 5 inherits none of
-# this — their dependency surface stays whatever `src/analysis_service` needs.
+# this — their dependency surface stays whatever `src/katra` needs.
 # The app's default store is `sql` on SQLite (ADR 0111), so the group carries
 # the `sql` extra and `uv run` installs it with the app. The extra stays the
 # one statement of its ranges.
 web = [
     "uvicorn>=0.30",
-    "analysis-service[sql]",
+    "katra[sql]",
 ]
 # Browser tests of the first-run app's pages (#1289): the web group's server,
 # and headless Chromium driven through Playwright. A group of its own, so a
@@ -161,26 +161,26 @@ override-dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-# `src/analysis_service/py.typed` rides along inside the package, which is what
+# `src/katra/py.typed` rides along inside the package, which is what
 # makes the annotations visible to an integrator's own checker -- without the
 # marker, PEP 561 says to treat an installed package as untyped however
 # thoroughly it is annotated.
-packages = ["src/analysis_service"]
+packages = ["src/katra"]
 
 [tool.hatch.build.targets.wheel.force-include]
 # The other half of what a run needs, alongside the engine code `packages`
 # already covers. Bundled under the package namespace rather than left at the
-# wheel root so `pip install analysis-service` (or `analysis-service[web]`, which
+# wheel root so `pip install katra` (or `katra[web]`, which
 # is still meaningless per the comment above) resolves everything from one
 # installed location with no additional fetch. The source of truth stays these
 # top-level directories -- editing a prompt or a config default still means
 # editing the file here, not something under `_bundled/`, which only exists in
 # a built wheel. See deployment.py's DEFAULT_* resolution for the read side.
-"prompts" = "analysis_service/_bundled/prompts"
-"domains" = "analysis_service/_bundled/domains"
-"frameworks" = "analysis_service/_bundled/frameworks"
-"config" = "analysis_service/_bundled/config"
-"diagram_reader" = "analysis_service/_bundled/diagram_reader"
+"prompts" = "katra/_bundled/prompts"
+"domains" = "katra/_bundled/domains"
+"frameworks" = "katra/_bundled/frameworks"
+"config" = "katra/_bundled/config"
+"diagram_reader" = "katra/_bundled/diagram_reader"
 
 [tool.ruff]
 # Stated rather than inferred from `requires-python`, so raising the floor to
@@ -211,8 +211,8 @@ files = ["src", "tests", "evals", "examples", "webapp", ".github/scripts"]
 # `.gitignore`; `tests/source_tree.py` skips them for the lints that walk the
 # tree; this is the third reader of the same rule (#942).
 exclude = ["^evals/runs/"]
-# `src` on the path, so `src/analysis_service/api.py` is the module
-# `analysis_service.api` and not also `src.analysis_service.api`. The CI
+# `src` on the path, so `src/katra/api.py` is the module
+# `katra.api` and not also `src.katra.api`. The CI
 # scripts' directory is on the path too, so a test names a script's type by
 # the script's module name. With the layouts
 # outside it -- `evals/` and `examples/` have no `__init__.py` -- that needs

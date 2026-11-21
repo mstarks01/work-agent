@@ -14,12 +14,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.system_model import (
-    SystemModel,
-    flow_label,
-    make_flow_id,
-    normalize_element_ids,
-)
 from evals.harness import modes
 from evals.harness.alignment import (
     FLOW_DISCRIMINATORS,
@@ -31,6 +25,12 @@ from evals.harness.alignment import (
 from evals.harness.extraction_losses import attribute_handoff
 from evals.harness.reference import ElementAlias, load_case, load_corpus
 from evals.harness.stability import load_runs
+from katra.system_model import (
+    SystemModel,
+    flow_label,
+    make_flow_id,
+    normalize_element_ids,
+)
 from tests.test_evals_extraction_losses import write_report_model
 from tests.test_evals_provenance import provenance, sampling  # noqa: F401
 from tests.test_evals_stability import score as score_block

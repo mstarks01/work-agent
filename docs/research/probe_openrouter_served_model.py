@@ -9,7 +9,7 @@ that answered, or the slug the request named. The answer decides whether the
 ``"requested_echo"``.
 
 It is a claim about a third party, so only a live call settles it. Run this
-from the repository root with a key in ``ANALYSIS_OPENROUTER_API_KEY``::
+from the repository root with a key in ``KATRA_OPENROUTER_API_KEY``::
 
     uv run python docs/research/probe_openrouter_served_model.py
 
@@ -45,7 +45,7 @@ from typing import Any
 
 import httpx
 
-from analysis_service.vendors import CredentialMode, ProviderAuthError, vendor_for
+from katra.vendors import CredentialMode, ProviderAuthError, vendor_for
 
 #: The base litellm's pinned ``main.py`` falls back to for this provider. It is
 #: a literal there rather than a constant, so it is repeated rather than read.

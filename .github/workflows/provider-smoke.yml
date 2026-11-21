@@ -12,7 +12,7 @@
 #
 # NOT AN EVAL, and the separation is load-bearing. `evals-live.yml` and
 # `evals-live-api-key.yml` sweep the twelve-case golden corpus for *quality* and
-# cost real money per run. This runs `python -m analysis_service.smoke`: one
+# cost real money per run. This runs `python -m katra.smoke`: one
 # ~600-character system, once, through the shipped graph -- roughly eight model
 # calls on a tiny input. Nothing here scores a threat model, and no lane fails
 # because one vendor's threats are weaker than another's. #116 lists that
@@ -37,7 +37,7 @@
 # runs untrusted code while holding credentials. Plain `pull_request` reaches
 # the same place by a longer road. It skips forks, but it does not skip a
 # collaborator, and a collaborator who can push a branch and open a pull request
-# can edit `src/analysis_service/**` -- which this job imports -- or edit this
+# can edit `src/katra/**` -- which this job imports -- or edit this
 # file, and have the edit execute while the job holds an OIDC identity or a
 # provider key. Repository-scoped federation cannot tell that code from main's.
 #
@@ -66,7 +66,7 @@ on:
       - "frameworks/**"
       - "domains/**"
       - "config/**"
-      - "src/analysis_service/**"
+      - "src/katra/**"
       - ".github/workflows/provider-smoke.yml"
   workflow_dispatch:
 
@@ -96,30 +96,30 @@ jobs:
     permissions:
       contents: read
       # The OIDC token exchanged for short-lived Vertex credentials. This job
-      # references no `secrets.ANALYSIS_*_API_KEY` and must not start to: see the
+      # references no `secrets.KATRA_*_API_KEY` and must not start to: see the
       # header for why the identity and the bearer keys stay in separate jobs.
       id-token: write
 
     # Pinned here rather than read from config/model_tiers.toml, which selects
     # no vendor at all -- so a live lane has to name one. The pair is the same
-    # one `analysis_service.conformance.REFERENCE_MODELS` profiles, and
+    # one `katra.conformance.REFERENCE_MODELS` profiles, and
     # tests/test_conformance.py fails if this file drifts from it: a lane
     # sweeping an unprofiled pair is how a vendor ends up "covered" by a job
     # nobody has checked the capabilities of.
     env:
-      ANALYSIS_MODEL_BASE_VENDOR: vertex
-      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash
-      ANALYSIS_MODEL_STRONG_VENDOR: vertex
-      ANALYSIS_MODEL_STRONG_MODEL: gemini-2.5-pro
+      KATRA_MODEL_BASE_VENDOR: vertex
+      KATRA_MODEL_BASE_MODEL: gemini-2.5-flash
+      KATRA_MODEL_STRONG_VENDOR: vertex
+      KATRA_MODEL_STRONG_MODEL: gemini-2.5-pro
       # `review` selects the same pair as `strong`. Every tier must name one or
       # the config refuses to load, and the shipped node map binds nothing to
       # this tier -- so no adapter is built for it and it costs no credential.
       # The shipped `review_independence = "shared"` is what makes a repeated
       # pair legal here.
-      ANALYSIS_MODEL_REVIEW_VENDOR: vertex
-      ANALYSIS_MODEL_REVIEW_MODEL: gemini-2.5-pro
-      ANALYSIS_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      ANALYSIS_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+      KATRA_MODEL_REVIEW_VENDOR: vertex
+      KATRA_MODEL_REVIEW_MODEL: gemini-2.5-pro
+      KATRA_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      KATRA_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
 
     steps:
       # Third-party actions are pinned by commit SHA, not tag: a moved tag runs
@@ -213,7 +213,7 @@ jobs:
           {
             echo "## Provider smoke: vertex"
             echo
-            uv run python -m analysis_service.smoke --out smoke-vertex.json
+            uv run python -m katra.smoke --out smoke-vertex.json
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the smoke record
@@ -259,12 +259,12 @@ jobs:
           # needs, space separated. Anthropic, OpenAI and Gemini address
           # nothing beyond their key, so theirs is empty.
           - vendor: anthropic
-            secret_name: ANALYSIS_ANTHROPIC_API_KEY
+            secret_name: KATRA_ANTHROPIC_API_KEY
             base_model: claude-sonnet-5
             strong_model: claude-opus-5-5
             addressing: ""
           - vendor: openai
-            secret_name: ANALYSIS_OPENAI_API_KEY
+            secret_name: KATRA_OPENAI_API_KEY
             base_model: gpt-4o-2024-08-06
             strong_model: gpt-5.6-sol
             addressing: ""
@@ -275,16 +275,16 @@ jobs:
           # than a gap to hide: the offline suite proves the mode fails closed
           # naming its own variable, and nothing proves AWS serves it.
           - vendor: bedrock
-            secret_name: ANALYSIS_BEDROCK_API_KEY
+            secret_name: KATRA_BEDROCK_API_KEY
             base_model: global.anthropic.claude-sonnet-4-6
             strong_model: global.anthropic.claude-opus-5-5
-            addressing: ANALYSIS_BEDROCK_REGION
+            addressing: KATRA_BEDROCK_REGION
           # The same models the vertex job above pins, behind an API key. Two
           # legs for one set of weights is the point: the vertex job holds an
           # identity and this leg holds a key, and the smoke asks whether
           # each route serves the graph, not whether the weights do.
           - vendor: gemini
-            secret_name: ANALYSIS_GEMINI_API_KEY
+            secret_name: KATRA_GEMINI_API_KEY
             base_model: gemini-2.5-flash
             strong_model: gemini-2.5-pro
             addressing: ""
@@ -294,32 +294,32 @@ jobs:
           # for, so the offline matrix profiles the gateway rather than falling
           # through to the direct route's entry.
           - vendor: openrouter
-            secret_name: ANALYSIS_OPENROUTER_API_KEY
+            secret_name: KATRA_OPENROUTER_API_KEY
             base_model: anthropic/claude-sonnet-5
             strong_model: anthropic/claude-opus-5.5
             addressing: ""
 
     env:
-      ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
-      ANALYSIS_MODEL_BASE_MODEL: ${{ matrix.base_model }}
-      ANALYSIS_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
-      ANALYSIS_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
+      KATRA_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
+      KATRA_MODEL_BASE_MODEL: ${{ matrix.base_model }}
+      KATRA_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
+      KATRA_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
       # `review` selects the same pair as `strong`. Every tier must name one or
       # the config refuses to load, and the shipped node map binds nothing to
       # this tier -- so no adapter is built for it and it costs no credential.
       # The shipped `review_independence = "shared"` is what makes a repeated
       # pair legal here.
-      ANALYSIS_MODEL_REVIEW_VENDOR: ${{ matrix.vendor }}
-      ANALYSIS_MODEL_REVIEW_MODEL: ${{ matrix.strong_model }}
+      KATRA_MODEL_REVIEW_VENDOR: ${{ matrix.vendor }}
+      KATRA_MODEL_REVIEW_MODEL: ${{ matrix.strong_model }}
       # Bedrock allows two credential modes, so a deployment that selects it
       # declares one. Set for every leg because a declaration for a vendor no
       # tier selects is legal and reads as nothing; a per-leg value would be a
       # second place for this to drift from the matrix above.
-      ANALYSIS_MODEL_CREDENTIALS_BEDROCK: api_key
+      KATRA_MODEL_CREDENTIALS_BEDROCK: api_key
       # The region Bedrock addresses. Required under both of its modes and a
       # credential under neither, so it is a repository variable rather than a
       # secret. The other legs never read it.
-      ANALYSIS_BEDROCK_REGION: ${{ vars.AWS_REGION }}
+      KATRA_BEDROCK_REGION: ${{ vars.AWS_REGION }}
 
     steps:
       - name: Check out
@@ -407,7 +407,7 @@ jobs:
               echo '```'
               echo
               echo "The name is vendor-scoped on purpose: the registry reads only"
-              echo "its own ANALYSIS_-prefixed variables, so a plain"
+              echo "its own KATRA_-prefixed variables, so a plain"
               echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
             else
               echo "Set the missing repository variable(s) in this repository's"
@@ -441,7 +441,7 @@ jobs:
           {
             echo "## Provider smoke: ${VENDOR}"
             echo
-            uv run python -m analysis_service.smoke --out "smoke-${VENDOR}.json"
+            uv run python -m katra.smoke --out "smoke-${VENDOR}.json"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the smoke record

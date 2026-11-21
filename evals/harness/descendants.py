@@ -36,22 +36,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from analysis_service.claims import FrameworkName, ProposalBatch
-from analysis_service.fan_in import fan_in
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.stride.record import (
-    DraftThreat,
-)
-from analysis_service.graph import (
-    STATE_SOURCE_TEXTS,
-    STATE_VALID_MODEL,
-    FrameworkNodes,
-    GraphKeys,
-    held_assertions,
-    seeded_source_texts,
-)
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.bundle import finished_file, read_report, stride_threats
 from evals.harness.fan_in_accounting import replay_fan_in
@@ -65,6 +49,22 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.scorer import score_case
+from katra.claims import FrameworkName, ProposalBatch
+from katra.fan_in import fan_in
+from katra.frameworks import PACKAGES
+from katra.frameworks.stride.record import (
+    DraftThreat,
+)
+from katra.graph import (
+    STATE_SOURCE_TEXTS,
+    STATE_VALID_MODEL,
+    FrameworkNodes,
+    GraphKeys,
+    held_assertions,
+    seeded_source_texts,
+)
+from katra.report import Report
+from katra.system_model import SystemModel
 
 FRAMEWORK: FrameworkName = "stride"
 

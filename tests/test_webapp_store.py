@@ -1,7 +1,7 @@
 """The first-run app's job store: its settings, its startup and its bound (#1676).
 
 The app reads the service's backend settings, and ``memory`` where
-``ANALYSIS_JOB_STORE`` is unset. It runs the service's startup over its store
+``KATRA_JOB_STORE`` is unset. It runs the service's startup over its store
 before it takes a request. A second app over the same ``sql`` store serves
 what the first one kept.
 """
@@ -22,14 +22,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
-from analysis_service import migrations
-from analysis_service.answer_sets import NO_SENT_ANSWERS
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
-from analysis_service.sources import Source
-from analysis_service.sql_store import RevisionNotHeld
-from analysis_service.store_backends import build_store
-from analysis_service.store_settings import StoreConfigError
+from katra import migrations
+from katra.answer_sets import NO_SENT_ANSWERS
+from katra.fact_answers import FactAnswer
+from katra.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
+from katra.sources import Source
+from katra.sql_store import RevisionNotHeld
+from katra.store_backends import build_store
+from katra.store_settings import StoreConfigError
 from tests import test_webapp
 from tests.factories import SEEDING_BUDGET, sample_selection, valid_model
 from tests.sql_stores import database_of, filesystem_env, sql_env, sqlite_url
@@ -51,11 +51,11 @@ tiers = test_webapp.tiers
 #: The settings a test may set, cleared first so the developer's shell decides
 #: nothing.
 STORE_SETTINGS = (
-    "ANALYSIS_JOB_STORE",
-    "ANALYSIS_OBJECT_STORE",
-    "ANALYSIS_DATABASE_URL",
-    "ANALYSIS_OBJECT_ROOT",
-    "ANALYSIS_RETENTION_DAYS",
+    "KATRA_JOB_STORE",
+    "KATRA_OBJECT_STORE",
+    "KATRA_DATABASE_URL",
+    "KATRA_OBJECT_ROOT",
+    "KATRA_RETENTION_DAYS",
 )
 
 
@@ -169,7 +169,7 @@ class TestTheDefaultStore:
 
 class TestTheSettings:
     def test_with_the_memory_store_a_restart_loses_every_run(self, tiers, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_JOB_STORE", "memory")
+        monkeypatch.setenv("KATRA_JOB_STORE", "memory")
         with app(tiers) as client:
             run_to_completion(client)
         with app(tiers) as client:
@@ -194,17 +194,17 @@ class TestTheSettings:
     @pytest.mark.parametrize(
         ("setting", "value", "message"),
         [
-            ("ANALYSIS_JOB_STORE", "redis", "unknown value for"),
-            ("ANALYSIS_JOB_STORE", "", "set ANALYSIS_JOB_STORE"),
+            ("KATRA_JOB_STORE", "redis", "unknown value for"),
+            ("KATRA_JOB_STORE", "", "set KATRA_JOB_STORE"),
             (
-                "ANALYSIS_OBJECT_STORE",
+                "KATRA_OBJECT_STORE",
                 "filesystem",
-                "memory job store takes no ANALYSIS_OBJECT_STORE",
+                "memory job store takes no KATRA_OBJECT_STORE",
             ),
             (
-                "ANALYSIS_DATABASE_URL",
+                "KATRA_DATABASE_URL",
                 "sqlite+aiosqlite:///srv/jobs.db",
-                "memory job store takes no ANALYSIS_DATABASE_URL",
+                "memory job store takes no KATRA_DATABASE_URL",
             ),
         ],
     )
@@ -218,15 +218,15 @@ class TestTheSettings:
     def test_a_retention_value_that_is_not_a_period_stops_the_startup(
         self, tiers, monkeypatch
     ):
-        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "0")
+        monkeypatch.setenv("KATRA_RETENTION_DAYS", "0")
         with (
-            pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
+            pytest.raises(StoreConfigError, match="KATRA_RETENTION_DAYS"),
             app(tiers),
         ):
             pass
 
     def test_the_retention_sweep_starts_with_the_app(self, tiers, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "30")
+        monkeypatch.setenv("KATRA_RETENTION_DAYS", "30")
         store = InMemoryJobStore()
         expired = completed_days_ago(store, 31)
         kept = completed_days_ago(store, 29)
@@ -253,8 +253,8 @@ def first_run(tmp_path: Path, monkeypatch) -> Path:
     directory.mkdir(mode=0o700)
     database = directory / "jobs.db"
     env = {
-        "ANALYSIS_JOB_STORE": "sql",
-        "ANALYSIS_DATABASE_URL": sqlite_url(database),
+        "KATRA_JOB_STORE": "sql",
+        "KATRA_DATABASE_URL": sqlite_url(database),
         **filesystem_env(tmp_path),
     }
     for name, value in env.items():
@@ -276,7 +276,7 @@ class TestTheFirstRunMigration:
         if exists:
             first_run.touch(mode=0o600)
         with (
-            caplog.at_level(logging.INFO, logger="analysis_service.sql_store"),
+            caplog.at_level(logging.INFO, logger="katra.sql_store"),
             app(tiers) as client,
         ):
             run_to_completion(client)
@@ -288,7 +288,7 @@ class TestTheFirstRunMigration:
 
     def test_a_file_at_the_latest_revision_stays_as_it_is(self, tiers, durable, caplog):
         with (
-            caplog.at_level(logging.INFO, logger="analysis_service.sql_store"),
+            caplog.at_level(logging.INFO, logger="katra.sql_store"),
             app(tiers),
         ):
             pass
@@ -498,7 +498,7 @@ class TestARecordOfAnotherSchemaVersion:
                 " WHERE id = ?",
                 (hashlib.sha256(sources).hexdigest(), run),
             )
-        root = Path(durable["ANALYSIS_OBJECT_ROOT"])
+        root = Path(durable["KATRA_OBJECT_ROOT"])
         (root / owner_id / run / "sources.json").write_bytes(sources)
         assert_listed_and_refused(tiers, run)
 
@@ -663,9 +663,7 @@ class TestTheBound:
         )
         with client:
             oldest = run_to_completion(client)
-            with caplog.at_level(
-                logging.INFO, logger="analysis_service.store_backends"
-            ):
+            with caplog.at_level(logging.INFO, logger="katra.store_backends"):
                 run_to_completion(client)
         [line] = caplog.messages
         assert re.fullmatch(

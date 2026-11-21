@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import UnknownRef
+from katra.claims import UnknownRef
 from tests.source_tree import MODEL_TEXT, REPO_ROOT, source_files
 
 pytestmark = pytest.mark.lint

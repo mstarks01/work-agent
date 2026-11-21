@@ -16,10 +16,10 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.ladder import OUTPUT_TOOL_NAME
-from analysis_service.model_gate import _litellm
-from analysis_service.provider import (
+from katra.binding import build_tier_adapters
+from katra.ladder import OUTPUT_TOOL_NAME
+from katra.model_gate import _litellm
+from katra.provider import (
     ANSWER_UNWRAPPED_METADATA_KEY,
     PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_PATH_METADATA_KEY,
@@ -28,9 +28,9 @@ from analysis_service.provider import (
     schema_as_tool,
     schema_in_prompt,
 )
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
-from analysis_service.vendors import vendor_for
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
+from katra.vendors import vendor_for
 from tests.factories import rungs_of, tiers_for
 from tests.test_schema_rules import (
     BEDROCK_SONNET_4_6,
@@ -44,7 +44,7 @@ from tests.test_schema_rules import (
 pytestmark = pytest.mark.usefixtures("supplied_transport")
 
 #: The strong tier on the tool path, as a deployment would set it.
-TOOL_TIER = {"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": "tool"}
+TOOL_TIER = {"KATRA_SAMPLING_STRONG_STRUCTURED_OUTPUT": "tool"}
 
 ANSWER: dict[str, Any] = {"claims": []}
 
@@ -271,6 +271,6 @@ def test_every_rung_has_a_path_and_translator_arguments():
     """A rung added to the vocabulary must answer in both tables."""
     from typing import get_args
 
-    from analysis_service.ladder import PATH_OF_RUNG, RUNG_KWARGS, Rung
+    from katra.ladder import PATH_OF_RUNG, RUNG_KWARGS, Rung
 
     assert set(PATH_OF_RUNG) == set(get_args(Rung)) == set(RUNG_KWARGS)

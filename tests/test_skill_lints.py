@@ -8,7 +8,7 @@ rather than a framework and every carried framework's lanes may earn it. That
 split is ADR 0011's rule — a document's home follows its retrieval key — and
 these lints are where it is enforced against the tree rather than argued about.
 
-The package gate (:func:`~analysis_service.frameworks.validate_package`) already
+The package gate (:func:`~katra.frameworks.validate_package`) already
 refuses a package whose lanes are missing files or whose ``## Scope`` headings
 do not match. What is here is what the gate does not reach: the token caps, the
 full heading set, and the shared root's own contract.
@@ -18,16 +18,16 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.domains import DETECTORS
-from analysis_service.frameworks import LANE_SECTION_HEADINGS, PACKAGES
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.skills import (
+from katra.domains import DETECTORS
+from katra.frameworks import LANE_SECTION_HEADINGS, PACKAGES
+from katra.markdown_loader import MarkdownLoader
+from katra.skills import (
     estimate_tokens,
     lane_boundary_digest,
     lane_skill_doc,
     split_sections,
 )
-from analysis_service.token_caps import TOKEN_CAPS, covered_assets
+from katra.token_caps import TOKEN_CAPS, covered_assets
 from tests.source_tree import MODEL_TEXT, held_files
 
 pytestmark = pytest.mark.lint
@@ -66,7 +66,7 @@ domain_packs = sorted(domain_loader.names())
 def test_lane_skill_has_exact_fixed_headings_in_order(framework, lane):
     """Duplicate of the package gate's own check, and kept deliberately.
 
-    :func:`~analysis_service.frameworks.validate_package` refuses a package whose
+    :func:`~katra.frameworks.validate_package` refuses a package whose
     lane headings do not match, so this cannot fail alone. What it gives is that
     the failure names the lane at collection time rather than at deployment
     construction, which is where a maintainer editing a skill is looking.

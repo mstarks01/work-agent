@@ -57,13 +57,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
 
-from analysis_service.frameworks.stride.record import (
-    STRIDE_CATEGORIES,
-    AttackerPosition,
-    DraftThreat,
-    StrideCategory,
-)
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, RepoCommit, ScoredAgainst
 from evals.harness.assembly import AssemblySweep
 from evals.harness.audit import Phase, phase_of
@@ -75,6 +68,13 @@ from evals.harness.rates import Rate
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import none_stated
 from evals.harness.triggers import case_trigger_recall
+from katra.frameworks.stride.record import (
+    STRIDE_CATEGORIES,
+    AttackerPosition,
+    DraftThreat,
+    StrideCategory,
+)
+from katra.system_model import SystemModel
 
 Compatibility = Literal["compatible", "uncaptured", "re-keyed", "position-unstated"]
 

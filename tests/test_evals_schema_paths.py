@@ -12,12 +12,12 @@ from dataclasses import replace
 
 from google.adk.agents import LlmAgent
 
-from analysis_service import graph
-from analysis_service.ladder import SchemaRefusal
-from analysis_service.provider import ExecutedLlm, GenerationRequest
-from analysis_service.report import Report
 from evals.harness.run import COMMANDS
 from evals.harness.schema_paths import NO_SCHEMA, schema_paths, sweep
+from katra import graph
+from katra.ladder import SchemaRefusal
+from katra.provider import ExecutedLlm, GenerationRequest
+from katra.report import Report
 from tests.factories import PROJECT_ROOT, STRONG_MODEL, scripted_pipeline
 from tests.test_execution import drive, happy_replies
 from tests.test_schema_reask import _policy, _Replies

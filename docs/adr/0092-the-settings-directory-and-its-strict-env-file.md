@@ -16,10 +16,10 @@ release, so its location, its contents and its format are recorded here.
 
 ## Decision
 
-**The directory.** The default is `$XDG_CONFIG_HOME/work-agent/`. When
+**The directory.** The default is `$XDG_CONFIG_HOME/katra/`. When
 `XDG_CONFIG_HOME` is unset or is not an absolute path, the default is
-`~/.config/work-agent/`. `ANALYSIS_SETTINGS_DIR` replaces the default. The
-app reads `ANALYSIS_SETTINGS_DIR` only from the process environment, because
+`~/.config/katra/`. `KATRA_SETTINGS_DIR` replaces the default. The
+app reads `KATRA_SETTINGS_DIR` only from the process environment, because
 `settings.env` cannot name its own location.
 
 **The contents.** The directory is flat and has mode `0700`. Each file has
@@ -27,22 +27,22 @@ mode `0600`:
 
 - `settings.env`;
 - one secret file for each secret variable that `secret_vars()` names. The
-  file name is the variable without `ANALYSIS_` and `_FILE`, in lower case,
+  file name is the variable without `KATRA_` and `_FILE`, in lower case,
   then a dot and 16 random hexadecimal characters from the `secrets` module:
-  `ANALYSIS_ANTHROPIC_API_KEY_FILE` names a file such as
+  `KATRA_ANTHROPIC_API_KEY_FILE` names a file such as
   `anthropic_api_key.3f9c0a1b2d4e5f60`. Each save of a key writes a new file.
   The name holds no part of the key. The secret is the content of the file
   without one final newline, and the rule of no whitespace at either end
   applies after that newline is removed, because an editor ends a file with
   a newline.
 
-**No TOML file.** The page writes each changed value as its `ANALYSIS_*`
-override in `settings.env`, for example `ANALYSIS_MODEL_BASE_MODEL` or
-`ANALYSIS_TIMEOUT_MS`. The shipped TOML files stay the base, and the directory
+**No TOML file.** The page writes each changed value as its `KATRA_*`
+override in `settings.env`, for example `KATRA_MODEL_BASE_MODEL` or
+`KATRA_TIMEOUT_MS`. The shipped TOML files stay the base, and the directory
 holds no copy of them. Each loader stays the only reader of its setting.
 
 **One new override.** `frameworks.toml` has one value that the page changes
-and that has no override: `carried`. `ANALYSIS_FRAMEWORKS_CARRIED` is that
+and that has no override: `carried`. `KATRA_FRAMEWORKS_CARRIED` is that
 override. Its value is a list of framework names separated by commas, with no
 spaces, for example `asvs,stride`. Each name must be in `FrameworkName`. The
 framework loader refuses a duplicate name and an empty list. The variable
@@ -50,7 +50,7 @@ replaces the `carried` list of the file and does not add to it. The framework
 loader is the only reader of the variable.
 
 **The format of `settings.env`.** Each line is `KEY=value`, or a blank line.
-`KEY` matches `ANALYSIS_[A-Z0-9_]+`. The value is all of the text after the
+`KEY` matches `KATRA_[A-Z0-9_]+`. The value is all of the text after the
 first `=`, with no change. The format has no quotes, no `export`, no `$`
 expansion and no comments. One function in `config_files.py` reads the file.
 It refuses any other line and gives the line number. It also refuses a key

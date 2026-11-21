@@ -14,8 +14,8 @@ import subprocess
 
 import pytest
 
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FactAnswer
+from katra.claims import UnknownRef
+from katra.fact_answers import FactAnswer
 from tests.factories import (
     asking_threat,
     report_state,
@@ -230,7 +230,7 @@ def test_each_finding_is_a_row_with_its_next_action():
 def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
     """Two confirmed findings that cite one stated-absent control name one
     shared action, and each finding stays its own row."""
-    from analysis_service.claims import Ground
+    from katra.claims import Ground
     from tests import factories
 
     model = valid_model()
@@ -266,7 +266,7 @@ def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
 
 def test_conditional_and_dismissed_findings_each_keep_their_own_row():
     """Each record stays individually reachable in its closed section (#1884)."""
-    from analysis_service.claims import Verdict
+    from katra.claims import Verdict
 
     rejected = sample_threat(
         "I-01",
@@ -337,9 +337,9 @@ def test_a_corrected_finding_is_marked_on_its_card():
 
 def test_an_owner_s_answer_is_marked_as_unchecked():
     """A quote of the owner's answer read like the description (#1289, PR 4)."""
-    from analysis_service.claims import Ground
-    from analysis_service.fact_answers import fact_line
-    from analysis_service.sources import ANSWERS_LABEL
+    from katra.claims import Ground
+    from katra.fact_answers import fact_line
+    from katra.sources import ANSWERS_LABEL
     from tests.factories import sample_threat
 
     answer = FactAnswer(key=ASKED.key, value="TLS 1.3")
@@ -362,10 +362,10 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
 def test_a_quote_no_check_read_is_marked_as_unchecked(checked):
     """A block whose fan-in checked no quote shows its quotes apart (#2314).
 
-    The page and :func:`~analysis_service.claims.quote_check_ran` read the
+    The page and :func:`~katra.claims.quote_check_ran` read the
     field's three shapes alike.
     """
-    from analysis_service.claims import quote_check_ran
+    from katra.claims import quote_check_ran
     from tests.factories import sample_threat
 
     unchecked = not quote_check_ran(checked)
@@ -384,9 +384,9 @@ def test_a_quote_no_check_read_is_marked_as_unchecked(checked):
 
 
 def test_an_owner_s_answer_keeps_its_label_in_an_unchecked_block():
-    from analysis_service.claims import Ground
-    from analysis_service.fact_answers import fact_line
-    from analysis_service.sources import ANSWERS_LABEL
+    from katra.claims import Ground
+    from katra.fact_answers import fact_line
+    from katra.sources import ANSWERS_LABEL
     from tests.factories import sample_threat
 
     answer = FactAnswer(key=ASKED.key, value="TLS 1.3")
@@ -414,7 +414,7 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
     from types import SimpleNamespace
     from typing import get_args
 
-    from analysis_service.claims import RejectionStep, RuledClaim
+    from katra.claims import RejectionStep, RuledClaim
     from tests.test_webapp import viewer_javascript
     from webapp.page_words import UNIT_RULING_WORDS
 
@@ -457,7 +457,7 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
 def test_the_page_names_the_attribute_ground_kinds_the_claims_name():
     """The page lists the attribute ground kinds again where it draws a
     ground, so its list is held to ``ATTRIBUTE_GROUNDS``."""
-    from analysis_service.claims import ATTRIBUTE_GROUNDS
+    from katra.claims import ATTRIBUTE_GROUNDS
     from tests.test_webapp import viewer_javascript
 
     branch = re.search(
@@ -508,7 +508,7 @@ def test_a_description_names_an_evidence_reference_by_its_label():
     The reference reads as the element and the attribute in words, and a
     crossing as the flow that crosses; the reference stays on hover.
     """
-    from analysis_service.evidence import (
+    from katra.evidence import (
         crossing_evidence_ref,
         evidence_catalog,
         unknown_evidence_ref,
@@ -642,7 +642,7 @@ def test_the_page_reads_each_lane_from_the_service_s_table():
     A lane read from guessed field names counts every finding of a framework
     it does not know as one lane in the follow-up's scope line.
     """
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
 
     (lanes,) = re.findall(r'id="lanes"[^>]*>(.*?)</script>', page(), re.DOTALL)
 
@@ -659,7 +659,7 @@ def test_every_ground_kind_renders_its_label_and_its_reference():
     """
     from typing import get_args
 
-    from analysis_service.claims import Ground, GroundKind
+    from katra.claims import Ground, GroundKind
 
     fields = {
         "quote": {"text": "a quote", "source_label": "description"},
@@ -712,7 +712,7 @@ def test_the_glyph_table_answers_for_each_verdict_status():
     lacks renders as ``undefined`` beside its label."""
     from typing import get_args
 
-    from analysis_service.claims import VerdictStatus
+    from katra.claims import VerdictStatus
 
     assert _page_table_keys("VERDICT_GLYPH") == set(get_args(VerdictStatus))
 
@@ -731,7 +731,7 @@ def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
     it."""
     from typing import get_args
 
-    from analysis_service import claims
+    from katra import claims
 
     assert set(getattr(claims, table)) == set(get_args(getattr(claims, vocabulary)))
 
@@ -746,7 +746,7 @@ def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
 def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
     """The page labels a verdict with the words the server sends, which the
     Markdown export reads too."""
-    from analysis_service import claims
+    from katra import claims
     from tests.test_webapp import _island, viewer_javascript
 
     assert _island(page(), island) == json.loads(
@@ -761,7 +761,7 @@ def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
 def test_the_page_reads_the_service_s_element_type_nouns():
     """The report page names an element type with the words the server
     sends."""
-    from analysis_service.system_model import ELEMENT_TYPE_NOUNS
+    from katra.system_model import ELEMENT_TYPE_NOUNS
     from tests.test_webapp import _island, viewer_javascript
 
     assert _island(page(), "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
@@ -773,7 +773,7 @@ def test_the_page_reads_the_service_s_element_type_nouns():
 
 def test_the_page_script_holds_no_verdict_labels():
     """The page holds no copy of the verdict words the server sends it."""
-    from analysis_service import claims
+    from katra import claims
     from tests.test_webapp import viewer_javascript
 
     script = viewer_javascript()
@@ -791,7 +791,7 @@ def test_the_page_reads_the_service_s_severity_order():
     The page holds no order of its own, so a level the service adds lands in
     the summary and the finding rows. ``SEVERITY_LABELS`` labels each level.
     """
-    from analysis_service.critic import SEVERITY_ORDER
+    from katra.critic import SEVERITY_ORDER
     from tests.test_webapp import _island, viewer_javascript
 
     assert _island(page(), "severity_order") == list(SEVERITY_ORDER)
@@ -815,7 +815,7 @@ def test_about_lists_the_model_s_gaps_with_their_questions():
 def test_a_count_of_one_reads_in_the_singular():
     """Every count on the page is worded by ``counted`` (#1878): the summary's
     confirmed and dismissed findings, and the scope's units and their needs."""
-    from analysis_service.claims import ScopeEntry, Verdict
+    from katra.claims import ScopeEntry, Verdict
 
     parts = run_report_page(page())
     assert (
@@ -868,7 +868,7 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
     """The export lists what the Questions section draws: a link answer the
     report read, worded as the page words it, and the note under an answer
     corrected after a final report."""
-    from analysis_service.links import LinkAnswer
+    from katra.links import LinkAnswer
 
     report = sample_report([asking_threat(ASKED)])
     follow_up = render_report(
@@ -946,7 +946,7 @@ def test_about_puts_the_model_first_with_a_table_per_kind():
 def test_the_pipeline_shows_each_fingerprint_once_with_its_steps():
     """The model steps form a table in seconds, a fingerprint the steps share
     shows once, and the code steps share one line."""
-    from analysis_service.report import NodeRun
+    from katra.report import NodeRun
 
     fingerprint = "f" * 64
     report = sample_report()

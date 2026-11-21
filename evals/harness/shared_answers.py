@@ -7,7 +7,7 @@ over the corpus, how often the elements of such a box have different true values
 
 **The truth is the case's blessed model.** Each attribute the early list can
 ask of an element (a field the prior rates for its type, read from
-:data:`~analysis_service.early_questions.QUESTION_PRIOR`) that the blessed
+:data:`~katra.early_questions.QUESTION_PRIOR`) that the blessed
 model states is made unknown, so the list asks it, and its blessed value is
 the true answer. A question kind writes nothing onto the model and no blessed
 model states one, so a box of question kinds has no truth and is counted
@@ -39,14 +39,14 @@ from itertools import groupby
 from pathlib import Path
 from typing import Any
 
-from analysis_service.analysis import control_state
-from analysis_service.claims import FrameworkName
-from analysis_service.early_questions import QUESTION_PRIOR, EarlyQuestion
-from analysis_service.fact_answers import attribute_place, key_ref
-from analysis_service.frameworks import PACKAGES
-from analysis_service.system_model import SystemModel
 from evals.harness.early_rounds import paused_state
 from evals.harness.run_record import run_record
+from katra.analysis import control_state
+from katra.claims import FrameworkName
+from katra.early_questions import QUESTION_PRIOR, EarlyQuestion
+from katra.fact_answers import attribute_place, key_ref
+from katra.frameworks import PACKAGES
+from katra.system_model import SystemModel
 
 #: The options each framework is read with, keyed by framework. ASVS sets no
 #: default level, so the instrument names one.

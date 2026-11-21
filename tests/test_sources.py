@@ -16,11 +16,11 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.mermaid import model_mermaid
-from analysis_service.prompts import compose_extract_prompt, compose_repair_prompt
-from analysis_service.sources import (
+from katra.compact import COMPACT_FORMAT, FULL_FORMAT
+from katra.markdown_loader import MarkdownLoader
+from katra.mermaid import model_mermaid
+from katra.prompts import compose_extract_prompt, compose_repair_prompt
+from katra.sources import (
     _REGISTERS,
     DEFAULT_DESCRIPTION_LABEL,
     DEFAULT_TRANSCRIPT_LABEL,

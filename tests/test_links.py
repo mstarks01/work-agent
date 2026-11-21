@@ -2,7 +2,7 @@
 
 A fact about a principal reaches a graph element only through a stated
 ``represented-by`` row. These tests hold the four halves of
-:mod:`analysis_service.links` together: the question a report asks, the Source
+:mod:`katra.links` together: the question a report asks, the Source
 an answer becomes, the row the answer writes, and the gate that checks the
 row's quote against that Source. The last class drives the rule the link
 exists to feed, so a link that writes a row nothing can read fails here.
@@ -16,8 +16,8 @@ from types import MappingProxyType
 import pytest
 from pydantic import ValidationError
 
-from analysis_service import graph
-from analysis_service.assertions import (
+from katra import graph
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
@@ -25,11 +25,11 @@ from analysis_service.assertions import (
     Subject,
     answer,
 )
-from analysis_service.candidates import generate_candidates
-from analysis_service.engine import EngineInputError
-from analysis_service.fact_answers import STORED, FactAnswer, fact_line
-from analysis_service.frameworks import PACKAGES
-from analysis_service.links import (
+from katra.candidates import generate_candidates
+from katra.engine import EngineInputError
+from katra.fact_answers import STORED, FactAnswer, fact_line
+from katra.frameworks import PACKAGES
+from katra.links import (
     ANSWERS_LABEL,
     NONE_OF_THESE,
     LinkAnswer,
@@ -38,8 +38,8 @@ from analysis_service.links import (
     link_questions,
     with_link_answers,
 )
-from analysis_service.sources import Source, quotable
-from analysis_service.system_model import make_element_id
+from katra.sources import Source, quotable
+from katra.system_model import make_element_id
 from tests.factories import valid_model
 from tests.test_api import auth, make_client, submission
 from tests.test_graph import KEYS, FakeContext
@@ -356,8 +356,8 @@ def catalog_client():
     """The route's test client on an app that builds an assertion catalog."""
     from fastapi.testclient import TestClient
 
-    from analysis_service.api import create_app
-    from analysis_service.jobs import InMemoryJobStore
+    from katra.api import create_app
+    from katra.jobs import InMemoryJobStore
     from tests import test_api
 
     store = InMemoryJobStore()
@@ -425,7 +425,7 @@ class TestTheEntryPoints:
         assert response.status_code == 422, response.text
 
     def test_the_engine_refuses_a_caller_s_answers_source(self):
-        from analysis_service.engine import Engine
+        from katra.engine import Engine
 
         forged = Source(kind="answers", label=ANSWERS_LABEL, text="x")
         with pytest.raises(EngineInputError, match="composed by this service"):
@@ -442,7 +442,7 @@ class TestTheQuestionsRoute:
     """The API serves what the page shows, under the report's own rule."""
 
     def completed(self, store, subject, assertions):
-        from analysis_service.jobs import JobRecord
+        from katra.jobs import JobRecord
         from tests.factories import sample_report, sample_selection
         from tests.test_api import admit
 

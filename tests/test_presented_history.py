@@ -14,10 +14,10 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
-from analysis_service.answer_state import question_set
-from analysis_service.early_questions import early_questions
-from analysis_service.fact_answers import FactAnswer
+from katra.answer_sets import NO_ANSWERS, AnswerSet
+from katra.answer_state import question_set
+from katra.early_questions import early_questions
+from katra.fact_answers import FactAnswer
 from tests.factories import valid_model
 from tests.test_pause_summary import _save
 from tests.test_webapp_questions import _run_form_script, _text_row
@@ -158,8 +158,8 @@ class TestTheServiceDecidesWhatWasPresented:
 def test_a_resumed_job_carries_the_skips_its_report_reads():
     """The report tells a skip from a blank only where the resumed job keeps
     the pause's skips beside what it presented."""
-    from analysis_service.answer_state import Answers, AnswerState, ResumedJob
-    from analysis_service.jobs import Checkpoint
+    from katra.answer_state import Answers, AnswerState, ResumedJob
+    from katra.jobs import Checkpoint
 
     skip = _paused().early[0].key
     state = AnswerState(

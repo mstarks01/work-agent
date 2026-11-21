@@ -12,15 +12,15 @@ from typing import get_args
 
 import pytest
 
-from analysis_service import critic
-from analysis_service.claims import (
+from katra import critic
+from katra.claims import (
     AnalysisMarks,
     ProposedVerdict,
     UnknownRef,
     UnverifiedGround,
 )
-from analysis_service.critic import CriticOutputError
-from analysis_service.critic_round import (
+from katra.critic import CriticOutputError
+from katra.critic_round import (
     REVIEW_ARTIFACTS,
     Accepted,
     CriticRound,
@@ -31,15 +31,15 @@ from analysis_service.critic_round import (
     critic_request,
     rulings_of,
 )
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.graph import (
+from katra.frameworks import PACKAGES, schemas_for
+from katra.graph import (
     FRAMEWORK_RENDERED_ARTIFACTS,
     STATE_BOUNDARY_CROSSINGS,
     STATE_INPUT_TEXT,
     STATE_SYSTEM_MODEL,
     FrameworkNodes,
 )
-from analysis_service.markdown_loader import MarkdownLoader
+from katra.markdown_loader import MarkdownLoader
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.test_graph import PROJECT_ROOT
 

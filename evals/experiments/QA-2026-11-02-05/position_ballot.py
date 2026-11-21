@@ -26,10 +26,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.frameworks.stride.record import AttackerPosition
 from evals.harness.artifact import CORPUS_DIR
 from evals.harness.near_misses import read_rows
 from evals.harness.reference import RULINGS_FILE, ReferenceThreat, load_case
+from katra.frameworks.stride.record import AttackerPosition
 
 HERE = Path(__file__).parent
 ISSUED = HERE / "position-ballot-issued.csv"

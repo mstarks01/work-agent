@@ -1,6 +1,6 @@
 """Measure whether a reported charge reaches this service's record (#822).
 
-`analysis_service.charges` reads a provider's own statement of what it charged
+`katra.charges` reads a provider's own statement of what it charged
 out of litellm's ``_hidden_params``, carries it across the ADK boundary and
 stamps it on the response the executor reads. Every step of that is offline and
 tested. What no test can settle is the first step: whether OpenRouter states a
@@ -8,7 +8,7 @@ charge at all, and whether litellm files it where this code looks — two claims
 about a third party and a pinned dependency.
 
 So this drives the service's own adapter against the live API. Run it from the
-repository root with a key in ``ANALYSIS_OPENROUTER_API_KEY``::
+repository root with a key in ``KATRA_OPENROUTER_API_KEY``::
 
     uv run python docs/research/probe_openrouter_reported_charge.py
 
@@ -53,17 +53,17 @@ import httpx
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.charges import (
+from katra.binding import build_tier_adapters
+from katra.charges import (
     CHARGE_METADATA_KEY,
     UPSTREAM_METADATA_KEY,
     reported_charge_of,
     served_upstream_of,
     stated_arrangement_of,
 )
-from analysis_service.model_tiers import load_model_tiers
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
+from katra.model_tiers import load_model_tiers
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
 
 #: Many providers front this one, and it is among the cheapest OpenRouter
 #: carries. The figure under test is whether a charge is *reported*, not what it
@@ -82,25 +82,25 @@ def _deployment():
     from the registry and the declared arrangement.
     """
     env = {
-        "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
-        "ANALYSIS_MODEL_BASE_MODEL": SLUG,
-        "ANALYSIS_MODEL_STRONG_VENDOR": "openrouter",
-        "ANALYSIS_MODEL_STRONG_MODEL": SLUG,
-        "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+        "KATRA_MODEL_BASE_VENDOR": "openrouter",
+        "KATRA_MODEL_BASE_MODEL": SLUG,
+        "KATRA_MODEL_STRONG_VENDOR": "openrouter",
+        "KATRA_MODEL_STRONG_MODEL": SLUG,
+        "KATRA_MODEL_CHARGES_OPENROUTER": "direct",
     }
     tiers = load_model_tiers(os.path.join(CONFIG, "model_tiers.toml"), env=env)
     return build_tier_adapters(
         tiers,
         load_sampling(os.path.join(CONFIG, "sampling.toml"), env={}),
         load_resilience(os.path.join(CONFIG, "resilience.toml"), env={}),
-        env={"ANALYSIS_OPENROUTER_API_KEY": os.environ["ANALYSIS_OPENROUTER_API_KEY"]},
+        env={"KATRA_OPENROUTER_API_KEY": os.environ["KATRA_OPENROUTER_API_KEY"]},
     )
 
 
 def _request() -> LlmRequest:
     """The smallest completion this service will accept.
 
-    Not one token: ``analysis_service.retry`` refuses a completion that stopped
+    Not one token: ``katra.retry`` refuses a completion that stopped
     at ``max_output_tokens``, because a fragment is not an answer. So the cap
     has to leave room for the model to stop on its own, and the prompt asks for
     a reply that fits.
@@ -144,8 +144,8 @@ class _Recording:
 
 
 def main() -> int:
-    if not os.environ.get("ANALYSIS_OPENROUTER_API_KEY", "").strip():
-        print("set ANALYSIS_OPENROUTER_API_KEY to run this probe", file=sys.stderr)
+    if not os.environ.get("KATRA_OPENROUTER_API_KEY", "").strip():
+        print("set KATRA_OPENROUTER_API_KEY to run this probe", file=sys.stderr)
         return 2
 
     adapters = _deployment()
@@ -196,7 +196,7 @@ def _generation(generation_id: str) -> Any:
     It lands a few seconds after the completion, so this waits and retries
     rather than reporting an absence that is only a delay.
     """
-    key = os.environ["ANALYSIS_OPENROUTER_API_KEY"]
+    key = os.environ["KATRA_OPENROUTER_API_KEY"]
     for _ in range(6):
         response = httpx.get(
             f"{API_BASE}/generation",
