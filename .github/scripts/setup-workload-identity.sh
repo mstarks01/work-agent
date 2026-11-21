@@ -19,7 +19,7 @@
 #   .github/scripts/setup-workload-identity.sh \
 #       --project-id  <PROJECT_ID> \
 #       --location    us-central1 \
-#       [--repo        mstarks01/work-agent] \
+#       [--repo        mstarks01/katra] \
 #       [--trusted-ref refs/heads/main] \
 #       [--dry-run]
 #
@@ -31,7 +31,7 @@ set -euo pipefail
 
 POOL_ID="github"
 PROVIDER_ID="github-actions"
-SA_ID="analysis-evals"
+SA_ID="katra-evals"
 
 # The ref a credential-bearing workflow must be defined on to federate. See the
 # attribute condition below for why this is a ref and not a branch name.
@@ -95,6 +95,13 @@ if [[ -z "$REPO" ]]; then
 fi
 [[ "$REPO" == */* ]] || die "--repo must be <OWNER>/<REPO>, got: $REPO"
 
+# The trust names the repository by its numeric ID, which a rename or a
+# transfer does not change. A full name can name another repository over
+# time: a rename frees it, and its owner can create a new repository with it.
+REPO_ID="$(gh api "repos/${REPO}" --jq .id)" \
+  || die "cannot read the id of '$REPO' -- check the name and your access"
+[[ "$REPO_ID" =~ ^[0-9]+$ ]] || die "the id of '$REPO' is not a number: $REPO_ID"
+
 # Derived rather than asked for: the project number is the field most often
 # transcribed wrong, and getting it wrong yields a provider that authenticates
 # nothing with no obvious cause.
@@ -104,13 +111,13 @@ PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(project
 SA_EMAIL="${SA_ID}@${PROJECT_ID}.iam.gserviceaccount.com"
 POOL_PATH="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}"
 PROVIDER_PATH="${POOL_PATH}/providers/${PROVIDER_ID}"
-PRINCIPAL_SET="principalSet://iam.googleapis.com/${POOL_PATH}/attribute.repository/${REPO}"
+PRINCIPAL_SET="principalSet://iam.googleapis.com/${POOL_PATH}/attribute.repository_id/${REPO_ID}"
 
 cat <<EOF
 
   project      ${PROJECT_ID} (${PROJECT_NUMBER})
   location     ${LOCATION}
-  repository   ${REPO}
+  repository   ${REPO} (id ${REPO_ID})
   pool         ${POOL_ID}
   provider     ${PROVIDER_ID}
   service acct ${SA_EMAIL}
@@ -150,7 +157,8 @@ fi
 #
 # IT NAMES TWO THINGS, AND THE REPOSITORY IS ONLY THE FIRST. `repository_owner`
 # alone still admits every repo under the account, including one an attacker
-# gets a workflow merged into -- so the repository is named. But the repository
+# gets a workflow merged into -- so the repository is named, by the
+# `repository_id` claim: the number that a rename does not change. But the repository
 # alone is not enough (#508): a collaborator who pushes a branch and opens a
 # pull request produces a token whose `repository` claim is identical to
 # main's. Repository scoping cannot
@@ -181,16 +189,20 @@ fi
 # --trusted-ref exists so a repository whose default branch is not `main` can
 # say so. It is a full git ref, not a branch name, because that is what the
 # claim carries.
-ATTRIBUTE_CONDITION="assertion.repository == '${REPO}' && assertion.ref == '${TRUSTED_REF}' && assertion.job_workflow_ref.endsWith('@${TRUSTED_REF}')"
+ATTRIBUTE_CONDITION="assertion.repository_id == '${REPO_ID}' && assertion.ref == '${TRUSTED_REF}' && assertion.job_workflow_ref.endsWith('@${TRUSTED_REF}')"
+
+# `attribute.repository_id` is what the service account binding names below.
+ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner=assertion.repository_owner"
 
 note "OIDC provider: ${PROVIDER_ID}"
 if gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
      --project="$PROJECT_ID" --location=global \
      --workload-identity-pool="$POOL_ID" >/dev/null 2>&1; then
-  echo "  already exists -- updating the attribute condition to match --repo"
+  echo "  already exists -- updating the attribute mapping and condition to match --repo"
   run gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
     --project="$PROJECT_ID" --location=global \
     --workload-identity-pool="$POOL_ID" \
+    --attribute-mapping="$ATTRIBUTE_MAPPING" \
     --attribute-condition="$ATTRIBUTE_CONDITION"
 else
   run gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
@@ -198,7 +210,7 @@ else
     --workload-identity-pool="$POOL_ID" \
     --display-name="GitHub Actions OIDC" \
     --issuer-uri="https://token.actions.githubusercontent.com" \
-    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
+    --attribute-mapping="$ATTRIBUTE_MAPPING" \
     --attribute-condition="$ATTRIBUTE_CONDITION"
 fi
 

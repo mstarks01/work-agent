@@ -427,6 +427,35 @@ def test_the_federation_pins_the_ref_claim_and_not_only_a_suffix():
     )
 
 
+def _setup_assignment(name: str) -> str:
+    """The line of the setup script that assigns ``name``."""
+    return next(
+        line
+        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
+        if line.startswith(f"{name}=")
+    )
+
+
+def test_the_federation_names_the_repository_by_its_id():
+    """A rename keeps the ID, and a name can come back to another repository
+    (ADR 0131). The condition, the mapping and the binding all name the ID."""
+    assert "assertion.repository_id == '${REPO_ID}'" in _setup_assignment(
+        "ATTRIBUTE_CONDITION"
+    )
+    assert "assertion.repository ==" not in _setup_assignment("ATTRIBUTE_CONDITION")
+    assert "attribute.repository_id=assertion.repository_id" in _setup_assignment(
+        "ATTRIBUTE_MAPPING"
+    )
+    assert _setup_assignment("PRINCIPAL_SET").endswith(
+        'attribute.repository_id/${REPO_ID}"'
+    )
+    script = SETUP_SCRIPT.read_text(encoding="utf-8")
+    assert script.count('--attribute-mapping="$ATTRIBUTE_MAPPING"') == 2, (
+        "a re-run must update the mapping, or the binding names an attribute"
+        " that an earlier provider never maps"
+    )
+
+
 def test_a_branch_name_cannot_satisfy_the_federation_condition():
     """The exploit input, asked of the shipped condition rather than of a memo.
 

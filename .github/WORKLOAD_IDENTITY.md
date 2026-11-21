@@ -90,8 +90,9 @@ nothing.
 ## 0. The repository
 
 The repository already exists at
-[`mstarks01/work-agent`](https://github.com/mstarks01/work-agent) and `origin`
-points at it; everything below pins to that full name. If you are standing this
+[`mstarks01/katra`](https://github.com/mstarks01/katra) and `origin`
+points at it; everything below pins to its numeric ID, which the script reads
+from that full name. If you are standing this
 setup up somewhere else, create the repository first:
 
 ```sh
@@ -108,7 +109,8 @@ prohibited here (see the header of `evals-live.yml` for why).
 |---|---|---|
 | `<PROJECT_ID>` | the GCP project billing the evals | `--project-id` |
 | `<LOCATION>` | Vertex region, e.g. `us-central1` | `--location` |
-| `<OWNER>/<REPO>` | the GitHub repository full name, e.g. `mstarks01/work-agent` | `--repo`, else `origin` |
+| `<OWNER>/<REPO>` | the GitHub repository full name, e.g. `mstarks01/katra` | `--repo`, else `origin` |
+| `<REPO_ID>` | the numeric ID of that repository | derived from `<OWNER>/<REPO>` |
 | `<PROJECT_NUMBER>` | numeric id of that project | derived from `<PROJECT_ID>` |
 
 ## 2. Run the setup
@@ -136,7 +138,7 @@ issuer `https://token.actions.githubusercontent.com`, carrying this attribute
 condition:
 
 ```
-assertion.repository == '<OWNER>/<REPO>' && assertion.job_workflow_ref.endsWith('@refs/heads/main')
+assertion.repository_id == '<REPO_ID>' && assertion.ref == 'refs/heads/main' && assertion.job_workflow_ref.endsWith('@refs/heads/main')
 ```
 
 That condition is **load-bearing and not optional**. Without it the provider
@@ -145,24 +147,32 @@ could then exchange its token for these credentials. The condition must name
 the repository, not just the owner: `repository_owner` alone still admits every
 repo under the account, including one an attacker gets a workflow merged into.
 
+**It names the repository by its ID, not by its name** (ADR 0131). A rename or
+a transfer keeps the ID, so the trust stays valid. A full name can name another
+repository over time: a rename frees it, its owner can create a new repository
+with it, and a condition on the name would trust that repository. The service account
+binding names the same ID, through the `attribute.repository_id` mapping.
+
 **The repository claim alone is not enough.** A collaborator's pull-request branch produces a token whose
 `repository` claim is identical to `main`'s, so repository scoping federates
 reviewed and unreviewed code alike. `job_workflow_ref` is the claim that tells
 them apart: it names the ref of the *workflow definition* GitHub is running —
-`<OWNER>/<REPO>/.github/workflows/<file>@<REF>` — so pinning its suffix admits
-only workflow files already on the trusted ref. It covers a reusable workflow
+`<OWNER>/<REPO>/.github/workflows/<file>@<REF>` — so it admits only workflow
+files already on the trusted ref. The condition compares the `ref` claim
+exactly, because a branch named `pwn@refs/heads/main` satisfies the suffix
+check on its own. It covers a reusable workflow
 called from elsewhere for the same reason, because the claim names the file
 that is executing.
 
 Pass `--trusted-ref` to name a different ref. It is a full git ref rather than a
 branch name, because that is what the claim carries.
 
-Re-running with a different `--repo` or `--trusted-ref` replaces the condition,
-so only the new values are trusted.
+Re-running with a different `--repo` or `--trusted-ref` replaces the mapping
+and the condition, so only the new values are trusted.
 
 ### What this rejects
 
-| Token from | `repository` | `job_workflow_ref` | Admitted |
+| Token from | `repository_id` | `job_workflow_ref` | Admitted |
 | --- | --- | --- | --- |
 | `push` to `main` | matches | `…@refs/heads/main` | yes |
 | `workflow_dispatch` on `main` | matches | `…@refs/heads/main` | yes |
@@ -172,7 +182,7 @@ so only the new values are trusted.
 
 ## 4. What it creates: a separate eval service account
 
-`analysis-evals@<PROJECT_ID>.iam.gserviceaccount.com`, holding
+`katra-evals@<PROJECT_ID>.iam.gserviceaccount.com`, holding
 `roles/aiplatform.user` and nothing else, impersonable only by this
 repository's federated principals via `roles/iam.workloadIdentityUser`.
 
@@ -192,7 +202,7 @@ been useful.
 | Variable | Value |
 |---|---|
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github/providers/github-actions` |
-| `GCP_EVAL_SERVICE_ACCOUNT` | `analysis-evals@<PROJECT_ID>.iam.gserviceaccount.com` |
+| `GCP_EVAL_SERVICE_ACCOUNT` | `katra-evals@<PROJECT_ID>.iam.gserviceaccount.com` |
 | `GCP_PROJECT_ID` | `<PROJECT_ID>` |
 | `GCP_LOCATION` | `<LOCATION>` |
 
